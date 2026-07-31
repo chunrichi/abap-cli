@@ -8,7 +8,7 @@ import { readAbapFile } from '../formats/abap-source.js';
  * Deploy bundled ABAP source files from abap/src/ to a SAP system.
  */
 export async function deployBundledSources(transport?: string, targetPackage?: string): Promise<void> {
-  const adt = new AdtClientWrapper();
+  const adt = await AdtClientWrapper.create();
   const bundledDir = path.resolve(__dirname, '../../../abap/src');
 
   let files: string[];

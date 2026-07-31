@@ -12,15 +12,21 @@
     "dev": "tsc --watch",
     "start": "node dist/abap_cli/index.js"
   },
-  "keywords": ["abap", "sap", "cli", "agent", "vibe-coding"],
+  "keywords": [
+    "abap",
+    "sap",
+    "cli",
+    "agent",
+    "vibe-coding"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
     "abap-adt-api": "^1.0.0",
     "axios": "^1.7.0",
     "commander": "^12.0.0",
-    "dotenv": "^16.4.0",
-    "fast-xml-parser": "^4.4.0"
+    "fast-xml-parser": "^4.4.0",
+    "keytar": "^7.9.0"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

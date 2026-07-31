@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as dotenv from 'dotenv';
+import { getPassword } from '../crypto/secrets.js';
+import { getSystem } from './user-config.js';
 
 export interface SapConfig {
   url: string;
@@ -19,42 +20,50 @@ export interface ProjectConfig {
 let cachedConfig: ProjectConfig | null = null;
 
 /**
- * Load project configuration from .abap.json + environment variables.
- * Environment variables take precedence over .abap.json values.
+ * Load project configuration from .abap.json (system reference) + user-level system profile + OS keychain.
  */
-export function loadConfig(): ProjectConfig {
+export async function loadConfig(): Promise<ProjectConfig> {
   if (cachedConfig) return cachedConfig;
 
-  // Load .env if present
-  dotenv.config();
-
-  // Load .abap.json if present
-  let fileConfig: Partial<ProjectConfig> = {};
-  const configPath = findConfigFile();
-  if (configPath) {
+  // Load .abap.json — workspace references a user-level system profile
+  let workspace: { system?: string; transport?: string; package?: string } = {};
+  const configPath = path.resolve(process.cwd(), '.abap.json');
+  if (fs.existsSync(configPath)) {
     try {
-      const raw = fs.readFileSync(configPath, 'utf-8');
-      fileConfig = JSON.parse(raw);
+      workspace = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
     } catch {
       // ignore parse errors
     }
   }
 
+  const systemName = workspace.system || '';
+  const profile = systemName ? getSystem(systemName) : null;
+  if (!profile) {
+    throw new Error(
+      systemName
+        ? `System profile '${systemName}' not found. Run 'abap init' to configure it.`
+        : 'Missing "system" in .abap.json. Run \'abap init\' to set up.',
+    );
+  }
+
+  // Password from OS keychain, keyed by system name
+  const password = (await getPassword(systemName)) || process.env.SAP_PASSWORD || '';
+
   const sap: SapConfig = {
-    url: envOrFile('SAP_URL', fileConfig.sap?.url),
-    client: envOrFile('SAP_CLIENT', fileConfig.sap?.client) || '100',
-    username: envOrFile('SAP_USER', fileConfig.sap?.username),
-    password: envOrFile('SAP_PASSWORD', fileConfig.sap?.password) || '',
-    language: envOrFile('SAP_LANGUAGE', fileConfig.sap?.language) || 'EN',
+    url: profile.url,
+    client: profile.client || '100',
+    username: profile.username,
+    password,
+    language: profile.language || 'EN',
   };
 
-  const transport = envOrFile('SAP_TRANSPORT', fileConfig.transport) || '';
-  const pkg = envOrFile('SAP_PACKAGE', fileConfig.package) || '';
+  const transport = workspace.transport || '';
+  const pkg = workspace.package || '';
 
   // Validate required fields
   const missing: string[] = [];
-  if (!sap.url) missing.push('SAP_URL (or sap.url in .abap.json)');
-  if (!sap.username) missing.push('SAP_USER (or sap.username in .abap.json)');
+  if (!sap.url) missing.push('url in system profile');
+  if (!sap.username) missing.push('username in system profile');
   if (missing.length > 0) {
     throw new Error(`Missing required configuration: ${missing.join(', ')}. Run 'abap init' to set up.`);
   }
@@ -68,17 +77,4 @@ export function loadConfig(): ProjectConfig {
  */
 export function resetConfig(): void {
   cachedConfig = null;
-}
-
-function envOrFile(envKey: string, fileValue: string | undefined): string {
-  return process.env[envKey] || fileValue || '';
-}
-
-function findConfigFile(): string | null {
-  const candidates = ['.abap.json'];
-  for (const name of candidates) {
-    const p = path.resolve(process.cwd(), name);
-    if (fs.existsSync(p)) return p;
-  }
-  return null;
 }

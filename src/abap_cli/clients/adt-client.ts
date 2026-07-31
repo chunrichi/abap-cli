@@ -9,8 +9,8 @@ export class AdtClientWrapper {
   private client: ADTClient;
   private config: ProjectConfig;
 
-  constructor() {
-    this.config = loadConfig();
+  private constructor(config: ProjectConfig) {
+    this.config = config;
     this.client = new ADTClient(
       this.config.sap.url,
       this.config.sap.username,
@@ -19,6 +19,11 @@ export class AdtClientWrapper {
       this.config.sap.language,
     );
     this.client.stateful = session_types.stateful;
+  }
+
+  static async create(): Promise<AdtClientWrapper> {
+    const config = await loadConfig();
+    return new AdtClientWrapper(config);
   }
 
   get raw(): ADTClient {

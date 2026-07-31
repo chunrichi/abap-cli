@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import * as https from 'https';
-import { loadConfig } from '../config/project-config.js';
+import { loadConfig, type ProjectConfig } from '../config/project-config.js';
 
 export interface IcfResponse<T = unknown> {
   status: 'success' | 'error';
@@ -16,8 +16,7 @@ export class IcfClient {
   private http: AxiosInstance;
   private baseUrl: string;
 
-  constructor() {
-    const config = loadConfig();
+  private constructor(config: ProjectConfig) {
     this.baseUrl = `${config.sap.url}/sap/zabap_vibe`;
     this.http = axios.create({
       baseURL: this.baseUrl,
@@ -35,6 +34,11 @@ export class IcfClient {
       }),
       timeout: 30000,
     });
+  }
+
+  static async create(): Promise<IcfClient> {
+    const config = await loadConfig();
+    return new IcfClient(config);
   }
 
   async get<T>(path: string): Promise<IcfResponse<T>> {
