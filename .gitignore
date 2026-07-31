@@ -1,0 +1,86 @@
+# .github/agents/speckit.analyze.agent.md
+# .github/agents/speckit.checklist.agent.md
+# .github/agents/speckit.clarify.agent.md
+# .github/agents/speckit.constitution.agent.md
+# .github/agents/speckit.converge.agent.md
+# .github/agents/speckit.implement.agent.md
+# .github/agents/speckit.plan.agent.md
+# .github/agents/speckit.specify.agent.md
+# .github/agents/speckit.tasks.agent.md
+# .github/agents/speckit.taskstoissues.agent.md
+# .github/prompts/speckit.analyze.prompt.md
+# .github/prompts/speckit.checklist.prompt.md
+# .github/prompts/speckit.clarify.prompt.md
+# .github/prompts/speckit.constitution.prompt.md
+# .github/prompts/speckit.converge.prompt.md
+# .github/prompts/speckit.implement.prompt.md
+# .github/prompts/speckit.plan.prompt.md
+# .github/prompts/speckit.specify.prompt.md
+# .github/prompts/speckit.tasks.prompt.md
+# .github/prompts/speckit.taskstoissues.prompt.md
+# .specify/init-options.json
+# .specify/integration.json
+# .specify/integrations/copilot.manifest.json
+# .specify/integrations/speckit.manifest.json
+# .specify/memory/.constitution-template.json
+# .specify/scripts/bash/check-prerequisites.sh
+# .specify/scripts/bash/common.sh
+# .specify/scripts/bash/create-new-feature.sh
+# .specify/scripts/bash/setup-plan.sh
+# .specify/scripts/bash/setup-tasks.sh
+# .specify/templates/checklist-template.md
+# .specify/templates/constitution-template.md
+# .specify/templates/plan-template.md
+# .specify/templates/spec-template.md
+# .specify/templates/tasks-template.md
+# .specify/workflows/workflow-registry.json
+# .specify/workflows/speckit/workflow.yml
+# .vscode/settings.json
+.gitignore
+
+
+# .specify/memory/constitution.md
+
+.specify/feature.json
+
+specs/001-project-structure/data-model.md
+specs/001-project-structure/plan.md
+specs/001-project-structure/quickstart.md
+specs/001-project-structure/research.md
+specs/001-project-structure/spec.md
+specs/001-project-structure/tasks.md
+specs/001-project-structure/checklists/requirements.md
+specs/001-project-structure/contracts/cli-commands.md
+specs/001-project-structure/contracts/icf-api.md
+
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment & config
+.env
+.env.local
+.abap.json
+
+# Source maps
+*.js.map
+
+# Coverage
+coverage/
+.nyc_output/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# Temp
+*.tmp
+*.log
