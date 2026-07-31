@@ -1,0 +1,29 @@
+{
+  "name": "abap-cli",
+  "version": "0.1.0",
+  "description": "CLI tool for ABAP vibe coding — agent-driven ABAP development in any agent",
+  "type": "module",
+  "main": "dist/src/abap_cli/index.js",
+  "bin": {
+    "abap": "dist/src/abap_cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/abap_cli/index.js"
+  },
+  "keywords": ["abap", "sap", "cli", "agent", "vibe-coding"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "abap-adt-api": "^1.0.0",
+    "axios": "^1.7.0",
+    "commander": "^12.0.0",
+    "dotenv": "^16.4.0",
+    "fast-xml-parser": "^4.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.0"
+  }
+}
