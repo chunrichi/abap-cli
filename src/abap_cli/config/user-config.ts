@@ -61,3 +61,15 @@ export function getSystem(name: string): SystemProfile | null {
 export function listSystemNames(): string[] {
   return Object.keys(loadUserConfig().systems).sort();
 }
+
+/**
+ * Delete a system profile by name.
+ * Returns true if it existed and was removed, false if it did not exist.
+ */
+export function deleteSystem(name: string): boolean {
+  const config = loadUserConfig();
+  if (!(name in config.systems)) return false;
+  delete config.systems[name];
+  saveUserConfig(config);
+  return true;
+}

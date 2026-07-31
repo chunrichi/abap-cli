@@ -11,6 +11,7 @@ import { registerAtcCommand } from './commands/atc.js';
 import { registerStatusCommand } from './commands/status.js';
 import { registerTransportCommand } from './commands/transport.js';
 import { registerDeployCommand } from './commands/deploy.js';
+import { registerSystemCommand } from './commands/system.js';
 
 const program = new Command();
 
@@ -31,5 +32,6 @@ registerAtcCommand(program);
 registerStatusCommand(program);
 registerTransportCommand(program);
 registerDeployCommand(program);
+registerSystemCommand(program);
 
 program.parse();

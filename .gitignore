@@ -1,7 +1,6 @@
 .specify/feature.json
 
-specs/001-project-structure/
-specs/002-init-wizard/
+specs/
 
 .gitignore
 

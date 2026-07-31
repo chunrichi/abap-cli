@@ -22,6 +22,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@clack/prompts": "^1.7.0",
     "abap-adt-api": "^1.0.0",
     "axios": "^1.7.0",
     "commander": "^12.0.0",

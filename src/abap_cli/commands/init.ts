@@ -1,8 +1,7 @@
 import { Command } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as readline from 'node:readline/promises';
-import { stdin, stdout } from 'node:process';
+import { select, text, password, confirm, isCancel } from '@clack/prompts';
 import { storePassword, getPassword } from '../crypto/secrets.js';
 import {
   getSystem,
@@ -131,11 +130,6 @@ async function createSystemFromParams(opts: Record<string, string>, jsonOutput: 
 
 /** Interactive: select existing system or create a new one */
 async function interactiveInit(opts: Record<string, string>, jsonOutput: boolean): Promise<void> {
-  process.on('SIGINT', () => {
-    console.log('\nAborted. No files were created.');
-    process.exit(130);
-  });
-
   const names = listSystemNames();
 
   let systemName = '';
@@ -153,14 +147,26 @@ async function interactiveInit(opts: Record<string, string>, jsonOutput: boolean
       transport: '',
       pkg: '',
     };
-    const useStored = (await ask('Use stored password? (Y/n): ')).toLowerCase() !== 'n';
-    if (!useStored) {
-      config.password = await askPassword(`Password for ${systemName}: `);
+    const useStored = orCancel(await confirm({ message: 'Use stored password?', initialValue: true }));
+    if (useStored) {
+      config.password = (await getPassword(systemName)) || '';
+      if (!config.password) {
+        console.log(`No stored password for '${systemName}'.`);
+        config.password = orCancel(await password({ message: `Password for ${systemName}` }));
+      }
+    } else {
+      config.password = orCancel(await password({ message: `Password for ${systemName}` }));
     }
     console.log(`Using system profile '${systemName}' (${profile.url}).`);
   } else {
     // Create new system profile
-    systemName = await ask('System name (e.g. dev): ', { required: true });
+    systemName = orCancel(
+      await text({
+        message: 'System name',
+        placeholder: 'e.g. dev',
+        validate: (value) => ((value ?? '').trim() ? undefined : 'System name is required'),
+      }),
+    );
     config = await collectNewSystem(opts);
     await saveProfile(systemName, {
       url: config.url,
@@ -171,8 +177,8 @@ async function interactiveInit(opts: Record<string, string>, jsonOutput: boolean
   }
 
   // Workspace-level fields
-  config.transport = opts.transport || (await ask('Transport request (optional): ')) || '';
-  config.pkg = opts.package || (await ask('Default package (optional): ')) || '';
+  config.transport = opts.transport || (orCancel(await text({ message: 'Transport request (optional)' }))) || '';
+  config.pkg = opts.package || (orCancel(await text({ message: 'Default package (optional)' }))) || '';
 
   validateInputs(config);
   await handleFileOverwrite(true);
@@ -180,39 +186,50 @@ async function interactiveInit(opts: Record<string, string>, jsonOutput: boolean
   if (jsonOutput) outputJson(systemName, config);
 }
 
-/** Show a numbered menu of existing systems, or allow creating a new one */
+/** Select an existing system profile, or signal creating a new one (returns '') */
 async function selectSystem(names: string[]): Promise<string> {
-  console.log('\nExisting system profiles:');
-  names.forEach((name, i) => {
-    const p = getSystem(name)!;
-    console.log(`  ${i + 1}. ${name} — ${p.username}@${p.url}`);
-  });
-  console.log(`  ${names.length + 1}. Create a new system profile`);
-  console.log('');
-
-  const answer = await ask(`Select a system (1-${names.length + 1}): `, { required: true });
-  const idx = Number(answer);
-  if (Number.isInteger(idx) && idx >= 1 && idx <= names.length) {
-    return names[idx - 1];
-  }
-  if (idx === names.length + 1) {
-    return ''; // signal: create new
-  }
-  console.log('Invalid selection. Creating a new system profile instead.');
-  return '';
+  const choice = orCancel(
+    await select({
+      message: 'Select a system profile',
+      options: [
+        ...names.map((name) => {
+          const p = getSystem(name)!;
+          return { value: name, label: name, hint: `${p.username}@${p.url}` };
+        }),
+        { value: '__new__', label: 'Create a new system profile' },
+      ],
+    }),
+  );
+  return choice === '__new__' ? '' : choice;
 }
 
 /** Prompt for a brand-new system profile */
 async function collectNewSystem(opts: Record<string, string>): Promise<CollectedConfig> {
   return {
-    url: opts.url || await ask('SAP URL (e.g. https://sap.example.com): ', { required: true }),
-    client: opts.client || await ask('Client [100]: ', { defaultValue: '100' }),
-    username: opts.username || await ask('Username: ', { required: true }),
-    password: opts.password || await askPassword('Password: '),
-    language: opts.language || await ask('Language [EN]: ', { defaultValue: 'EN' }),
+    url: opts.url || orCancel(await text({
+      message: 'SAP URL',
+      placeholder: 'https://sap.example.com',
+      validate: (value) => ((value ?? '').trim() ? undefined : 'URL is required'),
+    })),
+    client: opts.client || orCancel(await text({ message: 'Client', initialValue: '100' })),
+    username: opts.username || orCancel(await text({
+      message: 'Username',
+      validate: (value) => ((value ?? '').trim() ? undefined : 'Username is required'),
+    })),
+    password: opts.password || orCancel(await password({ message: 'Password' })),
+    language: opts.language || orCancel(await text({ message: 'Language', initialValue: 'EN' })),
     transport: '',
     pkg: '',
   };
+}
+
+/** Exit 130 on Ctrl+C (@clack cancel), otherwise return the value */
+function orCancel<T>(value: T | symbol): T {
+  if (isCancel(value)) {
+    console.log('\nAborted. No files were created.');
+    process.exit(130);
+  }
+  return value as T;
 }
 
 /** Save profile to user config + password to keychain */
@@ -232,81 +249,6 @@ function deriveSystemName(profile: SystemProfile): string {
   }
 }
 
-/**
- * Ask a single question with its own readline interface (closed on completion).
- * A fresh interface per prompt avoids echo conflicts with raw-mode password input.
- */
-async function ask(
-  prompt: string,
-  opts: { defaultValue?: string; required?: boolean } = {},
-): Promise<string> {
-  const rl = readline.createInterface({ input: stdin, output: stdout });
-  try {
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const value = await rl.question(prompt);
-      const trimmed = value.trim();
-      if (trimmed) return trimmed;
-      if (opts.defaultValue !== undefined) return opts.defaultValue;
-      if (opts.required) {
-        console.log('This field is required.');
-        continue;
-      }
-      return '';
-    }
-  } finally {
-    rl.close();
-  }
-}
-
-/** T004: Password input with masking — raw mode, no readline interface active */
-async function askPassword(prompt: string): Promise<string> {
-  if (!process.stdin.isTTY) return '';
-
-  return new Promise<string>((resolve) => {
-    let password = '';
-    process.stdout.write(prompt);
-    process.stdin.setRawMode!(true);
-    process.stdin.resume();
-
-    function onData(chunk: Buffer) {
-      // Process char-by-char: paste/batch input may carry \r in the same chunk
-      for (const char of chunk.toString()) {
-        if (char === '\n' || char === '\r' || char === '\u0004') {
-          // Enter or Ctrl+D — done
-          process.stdin.setRawMode!(false);
-          process.stdin.pause();
-          process.stdin.removeListener('data', onData);
-          process.stdout.write('\n');
-          resolve(password);
-          return;
-        }
-        if (char === '\u0003') {
-          // Ctrl+C — cancel
-          process.stdin.setRawMode!(false);
-          process.stdin.pause();
-          process.stdin.removeListener('data', onData);
-          process.stdout.write('\n');
-          console.log('Aborted. No files were created.');
-          process.exit(130);
-        }
-        if (char === '\u007F' || char === '\b') {
-          // Backspace
-          if (password.length > 0) {
-            password = password.slice(0, -1);
-            process.stdout.write('\b \b');
-          }
-          continue;
-        }
-        password += char;
-        process.stdout.write('*');
-      }
-    }
-
-    process.stdin.on('data', onData);
-  });
-}
-
 /** T008: File overwrite confirmation */
 async function handleFileOverwrite(isInteractive: boolean): Promise<void> {
   const configPath = path.join(process.cwd(), '.abap.json');
@@ -319,11 +261,8 @@ async function handleFileOverwrite(isInteractive: boolean): Promise<void> {
     process.exit(1);
   }
 
-  const rl = readline.createInterface({ input: stdin, output: stdout });
-  const answer = await rl.question('.abap.json already exists. Overwrite? (y/N): ');
-  rl.close();
-
-  if (answer.toLowerCase() !== 'y') {
+  const ok = orCancel(await confirm({ message: '.abap.json already exists. Overwrite?', initialValue: false }));
+  if (!ok) {
     console.log('Aborted. Existing configuration preserved.');
     process.exit(0);
   }
