@@ -1,12 +1,10 @@
 <!-- Sync Impact Report
-  Version change: 0.0.0 → 1.0.0
+  Version change: 1.0.0 → 1.1.0
   Added sections:
-    - Core Principles (6 principles)
-    - Technology Stack
-    - Development Workflow
-    - Quality Gates
-    - Governance
-  Removed sections: none (initial constitution)
+    - Principle VII: Dogfooding 驱动开发
+  Modified sections:
+    - Development Workflow (补充 dogfooding 流程)
+  Removed sections: none
   Follow-up TODOs: none
 -->
 
@@ -37,7 +35,10 @@ SAP 凭证不硬编码、不提交到版本控制。支持项目级配置文件 
 
 ## Technology Stack
 
-- **CLI**: TypeScript + Node.js，通过 npm/npx 分发
+- **CLI**: TypeScript + Node.js，通过 npm/npx 分
+
+### VII. Dogfooding 驱动开发
+SAP 端 ICF ABAP 服务的开发必须使用 CLI 自身完成（pull → edit → push → check 循环）。不允许绕过 CLI 直接在 Eclipse/SAP GUI 中开发 ICF 服务代码。这样确保 CLI 在实际使用中被持续验证和打磨，问题在开发阶段即被发现。发
 - **ADT 客户端**: 复用 `abap-adt-api` npm 包处理源码对象的 CRUD 及开发工具链（语法检查、激活、ATC 等）
 - **DDIC 服务**: SAP 端自建 ICF 服务（RESTful JSON），覆盖 Domain、Data Element、Table、Structure、Table Type 的创建与修改
 - **文件格式**: abap-file-format 规范，源码用纯文本 `.abap`，DDIC 用 `.json`
@@ -46,7 +47,8 @@ SAP 凭证不硬编码、不提交到版本控制。支持项目级配置文件 
 
 - CLI 和 ICF 服务可以独立开发和测试
 - Skill 文档先于实现定义（先写 spec，再写代码）
-- Agent 测试通过实际的 pull → edit → push 端到端工作流验证
+- Agent 测试通过
+- ICF ABAP 服务的开发遵循 Dogfooding 原则：用 CLI 的 pull/push/check 命令完成代码的下载、编辑、上传和验证实际的 pull → edit → push 端到端工作流验证
 
 ## Quality Gates
 
@@ -56,6 +58,6 @@ SAP 凭证不硬编码、不提交到版本控制。支持项目级配置文件 
 
 ## Governance
 
-本 Constitution 是项目的最高设计约束。所有实现决策必须与上述原则一致。修改 Constitution 需要记录变更原因并更新版本号。
+1 Constitution 是项目的最高设计约束。所有实现决策必须与上述原则一致。修改 Constitution 需要记录变更原因并更新版本号。
 
 **Version**: 1.0.0 | **Ratified**: 2026-07-31 | **Last Amended**: 2026-07-31
