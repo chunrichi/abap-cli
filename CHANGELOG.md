@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.0] - 2026-08-02
+
+### Added
+- `abap transport list [--open]` — list current user's transport requests (workbench + customizing) with request number/description/status/owner; `--open` filters to open (unreleased) requests; empty result is success (exit 0)
+- `abap transport create <description> [--package <package>]` — create a new transport request (default `$TMP` local request) via the ADT `createTransport` API; the created request is usable by push/create via `--tr`, closing the "no request → create → `--tr`" loop without SAP GUI
+- Unified `--json` output and error codes (`INVALID_ARGUMENT`/`TRANSPORT_CREATE_FAILED`/`CONFIG_ERROR`/`SAP_ERROR`) consistent with pull/push/check/create
+- `tmp/mock-adt/server.js` transport fixtures (released/customizing) + POST `/sap/bc/adt/cts/transports` create route for offline verification
+
+### Verified
+- Mock end-to-end: list (workbench/customizing buckets, `--open` filter, empty result), create (default `$TMP`, `--package`, blank description `INVALID_ARGUMENT`), closed loop (list → create → push `--tr`), NO_TRANSPORT path, headless `--json` agent loop
+- Real SAP (HANA vhcala4hci): `transport create` created local requests (e.g. `A4HK900116`/`A4HK900118`/`A4HK900120`); local requests don't appear in `list` (workbench modifiable) but work via `--tr`; closed loop verified (create CLAS without `--tr` → `NO_TRANSPORT`, with `--tr` → activated); Dogfooding loop (CLI transport create → pull → edit → push `--tr`, no Eclipse/SAP GUI)
+
 ## [0.3.0] - 2026-08-02
 
 ### Added

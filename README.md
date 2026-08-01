@@ -48,7 +48,8 @@ abap create CLAS ZCL_MY_NEW_CLASS --package $PKG --description "My new class" --
 | `abap system` | Manage system profiles (`list` / `show` / `set` / `delete`) |
 | `abap atc [files...]` | Run ATC checks (stub) |
 | `abap status` | Show local vs SAP differences (stub) |
-| `abap transport list` | List transport requests |
+| `abap transport list` | List transport requests (`--open` for open/released filter) |
+| `abap transport create <description>` | Create a new transport request (`--package`; default `$TMP` local request, usable via `--tr`) |
 | `abap deploy` | Deploy bundled ICF service to SAP |
 
 All commands support `--json` for structured output (Agent-first).
