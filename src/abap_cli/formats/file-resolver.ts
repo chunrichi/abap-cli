@@ -60,10 +60,12 @@ function getOuterExtension(filename: string): string {
 
 /**
  * Build a filename from object metadata.
+ * The ADT object type may carry a subtype suffix (e.g. "PROG/P"); only the
+ * primary type is used for the file extension (bcalv_grid_demo.prog.abap).
  */
 export function buildFilename(objectName: string, objectType: string, subtype?: string, ext = '.abap'): string {
   const name = objectName.toLowerCase();
-  const type = objectType.toLowerCase();
+  const type = objectType.split('/')[0].toLowerCase();
   const sub = subtype && subtype !== 'main' ? `.${subtype}` : '';
   return `${name}.${type}${sub}${ext}`;
 }

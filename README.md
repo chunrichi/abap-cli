@@ -18,16 +18,16 @@ Three-layer architecture:
 # Install globally
 npm install -g abap-cli
 
-# Initialize workspace
+# Initialize workspace (interactive or parameterized)
 abap init --url https://sap:44300 --client 100 --username DEV
 
-# Download an object from SAP
+# Download an object from SAP (classes pull all include parts)
 abap pull ZCL_MY_CLASS
 
-# Edit the local file, then push back
+# Edit the local file, then push back (lock → write → activate → unlock)
 abap push src/zcl_my_class.clas.abap --tr DEVK900001
 
-# Syntax check only
+# Syntax check only (no activation, no SAP-side changes)
 abap check src/zcl_my_class.clas.abap
 ```
 
@@ -35,18 +35,24 @@ abap check src/zcl_my_class.clas.abap
 
 | Command | Description |
 |---------|-------------|
-| `abap init` | Initialize workspace configuration |
-| `abap pull <object>` | Download ABAP object from SAP |
-| `abap push <files...>` | Push local files to SAP (lock → edit → check → activate) |
-| `abap check <files...>` | Syntax check only |
+| `abap init` | Initialize workspace configuration (system profile + `.abap.json`) |
+| `abap pull <object>` | Download a source object to `src/` (all class includes; `--type`, `--dir`; `--package` not yet implemented) |
+| `abap push <files...>` | Push local files: lock → write → activate → unlock (`--tr`, `--check-only`, `--all`) |
+| `abap check <files...>` | Content-based syntax check only, no SAP-side changes (`--all`) |
 | `abap search <query>` | Search ABAP objects |
 | `abap create <type> <name>` | Create a new ABAP object |
-| `abap atc [files...]` | Run ATC checks |
-| `abap status` | Show local vs SAP differences |
+| `abap system` | Manage system profiles (`list` / `show` / `set` / `delete`) |
+| `abap atc [files...]` | Run ATC checks (stub) |
+| `abap status` | Show local vs SAP differences (stub) |
 | `abap transport list` | List transport requests |
 | `abap deploy` | Deploy bundled ICF service to SAP |
 
-All commands support `--json` for structured output.
+All commands support `--json` for structured output (Agent-first).
+
+## Scope (v0.2)
+
+- **Source objects** (Class, Interface, Program, Function Group) are fully supported for pull / push / check via the ADT REST API
+- **DDIC objects** (`.doma.json`, `.tabl.json`, …) are rejected with a clear `DDIC_NOT_SUPPORTED` message — planned for a later phase (self-built ICF service)
 
 ## File Format
 

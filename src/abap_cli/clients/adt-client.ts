@@ -1,5 +1,6 @@
 import { ADTClient, session_types } from 'abap-adt-api';
 import { loadConfig, type ProjectConfig } from '../config/project-config.js';
+import { CliError } from '../output/json.js';
 
 /**
  * Thin wrapper around abap-adt-api ADTClient.
@@ -22,8 +23,13 @@ export class AdtClientWrapper {
   }
 
   static async create(): Promise<AdtClientWrapper> {
-    const config = await loadConfig();
-    return new AdtClientWrapper(config);
+    try {
+      const config = await loadConfig();
+      return new AdtClientWrapper(config);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new CliError('CONFIG_ERROR', message);
+    }
   }
 
   get raw(): ADTClient {
@@ -36,8 +42,8 @@ export class AdtClientWrapper {
 
   // --- Object operations ---
 
-  async searchObject(query: string, maxResults = 100) {
-    return this.client.searchObject(query, undefined, maxResults);
+  async searchObject(query: string, objType?: string, maxResults = 100) {
+    return this.client.searchObject(query, objType, maxResults);
   }
 
   async getObjectSource(objectSourceUrl: string) {
@@ -60,9 +66,16 @@ export class AdtClientWrapper {
 
   // --- Activation ---
 
-  async activate(objectUrl: string) {
-    // activate expects InactiveObject[], wrap the URL
-    return this.client.activate([{ objectUrl } as any]);
+  async activate(objectUrl: string, objectType: string, objectName: string, _mainInclude?: string) {
+    // Always use the array overload. The string overload appends ?context=main
+    // which real SAP rejects for both programs and classes here with
+    // "User X is currently editing Y".
+    return this.client.activate([{
+      'adtcore:uri': objectUrl,
+      'adtcore:type': objectType,
+      'adtcore:name': objectName,
+      'adtcore:parentUri': objectUrl,
+    }]);
   }
 
   // --- Syntax check ---
@@ -71,10 +84,20 @@ export class AdtClientWrapper {
     return this.client.syntaxCheck(cdsUrl);
   }
 
+  /** Content-based syntax check: validates local content without saving it. */
+  async syntaxCheckContent(url: string, mainUrl: string, content: string, mainProgram?: string) {
+    return this.client.syntaxCheck(url, mainUrl, content, mainProgram);
+  }
+
   // --- Object structure ---
 
   async objectStructure(objectUrl: string) {
     return this.client.objectStructure(objectUrl);
+  }
+
+  /** Main program(s) for an include part (program/function-group includes). */
+  async mainPrograms(includeUrl: string) {
+    return this.client.mainPrograms(includeUrl);
   }
 
   // --- Transport ---

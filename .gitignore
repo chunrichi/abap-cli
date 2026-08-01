@@ -34,3 +34,4 @@ Thumbs.db
 # Temp
 *.tmp
 *.log
+tmp/
