@@ -1,10 +1,6 @@
 {
-  "sap": {
-    "url": "https://your-sap-server.com:44300",
-    "client": "100",
-    "username": "",
-    "language": "EN"
-  },
+  "system": "dev",
   "transport": "",
   "package": ""
 }
+

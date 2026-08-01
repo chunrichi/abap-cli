@@ -4,11 +4,12 @@
 
 - **Issues**: [GitHub Issues](../../issues)
 - **Discussions**: [GitHub Discussions](../../discussions)
+- **Documentation**: [docs/README.md](docs/README.md)
 
 ## Reporting Bugs
 
 Please include:
-- CLI version (`abap-vibe --version`)
+- CLI version (`abap-cli --version`)
 - Node.js version (`node -v`)
 - SAP system version (if applicable)
 - Steps to reproduce

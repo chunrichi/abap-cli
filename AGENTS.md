@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-abap-vibe is a CLI tool for agent-driven ABAP development. It enables AI coding agents to develop ABAP code by reading/writing local files and communicating with SAP systems via ADT REST API and custom ICF services.
+abap-cli is a CLI tool for agent-driven ABAP development. It enables AI coding agents to develop ABAP code by reading/writing local files and communicating with SAP systems via ADT REST API and custom ICF services.
 
 ## Architecture
 
