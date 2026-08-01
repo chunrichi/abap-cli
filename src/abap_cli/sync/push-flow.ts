@@ -17,6 +17,8 @@ export interface PushOptions {
   transport: string;
   /** Stop after the syntax check; do not activate. */
   checkOnly: boolean;
+  /** Write source but skip activation (used by `abap create --no-activate`). Defaults to true. */
+  activate?: boolean;
 }
 
 /**
@@ -80,6 +82,11 @@ export async function pushObject(
           errors: checkErrors,
         });
       }
+      return;
+    }
+
+    // Write-only mode (create --no-activate): persist source, skip activation.
+    if (opts.activate === false) {
       return;
     }
 

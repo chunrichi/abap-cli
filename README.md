@@ -29,6 +29,10 @@ abap push src/zcl_my_class.clas.abap --tr DEVK900001
 
 # Syntax check only (no activation, no SAP-side changes)
 abap check src/zcl_my_class.clas.abap
+
+# Create a new source object in SAP (writes a default skeleton and activates it)
+abap create CLAS ZCL_MY_NEW_CLASS --package $PKG --description "My new class" --tr DEVK900001
+# Use --no-activate to create without activating
 ```
 
 ## CLI Commands
@@ -40,7 +44,7 @@ abap check src/zcl_my_class.clas.abap
 | `abap push <files...>` | Push local files: lock → write → activate → unlock (`--tr`, `--check-only`, `--all`) |
 | `abap check <files...>` | Content-based syntax check only, no SAP-side changes (`--all`) |
 | `abap search <query>` | Search ABAP objects |
-| `abap create <type> <name>` | Create a new ABAP object |
+| `abap create <type> <name>` | Create a new ABAP source object (CLAS/INTF/PROG/FUGR): writes a default skeleton, then activates (`--package`, `--description`, `--tr`, `--no-activate`) |
 | `abap system` | Manage system profiles (`list` / `show` / `set` / `delete`) |
 | `abap atc [files...]` | Run ATC checks (stub) |
 | `abap status` | Show local vs SAP differences (stub) |
@@ -49,9 +53,10 @@ abap check src/zcl_my_class.clas.abap
 
 All commands support `--json` for structured output (Agent-first).
 
-## Scope (v0.2)
+## Scope (v0.3)
 
 - **Source objects** (Class, Interface, Program, Function Group) are fully supported for pull / push / check via the ADT REST API
+- **Create** (`abap create`) supports CLAS/INTF/PROG/FUGR: creates the object with a default skeleton and activates it, so it can be immediately pulled, edited and pushed back (create → pull → edit → push loop)
 - **DDIC objects** (`.doma.json`, `.tabl.json`, …) are rejected with a clear `DDIC_NOT_SUPPORTED` message — planned for a later phase (self-built ICF service)
 
 ## File Format

@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.0] - 2026-08-02
+
+### Added
+- `abap create <type> <name>` — create new source objects (CLAS/INTF/PROG/FUGR) in SAP via the ADT REST API with `--package`/`--description`/`--tr`/`--no-activate`/`--json`
+- Default source skeletons per type (class writes DEFINITION + IMPLEMENTATION), so a created object can be immediately pulled, edited and pushed back (create → pull → edit → push loop)
+- Activation after create reuses the push flow (lock → write skeleton → activate → unlock, `finally`-guaranteed release); `--no-activate` creates and writes the skeleton without activating
+- Transport resolution reuses the existing order (`--tr` > `.abap.json` > user's open request > `NO_TRANSPORT`)
+- Object name normalization (lowercase/underscore → uppercase) and type mapping (CLAS/OC, INTF/OI, PROG/P, FUGR/F)
+- DDIC types (DOMA/DTEL/TABL/STRU/TTYP) rejected with a clear `DDIC_NOT_SUPPORTED` (ICF service, later phase); unknown types rejected with supported-type list
+- `tmp/mock-adt/server.js` now handles object creation (ADT createObject POST) for offline end-to-end verification
+
+### Verified
+- Mock end-to-end: create → pull round-trip (skeleton consistency), edit → push iteration, duplicate create → `OBJECT_EXISTS`, `--no-activate` lifecycle, `NO_TRANSPORT`, unknown/DDIC type rejection, headless `--json` agent loop
+
 ## [0.2.0] - 2026-08-02
 
 ### Added
