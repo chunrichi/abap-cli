@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import type { CreatableTypeIds } from 'abap-adt-api';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError, printError, printResult } from '../output/json.js';
-import { resolveObject, getObjectParts } from '../sync/resolve.js';
+import { resolveObject, getObjectParts, type ResolvedObject, type ObjectPart } from '../sync/resolve.js';
 import { resolveTransport } from '../sync/transport.js';
 import { pushObject } from '../sync/push-flow.js';
 
@@ -87,7 +87,7 @@ async function runCreate(type: string, name: string, opts: CreateOptions, json: 
 
   // Locate the freshly created object and its main source part for skeleton write.
   const object = await resolveObject(client, objectName, type);
-  const parts = await getObjectParts(client, object);
+  const parts = await getObjectPartsForCreate(client, object, type.toUpperCase());
   const mainPart = parts.find((p) => p.subtype === 'main') ?? parts[0];
   if (!mainPart) {
     throw new CliError('SAP_ERROR', `No source part found for created object ${objectName}`, { object: objectName });
@@ -151,4 +151,31 @@ async function assertNotExists(client: AdtClientWrapper, objectName: string): Pr
     throw error;
   }
   throw new CliError('OBJECT_EXISTS', `Object ${objectName} already exists`, { object: objectName });
+}
+
+/**
+ * Get the source parts of a freshly created object. A new class may not be
+ * readable via objectStructure yet on real SAP ("wrong input data"); for the
+ * simple source objects (CLAS/INTF/PROG) the main source URL is a stable
+ * `<objectUrl>/source/main` pattern, so fall back to it after a short retry.
+ * FUGR needs objectStructure (different include layout) and is ready immediately.
+ */
+async function getObjectPartsForCreate(
+  client: AdtClientWrapper,
+  object: ResolvedObject,
+  type: string,
+  attempts = 3,
+  delayMs = 400,
+): Promise<ObjectPart[]> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      return await getObjectParts(client, object);
+    } catch (error: unknown) {
+      lastError = error;
+      if (attempt < attempts - 1) await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  if (type === 'FUGR') throw lastError;
+  return [{ subtype: 'main', sourceUrl: `${object.objectUrl.replace(/\/$/, '')}/source/main` }];
 }

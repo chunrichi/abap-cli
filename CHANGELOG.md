@@ -13,6 +13,8 @@
 
 ### Verified
 - Mock end-to-end: create → pull round-trip (skeleton consistency), edit → push iteration, duplicate create → `OBJECT_EXISTS`, `--no-activate` lifecycle, `NO_TRANSPORT`, unknown/DDIC type rejection, headless `--json` agent loop
+- Real SAP (HANA vhcala4hci): create INTF/PROG/FUGR/CLAS with `$TMP` + local transport, pull round-trip zero-diff, `OBJECT_EXISTS`, `--no-activate` → push activate, Dogfooding loop on `ZCL_ICF_DEMO` (create → pull → edit → push, no Eclipse/SAP GUI)
+- Freshly created classes have a readiness delay for `objectStructure` on real SAP ("wrong input data"); `create` falls back to the stable `<objectUrl>/source/main` URL for CLAS/INTF/PROG (FUGR uses objectStructure, ready immediately)
 
 ## [0.2.0] - 2026-08-02
 
