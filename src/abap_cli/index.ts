@@ -16,7 +16,7 @@ import { registerSystemCommand } from './commands/system.js';
 const program = new Command();
 
 program
-  .name('abap-vibe')
+  .name('abap-cli')
   .description('CLI tool for ABAP vibe coding — agent-driven ABAP development')
   .version('0.1.0')
   .option('--json', 'Output in JSON format');

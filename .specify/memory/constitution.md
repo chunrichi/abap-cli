@@ -4,11 +4,12 @@
     - Principle VII: Dogfooding 驱动开发
   Modified sections:
     - Development Workflow (补充 dogfooding 流程)
+    - 标题（项目改名 abap-vibe → abap-cli，2026-08-02）
   Removed sections: none
   Follow-up TODOs: none
 -->
 
-# abap-vibe Constitution
+# abap-cli Constitution
 
 ## Core Principles
 
@@ -60,4 +61,4 @@ SAP 端 ICF ABAP 服务的开发必须使用 CLI 自身完成（pull → edit �
 
 1 Constitution 是项目的最高设计约束。所有实现决策必须与上述原则一致。修改 Constitution 需要记录变更原因并更新版本号。
 
-**Version**: 1.0.0 | **Ratified**: 2026-07-31 | **Last Amended**: 2026-07-31
+**Version**: 1.1.0 | **Ratified**: 2026-07-31 | **Last Amended**: 2026-08-02
