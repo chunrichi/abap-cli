@@ -13,11 +13,11 @@ export interface UserConfig {
   systems: Record<string, SystemProfile>;
 }
 
-const CONFIG_DIR = path.join(os.homedir(), '.abap-vibe');
+const CONFIG_DIR = path.join(os.homedir(), '.abap-cli');
 const CONFIG_PATH = path.join(CONFIG_DIR, 'systems.json');
 
 /**
- * Load user-level system profiles from ~/.abap-vibe/systems.json.
+ * Load user-level system profiles from ~/.abap-cli/systems.json.
  * Returns an empty config if the file does not exist.
  */
 export function loadUserConfig(): UserConfig {
@@ -31,7 +31,7 @@ export function loadUserConfig(): UserConfig {
 }
 
 /**
- * Save user-level system profiles to ~/.abap-vibe/systems.json.
+ * Save user-level system profiles to ~/.abap-cli/systems.json.
  * Creates the directory with 700 permissions if needed.
  */
 export function saveUserConfig(config: UserConfig): void {

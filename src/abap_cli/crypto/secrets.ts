@@ -1,6 +1,6 @@
 import keytar from 'keytar';
 
-const SERVICE = 'abap-vibe';
+const SERVICE = 'abap-cli';
 
 /**
  * Store a password in the OS keychain (macOS Keychain / Windows Credential Store / Linux Secret Service).

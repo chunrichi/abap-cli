@@ -6,14 +6,14 @@ abap-cli keeps configuration in two places: a **user-level** system profile stor
 
 | Layer | File | Content | Secrets |
 |-------|------|---------|---------|
-| User-level | `~/.abap-vibe/systems.json` | Named system profiles (URL, client, user, language) | No |
+| User-level | `~/.abap-cli/systems.json` | Named system profiles (URL, client, user, language) | No |
 | OS keychain | (keytar) | Password per system profile name | Yes |
 | Workspace | `<project>/.abap.json` | References a system profile + default transport/package | No |
 | Environment | `SAP_PASSWORD` etc. | Overrides for automation | Yes (but ephemeral) |
 
 Precedence for credentials: **OS keychain** for the referenced system name, falling back to `SAP_PASSWORD` environment variable.
 
-## System Profiles (`~/.abap-vibe/systems.json`)
+## System Profiles (`~/.abap-cli/systems.json`)
 
 Created/updated by `abap init` and managed by `abap system`:
 
@@ -70,5 +70,5 @@ When a command accepts `--tr`:
 
 - Passwords are stored via the OS keychain (`keytar`), keyed by system profile name
 - Credentials never appear in command output or error messages
-- `.env`, `.abap.json`, and `~/.abap-vibe/` are excluded from version control
+- `.env`, `.abap.json`, and `~/.abap-cli/` are excluded from version control
 - Give agents the minimum SAP authorizations they need (Constitution Principle VI)

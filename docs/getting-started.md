@@ -38,7 +38,7 @@ abap init --system dev --url https://sap:44300 --client 100 --username DEV --pas
 abap init --system dev --transport DEVK900001 --package ZDEV
 ```
 
-When given a full set of connection parameters, `abap init` creates a named **system profile** (stored under `~/.abap-vibe/systems.json`) and writes a `.abap.json` in the current directory referencing it. The password is stored in the OS keychain, never in plain text.
+When given a full set of connection parameters, `abap init` creates a named **system profile** (stored under `~/.abap-cli/systems.json`) and writes a `.abap.json` in the current directory referencing it. The password is stored in the OS keychain, never in plain text.
 
 ### Interactive
 
@@ -50,7 +50,7 @@ Prompts guide you through selecting an existing system profile or entering a new
 
 ## What `abap init` Produces
 
-`~/.abap-vibe/systems.json` — user-level system profiles (mode `0600`):
+`~/.abap-cli/systems.json` — user-level system profiles (mode `0600`):
 
 ```json
 {
