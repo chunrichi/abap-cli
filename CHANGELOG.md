@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.0] - 2026-08-03
+
+### Added
+- `abap search <query>` — search ABAP objects (class/interface/program/function group/DDIC) by name via the ADT repository search API, returning `{ name, type, uri, description, packageName }`; `--type` filter (normalized to uppercase) and `--max` result limit (default 100); empty result is success (exit 0); query string (incl. `*` wildcards) passed through to SAP
+- `test/mock-adt/server.js` search route now honors the `maxResults` parameter for offline `--max` verification
+
+### Verified
+- Mock end-to-end: basic search (`ZCL_DEMO` full fields), prefix query, empty result (exit 0), `--type clas` lowercase normalization → CLAS only, `--max 2` truncation, default limit, `USAGE` (blank query) / `INVALID_ARGUMENT` (`--max abc`) rejected before any SAP request, headless `--json` agent loop (search → pull)
+
 ## [0.4.0] - 2026-08-02
 
 ### Added

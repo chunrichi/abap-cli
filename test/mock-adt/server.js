@@ -373,11 +373,14 @@ const server = http.createServer(async (req, res) => {
     if (path === '/sap/bc/adt/repository/informationsystem/search' && req.method === 'GET') {
       const query = (q.get('query') || '').toUpperCase();
       const type = (q.get('objectType') || '').toUpperCase();
-      const matches = [...objects.values()].filter((o) => {
-        const nameOk = !query || o.name.includes(query) || query.includes(o.name);
-        const typeOk = !type || o.type === type || o.type.startsWith(type);
-        return nameOk && typeOk;
-      });
+      const max = Math.max(1, Number(q.get('maxResults')) || 100);
+      const matches = [...objects.values()]
+        .filter((o) => {
+          const nameOk = !query || o.name.includes(query) || query.includes(o.name);
+          const typeOk = !type || o.type === type || o.type.startsWith(type);
+          return nameOk && typeOk;
+        })
+        .slice(0, max);
       const refs = matches
         .map(
           (o) =>
