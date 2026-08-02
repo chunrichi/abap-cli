@@ -9,7 +9,8 @@ import {
   upsertSystem,
   type SystemProfile,
 } from '../config/user-config.js';
-import { CliError, printError, jsonFromCommand } from '../output/json.js';
+import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
+import { assertValidProfile } from '../config/validation.js';
 
 interface WorkspaceConfig {
   system: string;
@@ -104,7 +105,7 @@ async function useExistingSystem(
 
   validateInputs(config);
   await handleFileOverwrite(false);
-  await writeConfig(systemName, config);
+  await writeConfig(systemName, config, jsonOutput);
   if (jsonOutput) outputJson(systemName, config);
 }
 
@@ -127,9 +128,9 @@ async function createSystemFromParams(opts: Record<string, string>, jsonOutput: 
   validateInputs(config);
 
   const systemName = opts.system || deriveSystemName(profile);
-  await saveProfile(systemName, profile, password);
+  await saveProfile(systemName, profile, password, jsonOutput);
   await handleFileOverwrite(false);
-  await writeConfig(systemName, config);
+  await writeConfig(systemName, config, jsonOutput);
   if (jsonOutput) outputJson(systemName, config);
 }
 
@@ -156,13 +157,13 @@ async function interactiveInit(opts: Record<string, string>, jsonOutput: boolean
     if (useStored) {
       config.password = (await getPassword(systemName)) || '';
       if (!config.password) {
-        console.log(`No stored password for '${systemName}'.`);
+        if (!jsonOutput) console.log(`No stored password for '${systemName}'.`);
         config.password = orCancel(await password({ message: `Password for ${systemName}` }));
       }
     } else {
       config.password = orCancel(await password({ message: `Password for ${systemName}` }));
     }
-    console.log(`Using system profile '${systemName}' (${profile.url}).`);
+    if (!jsonOutput) console.log(`Using system profile '${systemName}' (${profile.url}).`);
   } else {
     // Create new system profile
     systemName = orCancel(
@@ -178,7 +179,7 @@ async function interactiveInit(opts: Record<string, string>, jsonOutput: boolean
       client: config.client,
       username: config.username,
       language: config.language,
-    }, config.password);
+    }, config.password, jsonOutput);
   }
 
   // Workspace-level fields
@@ -187,7 +188,7 @@ async function interactiveInit(opts: Record<string, string>, jsonOutput: boolean
 
   validateInputs(config);
   await handleFileOverwrite(true);
-  await writeConfig(systemName, config);
+  await writeConfig(systemName, config, jsonOutput);
   if (jsonOutput) outputJson(systemName, config);
 }
 
@@ -238,10 +239,10 @@ function orCancel<T>(value: T | symbol): T {
 }
 
 /** Save profile to user config + password to keychain */
-async function saveProfile(name: string, profile: SystemProfile, password: string): Promise<void> {
+async function saveProfile(name: string, profile: SystemProfile, password: string, jsonOutput: boolean): Promise<void> {
   upsertSystem(name, profile);
   await storePassword(name, password);
-  console.log(`System profile '${name}' saved. Password stored securely in OS keychain.`);
+  if (!jsonOutput) console.log(`System profile '${name}' saved. Password stored securely in OS keychain.`);
 }
 
 /** Auto-derive a profile name from the system URL and username */
@@ -262,7 +263,7 @@ async function handleFileOverwrite(isInteractive: boolean): Promise<void> {
 
   if (!isInteractive) {
     throw new CliError(
-      'CONFIG_ERROR',
+      'FILE_EXISTS',
       `.abap.json already exists. Delete it first or run interactively:\n  rm ${configPath}`,
     );
   }
@@ -276,37 +277,14 @@ async function handleFileOverwrite(isInteractive: boolean): Promise<void> {
 
 /** T012: Input validation */
 function validateInputs(config: CollectedConfig): void {
-  // URL: non-empty and has protocol prefix
-  if (!config.url) {
-    throw new CliError('INVALID_ARGUMENT', 'URL is required');
-  }
-  if (!config.url.match(/^https?:\/\//i)) {
-    throw new CliError('INVALID_ARGUMENT', 'Invalid URL format — must start with http:// or https://');
-  }
-
-  // Username: non-empty
-  if (!config.username) {
-    throw new CliError('INVALID_ARGUMENT', 'Username is required');
-  }
-
-  // Password: non-empty
+  assertValidProfile(config);
   if (!config.password) {
     throw new CliError('INVALID_ARGUMENT', 'Password is required');
-  }
-
-  // Client: 3-digit numeric or empty
-  if (config.client && !/^\d{3}$/.test(config.client)) {
-    throw new CliError('INVALID_ARGUMENT', 'Client must be a 3-digit number');
-  }
-
-  // Language: 2-char alpha or empty
-  if (config.language && !/^[a-zA-Z]{2}$/.test(config.language)) {
-    throw new CliError('INVALID_ARGUMENT', 'Language must be a 2-character code');
   }
 }
 
 /** Write workspace config referencing a user-level system profile */
-async function writeConfig(systemName: string, config: CollectedConfig): Promise<void> {
+async function writeConfig(systemName: string, config: CollectedConfig, jsonOutput: boolean): Promise<void> {
   const cwd = process.cwd();
 
   // .abap.json — references user-level system profile + workspace-specific fields
@@ -317,24 +295,23 @@ async function writeConfig(systemName: string, config: CollectedConfig): Promise
   };
   const configPath = path.join(cwd, '.abap.json');
   fs.writeFileSync(configPath, JSON.stringify(workspaceConfig, null, 2) + '\n', 'utf-8');
-  console.log(`Created ${configPath}`);
+  if (!jsonOutput) console.log(`Created ${configPath}`);
 
   // Create local work directories
   for (const dir of ['src', 'ddic']) {
     const dirPath = path.join(cwd, dir);
     if (!fs.existsSync(dirPath)) {
       fs.mkdirSync(dirPath, { recursive: true });
-      console.log(`Created directory ${dirPath}`);
+      if (!jsonOutput) console.log(`Created directory ${dirPath}`);
     }
   }
 
-  console.log('Workspace initialized.');
+  if (!jsonOutput) console.log('Workspace initialized.');
 }
 
 /** T013: JSON output */
 function outputJson(systemName: string, config: CollectedConfig): void {
-  const result = {
-    status: 'success',
+  const data = {
     configPath: '.abap.json',
     system: systemName,
     sap: {
@@ -346,5 +323,5 @@ function outputJson(systemName: string, config: CollectedConfig): void {
     transport: config.transport,
     package: config.pkg,
   };
-  console.log(JSON.stringify(result, null, 2));
+  printResult(true, data, '');
 }

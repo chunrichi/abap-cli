@@ -76,14 +76,22 @@ async function runCreate(type: string, name: string, opts: CreateOptions, json: 
   // Refuse to overwrite: create is a "new object" operation.
   await assertNotExists(client, objectName);
 
-  await client.createObject({
-    objtype: spec.objtype,
-    name: objectName,
-    parentName: opts.package,
-    description: opts.description,
-    parentPath: `/sap/bc/adt/packages/${encodeURIComponent(opts.package)}`,
-    transport,
-  });
+  try {
+    await client.createObject({
+      objtype: spec.objtype,
+      name: objectName,
+      parentName: opts.package,
+      description: opts.description,
+      parentPath: `/sap/bc/adt/packages/${encodeURIComponent(opts.package)}`,
+      transport,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new CliError('CREATE_FAILED', `Failed to create ${type.toUpperCase()} ${objectName}: ${message}`, {
+      object: objectName,
+      type: type.toUpperCase(),
+    });
+  }
 
   // Locate the freshly created object and its main source part for skeleton write.
   const object = await resolveObject(client, objectName, type);

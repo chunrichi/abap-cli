@@ -4,16 +4,23 @@ import * as path from 'path';
 import { select, text, password, confirm, isCancel } from '@clack/prompts';
 import { getSystem, listSystemNames, upsertSystem, deleteSystem, type SystemProfile } from '../config/user-config.js';
 import { getPassword, storePassword, deletePassword } from '../crypto/secrets.js';
-import { printError, jsonFromCommand, CliError } from '../output/json.js';
+import { printError, printResult, jsonFromCommand, CliError } from '../output/json.js';
+import { assertValidProfile } from '../config/validation.js';
 
 export function registerSystemCommand(program: Command): void {
   const system = program
     .command('system')
     .description('Manage global system profiles')
-    .action(async (opts, cmd) => {
+    .action(async (_opts, cmd) => {
       try {
         if (!process.stdin.isTTY) {
-          cmd.help();
+          printError(
+            jsonFromCommand(cmd),
+            new CliError(
+              'USAGE',
+              'Bare "abap system" is interactive only. Use: abap system list | show <name> | set <name> | delete <name>',
+            ),
+          );
           return;
         }
         await interactiveMenu(cmd);
@@ -25,7 +32,7 @@ export function registerSystemCommand(program: Command): void {
   system
     .command('list')
     .description('List all saved system profiles')
-    .action((opts, cmd) => {
+    .action((_opts, cmd) => {
       runList(jsonFromCommand(cmd));
     });
 
@@ -76,19 +83,19 @@ function handleError(jsonOutput: boolean, error: unknown): never {
 
 function runList(jsonOutput: boolean): void {
   const names = listSystemNames();
-  if (jsonOutput) {
-    console.log(JSON.stringify({ status: 'success', systems: names }, null, 2));
-    return;
-  }
   if (names.length === 0) {
-    console.log("No system profiles saved. Run 'abap init' to create one.");
+    printResult(jsonOutput, { systems: [] }, "No system profiles saved. Run 'abap init' to create one.");
     return;
   }
-  console.log('System profiles:');
-  for (const name of names) {
-    const profile = getSystem(name)!;
-    console.log(`  ${name} — ${profile.username}@${profile.url}`);
-  }
+  const systems = names.map((name) => {
+    const p = getSystem(name)!;
+    return { name, username: p.username, url: p.url };
+  });
+  const human = ['System profiles:', ...names.map((name) => {
+    const p = getSystem(name)!;
+    return `  ${name} — ${p.username}@${p.url}`;
+  })].join('\n');
+  printResult(jsonOutput, { systems }, human);
 }
 
 /** Guided menu: reachable via bare `abap system` on a TTY */
@@ -178,16 +185,15 @@ async function runShow(name: string, jsonOutput: boolean): Promise<void> {
     language: profile.language || 'EN',
     password,
   };
-  if (jsonOutput) {
-    console.log(JSON.stringify({ status: 'success', system: detail }, null, 2));
-    return;
-  }
-  console.log(`System profile '${name}':`);
-  console.log(`  url:      ${detail.url}`);
-  console.log(`  client:   ${detail.client}`);
-  console.log(`  username: ${detail.username}`);
-  console.log(`  language: ${detail.language}`);
-  console.log(`  password: ${detail.password}`);
+  const human = [
+    `System profile '${name}':`,
+    `  url:      ${detail.url}`,
+    `  client:   ${detail.client}`,
+    `  username: ${detail.username}`,
+    `  language: ${detail.language}`,
+    `  password: ${detail.password}`,
+  ].join('\n');
+  printResult(jsonOutput, { system: detail }, human);
 }
 
 async function runSet(
@@ -225,7 +231,7 @@ async function runSet(
   if (has('client')) updated.client = opts.client as string;
   if (has('username')) updated.username = opts.username as string;
   if (has('language')) updated.language = opts.language as string;
-  validateProfile(updated);
+  assertValidProfile(updated);
 
   let passwordUpdated = false;
   let passwordRemoved = false;
@@ -241,17 +247,11 @@ async function runSet(
 
   upsertSystem(name, updated);
 
-  if (jsonOutput) {
-    console.log(
-      JSON.stringify(
-        { status: 'success', system: { name, ...updated }, passwordUpdated, passwordRemoved },
-        null,
-        2,
-      ),
-    );
-  } else {
-    console.log(`System profile '${name}' updated.`);
-  }
+  printResult(
+    jsonOutput,
+    { system: { name, ...updated }, passwordUpdated, passwordRemoved },
+    `System profile '${name}' updated.`,
+  );
 }
 
 /** Interactive set wizard: show current values, Enter keeps them */
@@ -269,7 +269,7 @@ async function interactiveSet(
   if (username) updated.username = username;
   const language = orCancel(await text({ message: 'Language', initialValue: updated.language || 'EN' }));
   if (language) updated.language = language;
-  validateProfile(updated);
+  assertValidProfile(updated);
 
   let passwordUpdated = false;
   let passwordRemoved = false;
@@ -284,32 +284,11 @@ async function interactiveSet(
 
   upsertSystem(name, updated);
 
-  if (jsonOutput) {
-    console.log(
-      JSON.stringify(
-        { status: 'success', system: { name, ...updated }, passwordUpdated, passwordRemoved },
-        null,
-        2,
-      ),
-    );
-  } else {
-    console.log(`System profile '${name}' updated.`);
-  }
-}
-
-/** Shared field validation, consistent with the init command's rules */
-function validateProfile(profile: SystemProfile): void {
-  if (!profile.url) throw new CliError('INVALID_ARGUMENT', 'URL is required');
-  if (!/^https?:\/\//i.test(profile.url)) {
-    throw new CliError('INVALID_ARGUMENT', 'Invalid URL format — must start with http:// or https://');
-  }
-  if (!profile.username) throw new CliError('INVALID_ARGUMENT', 'Username is required');
-  if (profile.client && !/^\d{3}$/.test(profile.client)) {
-    throw new CliError('INVALID_ARGUMENT', 'Client must be a 3-digit number');
-  }
-  if (profile.language && !/^[a-zA-Z]{2}$/.test(profile.language)) {
-    throw new CliError('INVALID_ARGUMENT', 'Language must be a 2-character code');
-  }
+  printResult(
+    jsonOutput,
+    { system: { name, ...updated }, passwordUpdated, passwordRemoved },
+    `System profile '${name}' updated.`,
+  );
 }
 
 async function runDelete(name: string, jsonOutput: boolean): Promise<void> {
@@ -353,15 +332,7 @@ async function runDelete(name: string, jsonOutput: boolean): Promise<void> {
     console.warn(`Warning: ${warning}. Update it with 'abap init' if needed.`);
   }
 
-  if (jsonOutput) {
-    const result: Record<string, unknown> = {
-      status: 'success',
-      deleted: name,
-      passwordCleaned,
-    };
-    if (warning) result.warning = warning;
-    console.log(JSON.stringify(result, null, 2));
-  } else {
-    console.log(`System profile '${name}' deleted.`);
-  }
+  const data: Record<string, unknown> = { deleted: name, passwordCleaned };
+  if (warning) data.warning = warning;
+  printResult(jsonOutput, data, `System profile '${name}' deleted.`);
 }

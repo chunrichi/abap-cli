@@ -27,7 +27,8 @@ export class CliError extends Error {
 /** Normalize any thrown value into the contract error shape. */
 export function toErrorShape(error: unknown): { code: string; message: string; [key: string]: unknown } {
   if (error instanceof CliError) {
-    return { code: error.code, message: error.message, ...error.details };
+    // details first so code/message always win
+    return { ...error.details, code: error.code, message: error.message };
   }
   const err = error as { statusCode?: number; statusMessage?: string; message?: string };
   const status = typeof err?.statusCode === 'number' ? err.statusCode : undefined;

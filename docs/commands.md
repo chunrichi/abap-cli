@@ -228,6 +228,9 @@ abap deploy [options]
 | `TYPE_NOT_SUPPORTED` | Unknown object type (create) |
 | `DDIC_NOT_SUPPORTED` | DDIC object type, later phase (create) |
 | `INVALID_ARGUMENT` | Invalid argument (e.g. blank transport description) |
+| `USAGE` | Wrong invocation / missing required arguments (e.g. `init` without options, non-interactive `system`) |
+| `NOT_IMPLEMENTED` | Command is a stub in this phase (atc / search / status / deploy / pull --package) |
+| `FILE_EXISTS` | A required file already exists (e.g. `.abap.json` during `init`) |
 | `TRANSPORT_CREATE_FAILED` | Failed to create a transport request |
 | `CREATE_FAILED` | Object creation failed |
 | `LOCK_FAILED` | Could not lock the object (locked by another user) |
