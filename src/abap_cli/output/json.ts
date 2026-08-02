@@ -3,6 +3,15 @@
  * JSON shape follows contracts/cli-commands.md: { status: 'success', data } | { status: 'error', error }.
  */
 
+import type { Command } from 'commander';
+
+/** Resolve the top-level --json flag from any nested subcommand. */
+export function jsonFromCommand(cmd: Command): boolean {
+  let c: Command | undefined = cmd;
+  while (c.parent) c = c.parent;
+  return c.opts().json ?? false;
+}
+
 export class CliError extends Error {
   readonly code: string;
   readonly details?: Record<string, unknown>;

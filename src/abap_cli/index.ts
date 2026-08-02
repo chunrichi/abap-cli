@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { createRequire } from 'node:module';
 import { Command } from 'commander';
 import { registerInitCommand } from './commands/init.js';
 import { registerPullCommand } from './commands/pull.js';
@@ -15,10 +16,14 @@ import { registerSystemCommand } from './commands/system.js';
 
 const program = new Command();
 
+// 单一版本来源：从 package.json 读取
+const require = createRequire(import.meta.url);
+const { version } = require('../../../package.json') as { version: string };
+
 program
   .name('abap-cli')
   .description('CLI tool for ABAP vibe coding — agent-driven ABAP development')
-  .version('0.1.0')
+  .version(version)
   .option('--json', 'Output in JSON format');
 
 // Register all commands

@@ -3,7 +3,7 @@ import * as path from 'path';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { resolveFile } from '../formats/file-resolver.js';
 import { listAbapFiles, readAbapFile } from '../formats/abap-source.js';
-import { CliError, printError, printResult, toErrorShape } from '../output/json.js';
+import { CliError, printError, printResult, toErrorShape, jsonFromCommand } from '../output/json.js';
 import { resolveObject, getObjectParts, validateLocalFile } from '../sync/resolve.js';
 import { resolveTransport } from '../sync/transport.js';
 import { pushObject } from '../sync/push-flow.js';
@@ -17,7 +17,7 @@ export function registerPushCommand(program: Command): void {
     .option('--tr <transport>', 'Transport number')
     .option('--check-only', 'Only perform syntax check, do not activate')
     .action(async (files: string[], opts, cmd) => {
-      const json = cmd.parent?.opts()?.json ?? false;
+      const json = jsonFromCommand(cmd);
       try {
         await runPush(files, opts, json);
       } catch (error: unknown) {
@@ -65,7 +65,7 @@ async function runPush(files: string[], opts: { all?: boolean; tr?: string; chec
 
   if (failed > 0) {
     const single = fileList.length === 1;
-    const code = single ? (results[0].code ?? 'PUSH_FAILED') : 'PUSH_FAILED';
+    const code = single ? (results[0]?.code ?? 'PUSH_FAILED') : 'PUSH_FAILED';
     const payload = { code, message: `${failed} of ${fileList.length} file(s) failed`, results };
     if (json) {
       console.error(JSON.stringify({ status: 'error', error: payload }, null, 2));

@@ -4,6 +4,7 @@ import * as path from 'path';
 import { select, text, password, confirm, isCancel } from '@clack/prompts';
 import { getSystem, listSystemNames, upsertSystem, deleteSystem, type SystemProfile } from '../config/user-config.js';
 import { getPassword, storePassword, deletePassword } from '../crypto/secrets.js';
+import { printError, jsonFromCommand, CliError } from '../output/json.js';
 
 export function registerSystemCommand(program: Command): void {
   const system = program
@@ -17,7 +18,7 @@ export function registerSystemCommand(program: Command): void {
         }
         await interactiveMenu(cmd);
       } catch (error: unknown) {
-        handleError(error);
+        handleError(jsonFromCommand(cmd), error);
       }
     });
 
@@ -25,7 +26,7 @@ export function registerSystemCommand(program: Command): void {
     .command('list')
     .description('List all saved system profiles')
     .action((opts, cmd) => {
-      runList(jsonFrom(cmd));
+      runList(jsonFromCommand(cmd));
     });
 
   system
@@ -33,11 +34,9 @@ export function registerSystemCommand(program: Command): void {
     .description('Show details of a system profile')
     .action(async (name: string, _opts, cmd) => {
       try {
-        await runShow(name, jsonFrom(cmd));
+        await runShow(name, jsonFromCommand(cmd));
       } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.error(`Error: ${message}`);
-        process.exit(1);
+        handleError(jsonFromCommand(cmd), error);
       }
     });
 
@@ -52,9 +51,9 @@ export function registerSystemCommand(program: Command): void {
     .option('--remove-password', 'Remove the stored password from keychain')
     .action(async (name: string, opts, cmd) => {
       try {
-        await runSet(name, opts, jsonFrom(cmd));
+        await runSet(name, opts, jsonFromCommand(cmd));
       } catch (error: unknown) {
-        handleError(error);
+        handleError(jsonFromCommand(cmd), error);
       }
     });
 
@@ -63,29 +62,16 @@ export function registerSystemCommand(program: Command): void {
     .description('Delete a system profile and its stored password')
     .action(async (name: string, _opts, cmd) => {
       try {
-        await runDelete(name, jsonFrom(cmd));
+        await runDelete(name, jsonFromCommand(cmd));
       } catch (error: unknown) {
-        handleError(error);
+        handleError(jsonFromCommand(cmd), error);
       }
     });
 }
 
-/** Resolve the top-level --json flag from any nested subcommand */
-function jsonFrom(cmd: Command): boolean {
-  let c: Command | undefined = cmd;
-  while (c.parent) c = c.parent;
-  return c.opts().json ?? false;
-}
-
-/** Report command errors; Ctrl+C during interactive prompts exits 130 without changes */
-function handleError(error: unknown): never {
-  const message = error instanceof Error ? error.message : String(error);
-  if (message.includes('Aborted with Ctrl+C')) {
-    console.log('\nAborted. No changes were made.');
-    process.exit(130);
-  }
-  console.error(`Error: ${message}`);
-  process.exit(1);
+/** Report command errors via the unified JSON-aware handler */
+function handleError(jsonOutput: boolean, error: unknown): never {
+  printError(jsonOutput, error);
 }
 
 function runList(jsonOutput: boolean): void {
@@ -137,7 +123,7 @@ async function interactiveMenu(cmd: Command): Promise<void> {
       case 'exit':
         return;
       case 'list':
-        runList(jsonFrom(cmd));
+        runList(jsonFromCommand(cmd));
         break;
       case 'show':
       case 'set':
@@ -145,12 +131,12 @@ async function interactiveMenu(cmd: Command): Promise<void> {
         const name = await pickSystemName(choice);
         if (!name) break;
         if (choice === 'show') {
-          await runShow(name, jsonFrom(cmd));
+          await runShow(name, jsonFromCommand(cmd));
         } else if (choice === 'set') {
           const profile = getSystem(name)!;
-          await interactiveSet(name, profile, jsonFrom(cmd));
+          await interactiveSet(name, profile, jsonFromCommand(cmd));
         } else {
-          await runDelete(name, jsonFrom(cmd));
+          await runDelete(name, jsonFromCommand(cmd));
         }
         break;
       }
@@ -181,7 +167,7 @@ function orCancel<T>(value: T | symbol): T {
 async function runShow(name: string, jsonOutput: boolean): Promise<void> {
   const profile = getSystem(name);
   if (!profile) {
-    throw new Error(`System profile '${name}' not found.`);
+    throw new CliError('CONFIG_ERROR', `System profile '${name}' not found.`);
   }
   const password = (await getPassword(name)) ? 'stored' : 'not stored';
   const detail = {
@@ -211,14 +197,14 @@ async function runSet(
 ): Promise<void> {
   const profile = getSystem(name);
   if (!profile) {
-    throw new Error(`System profile '${name}' not found.`);
+    throw new CliError('CONFIG_ERROR', `System profile '${name}' not found.`);
   }
 
   const has = (key: string) => opts[key] !== undefined;
   const updatePassword = has('password');
   const removePassword = !!opts.removePassword;
   if (updatePassword && removePassword) {
-    throw new Error('Cannot use --password and --remove-password together.');
+    throw new CliError('INVALID_ARGUMENT', 'Cannot use --password and --remove-password together.');
   }
 
   const hasAny = has('url') || has('client') || has('username') || has('language') || updatePassword || removePassword;
@@ -227,7 +213,8 @@ async function runSet(
       await interactiveSet(name, profile, jsonOutput);
       return;
     }
-    throw new Error(
+    throw new CliError(
+      'USAGE',
       'Non-interactive environment detected. Provide field options:\n' +
       '  abap system set <name> --url <url> [--client <client>] [--username <user>] [--language <lang>] [--password <password>]',
     );
@@ -244,7 +231,7 @@ async function runSet(
   let passwordRemoved = false;
   if (updatePassword) {
     const password = opts.password as string;
-    if (!password) throw new Error('Password is required');
+    if (!password) throw new CliError('INVALID_ARGUMENT', 'Password is required');
     await storePassword(name, password);
     passwordUpdated = true;
   } else if (removePassword) {
@@ -312,22 +299,22 @@ async function interactiveSet(
 
 /** Shared field validation, consistent with the init command's rules */
 function validateProfile(profile: SystemProfile): void {
-  if (!profile.url) throw new Error('URL is required');
+  if (!profile.url) throw new CliError('INVALID_ARGUMENT', 'URL is required');
   if (!/^https?:\/\//i.test(profile.url)) {
-    throw new Error('Invalid URL format — must start with http:// or https://');
+    throw new CliError('INVALID_ARGUMENT', 'Invalid URL format — must start with http:// or https://');
   }
-  if (!profile.username) throw new Error('Username is required');
+  if (!profile.username) throw new CliError('INVALID_ARGUMENT', 'Username is required');
   if (profile.client && !/^\d{3}$/.test(profile.client)) {
-    throw new Error('Client must be a 3-digit number');
+    throw new CliError('INVALID_ARGUMENT', 'Client must be a 3-digit number');
   }
   if (profile.language && !/^[a-zA-Z]{2}$/.test(profile.language)) {
-    throw new Error('Language must be a 2-character code');
+    throw new CliError('INVALID_ARGUMENT', 'Language must be a 2-character code');
   }
 }
 
 async function runDelete(name: string, jsonOutput: boolean): Promise<void> {
   if (!getSystem(name)) {
-    throw new Error(`System profile '${name}' not found.`);
+    throw new CliError('CONFIG_ERROR', `System profile '${name}' not found.`);
   }
 
   if (process.stdin.isTTY) {

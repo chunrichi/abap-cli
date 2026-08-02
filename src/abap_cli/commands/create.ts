@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import type { CreatableTypeIds } from 'abap-adt-api';
 import { AdtClientWrapper } from '../clients/adt-client.js';
-import { CliError, printError, printResult } from '../output/json.js';
+import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
 import { resolveObject, getObjectParts, type ResolvedObject, type ObjectPart } from '../sync/resolve.js';
 import { resolveTransport } from '../sync/transport.js';
 import { pushObject } from '../sync/push-flow.js';
@@ -47,7 +47,7 @@ export function registerCreateCommand(program: Command): void {
     .option('--tr <transport>', 'Transport number')
     .option('--no-activate', 'Create the object but do not activate it')
     .action(async (type, name, opts, cmd) => {
-      const json = cmd.parent?.opts()?.json ?? false;
+      const json = jsonFromCommand(cmd);
       try {
         await runCreate(type, name, opts, json);
       } catch (error: unknown) {
@@ -164,18 +164,11 @@ async function getObjectPartsForCreate(
   client: AdtClientWrapper,
   object: ResolvedObject,
   type: string,
-  attempts = 3,
-  delayMs = 400,
 ): Promise<ObjectPart[]> {
-  let lastError: unknown;
-  for (let attempt = 0; attempt < attempts; attempt++) {
-    try {
-      return await getObjectParts(client, object);
-    } catch (error: unknown) {
-      lastError = error;
-      if (attempt < attempts - 1) await new Promise((resolve) => setTimeout(resolve, delayMs));
-    }
+  try {
+    return await getObjectParts(client, object, 3, 400);
+  } catch (error: unknown) {
+    if (type === 'FUGR') throw error;
+    return [{ subtype: 'main', sourceUrl: `${object.objectUrl.replace(/\/$/, '')}/source/main` }];
   }
-  if (type === 'FUGR') throw lastError;
-  return [{ subtype: 'main', sourceUrl: `${object.objectUrl.replace(/\/$/, '')}/source/main` }];
 }

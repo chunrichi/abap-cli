@@ -1,7 +1,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 import { getPassword } from '../crypto/secrets.js';
 import { getSystem } from './user-config.js';
+import { CliError } from '../output/json.js';
 
 export interface SapConfig {
   url: string;
@@ -17,14 +19,51 @@ export interface ProjectConfig {
   package: string;
 }
 
-let cachedConfig: ProjectConfig | null = null;
+/** Cached profile data minus the password, which is re-read on every load. */
+interface LoadedConfig {
+  systemName: string;
+  sap: Omit<SapConfig, 'password'>;
+  transport: string;
+  package: string;
+}
+
+let cached: LoadedConfig | null = null;
+let cachedMtimes: { configPath: number; systemsPath: number } | null = null;
+
+const SYSTEMS_PATH = path.join(os.homedir(), '.abap-cli', 'systems.json');
+
+function fileMtime(p: string): number {
+  try {
+    return fs.statSync(p).mtimeMs;
+  } catch {
+    return 0;
+  }
+}
+
+function currentMtimes(): { configPath: number; systemsPath: number } {
+  return {
+    configPath: fileMtime(path.resolve(process.cwd(), '.abap.json')),
+    systemsPath: fileMtime(SYSTEMS_PATH),
+  };
+}
 
 /**
  * Load project configuration from .abap.json (system reference) + user-level system profile + OS keychain.
+ * The file cache auto-invalidates on mtime change (abap init / system set); the
+ * password is re-read from the keychain every call so updates apply immediately.
  */
 export async function loadConfig(): Promise<ProjectConfig> {
-  if (cachedConfig) return cachedConfig;
+  const mtimes = currentMtimes();
+  if (!cached || !cachedMtimes || cachedMtimes.configPath !== mtimes.configPath || cachedMtimes.systemsPath !== mtimes.systemsPath) {
+    cached = await loadFileConfig();
+    cachedMtimes = mtimes;
+  }
 
+  const password = (await getPassword(cached.systemName)) || process.env.SAP_PASSWORD || '';
+  return { sap: { ...cached.sap, password }, transport: cached.transport, package: cached.package };
+}
+
+async function loadFileConfig(): Promise<LoadedConfig> {
   // Load .abap.json — workspace references a user-level system profile
   let workspace: { system?: string; transport?: string; package?: string } = {};
   const configPath = path.resolve(process.cwd(), '.abap.json');
@@ -39,42 +78,42 @@ export async function loadConfig(): Promise<ProjectConfig> {
   const systemName = workspace.system || '';
   const profile = systemName ? getSystem(systemName) : null;
   if (!profile) {
-    throw new Error(
+    throw new CliError(
+      'CONFIG_ERROR',
       systemName
         ? `System profile '${systemName}' not found. Run 'abap init' to configure it.`
         : 'Missing "system" in .abap.json. Run \'abap init\' to set up.',
     );
   }
 
-  // Password from OS keychain, keyed by system name
-  const password = (await getPassword(systemName)) || process.env.SAP_PASSWORD || '';
-
-  const sap: SapConfig = {
-    url: profile.url,
-    client: profile.client || '100',
-    username: profile.username,
-    password,
-    language: profile.language || 'EN',
-  };
-
-  const transport = workspace.transport || '';
-  const pkg = workspace.package || '';
-
   // Validate required fields
   const missing: string[] = [];
-  if (!sap.url) missing.push('url in system profile');
-  if (!sap.username) missing.push('username in system profile');
+  if (!profile.url) missing.push('url in system profile');
+  if (!profile.username) missing.push('username in system profile');
   if (missing.length > 0) {
-    throw new Error(`Missing required configuration: ${missing.join(', ')}. Run 'abap init' to set up.`);
+    throw new CliError(
+      'CONFIG_ERROR',
+      `Missing required configuration: ${missing.join(', ')}. Run 'abap init' to set up.`,
+    );
   }
 
-  cachedConfig = { sap, transport, package: pkg };
-  return cachedConfig;
+  return {
+    systemName,
+    sap: {
+      url: profile.url,
+      client: profile.client || '100',
+      username: profile.username,
+      language: profile.language || 'EN',
+    },
+    transport: workspace.transport || '',
+    package: workspace.package || '',
+  };
 }
 
 /**
  * Reset cached config (for testing).
  */
 export function resetConfig(): void {
-  cachedConfig = null;
+  cached = null;
+  cachedMtimes = null;
 }

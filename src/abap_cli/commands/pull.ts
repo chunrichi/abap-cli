@@ -3,7 +3,7 @@ import * as path from 'path';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { buildFilename } from '../formats/file-resolver.js';
 import { fileExists, writeAbapFile } from '../formats/abap-source.js';
-import { CliError, printError, printResult } from '../output/json.js';
+import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
 import { resolveObject, getObjectParts } from '../sync/resolve.js';
 
 export function registerPullCommand(program: Command): void {
@@ -15,7 +15,7 @@ export function registerPullCommand(program: Command): void {
     .option('--package <package>', 'Download all objects in a package (not implemented in this phase)')
     .option('--dir <path>', 'Output directory', 'src/')
     .action(async (objectName: string, opts, cmd) => {
-      const json = cmd.parent?.opts()?.json ?? false;
+      const json = jsonFromCommand(cmd);
       try {
         await runPull(objectName, opts, json);
       } catch (error: unknown) {
@@ -57,6 +57,8 @@ function humanSummary(
 ): string {
   const lines = [`Pulled ${object.name} (${object.type}) to ${files.length} file(s):`];
   for (const f of files) lines.push(`  ${f}`);
-  if (overwritten.length > 0) lines.push(`Overwrote ${overwritten.length} existing file(s)`);
+  if (overwritten.length > 0) {
+    lines.push(`Warning: overwrote ${overwritten.length} existing file(s) — any local edits to those files were replaced`);
+  }
   return lines.join('\n');
 }

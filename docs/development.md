@@ -26,7 +26,7 @@ There is no unit-test framework; verification is done via:
 
 ## Local Mock ADT Server
 
-`tmp/mock-adt/server.js` implements a subset of the ADT REST API for offline verification:
+`test/mock-adt/server.js` implements a subset of the ADT REST API for offline verification:
 
 - login (`compatibility/graph`), repository search, object structure, source GET/PUT
 - lock/unlock, content-based checkruns, activation
@@ -34,8 +34,8 @@ There is no unit-test framework; verification is done via:
 - transport: `GET /sap/bc/adt/cts/transportrequests` and `POST /sap/bc/adt/cts/transports`
 
 ```bash
-node tmp/mock-adt/server.js [port]        # default 8080
-MOCK_NO_TRANSPORTS=1 node tmp/mock-adt/server.js  # simulate no open transports
+node test/mock-adt/server.js [port]        # default 8080
+MOCK_NO_TRANSPORTS=1 node test/mock-adt/server.js  # simulate no open transports
 ```
 
 Point a test workspace at it:

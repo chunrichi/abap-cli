@@ -1,16 +1,23 @@
 {
   "name": "abap-cli",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "description": "CLI tool for ABAP vibe coding — agent-driven ABAP development in any agent",
   "type": "module",
   "main": "dist/src/abap_cli/index.js",
   "bin": {
     "abap": "dist/src/abap_cli/index.js"
   },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "start": "node dist/abap_cli/index.js"
+    "start": "node dist/src/abap_cli/index.js",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "abap",

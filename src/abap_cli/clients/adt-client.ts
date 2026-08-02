@@ -27,6 +27,7 @@ export class AdtClientWrapper {
       const config = await loadConfig();
       return new AdtClientWrapper(config);
     } catch (error: unknown) {
+      if (error instanceof CliError) throw error;
       const message = error instanceof Error ? error.message : String(error);
       throw new CliError('CONFIG_ERROR', message);
     }

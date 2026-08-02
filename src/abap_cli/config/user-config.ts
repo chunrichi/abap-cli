@@ -18,15 +18,17 @@ const CONFIG_PATH = path.join(CONFIG_DIR, 'systems.json');
 
 /**
  * Load user-level system profiles from ~/.abap-cli/systems.json.
- * Returns an empty config if the file does not exist.
+ * Returns an empty config if the file does not exist; throws if it is corrupt.
  */
 export function loadUserConfig(): UserConfig {
+  if (!fs.existsSync(CONFIG_PATH)) return { systems: {} };
   try {
     const raw = fs.readFileSync(CONFIG_PATH, 'utf-8');
     const parsed = JSON.parse(raw);
     return { systems: parsed.systems ?? {}, ...parsed };
-  } catch {
-    return { systems: {} };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Cannot parse user config ${CONFIG_PATH}: ${message}. Fix or delete the file.`);
   }
 }
 

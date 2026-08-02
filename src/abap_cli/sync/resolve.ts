@@ -45,12 +45,31 @@ export async function resolveObject(
       types: matches.map((m) => m['adtcore:type']),
     });
   }
-  const hit = matches[0];
+  // matches.length > 0 guaranteed by the checks above
+  const hit = matches[0]!;
   return { name: hit['adtcore:name'], type: hit['adtcore:type'], objectUrl: hit['adtcore:uri'], parts: [] };
 }
 
 /** Fetch all source parts (class includes or the single main part) of an object. */
 export async function getObjectParts(
+  client: AdtClientWrapper,
+  object: { name: string; objectUrl: string },
+  retries = 0,
+  delayMs = 400,
+): Promise<ObjectPart[]> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await getObjectPartsOnce(client, object);
+    } catch (error: unknown) {
+      lastError = error;
+      if (attempt < retries) await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw lastError;
+}
+
+async function getObjectPartsOnce(
   client: AdtClientWrapper,
   object: { name: string; objectUrl: string },
 ): Promise<ObjectPart[]> {

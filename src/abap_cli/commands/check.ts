@@ -3,7 +3,7 @@ import * as path from 'path';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { resolveFile } from '../formats/file-resolver.js';
 import { listAbapFiles, readAbapFile } from '../formats/abap-source.js';
-import { CliError, printError, printResult, toErrorShape } from '../output/json.js';
+import { CliError, printError, printResult, toErrorShape, jsonFromCommand } from '../output/json.js';
 import { resolveObject, getObjectParts, validateLocalFile } from '../sync/resolve.js';
 
 interface CheckIssue {
@@ -28,7 +28,7 @@ export function registerCheckCommand(program: Command): void {
     .argument('[files...]', 'Files to check')
     .option('--all', 'Check all .abap files under the current directory')
     .action(async (files: string[], opts, cmd) => {
-      const json = cmd.parent?.opts()?.json ?? false;
+      const json = jsonFromCommand(cmd);
       try {
         await runCheck(files, opts, json);
       } catch (error: unknown) {
@@ -63,7 +63,7 @@ async function runCheck(files: string[], opts: { all?: boolean }, json: boolean)
 
   if (failed > 0) {
     const single = fileList.length === 1;
-    const code = single ? (results[0].error?.code ?? 'SYNTAX_ERROR') : 'SYNTAX_ERROR';
+    const code = single ? (results[0]?.error?.code ?? 'SYNTAX_ERROR') : 'SYNTAX_ERROR';
     const payload = { code, message: `${failed} of ${fileList.length} file(s) failed`, results };
     if (json) {
       console.error(JSON.stringify({ status: 'error', error: payload }, null, 2));

@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
-import { CliError, printError, printResult } from '../output/json.js';
+import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
 
 interface TransportEntry {
   number: string;
@@ -24,7 +24,7 @@ export function registerTransportCommand(program: Command): void {
     .description('List transport requests for current user')
     .option('--open', 'Show only open (unreleased) transports')
     .action(async (opts, cmd) => {
-      const json = jsonFrom(cmd);
+      const json = jsonFromCommand(cmd);
       try {
         await runList(Boolean(opts.open), json);
       } catch (error: unknown) {
@@ -38,20 +38,13 @@ export function registerTransportCommand(program: Command): void {
     .argument('<description>', 'Transport description')
     .option('--package <package>', 'Target SAP package (default $TMP)')
     .action(async (description, opts, cmd) => {
-      const json = jsonFrom(cmd);
+      const json = jsonFromCommand(cmd);
       try {
         await runCreate(description, opts, json);
       } catch (error: unknown) {
         printError(json, error);
       }
     });
-}
-
-/** Resolve the top-level --json flag from any nested subcommand */
-function jsonFrom(cmd: Command): boolean {
-  let c: Command | undefined = cmd;
-  while (c.parent) c = c.parent;
-  return c.opts().json ?? false;
 }
 
 interface CreateOptions {

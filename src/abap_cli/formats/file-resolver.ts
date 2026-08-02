@@ -41,8 +41,9 @@ export function resolveFile(filePath: string): ResolvedFile {
     throw new Error(`Cannot resolve object type from filename: ${basename}`);
   }
 
-  const objectName = parts[0].toUpperCase();
-  const objectType = parts[1].toUpperCase();
+  // parts.length >= 2 guaranteed by the check above
+  const objectName = parts[0]!.toUpperCase();
+  const objectType = parts[1]!.toUpperCase();
   const subtype = parts.slice(2).join('.') || 'main';
   const route = EXT_ROUTE_MAP[ext] || 'adt';
   const format: 'abap' | 'xml' | 'json' = ext === '.json' ? 'json' : ext === '.xml' ? 'xml' : 'abap';
@@ -55,7 +56,7 @@ export function resolveFile(filePath: string): ResolvedFile {
  */
 function getOuterExtension(filename: string): string {
   const match = filename.match(/\.[^.]+$/);
-  return match ? match[0] : '';
+  return match?.[0] ?? '';
 }
 
 /**
@@ -65,7 +66,7 @@ function getOuterExtension(filename: string): string {
  */
 export function buildFilename(objectName: string, objectType: string, subtype?: string, ext = '.abap'): string {
   const name = objectName.toLowerCase();
-  const type = objectType.split('/')[0].toLowerCase();
+  const type = objectType.split('/')[0]!.toLowerCase();
   const sub = subtype && subtype !== 'main' ? `.${subtype}` : '';
   return `${name}.${type}${sub}${ext}`;
 }

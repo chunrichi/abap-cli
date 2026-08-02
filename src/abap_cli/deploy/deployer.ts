@@ -1,15 +1,18 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import { fileURLToPath } from 'node:url';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { resolveFile } from '../formats/file-resolver.js';
 import { readAbapFile } from '../formats/abap-source.js';
+
+// dist/src/abap_cli/deploy → project root (ESM has no __dirname)
+const bundledDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../abap/src');
 
 /**
  * Deploy bundled ABAP source files from abap/src/ to a SAP system.
  */
 export async function deployBundledSources(transport?: string, targetPackage?: string): Promise<void> {
   const adt = await AdtClientWrapper.create();
-  const bundledDir = path.resolve(__dirname, '../../../abap/src');
 
   let files: string[];
   try {

@@ -1,6 +1,12 @@
 import keytar from 'keytar';
+import { CliError } from '../output/json.js';
 
 const SERVICE = 'abap-cli';
+
+function keychainError(op: string, error: unknown): never {
+  const message = error instanceof Error ? error.message : String(error);
+  throw new CliError('CONFIG_ERROR', `Cannot ${op} password in OS keychain: ${message}`);
+}
 
 /**
  * Store a password in the OS keychain (macOS Keychain / Windows Credential Store / Linux Secret Service).
@@ -10,7 +16,11 @@ const SERVICE = 'abap-cli';
  * @param password The password to store
  */
 export async function storePassword(account: string, password: string): Promise<void> {
-  await keytar.setPassword(SERVICE, account, password);
+  try {
+    await keytar.setPassword(SERVICE, account, password);
+  } catch (error: unknown) {
+    keychainError('store', error);
+  }
 }
 
 /**
@@ -20,7 +30,11 @@ export async function storePassword(account: string, password: string): Promise<
  * @returns The password, or null if not found
  */
 export async function getPassword(account: string): Promise<string | null> {
-  return keytar.getPassword(SERVICE, account);
+  try {
+    return await keytar.getPassword(SERVICE, account);
+  } catch (error: unknown) {
+    keychainError('read', error);
+  }
 }
 
 /**
@@ -30,5 +44,9 @@ export async function getPassword(account: string): Promise<string | null> {
  * @returns true if deleted, false if not found
  */
 export async function deletePassword(account: string): Promise<boolean> {
-  return keytar.deletePassword(SERVICE, account);
+  try {
+    return await keytar.deletePassword(SERVICE, account);
+  } catch (error: unknown) {
+    keychainError('delete', error);
+  }
 }

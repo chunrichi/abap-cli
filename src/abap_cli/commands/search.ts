@@ -1,4 +1,5 @@
 import { Command } from 'commander';
+import { CliError, printError, jsonFromCommand } from '../output/json.js';
 
 export function registerSearchCommand(program: Command): void {
   program
@@ -7,14 +8,8 @@ export function registerSearchCommand(program: Command): void {
     .argument('<query>', 'Search query (supports * wildcard)')
     .option('--type <type>', 'Filter by object type')
     .option('--max <n>', 'Maximum results', '100')
-    .action(async (query, opts) => {
-      try {
-        // TODO: Implement search via adt-client
-        console.log('abap search: not yet implemented');
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.error(`Error: ${message}`);
-        process.exit(1);
-      }
+    .action(async (_query, _opts, cmd) => {
+      const json = jsonFromCommand(cmd);
+      printError(json, new CliError('NOT_IMPLEMENTED', 'abap search: not yet implemented'));
     });
 }

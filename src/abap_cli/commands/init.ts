@@ -9,6 +9,7 @@ import {
   upsertSystem,
   type SystemProfile,
 } from '../config/user-config.js';
+import { CliError, printError, jsonFromCommand } from '../output/json.js';
 
 interface WorkspaceConfig {
   system: string;
@@ -35,13 +36,11 @@ export function registerInitCommand(program: Command): void {
     .option('-t, --transport <transport>', 'Default transport number')
     .option('--package <package>', 'Default SAP package')
     .action(async (opts, cmd) => {
+      const jsonOutput = jsonFromCommand(cmd);
       try {
-        const jsonOutput = cmd.parent?.opts()?.json ?? false;
         await runInit(opts, jsonOutput);
       } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.error(`Error: ${message}`);
-        process.exit(1);
+        printError(jsonOutput, error);
       }
     });
 }
@@ -62,10 +61,12 @@ async function runInit(opts: Record<string, string>, jsonOutput: boolean): Promi
     // Interactive: select existing system or create new
     await interactiveInit(opts, jsonOutput);
   } else {
-    console.error('Error: Non-interactive environment detected. Provide required options:');
-    console.error('  abap init --system <name>');
-    console.error('  abap init --url <url> --username <user> --password <password>');
-    process.exit(1);
+    throw new CliError(
+      'USAGE',
+      'Non-interactive environment detected. Provide required options:\n' +
+        '  abap init --system <name>\n' +
+        '  abap init --url <url> --username <user> --password <password>',
+    );
   }
 }
 
@@ -77,8 +78,10 @@ async function useExistingSystem(
 ): Promise<void> {
   const profile = getSystem(systemName);
   if (!profile) {
-    console.error(`Error: System profile '${systemName}' not found. Run 'abap init' interactively to create it.`);
-    process.exit(1);
+    throw new CliError(
+      'CONFIG_ERROR',
+      `System profile '${systemName}' not found. Run 'abap init' interactively to create it.`,
+    );
   }
 
   // Password: keychain (stored at profile creation) or --password/env override
@@ -93,8 +96,10 @@ async function useExistingSystem(
   };
 
   if (!config.password) {
-    console.error(`Error: No password stored for system '${systemName}'. Re-run with --password.`);
-    process.exit(1);
+    throw new CliError(
+      'CONFIG_ERROR',
+      `No password stored for system '${systemName}'. Re-run with --password.`,
+    );
   }
 
   validateInputs(config);
@@ -256,9 +261,10 @@ async function handleFileOverwrite(isInteractive: boolean): Promise<void> {
   if (!fs.existsSync(configPath)) return;
 
   if (!isInteractive) {
-    console.error('Error: .abap.json already exists. Please delete it first or run interactively:');
-    console.error(`  rm ${configPath}`);
-    process.exit(1);
+    throw new CliError(
+      'CONFIG_ERROR',
+      `.abap.json already exists. Delete it first or run interactively:\n  rm ${configPath}`,
+    );
   }
 
   const ok = orCancel(await confirm({ message: '.abap.json already exists. Overwrite?', initialValue: false }));
@@ -272,36 +278,30 @@ async function handleFileOverwrite(isInteractive: boolean): Promise<void> {
 function validateInputs(config: CollectedConfig): void {
   // URL: non-empty and has protocol prefix
   if (!config.url) {
-    console.error('Error: URL is required');
-    process.exit(1);
+    throw new CliError('INVALID_ARGUMENT', 'URL is required');
   }
   if (!config.url.match(/^https?:\/\//i)) {
-    console.error('Error: Invalid URL format — must start with http:// or https://');
-    process.exit(1);
+    throw new CliError('INVALID_ARGUMENT', 'Invalid URL format — must start with http:// or https://');
   }
 
   // Username: non-empty
   if (!config.username) {
-    console.error('Error: Username is required');
-    process.exit(1);
+    throw new CliError('INVALID_ARGUMENT', 'Username is required');
   }
 
   // Password: non-empty
   if (!config.password) {
-    console.error('Error: Password is required');
-    process.exit(1);
+    throw new CliError('INVALID_ARGUMENT', 'Password is required');
   }
 
   // Client: 3-digit numeric or empty
   if (config.client && !/^\d{3}$/.test(config.client)) {
-    console.error('Error: Client must be a 3-digit number');
-    process.exit(1);
+    throw new CliError('INVALID_ARGUMENT', 'Client must be a 3-digit number');
   }
 
   // Language: 2-char alpha or empty
   if (config.language && !/^[a-zA-Z]{2}$/.test(config.language)) {
-    console.error('Error: Language must be a 2-character code');
-    process.exit(1);
+    throw new CliError('INVALID_ARGUMENT', 'Language must be a 2-character code');
   }
 }
 
