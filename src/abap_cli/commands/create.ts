@@ -1,4 +1,6 @@
 import { Command } from 'commander';
+import * as path from 'path';
+import * as fs from 'fs/promises';
 import type { CreatableTypeIds } from 'abap-adt-api';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
@@ -6,36 +8,37 @@ import { commonErrorsAfter } from '../output/help-text.js';
 import { resolveObject, getObjectParts, type ResolvedObject, type ObjectPart } from '../sync/resolve.js';
 import { resolveTransport } from '../sync/transport.js';
 import { pushObject } from '../sync/push-flow.js';
+import { buildFilename } from '../formats/file-resolver.js';
+import { writeAbapFile, fileExists } from '../formats/abap-source.js';
+import { defaultSkeleton, getTemplate } from '../formats/templates.js';
 
 interface CreateTypeSpec {
   objtype: CreatableTypeIds;
-  skeleton: (name: string) => string;
 }
 
-// User-facing type → ADT objtype + default skeleton (abap-file-format compliant).
+// User-facing type → ADT objtype (abap-file-format compliant).
 const TYPE_MAP: Record<string, CreateTypeSpec> = {
-  CLAS: {
-    objtype: 'CLAS/OC',
-    skeleton: (n) =>
-      `CLASS ${n} DEFINITION PUBLIC.\n  PUBLIC SECTION.\nENDCLASS.\nCLASS ${n} IMPLEMENTATION.\nENDCLASS.\n`,
-  },
-  INTF: {
-    objtype: 'INTF/OI',
-    skeleton: (n) => `INTERFACE ${n} PUBLIC.\nENDINTERFACE.\n`,
-  },
-  PROG: {
-    objtype: 'PROG/P',
-    skeleton: (n) => `REPORT ${n}.\n`,
-  },
-  FUGR: {
-    // FUGR/F creates a new function group; FUGR/FF is a function module within a group.
-    objtype: 'FUGR/F',
-    skeleton: (n) => `FUNCTION-POOL ${n}.\n`,
-  },
+  CLAS: { objtype: 'CLAS/OC' },
+  INTF: { objtype: 'INTF/OI' },
+  PROG: { objtype: 'PROG/P' },
+  FUGR: { objtype: 'FUGR/F' },
 };
 
 // DDIC objects are created via the ICF service (later phase, not implemented yet).
 const DDIC_TYPES = new Set(['DOMA', 'DTEL', 'TABL', 'STRU', 'TTYP']);
+
+interface CreateOptions {
+  package: string;
+  description: string;
+  tr?: string;
+  /** false when --no-activate is passed (commander negated boolean) */
+  activate?: boolean;
+  template?: string;
+  /** false when --no-pull is passed (commander negated boolean) */
+  pull?: boolean;
+  checkOnly?: boolean;
+  audit?: boolean;
+}
 
 export function registerCreateCommand(program: Command): void {
   program
@@ -48,6 +51,10 @@ export function registerCreateCommand(program: Command): void {
     .requiredOption('--description <desc>', 'Object description')
     .option('--tr <transport>', 'Transport number')
     .option('--no-activate', 'Create the object but do not activate it')
+    .option('--template <template>', 'Skeleton template (minimal, public-method, report, selection-screen, ...)')
+    .option('--no-pull', 'Skip the create-then-pull local copy (default: pull after create)')
+    .option('--check-only', 'Validate the proposed object without creating it')
+    .option('--audit', 'Include the before-checksum (extra SAP round-trip, off by default)')
     .action(async (type, name, opts, cmd) => {
       const json = jsonFromCommand(cmd);
       try {
@@ -58,21 +65,28 @@ export function registerCreateCommand(program: Command): void {
     });
 }
 
-interface CreateOptions {
-  package: string;
-  description: string;
-  tr?: string;
-  /** false when --no-activate is passed (commander negated boolean) */
-  activate?: boolean;
-}
-
 async function runCreate(type: string, name: string, opts: CreateOptions, json: boolean): Promise<void> {
-  // --no-activate sets opts.activate to false; it is true by default.
   const skipActivate = opts.activate === false;
   const spec = resolveType(type);
   const objectName = normalizeName(name);
-
   const client = await AdtClientWrapper.create();
+
+  // --check-only: validate the proposed object without creating it (FR-021).
+  if (opts.checkOnly) {
+    const result = await client.validateNewObject({
+      objtype: spec.objtype,
+      objname: objectName,
+      packagename: opts.package,
+      description: opts.description,
+    } as Parameters<AdtClientWrapper['validateNewObject']>[0]);
+    printResult(
+      json,
+      { object: objectName, type: type.toUpperCase(), checkOnly: true, valid: result.success, issues: result.success ? [] : [result.SHORT_TEXT] },
+      `Validation ${result.success ? 'passed' : 'failed'} for ${objectName} (no object created).`,
+    );
+    return;
+  }
+
   const transport = await resolveTransport(client, opts.tr, client.getConfig().transport);
 
   // Refuse to overwrite: create is a "new object" operation.
@@ -103,13 +117,38 @@ async function runCreate(type: string, name: string, opts: CreateOptions, json: 
     throw new CliError('SAP_ERROR', `No source part found for created object ${objectName}`, { object: objectName });
   }
 
-  // Write the skeleton then activate (or skip activation with --no-activate).
+  const templateName = opts.template;
+  const template = templateName ? getTemplate(type, templateName) : undefined;
+  if (templateName && !template) {
+    throw new CliError('INVALID_ARGUMENT', `Unknown template '${templateName}' for type ${type.toUpperCase()}`, {
+      nextSteps: [`List available templates: abap create ${type.toUpperCase()} <name> --help`],
+    });
+  }
+  const skeleton = template ? template.skeleton(objectName) : defaultSkeleton(type, objectName);
+
+  // --audit: capture the before-checksum (roadmap §1.2, off by default).
+  let checksum: string | undefined;
+  if (opts.audit) {
+    const before = await client.getObjectSource(mainPart.sourceUrl);
+    checksum = String(before.length);
+  }
+
   await pushObject(
     client,
     { name: object.name, type: object.type, objectUrl: object.objectUrl },
-    [{ subtype: mainPart.subtype, sourceUrl: mainPart.sourceUrl, content: spec.skeleton(objectName) }],
+    [{ subtype: mainPart.subtype, sourceUrl: mainPart.sourceUrl, content: skeleton }],
     { transport, checkOnly: false, activate: skipActivate ? false : true },
   );
+
+  // Create-then-pull default: write the local file so the agent has it (FR-021).
+  let localFile: string | undefined;
+  if (opts.pull !== false) {
+    const content = await client.getObjectSource(mainPart.sourceUrl);
+    const filename = buildFilename(object.name, object.type, mainPart.subtype, '.abap');
+    const relPath = path.join('src', filename);
+    await writeAbapFile(path.resolve(process.cwd(), relPath), content);
+    localFile = relPath;
+  }
 
   printResult(
     json,
@@ -120,6 +159,9 @@ async function runCreate(type: string, name: string, opts: CreateOptions, json: 
       description: opts.description,
       transport,
       activated: skipActivate ? false : true,
+      template: templateName,
+      localFile,
+      checksum,
     },
     `Created ${type.toUpperCase()} ${objectName} in ${opts.package}${skipActivate ? ' (not activated)' : ''} (${transport})`,
   );
@@ -152,7 +194,6 @@ function normalizeName(name: string): string {
 async function assertNotExists(client: AdtClientWrapper, objectName: string): Promise<void> {
   try {
     await resolveObject(client, objectName);
-    // Fall through — an exact match means the object already exists.
   } catch (error: unknown) {
     if (error instanceof CliError && error.code === 'OBJECT_NOT_FOUND') return;
     if (error instanceof CliError && error.code === 'AMBIGUOUS_OBJECT') {

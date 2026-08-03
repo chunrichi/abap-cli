@@ -22,6 +22,7 @@ export function registerPushCommand(program: Command): void {
     .option('--no-activate', 'Lock + write + skip check + skip activate + unlock')
     .option('--dry-run', 'Plan only — make no mutating ADT calls (FR-012)')
     .option('--fail-fast', 'Stop at the first failing file (default: --keep-going)')
+    .option('--atomic', 'Validate all files first; write nothing if any file fails validation')
     .action(async (files: string[], opts, cmd) => {
       const json = jsonFromCommand(cmd);
       try {
@@ -46,7 +47,7 @@ interface PushFileResult {
 
 async function runPush(
   files: string[],
-  opts: { all?: boolean; tr?: string; checkOnly?: boolean; activate?: boolean; dryRun?: boolean; failFast?: boolean },
+  opts: { all?: boolean; tr?: string; checkOnly?: boolean; activate?: boolean; dryRun?: boolean; failFast?: boolean; atomic?: boolean },
   json: boolean,
 ): Promise<void> {
   if (opts.checkOnly && opts.activate === false) {
@@ -65,6 +66,30 @@ async function runPush(
       nextSteps: ["Provide one or more file paths: abap push src/foo.abap src/bar.abap --tr NDK123456", "Or use --all with a .abapignore at the workspace root."],
       example: 'abap push src/foo.abap --tr NDK123456',
     });
+  }
+
+  // --atomic phase 1: structural validation of every file (NO content syntax
+  // check — it establishes an SAP edit session that breaks the later activate,
+  // per 008 real-SAP findings and research §11). Any failure → zero writes.
+  if (opts.atomic) {
+    const validationFailures: { file: string; code?: string; message: string }[] = [];
+    for (const file of target.files) {
+      try {
+        const resolved = resolveFile(file);
+        validateLocalFile(resolved);
+        await readAbapFile(file);
+      } catch (error: unknown) {
+        const err = toErrorShape(error);
+        validationFailures.push({ file, code: err.code as string, message: err.message as string });
+      }
+    }
+    if (validationFailures.length > 0) {
+      throw new CliError('VALIDATION_ERROR', `${validationFailures.length} file(s) failed validation; nothing was written`, {
+        details: { failures: validationFailures, atomic: true },
+        nextSteps: ['Fix the failing files and re-run.', 'Or drop --atomic to push the valid files individually.'],
+        example: 'abap push src/foo.abap --tr NDK123456 --atomic',
+      });
+    }
   }
 
   const client = await AdtClientWrapper.create();

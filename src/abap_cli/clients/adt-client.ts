@@ -148,10 +148,20 @@ export class AdtClientWrapper {
     return this._call(() => this.client.userTransports(user, targets));
   }
 
+  /** Structured transport metadata for `transport show <req>` (FR-015). */
+  transportDetails(transportNumber: string) {
+    return this._call(() => this.client.transportDetails(transportNumber));
+  }
+
   // --- Object creation ---
 
   createObject(options: Parameters<ADTClient['createObject']>[0]) {
     return this._call(() => this.client.createObject(options));
+  }
+
+  /** Validate a proposed object without creating it (FR-021, `create --check-only`). */
+  validateNewObject(options: Parameters<ADTClient['validateNewObject']>[0]) {
+    return this._call(() => this.client.validateNewObject(options));
   }
 
   // --- Deletion ---
@@ -160,9 +170,21 @@ export class AdtClientWrapper {
     return this._call(() => this.client.deleteObject(objectUrl, lockHandle, transport));
   }
 
-  // --- ATC ---
+  // --- ATC (check --atc, FR-011) ---
 
-  // TODO: ATC methods - check abap-adt-api for correct method names
-  // async createAtcRun(variant: string, mainUrl: string, maxResults = 100) {}
-  // async atcWorklists(runResultId: string) {}
+  atcCheckVariant(variant: string) {
+    return this._call(() => this.client.atcCheckVariant(variant));
+  }
+
+  createAtcRun(variant: string, mainUrl: string, maxResults = 100) {
+    return this._call(() => this.client.createAtcRun(variant, mainUrl, maxResults));
+  }
+
+  atcWorklists(runResultId: string, timestamp?: number, usedObjectSet?: string, includeExemptedFindings = false) {
+    return this._call(() =>
+      timestamp === undefined
+        ? this.client.atcWorklists(runResultId)
+        : this.client.atcWorklists(runResultId, timestamp, usedObjectSet ?? '', includeExemptedFindings),
+    );
+  }
 }

@@ -18,8 +18,11 @@ import { URL } from 'node:url';
 
 const PORT = Number(process.argv[2] || process.env.PORT || 8080);
 const NO_TRANSPORTS = process.env.MOCK_NO_TRANSPORTS === '1';
+// MOCK_ATOMIC_FAIL=1 → fail the 2nd setObjectSource (mid-batch write failure for push --atomic).
+const ATOMIC_FAIL = process.env.MOCK_ATOMIC_FAIL === '1';
 const NOW = '2026-08-01T00:00:00Z';
 const CURRENT_USER = 'MOCKUSER';
+let putCount = 0; // global PUT counter (MOCK_ATOMIC_FAIL fails on the 2nd write)
 
 // ---------- fixture store ----------
 const objects = new Map();
@@ -30,12 +33,42 @@ function addObject(name, type, objectUrl, description, parts, opts = {}) {
     type,
     objectUrl,
     description,
-    packageName: '$TMP',
+    packageName: opts.packageName ?? '$TMP',
     active: true,
     lockedBy: opts.lockedBy ?? null, // { user, lockHandle }
     parts,
   });
 }
+
+// Search pagination fixtures (US1/SC-001): 25 ZPAGE_* objects + exact "ZPAGE".
+// Inserted FIRST so bounded search windows reach the package members early
+// (search returns insertion order in this mock).
+for (let i = 1; i <= 25; i++) {
+  const name = `ZPAGE_${String(i).padStart(2, '0')}`;
+  addObject(name, 'PROG', `/sap/bc/adt/programs/programs/${name.toLowerCase()}`, `Paged object ${i}`, [
+    {
+      subtype: 'main',
+      sourceUrl: `/sap/bc/adt/programs/programs/${name.toLowerCase()}/source/main`,
+      content: `REPORT ${name.toLowerCase()}.\n`,
+    },
+  ], { packageName: i <= 5 ? 'ZPKG' : '$TMP' });
+}
+addObject('ZPAGE', 'PROG', '/sap/bc/adt/programs/programs/zpage', 'Exact match for ZPAGE', [
+  {
+    subtype: 'main',
+    sourceUrl: '/sap/bc/adt/programs/programs/zpage/source/main',
+    content: 'REPORT zpage.\n',
+  },
+], { packageName: 'ZPKG' });
+
+// Remote-only object (US4/SC-004): exists on the mock SAP side, no local counterpart.
+addObject('ZREMOTE_ONLY', 'PROG', '/sap/bc/adt/programs/programs/zremote_only', 'Remote-only object', [
+  {
+    subtype: 'main',
+    sourceUrl: '/sap/bc/adt/programs/programs/zremote_only/source/main',
+    content: 'REPORT zremote_only.\n',
+  },
+]);
 
 addObject('ZCL_DEMO', 'CLAS', '/sap/bc/adt/oo/classes/zcl_demo', 'Demo class for mock testing', [
   {
@@ -248,6 +281,19 @@ function lockXml(lockHandle) {
 const createdTransports = [];
 let transportSeq = 1;
 
+// ---------- ATC (check --atc, US2/US3) ----------
+const ATC_VARIANTS = new Map([['Z_ATC_VAR', 'Mock ATC variant']]);
+const atcRuns = new Map(); // runId -> { variant, timestamp }
+let atcSeq = 0;
+
+// ---------- transport detail / assign fixtures (US5) ----------
+// `transport show <req>` / `transport resolve <obj>` / `transport assign <obj> --tr <req>`.
+const DETAIL_TRANSPORTS = new Map([
+  ['NDK123456', { number: 'NDK123456', owner: 'MOCKUSER', desc: 'Mock request 1', status: 'D', uri: '/sap/bc/adt/cts/transportrequests/NDK123456' }],
+]);
+// Object → transport number as assigned via `transport assign` (or pre-seeded for resolve).
+const objectTransports = new Map([['ZPROG', 'NDK123456']]);
+
 const BASE_TRANSPORTS = NO_TRANSPORTS
   ? { workbench: { modifiable: [], released: [] }, customizing: [] }
   : {
@@ -357,6 +403,137 @@ function checkXml(sourceUrl, inclUrl, issues) {
   );
 }
 
+// createAtcRun response: worklistRun with worklistId / worklistTimestamp / infos.
+function atcRunXml(runId, variant) {
+  return (
+    '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<atc:worklistRun xmlns:atc="http://www.sap.com/adt/atc">\n' +
+    `  <atc:worklistId>${runId}</atc:worklistId>\n` +
+    `  <atc:worklistTimestamp>${NOW}</atc:worklistTimestamp>\n` +
+    '  <atc:infos>\n' +
+    `    <atc:info atc:type="INFO" atc:description="Mock run for ${esc(variant)}"/>\n` +
+    '  </atc:infos>\n' +
+    '</atc:worklistRun>\n'
+  );
+}
+
+// atcWorklists response: worklist with objects/findings (deterministic per fixture).
+function atcWorklistXml(run) {
+  const findings = [
+    {
+      uri: '/sap/bc/adt/oo/classes/zcl_ok/source/main',
+      location: '/sap/bc/adt/oo/classes/zcl_ok/source/main#start=3,1;end=3,10',
+      priority: '2',
+      checkId: 'check_style',
+      checkTitle: 'Style check',
+      messageId: 'MSG001',
+      messageTitle: 'Method is too long',
+      exemptionApproval: '',
+      exemptionKind: '',
+      checksum: '123456',
+      quickfixInfo: '',
+      linkHref: '/sap/bc/adt/atc/findings/1',
+    },
+  ];
+  const findingXml = findings
+    .map(
+      (f) =>
+        `        <atc:finding atc:uri="${f.uri}" atc:location="${f.location}" atc:priority="${f.priority}" ` +
+        `atc:checkId="${f.checkId}" atc:checkTitle="${f.checkTitle}" atc:messageId="${f.messageId}" ` +
+        `atc:messageTitle="${esc(f.messageTitle)}" atc:exemptionApproval="${f.exemptionApproval}" ` +
+        `atc:exemptionKind="${f.exemptionKind}" atc:checksum="${f.checksum}" atc:quickfixInfo="${f.quickfixInfo}">\n` +
+        `          <atom:link href="${f.linkHref}" rel="self" type="application/xml"/>\n` +
+        '        </atc:finding>\n',
+    )
+    .join('');
+  return (
+    '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<atc:worklist xmlns:atc="http://www.sap.com/adt/atc" xmlns:atom="http://www.w3.org/2005/Atom" ' +
+    `atc:id="WL001" atc:timestamp="${NOW}" atc:usedObjectSet="${run.variant}" atc:objectSetIsComplete="true">\n` +
+    '  <atc:objectSets>\n' +
+    `    <atc:objectSet atc:name="${run.variant}" atc:title="Mock ATC variant" atc:kind="inclusive"/>\n` +
+    '  </atc:objectSets>\n' +
+    '  <atc:objects>\n' +
+    '    <atc:object atc:uri="/sap/bc/adt/oo/classes/zcl_ok" atc:type="CLAS/OC" atc:name="ZCL_OK" ' +
+    'atc:packageName="$TMP" atc:author="MOCKUSER" atc:objectTypeId="CLAS/OC">\n' +
+    '      <atc:findings>\n' +
+    findingXml +
+    '      </atc:findings>\n' +
+    '    </atc:object>\n' +
+    '  </atc:objects>\n' +
+    '</atc:worklist>\n'
+  );
+}
+
+// transportDetails response (GET /sap/bc/adt/cts/transportrequests/<number>).
+// parseRequest reads tm:abap_object children of the tm:request element itself.
+function transportDetailsXml(req) {
+  const task = {
+    number: `${req.number}T1`,
+    owner: req.owner,
+    desc: req.desc,
+    status: req.status,
+    uri: `${req.uri}/tasks/${req.number}T1`,
+  };
+  return (
+    '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<tm:root xmlns:tm="http://www.sap.com/adt/transport" xmlns:atom="http://www.w3.org/2005/Atom">\n' +
+    `  <tm:request tm:number="${req.number}" tm:owner="${req.owner}" tm:desc="${esc(req.desc)}" ` +
+    `tm:status="${req.status}" tm:uri="${req.uri}">\n` +
+    '      <tm:abap_object tm:name="ZCL_DEMO" tm:type="CLAS/OC" tm:obj_info="Active"/>\n' +
+    '      <tm:abap_object tm:name="ZPROG" tm:type="PROG/P" tm:obj_info="Active"/>\n' +
+    `    <tm:task tm:number="${task.number}" tm:owner="${task.owner}" tm:desc="${esc(task.desc)}" ` +
+    `tm:status="${task.status}" tm:uri="${task.uri}">\n` +
+    `      <atom:link href="${task.uri}" rel="self" type="application/xml"/>\n` +
+    '    </tm:task>\n' +
+    '  </tm:request>\n' +
+    '</tm:root>\n'
+  );
+}
+
+// transportInfo response (POST /sap/bc/adt/cts/transportchecks).
+function transportInfoXml(transports) {
+  const reqs = transports
+    .map(
+      (t) =>
+        `      <CTS_REQUEST>\n        <REQ_HEADER>\n` +
+        `          <TRKORR>${t.number}</TRKORR>\n` +
+        `          <TRSTATUS>${t.status}</TRSTATUS>\n` +
+        `          <AS4USER>${t.owner}</AS4USER>\n` +
+        `          <AS4TEXT>${esc(t.desc)}</AS4TEXT>\n` +
+        `        </REQ_HEADER>\n      </CTS_REQUEST>\n`,
+    )
+    .join('');
+  return (
+    '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">\n' +
+    '  <asx:values>\n' +
+    '    <DATA>\n' +
+    '      <REQUESTS>\n' +
+    reqs +
+    '      </REQUESTS>\n' +
+    '    </DATA>\n' +
+    '  </asx:values>\n' +
+    '</asx:abap>\n'
+  );
+}
+
+// validateNewObject response (POST /sap/bc/adt/oo/validation/objectname).
+function validateXml(severity, shortText, checkResult) {
+  return (
+    '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">\n' +
+    '  <asx:values>\n' +
+    '    <DATA>\n' +
+    `      <SEVERITY>${severity}</SEVERITY>\n` +
+    `      <SHORT_TEXT>${esc(shortText)}</SHORT_TEXT>\n` +
+    `      <CHECK_RESULT>${checkResult}</CHECK_RESULT>\n` +
+    '    </DATA>\n' +
+    '  </asx:values>\n' +
+    '</asx:abap>\n'
+  );
+}
+
 // ---------- server ----------
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
@@ -440,7 +617,17 @@ const server = http.createServer(async (req, res) => {
       if (!owner.lockedBy || owner.lockedBy.lockHandle !== q.get('lockHandle')) {
         return adtError(res, 403, `Object ${owner.name} is not locked by this session`);
       }
+      putCount += 1;
+      if (ATOMIC_FAIL && putCount === 2) {
+        return adtError(res, 500, 'Simulated mid-batch write failure (MOCK_ATOMIC_FAIL=1)');
+      }
       part.content = await readBody(req);
+      // transport assign: writing identical content with corrNr attaches the
+      // object to that transport (mirrors how the CLI reuses setObjectSource).
+      const corrNr = q.get('corrNr');
+      if (corrNr && DETAIL_TRANSPORTS.has(corrNr)) {
+        objectTransports.set(owner.name, corrNr);
+      }
       return ok(res, '');
     }
 
@@ -495,6 +682,66 @@ const server = http.createServer(async (req, res) => {
       return ok(res, `/sap/bc/adt/cts/transportrequests/${number}`, 'text/plain');
     }
 
+    // transportInfo (POST /sap/bc/adt/cts/transportchecks) — which request owns an object
+    if (path === '/sap/bc/adt/cts/transportchecks' && req.method === 'POST') {
+      const body = await readBody(req);
+      const uri = /<URI>([^<]*)<\/URI>/.exec(body)?.[1] ?? '';
+      const owner = bySourceUrl(uri)?.owner ?? byObjectUrl(uri);
+      const trNumber = owner ? objectTransports.get(owner.name) : undefined;
+      const tr = trNumber ? DETAIL_TRANSPORTS.get(trNumber) : undefined;
+      return ok(
+        res,
+        transportInfoXml(tr ? [{ number: tr.number, status: tr.status, owner: tr.owner, desc: tr.desc }] : []),
+        'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.transport.service.checkData',
+      );
+    }
+
+    // transportDetails (GET /sap/bc/adt/cts/transportrequests/<number>)
+    if (path.startsWith('/sap/bc/adt/cts/transportrequests/') && req.method === 'GET') {
+      const number = path.split('/').pop();
+      const found = [...DETAIL_TRANSPORTS.values()].find((r) => r.number === number);
+      if (found) {
+        return ok(res, transportDetailsXml(found), 'application/vnd.sap.adt.transportorganizer.v1+xml');
+      }
+      return adtError(res, 404, `Transport request ${number} not found`);
+    }
+
+    // ATC: checkVariant (POST /sap/bc/adt/atc/worklists?checkVariant=<v>)
+    if (path === '/sap/bc/adt/atc/worklists' && req.method === 'POST') {
+      const variant = q.get('checkVariant');
+      if (!variant || !ATC_VARIANTS.has(variant)) return adtError(res, 404, `Unknown ATC variant: ${variant}`);
+      return ok(res, variant, 'text/plain');
+    }
+
+    // ATC: createAtcRun (POST /sap/bc/adt/atc/runs?worklistId=<variant>)
+    if (path === '/sap/bc/adt/atc/runs' && req.method === 'POST') {
+      const variant = q.get('worklistId');
+      if (!variant || !ATC_VARIANTS.has(variant)) return adtError(res, 404, `Unknown ATC variant: ${variant}`);
+      atcSeq += 1;
+      const runId = `RUN${String(atcSeq).padStart(3, '0')}`;
+      atcRuns.set(runId, { variant, timestamp: NOW });
+      return ok(res, atcRunXml(runId, variant), 'application/xml');
+    }
+
+    // ATC: worklist (GET /sap/bc/adt/atc/worklists/<runId>)
+    if (path.startsWith('/sap/bc/adt/atc/worklists/') && req.method === 'GET') {
+      const runId = path.split('/').pop();
+      const run = atcRuns.get(runId);
+      if (!run) return adtError(res, 404, `Unknown ATC run: ${runId}`);
+      return ok(res, atcWorklistXml(run), 'application/atc.worklist.v1+xml');
+    }
+
+    // validateNewObject (POST /sap/bc/adt/oo/validation/objectname)
+    if (path === '/sap/bc/adt/oo/validation/objectname' && req.method === 'POST') {
+      const objname = (q.get('objname') || '').toUpperCase();
+      const objtype = q.get('objtype') || '';
+      if (!objname || !objtype) return adtError(res, 400, 'Missing objname/objtype for validation');
+      if (objname.startsWith('ZBAD_')) {
+        return ok(res, validateXml('ERROR', `Object name ${objname} is not allowed`, ''), 'application/xml');
+      }
+      return ok(res, validateXml('INFO', `${objname} is available`, 'X'), 'application/xml');
+    }
+
     // object structure / source read (GET)
     if (req.method === 'GET') {
       const found = bySourceUrl(path);
@@ -515,4 +762,5 @@ server.listen(PORT, () => {
   console.log(`Mock ADT listening on http://localhost:${PORT}`);
   console.log(`Fixture objects: ${names}`);
   console.log(`NO_TRANSPORTS=${NO_TRANSPORTS ? 'on' : 'off'} (TRN001 available)`);
+  console.log(`ATOMIC_FAIL=${ATOMIC_FAIL ? 'on (2nd PUT fails)' : 'off'}`);
 });

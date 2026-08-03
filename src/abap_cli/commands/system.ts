@@ -8,6 +8,7 @@ import { printError, printResult, jsonFromCommand, CliError } from '../output/js
 import { commonErrorsAfter } from '../output/help-text.js';
 import { assertValidProfile } from '../config/validation.js';
 import { probeSystem } from '../clients/probe.js';
+import { exportProfiles, importProfiles, type ProfileBundle } from '../sync/profiles.js';
 
 export function registerSystemCommand(program: Command): void {
   const system = program
@@ -102,11 +103,66 @@ export function registerSystemCommand(program: Command): void {
         handleError(jsonFromCommand(cmd), error);
       }
     });
+
+  system
+    .command('export [names...]')
+    .description('Export system profiles to a portable bundle (passwords excluded by default)')
+    .option('--file <path>', 'Write the bundle to a file (default: stdout)')
+    .option('--with-passwords', 'Include passwords in the bundle (warned opt-in)')
+    .action(async (names: string[], opts: { file?: string; withPasswords?: boolean }, cmd) => {
+      const json = jsonFromCommand(cmd);
+      try {
+        if (opts.withPasswords) {
+          console.error('Warning: exporting profiles WITH passwords. Keep the bundle secure.');
+        }
+        const bundle = await exportProfiles({ names, withPasswords: opts.withPasswords });
+        const human = `Exported ${bundle.systems.length} profile(s)${opts.withPasswords ? ' (with passwords)' : ''}.`;
+        if (opts.file) {
+          fs.writeFileSync(path.resolve(opts.file), JSON.stringify(bundle, null, 2) + '\n', 'utf-8');
+          printResult(json, { file: opts.file, count: bundle.systems.length }, `${human} → ${opts.file}`);
+        } else {
+          printResult(json, bundle, human);
+        }
+      } catch (error: unknown) {
+        handleError(json, error);
+      }
+    });
+
+  system
+    .command('import <file>')
+    .description('Import system profiles from a bundle')
+    .option('--overwrite', 'Update profiles that already exist')
+    .action(async (file: string, opts: { overwrite?: boolean }, cmd) => {
+      const json = jsonFromCommand(cmd);
+      try {
+        const raw = JSON.parse(fs.readFileSync(path.resolve(file), 'utf-8'));
+        const bundle = validateBundle(raw);
+        const result = await importProfiles(bundle);
+        const human = result.imported
+          .map((i) => `  ${i.name} — ${i.action}`)
+          .join('\n');
+        printResult(json, result, `Imported ${result.imported.length} profile(s):\n${human}`);
+      } catch (error: unknown) {
+        handleError(json, error);
+      }
+    });
 }
 
 /** Report command errors via the unified JSON-aware handler */
 function handleError(jsonOutput: boolean, error: unknown): never {
   printError(jsonOutput, error);
+}
+
+/** Validate that a raw import payload is a ProfileBundle. */
+function validateBundle(raw: unknown): ProfileBundle {
+  const bundle = raw as Partial<ProfileBundle> | null;
+  if (!bundle || bundle.format !== 'abap-cli-profiles' || !Array.isArray(bundle.systems)) {
+    throw new CliError('INVALID_ARGUMENT', 'Not a valid abap-cli profiles bundle', {
+      nextSteps: ['Export a bundle first: abap system export --file profiles.json'],
+      example: 'abap system export --file profiles.json',
+    });
+  }
+  return bundle as ProfileBundle;
 }
 
 /** True while the guided @clack menu is active; plain console.log would clash with its frames. */

@@ -39,10 +39,18 @@ export function classifyHttpError(
   context?: { name?: string },
 ): CliError {
   // abap-adt-api wraps AxiosError into HttpClientException with a `status`
-  // number field. Detect auth/TLS/sap there first.
-  const httpEx = error as { status?: unknown; message?: string; code?: string };
+  // number field, or AdtErrorException with the status on `.err`. Normalise
+  // both here so TLS/auth/sap detection sees the numeric HTTP status.
+  const httpEx = error as { status?: unknown; err?: unknown; message?: string; code?: string };
+  const status =
+    typeof httpEx.status === 'number'
+      ? httpEx.status
+      : typeof httpEx.err === 'number'
+        ? httpEx.err
+        : undefined;
+
   if (
-    typeof httpEx.status === 'number' &&
+    status !== undefined &&
     !axios.isAxiosError(error)
   ) {
     // TLS handshake failures surface as AdtHttpException with status 0 and the
@@ -55,7 +63,6 @@ export function classifyHttpError(
         example: TLS_EXAMPLE,
       });
     }
-    const status = httpEx.status;
     if (status === 401 || status === 403) {
       return new CliError('AUTH_ERROR', httpEx.message || 'authentication failed', {
         details: { httpStatus: status, ...(context?.name ? { system: context.name } : {}) },
@@ -63,12 +70,10 @@ export function classifyHttpError(
         example: AUTH_EXAMPLE,
       });
     }
-    if (typeof status === 'number') {
-      const opts: CliErrorOptions = {
-        details: { httpStatus: status, ...(context?.name ? { system: context.name } : {}) },
-      };
-      return new CliError('SAP_ERROR', httpEx.message || `HTTP ${status}`, opts);
-    }
+    const opts: CliErrorOptions = {
+      details: { httpStatus: status, ...(context?.name ? { system: context.name } : {}) },
+    };
+    return new CliError('SAP_ERROR', httpEx.message || `HTTP ${status}`, opts);
   }
 
   // Non-Axios Node system errors (TLS, ECONNRESET, etc.) — sometimes arrive

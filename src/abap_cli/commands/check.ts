@@ -1,35 +1,41 @@
 import { Command } from 'commander';
+import * as fs from 'fs/promises';
 import * as path from 'path';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { resolveFile } from '../formats/file-resolver.js';
 import { listAbapFiles, readAbapFile } from '../formats/abap-source.js';
-import { CliError, printError, printResult, toErrorShape, jsonFromCommand } from '../output/json.js';
+import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import { resolveObject, getObjectParts, validateLocalFile } from '../sync/resolve.js';
+import { runAtcCheck } from '../sync/atc.js';
+import type { CheckIssue } from '../sync/issues.js';
 
-interface CheckIssue {
-  line: number;
-  offset: number;
-  severity: string;
-  text: string;
-}
+type CheckMode = 'syntax' | 'content' | 'atc';
 
-interface CheckFileResult {
-  file: string;
-  ok: boolean;
-  warnings?: CheckIssue[];
-  errors?: CheckIssue[];
-  error?: { code: string; message: string };
+interface CheckOptions {
+  syntax?: boolean;
+  content?: boolean;
+  atc?: boolean;
+  variant?: string;
+  all?: boolean;
+  changed?: boolean;
+  strict?: boolean;
 }
 
 export function registerCheckCommand(program: Command): void {
   program
     .command('check')
-    .description('Perform syntax check on local ABAP files (no activation, no SAP changes)')
+    .description('Validate local ABAP files: --syntax (default, against SAP), --content (local), --atc (against SAP)')
     .addHelpText('after', commonErrorsAfter())
     .argument('[files...]', 'Files to check')
+    .option('--syntax', 'Syntax check against SAP (default mode)')
+    .option('--content', 'Local-only validation, no SAP round-trip')
+    .option('--atc', 'ATC check against SAP')
+    .option('--variant <variant>', 'ATC check variant (only with --atc)')
     .option('--all', 'Check all .abap files under the current directory')
-    .action(async (files: string[], opts, cmd) => {
+    .option('--changed', 'Check only files changed since the SAP version')
+    .option('--strict', 'Treat warnings as failures')
+    .action(async (files: string[], opts: CheckOptions, cmd) => {
       const json = jsonFromCommand(cmd);
       try {
         await runCheck(files, opts, json);
@@ -39,102 +45,197 @@ export function registerCheckCommand(program: Command): void {
     });
 }
 
-async function runCheck(files: string[], opts: { all?: boolean }, json: boolean): Promise<void> {
-  const fileList = await collectFiles(files, opts.all);
-  const client = await AdtClientWrapper.create();
+async function runCheck(files: string[], opts: CheckOptions, json: boolean): Promise<void> {
+  const mode = resolveMode(opts);
+  if (mode === 'atc' && !opts.variant) {
+    throw new CliError('INVALID_ARGUMENT', '--atc requires --variant', {
+      nextSteps: ['Pass an ATC variant: abap check <file> --atc --variant Z_VARIANT'],
+      example: 'abap check src/zcl_ok.clas.abap --atc --variant Z_ATC_VAR',
+    });
+  }
 
-  const results: CheckFileResult[] = [];
-  let failed = 0;
+  const fileList = await collectFiles(files, opts);
+  if (fileList.length === 0) {
+    throw new CliError('USAGE', 'No files to check', {
+      nextSteps: ['Provide file paths, or use --all for every .abap file.'],
+      example: 'abap check src/zcl_demo.clas.abap',
+    });
+  }
+
+  // --content is local-only: no SAP client is created (zero SAP calls).
+  const client = mode === 'content' ? null : await AdtClientWrapper.create();
+
+  const issues: CheckIssue[] = [];
   for (const file of fileList) {
-    try {
-      results.push(await checkFile(client, file));
-    } catch (error: unknown) {
-      failed++;
-      const err = toErrorShape(error);
-      results.push({
-        file,
-        ok: false,
-        error: {
-          code: err.code,
-          message: err.message,
-          ...(Array.isArray(err.errors) ? { errors: err.errors } : {}),
-        },
-      });
-    }
+    issues.push(...(await checkFile(client, file, mode, opts)));
   }
 
-  if (failed > 0) {
-    const single = fileList.length === 1;
-    const code = single ? (results[0]?.error?.code ?? 'SYNTAX_ERROR') : 'SYNTAX_ERROR';
-    const payload = { code, message: `${failed} of ${fileList.length} file(s) failed`, results };
-    if (json) {
-      console.error(JSON.stringify({ status: 'error', error: payload }, null, 2));
-    } else {
-      console.error(`Error: ${failed} of ${fileList.length} file(s) failed`);
-      for (const r of results.filter((x) => !x.ok)) {
-        const detail = r.error ? ` (${r.error.code})` : '';
-        console.error(`  ${r.file}${detail}`);
-        for (const e of r.errors ?? []) console.error(`    L${e.line}:${e.offset} [${e.severity}] ${e.text}`);
-      }
-    }
-    process.exit(1);
+  const failed = issues.some((i) => i.severity === 'error' || (opts.strict && i.severity === 'warning'));
+  if (failed) {
+    const code = mode === 'syntax' ? 'SYNTAX_ERROR' : 'VALIDATION_ERROR';
+    throw new CliError(code, `${issues.length} issue(s) found across ${fileList.length} file(s)`, {
+      details: { issues, files: fileList.length },
+    });
   }
-
-  printResult(json, { results, failed }, humanSummary(results));
+  printResult(json, { issues, failure: false }, humanSummary(issues));
 }
 
-async function checkFile(client: AdtClientWrapper, file: string): Promise<CheckFileResult> {
+/** Resolve the single active mode flag; defaults to --syntax (FR-006). */
+function resolveMode(opts: CheckOptions): CheckMode {
+  const active = (['syntax', 'content', 'atc'] as const).filter((m) => opts[m]);
+  if (active.length > 1) {
+    throw new CliError('INVALID_ARGUMENT', `Check modes are mutually exclusive: ${active.join(', ')}`, {
+      nextSteps: ['Pick exactly one mode: --syntax (default), --content, or --atc.'],
+      example: 'abap check src/zcl_demo.clas.abap --atc --variant Z_ATC_VAR',
+    });
+  }
+  return active[0] ?? 'syntax';
+}
+
+/** Resolve the file set from explicit files, --all, or --changed (FR-007). */
+async function collectFiles(files: string[], opts: CheckOptions): Promise<string[]> {
+  const scopeCount = Number(Boolean(opts.all)) + Number(Boolean(opts.changed)) + Number(files.length > 0);
+  if (scopeCount > 1) {
+    throw new CliError('INVALID_ARGUMENT', 'Specify files, --all, or --changed — not a combination', {
+      nextSteps: ['Use --all for every file, --changed for the change set, or pass file paths.'],
+      example: 'abap check --all',
+    });
+  }
+  if (opts.all) {
+    const found = await listAbapFiles(process.cwd());
+    return found.filter((f) => f.endsWith('.abap'));
+  }
+  if (opts.changed) {
+    return collectChangedFiles();
+  }
+  return files.map((f) => path.resolve(f));
+}
+
+/**
+ * The change set: local files whose mtime is newer than the SAP object's
+ * changedAt (research §7). Empty set fails fast with guidance.
+ */
+async function collectChangedFiles(): Promise<string[]> {
+  const client = await AdtClientWrapper.create();
+  const all = (await listAbapFiles(process.cwd())).filter((f) => f.endsWith('.abap'));
+  const changed: string[] = [];
+  for (const file of all) {
+    try {
+      const resolved = resolveFile(file);
+      const object = await resolveObject(client, resolved.objectName, resolved.objectType);
+      const struc = await client.objectStructure(object.objectUrl);
+      const changedAt = (struc as { 'adtcore:changedAt'?: string })['adtcore:changedAt'];
+      const sapTime = changedAt ? new Date(changedAt).getTime() : 0;
+      const stat = await fs.stat(file);
+      // Allow 1s clock skew between local and SAP clocks.
+      if (stat.mtimeMs > sapTime + 1000) changed.push(file);
+    } catch {
+      // Unresolvable objects are skipped (not part of a detectable change set).
+    }
+  }
+  if (changed.length === 0) {
+    throw new CliError('USAGE', 'No changed files to check', {
+      nextSteps: ['Run `abap status` to see the local↔SAP differences.', 'Or use --all to check every file.'],
+      example: 'abap check --changed',
+    });
+  }
+  return changed;
+}
+
+async function checkFile(
+  client: AdtClientWrapper | null,
+  file: string,
+  mode: CheckMode,
+  opts: CheckOptions,
+): Promise<CheckIssue[]> {
   let resolved;
   try {
     resolved = resolveFile(file);
   } catch (error: unknown) {
-    throw new CliError('FILE_PARSE_ERROR', `Cannot parse ${file}: ${message(error)}`, { file });
+    return [{ file, line: 0, severity: 'error', code: 'FILE_PARSE_ERROR', message: message(error) }];
   }
-  validateLocalFile(resolved);
 
   let content: string;
   try {
     content = await readAbapFile(file);
   } catch (error: unknown) {
-    throw new CliError('FILE_PARSE_ERROR', `Cannot read ${file}: ${message(error)}`, { file });
+    return [{ file, line: 0, severity: 'error', code: 'FILE_PARSE_ERROR', message: message(error) }];
   }
 
-  const object = await resolveObject(client, resolved.objectName, resolved.objectType);
+  if (mode === 'content') {
+    return contentIssues(file, resolved, content);
+  }
+
+  const adt = client!;
+  let object;
+  try {
+    object = await resolveObject(adt, resolved.objectName, resolved.objectType);
+  } catch (error: unknown) {
+    if (error instanceof CliError) {
+      return [{ file, line: 0, severity: 'error', code: error.code, message: error.message }];
+    }
+    throw error;
+  }
+
+  if (mode === 'atc') {
+    const parts = await getObjectParts(adt, object);
+    const mainPart = parts.find((p) => p.subtype === 'main') ?? parts[0]!;
+    return runAtcCheck(adt, { variant: opts.variant!, mainUrl: mainPart.sourceUrl, file });
+  }
+
+  return syntaxIssues(adt, file, resolved, object, content);
+}
+
+async function syntaxIssues(
+  client: AdtClientWrapper,
+  file: string,
+  resolved: { objectName: string; objectType: string; subtype: string },
+  object: Awaited<ReturnType<typeof resolveObject>>,
+  content: string,
+): Promise<CheckIssue[]> {
   const parts = await getObjectParts(client, object);
   const part = parts.find((p) => p.subtype === resolved.subtype) ?? parts.find((p) => p.subtype === 'main');
   if (!part) {
-    throw new CliError('SAP_ERROR', `No source part matches ${resolved.subtype} for ${object.name}`, { object: object.name });
+    return [{ file, line: 0, severity: 'error', code: 'SAP_ERROR', message: `No source part matches ${resolved.subtype}` }];
   }
-
   const mainUrl = (parts.find((p) => p.subtype === 'main') ?? part).sourceUrl;
-  // Empty source parts are trivially valid (abap-adt-api rejects empty content)
+  // Empty source parts are trivially valid (abap-adt-api rejects empty content).
   const results = content.trim() === '' ? [] : await client.syntaxCheckContent(part.sourceUrl, mainUrl, content);
-  const errors = results.filter((r) => r.severity === 'E').map(toIssue);
-  const warnings = results.filter((r) => r.severity === 'W').map(toIssue);
-  if (errors.length > 0) {
-    throw new CliError('SYNTAX_ERROR', `Syntax check failed for ${file}`, { file, stage: 'check', errors });
-  }
-  return { file, ok: true, warnings };
+  return results.map((r) => ({
+    file,
+    line: r.line,
+    severity: r.severity === 'E' ? 'error' : r.severity === 'W' ? 'warning' : 'info',
+    code: 'SYNTAX_ERROR',
+    message: r.text,
+  }));
 }
 
-function toIssue(r: { line: number; offset: number; severity: string; text: string }): CheckIssue {
-  return { line: r.line, offset: r.offset, severity: r.severity, text: r.text };
+/** Local-only validation for --content (research §6): no SAP calls. */
+async function contentIssues(
+  file: string,
+  resolved: { objectName: string; objectType: string; subtype: string; route: string },
+  content: string,
+): Promise<CheckIssue[]> {
+  const issues: CheckIssue[] = [];
+  try {
+    validateLocalFile(resolved);
+  } catch (error: unknown) {
+    if (error instanceof CliError) {
+      issues.push({ file, line: 0, severity: 'error', code: error.code, message: error.message });
+    }
+  }
+  if (content.trim() === '') {
+    issues.push({ file, line: 0, severity: 'warning', code: 'EMPTY_FILE', message: 'File is empty' });
+  }
+  return issues;
 }
 
-async function collectFiles(files: string[], all?: boolean): Promise<string[]> {
-  if (all) {
-    const found = await listAbapFiles(process.cwd());
-    return found.filter((f) => f.endsWith('.abap'));
+function humanSummary(issues: CheckIssue[]): string {
+  if (issues.length === 0) return 'No issues found.';
+  const lines = [`${issues.length} issue(s) found:`];
+  for (const i of issues) {
+    lines.push(`  ${i.file}:${i.line} [${i.severity}] ${i.code} — ${i.message}`);
   }
-  if (!files || files.length === 0) {
-    throw new CliError('USAGE', 'Specify files or use --all');
-  }
-  return files.map((f) => path.resolve(f));
-}
-
-function humanSummary(results: CheckFileResult[]): string {
-  const lines = [`Checked ${results.length} file(s):`];
-  for (const r of results) lines.push(`  ${r.file} — ${r.ok ? 'OK' : 'FAILED'}`);
   return lines.join('\n');
 }
 

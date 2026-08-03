@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
 import { commonErrorsAfter } from '../output/help-text.js';
+import { showTransport, resolveObjectTransport, assignObjectToTransport } from '../sync/transport-ops.js';
 
 interface TransportEntry {
   number: string;
@@ -43,6 +44,49 @@ export function registerTransportCommand(program: Command): void {
       const json = jsonFromCommand(cmd);
       try {
         await runCreate(description, opts, json);
+      } catch (error: unknown) {
+        printError(json, error);
+      }
+    });
+
+  transportCmd
+    .command('show <req>')
+    .description('Show structured metadata for a transport request')
+    .action(async (req: string, _opts, cmd) => {
+      const json = jsonFromCommand(cmd);
+      try {
+        const client = await AdtClientWrapper.create();
+        const data = await showTransport(client, req);
+        printResult(json, data, formatShow(data));
+      } catch (error: unknown) {
+        printError(json, error);
+      }
+    });
+
+  transportCmd
+    .command('resolve <object>')
+    .description('Show which transport request(s) an object belongs to (read-only)')
+    .action(async (object: string, _opts, cmd) => {
+      const json = jsonFromCommand(cmd);
+      try {
+        const client = await AdtClientWrapper.create();
+        const data = await resolveObjectTransport(client, object);
+        printResult(json, data, formatResolve(data));
+      } catch (error: unknown) {
+        printError(json, error);
+      }
+    });
+
+  transportCmd
+    .command('assign <object>')
+    .description('Attach an object to a transport request (no-op when already assigned)')
+    .requiredOption('--tr <transport>', 'Target transport request')
+    .action(async (object: string, opts: { tr: string }, cmd) => {
+      const json = jsonFromCommand(cmd);
+      try {
+        const client = await AdtClientWrapper.create();
+        const data = await assignObjectToTransport(client, object, opts.tr);
+        printResult(json, data, formatAssign(data));
       } catch (error: unknown) {
         printError(json, error);
       }
@@ -119,5 +163,27 @@ function formatList(data: ListData): string {
     }
   }
   return rows.length > 0 ? rows.join('\n') : 'No transport requests';
+}
+
+function formatShow(data: { number: string; description: string; status: string; owner: string; objects: { name: string; type: string; status: string }[] }): string {
+  const lines = [`Transport ${data.number}:`, `  description: ${data.description}`, `  status: ${data.status}`, `  owner: ${data.owner}`];
+  if (data.objects.length > 0) {
+    lines.push('  objects:');
+    for (const o of data.objects) lines.push(`    ${o.name} (${o.type}) — ${o.status}`);
+  }
+  return lines.join('\n');
+}
+
+function formatResolve(data: { object: string; transports: { number: string; status: string; owner: string; text: string }[] }): string {
+  if (data.transports.length === 0) return `${data.object} is not assigned to any transport request.`;
+  const lines = [`${data.object} belongs to:`];
+  for (const t of data.transports) lines.push(`  ${t.number}  ${t.status}  ${t.owner}  ${t.text}`);
+  return lines.join('\n');
+}
+
+function formatAssign(data: { object: string; transport: string; assigned: boolean }): string {
+  return data.assigned
+    ? `Assigned ${data.object} to transport ${data.transport}.`
+    : `${data.object} is already assigned to transport ${data.transport} (no-op).`;
 }
 

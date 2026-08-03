@@ -17,11 +17,9 @@ import type { Command } from 'commander';
 import { categoryOf, type ErrorCode } from './error-codes.js';
 import { exitCodeFor, EXIT_GENERIC_FALLBACK } from './exit-codes.js';
 
-/** Resolve the top-level --json flag from any nested subcommand. */
+/** Resolve the top-level --json flag from any nested subcommand (FR-027). */
 export function jsonFromCommand(cmd: Command): boolean {
-  let c: Command | undefined = cmd;
-  while (c.parent) c = c.parent;
-  return c.opts().json ?? false;
+  return cmd.optsWithGlobals().json ?? false;
 }
 
 export interface CliErrorOptions {

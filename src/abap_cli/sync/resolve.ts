@@ -1,6 +1,9 @@
 import type { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError } from '../output/json.js';
 
+/** Single source of truth for bounded result sets (FR-023). */
+export const SEARCH_RESULT_LIMIT = 20;
+
 export interface ObjectPart {
   /** Subtype: main, locals_def, locals_imp, macros, testclasses */
   subtype: string;
@@ -34,7 +37,7 @@ export async function resolveObject(
   type?: string,
 ): Promise<ResolvedObject> {
   const normalized = name.trim().toUpperCase();
-  const results = await client.searchObject(normalized, type, 10);
+  const results = await client.searchObject(normalized, type, SEARCH_RESULT_LIMIT);
   const matches = results.filter((r) => r['adtcore:name'] === normalized);
   if (matches.length === 0) {
     throw new CliError('OBJECT_NOT_FOUND', `Object ${normalized} not found in system`, {

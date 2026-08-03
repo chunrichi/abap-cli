@@ -33,8 +33,10 @@ export type ErrorCode =
   // Not-found family
   | 'OBJECT_NOT_FOUND'
   | 'AMBIGUOUS_OBJECT'
+  | 'NOT_FOUND'
   // Locked family
   | 'LOCK_FAILED'
+  | 'LOCKED'
   | 'UNLOCK_WARNING'      // warning, not an error
   // Semantic-rejection family
   | 'ACTIVATION_FAILED'
@@ -50,7 +52,9 @@ export type ErrorCode =
   | 'PUSH_FAILED'
   | 'VALIDATION_ERROR'     // semantic rejection (exit 7); see contracts §3
   | 'OBJECT_EXISTS'        // legacy, used by create.ts
-  | 'FILE_EXISTS';         // legacy, used by init.ts
+  | 'FILE_EXISTS'          // legacy, used by init.ts
+  | 'COMMAND_MOVED'        // command retired; redirects to another command (e.g. atc → check --atc)
+  ;
 
 const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   CONFIG_ERROR: 'CONFIG_ERROR',
@@ -63,7 +67,9 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   OVERWRITE_REQUIRED: 'USAGE',
   OBJECT_NOT_FOUND: 'NOT_FOUND',
   AMBIGUOUS_OBJECT: 'NOT_FOUND',
+  NOT_FOUND: 'NOT_FOUND',
   LOCK_FAILED: 'LOCKED',
+  LOCKED: 'LOCKED',
   UNLOCK_WARNING: 'USAGE', // not emitted via error path; placeholder for type
   ACTIVATION_FAILED: 'VALIDATION_ERROR',
   SYNTAX_ERROR: 'VALIDATION_ERROR',
@@ -78,6 +84,7 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   FILE_EXISTS: 'USAGE',
   NOT_IMPLEMENTED: 'VALIDATION_ERROR',
   PUSH_FAILED: 'VALIDATION_ERROR',
+  COMMAND_MOVED: 'VALIDATION_ERROR',
 };
 
 export function categoryOf(code: ErrorCode): ErrorCategory {
