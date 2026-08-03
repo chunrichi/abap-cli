@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+// Must be first: patches removed util.is* functions before abap-adt-api loads.
+import './util-polyfill.js';
 import { createRequire } from 'node:module';
 import { Command } from 'commander';
 import { registerInitCommand } from './commands/init.js';
