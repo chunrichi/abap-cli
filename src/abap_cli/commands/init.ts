@@ -12,6 +12,8 @@ import {
 import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import { assertValidProfile } from '../config/validation.js';
+import { probeSystem, type ProbeLayerResult } from '../clients/probe.js';
+import type { ErrorCode } from '../output/error-codes.js';
 
 interface WorkspaceConfig {
   system: string;
@@ -38,15 +40,21 @@ export function registerInitCommand(program: Command): void {
     .description('Initialize workspace configuration for SAP connection')
     .addHelpText('after', commonErrorsAfter())
     .option('--system <name>', 'Name of an existing system profile (see user config)')
-    .option('--url <url>', 'SAP system URL (creates/updates a system profile)')
+    .option('--url <url>', 'SAP system URL (interactive only; use "abap system set" in scripts)')
     .option('-c, --client <client>', 'SAP client number')
     .option('-u, --username <user>', 'SAP username')
     .option('-p, --password <password>', 'SAP password')
     .option('-l, --language <language>', 'SAP language')
-    .option('-t, --transport <transport>', 'Default transport number')
+    .option('--tr <transport>', 'Default transport number')
+    .option('-t, --transport <transport>', 'Deprecated alias for --tr')
     .option('--package <package>', 'Default SAP package')
     .option('--insecure', 'Skip SSL certificate verification (self-signed certs, development only)')
     .option('--ca <path>', 'Path to a CA certificate (PEM) for SSL verification')
+    .option('--test-connection', 'Probe TLS + auth and report results (implies --test-tls --test-auth)')
+    .option('--test-tls', 'Probe the TLS handshake')
+    .option('--test-auth', 'Probe authentication (after TLS)')
+    .option('--yes', 'Non-interactive confirmation (alias: --no-input)')
+    .option('--no-input', 'Non-interactive confirmation (alias: --yes)')
     .action(async (opts, cmd) => {
       const jsonOutput = jsonFromCommand(cmd);
       try {
@@ -58,26 +66,38 @@ export function registerInitCommand(program: Command): void {
 }
 
 async function runInit(opts: CommandOpts, jsonOutput: boolean): Promise<void> {
+  const isNonTty = !process.stdin.isTTY;
   const systemName = str(opts.system) || '';
   const hasFullParams = (opts.url || process.env.SAP_URL) &&
     (opts.username || process.env.SAP_USER) &&
     (opts.password || process.env.SAP_PASSWORD);
 
+  // FR-022: in non-interactive mode init never creates or mutates profiles.
+  if (isNonTty && hasFullParams) {
+    throw new CliError(
+      'VALIDATION_ERROR',
+      'In non-interactive mode, abap init does not create system profiles. Use abap system set.',
+      {
+        nextSteps: [
+          "Create the profile: 'abap system set <name> --url <url> --username <user> --password <pass>'.",
+          "Then reference it: 'abap init --system <name>'.",
+        ],
+        example: 'abap system set dev --url https://sap.example.com --username USER',
+      },
+    );
+  }
+
   if (hasFullParams) {
-    // Create/update a system profile (named by --system if given) and reference it
+    // Interactive (TTY) path may still create a profile from params.
     await createSystemFromParams(opts, jsonOutput);
   } else if (systemName) {
-    // Reference an existing system profile directly
     await useExistingSystem(systemName, opts, jsonOutput);
-  } else if (process.stdin.isTTY) {
-    // Interactive: select existing system or create new
+  } else if (!isNonTty) {
     await interactiveInit(opts, jsonOutput);
   } else {
     throw new CliError(
       'USAGE',
-      'Non-interactive environment detected. Provide required options:\n' +
-        '  abap init --system <name>\n' +
-        '  abap init --url <url> --username <user> --password <password>',
+      'Non-interactive environment detected. Provide --system:\n  abap init --system <name>',
       {
         nextSteps: ["Run 'abap init --system <name>' to reference an existing profile."],
         example: 'abap init --system dev --test-connection --yes',
@@ -107,7 +127,7 @@ async function useExistingSystem(
   const config: CollectedConfig = {
     ...profile,
     password,
-    transport: str(opts.transport) || '',
+    transport: transportFromOpts(opts),
     pkg: str(opts.package) || '',
   };
 
@@ -119,9 +139,63 @@ async function useExistingSystem(
   }
 
   validateInputs(config);
-  await handleFileOverwrite(false);
+  // Probe BEFORE writing .abap.json so a failed probe leaves no workspace behind (US-5).
+  const probe = await maybeProbe(systemName, opts);
+  await handleFileOverwrite('refuse');
   await writeConfig(systemName, config, jsonOutput);
-  if (jsonOutput) outputJson(systemName, config);
+
+  // FR-021: optional per-layer probe (--test-tls / --test-auth / --test-connection).
+  if (jsonOutput) outputJson(systemName, config, probe);
+}
+
+/**
+ * Resolve the transport flag: canonical --tr wins, legacy -t/--transport is a
+ * deprecated alias that emits a warning (FR-026).
+ */
+function transportFromOpts(opts: CommandOpts): string {
+  const canonical = str(opts.tr);
+  const legacy = str(opts.transport);
+  if (opts.transport !== undefined) {
+    console.error("Warning: '-t/--transport' is deprecated; use '--tr <transport>'.");
+  }
+  return canonical || legacy;
+}
+
+/** Run the requested probe layers; throw a structured error if one fails. */
+async function maybeProbe(
+  systemName: string,
+  opts: CommandOpts,
+): Promise<{ tls?: ProbeLayerResult; auth?: ProbeLayerResult } | undefined> {
+  const wantTls = opts.testTls === true || opts.testConnection === true;
+  const wantAuth = opts.testAuth === true || opts.testConnection === true;
+  if (!wantTls && !wantAuth) return undefined;
+
+  const probe = await probeSystem(systemName);
+  const payload: { tls?: ProbeLayerResult; auth?: ProbeLayerResult } = {};
+  if (wantTls) payload.tls = probe.tls;
+  if (wantAuth) payload.auth = probe.auth;
+
+  const failed = wantTls && !probe.tls.ok && !probe.tls.skipped
+    ? { layer: 'tls' as const, result: probe.tls }
+    : wantAuth && !probe.auth.ok && !probe.auth.skipped
+      ? { layer: 'auth' as const, result: probe.auth }
+      : undefined;
+  if (failed) {
+    const code = (failed.result.error?.code ?? 'SAP_ERROR') as ErrorCode;
+    const example = failed.layer === 'tls'
+      ? `abap system set ${systemName} --ca ./sap-dev-ca.pem`
+      : `abap system set ${systemName} --password <new>`;
+    throw new CliError(
+      code,
+      `Probe failed at ${failed.layer}: ${failed.result.error?.message ?? 'unknown error'}`,
+      {
+        details: { layer: failed.layer, system: systemName },
+        nextSteps: failed.result.nextSteps,
+        example,
+      },
+    );
+  }
+  return payload;
 }
 
 /** Create/update a system profile from CLI params */
@@ -139,14 +213,14 @@ async function createSystemFromParams(opts: CommandOpts, jsonOutput: boolean): P
   const config: CollectedConfig = {
     ...profile,
     password,
-    transport: str(opts.transport) || process.env.SAP_TRANSPORT || '',
+    transport: transportFromOpts(opts) || process.env.SAP_TRANSPORT || '',
     pkg: str(opts.package) || process.env.SAP_PACKAGE || '',
   };
   validateInputs(config);
 
   const systemName = str(opts.system) || deriveSystemName(profile);
   await saveProfile(systemName, profile, password, jsonOutput);
-  await handleFileOverwrite(false);
+  await handleFileOverwrite('refuse');
   await writeConfig(systemName, config, jsonOutput);
   if (jsonOutput) outputJson(systemName, config);
 }
@@ -202,11 +276,11 @@ async function interactiveInit(opts: CommandOpts, jsonOutput: boolean): Promise<
   }
 
   // Workspace-level fields
-  config.transport = str(opts.transport) || (orCancel(await text({ message: 'Transport request (optional)' }))) || '';
+  config.transport = transportFromOpts(opts) || (orCancel(await text({ message: 'Transport request (optional)' }))) || '';
   config.pkg = str(opts.package) || (orCancel(await text({ message: 'Default package (optional)' }))) || '';
 
   validateInputs(config);
-  await handleFileOverwrite(true);
+  await handleFileOverwrite(opts.yes === true || opts.noInput === true ? 'overwrite' : 'prompt');
   await writeConfig(systemName, config, jsonOutput);
   if (jsonOutput) outputJson(systemName, config);
 }
@@ -276,24 +350,27 @@ function deriveSystemName(profile: SystemProfile): string {
   }
 }
 
-/** T008: File overwrite confirmation */
-async function handleFileOverwrite(isInteractive: boolean): Promise<void> {
+/** Refuse / confirm / skip overwriting an existing .abap.json. */
+async function handleFileOverwrite(mode: 'prompt' | 'overwrite' | 'refuse'): Promise<void> {
   const configPath = path.join(process.cwd(), '.abap.json');
 
   if (!fs.existsSync(configPath)) return;
 
-  if (!isInteractive) {
+  if (mode === 'refuse') {
     throw new CliError(
       'FILE_EXISTS',
       `.abap.json already exists. Delete it first or run interactively:\n  rm ${configPath}`,
     );
   }
 
-  const ok = orCancel(await confirm({ message: '.abap.json already exists. Overwrite?', initialValue: false }));
-  if (!ok) {
-    console.log('Aborted. Existing configuration preserved.');
-    process.exit(0);
+  if (mode === 'prompt') {
+    const ok = orCancel(await confirm({ message: '.abap.json already exists. Overwrite?', initialValue: false }));
+    if (!ok) {
+      console.log('Aborted. Existing configuration preserved.');
+      process.exit(0);
+    }
   }
+  // mode === 'overwrite': fall through and overwrite.
 }
 
 /** T012: Input validation */
@@ -331,7 +408,11 @@ async function writeConfig(systemName: string, config: CollectedConfig, jsonOutp
 }
 
 /** T013: JSON output */
-function outputJson(systemName: string, config: CollectedConfig): void {
+function outputJson(
+  systemName: string,
+  config: CollectedConfig,
+  probe?: { tls?: ProbeLayerResult; auth?: ProbeLayerResult },
+): void {
   const data = {
     configPath: '.abap.json',
     system: systemName,
@@ -343,6 +424,7 @@ function outputJson(systemName: string, config: CollectedConfig): void {
     },
     transport: config.transport,
     package: config.pkg,
+    ...(probe ?? {}),
   };
   printResult(true, data, '');
 }

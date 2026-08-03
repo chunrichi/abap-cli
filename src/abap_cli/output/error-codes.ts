@@ -48,6 +48,7 @@ export type ErrorCode =
   | 'NOT_IMPLEMENTED'
   | 'OVERWRITE_REQUIRED'   // NEW (FR-018)
   | 'PUSH_FAILED'
+  | 'VALIDATION_ERROR'     // semantic rejection (exit 7); see contracts §3
   | 'OBJECT_EXISTS'        // legacy, used by create.ts
   | 'FILE_EXISTS';         // legacy, used by init.ts
 
@@ -72,6 +73,7 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   CREATE_FAILED: 'VALIDATION_ERROR',
   DDIC_NOT_SUPPORTED: 'VALIDATION_ERROR',
   TYPE_NOT_SUPPORTED: 'VALIDATION_ERROR',
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
   OBJECT_EXISTS: 'USAGE',
   FILE_EXISTS: 'USAGE',
   NOT_IMPLEMENTED: 'VALIDATION_ERROR',

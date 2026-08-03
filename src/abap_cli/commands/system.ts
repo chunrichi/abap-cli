@@ -7,6 +7,7 @@ import { getPassword, storePassword, deletePassword } from '../crypto/secrets.js
 import { printError, printResult, jsonFromCommand, CliError } from '../output/json.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import { assertValidProfile } from '../config/validation.js';
+import { probeSystem } from '../clients/probe.js';
 
 export function registerSystemCommand(program: Command): void {
   const system = program
@@ -64,6 +65,28 @@ export function registerSystemCommand(program: Command): void {
     .action(async (name: string, opts, cmd) => {
       try {
         await runSet(name, opts, jsonFromCommand(cmd));
+      } catch (error: unknown) {
+        handleError(jsonFromCommand(cmd), error);
+      }
+    });
+
+  system
+    .command('use <name>')
+    .description('Switch the current workspace to a system profile')
+    .action(async (name: string, _opts, cmd) => {
+      try {
+        await runUse(name, jsonFromCommand(cmd));
+      } catch (error: unknown) {
+        handleError(jsonFromCommand(cmd), error);
+      }
+    });
+
+  system
+    .command('test <name>')
+    .description('Probe a system profile: tls → auth → adt → icf')
+    .action(async (name: string, _opts, cmd) => {
+      try {
+        await runTest(name, jsonFromCommand(cmd));
       } catch (error: unknown) {
         handleError(jsonFromCommand(cmd), error);
       }
@@ -226,6 +249,48 @@ async function runShow(name: string, jsonOutput: boolean): Promise<void> {
     `  ca:       ${detail.ca || '(none)'}`,
   ].join('\n');
   output(jsonOutput, { system: detail }, human);
+}
+
+/** Switch the workspace .abap.json to reference <name>, preserving other fields. */
+async function runUse(name: string, jsonOutput: boolean): Promise<void> {
+  if (!getSystem(name)) {
+    throw new CliError('CONFIG_ERROR', `System profile '${name}' not found.`, {
+      nextSteps: [`Run 'abap system set ${name} ...' to create the profile first.`],
+      example: `abap system set ${name} --url <url> --username <user> --password <pass>`,
+    });
+  }
+
+  const configPath = path.resolve(process.cwd(), '.abap.json');
+  let workspace: Record<string, unknown> = {};
+  if (fs.existsSync(configPath)) {
+    try {
+      workspace = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    } catch {
+      // ignore parse errors — a fresh object is written below
+    }
+  }
+  workspace.system = name;
+  fs.writeFileSync(configPath, JSON.stringify(workspace, null, 2) + '\n', 'utf-8');
+
+  output(
+    jsonOutput,
+    { configPath: '.abap.json', system: name },
+    `Workspace now uses system profile '${name}'.`,
+  );
+}
+
+/** Probe a profile across tls → auth → adt → icf and report per-layer results. */
+async function runTest(name: string, jsonOutput: boolean): Promise<void> {
+  const probe = await probeSystem(name);
+  const human = [
+    `System probe '${name}':`,
+    ...Object.entries(probe).map(([layer, r]) => {
+      const status = r.ok ? 'ok' : r.skipped ? 'skipped' : 'error';
+      const detail = r.error ? ` — ${r.error.message}` : '';
+      return `  ${layer}: ${status}${detail}`;
+    }),
+  ].join('\n');
+  output(jsonOutput, probe, human);
 }
 
 async function runSet(

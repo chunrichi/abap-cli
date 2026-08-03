@@ -3,7 +3,8 @@
 // Must be first: patches removed util.is* functions before abap-adt-api loads.
 import './util-polyfill.js';
 import { createRequire } from 'node:module';
-import { Command } from 'commander';
+import { Command, CommanderError } from 'commander';
+import { CliError, renderError } from './output/json.js';
 import { registerInitCommand } from './commands/init.js';
 import { registerPullCommand } from './commands/pull.js';
 import { registerPushCommand } from './commands/push.js';
@@ -28,6 +29,11 @@ program
   .version(version)
   .option('--json', 'Output in JSON format');
 
+// 顶层错误处理（FR-005/FR-007）：commander 抛错（缺参/未知选项）由这里归一化为
+// 结构化错误；--help/--version 仍走 commander 自带输出并 exit 0。
+program.exitOverride();
+program.configureOutput({ writeErr: () => {} });
+
 // Register all commands
 registerInitCommand(program);
 registerPullCommand(program);
@@ -41,4 +47,25 @@ registerTransportCommand(program);
 registerDeployCommand(program);
 registerSystemCommand(program);
 
-program.parse();
+try {
+  program.parse();
+} catch (error: unknown) {
+  const json = process.argv.includes('--json');
+  if (error instanceof CommanderError) {
+    // Help/version already printed to stdout; exit 0 without touching config.
+    if (error.exitCode === 0) process.exit(0);
+    const usage = new CliError('USAGE', error.message.replace(/^error: /, ''), {
+      nextSteps: ['Check the command usage: abap <command> --help.'],
+      example: 'abap <command> --help',
+    });
+    writeError(json, usage);
+  } else {
+    writeError(json, error);
+  }
+}
+
+function writeError(json: boolean, error: unknown): never {
+  const out = renderError(json, error);
+  for (const line of out.stderr) console.error(line);
+  process.exit(out.exitCode ?? 1);
+}
