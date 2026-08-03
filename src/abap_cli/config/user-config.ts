@@ -7,6 +7,10 @@ export interface SystemProfile {
   client: string;
   username: string;
   language: string;
+  /** Skip SSL certificate verification (self-signed certs, development only). */
+  insecure?: boolean;
+  /** Path to a CA certificate (PEM) used for SSL verification. */
+  ca?: string;
 }
 
 export interface UserConfig {

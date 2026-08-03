@@ -24,6 +24,13 @@ interface CollectedConfig extends SystemProfile {
   pkg: string;
 }
 
+type CommandOpts = Record<string, string | boolean | undefined>;
+
+/** Read a string option, falling back when absent or a non-string (boolean flag). */
+function str(v: string | boolean | undefined, fallback = ''): string {
+  return typeof v === 'string' ? v : fallback;
+}
+
 export function registerInitCommand(program: Command): void {
   program
     .command('init')
@@ -36,6 +43,8 @@ export function registerInitCommand(program: Command): void {
     .option('-l, --language <language>', 'SAP language')
     .option('-t, --transport <transport>', 'Default transport number')
     .option('--package <package>', 'Default SAP package')
+    .option('--insecure', 'Skip SSL certificate verification (self-signed certs, development only)')
+    .option('--ca <path>', 'Path to a CA certificate (PEM) for SSL verification')
     .action(async (opts, cmd) => {
       const jsonOutput = jsonFromCommand(cmd);
       try {
@@ -46,8 +55,8 @@ export function registerInitCommand(program: Command): void {
     });
 }
 
-async function runInit(opts: Record<string, string>, jsonOutput: boolean): Promise<void> {
-  const systemName = opts.system || '';
+async function runInit(opts: CommandOpts, jsonOutput: boolean): Promise<void> {
+  const systemName = str(opts.system) || '';
   const hasFullParams = (opts.url || process.env.SAP_URL) &&
     (opts.username || process.env.SAP_USER) &&
     (opts.password || process.env.SAP_PASSWORD);
@@ -74,7 +83,7 @@ async function runInit(opts: Record<string, string>, jsonOutput: boolean): Promi
 /** Use an existing user-level system profile */
 async function useExistingSystem(
   systemName: string,
-  opts: Record<string, string>,
+  opts: CommandOpts,
   jsonOutput: boolean,
 ): Promise<void> {
   const profile = getSystem(systemName);
@@ -87,13 +96,13 @@ async function useExistingSystem(
 
   // Password: keychain (stored at profile creation) or --password/env override
   const storedPassword = (await getPassword(systemName)) || '';
-  const password = opts.password || process.env.SAP_PASSWORD || storedPassword;
+  const password = str(opts.password) || process.env.SAP_PASSWORD || storedPassword;
 
   const config: CollectedConfig = {
     ...profile,
     password,
-    transport: opts.transport || '',
-    pkg: opts.package || '',
+    transport: str(opts.transport) || '',
+    pkg: str(opts.package) || '',
   };
 
   if (!config.password) {
@@ -110,24 +119,26 @@ async function useExistingSystem(
 }
 
 /** Create/update a system profile from CLI params */
-async function createSystemFromParams(opts: Record<string, string>, jsonOutput: boolean): Promise<void> {
+async function createSystemFromParams(opts: CommandOpts, jsonOutput: boolean): Promise<void> {
   const profile: SystemProfile = {
-    url: opts.url || process.env.SAP_URL || '',
-    client: opts.client || process.env.SAP_CLIENT || '100',
-    username: opts.username || process.env.SAP_USER || '',
-    language: opts.language || process.env.SAP_LANGUAGE || 'EN',
+    url: str(opts.url) || process.env.SAP_URL || '',
+    client: str(opts.client) || process.env.SAP_CLIENT || '100',
+    username: str(opts.username) || process.env.SAP_USER || '',
+    language: str(opts.language) || process.env.SAP_LANGUAGE || 'EN',
+    insecure: opts.insecure === true ? true : undefined,
+    ca: str(opts.ca) || undefined,
   };
-  const password = opts.password || process.env.SAP_PASSWORD || '';
+  const password = str(opts.password) || process.env.SAP_PASSWORD || '';
 
   const config: CollectedConfig = {
     ...profile,
     password,
-    transport: opts.transport || process.env.SAP_TRANSPORT || '',
-    pkg: opts.package || process.env.SAP_PACKAGE || '',
+    transport: str(opts.transport) || process.env.SAP_TRANSPORT || '',
+    pkg: str(opts.package) || process.env.SAP_PACKAGE || '',
   };
   validateInputs(config);
 
-  const systemName = opts.system || deriveSystemName(profile);
+  const systemName = str(opts.system) || deriveSystemName(profile);
   await saveProfile(systemName, profile, password, jsonOutput);
   await handleFileOverwrite(false);
   await writeConfig(systemName, config, jsonOutput);
@@ -135,7 +146,7 @@ async function createSystemFromParams(opts: Record<string, string>, jsonOutput: 
 }
 
 /** Interactive: select existing system or create a new one */
-async function interactiveInit(opts: Record<string, string>, jsonOutput: boolean): Promise<void> {
+async function interactiveInit(opts: CommandOpts, jsonOutput: boolean): Promise<void> {
   const names = listSystemNames();
 
   let systemName = '';
@@ -179,12 +190,14 @@ async function interactiveInit(opts: Record<string, string>, jsonOutput: boolean
       client: config.client,
       username: config.username,
       language: config.language,
+      insecure: config.insecure,
+      ca: config.ca,
     }, config.password, jsonOutput);
   }
 
   // Workspace-level fields
-  config.transport = opts.transport || (orCancel(await text({ message: 'Transport request (optional)' }))) || '';
-  config.pkg = opts.package || (orCancel(await text({ message: 'Default package (optional)' }))) || '';
+  config.transport = str(opts.transport) || (orCancel(await text({ message: 'Transport request (optional)' }))) || '';
+  config.pkg = str(opts.package) || (orCancel(await text({ message: 'Default package (optional)' }))) || '';
 
   validateInputs(config);
   await handleFileOverwrite(true);
@@ -210,20 +223,22 @@ async function selectSystem(names: string[]): Promise<string> {
 }
 
 /** Prompt for a brand-new system profile */
-async function collectNewSystem(opts: Record<string, string>): Promise<CollectedConfig> {
+async function collectNewSystem(opts: CommandOpts): Promise<CollectedConfig> {
   return {
-    url: opts.url || orCancel(await text({
+    url: str(opts.url) || orCancel(await text({
       message: 'SAP URL',
       placeholder: 'https://sap.example.com',
       validate: (value) => ((value ?? '').trim() ? undefined : 'URL is required'),
     })),
-    client: opts.client || orCancel(await text({ message: 'Client', initialValue: '100' })),
-    username: opts.username || orCancel(await text({
+    client: str(opts.client) || orCancel(await text({ message: 'Client', initialValue: '100' })),
+    username: str(opts.username) || orCancel(await text({
       message: 'Username',
       validate: (value) => ((value ?? '').trim() ? undefined : 'Username is required'),
     })),
-    password: opts.password || orCancel(await password({ message: 'Password' })),
-    language: opts.language || orCancel(await text({ message: 'Language', initialValue: 'EN' })),
+    password: str(opts.password) || orCancel(await password({ message: 'Password' })),
+    language: str(opts.language) || orCancel(await text({ message: 'Language', initialValue: 'EN' })),
+    insecure: opts.insecure === true ? true : undefined,
+    ca: str(opts.ca) || undefined,
     transport: '',
     pkg: '',
   };

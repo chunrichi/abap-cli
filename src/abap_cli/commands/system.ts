@@ -56,6 +56,9 @@ export function registerSystemCommand(program: Command): void {
     .option('-l, --language <lang>', 'New SAP language')
     .option('-p, --password <password>', 'New password (updates keychain credential)')
     .option('--remove-password', 'Remove the stored password from keychain')
+    .option('--insecure', 'Skip SSL certificate verification (self-signed certs, development only)')
+    .option('--ca <path>', 'Path to a CA certificate (PEM) for SSL verification')
+    .option('--clear-ca', 'Remove the CA certificate setting')
     .action(async (name: string, opts, cmd) => {
       try {
         await runSet(name, opts, jsonFromCommand(cmd));
@@ -184,6 +187,8 @@ async function runShow(name: string, jsonOutput: boolean): Promise<void> {
     username: profile.username,
     language: profile.language || 'EN',
     password,
+    insecure: profile.insecure ?? false,
+    ca: profile.ca || '',
   };
   const human = [
     `System profile '${name}':`,
@@ -192,6 +197,8 @@ async function runShow(name: string, jsonOutput: boolean): Promise<void> {
     `  username: ${detail.username}`,
     `  language: ${detail.language}`,
     `  password: ${detail.password}`,
+    `  insecure: ${detail.insecure}`,
+    `  ca:       ${detail.ca || '(none)'}`,
   ].join('\n');
   printResult(jsonOutput, { system: detail }, human);
 }
@@ -212,8 +219,12 @@ async function runSet(
   if (updatePassword && removePassword) {
     throw new CliError('INVALID_ARGUMENT', 'Cannot use --password and --remove-password together.');
   }
+  if (has('ca') && has('clearCa')) {
+    throw new CliError('INVALID_ARGUMENT', 'Cannot use --ca and --clear-ca together.');
+  }
 
-  const hasAny = has('url') || has('client') || has('username') || has('language') || updatePassword || removePassword;
+  const hasAny = has('url') || has('client') || has('username') || has('language') ||
+    has('insecure') || has('ca') || has('clearCa') || updatePassword || removePassword;
   if (!hasAny) {
     if (process.stdin.isTTY) {
       await interactiveSet(name, profile, jsonOutput);
@@ -222,7 +233,7 @@ async function runSet(
     throw new CliError(
       'USAGE',
       'Non-interactive environment detected. Provide field options:\n' +
-      '  abap system set <name> --url <url> [--client <client>] [--username <user>] [--language <lang>] [--password <password>]',
+      '  abap system set <name> --url <url> [--client <client>] [--username <user>] [--language <lang>] [--password <password>] [--insecure] [--ca <path>] [--clear-ca]',
     );
   }
 
@@ -231,6 +242,9 @@ async function runSet(
   if (has('client')) updated.client = opts.client as string;
   if (has('username')) updated.username = opts.username as string;
   if (has('language')) updated.language = opts.language as string;
+  if (has('insecure')) updated.insecure = !!opts.insecure;
+  if (has('ca')) updated.ca = opts.ca as string;
+  if (has('clearCa')) delete updated.ca;
   assertValidProfile(updated);
 
   let passwordUpdated = false;

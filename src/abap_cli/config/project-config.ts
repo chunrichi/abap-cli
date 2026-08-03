@@ -11,6 +11,10 @@ export interface SapConfig {
   username: string;
   password: string;
   language: string;
+  /** Skip SSL certificate verification (self-signed certs, development only). */
+  insecure: boolean;
+  /** Path to a CA certificate (PEM) used for SSL verification. */
+  caPath: string;
 }
 
 export interface ProjectConfig {
@@ -104,10 +108,26 @@ async function loadFileConfig(): Promise<LoadedConfig> {
       client: profile.client || '100',
       username: profile.username,
       language: profile.language || 'EN',
+      insecure: profile.insecure ?? (process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0'),
+      caPath: profile.ca || '',
     },
     transport: workspace.transport || '',
     package: workspace.package || '',
   };
+}
+
+/**
+ * Read a CA certificate (PEM) from disk. Returns undefined when no path is
+ * configured; throws CONFIG_ERROR if the file cannot be read.
+ */
+export function readCaCertificate(caPath: string): string | undefined {
+  if (!caPath) return undefined;
+  try {
+    return fs.readFileSync(caPath, 'utf-8');
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new CliError('CONFIG_ERROR', `Cannot read CA certificate '${caPath}': ${message}`);
+  }
 }
 
 /**

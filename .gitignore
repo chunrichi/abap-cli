@@ -35,3 +35,5 @@ Thumbs.db
 *.tmp
 *.log
 tmp/
+
+wiki/

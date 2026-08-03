@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import * as https from 'https';
-import { loadConfig, type ProjectConfig } from '../config/project-config.js';
+import { loadConfig, readCaCertificate, type ProjectConfig } from '../config/project-config.js';
 import { CliError } from '../output/json.js';
 
 export interface IcfResponse<T = unknown> {
@@ -31,7 +31,8 @@ export class IcfClient {
         'sap-client': config.sap.client,
       },
       httpsAgent: new https.Agent({
-        rejectUnauthorized: process.env.NODE_TLS_REJECT_UNAUTHORIZED !== '0',
+        rejectUnauthorized: !config.sap.insecure,
+        ca: readCaCertificate(config.sap.caPath),
       }),
       timeout: 30000,
     });

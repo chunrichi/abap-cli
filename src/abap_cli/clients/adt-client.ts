@@ -1,5 +1,5 @@
-import { ADTClient, session_types } from 'abap-adt-api';
-import { loadConfig, type ProjectConfig } from '../config/project-config.js';
+import { ADTClient, createSSLConfig, session_types } from 'abap-adt-api';
+import { loadConfig, readCaCertificate, type ProjectConfig } from '../config/project-config.js';
 import { CliError } from '../output/json.js';
 
 /**
@@ -18,6 +18,7 @@ export class AdtClientWrapper {
       this.config.sap.password,
       this.config.sap.client,
       this.config.sap.language,
+      createSSLConfig(this.config.sap.insecure, readCaCertificate(this.config.sap.caPath)),
     );
     this.client.stateful = session_types.stateful;
   }
