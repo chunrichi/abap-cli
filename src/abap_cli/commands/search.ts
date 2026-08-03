@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
+import { commonErrorsAfter } from '../output/help-text.js';
 
 interface SearchResult {
   name: string;
@@ -14,6 +15,7 @@ export function registerSearchCommand(program: Command): void {
   program
     .command('search')
     .description('Search for ABAP objects in SAP system')
+    .addHelpText('after', commonErrorsAfter())
     .argument('<query>', 'Search query (supports * wildcard)')
     .option('--type <type>', 'Filter by object type')
     .option('--max <n>', 'Maximum results', '100')

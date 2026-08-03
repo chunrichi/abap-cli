@@ -19,5 +19,8 @@ export async function resolveTransport(
     const first = target.modifiable[0];
     if (first?.['tm:number']) return first['tm:number'];
   }
-  throw new CliError('NO_TRANSPORT', 'No transport request available; specify one with --tr');
+  throw new CliError('NO_TRANSPORT', 'No transport request available; specify one with --tr', {
+    nextSteps: ['Re-run with --tr <request> (e.g. --tr NDK123456).', "Create one with 'abap transport create'."],
+    example: 'abap push src/foo.abap --tr NDK123456',
+  });
 }

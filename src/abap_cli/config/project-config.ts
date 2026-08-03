@@ -15,6 +15,8 @@ export interface SapConfig {
   insecure: boolean;
   /** Path to a CA certificate (PEM) used for SSL verification. */
   caPath: string;
+  /** Base directory for `push --all` / `check --all`; falls back to cwd. */
+  sourceDir: string;
 }
 
 export interface ProjectConfig {
@@ -69,7 +71,7 @@ export async function loadConfig(): Promise<ProjectConfig> {
 
 async function loadFileConfig(): Promise<LoadedConfig> {
   // Load .abap.json — workspace references a user-level system profile
-  let workspace: { system?: string; transport?: string; package?: string } = {};
+  let workspace: { system?: string; transport?: string; package?: string; sourceDir?: string } = {};
   const configPath = path.resolve(process.cwd(), '.abap.json');
   if (fs.existsSync(configPath)) {
     try {
@@ -110,6 +112,7 @@ async function loadFileConfig(): Promise<LoadedConfig> {
       language: profile.language || 'EN',
       insecure: profile.insecure ?? (process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0'),
       caPath: profile.ca || '',
+      sourceDir: workspace.sourceDir || process.cwd(),
     },
     transport: workspace.transport || '',
     package: workspace.package || '',

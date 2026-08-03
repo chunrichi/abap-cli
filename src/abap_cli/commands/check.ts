@@ -4,6 +4,7 @@ import { AdtClientWrapper } from '../clients/adt-client.js';
 import { resolveFile } from '../formats/file-resolver.js';
 import { listAbapFiles, readAbapFile } from '../formats/abap-source.js';
 import { CliError, printError, printResult, toErrorShape, jsonFromCommand } from '../output/json.js';
+import { commonErrorsAfter } from '../output/help-text.js';
 import { resolveObject, getObjectParts, validateLocalFile } from '../sync/resolve.js';
 
 interface CheckIssue {
@@ -25,6 +26,7 @@ export function registerCheckCommand(program: Command): void {
   program
     .command('check')
     .description('Perform syntax check on local ABAP files (no activation, no SAP changes)')
+    .addHelpText('after', commonErrorsAfter())
     .argument('[files...]', 'Files to check')
     .option('--all', 'Check all .abap files under the current directory')
     .action(async (files: string[], opts, cmd) => {

@@ -37,7 +37,11 @@ export async function resolveObject(
   const results = await client.searchObject(normalized, type, 10);
   const matches = results.filter((r) => r['adtcore:name'] === normalized);
   if (matches.length === 0) {
-    throw new CliError('OBJECT_NOT_FOUND', `Object ${normalized} not found in system`, { object: normalized });
+    throw new CliError('OBJECT_NOT_FOUND', `Object ${normalized} not found in system`, {
+      details: { object: normalized },
+      nextSteps: ["Verify the name: 'abap search <query>'.", "Confirm the active system: 'abap system test <name>'."],
+      example: `abap search ${normalized}`,
+    });
   }
   if (matches.length > 1 && !type) {
     throw new CliError('AMBIGUOUS_OBJECT', `Object ${normalized} matches multiple types; specify --type`, {

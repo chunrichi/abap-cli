@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import type { CreatableTypeIds } from 'abap-adt-api';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
+import { commonErrorsAfter } from '../output/help-text.js';
 import { resolveObject, getObjectParts, type ResolvedObject, type ObjectPart } from '../sync/resolve.js';
 import { resolveTransport } from '../sync/transport.js';
 import { pushObject } from '../sync/push-flow.js';
@@ -40,6 +41,7 @@ export function registerCreateCommand(program: Command): void {
   program
     .command('create')
     .description('Create a new ABAP source object (CLAS, INTF, PROG, FUGR) and activate it')
+    .addHelpText('after', commonErrorsAfter())
     .argument('<type>', 'Object type (CLAS, INTF, PROG, FUGR)')
     .argument('<name>', 'Object name')
     .requiredOption('--package <package>', 'Target SAP package')

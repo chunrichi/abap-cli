@@ -10,6 +10,7 @@ import {
   type SystemProfile,
 } from '../config/user-config.js';
 import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
+import { commonErrorsAfter } from '../output/help-text.js';
 import { assertValidProfile } from '../config/validation.js';
 
 interface WorkspaceConfig {
@@ -35,6 +36,7 @@ export function registerInitCommand(program: Command): void {
   program
     .command('init')
     .description('Initialize workspace configuration for SAP connection')
+    .addHelpText('after', commonErrorsAfter())
     .option('--system <name>', 'Name of an existing system profile (see user config)')
     .option('--url <url>', 'SAP system URL (creates/updates a system profile)')
     .option('-c, --client <client>', 'SAP client number')
@@ -76,6 +78,10 @@ async function runInit(opts: CommandOpts, jsonOutput: boolean): Promise<void> {
       'Non-interactive environment detected. Provide required options:\n' +
         '  abap init --system <name>\n' +
         '  abap init --url <url> --username <user> --password <password>',
+      {
+        nextSteps: ["Run 'abap init --system <name>' to reference an existing profile."],
+        example: 'abap init --system dev --test-connection --yes',
+      },
     );
   }
 }

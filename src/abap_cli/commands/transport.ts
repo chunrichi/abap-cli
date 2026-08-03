@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
+import { commonErrorsAfter } from '../output/help-text.js';
 
 interface TransportEntry {
   number: string;
@@ -17,7 +18,8 @@ interface ListData {
 export function registerTransportCommand(program: Command): void {
   const transportCmd = program
     .command('transport')
-    .description('Manage SAP transport requests');
+    .description('Manage SAP transport requests')
+    .addHelpText('after', commonErrorsAfter());
 
   transportCmd
     .command('list')

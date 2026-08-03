@@ -2,6 +2,7 @@ import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import * as https from 'https';
 import { loadConfig, readCaCertificate, type ProjectConfig } from '../config/project-config.js';
 import { CliError } from '../output/json.js';
+import { classifyHttpError } from './http-error.js';
 
 export interface IcfResponse<T = unknown> {
   status: 'success' | 'error';
@@ -69,12 +70,24 @@ export class IcfClient {
   }
 }
 
+/**
+ * Legacy transport-error mapper. Routes everything through the shared HTTP
+ * classifier so TLS / AUTH errors are recognised before reaching the consumer.
+ */
 function toHttpError(error: unknown): CliError {
   if (axios.isAxiosError(error)) {
-    const status = error.response?.status;
-    const message = error.response?.data?.message || error.message;
-    return new CliError('SAP_ERROR', `ICF request failed: ${message}`, status ? { httpStatus: status } : undefined);
+    // Prefix the message so ICF errors remain identifiable in logs.
+    const classified = classifyHttpError(error);
+    return new CliError(classified.code, `ICF request failed: ${classified.message}`, {
+      details: classified.details,
+      nextSteps: classified.nextSteps,
+      example: classified.example,
+    });
   }
-  const message = error instanceof Error ? error.message : String(error);
-  return new CliError('SAP_ERROR', `ICF request failed: ${message}`);
+  const classified = classifyHttpError(error);
+  return new CliError(classified.code, `ICF request failed: ${classified.message}`, {
+    details: classified.details,
+    nextSteps: classified.nextSteps,
+    example: classified.example,
+  });
 }

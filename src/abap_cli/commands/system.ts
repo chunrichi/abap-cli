@@ -5,12 +5,14 @@ import { select, text, password, confirm, isCancel, log } from '@clack/prompts';
 import { getSystem, listSystemNames, upsertSystem, deleteSystem, type SystemProfile } from '../config/user-config.js';
 import { getPassword, storePassword, deletePassword } from '../crypto/secrets.js';
 import { printError, printResult, jsonFromCommand, CliError } from '../output/json.js';
+import { commonErrorsAfter } from '../output/help-text.js';
 import { assertValidProfile } from '../config/validation.js';
 
 export function registerSystemCommand(program: Command): void {
   const system = program
     .command('system')
     .description('Manage global system profiles')
+    .addHelpText('after', commonErrorsAfter())
     .action(async (_opts, cmd) => {
       try {
         if (!process.stdin.isTTY) {

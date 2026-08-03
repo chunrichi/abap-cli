@@ -1,6 +1,8 @@
 import type { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError } from '../output/json.js';
 
+export type PushStage = 'lock' | 'write' | 'check' | 'activate' | 'unlock';
+
 export interface PushPart {
   subtype: string;
   sourceUrl: string;
@@ -19,6 +21,10 @@ export interface PushOptions {
   checkOnly: boolean;
   /** Write source but skip activation (used by `abap create --no-activate`). Defaults to true. */
   activate?: boolean;
+  /** Plan only — record stages without making mutating ADT calls (FR-012). */
+  dryRun?: boolean;
+  /** Per-stage callback for --json result reporting (FR-016). */
+  onStage?: (stage: PushStage) => void;
 }
 
 /**
@@ -32,16 +38,27 @@ export async function pushObject(
   parts: PushPart[],
   opts: PushOptions,
 ): Promise<void> {
+  // Dry-run: record every stage, perform no mutating calls (FR-012).
+  if (opts.dryRun) {
+    opts.onStage?.('lock');
+    for (const part of parts) opts.onStage?.('write');
+    opts.onStage?.('check');
+    if (!opts.checkOnly && opts.activate !== false) opts.onStage?.('activate');
+    opts.onStage?.('unlock');
+    return;
+  }
+
   let lockHandle: string | undefined;
   let locked = false;
   let unlockFailed = false;
   try {
+    opts.onStage?.('lock');
     const lock = await client.lock(object.objectUrl);
     lockHandle = lock.LOCK_HANDLE;
     locked = true;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new CliError('LOCK_FAILED', `Cannot lock ${object.name}: ${message}`, { object: object.name });
+    throw new CliError('LOCK_FAILED', `Cannot lock ${object.name}: ${message}`, { details: { object: object.name } });
   }
 
   try {
@@ -104,6 +121,7 @@ export async function pushObject(
   } finally {
     // Lock is always released; only surface UNLOCK_WARNING when nothing else failed
     if (locked && lockHandle) {
+      opts.onStage?.('unlock');
       try {
         await client.unLock(object.objectUrl, lockHandle);
       } catch {

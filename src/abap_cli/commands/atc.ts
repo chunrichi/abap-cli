@@ -1,10 +1,12 @@
 import { Command } from 'commander';
 import { CliError, printError, jsonFromCommand } from '../output/json.js';
+import { commonErrorsAfter } from '../output/help-text.js';
 
 export function registerAtcCommand(program: Command): void {
   program
     .command('atc')
     .description('Run ATC (ABAP Test Cockpit) checks')
+    .addHelpText('after', commonErrorsAfter())
     .argument('[files...]', 'Files to check')
     .option('--all', 'Check all files')
     .option('--variant <variant>', 'ATC check variant')
