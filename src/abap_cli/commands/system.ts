@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
-import { select, text, password, confirm, isCancel } from '@clack/prompts';
+import { select, text, password, confirm, isCancel, log } from '@clack/prompts';
 import { getSystem, listSystemNames, upsertSystem, deleteSystem, type SystemProfile } from '../config/user-config.js';
 import { getPassword, storePassword, deletePassword } from '../crypto/secrets.js';
 import { printError, printResult, jsonFromCommand, CliError } from '../output/json.js';
@@ -84,6 +84,20 @@ function handleError(jsonOutput: boolean, error: unknown): never {
   printError(jsonOutput, error);
 }
 
+/** True while the guided @clack menu is active; plain console.log would clash with its frames. */
+let inInteractiveMenu = false;
+
+/** Output results: JSON always via stdout; human text via log.* inside the menu, console.log elsewhere. */
+function output(jsonOutput: boolean, data: unknown, human: string): void {
+  if (jsonOutput) {
+    console.log(JSON.stringify({ status: 'success', data }, null, 2));
+  } else if (inInteractiveMenu) {
+    log.message(human);
+  } else {
+    console.log(human);
+  }
+}
+
 function runList(jsonOutput: boolean): void {
   const names = listSystemNames();
   if (names.length === 0) {
@@ -98,11 +112,20 @@ function runList(jsonOutput: boolean): void {
     const p = getSystem(name)!;
     return `  ${name} — ${p.username}@${p.url}`;
   })].join('\n');
-  printResult(jsonOutput, { systems }, human);
+  output(jsonOutput, { systems }, human);
 }
 
 /** Guided menu: reachable via bare `abap system` on a TTY */
 async function interactiveMenu(cmd: Command): Promise<void> {
+  inInteractiveMenu = true;
+  try {
+    await interactiveMenuLoop(cmd);
+  } finally {
+    inInteractiveMenu = false;
+  }
+}
+
+async function interactiveMenuLoop(cmd: Command): Promise<void> {
   while (true) {
     const names = listSystemNames();
     if (names.length === 0) {
@@ -200,7 +223,7 @@ async function runShow(name: string, jsonOutput: boolean): Promise<void> {
     `  insecure: ${detail.insecure}`,
     `  ca:       ${detail.ca || '(none)'}`,
   ].join('\n');
-  printResult(jsonOutput, { system: detail }, human);
+  output(jsonOutput, { system: detail }, human);
 }
 
 async function runSet(
@@ -261,7 +284,7 @@ async function runSet(
 
   upsertSystem(name, updated);
 
-  printResult(
+  output(
     jsonOutput,
     { system: { name, ...updated }, passwordUpdated, passwordRemoved },
     `System profile '${name}' updated.`,
@@ -298,7 +321,7 @@ async function interactiveSet(
 
   upsertSystem(name, updated);
 
-  printResult(
+  output(
     jsonOutput,
     { system: { name, ...updated }, passwordUpdated, passwordRemoved },
     `System profile '${name}' updated.`,
@@ -348,5 +371,5 @@ async function runDelete(name: string, jsonOutput: boolean): Promise<void> {
 
   const data: Record<string, unknown> = { deleted: name, passwordCleaned };
   if (warning) data.warning = warning;
-  printResult(jsonOutput, data, `System profile '${name}' deleted.`);
+  output(jsonOutput, data, `System profile '${name}' deleted.`);
 }
