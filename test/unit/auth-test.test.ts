@@ -63,7 +63,7 @@ describe('abap auth test (FR-006..010)', () => {
       auth: {
         ok: false,
         error: { code: 'AUTH_ERROR', message: '401 Unauthorized' },
-        nextSteps: ['abap system set mock --password <new>'],
+        nextSteps: ['abap connection set mock --password <new>'],
       },
       adt: { ok: false, skipped: true, error: { code: 'SKIPPED', message: 'Skipped because a prerequisite layer failed.' } },
       icf: { ok: false, skipped: true, error: { code: 'SKIPPED', message: 'Skipped because a prerequisite layer failed.' } },
@@ -84,7 +84,7 @@ describe('abap auth test (FR-006..010)', () => {
       tls: {
         ok: false,
         error: { code: 'TLS_ERROR', message: 'self-signed certificate' },
-        nextSteps: ['abap system set mock --ca <pem> or --insecure'],
+        nextSteps: ['abap connection set mock --ca <pem> or --insecure'],
       },
       auth: { ok: false, skipped: true, error: { code: 'SKIPPED', message: 'Skipped because a prerequisite layer failed.' } },
       adt: { ok: false, skipped: true, error: { code: 'SKIPPED', message: 'Skipped because a prerequisite layer failed.' } },
@@ -118,8 +118,8 @@ describe('abap auth test (FR-006..010)', () => {
 
   it('unknown system → CONFIG_ERROR exit 3 with nextSteps (FR-009)', async () => {
     probeSystemMock.mockRejectedValue(
-      new (await import('../../src/abap_cli/output/json.js')).CliError('CONFIG_ERROR', "System profile 'nope' not found.", {
-        nextSteps: ["Run 'abap system set nope ...' to create the profile."],
+      new (await import('../../src/abap_cli/output/json.js')).CliError('CONFIG_ERROR', "Connection profile 'nope' not found.", {
+        nextSteps: ["Run 'abap connection set nope ...' to create the profile."],
       }),
     );
     const res = await runAuth(['auth', 'test', '--system', 'nope', '--json']);

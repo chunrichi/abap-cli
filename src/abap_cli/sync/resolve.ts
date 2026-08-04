@@ -51,7 +51,7 @@ export async function resolveObject(
   if (matches.length === 0) {
     throw new CliError('OBJECT_NOT_FOUND', `Object ${normalized} not found in system`, {
       details: { object: normalized },
-      nextSteps: ["Verify the name: 'abap search <query>'.", "Confirm the active system: 'abap system test <name>'."],
+      nextSteps: ["Verify the name: 'abap search <query>'.", "Confirm the active system: 'abap connection test <name>'."],
       example: `abap search ${normalized}`,
     });
   }

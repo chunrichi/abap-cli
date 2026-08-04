@@ -55,7 +55,7 @@ function currentMtimes(): { configPath: number; systemsPath: number } {
 
 /**
  * Load project configuration from .abap.json (system reference) + user-level system profile + OS keychain.
- * The file cache auto-invalidates on mtime change (abap init / system set); the
+ * The file cache auto-invalidates on mtime change (abap init / connection set); the
  * password is re-read from the keychain every call so updates apply immediately.
  */
 export async function loadConfig(): Promise<ProjectConfig> {

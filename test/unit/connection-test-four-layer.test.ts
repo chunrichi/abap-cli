@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { registerSystemCommand } from '../../src/abap_cli/commands/system.js';
+import { registerConnectionCommand } from '../../src/abap_cli/commands/connection.js';
 import { makeProgram, runCommand } from './cli-helper.js';
 
 // Fake probe — no network access in unit tests.
@@ -24,7 +24,7 @@ vi.mock('../../src/abap_cli/config/user-config.js', () => ({
   saveUserConfig: vi.fn(),
 }));
 
-describe('abap system test (FR-024)', () => {
+describe('abap connection test (FR-024)', () => {
   let cwd: string;
 
   beforeEach(() => {
@@ -33,8 +33,8 @@ describe('abap system test (FR-024)', () => {
 
   it('returns the four-layer payload with ok/error per layer', async () => {
     const program = makeProgram();
-    registerSystemCommand(program);
-    const res = await runCommand(program, ['system', 'test', 'real', '--json'], { cwd });
+    registerConnectionCommand(program);
+    const res = await runCommand(program, ['connection', 'test', 'real', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     const parsed = JSON.parse(res.stdout);
     expect(parsed.status).toBe('success');

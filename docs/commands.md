@@ -181,20 +181,24 @@ JSON output:
 
 The returned transport number can be used with `--tr` on `push` / `create`.
 
-## `abap system`
+## `abap connection`
 
-Manage global system profiles.
+Manage global connection profiles.
 
 ```bash
-abap system <command>
+abap connection <command>
 ```
 
 | Command | Description |
 |---------|-------------|
-| `list` | List all saved system profiles |
+| `list` | List all saved connection profiles |
 | `show <name>` | Show details of a profile (no secrets) |
 | `set <name>` | Modify a profile (fields or password) |
+| `use <name>` | Switch the current workspace to a profile |
+| `test <name>` | Probe a profile: tls → auth → adt → icf |
 | `delete <name>` | Delete a profile and its stored password |
+| `export [names...]` | Export profiles to a portable bundle (`--file`, `--with-passwords`) |
+| `import <file>` | Import profiles from a bundle (`--overwrite`) |
 
 ## `abap atc`
 
@@ -337,7 +341,7 @@ JSON output: `{ id, recorded, echo: { goal, tried, where } }`. Reports are writt
 
 | Code | Meaning |
 |------|---------|
-| `CONFIG_ERROR` | Configuration missing/invalid (run `abap init` / `abap system set`) |
+| `CONFIG_ERROR` | Configuration missing/invalid (run `abap init` / `abap connection set`) |
 | `SAP_ERROR` | ADT request failed (includes HTTP status) |
 | `TLS_ERROR` | TLS handshake / certificate failure |
 | `AUTH_ERROR` | 401/403 from SAP (bad credentials) |

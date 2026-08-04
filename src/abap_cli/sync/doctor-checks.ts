@@ -69,7 +69,7 @@ function readSystems(configPath: string): { systems: Record<string, unknown>; er
     if (!fs.existsSync(configPath)) {
       return {
         systems: {},
-        error: { message: `Config file not found: ${configPath}`, suggestion: 'Run "abap init" or "abap system set <name> ..." to create it.' },
+        error: { message: `Config file not found: ${configPath}`, suggestion: 'Run "abap init" or "abap connection set <name> ..." to create it.' },
       };
     }
     const parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as { systems?: Record<string, unknown> };
@@ -164,7 +164,7 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
         errItem(
           `config.profile.${name}`,
           `Profile '${name}' is invalid: ${message}`,
-          `Fix the profile: abap system set ${name} --url <url> --username <user>`,
+          `Fix the profile: abap connection set ${name} --url <url> --username <user>`,
         ),
       );
     }
@@ -183,7 +183,7 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
           errItem(
             'config.active',
             `Workspace references unknown system '${activeSystem}'.`,
-            `Create the profile: abap system set ${activeSystem} --url <url> --username <user>`,
+            `Create the profile: abap connection set ${activeSystem} --url <url> --username <user>`,
           ),
         );
       } else if (activeSystem) {
@@ -203,7 +203,7 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
   if (systemsToProbe.length === 0) {
     push(
       connection,
-      errItem('conn.none', 'No systems configured.', 'Run "abap system set <name> ..." to add a system profile.'),
+      errItem('conn.none', 'No systems configured.', 'Run "abap connection set <name> ..." to add a connection profile.'),
     );
   } else {
     for (const name of systemsToProbe) {
@@ -213,7 +213,7 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
           errItem(
             `conn.${name}`,
             `System profile '${name}' not found.`,
-            `List profiles: abap system list — create one: abap system set ${name} --url <url> --username <user>`,
+            `List profiles: abap connection list — create one: abap connection set ${name} --url <url> --username <user>`,
           ),
         );
         continue;

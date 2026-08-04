@@ -15,14 +15,14 @@ Precedence for credentials: **OS keychain** for the referenced system name, fall
 
 ## System Profiles (`~/.abap-cli/systems.json`)
 
-Created/updated by `abap init` and managed by `abap system`:
+Created/updated by `abap init` and managed by `abap connection`:
 
 ```bash
-abap system list                  # List saved profiles
-abap system show dev              # Show profile details (no secrets)
-abap system set dev --url https://sap:44300   # Modify a field
-abap system set dev --password '***'          # Update the stored password
-abap system delete dev            # Delete profile + stored password
+abap connection list                  # List saved profiles
+abap connection show dev              # Show profile details (no secrets)
+abap connection set dev --url https://sap:44300   # Modify a field
+abap connection set dev --password '***'          # Update the stored password
+abap connection delete dev            # Delete profile + stored password
 ```
 
 The file is written with mode `0600` (`0700` for the directory) and is not committed.

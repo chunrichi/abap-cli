@@ -55,7 +55,7 @@ abap push src/zcl_my_class.clas.abap --tr <REQUEST_NUMBER>
 | `abap create <type> <name>` | Create a new ABAP source object (CLAS/INTF/PROG/FUGR): writes a default skeleton, then activates (`--package`, `--description`, `--tr`, `--no-activate`) |
 | `abap transport list` | List transport requests (`--open` for open/released filter) |
 | `abap transport create <description>` | Create a new transport request (`--package`; default `$TMP` local request, usable via `--tr`) |
-| `abap system` | Manage global system profiles (`list` / `show` / `set` / `delete`) |
+| `abap connection` | Manage global connection profiles (`list` / `show` / `set` / `use` / `test` / `delete` / `export` / `import`) |
 | `abap deploy` | Deploy the bundled ICF ABAP service to SAP |
 | `abap atc [files...]` | Run ATC checks (stub) |
 | `abap status` | Show local vs SAP differences (stub) |

@@ -40,7 +40,7 @@ export function registerInitCommand(program: Command): void {
     .description('Initialize workspace configuration for SAP connection')
     .addHelpText('after', commonErrorsAfter())
     .option('--system <name>', 'Name of an existing system profile (see user config)')
-    .option('--url <url>', 'SAP system URL (interactive only; use "abap system set" in scripts)')
+    .option('--url <url>', 'SAP system URL (interactive only; use "abap connection set" in scripts)')
     .option('-c, --client <client>', 'SAP client number')
     .option('-u, --username <user>', 'SAP username')
     .option('-p, --password <password>', 'SAP password')
@@ -76,13 +76,13 @@ async function runInit(opts: CommandOpts, jsonOutput: boolean): Promise<void> {
   if (isNonTty && hasFullParams) {
     throw new CliError(
       'VALIDATION_ERROR',
-      'In non-interactive mode, abap init does not create system profiles. Use abap system set.',
+      'In non-interactive mode, abap init does not create connection profiles. Use abap connection set.',
       {
         nextSteps: [
-          "Create the profile: 'abap system set <name> --url <url> --username <user> --password <pass>'.",
+          "Create the profile: 'abap connection set <name> --url <url> --username <user> --password <pass>'.",
           "Then reference it: 'abap init --system <name>'.",
         ],
-        example: 'abap system set dev --url https://sap.example.com --username USER',
+        example: 'abap connection set dev --url https://sap.example.com --username USER',
       },
     );
   }
@@ -183,8 +183,8 @@ async function maybeProbe(
   if (failed) {
     const code = (failed.result.error?.code ?? 'SAP_ERROR') as ErrorCode;
     const example = failed.layer === 'tls'
-      ? `abap system set ${systemName} --ca ./sap-dev-ca.pem`
-      : `abap system set ${systemName} --password <new>`;
+      ? `abap connection set ${systemName} --ca ./sap-dev-ca.pem`
+      : `abap connection set ${systemName} --password <new>`;
     throw new CliError(
       code,
       `Probe failed at ${failed.layer}: ${failed.result.error?.message ?? 'unknown error'}`,

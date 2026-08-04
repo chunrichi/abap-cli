@@ -1,6 +1,6 @@
 import { CliError } from '../output/json.js';
 
-/** Shared profile field validation (used by init and system commands). */
+/** Shared profile field validation (used by init and connection commands). */
 export function assertValidProfile(p: { url: string; client?: string; username: string; language?: string }): void {
   if (!p.url) throw new CliError('INVALID_ARGUMENT', 'URL is required');
   if (!/^https?:\/\//i.test(p.url)) {

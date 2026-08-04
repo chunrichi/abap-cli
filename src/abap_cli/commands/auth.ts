@@ -37,7 +37,7 @@ export function registerAuthCommand(program: Command): void {
       try {
         if (!opts.system) {
           throw new CliError('USAGE', 'auth test requires --system <name>.', {
-            nextSteps: ['List profiles: abap system list', 'Probe the active system: abap auth test --system <name>'],
+            nextSteps: ['List profiles: abap connection list', 'Probe the active system: abap auth test --system <name>'],
             example: 'abap auth test --system mock',
           });
         }

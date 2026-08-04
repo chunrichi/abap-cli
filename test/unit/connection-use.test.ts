@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { registerSystemCommand } from '../../src/abap_cli/commands/system.js';
+import { registerConnectionCommand } from '../../src/abap_cli/commands/connection.js';
 import { makeProgram, runCommand } from './cli-helper.js';
 
 // Isolate the user-config store from the real ~/.abap-cli/systems.json.
@@ -18,7 +18,7 @@ vi.mock('../../src/abap_cli/config/user-config.js', () => ({
   saveUserConfig: vi.fn(),
 }));
 
-describe('abap system use (FR-023)', () => {
+describe('abap connection use (FR-023)', () => {
   let cwd: string;
 
   beforeEach(() => {
@@ -31,8 +31,8 @@ describe('abap system use (FR-023)', () => {
 
   it('switches the workspace system and preserves other fields', async () => {
     const program = makeProgram();
-    registerSystemCommand(program);
-    const res = await runCommand(program, ['system', 'use', 'real', '--json'], { cwd });
+    registerConnectionCommand(program);
+    const res = await runCommand(program, ['connection', 'use', 'real', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     const parsed = JSON.parse(res.stdout);
     expect(parsed.status).toBe('success');
@@ -45,8 +45,8 @@ describe('abap system use (FR-023)', () => {
 
   it('errors with CONFIG_ERROR (exit 3) for a missing profile', async () => {
     const program = makeProgram();
-    registerSystemCommand(program);
-    const res = await runCommand(program, ['system', 'use', 'ghost', '--json'], { cwd });
+    registerConnectionCommand(program);
+    const res = await runCommand(program, ['connection', 'use', 'ghost', '--json'], { cwd });
     expect(res.exitCode).toBe(3);
     const parsed = JSON.parse(res.stderr);
     expect(parsed.status).toBe('error');

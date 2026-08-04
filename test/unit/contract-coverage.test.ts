@@ -16,7 +16,7 @@ const FEATURE_FLAGS = [
   '--dry-run', '--diff', '--force', '--yes', // deploy
   '--template', '--no-pull', '--check-only', '--audit', // create
   '--atomic', // push
-  '--file', '--with-passwords', '--overwrite', // system export/import
+  '--file', '--with-passwords', '--overwrite', // connection export/import
 ];
 
 describe('contract coverage (T035, SC-009)', () => {
@@ -36,9 +36,9 @@ describe('contract coverage (T035, SC-009)', () => {
     expect(missing).toEqual([]);
   });
 
-  it('the atc redirect, transport subcommands, and system export/import are documented', () => {
+  it('the atc redirect, transport subcommands, and connection export/import are documented', () => {
     const contract = fs.readFileSync(contractPath, 'utf-8');
-    for (const token of ['COMMAND_MOVED', 'transport show', 'transport assign', 'transport resolve', 'system export', 'system import']) {
+    for (const token of ['COMMAND_MOVED', 'transport show', 'transport assign', 'transport resolve', 'connection export', 'connection import']) {
       expect(contract).toContain(token);
     }
   });

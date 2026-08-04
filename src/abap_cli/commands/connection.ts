@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
-import { select, text, password, confirm, isCancel, log } from '@clack/prompts';
+import { text, password, confirm, isCancel } from '@clack/prompts';
 import { getSystem, listSystemNames, upsertSystem, deleteSystem, type SystemProfile } from '../config/user-config.js';
 import { getPassword, storePassword, deletePassword } from '../crypto/secrets.js';
 import { printError, printResult, jsonFromCommand, CliError } from '../output/json.js';
@@ -10,39 +10,31 @@ import { assertValidProfile } from '../config/validation.js';
 import { probeSystem } from '../clients/probe.js';
 import { exportProfiles, importProfiles, type ProfileBundle } from '../sync/profiles.js';
 
-export function registerSystemCommand(program: Command): void {
-  const system = program
-    .command('system')
-    .description('Manage global system profiles')
+export function registerConnectionCommand(program: Command): void {
+  const connection = program
+    .command('connection')
+    .description('Manage global connection profiles')
     .addHelpText('after', commonErrorsAfter())
-    .action(async (_opts, cmd) => {
-      try {
-        if (!process.stdin.isTTY) {
-          printError(
-            jsonFromCommand(cmd),
-            new CliError(
-              'USAGE',
-              'Bare "abap system" is interactive only. Use: abap system list | show <name> | set <name> | delete <name>',
-            ),
-          );
-          return;
-        }
-        await interactiveMenu(cmd);
-      } catch (error: unknown) {
-        handleError(jsonFromCommand(cmd), error);
-      }
+    .action((_opts, cmd) => {
+      printError(
+        jsonFromCommand(cmd),
+        new CliError(
+          'USAGE',
+          'Bare "abap connection" has no default action. Use: abap connection list | show <name> | set <name> | use <name> | test <name> | delete <name> | export | import <file>',
+        ),
+      );
     });
 
-  system
+  connection
     .command('list')
-    .description('List all saved system profiles')
+    .description('List all saved connection profiles')
     .action((_opts, cmd) => {
       runList(jsonFromCommand(cmd));
     });
 
-  system
+  connection
     .command('show <name>')
-    .description('Show details of a system profile')
+    .description('Show details of a connection profile')
     .action(async (name: string, _opts, cmd) => {
       try {
         await runShow(name, jsonFromCommand(cmd));
@@ -51,9 +43,9 @@ export function registerSystemCommand(program: Command): void {
       }
     });
 
-  system
+  connection
     .command('set <name>')
-    .description('Modify a system profile (fields or password)')
+    .description('Modify a connection profile (fields or password)')
     .option('--url <url>', 'New SAP system URL')
     .option('-c, --client <client>', 'New SAP client number')
     .option('-u, --username <user>', 'New SAP username')
@@ -71,9 +63,9 @@ export function registerSystemCommand(program: Command): void {
       }
     });
 
-  system
+  connection
     .command('use <name>')
-    .description('Switch the current workspace to a system profile')
+    .description('Switch the current workspace to a connection profile')
     .action(async (name: string, _opts, cmd) => {
       try {
         await runUse(name, jsonFromCommand(cmd));
@@ -82,9 +74,9 @@ export function registerSystemCommand(program: Command): void {
       }
     });
 
-  system
+  connection
     .command('test <name>')
-    .description('Probe a system profile: tls → auth → adt → icf')
+    .description('Probe a connection profile: tls → auth → adt → icf')
     .action(async (name: string, _opts, cmd) => {
       try {
         await runTest(name, jsonFromCommand(cmd));
@@ -93,9 +85,9 @@ export function registerSystemCommand(program: Command): void {
       }
     });
 
-  system
+  connection
     .command('delete <name>')
-    .description('Delete a system profile and its stored password')
+    .description('Delete a connection profile and its stored password')
     .action(async (name: string, _opts, cmd) => {
       try {
         await runDelete(name, jsonFromCommand(cmd));
@@ -104,9 +96,9 @@ export function registerSystemCommand(program: Command): void {
       }
     });
 
-  system
+  connection
     .command('export [names...]')
-    .description('Export system profiles to a portable bundle (passwords excluded by default)')
+    .description('Export connection profiles to a portable bundle (passwords excluded by default)')
     .option('--file <path>', 'Write the bundle to a file (default: stdout)')
     .option('--with-passwords', 'Include passwords in the bundle (warned opt-in)')
     .action(async (names: string[], opts: { file?: string; withPasswords?: boolean }, cmd) => {
@@ -128,9 +120,9 @@ export function registerSystemCommand(program: Command): void {
       }
     });
 
-  system
+  connection
     .command('import <file>')
-    .description('Import system profiles from a bundle')
+    .description('Import connection profiles from a bundle')
     .option('--overwrite', 'Update profiles that already exist')
     .action(async (file: string, opts: { overwrite?: boolean }, cmd) => {
       const json = jsonFromCommand(cmd);
@@ -158,22 +150,17 @@ function validateBundle(raw: unknown): ProfileBundle {
   const bundle = raw as Partial<ProfileBundle> | null;
   if (!bundle || bundle.format !== 'abap-cli-profiles' || !Array.isArray(bundle.systems)) {
     throw new CliError('INVALID_ARGUMENT', 'Not a valid abap-cli profiles bundle', {
-      nextSteps: ['Export a bundle first: abap system export --file profiles.json'],
-      example: 'abap system export --file profiles.json',
+      nextSteps: ['Export a bundle first: abap connection export --file profiles.json'],
+      example: 'abap connection export --file profiles.json',
     });
   }
   return bundle as ProfileBundle;
 }
 
-/** True while the guided @clack menu is active; plain console.log would clash with its frames. */
-let inInteractiveMenu = false;
-
-/** Output results: JSON always via stdout; human text via log.* inside the menu, console.log elsewhere. */
+/** Output results: JSON always via stdout, human text via console.log. */
 function output(jsonOutput: boolean, data: unknown, human: string): void {
   if (jsonOutput) {
     console.log(JSON.stringify({ status: 'success', data }, null, 2));
-  } else if (inInteractiveMenu) {
-    log.message(human);
   } else {
     console.log(human);
   }
@@ -182,91 +169,18 @@ function output(jsonOutput: boolean, data: unknown, human: string): void {
 function runList(jsonOutput: boolean): void {
   const names = listSystemNames();
   if (names.length === 0) {
-    printResult(jsonOutput, { systems: [] }, "No system profiles saved. Run 'abap init' to create one.");
+    printResult(jsonOutput, { systems: [] }, "No connection profiles saved. Run 'abap init' to create one.");
     return;
   }
   const systems = names.map((name) => {
     const p = getSystem(name)!;
     return { name, username: p.username, url: p.url };
   });
-  const human = ['System profiles:', ...names.map((name) => {
+  const human = ['Connection profiles:', ...names.map((name) => {
     const p = getSystem(name)!;
     return `  ${name} — ${p.username}@${p.url}`;
   })].join('\n');
   output(jsonOutput, { systems }, human);
-}
-
-/** Guided menu: reachable via bare `abap system` on a TTY */
-async function interactiveMenu(cmd: Command): Promise<void> {
-  inInteractiveMenu = true;
-  try {
-    await interactiveMenuLoop(cmd);
-  } finally {
-    inInteractiveMenu = false;
-  }
-}
-
-async function interactiveMenuLoop(cmd: Command): Promise<void> {
-  while (true) {
-    const names = listSystemNames();
-    if (names.length === 0) {
-      const action = await select({
-        message: 'No system profiles saved yet',
-        options: [
-          { value: 'init', label: 'Create a system profile', hint: 'abap init' },
-          { value: 'exit', label: 'Exit' },
-        ],
-      });
-      if (orCancel(action) === 'exit') return;
-      console.log("Run 'abap init' to create a system profile.");
-      return;
-    }
-
-    const action = await select({
-      message: 'System configuration manager',
-      options: [
-        { value: 'list', label: 'List system profiles' },
-        { value: 'show', label: 'Show system profile' },
-        { value: 'set', label: 'Modify system profile' },
-        { value: 'delete', label: 'Delete system profile' },
-        { value: 'exit', label: 'Exit' },
-      ],
-    });
-    const choice = orCancel(action);
-    switch (choice) {
-      case 'exit':
-        return;
-      case 'list':
-        runList(jsonFromCommand(cmd));
-        break;
-      case 'show':
-      case 'set':
-      case 'delete': {
-        const name = await pickSystemName(choice);
-        if (!name) break;
-        if (choice === 'show') {
-          await runShow(name, jsonFromCommand(cmd));
-        } else if (choice === 'set') {
-          const profile = getSystem(name)!;
-          await interactiveSet(name, profile, jsonFromCommand(cmd));
-        } else {
-          await runDelete(name, jsonFromCommand(cmd));
-        }
-        break;
-      }
-    }
-  }
-}
-
-/** Let the user pick one of the existing system profiles */
-async function pickSystemName(verb: string): Promise<string | null> {
-  const names = listSystemNames();
-  if (names.length === 0) return null;
-  const name = await select({
-    message: `Select system to ${verb}`,
-    options: names.map((n) => ({ value: n, label: n })),
-  });
-  return orCancel(name);
 }
 
 /** Exit 130 on Ctrl+C (@clack cancel), otherwise return the value */
@@ -281,7 +195,7 @@ function orCancel<T>(value: T | symbol): T {
 async function runShow(name: string, jsonOutput: boolean): Promise<void> {
   const profile = getSystem(name);
   if (!profile) {
-    throw new CliError('CONFIG_ERROR', `System profile '${name}' not found.`);
+    throw new CliError('CONFIG_ERROR', `Connection profile '${name}' not found.`);
   }
   const password = (await getPassword(name)) ? 'stored' : 'not stored';
   const detail = {
@@ -295,7 +209,7 @@ async function runShow(name: string, jsonOutput: boolean): Promise<void> {
     ca: profile.ca || '',
   };
   const human = [
-    `System profile '${name}':`,
+    `Connection profile '${name}':`,
     `  url:      ${detail.url}`,
     `  client:   ${detail.client}`,
     `  username: ${detail.username}`,
@@ -310,9 +224,9 @@ async function runShow(name: string, jsonOutput: boolean): Promise<void> {
 /** Switch the workspace .abap.json to reference <name>, preserving other fields. */
 async function runUse(name: string, jsonOutput: boolean): Promise<void> {
   if (!getSystem(name)) {
-    throw new CliError('CONFIG_ERROR', `System profile '${name}' not found.`, {
-      nextSteps: [`Run 'abap system set ${name} ...' to create the profile first.`],
-      example: `abap system set ${name} --url <url> --username <user> --password <pass>`,
+    throw new CliError('CONFIG_ERROR', `Connection profile '${name}' not found.`, {
+      nextSteps: [`Run 'abap connection set ${name} ...' to create the profile first.`],
+      example: `abap connection set ${name} --url <url> --username <user> --password <pass>`,
     });
   }
 
@@ -331,7 +245,7 @@ async function runUse(name: string, jsonOutput: boolean): Promise<void> {
   output(
     jsonOutput,
     { configPath: '.abap.json', system: name },
-    `Workspace now uses system profile '${name}'.`,
+    `Workspace now uses connection profile '${name}'.`,
   );
 }
 
@@ -339,7 +253,7 @@ async function runUse(name: string, jsonOutput: boolean): Promise<void> {
 async function runTest(name: string, jsonOutput: boolean): Promise<void> {
   const probe = await probeSystem(name);
   const human = [
-    `System probe '${name}':`,
+    `Connection probe '${name}':`,
     ...Object.entries(probe).map(([layer, r]) => {
       const status = r.ok ? 'ok' : r.skipped ? 'skipped' : 'error';
       const detail = r.error ? ` — ${r.error.message}` : '';
@@ -356,7 +270,7 @@ async function runSet(
 ): Promise<void> {
   const profile = getSystem(name);
   if (!profile) {
-    throw new CliError('CONFIG_ERROR', `System profile '${name}' not found.`);
+    throw new CliError('CONFIG_ERROR', `Connection profile '${name}' not found.`);
   }
 
   const has = (key: string) => opts[key] !== undefined;
@@ -379,7 +293,7 @@ async function runSet(
     throw new CliError(
       'USAGE',
       'Non-interactive environment detected. Provide field options:\n' +
-      '  abap system set <name> --url <url> [--client <client>] [--username <user>] [--language <lang>] [--password <password>] [--insecure] [--ca <path>] [--clear-ca]',
+      '  abap connection set <name> --url <url> [--client <client>] [--username <user>] [--language <lang>] [--password <password>] [--insecure] [--ca <path>] [--clear-ca]',
     );
   }
 
@@ -410,7 +324,7 @@ async function runSet(
   output(
     jsonOutput,
     { system: { name, ...updated }, passwordUpdated, passwordRemoved },
-    `System profile '${name}' updated.`,
+    `Connection profile '${name}' updated.`,
   );
 }
 
@@ -447,19 +361,19 @@ async function interactiveSet(
   output(
     jsonOutput,
     { system: { name, ...updated }, passwordUpdated, passwordRemoved },
-    `System profile '${name}' updated.`,
+    `Connection profile '${name}' updated.`,
   );
 }
 
 async function runDelete(name: string, jsonOutput: boolean): Promise<void> {
   if (!getSystem(name)) {
-    throw new CliError('CONFIG_ERROR', `System profile '${name}' not found.`);
+    throw new CliError('CONFIG_ERROR', `Connection profile '${name}' not found.`);
   }
 
   if (process.stdin.isTTY) {
-    const ok = orCancel(await confirm({ message: `Delete system profile '${name}'?`, initialValue: false }));
+    const ok = orCancel(await confirm({ message: `Delete connection profile '${name}'?`, initialValue: false }));
     if (!ok) {
-      console.log('Aborted. System profile kept.');
+      console.log('Aborted. Connection profile kept.');
       process.exit(0);
     }
   }
@@ -494,5 +408,5 @@ async function runDelete(name: string, jsonOutput: boolean): Promise<void> {
 
   const data: Record<string, unknown> = { deleted: name, passwordCleaned };
   if (warning) data.warning = warning;
-  output(jsonOutput, data, `System profile '${name}' deleted.`);
+  output(jsonOutput, data, `Connection profile '${name}' deleted.`);
 }

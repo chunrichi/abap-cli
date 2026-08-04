@@ -15,16 +15,16 @@ const TLS_ERROR_CODES = new Set<string>([
 ]);
 
 const TLS_NEXT_STEPS = [
-  "Run 'abap system set <name> --ca <pem>' to trust a private CA.",
-  "For self-signed dev systems only: 'abap system set <name> --insecure'.",
+  "Run 'abap connection set <name> --ca <pem>' to trust a private CA.",
+  "For self-signed dev systems only: 'abap connection set <name> --insecure'.",
 ];
-const TLS_EXAMPLE = 'abap system set <name> --ca ./sap-dev-ca.pem';
+const TLS_EXAMPLE = 'abap connection set <name> --ca ./sap-dev-ca.pem';
 
 const AUTH_NEXT_STEPS = [
-  "Verify credentials: 'abap system test <name> --json'.",
-  "If password expired: 'abap system set <name> --password <new>'.",
+  "Verify credentials: 'abap connection test <name> --json'.",
+  "If password expired: 'abap connection set <name> --password <new>'.",
 ];
-const AUTH_EXAMPLE = 'abap system set <name> --password <new>';
+const AUTH_EXAMPLE = 'abap connection set <name> --password <new>';
 
 /**
  * Classify any thrown value from an HTTP client into a CliError with the right

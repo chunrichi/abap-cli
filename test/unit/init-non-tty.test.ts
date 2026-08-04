@@ -55,7 +55,7 @@ describe('abap init non-interactive (FR-006, FR-022, SC-007)', () => {
     expect(res.exitCode).toBe(7); // VALIDATION_ERROR
     const parsed = JSON.parse(res.stderr);
     expect(parsed.error.code).toBe('VALIDATION_ERROR');
-    expect(parsed.error.nextSteps.join(' ')).toContain('abap system set');
+    expect(parsed.error.nextSteps.join(' ')).toContain('abap connection set');
     expect(upsertSystem).not.toHaveBeenCalled();
     expect(fs.existsSync(path.join(cwd, '.abap.json'))).toBe(false);
   });
