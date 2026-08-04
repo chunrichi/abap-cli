@@ -250,6 +250,8 @@ async function interactiveInit(opts: CommandOpts, jsonOutput: boolean): Promise<
       if (!config.password) {
         if (!jsonOutput) console.log(`No stored password for '${systemName}'.`);
         config.password = orCancel(await password({ message: `Password for ${systemName}` }));
+        // The user asked for a stored password — persist it so later runs find it.
+        await storePassword(systemName, config.password);
       }
     } else {
       config.password = orCancel(await password({ message: `Password for ${systemName}` }));

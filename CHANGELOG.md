@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- `abap init` (interactive, existing profile) now persists the fallback-typed password to the OS keychain. Previously it re-prompted "Use stored password?" on every run and the typed password was never saved.
+
 ### Changed
 - Bare `abap` and bare `abap connection` (no subcommand) now print their help text to stdout and exit `0`, instead of failing with `Error: (outputHelp)` / a `USAGE` error (exit 2). Unknown commands and missing arguments still return structured `USAGE` errors.
 - Added `abap connection add <name>` — creates a new profile (refuses when the name exists). `connection set <name>` is now strictly "modify an existing profile" and points to `add` when the profile is missing. All create-profile guidance (`init`, `doctor`, probe errors) now uses `connection add`.
