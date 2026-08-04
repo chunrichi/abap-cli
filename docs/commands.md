@@ -193,7 +193,8 @@ abap connection <command>
 |---------|-------------|
 | `list` | List all saved connection profiles |
 | `show <name>` | Show details of a profile (no secrets) |
-| `set <name>` | Modify a profile (fields or password) |
+| `add <name>` | Create a new profile (`--url` + `--username` required, `--password` stores the credential) |
+| `set <name>` | Modify an existing profile (fields or password) |
 | `use <name>` | Switch the current workspace to a profile |
 | `test <name>` | Probe a profile: tls → auth → adt → icf (exit code reflects the worst failing layer: TLS→4, AUTH→5, ADT/ICF→6) |
 | `delete <name>` | Delete a profile and its stored password |
@@ -328,7 +329,7 @@ JSON output: `{ id, recorded, echo: { goal, tried, where } }`. Reports are writt
 
 | Code | Meaning |
 |------|---------|
-| `CONFIG_ERROR` | Configuration missing/invalid (run `abap init` / `abap connection set`) |
+| `CONFIG_ERROR` | Configuration missing/invalid (run `abap init` / `abap connection add` / `abap connection set`) |
 | `SAP_ERROR` | ADT request failed (includes HTTP status) |
 | `TLS_ERROR` | TLS handshake / certificate failure |
 | `AUTH_ERROR` | 401/403 from SAP (bad credentials) |

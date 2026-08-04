@@ -49,7 +49,7 @@ export async function probeSystem(name: string): Promise<SystemProbe> {
   const profile = getSystem(name);
   if (!profile) {
     throw new CliError('CONFIG_ERROR', `Connection profile '${name}' not found.`, {
-      nextSteps: [`Run 'abap connection set ${name} ...' to create the profile.`],
+      nextSteps: [`Run 'abap connection add ${name} --url <url> --username <user>' to create the profile.`],
       example: `abap connection set ${name} --url <url> --username <user> --password <pass>`,
     });
   }

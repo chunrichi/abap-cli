@@ -20,6 +20,7 @@ Created/updated by `abap init` and managed by `abap connection`:
 ```bash
 abap connection list                  # List saved profiles
 abap connection show dev              # Show profile details (no secrets)
+abap connection add dev --url https://sap:44300 --username DEV --password '***'  # Create a profile
 abap connection set dev --url https://sap:44300   # Modify a field
 abap connection set dev --password '***'          # Update the stored password
 abap connection delete dev            # Delete profile + stored password

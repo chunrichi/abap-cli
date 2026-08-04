@@ -16,13 +16,8 @@ export function registerConnectionCommand(program: Command): void {
     .description('Manage global connection profiles')
     .addHelpText('after', commonErrorsAfter())
     .action((_opts, cmd) => {
-      printError(
-        jsonFromCommand(cmd),
-        new CliError(
-          'USAGE',
-          'Bare "abap connection" has no default action. Use: abap connection list | show <name> | set <name> | use <name> | test <name> | delete <name> | export | import <file>',
-        ),
-      );
+      // Bare `abap connection` prints the subcommand help (exit 0), like bare `abap`.
+      console.log(cmd.helpInformation());
     });
 
   connection
@@ -44,8 +39,26 @@ export function registerConnectionCommand(program: Command): void {
     });
 
   connection
+    .command('add <name>')
+    .description('Create a new connection profile')
+    .option('--url <url>', 'SAP system URL')
+    .option('-c, --client <client>', 'SAP client number')
+    .option('-u, --username <user>', 'SAP username')
+    .option('-l, --language <lang>', 'SAP language')
+    .option('-p, --password <password>', 'Password (stores credential in keychain)')
+    .option('--insecure', 'Skip SSL certificate verification (self-signed certs, development only)')
+    .option('--ca <path>', 'Path to a CA certificate (PEM) for SSL verification')
+    .action(async (name: string, opts, cmd) => {
+      try {
+        await runAdd(name, opts, jsonFromCommand(cmd));
+      } catch (error: unknown) {
+        handleError(jsonFromCommand(cmd), error);
+      }
+    });
+
+  connection
     .command('set <name>')
-    .description('Modify a connection profile (fields or password)')
+    .description('Modify an existing connection profile (fields or password)')
     .option('--url <url>', 'New SAP system URL')
     .option('-c, --client <client>', 'New SAP client number')
     .option('-u, --username <user>', 'New SAP username')
@@ -225,7 +238,7 @@ async function runShow(name: string, jsonOutput: boolean): Promise<void> {
 async function runUse(name: string, jsonOutput: boolean): Promise<void> {
   if (!getSystem(name)) {
     throw new CliError('CONFIG_ERROR', `Connection profile '${name}' not found.`, {
-      nextSteps: [`Run 'abap connection set ${name} ...' to create the profile first.`],
+      nextSteps: [`Run 'abap connection add ${name} --url <url> --username <user>' to create the profile first.`],
       example: `abap connection set ${name} --url <url> --username <user> --password <pass>`,
     });
   }
@@ -282,16 +295,19 @@ async function runTest(name: string, jsonOutput: boolean): Promise<void> {
   }
 }
 
-async function runSet(
+/** True when any profile field option (incl. password) is present. */
+function hasProfileOptions(opts: Record<string, string | boolean>): boolean {
+  const has = (key: string) => opts[key] !== undefined;
+  return has('url') || has('client') || has('username') || has('language') ||
+    has('insecure') || has('ca') || has('clearCa') || has('password') || !!opts.removePassword;
+}
+
+/** Merge CLI field options into a base profile; stores/removes password on request. */
+async function applyProfileOptions(
+  base: SystemProfile,
   name: string,
   opts: Record<string, string | boolean>,
-  jsonOutput: boolean,
-): Promise<void> {
-  const profile = getSystem(name);
-  if (!profile) {
-    throw new CliError('CONFIG_ERROR', `Connection profile '${name}' not found.`);
-  }
-
+): Promise<{ updated: SystemProfile; passwordUpdated: boolean; passwordRemoved: boolean }> {
   const has = (key: string) => opts[key] !== undefined;
   const updatePassword = has('password');
   const removePassword = !!opts.removePassword;
@@ -302,21 +318,7 @@ async function runSet(
     throw new CliError('INVALID_ARGUMENT', 'Cannot use --ca and --clear-ca together.');
   }
 
-  const hasAny = has('url') || has('client') || has('username') || has('language') ||
-    has('insecure') || has('ca') || has('clearCa') || updatePassword || removePassword;
-  if (!hasAny) {
-    if (process.stdin.isTTY) {
-      await interactiveSet(name, profile, jsonOutput);
-      return;
-    }
-    throw new CliError(
-      'USAGE',
-      'Non-interactive environment detected. Provide field options:\n' +
-      '  abap connection set <name> --url <url> [--client <client>] [--username <user>] [--language <lang>] [--password <password>] [--insecure] [--ca <path>] [--clear-ca]',
-    );
-  }
-
-  const updated: SystemProfile = { ...profile };
+  const updated: SystemProfile = { ...base };
   if (has('url')) updated.url = opts.url as string;
   if (has('client')) updated.client = opts.client as string;
   if (has('username')) updated.username = opts.username as string;
@@ -337,7 +339,70 @@ async function runSet(
     await deletePassword(name);
     passwordRemoved = true;
   }
+  return { updated, passwordUpdated, passwordRemoved };
+}
 
+/** Create a new profile; refuses when the name is already taken. */
+async function runAdd(
+  name: string,
+  opts: Record<string, string | boolean>,
+  jsonOutput: boolean,
+): Promise<void> {
+  if (getSystem(name)) {
+    throw new CliError('CONFIG_ERROR', `Connection profile '${name}' already exists.`, {
+      nextSteps: [`Modify it: abap connection set ${name} --url <url>`, `Or delete it first: abap connection delete ${name}`],
+      example: `abap connection set ${name} --url https://sap.example.com`,
+    });
+  }
+  if (!hasProfileOptions(opts)) {
+    if (process.stdin.isTTY) {
+      await interactiveSet(name, { url: '', client: '100', username: '', language: 'EN' }, jsonOutput);
+      return;
+    }
+    throw new CliError(
+      'USAGE',
+      'Non-interactive environment detected. Provide field options:\n' +
+      '  abap connection add <name> --url <url> [--client <client>] [--username <user>] [--language <lang>] [--password <password>] [--insecure] [--ca <path>]',
+    );
+  }
+
+  const { updated, passwordUpdated, passwordRemoved } =
+    await applyProfileOptions({ url: '', client: '100', username: '', language: 'EN' }, name, opts);
+  upsertSystem(name, updated);
+
+  output(
+    jsonOutput,
+    { system: { name, ...updated }, passwordUpdated, passwordRemoved },
+    `Connection profile '${name}' created.`,
+  );
+}
+
+async function runSet(
+  name: string,
+  opts: Record<string, string | boolean>,
+  jsonOutput: boolean,
+): Promise<void> {
+  const profile = getSystem(name);
+  if (!profile) {
+    throw new CliError('CONFIG_ERROR', `Connection profile '${name}' not found.`, {
+      nextSteps: [`Create it: abap connection add ${name} --url <url> --username <user> --password <pass>`],
+      example: `abap connection add ${name} --url https://sap.example.com --username USER`,
+    });
+  }
+
+  if (!hasProfileOptions(opts)) {
+    if (process.stdin.isTTY) {
+      await interactiveSet(name, profile, jsonOutput);
+      return;
+    }
+    throw new CliError(
+      'USAGE',
+      'Non-interactive environment detected. Provide field options:\n' +
+      '  abap connection set <name> --url <url> [--client <client>] [--username <user>] [--language <lang>] [--password <password>] [--insecure] [--ca <path>] [--clear-ca]',
+    );
+  }
+
+  const { updated, passwordUpdated, passwordRemoved } = await applyProfileOptions(profile, name, opts);
   upsertSystem(name, updated);
 
   output(

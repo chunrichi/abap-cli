@@ -63,7 +63,14 @@ try {
 } catch (error: unknown) {
   const json = process.argv.includes('--json');
   if (error instanceof CommanderError) {
-    // Help/version already printed to stdout; exit 0 without touching config.
+    // Help already handled by commander; exit 0 without touching config.
+    // Bare `abap` (no command) routes the help body to writeErr, which we
+    // swallow for structured errors — re-print it to stdout here.
+    const helpShown = error.code === 'commander.helpDisplayed' || error.code === 'commander.help';
+    if (helpShown) {
+      if (error.code === 'commander.help') console.log(program.helpInformation());
+      process.exit(0);
+    }
     if (error.exitCode === 0) process.exit(0);
     const usage = new CliError('USAGE', error.message.replace(/^error: /, ''), {
       nextSteps: ['Check the command usage: abap <command> --help.'],

@@ -69,7 +69,7 @@ function readSystems(configPath: string): { systems: Record<string, unknown>; er
     if (!fs.existsSync(configPath)) {
       return {
         systems: {},
-        error: { message: `Config file not found: ${configPath}`, suggestion: 'Run "abap init" or "abap connection set <name> ..." to create it.' },
+        error: { message: `Config file not found: ${configPath}`, suggestion: 'Run "abap init" or "abap connection add <name> ..." to create it.' },
       };
     }
     const parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as { systems?: Record<string, unknown> };
@@ -203,7 +203,7 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
   if (systemsToProbe.length === 0) {
     push(
       connection,
-      errItem('conn.none', 'No systems configured.', 'Run "abap connection set <name> ..." to add a connection profile.'),
+      errItem('conn.none', 'No systems configured.', 'Run "abap connection add <name> --url <url> --username <user>" to add a connection profile.'),
     );
   } else {
     for (const name of systemsToProbe) {
@@ -213,7 +213,7 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
           errItem(
             `conn.${name}`,
             `System profile '${name}' not found.`,
-            `List profiles: abap connection list — create one: abap connection set ${name} --url <url> --username <user>`,
+            `List profiles: abap connection list — create one: abap connection add ${name} --url <url> --username <user>`,
           ),
         );
         continue;
