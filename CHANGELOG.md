@@ -3,8 +3,11 @@
 ## [Unreleased]
 
 ### Changed
+- Bare `abap` and bare `abap connection` (no subcommand) now print their help text to stdout and exit `0`, instead of failing with `Error: (outputHelp)` / a `USAGE` error (exit 2). Unknown commands and missing arguments still return structured `USAGE` errors.
+- Added `abap connection add <name>` — creates a new profile (refuses when the name exists). `connection set <name>` is now strictly "modify an existing profile" and points to `add` when the profile is missing. All create-profile guidance (`init`, `doctor`, probe errors) now uses `connection add`.
+- `abap pull` now writes the official abap-file-format layout: one directory per object (`src/<object>/`) containing the mandatory `<name>.<type>.json` metadata (formatVersion + header, from `objectStructure`) plus `<name>.<type>.abap` source parts (includes as `<name>.<type>.<subtype>.abap`). `create` (create-then-pull) and `sync --pull` follow the same layout.
+- Namespaced object names (e.g. `/UI2/CL_JSON`) map to the `#`-escaped directory `#ui2#cl_json/` with matching file names, so no nested directory levels are created; `resolveFile` restores `/` for push/check/diff/status/sync round-trips.
 - `abap init` no longer creates the `src/` and `ddic/` work directories — it only writes `.abap.json`. Directories are created on demand by `pull` / `create` / `sync --pull`.
-- Fixed: namespaced object names (e.g. `/UI2/CL_JSON`) are stored on disk with `/` → `#` (`#ui2#cl_json.clas.abap`), so `pull` no longer creates a nested directory level; `resolveFile` restores `/` for push/check/diff/status/sync round-trips.
 - `abap auth test` removed — merged into `abap connection test <name>`. `connection test` now sets the worst-failing-layer exit code (TLS→4, AUTH→5, ADT/ICF→6); `--verbose` (a no-op on `auth test`) is dropped. Migration: `abap auth test --system <name>` → `abap connection test <name>`.
 - `abap system` renamed to `abap connection` — breaking change. Migration: `abap system list|show|set|use|test|delete|export|import` → `abap connection …`. The old `system` command is removed (no alias); help text and error `nextSteps` across all commands now reference `abap connection`.
 - Removed the interactive menu behind bare `abap system` (previously reachable on a TTY). Bare `abap connection` now prints a `USAGE` error listing subcommands. `abap connection set <name>` without flags still opens the field-editing wizard on a TTY.
