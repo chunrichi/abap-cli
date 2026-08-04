@@ -16,6 +16,13 @@ import { registerStatusCommand } from './commands/status.js';
 import { registerTransportCommand } from './commands/transport.js';
 import { registerDeployCommand } from './commands/deploy.js';
 import { registerSystemCommand } from './commands/system.js';
+import { registerDoctorCommand } from './commands/doctor.js';
+import { registerAuthCommand } from './commands/auth.js';
+import { registerInspectCommand } from './commands/inspect.js';
+import { registerDiffCommand } from './commands/diff.js';
+import { registerSyncCommand } from './commands/sync.js';
+import { registerReportStuckCommand } from './commands/report-stuck.js';
+import { writeStuckReport, recordFailure, shouldAutoReport } from './sync/stuck-reports.js';
 
 const program = new Command();
 
@@ -27,7 +34,8 @@ program
   .name('abap-cli')
   .description('CLI tool for ABAP vibe coding — agent-driven ABAP development')
   .version(version)
-  .option('--json', 'Output in JSON format');
+  .option('--json', 'Output in JSON format')
+  .option('--report-stuck', 'Record a stuck report when this command fails (feedback loop, FR-023)');
 
 // 顶层错误处理（FR-005/FR-007）：commander 抛错（缺参/未知选项）由这里归一化为
 // 结构化错误；--help/--version 仍走 commander 自带输出并 exit 0。
@@ -46,6 +54,12 @@ registerStatusCommand(program);
 registerTransportCommand(program);
 registerDeployCommand(program);
 registerSystemCommand(program);
+registerDoctorCommand(program);
+registerAuthCommand(program);
+registerInspectCommand(program);
+registerDiffCommand(program);
+registerSyncCommand(program);
+registerReportStuckCommand(program);
 
 try {
   program.parse();
@@ -65,6 +79,22 @@ try {
 }
 
 function writeError(json: boolean, error: unknown): never {
+  // Feedback loop (FR-023): --report-stuck flag or ABAP_REPORT_STUCK=1 after the
+  // failure threshold records a local report; the original error is unchanged.
+  recordFailure();
+  const reportFlag = process.argv.includes('--report-stuck');
+  if (reportFlag || shouldAutoReport(process.env.ABAP_REPORT_STUCK)) {
+    const err = error as { code?: string; message?: string };
+    writeStuckReport({
+      goal: 'unknown',
+      where: process.argv.slice(2).filter((a) => !a.startsWith('--report-stuck')).join(' ') || 'abap',
+      tried: `command failed: ${err.code ?? ''} ${err.message ?? ''}`,
+      command: 'abap',
+      argv: process.argv.slice(2),
+      cwd: process.cwd(),
+      cliVersion: version,
+    });
+  }
   const out = renderError(json, error);
   for (const line of out.stderr) console.error(line);
   process.exit(out.exitCode ?? 1);

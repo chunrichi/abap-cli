@@ -1,0 +1,132 @@
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import { makeProgram, runCommand } from './cli-helper.js';
+
+// Fake probe — no network access in unit tests.
+vi.mock('../../src/abap_cli/clients/probe.js', () => ({
+  probeSystem: vi.fn().mockResolvedValue({
+    tls: { ok: true, skipped: true },
+    auth: { ok: true },
+    adt: { ok: true },
+    icf: { ok: true },
+  }),
+}));
+
+import { runDoctorChecks } from '../../src/abap_cli/sync/doctor-checks.js';
+
+function tmpDir(): string {
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'doctor-'));
+}
+
+function writeSystems(dir: string, systems: Record<string, unknown>): string {
+  const cliDir = path.join(dir, '.abap-cli');
+  fs.mkdirSync(cliDir, { recursive: true });
+  const configPath = path.join(cliDir, 'systems.json');
+  fs.writeFileSync(configPath, JSON.stringify({ systems }, null, 2) + '\n');
+  return configPath;
+}
+
+describe('doctor-checks (FR-001..005)', () => {
+  let home: string;
+
+  beforeEach(() => {
+    home = tmpDir();
+  });
+
+  it('healthy environment → all items ok and empty nextSteps (FR-001/FR-002, SC-001)', async () => {
+    writeSystems(home, {
+      mock: { url: 'http://localhost:8080', client: '100', username: 'MOCKUSER', language: 'EN' },
+    });
+    const report = await runDoctorChecks({ home });
+    expect(report.environment.every((i) => i.status === 'ok')).toBe(true);
+    expect(report.config.every((i) => i.status === 'ok')).toBe(true);
+    expect(report.nextSteps).toEqual([]);
+  });
+
+  it('corrupt systems.json → config item err + suggestion in nextSteps, no throw (FR-002, SC-001)', async () => {
+    const cliDir = path.join(home, '.abap-cli');
+    fs.mkdirSync(cliDir, { recursive: true });
+    const configPath = path.join(cliDir, 'systems.json');
+    fs.writeFileSync(configPath, '{ not valid json');
+    const report = await runDoctorChecks({ home });
+    const env = report.environment.find((i) => i.key === 'env.config');
+    expect(env?.status).toBe('err');
+    expect(env?.suggestion).toBeTruthy();
+    expect(report.nextSteps.length).toBeGreaterThan(0);
+  });
+
+  it('invalid profile → config item err (FR-002)', async () => {
+    writeSystems(home, { bad: { url: 'not-a-url', username: 'x' } });
+    const report = await runDoctorChecks({ home });
+    const item = report.config.find((i) => i.key.startsWith('config.profile'));
+    expect(item?.status).toBe('err');
+  });
+
+  it('unknown --system → connection item err, not a hard failure (FR-005)', async () => {
+    writeSystems(home, {
+      mock: { url: 'http://localhost:8080', client: '100', username: 'MOCKUSER', language: 'EN' },
+    });
+    const report = await runDoctorChecks({ home, system: 'does-not-exist' });
+    const conn = report.connection.find((i) => i.key.includes('does-not-exist'));
+    expect(conn?.status).toBe('err');
+    expect(conn?.suggestion).toBeTruthy();
+  });
+
+  it('--verbose adds per-item detail (FR-003)', async () => {
+    writeSystems(home, {
+      mock: { url: 'http://localhost:8080', client: '100', username: 'MOCKUSER', language: 'EN' },
+    });
+    const brief = await runDoctorChecks({ home });
+    const verbose = await runDoctorChecks({ home, verbose: true });
+    expect(brief.environment.every((i) => i.detail === undefined)).toBe(true);
+    expect(verbose.environment.some((i) => i.detail !== undefined)).toBe(true);
+  });
+});
+
+describe('abap doctor command (FR-004)', () => {
+  // Command layer: use doMock so --fix never touches the real home dir, while
+  // the unit describe above keeps the real runDoctorChecks implementation.
+  const runDoctorChecksMock = vi.fn();
+  const applySafeFixesMock = vi.fn(() => ['recreated ~/.abap-cli with 0700 perms']);
+  let registerCmd: (p: ReturnType<typeof makeProgram>) => void;
+
+  beforeEach(async () => {
+    vi.doMock('../../src/abap_cli/sync/doctor-checks.js', () => ({
+      runDoctorChecks: runDoctorChecksMock,
+      applySafeFixes: applySafeFixesMock,
+    }));
+    runDoctorChecksMock.mockResolvedValue({
+      environment: [{ key: 'env.node', status: 'ok', message: '' }],
+      config: [],
+      connection: [],
+      nextSteps: [],
+    });
+    const cmd = await import('../../src/abap_cli/commands/doctor.js');
+    registerCmd = cmd.registerDoctorCommand;
+  });
+
+  it('--fix without --yes in non-TTY → VALIDATION_ERROR exit 7, zero changes (FR-004, SC-002)', async () => {
+    const program = makeProgram();
+    registerCmd(program);
+    const res = await runCommand(program, ['doctor', '--fix', '--json'], {});
+    expect(res.exitCode).toBe(7);
+    const parsed = JSON.parse(res.stderr);
+    expect(parsed.status).toBe('error');
+    expect(parsed.error.code).toBe('VALIDATION_ERROR');
+    expect(applySafeFixesMock).not.toHaveBeenCalled();
+  });
+
+  it('--fix --yes applies only safe fixes and reports fixesApplied (FR-004, SC-002)', async () => {
+    const program = makeProgram();
+    registerCmd(program);
+    const res = await runCommand(program, ['doctor', '--fix', '--yes', '--json'], {});
+    expect(res.exitCode).toBeUndefined();
+    const parsed = JSON.parse(res.stdout);
+    expect(parsed.status).toBe('success');
+    expect(Array.isArray(parsed.data.fixesApplied)).toBe(true);
+    expect(parsed.data.fixesApplied.length).toBeGreaterThan(0);
+    expect(applySafeFixesMock).toHaveBeenCalled();
+  });
+});

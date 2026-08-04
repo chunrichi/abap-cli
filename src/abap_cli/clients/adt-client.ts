@@ -129,6 +129,11 @@ export class AdtClientWrapper {
     return this._call(() => this.client.objectStructure(objectUrl));
   }
 
+  /** Structure elements for `inspect --structure` (FR-012). */
+  objectStructureElements(objectUrl: string, version?: Parameters<ADTClient['objectStructureElements']>[1]) {
+    return this._call(() => this.client.objectStructureElements(objectUrl, version));
+  }
+
   /** Main program(s) for an include part (program/function-group includes). */
   mainPrograms(includeUrl: string) {
     return this._call(() => this.client.mainPrograms(includeUrl));

@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.6.0] - 2026-08-04
+
+### Added
+- `abap doctor` — one-command environment diagnosis (environment / config / connection sections with per-item ok/err + prioritized `nextSteps`); `--verbose` detail; `--fix` applies only safe, reversible fixes (`--yes`-gated)
+- `abap auth test --system <name>` — layer-by-layer connection diagnosis (`tls` → `auth` → `adt` → `icf`) with per-layer `nextSteps`; exit code reflects the worst failing layer (TLS→4, AUTH→5, ADT/ICF→6)
+- `abap inspect <object>` — read-only object metadata probe (`--structure` / `--includes` / `--locks` / `--package`); never acquires a lock
+- `abap diff [file]` — local↔SAP comparison with per-part `direction` + bounded line-change `summary` (`--all` / `--remote` / `--local-only` / `--limit`); read-only
+- `abap sync` — chained status/pull/push workflow (`--status` default, `--pull`, `--push`, `--dry-run` zero-write plan, `--yes`); divergent parts are never silently overwritten (conflict guard)
+- `abap report-stuck` — local feedback-loop record (`--goal` / `--tried` / `--where`) returning a `STUCK-` report id; global `--report-stuck` flag on any failing command + `ABAP_REPORT_STUCK=1` auto-trigger after repeated failures; credentials never recorded; non-blocking degrade to `STUCK-DEGRADED-`
+- `test/mock-adt/server.js` — `/sap/zabap_vibe/` ICF root route (`MOCK_ICF_FAIL`), `MOCK_AUTH_FAIL` (401 on compatibility graph), and `ZCL_MULTI` multi-include class fixture
+- Fixed: ADT quickSearch requires `*` wildcards on real SAP — `resolveObject` now retries with `*NAME*` when an exact-name search returns zero hits (mock's substring matching had hidden this)
+
+### Verified
+- Unit: 112 tests across 24 files (38 new: doctor 7 / auth 7 / inspect 8 / diff 6 / sync 6 / report-stuck 6) — `npm run verify` green
+- Mock end-to-end: all six commands verified offline against `test/mock-adt/server.js`
+- Real SAP (HANA vhcala4hci): `auth test` tls/auth/adt ok (icf 404 — self-built ICF service not deployed on this system, expected); `doctor` env/config ok with icf reported as a diagnosed item; `inspect` real object metadata + `OBJECT_NOT_FOUND` for unknown; `diff` divergent summary on a real object; `sync` status/dry-run/conflict guard; `report-stuck` local record
+
 ## [0.5.0] - 2026-08-03
 
 ### Added

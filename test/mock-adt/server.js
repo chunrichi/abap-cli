@@ -20,6 +20,10 @@ const PORT = Number(process.argv[2] || process.env.PORT || 8080);
 const NO_TRANSPORTS = process.env.MOCK_NO_TRANSPORTS === '1';
 // MOCK_ATOMIC_FAIL=1 → fail the 2nd setObjectSource (mid-batch write failure for push --atomic).
 const ATOMIC_FAIL = process.env.MOCK_ATOMIC_FAIL === '1';
+// MOCK_AUTH_FAIL=1 → compatibility graph returns 401 (auth layer failure for `auth test`).
+const AUTH_FAIL = process.env.MOCK_AUTH_FAIL === '1';
+// MOCK_ICF_FAIL=1 → /sap/zabap_vibe/ returns 500 (icf layer failure for `auth test`).
+const ICF_FAIL = process.env.MOCK_ICF_FAIL === '1';
 const NOW = '2026-08-01T00:00:00Z';
 const CURRENT_USER = 'MOCKUSER';
 let putCount = 0; // global PUT counter (MOCK_ATOMIC_FAIL fails on the 2nd write)
@@ -105,6 +109,30 @@ addObject('ZCL_SYNTAX_ERROR', 'CLAS', '/sap/bc/adt/oo/classes/zcl_syntax_error',
     subtype: 'locals_imp',
     sourceUrl: '/sap/bc/adt/oo/classes/zcl_syntax_error/source/locals_imp',
     content: '',
+  },
+]);
+
+// Multi-include class (T002/SC-004): main + locals_def + locals_imp with distinct
+// content, so `inspect --includes` / `diff` per-part scenarios have fixtures.
+addObject('ZCL_MULTI', 'CLAS', '/sap/bc/adt/oo/classes/zcl_multi', 'Class with multiple includes', [
+  {
+    subtype: 'main',
+    sourceUrl: '/sap/bc/adt/oo/classes/zcl_multi/source/main',
+    content:
+      'CLASS zcl_multi DEFINITION PUBLIC.\n' +
+      '  PUBLIC SECTION.\n' +
+      '    METHODS run.\n' +
+      'ENDCLASS.\n',
+  },
+  {
+    subtype: 'locals_def',
+    sourceUrl: '/sap/bc/adt/oo/classes/zcl_multi/source/locals_def',
+    content: 'DATA: gv_multi TYPE i.\n',
+  },
+  {
+    subtype: 'locals_imp',
+    sourceUrl: '/sap/bc/adt/oo/classes/zcl_multi/source/locals_imp',
+    content: 'CLASS zcl_multi IMPLEMENTATION.\n  METHOD run.\n  ENDMETHOD.\nENDCLASS.\n',
   },
 ]);
 
@@ -543,7 +571,14 @@ const server = http.createServer(async (req, res) => {
   try {
     // login / compatibility
     if (path === '/sap/bc/adt/compatibility/graph') {
+      if (AUTH_FAIL) return adtError(res, 401, 'Simulated auth failure (MOCK_AUTH_FAIL=1)');
       return ok(res, '{}', 'application/json');
+    }
+
+    // self-built ICF service root (probeIcf target for `auth test` / `doctor`)
+    if (path === '/sap/zabap_vibe/') {
+      if (ICF_FAIL) return adtError(res, 500, 'Simulated ICF failure (MOCK_ICF_FAIL=1)');
+      return ok(res, JSON.stringify({ status: 'ok' }), 'application/json');
     }
 
     // object search
