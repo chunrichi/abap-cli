@@ -42,7 +42,8 @@ export function resolveFile(filePath: string): ResolvedFile {
   }
 
   // parts.length >= 2 guaranteed by the check above
-  const objectName = parts[0]!.toUpperCase();
+  // Namespaced objects are stored as `#ns#name` on disk; restore the `/` form.
+  const objectName = parts[0]!.toUpperCase().replace(/#/g, '/');
   const objectType = parts[1]!.toUpperCase();
   const subtype = parts.slice(2).join('.') || 'main';
   const route = EXT_ROUTE_MAP[ext] || 'adt';
@@ -65,7 +66,8 @@ function getOuterExtension(filename: string): string {
  * primary type is used for the file extension (bcalv_grid_demo.prog.abap).
  */
 export function buildFilename(objectName: string, objectType: string, subtype?: string, ext = '.abap'): string {
-  const name = objectName.toLowerCase();
+  // Namespaced names (e.g. /UI2/CL_JSON) must not create directory levels: / → #.
+  const name = objectName.toLowerCase().replace(/\//g, '#');
   const type = objectType.split('/')[0]!.toLowerCase();
   const sub = subtype && subtype !== 'main' ? `.${subtype}` : '';
   return `${name}.${type}${sub}${ext}`;
