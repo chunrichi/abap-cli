@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Changed
+- `abap init` no longer creates the `src/` and `ddic/` work directories — it only writes `.abap.json`. Directories are created on demand by `pull` / `create` / `sync --pull`.
+- Fixed: namespaced object names (e.g. `/UI2/CL_JSON`) are stored on disk with `/` → `#` (`#ui2#cl_json.clas.abap`), so `pull` no longer creates a nested directory level; `resolveFile` restores `/` for push/check/diff/status/sync round-trips.
 - `abap auth test` removed — merged into `abap connection test <name>`. `connection test` now sets the worst-failing-layer exit code (TLS→4, AUTH→5, ADT/ICF→6); `--verbose` (a no-op on `auth test`) is dropped. Migration: `abap auth test --system <name>` → `abap connection test <name>`.
 - `abap system` renamed to `abap connection` — breaking change. Migration: `abap system list|show|set|use|test|delete|export|import` → `abap connection …`. The old `system` command is removed (no alias); help text and error `nextSteps` across all commands now reference `abap connection`.
 - Removed the interactive menu behind bare `abap system` (previously reachable on a TTY). Bare `abap connection` now prints a `USAGE` error listing subcommands. `abap connection set <name>` without flags still opens the field-editing wizard on a TTY.
