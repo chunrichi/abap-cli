@@ -63,15 +63,36 @@ try {
 } catch (error: unknown) {
   const json = process.argv.includes('--json');
   if (error instanceof CommanderError) {
-    // Help already handled by commander; exit 0 without touching config.
-    // Bare `abap` (no command) routes the help body to writeErr, which we
-    // swallow for structured errors — re-print it to stdout here.
+    // commander routes help bodies to writeErr (swallowed above) and reports
+    // both `--help` and missing-required-args as help errors. Re-print the
+    // right help ourselves: bare `abap` shows the top-level help (exit 0),
+    // while a missing required argument shows that subcommand's help (exit 2).
     const helpShown = error.code === 'commander.helpDisplayed' || error.code === 'commander.help';
     if (helpShown) {
-      if (error.code === 'commander.help') console.log(program.helpInformation());
+      if (error.code === 'commander.help') {
+        const firstArg = process.argv.slice(2).find((a) => !a.startsWith('-'));
+        const sub = program.commands.find((c) => c.name() === firstArg);
+        if (sub) {
+          console.log(sub.helpInformation());
+          console.error('Missing required argument(s). See the usage above.');
+          process.exit(2);
+        }
+        console.log(program.helpInformation());
+      }
       process.exit(0);
     }
     if (error.exitCode === 0) process.exit(0);
+    // Missing required argument/option: surface that subcommand's usage so the
+    // caller sees exactly what is expected (the error itself follows on stderr).
+    if (
+      error.code === 'commander.missingArgument' ||
+      error.code === 'commander.missingMandatoryOptionValue' ||
+      error.code === 'commander.optionMissingArgument'
+    ) {
+      const firstArg = process.argv.slice(2).find((a) => !a.startsWith('-'));
+      const sub = program.commands.find((c) => c.name() === firstArg);
+      if (sub) console.log(sub.helpInformation());
+    }
     const usage = new CliError('USAGE', error.message.replace(/^error: /, ''), {
       nextSteps: ['Check the command usage: abap <command> --help.'],
       example: 'abap <command> --help',

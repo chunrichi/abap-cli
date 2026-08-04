@@ -6,7 +6,7 @@
 - `abap init` (interactive, existing profile) now persists the fallback-typed password to the OS keychain. Previously it re-prompted "Use stored password?" on every run and the typed password was never saved.
 
 ### Changed
-- Bare `abap` and bare `abap connection` (no subcommand) now print their help text to stdout and exit `0`, instead of failing with `Error: (outputHelp)` / a `USAGE` error (exit 2). Unknown commands and missing arguments still return structured `USAGE` errors.
+- Bare `abap` and bare `abap connection` (no subcommand) print their help text to stdout and exit `0`. Commands missing required arguments/options (e.g. `abap search` without a query) print that subcommand's help to stdout followed by the structured `USAGE` error on stderr, exit `2`. Unknown commands still return the structured `USAGE` error.
 - Added `abap connection add <name>` — creates a new profile (refuses when the name exists). `connection set <name>` is now strictly "modify an existing profile" and points to `add` when the profile is missing. All create-profile guidance (`init`, `doctor`, probe errors) now uses `connection add`.
 - `abap pull` now writes the official abap-file-format layout: one directory per object (`src/<object>/`) containing the mandatory `<name>.<type>.json` metadata (formatVersion + header, from `objectStructure`) plus `<name>.<type>.abap` source parts (includes as `<name>.<type>.<subtype>.abap`). `create` (create-then-pull) and `sync --pull` follow the same layout.
 - Namespaced object names (e.g. `/UI2/CL_JSON`) map to the `#`-escaped directory `#ui2#cl_json/` with matching file names, so no nested directory levels are created; `resolveFile` restores `/` for push/check/diff/status/sync round-trips.
