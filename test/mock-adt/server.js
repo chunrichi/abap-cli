@@ -40,6 +40,7 @@ function addObject(name, type, objectUrl, description, parts, opts = {}) {
     packageName: opts.packageName ?? '$TMP',
     active: true,
     lockedBy: opts.lockedBy ?? null, // { user, lockHandle }
+    programType: opts.programType ?? '1', // ADT program:programType
     parts,
   });
 }
@@ -89,7 +90,7 @@ addObject('ZCL_DEMO', 'CLAS', '/sap/bc/adt/oo/classes/zcl_demo', 'Demo class for
       'ENDCLASS.\n',
   },
   {
-    subtype: 'locals_imp',
+    subtype: 'implementations',
     sourceUrl: '/sap/bc/adt/oo/classes/zcl_demo/source/locals_imp',
     content: '',
   },
@@ -106,13 +107,13 @@ addObject('ZCL_SYNTAX_ERROR', 'CLAS', '/sap/bc/adt/oo/classes/zcl_syntax_error',
       'ENDCLASS.\n',
   },
   {
-    subtype: 'locals_imp',
+    subtype: 'implementations',
     sourceUrl: '/sap/bc/adt/oo/classes/zcl_syntax_error/source/locals_imp',
     content: '',
   },
 ]);
 
-// Multi-include class (T002/SC-004): main + locals_def + locals_imp with distinct
+// Multi-include class (T002/SC-004): main + definitions + implementations with distinct
 // content, so `inspect --includes` / `diff` per-part scenarios have fixtures.
 addObject('ZCL_MULTI', 'CLAS', '/sap/bc/adt/oo/classes/zcl_multi', 'Class with multiple includes', [
   {
@@ -125,12 +126,12 @@ addObject('ZCL_MULTI', 'CLAS', '/sap/bc/adt/oo/classes/zcl_multi', 'Class with m
       'ENDCLASS.\n',
   },
   {
-    subtype: 'locals_def',
+    subtype: 'definitions',
     sourceUrl: '/sap/bc/adt/oo/classes/zcl_multi/source/locals_def',
     content: 'DATA: gv_multi TYPE i.\n',
   },
   {
-    subtype: 'locals_imp',
+    subtype: 'implementations',
     sourceUrl: '/sap/bc/adt/oo/classes/zcl_multi/source/locals_imp',
     content: 'CLASS zcl_multi IMPLEMENTATION.\n  METHOD run.\n  ENDMETHOD.\nENDCLASS.\n',
   },
@@ -143,17 +144,25 @@ addObject('ZCL_LOCKED', 'CLAS', '/sap/bc/adt/oo/classes/zcl_locked', 'Class lock
     content: 'CLASS zcl_locked DEFINITION PUBLIC.\nENDCLASS.\n',
   },
   {
-    subtype: 'locals_imp',
+    subtype: 'implementations',
     sourceUrl: '/sap/bc/adt/oo/classes/zcl_locked/source/locals_imp',
     content: '',
   },
 ], { lockedBy: { user: 'OTHER', lockHandle: 'lock-other' } });
 
-addObject('ZPROG', 'PROG', '/sap/bc/adt/programs/programs/zprog', 'Demo report', [
+addObject('ZPROG', 'PROG/P', '/sap/bc/adt/programs/programs/zprog', 'Demo report', [
   {
     subtype: 'main',
     sourceUrl: '/sap/bc/adt/programs/programs/zprog/source/main',
     content: "REPORT zprog.\nWRITE: / 'hello mock'.\n",
+  },
+], { programType: 'executableProgram' });
+
+addObject('ZPROG_TOP', 'PROG/I', '/sap/bc/adt/programs/includes/zprog_top', 'Demo include', [
+  {
+    subtype: 'main',
+    sourceUrl: '/sap/bc/adt/programs/includes/zprog_top/source/main',
+    content: "TABLES: t001.\n",
   },
 ]);
 
@@ -197,7 +206,7 @@ function skeletonParts(type, name) {
   };
   const parts = [main];
   if (type === 'CLAS') {
-    parts.push({ subtype: 'locals_imp', sourceUrl: `${base}/source/locals_imp`, content: '' });
+    parts.push({ subtype: 'implementations', sourceUrl: `${base}/source/locals_imp`, content: '' });
   }
   return parts;
 }
@@ -239,10 +248,11 @@ function esc(s) {
 }
 
 // ---------- response builders ----------
+// Mock-internal subtype names equal ADT includeType names (abap-file-format style).
 const SUBTYPE_TO_INCLUDE_TYPE = {
   main: 'main',
-  locals_def: 'definitions',
-  locals_imp: 'implementations',
+  definitions: 'definitions',
+  implementations: 'implementations',
   macros: 'macros',
   testclasses: 'testclasses',
 };
@@ -281,7 +291,7 @@ function structureXml(obj) {
     `adtcore:description="${obj.description}" adtcore:masterLanguage="EN" adtcore:language="EN" adtcore:masterSystem="MOCK" ` +
     `adtcore:version="active" adtcore:responsible="${CURRENT_USER}" adtcore:changedBy="${CURRENT_USER}" adtcore:createdBy="${CURRENT_USER}" ` +
     `adtcore:changedAt="${NOW}" adtcore:createdAt="${NOW}" adtcore:descriptionTextLimit="60" ` +
-    `abapsource:sourceUri="${main.sourceUrl}" program:programType="1" program:lockedByEditor="false"/>`
+    `abapsource:sourceUri="${main.sourceUrl}" program:programType="${obj.programType}" program:lockedByEditor="false"/>`
   );
 }
 

@@ -8,18 +8,22 @@ import { makeProgram, runCommand } from './cli-helper.js';
 const searchObject = vi.fn(async (name: string) => [
   { 'adtcore:name': name.toUpperCase(), 'adtcore:type': 'CLAS', 'adtcore:uri': `/sap/bc/adt/oo/classes/${name.toLowerCase()}` },
 ]);
-const objectStructure = vi.fn(async (objectUrl: string) => ({
+const defaultObjectStructure = async (objectUrl: string) => ({
   objectUrl,
   metaData: {
     'adtcore:description': 'Demo class',
     'adtcore:masterLanguage': 'EN',
+    'adtcore:type': 'CLAS/OC',
     'abapsource:sourceUri': `${objectUrl}/source/main`,
   },
   includes: [
     { 'class:includeType': 'main', 'abapsource:sourceUri': `${objectUrl}/source/main` },
+    { 'class:includeType': 'definitions', 'abapsource:sourceUri': `${objectUrl}/source/locals_def` },
+    { 'class:includeType': 'implementations', 'abapsource:sourceUri': `${objectUrl}/source/locals_imp` },
     { 'class:includeType': 'testclasses', 'abapsource:sourceUri': `${objectUrl}/source/testclasses` },
   ],
-}));
+});
+const objectStructure = vi.fn(defaultObjectStructure);
 const getObjectSource = vi.fn(async (url: string) => `SOURCE ${url}`);
 
 vi.mock('../../src/abap_cli/clients/adt-client.js', () => ({
@@ -39,6 +43,7 @@ beforeEach(() => {
   searchObject.mockImplementation(async (name: string) => [
     { 'adtcore:name': name.toUpperCase(), 'adtcore:type': 'CLAS', 'adtcore:uri': `/sap/bc/adt/oo/classes/${name.toLowerCase()}` },
   ]);
+  objectStructure.mockImplementation(defaultObjectStructure);
   cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'pull-'));
   fs.mkdirSync(path.join(cwd, 'src'), { recursive: true });
 });
@@ -59,6 +64,9 @@ describe('abap pull (abap-file-format layout)', () => {
     const dir = path.join(cwd, 'src', 'zcl_demo');
     expect(fs.existsSync(path.join(dir, 'zcl_demo.clas.json'))).toBe(true);
     expect(fs.existsSync(path.join(dir, 'zcl_demo.clas.abap'))).toBe(true);
+    // local types use the abap-file-format include names (definitions/implementations)
+    expect(fs.existsSync(path.join(dir, 'zcl_demo.clas.definitions.abap'))).toBe(true);
+    expect(fs.existsSync(path.join(dir, 'zcl_demo.clas.implementations.abap'))).toBe(true);
     // testclasses part is excluded by default
     expect(fs.existsSync(path.join(dir, 'zcl_demo.clas.testclasses.abap'))).toBe(false);
 
@@ -91,6 +99,60 @@ describe('abap pull (abap-file-format layout)', () => {
     const dir = path.join(cwd, 'src', '#ui2#cl_json');
     expect(fs.existsSync(path.join(dir, '#ui2#cl_json.clas.json'))).toBe(true);
     expect(fs.existsSync(path.join(dir, '#ui2#cl_json.clas.abap'))).toBe(true);
+  });
+
+  it('PROG main program: generalInformation.programType passes the enum through', async () => {
+    searchObject.mockResolvedValue([
+      { 'adtcore:name': 'ZAKIT_DEMO', 'adtcore:type': 'PROG/P', 'adtcore:uri': '/sap/bc/adt/programs/programs/zakit_demo' },
+    ]);
+    objectStructure.mockResolvedValue({
+      objectUrl: '/sap/bc/adt/programs/programs/zakit_demo',
+      metaData: {
+        'adtcore:description': 'Demo report',
+        'adtcore:masterLanguage': 'EN',
+        'adtcore:type': 'PROG/P',
+        'abapsource:sourceUri': '/sap/bc/adt/programs/programs/zakit_demo/source/main',
+        'program:programType': 'executableProgram',
+      },
+      links: [],
+    });
+
+    const program = makeProgram();
+    registerPullCommand(program);
+    const res = await runCommand(program, ['pull', 'ZAKIT_DEMO', '--type', 'PROG', '--json'], { cwd });
+    expect(res.exitCode).toBeUndefined();
+
+    const dir = path.join(cwd, 'src', 'zakit_demo');
+    const meta = JSON.parse(fs.readFileSync(path.join(dir, 'zakit_demo.prog.json'), 'utf-8'));
+    expect(meta.generalInformation.programType).toBe('executableProgram');
+    expect(fs.existsSync(path.join(dir, 'zakit_demo.prog.abap'))).toBe(true);
+  });
+
+  it('PROG include: programType inferred as "include" when attribute is missing (PROG/I)', async () => {
+    searchObject.mockResolvedValue([
+      { 'adtcore:name': 'ZPROG_TOP', 'adtcore:type': 'PROG/I', 'adtcore:uri': '/sap/bc/adt/programs/includes/zprog_top' },
+    ]);
+    objectStructure.mockResolvedValue({
+      objectUrl: '/sap/bc/adt/programs/includes/zprog_top',
+      metaData: {
+        'adtcore:description': 'Demo include',
+        'adtcore:masterLanguage': 'EN',
+        'adtcore:type': 'PROG/I',
+        'abapsource:sourceUri': '/sap/bc/adt/programs/includes/zprog_top/source/main',
+      },
+      links: [],
+    });
+
+    const program = makeProgram();
+    registerPullCommand(program);
+    const res = await runCommand(program, ['pull', 'ZPROG_TOP', '--type', 'PROG', '--json'], { cwd });
+    expect(res.exitCode).toBeUndefined();
+
+    const dir = path.join(cwd, 'src', 'zprog_top');
+    const meta = JSON.parse(fs.readFileSync(path.join(dir, 'zprog_top.prog.json'), 'utf-8'));
+    expect(meta.generalInformation.programType).toBe('include');
+    // main part has no subtype suffix
+    expect(fs.existsSync(path.join(dir, 'zprog_top.prog.abap'))).toBe(true);
   });
 
   it('existing identical files are skipped; differing files need --overwrite', async () => {

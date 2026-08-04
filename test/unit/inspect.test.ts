@@ -84,7 +84,7 @@ describe('abap inspect (US3, FR-011..014, SC-004)', () => {
     expect(objectStructureElements).toHaveBeenCalled();
   });
 
-  it('--includes lists main + locals_def + locals_imp with sourceUri (FR-012)', async () => {
+  it('--includes lists main + definitions + implementations with sourceUri (FR-012)', async () => {
     const program = makeProgram();
     registerInspectCommand(program);
     const res = await runCommand(program, ['inspect', 'ZCL_MULTI', '--includes', '--json']);

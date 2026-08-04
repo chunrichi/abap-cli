@@ -7,7 +7,7 @@ export interface ResolvedFile {
   objectName: string;
   /** SAP object type (e.g., CLAS, INTF, PROG, DOMA) */
   objectType: string;
-  /** Subtype / include (e.g., main, locals_imp, testclasses) */
+  /** Subtype / include (e.g., main, implementations, testclasses) */
   subtype: string;
   /** Route: 'adt' for source objects, 'icf' for DDIC objects */
   route: 'adt' | 'icf';
@@ -27,7 +27,7 @@ const SOURCE_EXTENSIONS = new Set(['.abap', '.asddls', '.asbdef', '.assrvd']);
  * Parse a filename into object metadata.
  * Examples:
  *   zcl_foo.clas.abap → { objectName: "ZCL_FOO", objectType: "CLAS", subtype: "main", route: "adt" }
- *   zcl_foo.clas.locals_imp.abap → { objectName: "ZCL_FOO", objectType: "CLAS", subtype: "locals_imp", route: "adt" }
+ *   zcl_foo.clas.implementations.abap → { objectName: "ZCL_FOO", objectType: "CLAS", subtype: "implementations", route: "adt" }
  *   zmy_domain.doma.json → { objectName: "ZMY_DOMAIN", objectType: "DOMA", subtype: "", route: "icf" }
  *   zmy_table.tabl.json → { objectName: "ZMY_TABLE", objectType: "TABL", subtype: "", route: "icf" }
  */

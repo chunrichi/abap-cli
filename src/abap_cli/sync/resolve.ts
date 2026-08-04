@@ -5,7 +5,7 @@ import { CliError } from '../output/json.js';
 export const SEARCH_RESULT_LIMIT = 20;
 
 export interface ObjectPart {
-  /** Subtype: main, locals_def, locals_imp, macros, testclasses */
+  /** Subtype (abap-file-format name): main, definitions, implementations, macros, testclasses */
   subtype: string;
   /** ADT source URI of this part */
   sourceUrl: string;
@@ -15,6 +15,10 @@ export interface ObjectPart {
 export interface ObjectMetadata {
   description?: string;
   masterLanguage?: string;
+  /** ADT program:programType — enum ('executableProgram') on real SAP, raw ('1'|'M'|'S'|'I') in mock. */
+  programType?: string;
+  /** ADT object type (e.g. 'PROG/P', 'PROG/I') from the structure root. */
+  objectType?: string;
 }
 
 export interface ObjectPartsResult {
@@ -29,11 +33,11 @@ export interface ResolvedObject {
   parts: ObjectPart[];
 }
 
-/** Map ADT class include types to abap-file-format subtypes. */
+/** Map ADT class include types to abap-file-format subtypes (file-name suffixes). */
 const CLASS_INCLUDE_SUBTYPES: Record<string, string> = {
   main: 'main',
-  definitions: 'locals_def',
-  implementations: 'locals_imp',
+  definitions: 'definitions',
+  implementations: 'implementations',
   macros: 'macros',
   testclasses: 'testclasses',
 };
@@ -112,10 +116,12 @@ async function getObjectPartsOnce(
   object: { name: string; objectUrl: string },
 ): Promise<ObjectPartsResult> {
   const struc = await client.objectStructure(object.objectUrl);
-  const meta = (struc as { metaData?: { 'adtcore:description'?: string; 'adtcore:masterLanguage'?: string; 'abapsource:sourceUri'?: string } }).metaData;
+  const meta = (struc as { metaData?: { 'adtcore:description'?: string; 'adtcore:masterLanguage'?: string; 'abapsource:sourceUri'?: string; 'program:programType'?: string; 'adtcore:type'?: string } }).metaData;
   const metadata: ObjectMetadata = {
     description: meta?.['adtcore:description'],
     masterLanguage: meta?.['adtcore:masterLanguage'],
+    programType: meta?.['program:programType'],
+    objectType: meta?.['adtcore:type'],
   };
   const parts: ObjectPart[] = [];
   const push = (subtype: string, sourceUrl: string) =>
