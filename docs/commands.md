@@ -195,10 +195,12 @@ abap connection <command>
 | `show <name>` | Show details of a profile (no secrets) |
 | `set <name>` | Modify a profile (fields or password) |
 | `use <name>` | Switch the current workspace to a profile |
-| `test <name>` | Probe a profile: tls → auth → adt → icf |
+| `test <name>` | Probe a profile: tls → auth → adt → icf (exit code reflects the worst failing layer: TLS→4, AUTH→5, ADT/ICF→6) |
 | `delete <name>` | Delete a profile and its stored password |
 | `export [names...]` | Export profiles to a portable bundle (`--file`, `--with-passwords`) |
 | `import <file>` | Import profiles from a bundle (`--overwrite`) |
+
+`connection test <name>` returns one object per layer `{ tls, auth, adt, icf }`, each `{ ok, skipped?, error?, nextSteps? }`. A failing layer drives a non-zero exit code while all layers are still reported (partial results, not a crash).
 
 ## `abap atc`
 
@@ -253,21 +255,6 @@ abap doctor [options]
 | `--system <name>` | Scope the connection section to a named profile |
 
 JSON output: sections `environment` / `config` / `connection`, each item `{ key, status: ok|err, message, suggestion? }`, plus an overall prioritized `nextSteps` list. Connection issues are reported as items — the command never hard-fails on an unreachable system.
-
-## `abap auth test`
-
-Probe a system profile layer by layer: `tls` → `auth` → `adt` → `icf`.
-
-```bash
-abap auth test [options]
-```
-
-| Option | Description |
-|--------|-------------|
-| `--system <name>` | System profile to probe (required) |
-| `--verbose` | Include per-layer detail |
-
-JSON output: one object per layer `{ tls, auth, adt, icf }`, each `{ ok, skipped?, error?, nextSteps? }`. A failing layer drives a non-zero exit code (TLS→4, AUTH→5, ADT/ICF→6) while all layers are still reported.
 
 ## `abap inspect`
 

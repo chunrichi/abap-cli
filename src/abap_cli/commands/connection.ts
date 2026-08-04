@@ -249,6 +249,19 @@ async function runUse(name: string, jsonOutput: boolean): Promise<void> {
   );
 }
 
+/** Exit code for the worst failing layer (FR-008): TLS→4, AUTH→5, SAP→6. */
+function worstExitCode(probe: { tls: { ok: boolean }; auth: { ok: boolean }; adt: { ok: boolean }; icf: { ok: boolean } }): number | undefined {
+  const codes: Record<string, number> = { tls: 4, auth: 5, adt: 6, icf: 6 };
+  let worst: number | undefined;
+  for (const layer of ['tls', 'auth', 'adt', 'icf'] as const) {
+    if (!probe[layer].ok) {
+      const code = codes[layer]!;
+      if (worst === undefined || code < worst) worst = code;
+    }
+  }
+  return worst;
+}
+
 /** Probe a profile across tls → auth → adt → icf and report per-layer results. */
 async function runTest(name: string, jsonOutput: boolean): Promise<void> {
   const probe = await probeSystem(name);
@@ -261,6 +274,12 @@ async function runTest(name: string, jsonOutput: boolean): Promise<void> {
     }),
   ].join('\n');
   output(jsonOutput, probe, human);
+  // The four-layer payload IS the result (success envelope); a failing layer
+  // drives a non-zero exit code per FR-008 (partial results, not a crash).
+  const exitCode = worstExitCode(probe);
+  if (exitCode !== undefined) {
+    process.exitCode = exitCode;
+  }
 }
 
 async function runSet(

@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Changed
+- `abap auth test` removed — merged into `abap connection test <name>`. `connection test` now sets the worst-failing-layer exit code (TLS→4, AUTH→5, ADT/ICF→6); `--verbose` (a no-op on `auth test`) is dropped. Migration: `abap auth test --system <name>` → `abap connection test <name>`.
 - `abap system` renamed to `abap connection` — breaking change. Migration: `abap system list|show|set|use|test|delete|export|import` → `abap connection …`. The old `system` command is removed (no alias); help text and error `nextSteps` across all commands now reference `abap connection`.
 - Removed the interactive menu behind bare `abap system` (previously reachable on a TTY). Bare `abap connection` now prints a `USAGE` error listing subcommands. `abap connection set <name>` without flags still opens the field-editing wizard on a TTY.
 - Unchanged (out of scope): the `--system <name>` option on `init` / `auth test` / `doctor`, the `~/.abap-cli/systems.json` storage file, and the internal `SystemProfile` naming.

@@ -231,7 +231,7 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
             errItem(
               `conn.${name}`,
               `System '${name}' unreachable: ${layerMsg}`,
-              `Diagnose per layer: abap auth test --system ${name}`,
+              `Diagnose per layer: abap connection test ${name}`,
               verbose ? layers.join(', ') : undefined,
             ),
           );
@@ -240,7 +240,7 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
         const message = error instanceof Error ? error.message : String(error);
         push(
           connection,
-          errItem(`conn.${name}`, `Probe of '${name}' failed: ${message}`, `Diagnose per layer: abap auth test --system ${name}`),
+          errItem(`conn.${name}`, `Probe of '${name}' failed: ${message}`, `Diagnose per layer: abap connection test ${name}`),
         );
       }
     }

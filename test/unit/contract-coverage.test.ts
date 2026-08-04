@@ -47,7 +47,7 @@ describe('contract coverage (T035, SC-009)', () => {
 // --- 010-new-cli-commands: six new top-level commands (SC-009) ---
 const FLAGS_010 = [
   '--verbose', '--fix', '--yes', // doctor
-  '--system', // auth test + doctor
+  '--system', // doctor
   '--structure', '--includes', '--locks', '--package', // inspect
   '--all', '--remote', '--local-only', '--limit', // diff
   '--status', '--pull', '--push', '--dry-run', // sync
@@ -71,9 +71,9 @@ describe('contract coverage 010 (T021, SC-009)', () => {
     expect(missing).toEqual([]);
   });
 
-  it('all six new commands are registered in index.ts', () => {
+  it('all new 010 commands are registered in index.ts', () => {
     const index = fs.readFileSync(path.join(repoRoot, 'src/abap_cli/index.ts'), 'utf-8');
-    for (const cmd of ['registerDoctorCommand', 'registerAuthCommand', 'registerInspectCommand', 'registerDiffCommand', 'registerSyncCommand', 'registerReportStuckCommand']) {
+    for (const cmd of ['registerDoctorCommand', 'registerInspectCommand', 'registerDiffCommand', 'registerSyncCommand', 'registerReportStuckCommand']) {
       expect(index).toContain(cmd);
     }
   });

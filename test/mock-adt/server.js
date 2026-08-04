@@ -20,9 +20,9 @@ const PORT = Number(process.argv[2] || process.env.PORT || 8080);
 const NO_TRANSPORTS = process.env.MOCK_NO_TRANSPORTS === '1';
 // MOCK_ATOMIC_FAIL=1 → fail the 2nd setObjectSource (mid-batch write failure for push --atomic).
 const ATOMIC_FAIL = process.env.MOCK_ATOMIC_FAIL === '1';
-// MOCK_AUTH_FAIL=1 → compatibility graph returns 401 (auth layer failure for `auth test`).
+// MOCK_AUTH_FAIL=1 → compatibility graph returns 401 (auth layer failure for `connection test`).
 const AUTH_FAIL = process.env.MOCK_AUTH_FAIL === '1';
-// MOCK_ICF_FAIL=1 → /sap/zabap_vibe/ returns 500 (icf layer failure for `auth test`).
+// MOCK_ICF_FAIL=1 → /sap/zabap_vibe/ returns 500 (icf layer failure for `connection test`).
 const ICF_FAIL = process.env.MOCK_ICF_FAIL === '1';
 const NOW = '2026-08-01T00:00:00Z';
 const CURRENT_USER = 'MOCKUSER';
@@ -575,7 +575,7 @@ const server = http.createServer(async (req, res) => {
       return ok(res, '{}', 'application/json');
     }
 
-    // self-built ICF service root (probeIcf target for `auth test` / `doctor`)
+    // self-built ICF service root (probeIcf target for `connection test` / `doctor`)
     if (path === '/sap/zabap_vibe/') {
       if (ICF_FAIL) return adtError(res, 500, 'Simulated ICF failure (MOCK_ICF_FAIL=1)');
       return ok(res, JSON.stringify({ status: 'ok' }), 'application/json');
