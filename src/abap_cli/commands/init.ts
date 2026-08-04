@@ -395,15 +395,6 @@ async function writeConfig(systemName: string, config: CollectedConfig, jsonOutp
   fs.writeFileSync(configPath, JSON.stringify(workspaceConfig, null, 2) + '\n', 'utf-8');
   if (!jsonOutput) console.log(`Created ${configPath}`);
 
-  // Create local work directories
-  for (const dir of ['src', 'ddic']) {
-    const dirPath = path.join(cwd, dir);
-    if (!fs.existsSync(dirPath)) {
-      fs.mkdirSync(dirPath, { recursive: true });
-      if (!jsonOutput) console.log(`Created directory ${dirPath}`);
-    }
-  }
-
   if (!jsonOutput) console.log('Workspace initialized.');
 }
 
