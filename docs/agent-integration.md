@@ -35,10 +35,10 @@ abap create CLAS ZCL_DEMO --package ZDEV --description "Demo" --tr DEVK900001 --
 # Pull it back to edit locally
 abap pull ZCL_DEMO --json
 
-# ... edit src/zcl_demo.clas.abap ...
+# ... edit src/zcl_demo/zcl_demo.clas.abap ...
 
 # Push the change (lock → write → activate → unlock)
-abap push src/zcl_demo.clas.abap --tr DEVK900001 --json
+abap push src/zcl_demo/zcl_demo.clas.abap --tr DEVK900001 --json
 ```
 
 ### 2. Recovering from `NO_TRANSPORT`
@@ -55,7 +55,7 @@ abap transport create "Feature work" --json
 # → { "status": "success", "data": { "transport": "DEVK900123", ... } }
 
 # Retry with the explicit request
-abap push src/zcl_demo.clas.abap --tr DEVK900123 --json
+abap push src/zcl_demo/zcl_demo.clas.abap --tr DEVK900123 --json
 ```
 
 This closes the "no request → create → use with `--tr`" loop without touching SAP GUI (Constitution Principle VII, Dogfooding).
@@ -79,7 +79,7 @@ if (result.status === 'success') {
 
 ```bash
 transport=$(abap transport create "task" --json | jq -r '.data.transport')
-abap push src/zcl_demo.clas.abap --tr "$transport" --json
+abap push src/zcl_demo/zcl_demo.clas.abap --tr "$transport" --json
 ```
 
 ## Guidance for Agents

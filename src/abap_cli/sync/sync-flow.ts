@@ -2,7 +2,7 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import type { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError } from '../output/json.js';
-import { resolveFile, buildFilename } from '../formats/file-resolver.js';
+import { resolveFile, buildFilename, objectDirName } from '../formats/file-resolver.js';
 import { writeAbapFile } from '../formats/abap-source.js';
 import { resolveObject, getObjectParts } from './resolve.js';
 import { computeChangedParts, type ChangedPart } from './status.js';
@@ -58,7 +58,7 @@ async function executePull(client: AdtClientWrapper, part: ChangedPart, cwd: str
   }
   const content = await client.getObjectSource(sourcePart.sourceUrl);
   const filename = buildFilename(object.name, object.type, sourcePart.subtype, '.abap');
-  await writeAbapFile(path.resolve(cwd, 'src', filename), content);
+  await writeAbapFile(path.resolve(cwd, 'src', objectDirName(object.name), filename), content);
 }
 
 /**

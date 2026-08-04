@@ -11,6 +11,17 @@ export interface ObjectPart {
   sourceUrl: string;
 }
 
+/** Object-level metadata from objectStructure (drives the <name>.<type>.json file). */
+export interface ObjectMetadata {
+  description?: string;
+  masterLanguage?: string;
+}
+
+export interface ObjectPartsResult {
+  parts: ObjectPart[];
+  metadata: ObjectMetadata;
+}
+
 export interface ResolvedObject {
   name: string;
   type: string;
@@ -73,6 +84,17 @@ export async function getObjectParts(
   retries = 0,
   delayMs = 400,
 ): Promise<ObjectPart[]> {
+  const result = await getObjectPartsWithMeta(client, object, retries, delayMs);
+  return result.parts;
+}
+
+/** Fetch source parts plus object metadata in one objectStructure call. */
+export async function getObjectPartsWithMeta(
+  client: AdtClientWrapper,
+  object: { name: string; objectUrl: string },
+  retries = 0,
+  delayMs = 400,
+): Promise<ObjectPartsResult> {
   let lastError: unknown;
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
@@ -88,8 +110,13 @@ export async function getObjectParts(
 async function getObjectPartsOnce(
   client: AdtClientWrapper,
   object: { name: string; objectUrl: string },
-): Promise<ObjectPart[]> {
+): Promise<ObjectPartsResult> {
   const struc = await client.objectStructure(object.objectUrl);
+  const meta = (struc as { metaData?: { 'adtcore:description'?: string; 'adtcore:masterLanguage'?: string; 'abapsource:sourceUri'?: string } }).metaData;
+  const metadata: ObjectMetadata = {
+    description: meta?.['adtcore:description'],
+    masterLanguage: meta?.['adtcore:masterLanguage'],
+  };
   const parts: ObjectPart[] = [];
   const push = (subtype: string, sourceUrl: string) =>
     parts.push({ subtype, sourceUrl: absoluteSourceUrl(object.objectUrl, sourceUrl) });
@@ -98,15 +125,14 @@ async function getObjectPartsOnce(
       push(CLASS_INCLUDE_SUBTYPES[inc['class:includeType']] ?? 'main', inc['abapsource:sourceUri']);
     }
   } else {
-    const meta = struc.metaData as { 'abapsource:sourceUri'?: string };
-    if (meta['abapsource:sourceUri']) {
+    if (meta?.['abapsource:sourceUri']) {
       push('main', meta['abapsource:sourceUri']);
     }
   }
   if (parts.length === 0) {
     throw new CliError('SAP_ERROR', `No source parts found for object ${object.name}`, { object: object.name });
   }
-  return parts;
+  return { parts, metadata };
 }
 
 /**

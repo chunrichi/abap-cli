@@ -8,7 +8,7 @@ import { commonErrorsAfter } from '../output/help-text.js';
 import { resolveObject, getObjectParts, type ResolvedObject, type ObjectPart } from '../sync/resolve.js';
 import { resolveTransport } from '../sync/transport.js';
 import { pushObject } from '../sync/push-flow.js';
-import { buildFilename } from '../formats/file-resolver.js';
+import { buildFilename, objectDirName } from '../formats/file-resolver.js';
 import { writeAbapFile, fileExists } from '../formats/abap-source.js';
 import { defaultSkeleton, getTemplate } from '../formats/templates.js';
 
@@ -145,7 +145,7 @@ async function runCreate(type: string, name: string, opts: CreateOptions, json: 
   if (opts.pull !== false) {
     const content = await client.getObjectSource(mainPart.sourceUrl);
     const filename = buildFilename(object.name, object.type, mainPart.subtype, '.abap');
-    const relPath = path.join('src', filename);
+    const relPath = path.join('src', objectDirName(object.name), filename);
     await writeAbapFile(path.resolve(process.cwd(), relPath), content);
     localFile = relPath;
   }

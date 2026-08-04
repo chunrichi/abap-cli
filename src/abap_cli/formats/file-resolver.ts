@@ -61,13 +61,20 @@ function getOuterExtension(filename: string): string {
 }
 
 /**
+ * Namespaced names (e.g. /UI2/CL_JSON) must not create directory levels: / → #.
+ * abapGit-style: `#ui2#cl_json` is both the object directory and the file prefix.
+ */
+export function objectDirName(objectName: string): string {
+  return objectName.toLowerCase().replace(/\//g, '#');
+}
+
+/**
  * Build a filename from object metadata.
  * The ADT object type may carry a subtype suffix (e.g. "PROG/P"); only the
  * primary type is used for the file extension (bcalv_grid_demo.prog.abap).
  */
 export function buildFilename(objectName: string, objectType: string, subtype?: string, ext = '.abap'): string {
-  // Namespaced names (e.g. /UI2/CL_JSON) must not create directory levels: / → #.
-  const name = objectName.toLowerCase().replace(/\//g, '#');
+  const name = objectDirName(objectName);
   const type = objectType.split('/')[0]!.toLowerCase();
   const sub = subtype && subtype !== 'main' ? `.${subtype}` : '';
   return `${name}.${type}${sub}${ext}`;

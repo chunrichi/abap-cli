@@ -25,14 +25,14 @@ npm install -g abap-cli
 # Initialize workspace (interactive or parameterized)
 abap init --url https://sap:44300 --client 100 --username DEV --password '***'
 
-# Download an object from SAP (classes pull all include parts)
+# Download an object from SAP (classes pull all include parts into a per-object dir)
 abap pull ZCL_MY_CLASS
 
 # Edit the local file, then push back (lock → write → activate → unlock)
-abap push src/zcl_my_class.clas.abap --tr DEVK900001
+abap push src/zcl_my_class/zcl_my_class.clas.abap --tr DEVK900001
 
 # Syntax check only (no activation, no SAP-side changes)
-abap check src/zcl_my_class.clas.abap
+abap check src/zcl_my_class/zcl_my_class.clas.abap
 
 # Create a new source object in SAP (writes a default skeleton and activates it)
 abap create CLAS ZCL_MY_NEW_CLASS --package $PKG --description "My new class" --tr DEVK900001
@@ -40,7 +40,7 @@ abap create CLAS ZCL_MY_NEW_CLASS --package $PKG --description "My new class" --
 # No open transport? Create one and use it explicitly
 abap transport list --json
 abap transport create "Feature X" --json
-abap push src/zcl_my_class.clas.abap --tr <REQUEST_NUMBER>
+abap push src/zcl_my_class/zcl_my_class.clas.abap --tr <REQUEST_NUMBER>
 ```
 
 ## CLI Commands
@@ -48,7 +48,7 @@ abap push src/zcl_my_class.clas.abap --tr <REQUEST_NUMBER>
 | Command | Description |
 |---------|-------------|
 | `abap init` | Initialize workspace configuration (system profile + `.abap.json`) |
-| `abap pull <object>` | Download a source object to `src/` (all class includes; `--type`, `--dir`) |
+| `abap pull <object>` | Download a source object to `src/<object>/` (abap-file-format: per-object dir with `<name>.<type>.json` + `.abap` parts; `--type`, `--dir`) |
 | `abap push <files...>` | Push local files: lock → write → activate → unlock (`--tr`, `--check-only`, `--all`) |
 | `abap check <files...>` | Content-based syntax check only, no SAP-side changes (`--all`) |
 | `abap search <query>` | Search ABAP objects |

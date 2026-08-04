@@ -2,11 +2,12 @@ import { Command } from 'commander';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { AdtClientWrapper } from '../clients/adt-client.js';
-import { buildFilename } from '../formats/file-resolver.js';
+import { buildFilename, objectDirName } from '../formats/file-resolver.js';
 import { fileExists, writeAbapFile } from '../formats/abap-source.js';
+import { renderObjectMetadataJson } from '../formats/object-metadata.js';
 import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
 import { commonErrorsAfter } from '../output/help-text.js';
-import { resolveObject, getObjectParts, SEARCH_RESULT_LIMIT } from '../sync/resolve.js';
+import { resolveObject, getObjectPartsWithMeta, SEARCH_RESULT_LIMIT } from '../sync/resolve.js';
 
 interface PullOptions {
   type?: string;
@@ -135,7 +136,7 @@ async function pullObject(
   object: { name: string; type: string; objectUrl: string },
   opts: { dir: string; overwrite?: boolean; skipExisting?: boolean; includeTests?: boolean; includeAllParts?: boolean },
 ): Promise<{ entries: PullEntry[]; written: string[]; skipped: string[]; failed: string[] }> {
-  const allParts = await getObjectParts(client, object);
+  const { parts: allParts, metadata } = await getObjectPartsWithMeta(client, object);
   const parts = opts.includeAllParts
     ? allParts
     : allParts.filter((p) => (opts.includeTests ? true : p.subtype !== 'testclasses'));
@@ -144,22 +145,33 @@ async function pullObject(
   const written: string[] = [];
   const skipped: string[] = [];
   const failed: string[] = [];
+
+  // abap-file-format layout: one directory per object under opts.dir.
+  const objectDir = objectDirName(object.name);
+
+  // abap-file-format: <name>.<type>.json metadata is mandatory (cardinality 1).
+  await writeOne(renderObjectMetadataJson(metadata), buildFilename(object.name, object.type, undefined, '.json'));
   for (const part of parts) {
     const content = await client.getObjectSource(part.sourceUrl);
-    const filename = buildFilename(object.name, object.type, part.subtype, '.abap');
-    const filePath = path.join(opts.dir, filename);
+    await writeOne(content, buildFilename(object.name, object.type, part.subtype, '.abap'));
+  }
+  return { entries, written, skipped, failed };
 
-    if (await fileExists(filePath)) {
-      const existing = await fs.readFile(filePath, 'utf-8');
+  /** Write one file with exists/skip/overwrite conflict handling. */
+  async function writeOne(content: string, filename: string): Promise<void> {
+    const filePath = path.join(opts.dir, objectDir, filename);
+    const absPath = path.resolve(process.cwd(), filePath);
+    if (await fileExists(absPath)) {
+      const existing = await fs.readFile(absPath, 'utf-8');
       if (existing === content) {
         entries.push({ object: object.name, type: object.type, status: 'skipped', detail: 'already matches' });
         skipped.push(filePath);
-        continue;
+        return;
       }
       if (opts.skipExisting) {
         entries.push({ object: object.name, type: object.type, status: 'skipped', detail: 'local file differs; --skip-existing' });
         skipped.push(filePath);
-        continue;
+        return;
       }
       if (!opts.overwrite) {
         throw new CliError(
@@ -176,11 +188,10 @@ async function pullObject(
         );
       }
     }
-    await writeAbapFile(path.resolve(process.cwd(), filePath), content);
+    await writeAbapFile(absPath, content);
     entries.push({ object: object.name, type: object.type, status: 'written', files: [filePath] });
     written.push(filePath);
   }
-  return { entries, written, skipped, failed };
 }
 
 function parsePositiveInt(value: string | undefined, flag: string, fallback: number): number {

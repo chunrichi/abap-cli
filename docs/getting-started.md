@@ -80,16 +80,16 @@ See [Configuration](configuration.md) for details.
 ## Your First Workflow
 
 ```bash
-# 1. Download an object (classes pull all include parts to src/)
+# 1. Download an object (per-object dir under src/, e.g. src/zcl_my_class/)
 abap pull ZCL_MY_CLASS
 
-# 2. Edit the local file (abap-file-format naming, e.g. src/zcl_my_class.clas.abap)
+# 2. Edit the local file (abap-file-format naming, e.g. src/zcl_my_class/zcl_my_class.clas.abap)
 
 # 3. Check syntax locally (no SAP-side changes)
-abap check src/zcl_my_class.clas.abap
+abap check src/zcl_my_class/zcl_my_class.clas.abap
 
 # 4. Push back (lock → write → activate → unlock)
-abap push src/zcl_my_class.clas.abap --tr DEVK900001
+abap push src/zcl_my_class/zcl_my_class.clas.abap --tr DEVK900001
 ```
 
 ### When You Have No Transport Request

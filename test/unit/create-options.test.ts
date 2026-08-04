@@ -80,7 +80,7 @@ describe('abap create options (US7, FR-021..023, SC-008)', () => {
     expect(res.exitCode).toBeUndefined();
     const data = parseData(res);
     expect(data.localFile).toBeUndefined();
-    expect(fs.existsSync(path.join(cwd, 'src/zcl_nopull.clas.abap'))).toBe(false);
+    expect(fs.existsSync(path.join(cwd, 'src/zcl_nopull/zcl_nopull.clas.abap'))).toBe(false);
   });
 
   it('default create writes the local file (create-then-pull)', async () => {
@@ -89,7 +89,7 @@ describe('abap create options (US7, FR-021..023, SC-008)', () => {
     const res = await runCommand(program, ['create', 'CLAS', 'ZCL_PULL', '--package', 'ZPKG', '--description', 'T', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     const data = parseData(res);
-    expect(data.localFile).toMatch(/zcl_pull\.clas\.abap$/);
-    expect(fs.existsSync(path.join(cwd, 'src/zcl_pull.clas.abap'))).toBe(true);
+    expect(data.localFile).toMatch(/zcl_pull\/zcl_pull\.clas\.abap$/);
+    expect(fs.existsSync(path.join(cwd, 'src/zcl_pull/zcl_pull.clas.abap'))).toBe(true);
   });
 });
