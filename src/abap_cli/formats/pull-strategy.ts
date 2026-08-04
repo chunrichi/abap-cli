@@ -3,6 +3,7 @@ import { CliError } from '../output/json.js';
 import { getObjectPartsWithMeta } from '../sync/resolve.js';
 import { buildFilename } from './file-resolver.js';
 import { renderObjectMetadataJson } from './object-metadata.js';
+import { fugrStrategy } from './pull-fugr.js';
 
 /** A file to write for an object; content is lazy to avoid fetching unused parts. */
 export interface OutputFile {
@@ -67,5 +68,6 @@ const SOURCE_OBJECT_TYPES = new Set(['CLAS', 'PROG', 'INTF']);
 export function strategyFor(type: string): PullStrategy {
   const primary = type.split('/')[0]!.toUpperCase();
   if (SOURCE_OBJECT_TYPES.has(primary)) return sourceObjectStrategy();
+  if (primary === 'FUGR') return fugrStrategy();
   throw new CliError('TYPE_NOT_SUPPORTED', `Pull not supported for object type ${primary}`, { type: primary });
 }
