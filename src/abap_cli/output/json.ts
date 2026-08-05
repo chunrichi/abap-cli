@@ -141,3 +141,44 @@ export function printError(json: boolean, error: unknown): never {
   for (const line of out.stderr) console.error(line);
   process.exit(out.exitCode ?? EXIT_GENERIC_FALLBACK);
 }
+
+// --- Command parameter schema (`--schema` introspection, P0.1) ---
+// Machine-readable description of a command's arguments/options so an agent
+// can discover the exact invocation contract before calling it.
+
+export interface CommandSchemaArgument {
+  name: string;
+  required: boolean;
+  description: string;
+  allowedValues?: string[];
+}
+
+export interface CommandSchemaOption {
+  name: string;
+  type: 'string' | 'int' | 'boolean';
+  /** Placeholder text shown in usage, e.g. `<n>` for --limit <n>. */
+  valuePlaceholder?: string;
+  description: string;
+  required?: boolean;
+  default?: string | number | boolean;
+  deprecated?: boolean;
+  allowedValues?: string[];
+}
+
+export interface CommandSchema {
+  schemaVersion: 1;
+  command: string;
+  description: string;
+  usage: string;
+  arguments: CommandSchemaArgument[];
+  options: CommandSchemaOption[];
+  /** Option sets that must not be combined, e.g. [['--exact', '--fuzzy']]. */
+  exclusiveGroups?: string[][];
+  globalOptions: string[];
+  examples?: string[];
+}
+
+/** Print a command schema. Always JSON — it is a machine-readable contract. */
+export function printSchema(schema: CommandSchema): void {
+  printResult(true, schema, '');
+}

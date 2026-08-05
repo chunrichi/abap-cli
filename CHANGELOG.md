@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- `abap search --schema` / `abap create --schema [type]` — agent-facing parameter introspection (P0.1): prints the machine-readable command schema (arguments, options with types/defaults, mutual-exclusion groups, examples) as JSON on stdout and exits `0` without any SAP call. `create --schema` without a type lists the supported types; with a type it adds the per-type `templates` (also reflected in `--template`'s `allowedValues`) and reports unsupported types via `supported: false` + `reason` (`DDIC_NOT_SUPPORTED` / `TYPE_NOT_SUPPORTED`). The previously required `search <query>` / `create <type> <name>` arguments are now optional so `--schema` can run without them; a real invocation still enforces them with the `USAGE` error (exit `2`).
 - `abap create local <type> <name>` — experimental: create a local draft skeleton file (`src/<obj>/<obj>.<type>.abap`, abap-file-format layout) without contacting SAP. Zero SAP requests / no credential reads; reuses `create`'s type map, template registry and error codes (`TYPE_NOT_SUPPORTED` / `DDIC_NOT_SUPPORTED` / `INVALID_ARGUMENT` / `FILE_EXISTS`); `--template` / `--dir` (default `src/`). Land the draft via `abap create ... --no-pull` then `abap push <file> --tr <tr>` (documented in `--help` and `docs/commands.md`).
 
 ### Fixed

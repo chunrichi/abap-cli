@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import type { CreatableTypeIds } from 'abap-adt-api';
 import { AdtClientWrapper } from '../clients/adt-client.js';
-import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
+import { CliError, printError, printResult, jsonFromCommand, printSchema, type CommandSchema } from '../output/json.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import { resolveObject, getObjectParts, type ResolvedObject, type ObjectPart } from '../sync/resolve.js';
 import { resolveTransport } from '../sync/transport.js';
@@ -38,6 +38,7 @@ interface CreateOptions {
   pull?: boolean;
   checkOnly?: boolean;
   audit?: boolean;
+  schema?: boolean;
 }
 
 export function registerCreateCommand(program: Command): void {
@@ -45,8 +46,9 @@ export function registerCreateCommand(program: Command): void {
     .command('create')
     .description('Create a new ABAP source object (CLAS, INTF, PROG, FUGR) and activate it')
     .addHelpText('after', commonErrorsAfter())
-    .argument('<type>', 'Object type (CLAS, INTF, PROG, FUGR)')
-    .argument('<name>', 'Object name')
+    // [type]/[name]（可选）是因为 --schema 模式下不需要 name；真实创建仍需两者。
+    .argument('[type]', 'Object type (CLAS, INTF, PROG, FUGR)')
+    .argument('[name]', 'Object name')
     // 不用 requiredOption：父命令的 mandatory 选项会被 commander 在子命令
     // local 的解析中一并校验（walk ancestors），故改为 .option + 手动校验。
     .option('--package <package>', 'Target SAP package (required)')
@@ -57,6 +59,7 @@ export function registerCreateCommand(program: Command): void {
     .option('--no-pull', 'Skip the create-then-pull local copy (default: pull after create)')
     .option('--check-only', 'Validate the proposed object without creating it')
     .option('--audit', 'Include the before-checksum (extra SAP round-trip, off by default)')
+    .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action(async (type, name, opts, cmd) => {
       const json = jsonFromCommand(cmd);
       try {
@@ -134,7 +137,21 @@ async function runCreateLocal(type: string, name: string, opts: CreateLocalOptio
   );
 }
 
-async function runCreate(type: string, name: string, opts: CreateOptions, json: boolean): Promise<void> {
+async function runCreate(type: string | undefined, name: string | undefined, opts: CreateOptions, json: boolean): Promise<void> {
+  if (opts.schema) {
+    printSchema(createSchema(type));
+    return;
+  }
+  if (!type) {
+    throw new CliError('USAGE', "Missing required argument 'type'", {
+      example: 'abap create CLAS ZCL_MY_CLASS --package ZPKG --description "desc"',
+    });
+  }
+  if (!name) {
+    throw new CliError('USAGE', "Missing required argument 'name'", {
+      example: 'abap create CLAS ZCL_MY_CLASS --package ZPKG --description "desc"',
+    });
+  }
   if (!opts.package) {
     throw new CliError('USAGE', "Missing required option '--package <package>'", {
       example: 'abap create CLAS ZCL_MY_CLASS --package ZPKG --description "desc"',
@@ -244,6 +261,76 @@ async function runCreate(type: string, name: string, opts: CreateOptions, json: 
     },
     `Created ${type.toUpperCase()} ${objectName} in ${opts.package}${skipActivate ? ' (not activated)' : ''} (${transport})`,
   );
+}
+
+/** `create --schema` 的返回类型：在通用 schema 上补充类型维度。 */
+type CreateCommandSchema = CommandSchema & {
+  type?: string;
+  supported?: boolean;
+  reason?: 'DDIC_NOT_SUPPORTED' | 'TYPE_NOT_SUPPORTED';
+  message?: string;
+  templates?: { name: string; description: string }[];
+};
+
+/**
+ * Machine-readable parameter contract for `abap create --schema [type]` (P0.1).
+ * 无 type → 通用 schema（列出支持的类型）；DDIC/未知类型 → supported:false。
+ */
+function createSchema(type?: string): CreateCommandSchema {
+  const t = type?.trim().toUpperCase();
+  const base: CreateCommandSchema = {
+    schemaVersion: 1,
+    command: 'create',
+    description: 'Create a new ABAP source object (CLAS, INTF, PROG, FUGR) and activate it',
+    usage: 'abap create <type> <name> [options]',
+    arguments: [
+      { name: 'type', required: true, description: 'Object type', allowedValues: Object.keys(TYPE_MAP) },
+      { name: 'name', required: true, description: 'Object name' },
+    ],
+    options: [
+      { name: '--package', type: 'string', valuePlaceholder: '<package>', required: true, description: 'Target SAP package (required)' },
+      { name: '--description', type: 'string', valuePlaceholder: '<desc>', required: true, description: 'Object description (required)' },
+      { name: '--tr', type: 'string', valuePlaceholder: '<transport>', description: 'Transport number' },
+      { name: '--no-activate', type: 'boolean', description: 'Create the object but do not activate it' },
+      { name: '--template', type: 'string', valuePlaceholder: '<template>', description: 'Skeleton template' },
+      { name: '--no-pull', type: 'boolean', description: 'Skip the create-then-pull local copy (default: pull after create)' },
+      { name: '--check-only', type: 'boolean', description: 'Validate the proposed object without creating it' },
+      { name: '--audit', type: 'boolean', description: 'Include the before-checksum (extra SAP round-trip, off by default)' },
+    ],
+    globalOptions: ['--json', '--report-stuck'],
+    examples: ['abap create CLAS ZCL_MY_CLASS --package ZPKG --description "desc"'],
+  };
+
+  if (!t) return base;
+  if (DDIC_TYPES.has(t)) {
+    return {
+      ...base,
+      type: t,
+      supported: false,
+      reason: 'DDIC_NOT_SUPPORTED',
+      message: `Object type ${t} is a DDIC object; not supported in this phase (ICF service not implemented yet)`,
+    };
+  }
+  if (!TYPE_MAP[t]) {
+    return {
+      ...base,
+      type: t,
+      supported: false,
+      reason: 'TYPE_NOT_SUPPORTED',
+      message: `Object type ${t} is not supported. Supported types: ${Object.keys(TYPE_MAP).join(', ')}`,
+    };
+  }
+
+  const templates = listTemplates(t).map((x) => ({ name: x.name, description: x.description }));
+  return {
+    ...base,
+    type: t,
+    supported: true,
+    templates,
+    options: base.options.map((o) =>
+      o.name === '--template' ? { ...o, allowedValues: templates.map((x) => x.name) } : o,
+    ),
+  };
 }
 
 function resolveType(type: string): CreateTypeSpec {

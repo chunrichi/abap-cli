@@ -124,8 +124,11 @@ abap search [options] <query>
 | `--fuzzy` | Substring match (default) |
 | `--package <pkg>` | Filter results by package |
 | `--max <n>` | Deprecated alias for `--limit` |
+| `--schema` | Print the command parameter schema as JSON and exit (no SAP call) |
 
 The query supports `*` wildcards. Truncated results set `truncated: true` with a `hint` suggesting narrowing flags or the next page.
+
+`--schema` is an agent-facing introspection mode: it prints the machine-readable parameter contract (arguments, options with types/defaults, mutual-exclusion groups, examples) as JSON on stdout and exits `0` without contacting SAP. The `<query>` argument is not required in this mode.
 
 ## `abap create`
 
@@ -150,8 +153,11 @@ abap create [options] <type> <name>
 | `--no-pull` | Skip the create-then-pull local copy (default: pull after create) |
 | `--check-only` | Validate the proposed object without creating it |
 | `--audit` | Include the before-checksum (extra SAP round-trip, off by default) |
+| `--schema` | Print the command parameter schema as JSON and exit (no SAP call) |
 
 DDIC types (DOMA/DTEL/TABL/STRU/TTYP) are rejected with `DDIC_NOT_SUPPORTED`; unknown types with `TYPE_NOT_SUPPORTED`.
+
+`--schema` is an agent-facing introspection mode: `abap create --schema` prints the general contract (supported types, required `--package`/`--description`, all options); `abap create --schema <type>` adds the type dimension — `templates` for the type (also reflected in `--template`'s `allowedValues`) and `supported: false` with a `reason` (`DDIC_NOT_SUPPORTED` / `TYPE_NOT_SUPPORTED`) for types that cannot be created. Output is JSON on stdout, exit `0`, no SAP call; the `<type>`/`<name>` arguments are not required in this mode.
 
 ### `abap create local` (experimental)
 

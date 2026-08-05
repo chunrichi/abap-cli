@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
-import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
+import { CliError, printError, printResult, jsonFromCommand, printSchema, type CommandSchema } from '../output/json.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import { SEARCH_RESULT_LIMIT } from '../sync/resolve.js';
 
@@ -20,6 +20,7 @@ interface SearchOptions {
   fuzzy?: boolean;
   package?: string;
   max?: string; // deprecated alias for --limit
+  schema?: boolean;
 }
 
 export function registerSearchCommand(program: Command): void {
@@ -27,7 +28,8 @@ export function registerSearchCommand(program: Command): void {
     .command('search')
     .description('Search for ABAP objects in SAP system')
     .addHelpText('after', commonErrorsAfter())
-    .argument('<query>', 'Search query (supports * wildcard)')
+    // [query]（可选）是因为 --schema 模式下不需要查询词；真实搜索仍需 query。
+    .argument('[query]', 'Search query (supports * wildcard)')
     .option('--type <type>', 'Filter by object type')
     .option('--limit <n>', `Maximum results per page (default ${SEARCH_RESULT_LIMIT})`)
     .option('--page <n>', 'Page number (1-based)', '1')
@@ -35,7 +37,8 @@ export function registerSearchCommand(program: Command): void {
     .option('--fuzzy', 'Substring match (default)')
     .option('--package <package>', 'Filter by package')
     .option('--max <n>', 'DEPRECATED: alias for --limit')
-    .action(async (query: string, opts: SearchOptions, cmd) => {
+    .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
+    .action(async (query: string | undefined, opts: SearchOptions, cmd) => {
       const json = jsonFromCommand(cmd);
       try {
         await runSearch(query, opts, json);
@@ -45,8 +48,12 @@ export function registerSearchCommand(program: Command): void {
     });
 }
 
-async function runSearch(query: string, opts: SearchOptions, json: boolean): Promise<void> {
-  if (!query.trim()) {
+async function runSearch(query: string | undefined, opts: SearchOptions, json: boolean): Promise<void> {
+  if (opts.schema) {
+    printSchema(searchSchema());
+    return;
+  }
+  if (!query?.trim()) {
     throw new CliError('USAGE', 'Search query must not be empty');
   }
   if (opts.exact && opts.fuzzy) {
@@ -127,4 +134,27 @@ function humanSummary(query: string, type: string | undefined, items: SearchResu
   }
   if (truncated) lines.push('(truncated — use --limit/--page to page through results)');
   return lines.join('\n');
+}
+
+/** Machine-readable parameter contract for `abap search --schema` (P0.1). */
+function searchSchema(): CommandSchema {
+  return {
+    schemaVersion: 1,
+    command: 'search',
+    description: 'Search for ABAP objects in SAP system',
+    usage: 'abap search [options] <query>',
+    arguments: [{ name: 'query', required: true, description: 'Search query (supports * wildcard)' }],
+    options: [
+      { name: '--type', type: 'string', valuePlaceholder: '<type>', description: 'Filter by object type' },
+      { name: '--limit', type: 'int', valuePlaceholder: '<n>', default: SEARCH_RESULT_LIMIT, description: 'Maximum results per page' },
+      { name: '--page', type: 'int', valuePlaceholder: '<n>', default: 1, description: 'Page number (1-based)' },
+      { name: '--exact', type: 'boolean', description: 'Exact name match (mutually exclusive with --fuzzy)' },
+      { name: '--fuzzy', type: 'boolean', description: 'Substring match (default)' },
+      { name: '--package', type: 'string', valuePlaceholder: '<package>', description: 'Filter by package' },
+      { name: '--max', type: 'int', valuePlaceholder: '<n>', deprecated: true, description: 'Deprecated alias for --limit' },
+    ],
+    exclusiveGroups: [['--exact', '--fuzzy']],
+    globalOptions: ['--json', '--report-stuck'],
+    examples: ['abap search ZCL_* --type CLAS --limit 50', 'abap search ZCL_DEMO --exact'],
+  };
 }
