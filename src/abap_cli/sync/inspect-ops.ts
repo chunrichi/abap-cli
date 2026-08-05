@@ -36,11 +36,26 @@ export interface ObjectLock {
   text: string;
 }
 
+/** Per-part activation state from `--activation` (013 dogfooding). */
+export interface ActivationPart {
+  includeType: string;
+  sourceUri: string;
+  /** true when the active source equals the latest (inactive) source. */
+  active: boolean;
+}
+
+export interface ActivationInfo {
+  /** true when every source part is fully activated (active == latest). */
+  ok: boolean;
+  parts: ActivationPart[];
+}
+
 export interface InspectResult {
   metadata: ObjectMetadata;
   structure?: ObjectStructureElement[];
   includes?: ObjectInclude[];
   locks?: ObjectLock[];
+  activation?: ActivationInfo;
 }
 
 export interface InspectFlags {
@@ -48,6 +63,8 @@ export interface InspectFlags {
   includes?: boolean;
   locks?: boolean;
   package?: boolean;
+  /** Compare active vs latest source to verify real activation (read-only). */
+  activation?: boolean;
 }
 
 /**
@@ -112,5 +129,37 @@ export async function inspectObject(client: AdtClientWrapper, name: string, flag
     }));
   }
 
+  if (flags.activation && 'includes' in structure && Array.isArray(structure.includes)) {
+    result.activation = await checkActivation(client, resolved.objectUrl, structure.includes);
+  }
+
   return result;
+}
+
+/**
+ * Compare active vs latest source for each part (013 dogfooding lesson: an
+ * activate that reports success may leave active == stale skeleton). Read-only.
+ */
+async function checkActivation(
+  client: AdtClientWrapper,
+  objectUrl: string,
+  includes: Array<{ 'class:includeType'?: string; 'abapsource:sourceUri'?: string }>,
+): Promise<ActivationInfo> {
+  const parts: ActivationPart[] = [];
+  for (const inc of includes) {
+    const sourceUri = inc['abapsource:sourceUri'] ?? '';
+    const abs = sourceUri.startsWith('/') ? sourceUri : `${objectUrl.replace(/\/$/, '')}/${sourceUri}`;
+    let active = false;
+    try {
+      const [latest, activeSrc] = await Promise.all([
+        client.getObjectSource(abs),
+        client.raw.getObjectSource(abs, { version: 'active' }),
+      ]);
+      active = latest === activeSrc;
+    } catch {
+      active = false;
+    }
+    parts.push({ includeType: inc['class:includeType'] ?? 'main', sourceUri, active });
+  }
+  return { ok: parts.every((p) => p.active), parts };
 }

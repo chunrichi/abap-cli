@@ -51,12 +51,26 @@ export function registerDeployCommand(program: Command): void {
 }
 
 function humanSummary(summary: DeploymentSummary): string {
-  if (summary.files.length === 0) return 'No bundled sources to deploy.';
-  const lines = [`Deploy ${summary.dryRun ? 'plan' : 'result'} (${summary.files.length} file(s)):`];
-  for (const f of summary.files) {
-    const reason = f.reason ? ` — ${f.reason}` : '';
-    const changed = f.changed !== undefined ? ` (changed: ${f.changed})` : '';
-    lines.push(`  ${f.file} — ${f.status}${changed}${reason}`);
+  const lines: string[] = [];
+  if (summary.files.length > 0) {
+    lines.push(`Deploy ${summary.dryRun ? 'plan' : 'result'} (${summary.files.length} file(s)):`);
+    for (const f of summary.files) {
+      const reason = f.reason ? ` — ${f.reason}` : '';
+      const changed = f.changed !== undefined ? ` (changed: ${f.changed})` : '';
+      lines.push(`  ${f.file} — ${f.status}${changed}${reason}`);
+    }
+  } else {
+    lines.push('No bundled sources to deploy.');
+  }
+  if (summary.icfNode) {
+    const node = summary.icfNode;
+    if (node.status === 'planned') {
+      lines.push('ICF node: planned (setup will run on actual deploy)');
+    } else if (node.status === 'success') {
+      lines.push(`ICF node: ${node.status} (${node.action}) — ${node.url} active=${node.active}`);
+    } else {
+      lines.push(`ICF node: ${node.status}`);
+    }
   }
   if (summary.forced) lines.push('(forced)');
   return lines.join('\n');

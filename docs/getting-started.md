@@ -124,7 +124,29 @@ abap push src/zcl_my_new_class/zcl_my_new_class.clas.abap --tr DEVK900001
 - **Source objects** — Class (CLAS), Interface (INTF), Program (PROG), Function Group (FUGR) for pull / push / check / create via the ADT REST API
 - **Transport management** — `abap transport list` / `create` / `show` / `resolve` / `assign`
 - **Diagnosis & workflows** — `abap doctor`, `abap inspect`, `abap diff`, `abap sync`, `abap report-stuck`
+- **ICF service lifecycle** — `abap deploy` deploys the bundled ICF service (`/sap/zabap_vibe`) and triggers its SICF node setup; `abap init` checks deployment/version state; `abap activate` fixes stale activation (see [Commands](commands.md))
 - **DDIC objects** (Domain, DataElement, Table, etc. as `.json`) — not yet supported; rejected with a clear `DDIC_NOT_SUPPORTED` message (planned via the self-built ICF service)
+
+## Deploy the Bundled ICF Service
+
+The bundled service (handler + setup classes in `abap/src/clas/`) provides the `/sap/zabap_vibe/` health/version endpoint and is the base for future DDIC CRUD.
+
+```bash
+# Deploy sources and trigger SICF node creation/activation (idempotent)
+abap deploy --yes --json
+# → data.icfNode: { status: "success", action: "created|already_active", url: "/sap/zabap_vibe", active: true, handler: "ZCL_ABAP_VIBE_ICF" }
+
+# Verify the endpoint
+abap connection test <name> --json        # icf layer should be ok
+abap init --system <name> --json          # data.icf.status: current / not_deployed / outdated
+```
+
+If a class reports `activated` but is actually stale, use the diagnostic + repair pair:
+
+```bash
+abap inspect <object> --activation --json # check active vs latest per part
+abap activate <object> --yes --json       # activate all inactive items (method/OSI level)
+```
 
 ## Next Steps
 

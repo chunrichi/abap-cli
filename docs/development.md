@@ -54,15 +54,15 @@ Then run the workflows from [Getting Started](getting-started.md) against the mo
 
 ```
 src/abap_cli/
-├── index.ts              # commander entry, registers all commands
-├── clients/              # AdtClientWrapper, ICF client
-├── commands/             # one file per command
+├── index.ts              # commander entry, lazy-registers all commands
+├── clients/              # AdtClientWrapper, ICF client, probe
+├── commands/             # one file per command (incl. activate, deploy, inspect)
 ├── config/               # project + user config
 ├── crypto/secrets.ts     # keychain
-├── deploy/deployer.ts
-├── formats/              # file format + resolver
-├── output/json.ts        # unified JSON output
-└── sync/                 # resolve, transport, push-flow
+├── icf/                  # ICF service version + deployment check (service-version.ts)
+├── formats/              # file format + resolver + pull strategies
+├── output/               # unified JSON output, error codes, meta
+└── sync/                 # resolve, transport, push-flow, deploy-flow, status, doctor-checks
 ```
 
 ## Adding a New Command

@@ -55,6 +55,8 @@ abap init [options]
 
 Non-interactive usage requires either `--system <name>` (reference existing) or a full connection set (`--url` + `--username` + `--password`).
 
+After writing the workspace config, `abap init` performs an informational ICF deployment check (FR-012..FR-015): it probes `/sap/zabap_vibe/` and compares the deployed version with the bundled expected version. The JSON result carries an `icf` field with one of four states: `not_deployed` (hint to run `abap deploy`), `current`, `outdated` (hint to run `abap deploy` to upgrade / `--force` to overwrite), or `unreachable` (degraded to a `meta.warnings` entry — init still succeeds). The check never modifies SAP and never blocks init.
+
 ## `abap pull`
 
 Download ABAP objects from SAP to local files. Classes download all include parts.
@@ -332,6 +334,8 @@ abap deploy [options]
 | `--force` | Bypass safety guards (`forced: true` in the result) |
 | `--yes` | Confirm in non-interactive environments |
 
+After deploying the bundled sources, `abap deploy` triggers the bundled ICF setup class (`ZCL_ABAP_VIBE_ICF_SETUP`) via ADT classrun, which creates/binds/activates the `/sap/zabap_vibe` SICF node (idempotent). The JSON result includes an `icfNode` field with the node state (`status`, `action`, `url`, `active`, `handler`); `--dry-run` reports `icfNode.status: "planned"` without triggering setup. A setup failure surfaces as a structured `SAP_ERROR` (exit 6).
+
 ## `abap doctor`
 
 Diagnose the CLI environment — environment, configuration, and connections.
@@ -363,8 +367,24 @@ abap inspect [options] <object>
 | `--includes` | Include class include parts |
 | `--locks` | Include lock / transport ownership (read-only) |
 | `--package` | Include the object package name |
+| `--activation` | Verify active vs latest source per part (read-only; detect stale activation) |
 
-JSON output: `{ metadata: { object, type, uri, ... }, structure?, includes?, locks? }`. Read-only — never acquires a lock.
+JSON output: `{ metadata: { object, type, uri, ... }, structure?, includes?, locks?, activation? }`. `--activation` returns `{ ok, parts: [{ includeType, sourceUri, active }] }` — `ok` is true when every part's active source equals its latest (inactive) source. Read-only — never acquires a lock.
+
+## `abap activate`
+
+Activate all inactive items (method/OSI source level) of an object.
+
+```bash
+abap activate <object> [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--tr <transport>` | Transport number |
+| `--yes` | Confirm in non-interactive environments |
+
+A root-URI-only activation can silently no-op while method/OSI items stay inactive (013 dogfooding). `abap activate` collects every inactive item of the object and activates them as a batch. Typical flow: `abap inspect <object> --activation` to check, then `abap activate <object> --yes` to fix.
 
 ## `abap diff`
 

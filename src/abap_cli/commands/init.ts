@@ -14,6 +14,7 @@ import { collectWarning } from '../output/meta.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import { assertValidProfile } from '../config/validation.js';
 import { probeSystem, type ProbeLayerResult } from '../clients/probe.js';
+import { checkIcfDeployment, type IcfDeploymentInfo } from '../icf/service-version.js';
 import type { ErrorCode } from '../output/error-codes.js';
 
 interface WorkspaceConfig {
@@ -146,7 +147,9 @@ async function useExistingSystem(
   await writeConfig(systemName, config, jsonOutput);
 
   // FR-021: optional per-layer probe (--test-tls / --test-auth / --test-connection).
-  if (jsonOutput) outputJson(systemName, config, probe);
+  // FR-012..FR-015: informational ICF deployment + version check (never blocks init).
+  const icf = await icfDeploymentCheck(jsonOutput);
+  if (jsonOutput) outputJson(systemName, config, probe, icf);
 }
 
 /**
@@ -223,7 +226,8 @@ async function createSystemFromParams(opts: CommandOpts, jsonOutput: boolean): P
   await saveProfile(systemName, profile, password, jsonOutput);
   await handleFileOverwrite('refuse');
   await writeConfig(systemName, config, jsonOutput);
-  if (jsonOutput) outputJson(systemName, config);
+  const icf = await icfDeploymentCheck(jsonOutput);
+  if (jsonOutput) outputJson(systemName, config, undefined, icf);
 }
 
 /** Interactive: select existing system or create a new one */
@@ -406,6 +410,7 @@ function outputJson(
   systemName: string,
   config: CollectedConfig,
   probe?: { tls?: ProbeLayerResult; auth?: ProbeLayerResult },
+  icf?: IcfDeploymentInfo,
 ): void {
   const data = {
     configPath: '.abap.json',
@@ -419,6 +424,45 @@ function outputJson(
     transport: config.transport,
     package: config.pkg,
     ...(probe ?? {}),
+    ...(icf ? { icf } : {}),
   };
   printResult(true, data, '');
+}
+
+/**
+ * Informational ICF deployment check (FR-012..FR-015).
+ * Never throws or blocks init: unreachable degrades to a warning; human mode
+ * prints a hint. Returns the state so JSON output can embed it in data.icf.
+ */
+async function icfDeploymentCheck(jsonOutput: boolean): Promise<IcfDeploymentInfo | undefined> {
+  let icf: IcfDeploymentInfo;
+  try {
+    icf = await checkIcfDeployment();
+  } catch (error: unknown) {
+    // Unreachable degraded check — never fails init.
+    icf = {
+      status: 'unreachable',
+      expectedVersion: '0.1.0',
+      error: { code: 'ICF_CHECK_DEGRADED', message: error instanceof Error ? error.message : String(error) },
+    };
+  }
+  if (icf.status === 'unreachable') {
+    collectWarning('ICF_CHECK_DEGRADED', `ICF deployment check degraded: ${icf.error?.message ?? 'unreachable'}`, {
+      status: 'unreachable',
+    });
+    if (!jsonOutput) console.log('Warning: ICF deployment check skipped (SAP unreachable).');
+    return icf;
+  }
+  if (!jsonOutput) {
+    if (icf.status === 'not_deployed') {
+      console.log('ICF service not deployed — run "abap deploy" to deploy/update it.');
+    } else if (icf.status === 'current') {
+      console.log(`ICF service deployed (version ${icf.remoteVersion}).`);
+    } else {
+      console.log(
+        `ICF service version mismatch (remote ${icf.remoteVersion ?? 'unknown'} vs expected ${icf.expectedVersion}) — run "abap deploy" to upgrade.`,
+      );
+    }
+  }
+  return icf;
 }

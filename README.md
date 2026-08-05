@@ -58,9 +58,10 @@ abap push src/zcl_my_class/zcl_my_class.clas.abap --tr <REQUEST_NUMBER>
 | `abap transport create <description>` | Create a new transport request (`--package`; default `$TMP` local request, usable via `--tr`) |
 | `abap transport show \| resolve \| assign` | Inspect a request / find an object's request / attach an object to a request |
 | `abap connection` | Manage global connection profiles (`list` / `show` / `add` / `set` / `use` / `test` / `delete` / `export` / `import`) |
-| `abap deploy` | Deploy the bundled ICF ABAP service to SAP |
+| `abap deploy` | Deploy the bundled ICF ABAP service to SAP (deploys sources, triggers SICF node setup; `--dry-run`/`--diff`) |
 | `abap doctor` | Diagnose the CLI environment (`--fix` applies safe fixes) |
-| `abap inspect <object>` | Read-only SAP object metadata probe |
+| `abap inspect <object>` | Read-only SAP object metadata probe (`--structure` / `--includes` / `--locks` / `--activation`) |
+| `abap activate <object>` | Activate all inactive items (method/OSI level) of an object — repairs stale activation |
 | `abap diff [file]` | Read-only local↔SAP comparison with per-part change summary |
 | `abap sync` | Chain status / pull / push into one workflow |
 | `abap report-stuck` | Record a stuck-agent report locally (feedback loop) |
@@ -75,6 +76,7 @@ All commands support `--json` for structured output (Agent-first).
 - **Create** (`abap create`) supports CLAS/INTF/PROG/FUGR: creates the object with a default skeleton, pulls it locally and activates it, so it can be immediately edited and pushed back (create → pull → edit → push loop)
 - **Transport management** (`abap transport`) lists, creates, inspects and assigns transport requests, closing the "no request → create → `--tr`" loop without SAP GUI
 - **Diagnosis & workflows** (`abap doctor`, `abap inspect`, `abap diff`, `abap sync`, `abap report-stuck`) are agent-friendly read-only probes and chained workflows with `--dry-run` safety
+- **ICF service** — `abap deploy` deploys the bundled `/sap/zabap_vibe` service (handler + SICF setup, health/version endpoint); `abap inspect --activation` + `abap activate` detect and repair stale activation
 - **DDIC objects** (`.doma.json`, `.tabl.json`, …) are rejected with a clear `DDIC_NOT_SUPPORTED` message — planned for a later phase (self-built ICF service)
 
 ## File Format

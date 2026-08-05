@@ -22,6 +22,7 @@ export type WarningCode =
   | 'PROFILE_MISMATCH'      // stored profile differs from current config
   | 'STUCK_REPORT_DEGRADED' // stuck report write degraded (STUCK-DEGRADED-)
   | 'PAGINATION_LIMITED'    // search --page-all hit the page cap; result truncated
+  | 'ICF_CHECK_DEGRADED'    // init ICF deployment check degraded (non-blocking)
   ;
 
 export interface Warning {

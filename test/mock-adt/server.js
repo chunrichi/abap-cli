@@ -24,6 +24,10 @@ const ATOMIC_FAIL = process.env.MOCK_ATOMIC_FAIL === '1';
 const AUTH_FAIL = process.env.MOCK_AUTH_FAIL === '1';
 // MOCK_ICF_FAIL=1 → /sap/zabap_vibe/ returns 500 (icf layer failure for `connection test`).
 const ICF_FAIL = process.env.MOCK_ICF_FAIL === '1';
+// MOCK_SETUP_FAIL=1 → classrun of the ICF setup class returns a failure envelope.
+const SETUP_FAIL = process.env.MOCK_SETUP_FAIL === '1';
+// Deployed zabap_vibe version served by the mock root (mirrors CLI ICF_SERVICE_VERSION).
+const ICF_SERVICE_VERSION = process.env.MOCK_ICF_VERSION || '0.1.0';
 const NOW = '2026-08-01T00:00:00Z';
 const CURRENT_USER = 'MOCKUSER';
 let putCount = 0; // global PUT counter (MOCK_ATOMIC_FAIL fails on the 2nd write)
@@ -163,6 +167,45 @@ addObject('ZPROG_TOP', 'PROG/I', '/sap/bc/adt/programs/includes/zprog_top', 'Dem
     subtype: 'main',
     sourceUrl: '/sap/bc/adt/programs/includes/zprog_top/source/main',
     content: "TABLES: t001.\n",
+  },
+]);
+
+// ICF service classes (013): handler + setup, targets for deploy enumeration / classrun.
+addObject('ZCL_ABAP_VIBE_ICF', 'CLAS', '/sap/bc/adt/oo/classes/zcl_abap_vibe_icf', 'ICF handler for zabap_vibe', [
+  {
+    subtype: 'main',
+    sourceUrl: '/sap/bc/adt/oo/classes/zcl_abap_vibe_icf/source/main',
+    content:
+      'CLASS zcl_abap_vibe_icf DEFINITION PUBLIC.\n' +
+      '  PUBLIC SECTION.\n' +
+      '    INTERFACES if_http_extension.\n' +
+      'ENDCLASS.\n' +
+      'CLASS zcl_abap_vibe_icf IMPLEMENTATION.\n' +
+      'ENDCLASS.\n',
+  },
+  {
+    subtype: 'implementations',
+    sourceUrl: '/sap/bc/adt/oo/classes/zcl_abap_vibe_icf/source/locals_imp',
+    content: '',
+  },
+]);
+
+addObject('ZCL_ABAP_VIBE_ICF_SETUP', 'CLAS', '/sap/bc/adt/oo/classes/zcl_abap_vibe_icf_setup', 'ICF setup class', [
+  {
+    subtype: 'main',
+    sourceUrl: '/sap/bc/adt/oo/classes/zcl_abap_vibe_icf_setup/source/main',
+    content:
+      'CLASS zcl_abap_vibe_icf_setup DEFINITION PUBLIC.\n' +
+      '  PUBLIC SECTION.\n' +
+      '    INTERFACES if_oo_adt_classrun.\n' +
+      'ENDCLASS.\n' +
+      'CLASS zcl_abap_vibe_icf_setup IMPLEMENTATION.\n' +
+      'ENDCLASS.\n',
+  },
+  {
+    subtype: 'implementations',
+    sourceUrl: '/sap/bc/adt/oo/classes/zcl_abap_vibe_icf_setup/source/locals_imp',
+    content: '',
   },
 ]);
 
@@ -588,7 +631,18 @@ const server = http.createServer(async (req, res) => {
     // self-built ICF service root (probeIcf target for `connection test` / `doctor`)
     if (path === '/sap/zabap_vibe/') {
       if (ICF_FAIL) return adtError(res, 500, 'Simulated ICF failure (MOCK_ICF_FAIL=1)');
-      return ok(res, JSON.stringify({ status: 'ok' }), 'application/json');
+      return ok(res, JSON.stringify({ status: 'success', data: { service: 'zabap_vibe', version: ICF_SERVICE_VERSION } }), 'application/json');
+    }
+
+    // ADT classrun (runClass) — simulates the remote ICF setup execution (013).
+    const classrun = /^\/sap\/bc\/adt\/oo\/classrun\/([^/?]+)/.exec(path);
+    if (classrun && req.method === 'POST') {
+      const className = classrun[1].toUpperCase();
+      if (className === 'ZCL_ABAP_VIBE_ICF_SETUP') {
+        if (SETUP_FAIL) return ok(res, JSON.stringify({ status: 'error', error: { code: 'ICF_ADMIN_REQUIRED', message: 'Simulated setup failure (MOCK_SETUP_FAIL=1)' } }), 'application/json');
+        return ok(res, JSON.stringify({ status: 'success', action: 'already_active', node: { vhost: 'default_host', url: '/sap/zabap_vibe', handler: 'ZCL_ABAP_VIBE_ICF', active: true } }), 'application/json');
+      }
+      return ok(res, JSON.stringify({ status: 'success' }), 'application/json');
     }
 
     // object search

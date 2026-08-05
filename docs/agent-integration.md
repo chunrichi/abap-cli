@@ -60,6 +60,25 @@ abap push src/zcl_demo/zcl_demo.clas.abap --tr DEVK900123 --json
 
 This closes the "no request → create → use with `--tr`" loop without touching SAP GUI (Constitution Principle VII, Dogfooding).
 
+### 3. Detecting & fixing stale activation
+
+A `push` that reports `activated` can still leave the object stale on real SAP when method/OSI-level inactive items were not included in the activation. Verify with the read-only check, then repair:
+
+```bash
+# Check whether active source really matches latest (per part)
+abap inspect <object> --activation --json
+# → { status: "success", data: { ..., activation: { ok: false, parts: [{ includeType, sourceUri, active }] } } }
+
+# Activate all inactive items of the object (method/OSI level)
+abap activate <object> --yes --json
+# → { status: "success", data: { object, activated: <n> } }
+
+# Re-verify
+abap inspect <object> --activation --json   # activation.ok should now be true
+```
+
+This keeps the normal `push` flow lightweight: diagnose on demand with `inspect --activation`, repair with `activate`.
+
 ## Parsing Examples
 
 ### Node.js

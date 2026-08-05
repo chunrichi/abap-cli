@@ -17,9 +17,12 @@ const objectStructure = vi.fn(async (objectUrl: string) => ({
   includes: [{ 'class:includeType': 'main', 'abapsource:sourceUri': `${objectUrl}/source/main` }],
 }));
 const getObjectSource = vi.fn(async (_url: string) => 'SAP VERSION');
+const runClass = vi.fn(async (_className: string) =>
+  JSON.stringify({ status: 'success', action: 'already_active', node: { active: true } }),
+);
 
 const client = {
-  lock, setObjectSource, syntaxCheck, activate, unLock, searchObject, objectStructure, getObjectSource,
+  lock, setObjectSource, syntaxCheck, activate, unLock, searchObject, objectStructure, getObjectSource, runClass,
   getConfig: () => ({ sap: { username: 'MOCKUSER' } }),
 } as never;
 

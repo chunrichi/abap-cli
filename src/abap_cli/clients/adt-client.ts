@@ -112,6 +112,28 @@ export class AdtClientWrapper {
     );
   }
 
+  /**
+   * Activate a full list of inactive items (method/OSI source level). The
+   * root-URI-only activate can silently no-op on real SAP (013 dogfooding).
+   */
+  activateAll(items: Array<{ uri: string; type: string; name: string; parentUri: string }>) {
+    return this._call(() =>
+      this.client.activate(
+        items.map((i) => ({
+          'adtcore:uri': i.uri,
+          'adtcore:type': i.type,
+          'adtcore:name': i.name,
+          'adtcore:parentUri': i.parentUri,
+        })),
+      ),
+    );
+  }
+
+  /** List inactive objects (edit sessions awaiting activation). */
+  inactiveObjects() {
+    return this._call(() => this.client.inactiveObjects());
+  }
+
   // --- Syntax check ---
 
   syntaxCheck(cdsUrl: string) {
@@ -132,6 +154,11 @@ export class AdtClientWrapper {
   /** Structure elements for `inspect --structure` (FR-012). */
   objectStructureElements(objectUrl: string, version?: Parameters<ADTClient['objectStructureElements']>[1]) {
     return this._call(() => this.client.objectStructureElements(objectUrl, version));
+  }
+
+  /** Run an ABAP class as an application (ADT classrun, e.g. ICF setup). */
+  runClass(className: string) {
+    return this._call(() => this.client.runClass(className));
   }
 
   /** Main program(s) for an include part (program/function-group includes). */

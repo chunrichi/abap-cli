@@ -15,6 +15,7 @@ export function registerInspectCommand(program: Command): void {
     .option('--includes', 'Include class include parts')
     .option('--locks', 'Include lock / transport ownership (read-only)')
     .option('--package', 'Include the object package name')
+    .option('--activation', 'Verify active vs latest source (read-only; detect stale activation)')
     .action(async (object: string | undefined, opts: InspectOptions, cmd) => {
       const json = jsonFromCommand(cmd);
       try {
@@ -34,6 +35,12 @@ export function registerInspectCommand(program: Command): void {
           ...(result.structure ? [`  structure: ${result.structure.length} element(s)`] : []),
           ...(result.includes ? [`  includes: ${result.includes.length} part(s)`] : []),
           ...(result.locks ? [`  locks: ${result.locks.length} request(s)`] : []),
+          ...(result.activation
+            ? [
+                `  activation: ${result.activation.ok ? 'OK (active == latest)' : 'STALE (active != latest)'}`,
+                ...result.activation.parts.map((p) => `    ${p.includeType}: ${p.active ? 'active' : 'stale'} (${p.sourceUri})`),
+              ]
+            : []),
         ].join('\n');
         printResult(json, result, human);
       } catch (error: unknown) {

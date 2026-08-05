@@ -81,6 +81,11 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
     load: () => import('./commands/inspect.js').then((m) => ({ register: m.registerInspectCommand })),
   },
   {
+    name: 'activate',
+    description: 'Activate all inactive items of an object (method/OSI level)',
+    load: () => import('./commands/activate.js').then((m) => ({ register: m.registerActivateCommand })),
+  },
+  {
     name: 'diff',
     description: 'Compare local files against SAP (read-only)',
     load: () => import('./commands/diff.js').then((m) => ({ register: m.registerDiffCommand })),
