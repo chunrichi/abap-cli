@@ -9,6 +9,7 @@ import { resolveObject, getObjectParts, validateLocalFile } from '../sync/resolv
 import { resolveTransport } from '../sync/transport.js';
 import { pushObject, type PushStage } from '../sync/push-flow.js';
 import { resolveLocalTargets } from '../sync/local-targets.js';
+import { enumerateFugr, fugrPushTargetFor } from '../formats/fugr-layout.js';
 
 export function registerPushCommand(program: Command): void {
   program
@@ -193,6 +194,12 @@ async function pushOne(
   }
 
   const object = await resolveObject(client, resolved.objectName, resolved.objectType);
+
+  if (resolved.objectType === 'FUGR') {
+    await pushFugrOne(client, object, resolved, content, transport, opts, onStage);
+    return;
+  }
+
   const parts = await getObjectParts(client, object);
   const part = parts.find((p) => p.subtype === resolved.subtype) ?? parts.find((p) => p.subtype === 'main');
   if (!part) {
@@ -205,6 +212,103 @@ async function pushOne(
     [{ subtype: part.subtype, sourceUrl: part.sourceUrl, content }],
     { transport, checkOnly: opts.checkOnly ?? false, activate: opts.activate, dryRun: opts.dryRun, onStage },
   );
+}
+
+/**
+ * Push a single FUGR file. FUGR sub-objects (function modules, includes) are
+ * independently locked ADT objects, so each file locks its own target object,
+ * writes its source, then activates the enclosing function group.
+ */
+async function pushFugrOne(
+  client: AdtClientWrapper,
+  object: { name: string; type: string; objectUrl: string },
+  resolved: { subtype: string },
+  content: string,
+  transport: string,
+  opts: { checkOnly?: boolean; activate?: boolean; dryRun?: boolean },
+  onStage: (s: PushStage) => void,
+): Promise<void> {
+  const layout = await enumerateFugr(client, object.objectUrl);
+  const target = fugrPushTargetFor(layout, resolved.subtype, object.objectUrl);
+  if (!target) {
+    throw new CliError('SAP_ERROR', `No source part matches ${resolved.subtype} for ${object.name}`, { details: { object: object.name } });
+  }
+
+  if (opts.dryRun) {
+    onStage('lock');
+    onStage('write');
+    if (opts.checkOnly) onStage('check');
+    else if (opts.activate !== false) onStage('activate');
+    onStage('unlock');
+    return;
+  }
+
+  let lockHandle: string | undefined;
+  let locked = false;
+  try {
+    onStage('lock');
+    const lock = await client.lock(target.objectUrl);
+    lockHandle = lock.LOCK_HANDLE;
+    locked = true;
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new CliError('LOCK_FAILED', `Cannot lock ${object.name} (${resolved.subtype}): ${message}`, { details: { object: object.name } });
+  }
+
+  try {
+    onStage('write');
+    try {
+      await client.setObjectSource(target.sourceUrl, content, lockHandle, transport);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new CliError('SAP_ERROR', `Failed to write source of ${object.name} (${resolved.subtype}): ${message}`, {
+        object: object.name,
+        subtype: resolved.subtype,
+        stage: 'write',
+      });
+    }
+
+    if (opts.checkOnly) {
+      const checkErrors: { line: number; severity: string; text: string }[] = [];
+      if (content.trim() !== '') {
+        const results = await client.syntaxCheckContent(target.sourceUrl, layout.saplUrl, content);
+        for (const r of results) {
+          if (r.severity === 'E') checkErrors.push({ line: r.line, severity: r.severity, text: r.text });
+        }
+      }
+      if (checkErrors.length > 0) {
+        throw new CliError('SYNTAX_ERROR', `Syntax check failed for ${object.name}`, {
+          object: object.name,
+          stage: 'check',
+          errors: checkErrors,
+        });
+      }
+      return;
+    }
+
+    if (opts.activate !== false) {
+      onStage('activate');
+      try {
+        await client.activate(object.objectUrl, object.type, object.name);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new CliError('ACTIVATION_FAILED', `Activation failed for ${object.name}: ${message}`, {
+          object: object.name,
+          stage: 'activate',
+          detail: message,
+        });
+      }
+    }
+  } finally {
+    onStage('unlock');
+    if (locked && lockHandle) {
+      try {
+        await client.unLock(target.objectUrl, lockHandle);
+      } catch {
+        // Best effort; the source is already persisted.
+      }
+    }
+  }
 }
 
 function humanSummary(results: PushFileResult[]): string {
