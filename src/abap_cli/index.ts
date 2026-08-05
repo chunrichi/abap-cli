@@ -3,11 +3,11 @@
 // Must be first: patches removed util.is* functions before abap-adt-api loads.
 import './util-polyfill.js';
 import { createRequire } from 'node:module';
-import { Command, CommanderError } from 'commander';
-import { CliError, renderError } from './output/json.js';
-import { setProgram, buildMeta } from './output/meta.js';
+import { Command } from 'commander';
+import { setProgram } from './output/meta.js';
 import { registerLazyCommands, type LazyCommandSpec } from './commands/lazy.js';
 import { writeStuckReport, recordFailure, shouldAutoReport } from './sync/stuck-reports.js';
+import { handleTopLevelError } from './top-error.js';
 
 // 声明式惰性注册（P1.6）：只有 name + description 在启动时加载，模块体在
 // 命令真正被调用（或请求其 --help）时才 import。
@@ -124,51 +124,8 @@ try {
   // parseAsync (which awaits the chain) re-throws into this catch block.
   await program.parseAsync();
 } catch (error: unknown) {
-  const json = process.argv.includes('--json');
-  if (error instanceof CommanderError) {
-    // commander routes help bodies to writeErr (swallowed above) and reports
-    // both `--help` and missing-required-args as help errors. Re-print the
-    // right help ourselves: bare `abap` shows the top-level help (exit 0),
-    // while a missing required argument shows that subcommand's help (exit 2).
-    const helpShown = error.code === 'commander.helpDisplayed' || error.code === 'commander.help';
-    if (helpShown) {
-      if (error.code === 'commander.help') {
-        const firstArg = process.argv.slice(2).find((a) => !a.startsWith('-'));
-        const sub = program.commands.find((c) => c.name() === firstArg);
-        if (sub) {
-          console.log(sub.helpInformation());
-          console.error('Missing required argument(s). See the usage above.');
-          process.exit(2);
-        }
-        console.log(program.helpInformation());
-      }
-      process.exit(0);
-    }
-    if (error.exitCode === 0) process.exit(0);
-    // Missing required argument/option: surface that subcommand's usage so the
-    // caller sees exactly what is expected (the error itself follows on stderr).
-    if (
-      error.code === 'commander.missingArgument' ||
-      error.code === 'commander.missingMandatoryOptionValue' ||
-      error.code === 'commander.optionMissingArgument'
-    ) {
-      const firstArg = process.argv.slice(2).find((a) => !a.startsWith('-'));
-      const sub = program.commands.find((c) => c.name() === firstArg);
-      if (sub) console.log(sub.helpInformation());
-    }
-    const usage = new CliError('USAGE', error.message.replace(/^error: /, ''), {
-      nextSteps: ['Check the command usage: abap <command> --help.'],
-      example: 'abap <command> --help',
-    });
-    writeError(json, usage);
-  } else {
-    writeError(json, error);
-  }
-}
-
-function writeError(json: boolean, error: unknown): never {
-  // Feedback loop (FR-023): --report-stuck flag or ABAP_REPORT_STUCK=1 after the
-  // failure threshold records a local report; the original error is unchanged.
+  // Feedback loop (FR-023): record the failure before the structured handler
+  // runs so the stuck report captures the original error unchanged.
   recordFailure();
   const reportFlag = process.argv.includes('--report-stuck');
   if (reportFlag || shouldAutoReport(process.env.ABAP_REPORT_STUCK)) {
@@ -183,7 +140,5 @@ function writeError(json: boolean, error: unknown): never {
       cliVersion: version,
     });
   }
-  const out = renderError(json, error, buildMeta());
-  for (const line of out.stderr) console.error(line);
-  process.exit(out.exitCode ?? 1);
+  handleTopLevelError(error, { program, argv: process.argv, version });
 }
