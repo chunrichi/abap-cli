@@ -34,13 +34,20 @@ abap init [options]
 | Option | Description |
 |--------|-------------|
 | `--system <name>` | Name of an existing system profile |
-| `--url <url>` | SAP system URL (creates/updates a profile) |
+| `--url <url>` | SAP system URL (interactive; in scripts use `abap connection add`) |
 | `-c, --client <client>` | SAP client number |
 | `-u, --username <user>` | SAP username |
 | `-p, --password <password>` | SAP password (stored in keychain) |
 | `-l, --language <language>` | SAP language |
-| `-t, --transport <transport>` | Default transport number |
+| `--tr <transport>` | Default transport number |
+| `-t, --transport <transport>` | Deprecated alias for `--tr` |
 | `--package <package>` | Default SAP package |
+| `--insecure` | Skip SSL certificate verification (self-signed certs, development only) |
+| `--ca <path>` | Path to a CA certificate (PEM) for SSL verification |
+| `--test-connection` | Probe TLS + auth and report results (implies `--test-tls --test-auth`) |
+| `--test-tls` | Probe the TLS handshake |
+| `--test-auth` | Probe authentication (after TLS) |
+| `--yes` / `--no-input` | Non-interactive confirmation (aliases) |
 
 Non-interactive usage requires either `--system <name>` (reference existing) or a full connection set (`--url` + `--username` + `--password`).
 
@@ -61,6 +68,8 @@ abap pull [options] [object-name]
 | `--page <n>` | Batch page number for `--package` |
 | `--overwrite` | Allow replacing a local file with different content |
 | `--skip-existing` | Skip files that already exist locally |
+| `--include-tests` | Include the testclasses source part |
+| `--include-all-parts` | Include every source-code part |
 
 ## `abap push`
 
@@ -72,13 +81,17 @@ abap push [options] [files...]
 
 | Option | Description |
 |--------|-------------|
-| `--all` | Push all `.abap` files under the current directory |
+| `--all` | Push all `.abap` files under the current directory (honours `.abapignore`) |
 | `--tr <transport>` | Transport number (see resolution order in [Configuration](configuration.md)) |
-| `--check-only` | Only perform a syntax check, do not activate |
+| `--check-only` | Only perform a syntax check, do not activate (mutex with `--no-activate`) |
+| `--no-activate` | Lock + write + skip check + skip activate + unlock |
+| `--dry-run` | Plan only — make no mutating ADT calls |
+| `--fail-fast` | Stop at the first failing file (default: keep going) |
+| `--atomic` | Validate all files first; write nothing if any file fails validation |
 
 ## `abap check`
 
-Perform a content-based syntax check on local files — no activation, no SAP-side changes.
+Validate local ABAP files. Exactly one mode applies; `--syntax` is the default.
 
 ```bash
 abap check [options] [files...]
@@ -86,7 +99,13 @@ abap check [options] [files...]
 
 | Option | Description |
 |--------|-------------|
+| `--syntax` | Syntax check against SAP (default mode) |
+| `--content` | Local-only validation, no SAP round-trip |
+| `--atc` | ATC check against SAP |
+| `--variant <variant>` | ATC check variant (only with `--atc`) |
 | `--all` | Check all `.abap` files under the current directory |
+| `--changed` | Check only files changed since the SAP version |
+| `--strict` | Treat warnings as failures |
 
 ## `abap search`
 
@@ -127,6 +146,10 @@ abap create [options] <type> <name>
 | `--description <desc>` | Object description (required) |
 | `--tr <transport>` | Transport number |
 | `--no-activate` | Create and write the skeleton but do not activate |
+| `--template <template>` | Skeleton template (`minimal`, `public-method`, `report`, `selection-screen`, …) |
+| `--no-pull` | Skip the create-then-pull local copy (default: pull after create) |
+| `--check-only` | Validate the proposed object without creating it |
+| `--audit` | Include the before-checksum (extra SAP round-trip, off by default) |
 
 DDIC types (DOMA/DTEL/TABL/STRU/TTYP) are rejected with `DDIC_NOT_SUPPORTED`; unknown types with `TYPE_NOT_SUPPORTED`.
 
@@ -181,6 +204,34 @@ JSON output:
 
 The returned transport number can be used with `--tr` on `push` / `create`.
 
+### `abap transport show <req>`
+
+Show structured metadata for a transport request (read-only).
+
+```bash
+abap transport show <request-number>
+```
+
+### `abap transport resolve <object>`
+
+Show which transport request(s) an object belongs to (read-only).
+
+```bash
+abap transport resolve <object-name>
+```
+
+### `abap transport assign <object>`
+
+Attach an object to a transport request (no-op when already assigned).
+
+```bash
+abap transport assign <object-name> --tr <request-number>
+```
+
+| Option | Description |
+|--------|-------------|
+| `--tr <transport>` | Target transport request (required) |
+
 ## `abap connection`
 
 Manage global connection profiles.
@@ -200,6 +251,8 @@ abap connection <command>
 | `delete <name>` | Delete a profile and its stored password |
 | `export [names...]` | Export profiles to a portable bundle (`--file`, `--with-passwords`) |
 | `import <file>` | Import profiles from a bundle (`--overwrite`) |
+
+`add` / `set` accept the connection fields as options: `--url`, `-c/--client`, `-u/--username`, `-l/--language`, `-p/--password`, plus `--insecure` (skip SSL verification, development only) and `--ca <path>` (PEM CA certificate). `set` additionally supports `--remove-password` (drop the keychain credential) and `--clear-ca` (remove the CA setting).
 
 `connection test <name>` returns one object per layer `{ tls, auth, adt, icf }`, each `{ ok, skipped?, error?, nextSteps? }`. A failing layer drives a non-zero exit code while all layers are still reported (partial results, not a crash).
 
@@ -351,3 +404,8 @@ JSON output: `{ id, recorded, echo: { goal, tried, where } }`. Reports are writt
 | `SYNTAX_ERROR` | Content-based syntax check failed |
 | `OVERWRITE_REQUIRED` | Pull refuses to overwrite a differing local file |
 | `UNLOCK_WARNING` | Object updated but the edit lock could not be released |
+| `FILE_PARSE_ERROR` | Local file could not be parsed |
+| `NOT_FOUND` | Generic not-found (parent of `OBJECT_NOT_FOUND` / `AMBIGUOUS_OBJECT`) |
+| `TRANSPORT_NOT_FOUND` | Referenced transport request does not exist |
+| `NOT_IMPLEMENTED` | Requested feature not implemented yet |
+| `PUSH_FAILED` | Push operation failed |

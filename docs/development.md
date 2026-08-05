@@ -15,14 +15,17 @@ npm run build        # tsc → dist/
 
 ```bash
 npm run build        # TypeScript compile check
+npm test             # unit tests (vitest)
+npm run verify       # build + unit tests
 node dist/src/abap_cli/index.js --help
 ```
 
-There is no unit-test framework; verification is done via:
+Verification is done via:
 
 1. **`npm run build`** — TypeScript compile gate
-2. **Local mock ADT server** — offline end-to-end checks (no SAP needed)
-3. **Real SAP integration** — protocol-level verification against a live system
+2. **`npm test` (vitest)** — unit tests in `test/unit/` covering command option contracts, error codes, and config handling
+3. **Local mock ADT server** — offline end-to-end checks (no SAP needed)
+4. **Real SAP integration** — protocol-level verification against a live system
 
 ## Local Mock ADT Server
 

@@ -3,9 +3,11 @@
 ## [Unreleased]
 
 ### Fixed
+- `abap inspect` was imported but never registered in `index.ts`, so the command silently did not exist; it is now wired up and runs as documented.
 - `abap init` (interactive, existing profile) now persists the fallback-typed password to the OS keychain. Previously it re-prompted "Use stored password?" on every run and the typed password was never saved.
 
 ### Changed
+- Documentation synced with the CLI: `docs/commands.md` now covers all current options/subcommands (check `--syntax/--content/--atc` modes, pull `--include-tests/--include-all-parts`, push `--no-activate/--dry-run/--fail-fast/--atomic`, create `--template/--no-pull/--check-only/--audit`, transport `show/resolve/assign`, connection/init TLS options, full error-code table); README command table, scope version (v0.6), getting-started and architecture docs updated; `docs/development.md` documents the vitest unit-test suite.
 - Bare `abap` and bare `abap connection` (no subcommand) print their help text to stdout and exit `0`. Commands missing required arguments/options (e.g. `abap search` without a query) print that subcommand's help to stdout followed by the structured `USAGE` error on stderr, exit `2`. Unknown commands still return the structured `USAGE` error.
 - Added `abap connection add <name>` — creates a new profile (refuses when the name exists). `connection set <name>` is now strictly "modify an existing profile" and points to `add` when the profile is missing. All create-profile guidance (`init`, `doctor`, probe errors) now uses `connection add`.
 - `abap pull` now writes the official abap-file-format layout: one directory per object (`src/<object>/`) containing the mandatory `<name>.<type>.json` metadata (formatVersion + header, from `objectStructure`) plus `<name>.<type>.abap` source parts (includes as `<name>.<type>.<subtype>.abap`). `create` (create-then-pull) and `sync --pull` follow the same layout.

@@ -85,7 +85,7 @@ abap pull ZCL_MY_CLASS
 
 # 2. Edit the local file (abap-file-format naming, e.g. src/zcl_my_class/zcl_my_class.clas.abap)
 
-# 3. Check syntax locally (no SAP-side changes)
+# 3. Check the file (default --syntax mode, checked against SAP; nothing is changed)
 abap check src/zcl_my_class/zcl_my_class.clas.abap
 
 # 4. Push back (lock → write → activate → unlock)
@@ -104,25 +104,26 @@ abap transport list --json
 abap transport create "Feature X" --json
 
 # Use the returned number via --tr
-abap push src/zcl_my_class.clas.abap --tr <REQUEST_NUMBER>
+abap push src/zcl_my_class/zcl_my_class.clas.abap --tr <REQUEST_NUMBER>
 ```
 
 ### Create → Pull → Edit → Push Loop
 
 ```bash
-# Create a new class in SAP (writes a default skeleton and activates it)
+# Create a new class in SAP (writes a default skeleton, pulls it locally, and activates it)
 abap create CLAS ZCL_MY_NEW_CLASS --package ZDEV --description "My class" --tr DEVK900001
 
 # Pull the skeleton, edit, push back
 abap pull ZCL_MY_NEW_CLASS
-# ... edit src/zcl_my_new_class.clas.abap ...
-abap push src/zcl_my_new_class.clas.abap --tr DEVK900001
+# ... edit src/zcl_my_new_class/zcl_my_new_class.clas.abap ...
+abap push src/zcl_my_new_class/zcl_my_new_class.clas.abap --tr DEVK900001
 ```
 
-## What's Supported (v0.3+)
+## What's Supported (v0.6)
 
 - **Source objects** — Class (CLAS), Interface (INTF), Program (PROG), Function Group (FUGR) for pull / push / check / create via the ADT REST API
-- **Transport management** — `abap transport list` / `abap transport create`
+- **Transport management** — `abap transport list` / `create` / `show` / `resolve` / `assign`
+- **Diagnosis & workflows** — `abap doctor`, `abap inspect`, `abap diff`, `abap sync`, `abap report-stuck`
 - **DDIC objects** (Domain, DataElement, Table, etc. as `.json`) — not yet supported; rejected with a clear `DDIC_NOT_SUPPORTED` message (planned via the self-built ICF service)
 
 ## Next Steps

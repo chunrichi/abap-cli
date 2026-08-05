@@ -25,14 +25,14 @@ src/abap_cli/
 ├── index.ts              # commander entry point, registers all commands
 ├── clients/
 │   ├── adt-client.ts     # AdtClientWrapper — thin wrapper over abap-adt-api
-│   └── icf-client.ts     # ICF service client (DDIC, later phase)
+│   ├── icf-client.ts     # ICF service client (DDIC, later phase)
+│   └── probe.ts          # layer-by-layer connection probe (tls → auth → adt → icf)
 ├── commands/             # one file per CLI command (init, pull, push, ...)
 ├── config/               # .abap.json + user system profiles
 ├── crypto/secrets.ts     # OS keychain (keytar) for passwords
-├── deploy/deployer.ts    # ICF service deployer
-├── formats/              # abap-file-format / DDIC JSON file resolution
-├── output/json.ts        # unified JSON output + error shape + exit codes
-└── sync/                 # orchestration: object resolution, transport, push flow
+├── formats/              # abap-file-format / DDIC JSON file resolution + pull strategies
+├── output/               # unified JSON output, error/exit codes, help text
+└── sync/                 # orchestration: resolve, transport, push flow, status/diff/sync, deploy, stuck reports
 ```
 
 ### Key decisions

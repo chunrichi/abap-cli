@@ -54,6 +54,7 @@ registerTransportCommand(program);
 registerDeployCommand(program);
 registerConnectionCommand(program);
 registerDoctorCommand(program);
+registerInspectCommand(program);
 registerDiffCommand(program);
 registerSyncCommand(program);
 registerReportStuckCommand(program);
