@@ -10,7 +10,7 @@ import { resolveTransport } from '../sync/transport.js';
 import { pushObject } from '../sync/push-flow.js';
 import { buildFilename, objectDirName } from '../formats/file-resolver.js';
 import { writeAbapFile, fileExists } from '../formats/abap-source.js';
-import { defaultSkeleton, getTemplate } from '../formats/templates.js';
+import { defaultSkeleton, getTemplate, listTemplates } from '../formats/templates.js';
 
 interface CreateTypeSpec {
   objtype: CreatableTypeIds;
@@ -41,14 +41,16 @@ interface CreateOptions {
 }
 
 export function registerCreateCommand(program: Command): void {
-  program
+  const createCmd = program
     .command('create')
     .description('Create a new ABAP source object (CLAS, INTF, PROG, FUGR) and activate it')
     .addHelpText('after', commonErrorsAfter())
     .argument('<type>', 'Object type (CLAS, INTF, PROG, FUGR)')
     .argument('<name>', 'Object name')
-    .requiredOption('--package <package>', 'Target SAP package')
-    .requiredOption('--description <desc>', 'Object description')
+    // 不用 requiredOption：父命令的 mandatory 选项会被 commander 在子命令
+    // local 的解析中一并校验（walk ancestors），故改为 .option + 手动校验。
+    .option('--package <package>', 'Target SAP package (required)')
+    .option('--description <desc>', 'Object description (required)')
     .option('--tr <transport>', 'Transport number')
     .option('--no-activate', 'Create the object but do not activate it')
     .option('--template <template>', 'Skeleton template (minimal, public-method, report, selection-screen, ...)')
@@ -63,9 +65,86 @@ export function registerCreateCommand(program: Command): void {
         printError(json, error);
       }
     });
+
+  registerCreateLocalCommand(createCmd);
+}
+
+function registerCreateLocalCommand(createCmd: Command): void {
+  // 实验性：本地生成草稿骨架，不连接 SAP（FR-021-local）。
+  createCmd
+    .command('local')
+    .description('Experimental: create a local draft skeleton file (no SAP connection)')
+    .addHelpText('after', commonErrorsAfter())
+    .addHelpText('after', [
+      '',
+      'This command is experimental and creates a local draft only — nothing is sent to SAP.',
+      'To land the draft in SAP, run:',
+      '  abap create <type> <name> --package <pkg> --description <desc> --no-pull',
+      '  abap push src/<obj>/<obj>.<type>.abap --tr <transport>',
+      '',
+    ].join('\n'))
+    .argument('<type>', 'Object type (CLAS, INTF, PROG, FUGR)')
+    .argument('<name>', 'Object name')
+    .option('--template <template>', 'Skeleton template (minimal, public-method, report, selection-screen, ...)')
+    .option('--dir <path>', 'Output directory', 'src/')
+    .action(async (type, name, opts, cmd) => {
+      const json = jsonFromCommand(cmd);
+      try {
+        // 父子同名选项 --template：commander 把值路由到父命令 create 上（子命令自身为 undefined）。
+        await runCreateLocal(type, name, { ...opts, template: cmd.parent?.opts().template }, json);
+      } catch (error: unknown) {
+        printError(json, error);
+      }
+    });
+}
+
+interface CreateLocalOptions {
+  template?: string;
+  dir: string;
+}
+
+async function runCreateLocal(type: string, name: string, opts: CreateLocalOptions, json: boolean): Promise<void> {
+  const objectName = normalizeName(name);
+  resolveType(type); // throws TYPE_NOT_SUPPORTED / DDIC_NOT_SUPPORTED before any write
+  const typeUpper = type.toUpperCase();
+
+  const templateName = opts.template;
+  const template = templateName ? getTemplate(typeUpper, templateName) : undefined;
+  if (templateName && !template) {
+    throw new CliError('INVALID_ARGUMENT', `Unknown template '${templateName}' for type ${typeUpper}`, {
+      nextSteps: [`Available templates: ${listTemplates(typeUpper).map((t) => t.name).join(', ')}`],
+    });
+  }
+  const content = template ? template.skeleton(objectName) : defaultSkeleton(typeUpper, objectName);
+
+  const filename = buildFilename(objectName, typeUpper, 'main', '.abap');
+  const relPath = path.join(opts.dir, objectDirName(objectName), filename);
+  const targetPath = path.resolve(process.cwd(), relPath);
+
+  if (await fileExists(targetPath)) {
+    throw new CliError('FILE_EXISTS', `${relPath} already exists. Delete it first or use another name`, { file: relPath });
+  }
+
+  await writeAbapFile(targetPath, content);
+
+  printResult(
+    json,
+    { object: objectName, type: typeUpper, template: templateName ?? null, file: relPath, experimental: true },
+    `Created local draft ${typeUpper} ${objectName} at ${relPath} (experimental, not in SAP)`,
+  );
 }
 
 async function runCreate(type: string, name: string, opts: CreateOptions, json: boolean): Promise<void> {
+  if (!opts.package) {
+    throw new CliError('USAGE', "Missing required option '--package <package>'", {
+      example: 'abap create CLAS ZCL_MY_CLASS --package ZPKG --description "desc"',
+    });
+  }
+  if (!opts.description) {
+    throw new CliError('USAGE', "Missing required option '--description <desc>'", {
+      example: 'abap create CLAS ZCL_MY_CLASS --package ZPKG --description "desc"',
+    });
+  }
   const skipActivate = opts.activate === false;
   const spec = resolveType(type);
   const objectName = normalizeName(name);

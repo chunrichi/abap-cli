@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- `abap create local <type> <name>` — experimental: create a local draft skeleton file (`src/<obj>/<obj>.<type>.abap`, abap-file-format layout) without contacting SAP. Zero SAP requests / no credential reads; reuses `create`'s type map, template registry and error codes (`TYPE_NOT_SUPPORTED` / `DDIC_NOT_SUPPORTED` / `INVALID_ARGUMENT` / `FILE_EXISTS`); `--template` / `--dir` (default `src/`). Land the draft via `abap create ... --no-pull` then `abap push <file> --tr <tr>` (documented in `--help` and `docs/commands.md`).
+
 ### Fixed
 - `abap inspect` was imported but never registered in `index.ts`, so the command silently did not exist; it is now wired up and runs as documented.
 - `abap init` (interactive, existing profile) now persists the fallback-typed password to the OS keychain. Previously it re-prompted "Use stored password?" on every run and the typed password was never saved.

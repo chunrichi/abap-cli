@@ -53,6 +53,7 @@ abap push src/zcl_my_class/zcl_my_class.clas.abap --tr <REQUEST_NUMBER>
 | `abap check <files...>` | Validate local files: `--syntax` (default, against SAP) / `--content` (local) / `--atc` |
 | `abap search <query>` | Search ABAP objects |
 | `abap create <type> <name>` | Create a new ABAP source object (CLAS/INTF/PROG/FUGR): writes a default skeleton, pulls it locally, then activates (`--package`, `--description`, `--tr`, `--no-activate`) |
+| `abap create local <type> <name>` | Experimental: create a local draft skeleton file offline (no SAP connection; `--template`, `--dir`) |
 | `abap transport list` | List transport requests (`--open` for open/released filter) |
 | `abap transport create <description>` | Create a new transport request (`--package`; default `$TMP` local request, usable via `--tr`) |
 | `abap transport show \| resolve \| assign` | Inspect a request / find an object's request / attach an object to a request |

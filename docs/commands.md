@@ -153,6 +153,33 @@ abap create [options] <type> <name>
 
 DDIC types (DOMA/DTEL/TABL/STRU/TTYP) are rejected with `DDIC_NOT_SUPPORTED`; unknown types with `TYPE_NOT_SUPPORTED`.
 
+### `abap create local` (experimental)
+
+**Experimental**: create a local draft skeleton file without contacting SAP. Nothing is sent to SAP and no credentials are read — the draft can be edited offline before landing it via the existing commands.
+
+```bash
+abap create local <type> <name> [options]
+```
+
+| Argument | Description |
+|----------|-------------|
+| `type` | Object type: `CLAS`, `INTF`, `PROG`, `FUGR` |
+| `name` | Object name (normalized to uppercase) |
+
+| Option | Description |
+|--------|-------------|
+| `--template <template>` | Skeleton template (`minimal`, `public-method`, `report`, `selection-screen`, …) |
+| `--dir <path>` | Output directory (default `src/`) |
+
+The file is written as `src/<obj>/<obj>.<type>.abap` (abap-file-format layout, same as `create`'s create-then-pull output). An existing file is refused with `FILE_EXISTS`; unknown types / DDIC types / unknown templates match `create`'s error codes (`TYPE_NOT_SUPPORTED` / `DDIC_NOT_SUPPORTED` / `INVALID_ARGUMENT`).
+
+To land the draft in SAP:
+
+```bash
+abap create CLAS ZCL_DRAFT --package ZPKG --description "desc" --no-pull
+abap push src/zcl_draft/zcl_draft.clas.abap --tr <transport>
+```
+
 ## `abap transport`
 
 Manage SAP transport requests.
