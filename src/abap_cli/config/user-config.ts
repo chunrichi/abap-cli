@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { CliError } from '../output/json.js';
 
 export interface SystemProfile {
   url: string;
@@ -32,7 +33,13 @@ export function loadUserConfig(): UserConfig {
     return { systems: parsed.systems ?? {}, ...parsed };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Cannot parse user config ${CONFIG_PATH}: ${message}. Fix or delete the file.`);
+    throw new CliError('CONFIG_ERROR', `Cannot parse user config ${CONFIG_PATH}: ${message}. Fix or delete the file.`, {
+      file: CONFIG_PATH,
+      nextSteps: [
+        `Open ${CONFIG_PATH} and fix the JSON, or delete it (your system profiles will need to be re-added).`,
+      ],
+      example: `abap connection add <name> --url <url> --username <user> --password <pwd>`,
+    });
   }
 }
 

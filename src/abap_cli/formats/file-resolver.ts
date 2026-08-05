@@ -1,4 +1,5 @@
 import * as path from 'path';
+import { CliError } from '../output/json.js';
 
 export interface ResolvedFile {
   /** Full file path */
@@ -38,7 +39,14 @@ export function resolveFile(filePath: string): ResolvedFile {
   const parts = stem.split('.');
 
   if (parts.length < 2) {
-    throw new Error(`Cannot resolve object type from filename: ${basename}`);
+    throw new CliError('FILE_PARSE_ERROR', `Cannot resolve object type from filename: ${basename}`, {
+      file: basename,
+      nextSteps: [
+        'Files must follow the abap-file-format layout: <name>.<type>.abap (e.g. zcl_foo.clas.abap).',
+        'Run `abap pull <object>` to regenerate the file with the correct name.',
+      ],
+      example: 'abap pull ZCL_FOO',
+    });
   }
 
   // parts.length >= 2 guaranteed by the check above
