@@ -71,10 +71,11 @@ describe('contract coverage 010 (T021, SC-009)', () => {
     expect(missing).toEqual([]);
   });
 
-  it('all new 010 commands are registered in index.ts', () => {
+  it('all new 010 commands are registered as lazy specs in index.ts', () => {
     const index = fs.readFileSync(path.join(repoRoot, 'src/abap_cli/index.ts'), 'utf-8');
-    for (const cmd of ['registerDoctorCommand', 'registerInspectCommand', 'registerDiffCommand', 'registerSyncCommand', 'registerReportStuckCommand']) {
-      expect(index).toContain(cmd);
+    for (const cmd of ['doctor', 'inspect', 'diff', 'sync', 'report-stuck']) {
+      expect(index).toContain(`name: '${cmd}'`);
+      expect(index).toContain(`./commands/${cmd}.js`);
     }
   });
 });

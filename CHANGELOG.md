@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- **Lazy command registration (P1.6)** — `src/abap_cli/index.ts` no longer eagerly imports all 16 command modules at startup. Commands are declared as a `COMMAND_SPECS` table (name + description + dynamic `import()`) and registered via `registerLazyCommands` in `src/abap_cli/commands/lazy.ts`; a command's module (and its heavy deps: keytar, abap-adt-api, clack) is imported only when that command is actually dispatched or its `--help`/`help <cmd>` is requested. Root `--help` still lists every command. The CLI entry now uses `program.parseAsync()` so commander's synchronous help/error throws (raised inside the async lazy dispatch) are caught by the existing structured-error handler instead of leaking as unhandled rejections. No public CLI behavior changed; `test/unit/lazy-commands.test.ts` covers lazy dispatch, subcommand/help loading, and description consistency with the command modules.
+
 ## [0.7.0] - 2026-08-05
 
 ### Added

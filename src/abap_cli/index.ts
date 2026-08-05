@@ -6,23 +6,93 @@ import { createRequire } from 'node:module';
 import { Command, CommanderError } from 'commander';
 import { CliError, renderError } from './output/json.js';
 import { setProgram, buildMeta } from './output/meta.js';
-import { registerInitCommand } from './commands/init.js';
-import { registerPullCommand } from './commands/pull.js';
-import { registerPushCommand } from './commands/push.js';
-import { registerCheckCommand } from './commands/check.js';
-import { registerSearchCommand } from './commands/search.js';
-import { registerCreateCommand } from './commands/create.js';
-import { registerAtcCommand } from './commands/atc.js';
-import { registerStatusCommand } from './commands/status.js';
-import { registerTransportCommand } from './commands/transport.js';
-import { registerDeployCommand } from './commands/deploy.js';
-import { registerConnectionCommand } from './commands/connection.js';
-import { registerDoctorCommand } from './commands/doctor.js';
-import { registerInspectCommand } from './commands/inspect.js';
-import { registerDiffCommand } from './commands/diff.js';
-import { registerSyncCommand } from './commands/sync.js';
-import { registerReportStuckCommand } from './commands/report-stuck.js';
+import { registerLazyCommands, type LazyCommandSpec } from './commands/lazy.js';
 import { writeStuckReport, recordFailure, shouldAutoReport } from './sync/stuck-reports.js';
+
+// 声明式惰性注册（P1.6）：只有 name + description 在启动时加载，模块体在
+// 命令真正被调用（或请求其 --help）时才 import。
+const COMMAND_SPECS: LazyCommandSpec[] = [
+  {
+    name: 'init',
+    description: 'Initialize workspace configuration for SAP connection',
+    load: () => import('./commands/init.js').then((m) => ({ register: m.registerInitCommand })),
+  },
+  {
+    name: 'pull',
+    description: 'Download ABAP objects from SAP to local files',
+    load: () => import('./commands/pull.js').then((m) => ({ register: m.registerPullCommand })),
+  },
+  {
+    name: 'push',
+    description: 'Push local ABAP files to SAP (lock → set source → syntax check → activate → unlock)',
+    load: () => import('./commands/push.js').then((m) => ({ register: m.registerPushCommand })),
+  },
+  {
+    name: 'check',
+    description: 'Validate local ABAP files: --syntax (default, against SAP), --content (local), --atc (against SAP)',
+    load: () => import('./commands/check.js').then((m) => ({ register: m.registerCheckCommand })),
+  },
+  {
+    name: 'search',
+    description: 'Search for ABAP objects in SAP system',
+    load: () => import('./commands/search.js').then((m) => ({ register: m.registerSearchCommand })),
+  },
+  {
+    name: 'create',
+    description: 'Create a new ABAP source object (CLAS, INTF, PROG, FUGR) and activate it',
+    load: () => import('./commands/create.js').then((m) => ({ register: m.registerCreateCommand })),
+  },
+  {
+    name: 'atc',
+    description: 'DEPRECATED: ATC checks moved to `abap check --atc`',
+    load: () => import('./commands/atc.js').then((m) => ({ register: m.registerAtcCommand })),
+  },
+  {
+    name: 'status',
+    description: 'Show differences between local files and SAP system (changed parts)',
+    load: () => import('./commands/status.js').then((m) => ({ register: m.registerStatusCommand })),
+  },
+  {
+    name: 'transport',
+    description: 'Manage SAP transport requests',
+    load: () => import('./commands/transport.js').then((m) => ({ register: m.registerTransportCommand })),
+  },
+  {
+    name: 'deploy',
+    description: 'Deploy bundled ICF ABAP service to SAP system (--dry-run/--diff preview available)',
+    load: () => import('./commands/deploy.js').then((m) => ({ register: m.registerDeployCommand })),
+  },
+  {
+    name: 'connection',
+    description: 'Manage global connection profiles',
+    load: () => import('./commands/connection.js').then((m) => ({ register: m.registerConnectionCommand })),
+  },
+  {
+    name: 'doctor',
+    description: 'Diagnose the CLI environment: environment, config, connections',
+    load: () => import('./commands/doctor.js').then((m) => ({ register: m.registerDoctorCommand })),
+  },
+  {
+    name: 'inspect',
+    description: 'Inspect SAP object metadata read-only (no local files required)',
+    load: () => import('./commands/inspect.js').then((m) => ({ register: m.registerInspectCommand })),
+  },
+  {
+    name: 'diff',
+    description: 'Compare local files against SAP (read-only)',
+    load: () => import('./commands/diff.js').then((m) => ({ register: m.registerDiffCommand })),
+  },
+  {
+    name: 'sync',
+    description: 'Chain status / pull / push into one workflow',
+    load: () => import('./commands/sync.js').then((m) => ({ register: m.registerSyncCommand })),
+  },
+  {
+    name: 'report-stuck',
+    description: 'Record a stuck-agent report locally (feedback loop)',
+    load: () => import('./commands/report-stuck.js').then((m) => ({ register: m.registerReportStuckCommand })),
+  },
+];
 
 const program = new Command();
 
@@ -42,29 +112,17 @@ program
 program.exitOverride();
 program.configureOutput({ writeErr: () => {} });
 
-// Register all commands
-registerInitCommand(program);
-registerPullCommand(program);
-registerPushCommand(program);
-registerCheckCommand(program);
-registerSearchCommand(program);
-registerCreateCommand(program);
-registerAtcCommand(program);
-registerStatusCommand(program);
-registerTransportCommand(program);
-registerDeployCommand(program);
-registerConnectionCommand(program);
-registerDoctorCommand(program);
-registerInspectCommand(program);
-registerDiffCommand(program);
-registerSyncCommand(program);
-registerReportStuckCommand(program);
+// Register all commands lazily (P1.6): stubs up front, modules on demand.
+registerLazyCommands(program, COMMAND_SPECS);
 
 // 注册命令树供 buildMeta 推导规范命令名（FR-003）。
 setProgram(program);
 
 try {
-  program.parse();
+  // parseAsync: lazy commands (P1.6) dispatch through an async _parseCommand,
+  // so commander's sync help/error throws surface as rejections that only
+  // parseAsync (which awaits the chain) re-throws into this catch block.
+  await program.parseAsync();
 } catch (error: unknown) {
   const json = process.argv.includes('--json');
   if (error instanceof CommanderError) {

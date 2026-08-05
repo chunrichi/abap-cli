@@ -68,7 +68,7 @@ src/abap_cli/
 ## Adding a New Command
 
 1. Create `src/abap_cli/commands/<name>.ts` exporting `register<Name>Command(program: Command)`
-2. Register it in `src/abap_cli/index.ts`
+2. Register it lazily in `src/abap_cli/index.ts`: add a `COMMAND_SPECS` entry (command `name`, root-help `description`, and a `load` that dynamically `import()`s the module — see `src/abap_cli/commands/lazy.ts`). The stub's description must match the one the module registers.
 3. Use `output/json.ts` (`printResult` / `printError`) so `--json` behaves consistently
 4. Add a corresponding skill prompt in `skills/abap-<name>.md` (Agent layer)
 5. Document it in [Commands](commands.md) and update the README command table
