@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { printError, printResult, jsonFromCommand } from '../output/json.js';
+import { collectWarning } from '../output/meta.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import { resolveTransport } from '../sync/transport.js';
 import { deployBundled, type DeploymentSummary } from '../sync/deploy-flow.js';
@@ -40,7 +41,7 @@ export function registerDeployCommand(program: Command): void {
           yes: opts.yes,
         });
         if (opts.force) {
-          console.error('Warning: --force bypassed safety guards.');
+          collectWarning('FORCE_BYPASSED', '--force bypassed safety guards.', { force: true });
         }
         printResult(json, summary, humanSummary(summary));
       } catch (error: unknown) {

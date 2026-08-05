@@ -3,19 +3,24 @@
  *
  * Public API:
  *  - CliError: the in-process error type (extended with nextSteps/example).
- *  - toErrorShape: normalises any thrown value into the error contract shape.
+ *  - toErrorShape: normalises any thrown value into the error contract shape
+ *    (now with an explicit `category`, FR-005/FR-006).
  *  - renderResult / renderError: pure functions returning a RenderedOutput
  *    (stdout lines, stderr lines, exitCode). No stream writes, no process.exit.
  *  - printResult / printError: thin shims that call the renderers, write to
- *    the streams, and (in printError's case) call process.exit.
+ *    the streams, and (in printError's case) call process.exit. The `meta`
+ *    argument is optional — it defaults to buildMeta().
  *
- * Contract: { status: 'success', data } | { status: 'error', error: { code,
- * message, details?, nextSteps?, example? } }.
+ * Contract (specs/012-unify-cli-output-contract/contracts/cli-output.md):
+ *   success: { status: 'success', meta, data }
+ *   failure: { status: 'error', meta, error: { code, category, message,
+ *     details?, nextSteps?, example? } }.
  */
 
 import type { Command } from 'commander';
-import { categoryOf, type ErrorCode } from './error-codes.js';
+import { categoryOf, type ErrorCode, type ErrorCategory } from './error-codes.js';
 import { exitCodeFor, EXIT_GENERIC_FALLBACK } from './exit-codes.js';
+import { buildMeta, type OutputMeta } from './meta.js';
 
 /** Resolve the top-level --json flag from any nested subcommand (FR-027). */
 export function jsonFromCommand(cmd: Command): boolean {
@@ -60,18 +65,20 @@ export class CliError extends Error {
 
 /**
  * Normalize any thrown value into the contract error shape.
- * Includes details/nextSteps/example from CliError instances.
+ * Includes details/nextSteps/example from CliError instances and the explicit
+ * `category` derived from the error code (FR-005/FR-006).
  */
-export function toErrorShape(error: unknown): { code: ErrorCode; message: string; [key: string]: unknown } {
+export function toErrorShape(error: unknown): { code: ErrorCode; category: ErrorCategory; message: string; [key: string]: unknown } {
   if (error instanceof CliError) {
     const out: Record<string, unknown> = {
       code: error.code,
+      category: categoryOf(error.code),
       message: error.message,
     };
     if (error.details) out.details = error.details;
     if (error.nextSteps) out.nextSteps = error.nextSteps;
     if (error.example) out.example = error.example;
-    return out as { code: ErrorCode; message: string; [key: string]: unknown };
+    return out as { code: ErrorCode; category: ErrorCategory; message: string; [key: string]: unknown };
   }
   const err = error as { statusCode?: number; statusMessage?: string; message?: string };
   const status = typeof err?.statusCode === 'number' ? err.statusCode : undefined;
@@ -79,12 +86,14 @@ export function toErrorShape(error: unknown): { code: ErrorCode; message: string
   if (status !== undefined) {
     return {
       code: 'SAP_ERROR',
+      category: 'SAP_ERROR',
       message,
       httpStatus: status,
       ...(err.statusMessage ? { httpStatusText: err.statusMessage } : {}),
     };
   }
-  return { code: 'SAP_ERROR', message };
+  // Unmapped exception — generic fallback (exit 1), not a fake SAP error.
+  return { code: 'UNKNOWN', category: 'UNKNOWN', message };
 }
 
 /** Pure output payload — never writes to streams, never exits. */
@@ -95,20 +104,23 @@ export interface RenderedOutput {
   exitCode?: number;
 }
 
-/** Render a success payload. JSON goes to stdout; human text goes to stdout. */
-export function renderResult(json: boolean, data: unknown, human?: string): RenderedOutput {
+/** Render a success payload. JSON (with meta) goes to stdout; human text goes
+ *  to stdout with any warnings as `Warning:` lines on stderr (FR-016). */
+export function renderResult(json: boolean, data: unknown, human: string, meta: OutputMeta): RenderedOutput {
   if (json) {
     return {
-      stdout: [JSON.stringify({ status: 'success', data }, null, 2)],
+      stdout: [JSON.stringify({ status: 'success', meta, data }, null, 2)],
       stderr: [],
       exitCode: undefined,
     };
   }
-  return { stdout: [human ?? ''], stderr: [], exitCode: undefined };
+  const warningLines = meta.warnings.map((w) => `Warning: ${w.message}`);
+  return { stdout: [human], stderr: warningLines, exitCode: undefined };
 }
 
-/** Render a failure payload. JSON goes to stderr; human text goes to stderr. */
-export function renderError(json: boolean, error: unknown): RenderedOutput {
+/** Render a failure payload. JSON (with meta) goes to stderr; human text goes
+ *  to stderr with `Warning:` lines first, then `Error:` + `Try:` (FR-016). */
+export function renderError(json: boolean, error: unknown, meta: OutputMeta): RenderedOutput {
   const err = toErrorShape(error);
   const exitCode =
     'code' in err && typeof err.code === 'string'
@@ -117,27 +129,27 @@ export function renderError(json: boolean, error: unknown): RenderedOutput {
   if (json) {
     return {
       stdout: [],
-      stderr: [JSON.stringify({ status: 'error', error: err }, null, 2)],
+      stderr: [JSON.stringify({ status: 'error', meta, error: err }, null, 2)],
       exitCode,
     };
   }
-  // Non-JSON human-readable stderr line.
-  const lines = [`Error: ${err.message}`];
+  const lines = [...meta.warnings.map((w) => `Warning: ${w.message}`), `Error: ${err.message}`];
   if (Array.isArray(err.nextSteps) && err.nextSteps.length > 0) {
     lines.push(`  Try: ${err.nextSteps.join(' / ')}`);
   }
   return { stdout: [], stderr: lines, exitCode };
 }
 
-/** Shim — writes to stdout and returns. Backward compatibility for existing call sites. */
-export function printResult(json: boolean, data: unknown, human: string): void {
-  const out = renderResult(json, data, human);
+/** Shim — writes to stdout/stderr and returns. `meta` defaults to buildMeta(). */
+export function printResult(json: boolean, data: unknown, human: string, meta?: OutputMeta): void {
+  const out = renderResult(json, data, human, meta ?? buildMeta());
   for (const line of out.stdout) console.log(line);
+  for (const line of out.stderr) console.error(line);
 }
 
 /** Shim — writes to stderr and exits with the category's exit code. */
-export function printError(json: boolean, error: unknown): never {
-  const out = renderError(json, error);
+export function printError(json: boolean, error: unknown, meta?: OutputMeta): never {
+  const out = renderError(json, error, meta ?? buildMeta());
   for (const line of out.stderr) console.error(line);
   process.exit(out.exitCode ?? EXIT_GENERIC_FALLBACK);
 }

@@ -52,4 +52,22 @@ describe('push dry-run (FR-012, SC-005)', () => {
     expect(client.unLock).toHaveBeenCalled();
     expect(stages).toContain('unlock');
   });
+
+  it('a failed unlock surfaces as UNLOCK_WARNING via onWarning, not an error (US-5)', async () => {
+    const client = mockClient();
+    (client.lock as ReturnType<typeof vi.fn>).mockResolvedValue({ LOCK_HANDLE: 'h1' });
+    (client.setObjectSource as ReturnType<typeof vi.fn>).mockResolvedValue({});
+    (client.unLock as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('unlock boom'));
+    const warnings: unknown[] = [];
+    await expect(
+      pushObject(
+        client,
+        { name: 'ZCL_DEMO', type: 'CLAS', objectUrl: '/x' },
+        [{ subtype: 'main', sourceUrl: '/x/source/main', content: '' }],
+        { transport: 'T1', checkOnly: true, onWarning: (w) => warnings.push(w) },
+      ),
+    ).resolves.toBeUndefined(); // success — no throw for unlock failure
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatchObject({ code: 'UNLOCK_WARNING', details: { unlock: 'failed' } });
+  });
 });

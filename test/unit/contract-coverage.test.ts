@@ -78,3 +78,32 @@ describe('contract coverage 010 (T021, SC-009)', () => {
     }
   });
 });
+
+// --- 012-unify-cli-output-contract: unified output contract (SC-003, FR-017) ---
+const contract012Path = path.join(repoRoot, 'specs/012-unify-cli-output-contract/contracts/cli-output.md');
+const CONTRACT012_TOKENS = [
+  'meta', 'category', 'UNKNOWN', 'WarningCode', 'warnings', 'durationMs',
+  'cli-output', 'UNLOCK_WARNING', 'NOT_IMPLEMENTED', 'PUSH_FAILED', 'COMMAND_MOVED',
+  'OBJECT_EXISTS', 'FILE_EXISTS', 'schema version',
+];
+
+describe('contract coverage 012 (T018, SC-003)', () => {
+  it('the unified contract documents every key token', () => {
+    const contract = fs.readFileSync(contract012Path, 'utf-8').toLowerCase();
+    const missing = CONTRACT012_TOKENS.filter((t) => !contract.includes(t.toLowerCase()));
+    expect(missing).toEqual([]);
+  });
+
+  it('the 008 contract points to the 012 contract as superseding', () => {
+    const contract008 = fs.readFileSync(path.join(repoRoot, 'specs/008-cli-foundation/contracts/cli-commands.md'), 'utf-8');
+    expect(contract008).toContain('012-unify-cli-output-contract');
+  });
+
+  it('the migration section is documented in the contract and CHANGELOG', () => {
+    const contract = fs.readFileSync(contract012Path, 'utf-8');
+    expect(contract).toContain('迁移记录');
+    expect(contract).toContain('CHANGELOG.md');
+    const changelog = fs.readFileSync(path.join(repoRoot, 'CHANGELOG.md'), 'utf-8');
+    expect(changelog).toContain('## [Unreleased]');
+  });
+});

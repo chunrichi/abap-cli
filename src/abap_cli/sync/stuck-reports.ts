@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { collectWarning } from '../output/meta.js';
 
 /** Stable report identity, sortable and unique (FR-022). */
 export function newReportId(prefix = 'STUCK'): string {
@@ -72,7 +73,7 @@ export function writeStuckReport(input: StuckReportInput): StuckReportResult {
     return { id, recorded: true, echo: { goal: input.goal, tried: input.tried, where: input.where } };
   } catch {
     const degradedId = newReportId('STUCK-DEGRADED');
-    console.error(`Warning: could not write stuck report to ${reportsDir} (${degradedId}).`);
+    collectWarning('STUCK_REPORT_DEGRADED', `Could not write stuck report to ${reportsDir} (${degradedId}).`);
     return { id: degradedId, recorded: false, echo: { goal: input.goal, tried: input.tried, where: input.where } };
   }
 }

@@ -6,15 +6,15 @@ abap-cli is designed to be driven by AI agents. Every command supports `--json` 
 
 ```jsonc
 // Success — written to stdout
-{ "status": "success", "data": { ... } }
+{ "status": "success", "meta": { "command": "abap pull", "version": "0.6.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { ... } }
 
-// Failure — written to stderr, exit code non-zero
-{ "status": "error", "error": { "code": "NO_TRANSPORT", "message": "...", ... } }
+// Failure — written to stderr (stdout empty), exit code non-zero
+{ "status": "error", "meta": { ... }, "error": { "code": "NO_TRANSPORT", "category": "VALIDATION_ERROR", "message": "...", ... } }
 ```
 
 - Success goes to **stdout**; errors go to **stderr**. Capture them separately.
-- Exit code `0` = success, `1` = any failure.
-- `error.code` is stable and machine-readable (see [Commands → Error Codes](commands.md#error-codes)).
+- Exit code `0` = success, `1` = unknown/unmapped failure, `2`–`9` = categorized (usage / config / TLS / auth / SAP / validation / not-found / locked). The mapping is stable and 1:1 with `error.category`.
+- `error.code` is stable and machine-readable; `error.category` is explicit (see [Commands → Error Codes](commands.md#error-codes)). Non-fatal warnings live in `meta.warnings` and never change the exit code.
 
 ## Non-Interactive Operation
 

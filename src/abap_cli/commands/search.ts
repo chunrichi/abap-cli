@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError, printError, printResult, jsonFromCommand, printSchema, type CommandSchema } from '../output/json.js';
+import { collectWarning } from '../output/meta.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import { SEARCH_RESULT_LIMIT } from '../sync/resolve.js';
 
@@ -64,9 +65,8 @@ async function runSearch(query: string | undefined, opts: SearchOptions, json: b
   }
 
   // --max is a deprecated alias for --limit; --limit wins when both are given.
-  let deprecationWarning = '';
   if (opts.max !== undefined) {
-    deprecationWarning = 'Warning: --max is deprecated; use --limit instead.';
+    collectWarning('DEPRECATED_OPTION', '--max is deprecated; use --limit instead.', { option: '--max' });
     if (opts.limit === undefined) opts.limit = opts.max;
   }
   const limit = parsePositiveInt(opts.limit, '--limit', SEARCH_RESULT_LIMIT);
@@ -106,7 +106,6 @@ async function runSearch(query: string | undefined, opts: SearchOptions, json: b
       : '';
 
   const data = { items, page, limit, truncated, ...(hint ? { hint } : {}) };
-  if (deprecationWarning) console.error(deprecationWarning);
   printResult(json, data, humanSummary(query, type, items, truncated));
 }
 

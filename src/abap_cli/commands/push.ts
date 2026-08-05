@@ -4,6 +4,8 @@ import { AdtClientWrapper } from '../clients/adt-client.js';
 import { resolveFile } from '../formats/file-resolver.js';
 import { listAbapFiles, readAbapFile } from '../formats/abap-source.js';
 import { CliError, printError, printResult, toErrorShape, jsonFromCommand } from '../output/json.js';
+import { collectWarning, type Warning } from '../output/meta.js';
+import type { ErrorCode } from '../output/error-codes.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import { resolveObject, getObjectParts, validateLocalFile } from '../sync/resolve.js';
 import { resolveTransport } from '../sync/transport.js';
@@ -101,11 +103,12 @@ async function runPush(
 
   const results: PushFileResult[] = [];
   let failed = 0;
+  const onWarning = (w: Warning) => collectWarning(w.code, w.message, w.details);
   for (const file of target.files) {
     const stages: PushStage[] = [];
     const onStage = (s: PushStage) => stages.push(s);
     try {
-      await pushOne(client, file, transport, opts, onStage);
+      await pushOne(client, file, transport, opts, onStage, onWarning);
       if (opts.dryRun) {
         results.push({ file, status: 'dry-run', plan: stages });
       } else {
@@ -134,34 +137,21 @@ async function runPush(
   }
 
   if (failed > 0) {
+    // Aggregate exit code follows the category of the first failed file
+    // (or PUSH_FAILED fallback); thrown so the unified renderer in the action
+    // handles envelope + exit code (FR-011).
     const single = target.files.length === 1;
-    const code = single ? (results[0]?.code ?? 'PUSH_FAILED') : 'PUSH_FAILED';
-    const payload = {
-      code,
-      message: `${failed} of ${target.files.length} file(s) failed`,
-      results,
+    const code = (single ? (results[0]?.code ?? 'PUSH_FAILED') : 'PUSH_FAILED') as ErrorCode;
+    const firstFailed = results.find((r) => r.status === 'failed');
+    const aggregateCode = (firstFailed?.code ?? code) as ErrorCode;
+    throw new CliError(aggregateCode, `${failed} of ${target.files.length} file(s) failed`, {
+      details: { results, failed },
       nextSteps: [
-        'Inspect the failing file\'s `code` and `stage` fields.',
+        "Inspect the failing file's `code` and `stage` fields.",
         'Fix the issue and re-run with --keep-going (default) or --fail-fast to stop earlier.',
       ],
       example: 'abap push src/foo.abap --tr NDK123456',
-    };
-    if (json) {
-      console.error(JSON.stringify({ status: 'error', error: payload }, null, 2));
-    } else {
-      console.error(`Error: ${payload.message}`);
-      for (const r of results.filter((x) => x.status === 'failed')) {
-        console.error(`  ${r.file} — ${r.code ?? 'FAILED'}${r.stage ? ` (stage: ${r.stage})` : ''}`);
-      }
-    }
-    // Aggregate exit code follows the category of the first failed file (or PUSH_FAILED fallback).
-    const firstFailed = results.find((r) => r.status === 'failed');
-    const aggregateCode = (firstFailed?.code ?? code) as
-      'PUSH_FAILED' | 'LOCK_FAILED' | 'ACTIVATION_FAILED' | 'SYNTAX_ERROR' | 'NO_TRANSPORT' | 'OBJECT_NOT_FOUND' | 'TLS_ERROR' | 'AUTH_ERROR' | 'SAP_ERROR' | 'TRANSPORT_CREATE_FAILED' | 'TRANSPORT_NOT_FOUND' | 'OVERWRITE_REQUIRED' | 'CONFIG_ERROR' | 'CREATE_FAILED' | 'DDIC_NOT_SUPPORTED' | 'TYPE_NOT_SUPPORTED' | 'NOT_IMPLEMENTED' | 'USAGE' | 'INVALID_ARGUMENT' | 'FILE_PARSE_ERROR' | 'AMBIGUOUS_OBJECT';
-    const { exitCodeFor } = await import('../output/exit-codes.js');
-    const { categoryOf } = await import('../output/error-codes.js');
-    void exitCodeFor;
-    process.exit(exitCodeFor(categoryOf(aggregateCode)));
+    });
   }
 
   printResult(
@@ -177,6 +167,7 @@ async function pushOne(
   transport: string,
   opts: { checkOnly?: boolean; activate?: boolean; dryRun?: boolean },
   onStage: (s: PushStage) => void,
+  onWarning: (w: Warning) => void,
 ): Promise<void> {
   let resolved;
   try {
@@ -196,7 +187,7 @@ async function pushOne(
   const object = await resolveObject(client, resolved.objectName, resolved.objectType);
 
   if (resolved.objectType === 'FUGR') {
-    await pushFugrOne(client, object, resolved, content, transport, opts, onStage);
+    await pushFugrOne(client, object, resolved, content, transport, opts, onStage, onWarning);
     return;
   }
 
@@ -210,7 +201,7 @@ async function pushOne(
     client,
     object,
     [{ subtype: part.subtype, sourceUrl: part.sourceUrl, content }],
-    { transport, checkOnly: opts.checkOnly ?? false, activate: opts.activate, dryRun: opts.dryRun, onStage },
+    { transport, checkOnly: opts.checkOnly ?? false, activate: opts.activate, dryRun: opts.dryRun, onStage, onWarning },
   );
 }
 
@@ -227,6 +218,7 @@ async function pushFugrOne(
   transport: string,
   opts: { checkOnly?: boolean; activate?: boolean; dryRun?: boolean },
   onStage: (s: PushStage) => void,
+  onWarning: (w: Warning) => void,
 ): Promise<void> {
   const layout = await enumerateFugr(client, object.objectUrl);
   const target = fugrPushTargetFor(layout, resolved.subtype, object.objectUrl);
@@ -305,7 +297,11 @@ async function pushFugrOne(
       try {
         await client.unLock(target.objectUrl, lockHandle);
       } catch {
-        // Best effort; the source is already persisted.
+        onWarning({
+          code: 'UNLOCK_WARNING',
+          message: `Object ${object.name} was updated but the edit lock could not be released; release it manually in SE03`,
+          details: { object: object.name, unlock: 'failed' },
+        });
       }
     }
   }

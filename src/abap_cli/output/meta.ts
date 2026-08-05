@@ -1,0 +1,110 @@
+/**
+ * Envelope meta + structured warnings (FR-003/FR-004).
+ *
+ * Public API:
+ *  - setProgram: register the commander program once (from index.ts) so
+ *    buildMeta can derive the canonical command name from argv + command tree.
+ *  - collectWarning / getWarnings / resetWarnings: structured non-fatal
+ *    warnings that only ever appear in meta.warnings, never in the error
+ *    envelope (FR-009).
+ *  - buildMeta: snapshot of command, version, timestamp, durationMs, warnings.
+ */
+
+import type { Command } from 'commander';
+import { createRequire } from 'node:module';
+
+export type WarningCode =
+  | 'UNLOCK_WARNING'        // push succeeded but the edit lock could not be released
+  | 'DEPRECATED_OPTION'     // deprecated option used (--max, -t/--transport)
+  | 'PASSWORD_EXPORT'       // connection export includes passwords
+  | 'KEYCHAIN_WARNING'      // OS keychain store/cleanup failed (degraded continue)
+  | 'FORCE_BYPASSED'        // deploy --force bypassed safety guards
+  | 'PROFILE_MISMATCH'      // stored profile differs from current config
+  | 'STUCK_REPORT_DEGRADED' // stuck report write degraded (STUCK-DEGRADED-)
+  ;
+
+export interface Warning {
+  code: WarningCode;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
+export interface OutputMeta {
+  /** Canonical command name, e.g. 'abap pull', 'abap connection test'. */
+  command: string;
+  /** CLI version from package.json. */
+  version: string;
+  /** ISO 8601 (UTC) timestamp. */
+  timestamp: string;
+  /** Milliseconds since CLI start (non-negative integer). */
+  durationMs: number;
+  /** Structured warnings; always present, empty when none. */
+  warnings: Warning[];
+}
+
+const startTime = Date.now();
+
+let program: Command | undefined;
+const warnings: Warning[] = [];
+
+/** Register the commander program so buildMeta can derive the command name. */
+export function setProgram(cmd: Command): void {
+  program = cmd;
+}
+
+/** Record a non-fatal warning (only surfaces in meta.warnings). */
+export function collectWarning(
+  code: WarningCode,
+  message: string,
+  details?: Record<string, unknown>,
+): void {
+  warnings.push(details ? { code, message, details } : { code, message });
+}
+
+/** Snapshot of collected warnings (copy, so callers cannot mutate the store). */
+export function getWarnings(): Warning[] {
+  return warnings.slice();
+}
+
+/** Clear collected warnings (test isolation). */
+export function resetWarnings(): void {
+  warnings.length = 0;
+}
+
+function deriveCommand(argv: string[]): string {
+  let cmd: Command | undefined = program;
+  const parts: string[] = [];
+  for (const token of argv.slice(2)) {
+    if (token.startsWith('-')) continue;
+    const sub = cmd?.commands.find((c) => c.name() === token);
+    if (sub) {
+      cmd = sub;
+      parts.push(sub.name());
+    } else {
+      break;
+    }
+  }
+  return ['abap', ...parts].join(' ');
+}
+
+function readVersion(): string {
+  try {
+    const require = createRequire(import.meta.url);
+    // From dist/src/abap_cli/output/ this resolves to the repo-root package.json.
+    const { version } = require('../../../../package.json') as { version?: string };
+    return version ?? 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
+/** Build the envelope meta block (FR-003). */
+export function buildMeta(): OutputMeta {
+  return {
+    command: deriveCommand(process.argv),
+    version: readVersion(),
+    timestamp: new Date().toISOString(),
+    durationMs: Math.max(0, Date.now() - startTime),
+    warnings: getWarnings(),
+  };
+}

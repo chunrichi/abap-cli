@@ -80,7 +80,7 @@ describe('abap search pagination (US1, SC-001/SC-002)', () => {
     for (const item of json.data.items) expect(item.packageName).toBe('ZPKG');
   });
 
-  it('--max is a deprecated alias for --limit (works + stderr warning)', async () => {
+  it('--max is a deprecated alias for --limit (works + meta.warnings)', async () => {
     const program = makeProgram();
     registerSearchCommand(program);
     const res = await runCommand(program, ['search', 'ZPAGE', '--max', '5', '--json']);
@@ -88,6 +88,8 @@ describe('abap search pagination (US1, SC-001/SC-002)', () => {
     expect(exitCode).toBeUndefined();
     expect(json.data.items).toHaveLength(5);
     expect(json.data.limit).toBe(5);
-    expect(res.stderr).toMatch(/deprecat/i);
+    expect(json.meta.warnings).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'DEPRECATED_OPTION' })]),
+    );
   });
 });

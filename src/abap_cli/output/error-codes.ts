@@ -5,6 +5,7 @@
  */
 
 export type ErrorCategory =
+  | 'UNKNOWN'          // exit 1 — generic fallback for unmapped exceptions
   | 'USAGE'            // exit 2 — bad flag combination, missing positional
   | 'CONFIG_ERROR'     // exit 3 — missing/invalid config or profile
   | 'TLS_ERROR'        // exit 4 — TLS handshake failure
@@ -16,12 +17,12 @@ export type ErrorCategory =
 
 /**
  * Sub-codes are emitted as the `code` value to preserve backward compatibility
- * with existing callers. `UNLOCK_WARNING` is a non-fatal warning — it is never
- * emitted via renderError/printError; see push-flow.ts for its success-side
- * handling.
+ * with existing callers. `UNLOCK_WARNING` is a WarningCode (meta.warnings),
+ * not an error — see output/meta.ts and push-flow.ts's onWarning callback.
  */
 export type ErrorCode =
   // Top-level categories
+  | 'UNKNOWN'             // NEW — unmapped exception fallback (exit 1)
   | 'CONFIG_ERROR'
   | 'SAP_ERROR'
   | 'TLS_ERROR'           // NEW (FR-010)
@@ -37,7 +38,6 @@ export type ErrorCode =
   // Locked family
   | 'LOCK_FAILED'
   | 'LOCKED'
-  | 'UNLOCK_WARNING'      // warning, not an error
   // Semantic-rejection family
   | 'ACTIVATION_FAILED'
   | 'SYNTAX_ERROR'
@@ -47,16 +47,16 @@ export type ErrorCode =
   | 'CREATE_FAILED'
   | 'DDIC_NOT_SUPPORTED'
   | 'TYPE_NOT_SUPPORTED'
-  | 'NOT_IMPLEMENTED'
   | 'OVERWRITE_REQUIRED'   // NEW (FR-018)
   | 'PUSH_FAILED'
   | 'VALIDATION_ERROR'     // semantic rejection (exit 7); see contracts §3
-  | 'OBJECT_EXISTS'        // legacy, used by create.ts
-  | 'FILE_EXISTS'          // legacy, used by init.ts
-  | 'COMMAND_MOVED'        // command retired; redirects to another command (e.g. atc → check --atc)
+  | 'OBJECT_EXISTS'        // normalized legacy code (USAGE/2), used by create.ts
+  | 'FILE_EXISTS'          // normalized legacy code (USAGE/2), used by init.ts
+  | 'COMMAND_MOVED'        // normalized legacy code (VALIDATION_ERROR/7); command retired (e.g. atc → check --atc)
   ;
 
 const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
+  UNKNOWN: 'UNKNOWN',
   CONFIG_ERROR: 'CONFIG_ERROR',
   SAP_ERROR: 'SAP_ERROR',
   TLS_ERROR: 'TLS_ERROR',
@@ -70,7 +70,6 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   NOT_FOUND: 'NOT_FOUND',
   LOCK_FAILED: 'LOCKED',
   LOCKED: 'LOCKED',
-  UNLOCK_WARNING: 'USAGE', // not emitted via error path; placeholder for type
   ACTIVATION_FAILED: 'VALIDATION_ERROR',
   SYNTAX_ERROR: 'VALIDATION_ERROR',
   NO_TRANSPORT: 'VALIDATION_ERROR',
@@ -82,7 +81,6 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   VALIDATION_ERROR: 'VALIDATION_ERROR',
   OBJECT_EXISTS: 'USAGE',
   FILE_EXISTS: 'USAGE',
-  NOT_IMPLEMENTED: 'VALIDATION_ERROR',
   PUSH_FAILED: 'VALIDATION_ERROR',
   COMMAND_MOVED: 'VALIDATION_ERROR',
 };

@@ -3,14 +3,19 @@
 ## [Unreleased]
 
 ### Added
+- **统一 CLI 输出契约（012-unify-cli-output-contract）** — every `--json` envelope now carries a unified `meta` block (`command` / `version` / `timestamp` / `durationMs` / `warnings`) on both success (`{ status, meta, data }`) and failure (`{ status, meta, error }`). Errors now carry an explicit `error.category` (USAGE/CONFIG_ERROR/TLS_ERROR/AUTH_ERROR/SAP_ERROR/VALIDATION_ERROR/NOT_FOUND/LOCKED/UNKNOWN) that maps 1:1 to the exit code, so agents can branch on JSON alone. The unified contract is documented as the single source of truth in `specs/012-unify-cli-output-contract/contracts/cli-output.md` and enforced by `test/unit/output-contract-audit.test.ts`.
 - `abap search --schema` / `abap create --schema [type]` — agent-facing parameter introspection (P0.1): prints the machine-readable command schema (arguments, options with types/defaults, mutual-exclusion groups, examples) as JSON on stdout and exits `0` without any SAP call. `create --schema` without a type lists the supported types; with a type it adds the per-type `templates` (also reflected in `--template`'s `allowedValues`) and reports unsupported types via `supported: false` + `reason` (`DDIC_NOT_SUPPORTED` / `TYPE_NOT_SUPPORTED`). The previously required `search <query>` / `create <type> <name>` arguments are now optional so `--schema` can run without them; a real invocation still enforces them with the `USAGE` error (exit `2`).
 - `abap create local <type> <name>` — experimental: create a local draft skeleton file (`src/<obj>/<obj>.<type>.abap`, abap-file-format layout) without contacting SAP. Zero SAP requests / no credential reads; reuses `create`'s type map, template registry and error codes (`TYPE_NOT_SUPPORTED` / `DDIC_NOT_SUPPORTED` / `INVALID_ARGUMENT` / `FILE_EXISTS`); `--template` / `--dir` (default `src/`). Land the draft via `abap create ... --no-pull` then `abap push <file> --tr <tr>` (documented in `--help` and `docs/commands.md`).
 
 ### Fixed
 - `abap inspect` was imported but never registered in `index.ts`, so the command silently did not exist; it is now wired up and runs as documented.
 - `abap init` (interactive, existing profile) now persists the fallback-typed password to the OS keychain. Previously it re-prompted "Use stored password?" on every run and the typed password was never saved.
+- `abap push` no longer builds its failure envelope by hand — the aggregate failure now throws a structured `CliError` through the unified renderer (previously a raw `JSON.stringify` + manual `process.exit` in `push.ts`, which bypassed the error contract and duplicated the error-code table).
+- Unmapped exceptions no longer masquerade as `SAP_ERROR` (exit 6) — they now surface as `code: UNKNOWN` / `category: UNKNOWN` with the generic exit code `1` (exit 1 was previously unreachable).
+- A push whose edit lock cannot be released is no longer reported as a failure: the file is recorded as successful and the issue surfaces as an `UNLOCK_WARNING` in `meta.warnings` (exit stays `0`).
 
 ### Changed
+- **Error-code migration (breaking, see migration table below)**: `UNLOCK_WARNING` and `NOT_IMPLEMENTED` are removed from the `ErrorCode` set; `OBJECT_EXISTS`, `FILE_EXISTS`, `COMMAND_MOVED`, `PUSH_FAILED` are kept but formally normalized into the documented error-code table (their category/exit code are unchanged). All `Warning:`/`console.warn` outputs across `search`/`init`/`deploy`/`connection`/`stuck-reports` are now structured `meta.warnings` (or `Warning:` stderr lines in human mode).
 - Documentation synced with the CLI: `docs/commands.md` now covers all current options/subcommands (check `--syntax/--content/--atc` modes, pull `--include-tests/--include-all-parts`, push `--no-activate/--dry-run/--fail-fast/--atomic`, create `--template/--no-pull/--check-only/--audit`, transport `show/resolve/assign`, connection/init TLS options, full error-code table); README command table, scope version (v0.6), getting-started and architecture docs updated; `docs/development.md` documents the vitest unit-test suite.
 - Bare `abap` and bare `abap connection` (no subcommand) print their help text to stdout and exit `0`. Commands missing required arguments/options (e.g. `abap search` without a query) print that subcommand's help to stdout followed by the structured `USAGE` error on stderr, exit `2`. Unknown commands still return the structured `USAGE` error.
 - Added `abap connection add <name>` — creates a new profile (refuses when the name exists). `connection set <name>` is now strictly "modify an existing profile" and points to `add` when the profile is missing. All create-profile guidance (`init`, `doctor`, probe errors) now uses `connection add`.
@@ -26,6 +31,15 @@
 - `abap system` renamed to `abap connection` — breaking change. Migration: `abap system list|show|set|use|test|delete|export|import` → `abap connection …`. The old `system` command is removed (no alias); help text and error `nextSteps` across all commands now reference `abap connection`.
 - Removed the interactive menu behind bare `abap system` (previously reachable on a TTY). Bare `abap connection` now prints a `USAGE` error listing subcommands. `abap connection set <name>` without flags still opens the field-editing wizard on a TTY.
 - Unchanged (out of scope): the `--system <name>` option on `init` / `auth test` / `doctor`, the `~/.abap-cli/systems.json` storage file, and the internal `SystemProfile` naming.
+
+### 错误码迁移表（012 统一输出契约）
+
+| 旧 | 新 | 迁移说明 |
+|---|---|---|
+| `ErrorCode UNLOCK_WARNING` | `WarningCode UNLOCK_WARNING` | 不再是错误码。解锁失败但推送成功时，告警出现在 `meta.warnings`，文件记为成功，退出码 0 |
+| `ErrorCode NOT_IMPLEMENTED` | 移除 | 死代码（全库无调用）。如未来需要，用 `VALIDATION_ERROR` |
+| 无形状异常 → `SAP_ERROR` (exit 6) | → `UNKNOWN` (exit 1) | 修复：无法归类的异常不再伪装成 SAP 错误；HTTP 形状异常仍为 `SAP_ERROR` |
+| `OBJECT_EXISTS` / `FILE_EXISTS` / `COMMAND_MOVED` / `PUSH_FAILED` | 保留，正式规范化 | 类别与退出码不变（USAGE/2、USAGE/2、VALIDATION_ERROR/7、VALIDATION_ERROR/7），纳入合同文档权威清单 |
 
 ## [0.6.0] - 2026-08-04
 

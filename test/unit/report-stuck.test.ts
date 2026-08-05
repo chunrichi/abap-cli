@@ -73,7 +73,10 @@ describe('abap report-stuck (US6, FR-022..024, SC-007)', () => {
       const data = parseData(res);
       expect(data.recorded).toBe(false);
       expect(data.id).toMatch(/^STUCK-DEGRADED-/);
-      expect(res.stderr).toContain('Warning');
+      const parsed = JSON.parse(res.stdout);
+      expect(parsed.meta.warnings).toEqual(
+        expect.arrayContaining([expect.objectContaining({ code: 'STUCK_REPORT_DEGRADED' })]),
+      );
     } finally {
       fs.chmodSync(path.join(home, '.abap-cli'), 0o700);
     }

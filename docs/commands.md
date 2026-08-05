@@ -13,15 +13,19 @@ All commands support the global `--json` option for structured output (Agent-Fir
 
 ## JSON Output Contract
 
+Every `--json` envelope carries a `meta` block (`command`, `version`, `timestamp`, `durationMs`, `warnings`). The unified contract is authoritative in `specs/012-unify-cli-output-contract/contracts/cli-output.md`.
+
 ```jsonc
 // Success (stdout)
-{ "status": "success", "data": { ... } }
+{ "status": "success", "meta": { "command": "abap pull", "version": "0.6.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { ... } }
 
-// Failure (stderr)
-{ "status": "error", "error": { "code": "...", "message": "...", "nextSteps": [...], ... } }
+// Failure (stderr — stdout is empty)
+{ "status": "error", "meta": { ... }, "error": { "code": "...", "category": "...", "message": "...", "nextSteps": [...], ... } }
 ```
 
-Exit codes: `0` success, `1` any failure (runtime, SAP, or usage error), `2`–`9` categorized (usage / config / TLS / auth / SAP / validation / not-found / locked). See the common-errors help block on every command for the full table.
+Warnings never enter the error envelope: non-fatal warnings (e.g. a deprecated option, or a push whose lock could not be released) appear as structured `meta.warnings` entries (or `Warning: …` stderr lines in human mode) and never change the exit code.
+
+Exit codes (stable contract, only additive across versions): `0` success, `1` unknown/unmapped failure (generic fallback), `2` usage, `3` config, `4` TLS, `5` auth, `6` SAP error, `7` validation, `8` not-found, `9` locked; `>=10` reserved. `error.category` in the JSON always maps 1:1 to the exit code. See the common-errors help block on every command for the full table.
 
 ## `abap init`
 
@@ -413,8 +417,11 @@ JSON output: `{ id, recorded, echo: { goal, tried, where } }`. Reports are writt
 
 ## Error Codes
 
+Every error's `error.category` maps 1:1 to its exit code (see JSON Output Contract). `UNKNOWN` is the generic fallback for unmapped exceptions (exit `1`). The full authoritative list lives in `specs/012-unify-cli-output-contract/contracts/cli-output.md`.
+
 | Code | Meaning |
 |------|---------|
+| `UNKNOWN` | Unmapped exception fallback (exit 1) |
 | `CONFIG_ERROR` | Configuration missing/invalid (run `abap init` / `abap connection add` / `abap connection set`) |
 | `SAP_ERROR` | ADT request failed (includes HTTP status) |
 | `TLS_ERROR` | TLS handshake / certificate failure |
@@ -436,9 +443,7 @@ JSON output: `{ id, recorded, echo: { goal, tried, where } }`. Reports are writt
 | `ACTIVATION_FAILED` | Activation failed |
 | `SYNTAX_ERROR` | Content-based syntax check failed |
 | `OVERWRITE_REQUIRED` | Pull refuses to overwrite a differing local file |
-| `UNLOCK_WARNING` | Object updated but the edit lock could not be released |
 | `FILE_PARSE_ERROR` | Local file could not be parsed |
 | `NOT_FOUND` | Generic not-found (parent of `OBJECT_NOT_FOUND` / `AMBIGUOUS_OBJECT`) |
 | `TRANSPORT_NOT_FOUND` | Referenced transport request does not exist |
-| `NOT_IMPLEMENTED` | Requested feature not implemented yet |
-| `PUSH_FAILED` | Push operation failed |
+| `PUSH_FAILED` | Push operation failed (aggregate) |

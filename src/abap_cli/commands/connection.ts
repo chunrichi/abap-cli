@@ -5,6 +5,7 @@ import { text, password, confirm, isCancel } from '@clack/prompts';
 import { getSystem, listSystemNames, upsertSystem, deleteSystem, type SystemProfile } from '../config/user-config.js';
 import { getPassword, storePassword, deletePassword } from '../crypto/secrets.js';
 import { printError, printResult, jsonFromCommand, CliError } from '../output/json.js';
+import { collectWarning } from '../output/meta.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import { assertValidProfile } from '../config/validation.js';
 import { probeSystem } from '../clients/probe.js';
@@ -118,7 +119,7 @@ export function registerConnectionCommand(program: Command): void {
       const json = jsonFromCommand(cmd);
       try {
         if (opts.withPasswords) {
-          console.error('Warning: exporting profiles WITH passwords. Keep the bundle secure.');
+          collectWarning('PASSWORD_EXPORT', 'Exporting profiles WITH passwords. Keep the bundle secure.');
         }
         const bundle = await exportProfiles({ names, withPasswords: opts.withPasswords });
         const human = `Exported ${bundle.systems.length} profile(s)${opts.withPasswords ? ' (with passwords)' : ''}.`;
@@ -170,15 +171,7 @@ function validateBundle(raw: unknown): ProfileBundle {
   return bundle as ProfileBundle;
 }
 
-/** Output results: JSON always via stdout, human text via console.log. */
-function output(jsonOutput: boolean, data: unknown, human: string): void {
-  if (jsonOutput) {
-    console.log(JSON.stringify({ status: 'success', data }, null, 2));
-  } else {
-    console.log(human);
-  }
-}
-
+/** List saved connection profiles. */
 function runList(jsonOutput: boolean): void {
   const names = listSystemNames();
   if (names.length === 0) {
@@ -193,7 +186,7 @@ function runList(jsonOutput: boolean): void {
     const p = getSystem(name)!;
     return `  ${name} — ${p.username}@${p.url}`;
   })].join('\n');
-  output(jsonOutput, { systems }, human);
+  printResult(jsonOutput, { systems }, human);
 }
 
 /** Exit 130 on Ctrl+C (@clack cancel), otherwise return the value */
@@ -231,7 +224,7 @@ async function runShow(name: string, jsonOutput: boolean): Promise<void> {
     `  insecure: ${detail.insecure}`,
     `  ca:       ${detail.ca || '(none)'}`,
   ].join('\n');
-  output(jsonOutput, { system: detail }, human);
+  printResult(jsonOutput, { system: detail }, human);
 }
 
 /** Switch the workspace .abap.json to reference <name>, preserving other fields. */
@@ -255,7 +248,7 @@ async function runUse(name: string, jsonOutput: boolean): Promise<void> {
   workspace.system = name;
   fs.writeFileSync(configPath, JSON.stringify(workspace, null, 2) + '\n', 'utf-8');
 
-  output(
+  printResult(
     jsonOutput,
     { configPath: '.abap.json', system: name },
     `Workspace now uses connection profile '${name}'.`,
@@ -286,7 +279,7 @@ async function runTest(name: string, jsonOutput: boolean): Promise<void> {
       return `  ${layer}: ${status}${detail}`;
     }),
   ].join('\n');
-  output(jsonOutput, probe, human);
+  printResult(jsonOutput, probe, human);
   // The four-layer payload IS the result (success envelope); a failing layer
   // drives a non-zero exit code per FR-008 (partial results, not a crash).
   const exitCode = worstExitCode(probe);
@@ -370,7 +363,7 @@ async function runAdd(
     await applyProfileOptions({ url: '', client: '100', username: '', language: 'EN' }, name, opts);
   upsertSystem(name, updated);
 
-  output(
+  printResult(
     jsonOutput,
     { system: { name, ...updated }, passwordUpdated, passwordRemoved },
     `Connection profile '${name}' created.`,
@@ -405,7 +398,7 @@ async function runSet(
   const { updated, passwordUpdated, passwordRemoved } = await applyProfileOptions(profile, name, opts);
   upsertSystem(name, updated);
 
-  output(
+  printResult(
     jsonOutput,
     { system: { name, ...updated }, passwordUpdated, passwordRemoved },
     `Connection profile '${name}' updated.`,
@@ -442,7 +435,7 @@ async function interactiveSet(
 
   upsertSystem(name, updated);
 
-  output(
+  printResult(
     jsonOutput,
     { system: { name, ...updated }, passwordUpdated, passwordRemoved },
     `Connection profile '${name}' updated.`,
@@ -469,8 +462,9 @@ async function runDelete(name: string, jsonOutput: boolean): Promise<void> {
     await deletePassword(name);
   } catch {
     passwordCleaned = false;
-    console.error(
-      `Warning: could not remove the stored password for '${name}'. Remove it manually in your OS keychain.`,
+    collectWarning(
+      'KEYCHAIN_WARNING',
+      `Could not remove the stored password for '${name}'. Remove it manually in your OS keychain.`,
     );
   }
 
@@ -487,10 +481,9 @@ async function runDelete(name: string, jsonOutput: boolean): Promise<void> {
     }
   }
   if (warning) {
-    console.warn(`Warning: ${warning}. Update it with 'abap init' if needed.`);
+    collectWarning('PROFILE_MISMATCH', `${warning}. Update it with 'abap init' if needed.`);
   }
 
   const data: Record<string, unknown> = { deleted: name, passwordCleaned };
-  if (warning) data.warning = warning;
-  output(jsonOutput, data, `Connection profile '${name}' deleted.`);
+  printResult(jsonOutput, data, `Connection profile '${name}' deleted.`);
 }

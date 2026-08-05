@@ -2,12 +2,34 @@ import { describe, expect, it } from 'vitest';
 import axios from 'axios';
 import { AxiosError } from 'axios';
 import { classifyHttpError, isTlsErrorCode, TLS_ERROR_CODE_LIST } from '../../src/abap_cli/clients/http-error.js';
+import { toErrorShape } from '../../src/abap_cli/output/json.js';
 
 describe('http-error classifier (FR-010)', () => {
   it('TLS_ERROR_CODE_LIST contains the documented Node codes', () => {
     expect(TLS_ERROR_CODE_LIST).toContain('UNABLE_TO_VERIFY_LEAF_SIGNATURE');
     expect(TLS_ERROR_CODE_LIST).toContain('SELF_SIGNED_CERT_IN_CHAIN');
     expect(TLS_ERROR_CODE_LIST).toContain('CERT_HAS_EXPIRED');
+  });
+
+  it('classified errors carry the explicit category via toErrorShape (US-2)', () => {
+    const ax = new AxiosError('Unauthorized', '401', undefined, undefined, {
+      status: 401,
+      statusText: 'Unauthorized',
+      data: {},
+      headers: {},
+      config: undefined as never,
+    });
+    const cli = classifyHttpError(ax);
+    expect(toErrorShape(cli).category).toBe('AUTH_ERROR');
+
+    const ax500 = new AxiosError('Server Error', '500', undefined, undefined, {
+      status: 500,
+      statusText: 'Internal Server Error',
+      data: { message: 'boom' },
+      headers: {},
+      config: undefined as never,
+    });
+    expect(toErrorShape(classifyHttpError(ax500)).category).toBe('SAP_ERROR');
   });
 
   it('isTlsErrorCode recognises a TLS code', () => {

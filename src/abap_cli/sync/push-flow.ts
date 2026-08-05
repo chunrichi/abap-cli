@@ -1,5 +1,6 @@
 import type { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError } from '../output/json.js';
+import type { Warning } from '../output/meta.js';
 
 export type PushStage = 'lock' | 'write' | 'check' | 'activate' | 'unlock';
 
@@ -25,6 +26,8 @@ export interface PushOptions {
   dryRun?: boolean;
   /** Per-stage callback for --json result reporting (FR-016). */
   onStage?: (stage: PushStage) => void;
+  /** Non-fatal warning (e.g. unlock failed after a successful push) — US-5. */
+  onWarning?: (warning: Warning) => void;
 }
 
 /**
@@ -50,7 +53,6 @@ export async function pushObject(
 
   let lockHandle: string | undefined;
   let locked = false;
-  let unlockFailed = false;
   try {
     opts.onStage?.('lock');
     const lock = await client.lock(object.objectUrl);
@@ -119,21 +121,19 @@ export async function pushObject(
       });
     }
   } finally {
-    // Lock is always released; only surface UNLOCK_WARNING when nothing else failed
+    // Lock is always released on every completion path (check-only, write-only,
+    // activate); a failed unlock is a non-fatal UNLOCK_WARNING, never an error.
     if (locked && lockHandle) {
       opts.onStage?.('unlock');
       try {
         await client.unLock(object.objectUrl, lockHandle);
       } catch {
-        unlockFailed = true;
+        opts.onWarning?.({
+          code: 'UNLOCK_WARNING',
+          message: `Object ${object.name} was updated but the edit lock could not be released; release it manually in SE03`,
+          details: { object: object.name, unlock: 'failed' },
+        });
       }
     }
-  }
-  if (unlockFailed) {
-    throw new CliError(
-      'UNLOCK_WARNING',
-      `Object ${object.name} was updated but the edit lock could not be released; release it manually in SE03`,
-      { object: object.name, unlock: 'failed' },
-    );
   }
 }

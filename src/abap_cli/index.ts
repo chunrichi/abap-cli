@@ -5,6 +5,7 @@ import './util-polyfill.js';
 import { createRequire } from 'node:module';
 import { Command, CommanderError } from 'commander';
 import { CliError, renderError } from './output/json.js';
+import { setProgram, buildMeta } from './output/meta.js';
 import { registerInitCommand } from './commands/init.js';
 import { registerPullCommand } from './commands/pull.js';
 import { registerPushCommand } from './commands/push.js';
@@ -58,6 +59,9 @@ registerInspectCommand(program);
 registerDiffCommand(program);
 registerSyncCommand(program);
 registerReportStuckCommand(program);
+
+// 注册命令树供 buildMeta 推导规范命令名（FR-003）。
+setProgram(program);
 
 try {
   program.parse();
@@ -121,7 +125,7 @@ function writeError(json: boolean, error: unknown): never {
       cliVersion: version,
     });
   }
-  const out = renderError(json, error);
+  const out = renderError(json, error, buildMeta());
   for (const line of out.stderr) console.error(line);
   process.exit(out.exitCode ?? 1);
 }

@@ -10,6 +10,7 @@ import {
   type SystemProfile,
 } from '../config/user-config.js';
 import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
+import { collectWarning } from '../output/meta.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import { assertValidProfile } from '../config/validation.js';
 import { probeSystem, type ProbeLayerResult } from '../clients/probe.js';
@@ -156,7 +157,7 @@ function transportFromOpts(opts: CommandOpts): string {
   const canonical = str(opts.tr);
   const legacy = str(opts.transport);
   if (opts.transport !== undefined) {
-    console.error("Warning: '-t/--transport' is deprecated; use '--tr <transport>'.");
+    collectWarning('DEPRECATED_OPTION', "'-t/--transport' is deprecated; use '--tr <transport>'.", { option: '-t/--transport' });
   }
   return canonical || legacy;
 }
