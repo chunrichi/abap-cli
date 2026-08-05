@@ -37,9 +37,11 @@ export function registerTransportCommand(program: Command): void {
 
   transportCmd
     .command('create')
-    .description('Create a new transport request')
+    .description('Create a new transport request (write — requires --yes / --dry-run in non-TTY mode)')
     .argument('<description>', 'Transport description')
     .option('--package <package>', 'Target SAP package (default $TMP)')
+    .option('--dry-run', 'Plan only — make no mutating SAP calls')
+    .option('--yes', 'Confirm the create in non-interactive mode')
     .action(async (description, opts, cmd) => {
       const json = jsonFromCommand(cmd);
       try {
@@ -79,14 +81,14 @@ export function registerTransportCommand(program: Command): void {
 
   transportCmd
     .command('assign <object>')
-    .description('Attach an object to a transport request (no-op when already assigned)')
+    .description('Attach an object to a transport request (write — requires --yes / --dry-run in non-TTY mode; no-op when already assigned)')
     .requiredOption('--tr <transport>', 'Target transport request')
-    .action(async (object: string, opts: { tr: string }, cmd) => {
+    .option('--dry-run', 'Plan only — make no mutating SAP calls')
+    .option('--yes', 'Confirm the assign in non-interactive mode')
+    .action(async (object: string, opts: AssignOptions, cmd) => {
       const json = jsonFromCommand(cmd);
       try {
-        const client = await AdtClientWrapper.create();
-        const data = await assignObjectToTransport(client, object, opts.tr);
-        printResult(json, data, formatAssign(data));
+        await runAssign(object, opts, json);
       } catch (error: unknown) {
         printError(json, error);
       }
@@ -95,15 +97,41 @@ export function registerTransportCommand(program: Command): void {
 
 interface CreateOptions {
   package?: string;
+  dryRun?: boolean;
+  yes?: boolean;
+}
+
+interface AssignOptions {
+  tr: string;
+  dryRun?: boolean;
+  yes?: boolean;
 }
 
 async function runCreate(description: string, opts: CreateOptions, json: boolean): Promise<void> {
   if (!description.trim()) {
     throw new CliError('INVALID_ARGUMENT', 'Transport description must not be empty');
   }
+  if (!opts.dryRun && !opts.yes && !process.stdin.isTTY) {
+    throw new CliError('VALIDATION_ERROR', 'transport create is a write operation; confirm with --yes or pass --dry-run.', {
+      nextSteps: [
+        'Re-run with --yes to actually create the transport.',
+        'Or pass --dry-run to preview the request without creating it.',
+      ],
+      example: 'abap transport create "<description>" --yes',
+    });
+  }
   const devClass = (opts.package || '$TMP').trim().toUpperCase();
   // A standalone request (no object context) references a package URL as REF.
   const ref = `/sap/bc/adt/packages/${encodeURIComponent(devClass)}`;
+
+  if (opts.dryRun) {
+    printResult(
+      json,
+      { transport: null, description: description.trim(), package: devClass, dryRun: true, ref },
+      `Would create transport request in ${devClass} (dry-run)`,
+    );
+    return;
+  }
 
   const client = await AdtClientWrapper.create();
   let transport: string;
@@ -119,6 +147,31 @@ async function runCreate(description: string, opts: CreateOptions, json: boolean
     { transport, description: description.trim(), package: devClass },
     `Created transport request ${transport} (${devClass})`,
   );
+}
+
+async function runAssign(object: string, opts: AssignOptions, json: boolean): Promise<void> {
+  if (!process.stdin.isTTY && !opts.dryRun && !opts.yes) {
+    throw new CliError('VALIDATION_ERROR', 'transport assign is a write operation; confirm with --yes or pass --dry-run.', {
+      nextSteps: [
+        'Re-run with --yes to actually attach the object to the transport.',
+        'Or pass --dry-run to preview the assign without writing.',
+      ],
+      example: 'abap transport assign <object> --tr <transport> --yes',
+    });
+  }
+
+  if (opts.dryRun) {
+    printResult(
+      json,
+      { object, transport: opts.tr, assigned: false, dryRun: true },
+      `Would attach ${object} to transport ${opts.tr} (dry-run)`,
+    );
+    return;
+  }
+
+  const client = await AdtClientWrapper.create();
+  const data = await assignObjectToTransport(client, object, opts.tr);
+  printResult(json, data, formatAssign(data));
 }
 
 async function runList(openOnly: boolean, json: boolean): Promise<void> {

@@ -36,10 +36,11 @@ const lock = vi.fn(async () => ({ LOCK_HANDLE: 'lock-1' }));
 const unLock = vi.fn(async () => '');
 const getObjectSource = vi.fn(async () => 'CLASS zcl_demo DEFINITION PUBLIC.\nENDCLASS.\n');
 const setObjectSource = vi.fn(async () => '');
+const createTransport = vi.fn(async () => 'NDK999999');
 
 vi.mock('../../src/abap_cli/clients/adt-client.js', () => ({
   AdtClientWrapper: {
-    create: async () => ({ transportDetails, transportInfo, searchObject, objectStructure, lock, unLock, getObjectSource, setObjectSource }),
+    create: async () => ({ transportDetails, transportInfo, searchObject, objectStructure, lock, unLock, getObjectSource, setObjectSource, createTransport, getConfig: () => ({ sap: { username: 'MOCKUSER' }, transport: 'NDK123456' }) }),
   },
 }));
 
@@ -89,15 +90,88 @@ describe('abap transport metadata (US5, FR-015..017, SC-006)', () => {
     registerTransportCommand(program);
     // First assign: object not yet on the transport → assigned: true.
     transportInfo.mockResolvedValueOnce({ TRANSPORTS: [], LOCKS: undefined });
-    const res1 = await runCommand(program, ['transport', 'assign', 'ZCL_DEMO', '--tr', 'NDK123456', '--json']);
+    const res1 = await runCommand(program, ['transport', 'assign', 'ZCL_DEMO', '--tr', 'NDK123456', '--yes', '--json']);
     expect(res1.exitCode).toBeUndefined();
     expect(parseData(res1).assigned).toBe(true);
     expect(lock).toHaveBeenCalled();
     expect(unLock).toHaveBeenCalled();
 
     // Second assign: already on the transport → assigned: false (no-op).
-    const res2 = await runCommand(program, ['transport', 'assign', 'ZCL_DEMO', '--tr', 'NDK123456', '--json']);
+    const res2 = await runCommand(program, ['transport', 'assign', 'ZCL_DEMO', '--tr', 'NDK123456', '--yes', '--json']);
     expect(res2.exitCode).toBeUndefined();
     expect(parseData(res2).assigned).toBe(false);
+  });
+});
+
+describe('abap transport write protection (P0.3)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('create without --yes in non-TTY mode rejects with VALIDATION_ERROR', async () => {
+    const program = makeProgram();
+    registerTransportCommand(program);
+    const res = await runCommand(program, ['transport', 'create', 'Demo request', '--json']);
+    expect(res.exitCode).toBe(7);
+    const json = JSON.parse(res.stderr);
+    expect(json.error.code).toBe('VALIDATION_ERROR');
+    expect(json.error.message).toMatch(/--yes|--dry-run/);
+    expect(Array.isArray(json.error.nextSteps)).toBe(true);
+  });
+
+  it('create with --dry-run skips the SAP call and reports dry-run=true', async () => {
+    const program = makeProgram();
+    registerTransportCommand(program);
+    const res = await runCommand(program, ['transport', 'create', 'Demo request', '--package', 'ztmp', '--dry-run', '--json']);
+    expect(res.exitCode).toBeUndefined();
+    const data = parseData(res);
+    expect(data.dryRun).toBe(true);
+    expect(data.transport).toBeNull();
+    expect(data.package).toBe('ZTMP');
+    expect(data.ref).toBe('/sap/bc/adt/packages/ZTMP');
+    // No SAP call should happen in dry-run.
+    expect(setObjectSource).not.toHaveBeenCalled();
+  });
+
+  it('create with --yes overrides the non-TTY guard and creates the transport', async () => {
+    const program = makeProgram();
+    registerTransportCommand(program);
+    const res = await runCommand(program, ['transport', 'create', 'Demo request', '--yes', '--json']);
+    expect(res.exitCode).toBeUndefined();
+    const data = parseData(res);
+    expect(data.transport).toBe('NDK999999');
+    expect(data.dryRun).toBeUndefined();
+    expect(createTransport).toHaveBeenCalledOnce();
+    expect(createTransport.mock.calls[0][1]).toBe('Demo request');
+  });
+
+  it('assign without --yes/--dry-run in non-TTY mode rejects with VALIDATION_ERROR', async () => {
+    const program = makeProgram();
+    registerTransportCommand(program);
+    const res = await runCommand(program, ['transport', 'assign', 'ZCL_DEMO', '--tr', 'NDK123456', '--json']);
+    expect(res.exitCode).toBe(7);
+    const json = JSON.parse(res.stderr);
+    expect(json.error.code).toBe('VALIDATION_ERROR');
+    expect(lock).not.toHaveBeenCalled();
+    expect(setObjectSource).not.toHaveBeenCalled();
+  });
+
+  it('assign with --dry-run reports the plan without mutating SAP calls', async () => {
+    const program = makeProgram();
+    registerTransportCommand(program);
+    const res = await runCommand(program, ['transport', 'assign', 'ZCL_DEMO', '--tr', 'NDK123456', '--dry-run', '--json']);
+    expect(res.exitCode).toBeUndefined();
+    const data = parseData(res);
+    expect(data.dryRun).toBe(true);
+    expect(data.transport).toBe('NDK123456');
+    expect(lock).not.toHaveBeenCalled();
+    expect(setObjectSource).not.toHaveBeenCalled();
+  });
+
+  it('assign with --tr before --yes still works (option order independence)', async () => {
+    const program = makeProgram();
+    registerTransportCommand(program);
+    transportInfo.mockResolvedValueOnce({ TRANSPORTS: [], LOCKS: undefined });
+    const res = await runCommand(program, ['transport', 'assign', '--tr', 'NDK123456', 'ZCL_DEMO', '--yes', '--json']);
+    expect(res.exitCode).toBeUndefined();
+    expect(parseData(res).assigned).toBe(true);
   });
 });
