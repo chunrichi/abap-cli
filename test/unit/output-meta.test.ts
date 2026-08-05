@@ -118,6 +118,7 @@ describe('output meta (FR-003, FR-004, US-1)', () => {
       'FORCE_BYPASSED',
       'PROFILE_MISMATCH',
       'STUCK_REPORT_DEGRADED',
+      'PAGINATION_LIMITED',
     ] as const;
     for (const code of codes) {
       collectWarning(code, `msg for ${code}`);

@@ -124,13 +124,15 @@ abap search [options] <query>
 | `--type <type>` | Filter by object type |
 | `--limit <n>` | Page size (default `20`); result is truncated at this bound |
 | `--page <n>` | 1-based page (default `1`) |
+| `--page-all` | Auto-page through every result until the server returns less than `--limit` rows (mutually exclusive with `--page`). The default `--page-all-max` is `50` pages — when reached, the result is marked `truncated: true` and a `PAGINATION_LIMITED` warning surfaces in `meta.warnings`. |
+| `--page-all-max <n>` | Hard cap on pages fetched under `--page-all` (default `50`; `50 × 20 = 1000` items by default) |
 | `--exact` | Exact name match (mutually exclusive with `--fuzzy`) |
 | `--fuzzy` | Substring match (default) |
 | `--package <pkg>` | Filter results by package |
 | `--max <n>` | Deprecated alias for `--limit` |
 | `--schema` | Print the command parameter schema as JSON and exit (no SAP call) |
 
-The query supports `*` wildcards. Truncated results set `truncated: true` with a `hint` suggesting narrowing flags or the next page.
+The query supports `*` wildcards. Truncated results set `truncated: true` with a `hint` suggesting narrowing flags or the next page. Under `--page-all`, the JSON envelope replaces `page` with `pageAll: true`, `pagesFetched`, and `total`.
 
 `--schema` is an agent-facing introspection mode: it prints the machine-readable parameter contract (arguments, options with types/defaults, mutual-exclusion groups, examples) as JSON on stdout and exits `0` without contacting SAP. The `<query>` argument is not required in this mode.
 

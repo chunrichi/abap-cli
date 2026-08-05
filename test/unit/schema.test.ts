@@ -37,9 +37,9 @@ describe('abap search --schema (P0.1 introspection)', () => {
     expect(data.schemaVersion).toBe(1);
     expect(data.arguments).toEqual([{ name: 'query', required: true, description: 'Search query (supports * wildcard)' }]);
     expect(data.options.map((o: { name: string }) => o.name)).toEqual(
-      expect.arrayContaining(['--type', '--limit', '--page', '--exact', '--fuzzy', '--package', '--max']),
+      expect.arrayContaining(['--type', '--limit', '--page', '--exact', '--fuzzy', '--package', '--max', '--page-all', '--page-all-max']),
     );
-    expect(data.exclusiveGroups).toEqual([['--exact', '--fuzzy']]);
+    expect(data.exclusiveGroups).toEqual([['--exact', '--fuzzy'], ['--page', '--page-all']]);
     expect(data.globalOptions).toContain('--json');
     expect(searchObject).not.toHaveBeenCalled();
   });
@@ -51,6 +51,15 @@ describe('abap search --schema (P0.1 introspection)', () => {
     const { data } = parseStdout(res);
     const limit = data.options.find((o: { name: string }) => o.name === '--limit');
     expect(limit).toMatchObject({ type: 'int', default: 20 });
+  });
+
+  it('--page-all-max is documented as an int with the default page cap (P1.8)', async () => {
+    const program = makeProgram();
+    registerSearchCommand(program);
+    const res = await runCommand(program, ['search', '--schema']);
+    const { data } = parseStdout(res);
+    const cap = data.options.find((o: { name: string }) => o.name === '--page-all-max');
+    expect(cap).toMatchObject({ type: 'int', default: 50 });
   });
 
   it('--schema output carries the unified meta block (US-1)', async () => {

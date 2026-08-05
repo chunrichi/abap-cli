@@ -21,6 +21,7 @@ export type WarningCode =
   | 'FORCE_BYPASSED'        // deploy --force bypassed safety guards
   | 'PROFILE_MISMATCH'      // stored profile differs from current config
   | 'STUCK_REPORT_DEGRADED' // stuck report write degraded (STUCK-DEGRADED-)
+  | 'PAGINATION_LIMITED'    // search --page-all hit the page cap; result truncated
   ;
 
 export interface Warning {

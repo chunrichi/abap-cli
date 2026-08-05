@@ -4,6 +4,7 @@ import { CliError, printError, printResult, jsonFromCommand, printSchema, type C
 import { collectWarning } from '../output/meta.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import { SEARCH_RESULT_LIMIT } from '../sync/resolve.js';
+import type { SearchResult } from 'abap-adt-api';
 
 interface SearchResultItem {
   name: string;
@@ -22,7 +23,14 @@ interface SearchOptions {
   package?: string;
   max?: string; // deprecated alias for --limit
   schema?: boolean;
+  /** P1.8 — fetch every page until the server returns less than `limit`. */
+  pageAll?: boolean;
+  /** P1.8 — hard cap on pages fetched under --page-all (default 50). */
+  pageAllMax?: string;
 }
+
+/** Default hard cap for `--page-all` (50 × 20 = 1000 items). */
+const PAGE_ALL_DEFAULT_MAX = 50;
 
 export function registerSearchCommand(program: Command): void {
   program
@@ -38,6 +46,8 @@ export function registerSearchCommand(program: Command): void {
     .option('--fuzzy', 'Substring match (default)')
     .option('--package <package>', 'Filter by package')
     .option('--max <n>', 'DEPRECATED: alias for --limit')
+    .option('--page-all', 'Fetch every page until the server returns less than --limit (mutually exclusive with --page)')
+    .option('--page-all-max <n>', `Hard cap on pages fetched under --page-all (default ${PAGE_ALL_DEFAULT_MAX})`)
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action(async (query: string | undefined, opts: SearchOptions, cmd) => {
       const json = jsonFromCommand(cmd);
@@ -63,6 +73,12 @@ async function runSearch(query: string | undefined, opts: SearchOptions, json: b
       example: 'abap search ZCL_DEMO --exact',
     });
   }
+  if (opts.pageAll && opts.page !== undefined && opts.page !== '1') {
+    throw new CliError('INVALID_ARGUMENT', '--page-all is mutually exclusive with --page', {
+      nextSteps: ['Drop --page (--page-all auto-pages through every page).'],
+      example: `abap search ${query} --page-all`,
+    });
+  }
 
   // --max is a deprecated alias for --limit; --limit wins when both are given.
   if (opts.max !== undefined) {
@@ -70,30 +86,70 @@ async function runSearch(query: string | undefined, opts: SearchOptions, json: b
     if (opts.limit === undefined) opts.limit = opts.max;
   }
   const limit = parsePositiveInt(opts.limit, '--limit', SEARCH_RESULT_LIMIT);
-  const page = parsePositiveInt(opts.page, '--page', 1);
+  const pageAllMax = parsePositiveInt(opts.pageAllMax, '--page-all-max', PAGE_ALL_DEFAULT_MAX);
   const type = opts.type?.trim().toUpperCase() || undefined;
 
   const client = await AdtClientWrapper.create();
+
+  // P1.8 — auto-page through every result. We fetch `limit` per call until
+  // the server returns fewer than `limit` rows (last page) or we hit the
+  // hard cap (PAGE_ALL_DEFAULT_MAX). Filters are applied to the accumulated
+  // set so we don't lose matches when filters reduce the page below `limit`.
+  if (opts.pageAll) {
+    const accumulated: SearchResultItem[] = [];
+    let truncated = false;
+    for (let p = 1; p <= pageAllMax; p++) {
+      const raw = await client.searchObject(query, type, limit);
+      const mapped = raw.map(toResultItem);
+      const before = accumulated.length;
+      applyFilters(mapped, opts, query).forEach((item) => {
+        // De-dup by URI so the same object never appears twice across pages.
+        if (!accumulated.some((a) => a.uri && a.uri === item.uri)) accumulated.push(item);
+      });
+      // Last page = the server returned strictly less than `limit` rows
+      // (after we asked for `limit`). When that happens we stop.
+      if (raw.length < limit) {
+        truncated = false;
+        break;
+      }
+      // No progress (e.g. dedup ate everything) — also stop to avoid spin.
+      if (accumulated.length === before) {
+        truncated = false;
+        break;
+      }
+      if (p === pageAllMax) truncated = true;
+    }
+    if (truncated) {
+      collectWarning(
+        'PAGINATION_LIMITED',
+        `Stopped after --page-all-max ${pageAllMax} pages (${pageAllMax * limit} items). Narrow with --type/--package/--exact.`,
+        { pagesFetched: pageAllMax, pageAllMax },
+      );
+    }
+    const hint = accumulated.length === 0
+      ? 'No matches. Broaden the query, drop --package, or use --fuzzy.'
+      : '';
+    const data = {
+      items: accumulated,
+      pageAll: true,
+      pagesFetched: Math.min(pageAllMax, accumulated.length === 0 ? 1 : Math.ceil(accumulated.length / limit)),
+      limit,
+      total: accumulated.length,
+      ...(truncated ? { truncated: true } : {}),
+      ...(hint ? { hint } : {}),
+    };
+    printResult(json, data, humanSummaryAll(query, type, accumulated, truncated));
+    return;
+  }
+
+  // Single-page (default) path: keep the existing "fetch limit*page then slice"
+  // behavior so back-compat with --page and --limit is unchanged.
+  const page = parsePositiveInt(opts.page, '--page', 1);
   // Fetch limit*page in one call, then slice client-side (research §1).
   const results = await client.searchObject(query, type, limit * page);
 
-  let mapped: SearchResultItem[] = results.map((r) => ({
-    name: r['adtcore:name'] ?? '',
-    type: r['adtcore:type'] ?? '',
-    uri: r['adtcore:uri'] ?? '',
-    description: r['adtcore:description'] ?? '',
-    packageName: r['adtcore:packageName'] ?? '',
-  }));
-
-  // --exact / --fuzzy and --package are applied client-side (research §2/§3).
-  if (opts.exact) {
-    const needle = query.trim().toUpperCase();
-    mapped = mapped.filter((r) => r.name.toUpperCase() === needle);
-  }
-  const pkg = opts.package?.trim().toUpperCase();
-  if (pkg) {
-    mapped = mapped.filter((r) => r.packageName.toUpperCase() === pkg);
-  }
+  let mapped: SearchResultItem[] = results.map(toResultItem);
+  mapped = applyFilters(mapped, opts, query);
 
   const start = (page - 1) * limit;
   const items = mapped.slice(start, start + limit);
@@ -107,6 +163,49 @@ async function runSearch(query: string | undefined, opts: SearchOptions, json: b
 
   const data = { items, page, limit, truncated, ...(hint ? { hint } : {}) };
   printResult(json, data, humanSummary(query, type, items, truncated));
+}
+
+function toResultItem(r: SearchResult): SearchResultItem {
+  return {
+    name: r['adtcore:name'] ?? '',
+    type: r['adtcore:type'] ?? '',
+    uri: r['adtcore:uri'] ?? '',
+    description: r['adtcore:description'] ?? '',
+    packageName: r['adtcore:packageName'] ?? '',
+  };
+}
+
+function applyFilters(items: SearchResultItem[], opts: SearchOptions, query: string): SearchResultItem[] {
+  let mapped = items;
+  if (opts.exact) {
+    const needle = query.trim().toUpperCase();
+    mapped = mapped.filter((r) => r.name.toUpperCase() === needle);
+  }
+  const pkg = opts.package?.trim().toUpperCase();
+  if (pkg) {
+    mapped = mapped.filter((r) => r.packageName.toUpperCase() === pkg);
+  }
+  return mapped;
+}
+
+function humanSummaryAll(
+  query: string,
+  type: string | undefined,
+  items: SearchResultItem[],
+  truncated: boolean,
+): string {
+  const filter = type ? ` (type ${type})` : '';
+  if (items.length === 0) {
+    return `No objects found for '${query}'${filter}.`;
+  }
+  const lines = [`Found ${items.length} object(s) matching '${query}'${filter}:`];
+  for (const r of items) {
+    const desc = r.description ? ` — ${r.description}` : '';
+    const pkg = r.packageName ? ` (${r.packageName})` : '';
+    lines.push(`  ${r.name} (${r.type})${desc}${pkg}`);
+  }
+  if (truncated) lines.push('(truncated by --page-all-max; narrow with --type/--package/--exact)');
+  return lines.join('\n');
 }
 
 function parsePositiveInt(value: string | undefined, flag: string, fallback: number): number {
@@ -151,9 +250,11 @@ function searchSchema(): CommandSchema {
       { name: '--fuzzy', type: 'boolean', description: 'Substring match (default)' },
       { name: '--package', type: 'string', valuePlaceholder: '<package>', description: 'Filter by package' },
       { name: '--max', type: 'int', valuePlaceholder: '<n>', deprecated: true, description: 'Deprecated alias for --limit' },
+      { name: '--page-all', type: 'boolean', description: 'Fetch every page until the server returns less than --limit (mutually exclusive with --page)' },
+      { name: '--page-all-max', type: 'int', valuePlaceholder: '<n>', default: PAGE_ALL_DEFAULT_MAX, description: 'Hard cap on pages fetched under --page-all' },
     ],
-    exclusiveGroups: [['--exact', '--fuzzy']],
+    exclusiveGroups: [['--exact', '--fuzzy'], ['--page', '--page-all']],
     globalOptions: ['--json', '--report-stuck'],
-    examples: ['abap search ZCL_* --type CLAS --limit 50', 'abap search ZCL_DEMO --exact'],
+    examples: ['abap search ZCL_* --type CLAS --limit 50', 'abap search ZCL_DEMO --exact', 'abap search ZCL_* --page-all'],
   };
 }
