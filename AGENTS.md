@@ -1,4 +1,4 @@
-# AGENTS.md — AI Agent Project Guidelines
+# Project Requirements & Conventions
 
 ## Project Overview
 
@@ -19,6 +19,26 @@ Three layers, each with its own directory:
 - File format follows abap-file-format / abapGit conventions
 - Credentials in `.env` (gitignored), config in `.abap.json` (gitignored)
 - Environment variables override `.abap.json` values
+
+## Working Style
+
+### Refactor Fearlessly
+
+- Prefer **rewriting** over patching. When code grows wrong, delete and rebuild instead of stacking compatibility layers, deprecated aliases, or wrappers.
+- Breaking changes are allowed (public CLI behavior, module structure, file naming). Each must:
+  1. Be recorded at the top of `CHANGELOG.md` (per the existing `## [Unreleased]` format)
+  2. State the migration path or impact in the commit/PR description
+- Don't keep compatibility for its own sake — old code should disappear, not coexist with new code.
+- Ensure `test/` covers the change; add tests before or alongside a rewrite.
+
+## Test
+
+### Testable real environment
+
+- URL: http://vhcala4hci:50000
+- User: developer
+- Password: Abap123456@
+- Client: 001
 
 ## When Working on This Project
 
