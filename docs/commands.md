@@ -17,7 +17,7 @@ Every `--json` envelope carries a `meta` block (`command`, `version`, `timestamp
 
 ```jsonc
 // Success (stdout)
-{ "status": "success", "meta": { "command": "abap pull", "version": "0.6.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { ... } }
+{ "status": "success", "meta": { "command": "abap pull", "version": "0.7.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { ... } }
 
 // Failure (stderr — stdout is empty)
 { "status": "error", "meta": { ... }, "error": { "code": "...", "category": "...", "message": "...", "nextSteps": [...], ... } }

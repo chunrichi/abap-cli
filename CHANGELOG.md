@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-05
+
 ### Added
 - **统一 CLI 输出契约（012-unify-cli-output-contract）** — every `--json` envelope now carries a unified `meta` block (`command` / `version` / `timestamp` / `durationMs` / `warnings`) on both success (`{ status, meta, data }`) and failure (`{ status, meta, error }`). Errors now carry an explicit `error.category` (USAGE/CONFIG_ERROR/TLS_ERROR/AUTH_ERROR/SAP_ERROR/VALIDATION_ERROR/NOT_FOUND/LOCKED/UNKNOWN) that maps 1:1 to the exit code, so agents can branch on JSON alone. The unified contract is documented as the single source of truth in `specs/012-unify-cli-output-contract/contracts/cli-output.md` and enforced by `test/unit/output-contract-audit.test.ts`.
 - `abap search --schema` / `abap create --schema [type]` — agent-facing parameter introspection (P0.1): prints the machine-readable command schema (arguments, options with types/defaults, mutual-exclusion groups, examples) as JSON on stdout and exits `0` without any SAP call. `create --schema` without a type lists the supported types; with a type it adds the per-type `templates` (also reflected in `--template`'s `allowedValues`) and reports unsupported types via `supported: false` + `reason` (`DDIC_NOT_SUPPORTED` / `TYPE_NOT_SUPPORTED`). The previously required `search <query>` / `create <type> <name>` arguments are now optional so `--schema` can run without them; a real invocation still enforces them with the `USAGE` error (exit `2`).
