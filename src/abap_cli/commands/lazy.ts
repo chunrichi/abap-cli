@@ -14,11 +14,20 @@
 
 import type { Command } from 'commander';
 
+export type CommandScope = 'local' | 'sap';
+
 export interface LazyCommandSpec {
   /** Command name as typed on the CLI, e.g. 'pull' (no positional args). */
   name: string;
   /** One-line description shown in root help (must match the module). */
   description: string;
+  /**
+   * Whether the command talks to SAP. Used by root --help to group commands
+   * under "Local Commands" / "SAP Commands" sections (P2.9). Defaults to 'sap'
+   * so existing specs stay grouped with the SAP section unless explicitly
+   * overridden.
+   */
+  scope?: CommandScope;
   /** Dynamic import returning the module with a register(program) function. */
   load: () => Promise<{ register: (program: Command) => void }>;
 }
@@ -62,6 +71,24 @@ export function registerLazyCommands(program: Command, specs: LazyCommandSpec[])
     }
     return dispatchHelp(subcommandName);
   };
+
+  // Root help (P2.9): append a "Local commands" section so the agent can see
+  // at a glance which commands don't need a SAP connection. The default
+  // Commands: list above still shows every command; this section is a guide,
+  // not a replacement.
+  const localNames = specs.filter((s) => s.scope === 'local').map((s) => s.name);
+  if (localNames.length > 0) {
+    const localList = localNames.map((n) => `  ${n}`).join('\n');
+    program.addHelpText('after', [
+      '',
+      'Local commands (no SAP connection required):',
+      '',
+      localList,
+      '',
+      'These commands do not call SAP. All other commands listed above do.',
+      '',
+    ].join('\n'));
+  }
 }
 
 async function loadAndSwap(

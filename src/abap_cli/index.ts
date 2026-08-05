@@ -14,6 +14,7 @@ import { handleTopLevelError } from './top-error.js';
 const COMMAND_SPECS: LazyCommandSpec[] = [
   {
     name: 'init',
+    scope: 'local',
     description: 'Initialize workspace configuration for SAP connection',
     load: () => import('./commands/init.js').then((m) => ({ register: m.registerInitCommand })),
   },
@@ -64,11 +65,13 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
   },
   {
     name: 'connection',
+    scope: 'local',
     description: 'Manage global connection profiles',
     load: () => import('./commands/connection.js').then((m) => ({ register: m.registerConnectionCommand })),
   },
   {
     name: 'doctor',
+    scope: 'local',
     description: 'Diagnose the CLI environment: environment, config, connections',
     load: () => import('./commands/doctor.js').then((m) => ({ register: m.registerDoctorCommand })),
   },
@@ -89,6 +92,7 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
   },
   {
     name: 'report-stuck',
+    scope: 'local',
     description: 'Record a stuck-agent report locally (feedback loop)',
     load: () => import('./commands/report-stuck.js').then((m) => ({ register: m.registerReportStuckCommand })),
   },

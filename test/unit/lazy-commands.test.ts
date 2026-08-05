@@ -202,3 +202,78 @@ describe('lazy loading at the process level (P1.6)', () => {
     expect(stdout).toContain('"schemaVersion"');
   });
 });
+
+// --- root --help groups local commands under a dedicated section (P2.9) ---
+const LOCAL_NAMES = ['init', 'connection', 'doctor', 'report-stuck'];
+const SAP_NAMES = ['pull', 'push', 'check', 'search', 'create', 'status', 'transport', 'deploy', 'inspect', 'diff', 'sync', 'atc'];
+
+describe('lazy command scope grouping (P2.9)', () => {
+  it('every lazy spec is annotated as either local or sap (defaults to sap)', () => {
+    const index = fs.readFileSync(path.join(repoRoot, 'src/abap_cli/index.ts'), 'utf-8');
+    // Each spec is a `{\n  name: 'X', ...\n},` block. Anchor on the `name:`
+    // line so the match doesn't start at the first `{` in the file (which is
+    // an import block).
+    const blockFor = (name: string): string | null => {
+      const re = new RegExp(
+        `name:\\s*'${name}',[\\s\\S]*?\\},`,
+      );
+      return index.match(re)?.[0] ?? null;
+    };
+    for (const name of LOCAL_NAMES) {
+      const block = blockFor(name);
+      expect(block, `${name} spec block exists`).toBeTruthy();
+      expect(block, `${name} declares scope: 'local'`).toMatch(/scope:\s*'local'/);
+    }
+    for (const name of SAP_NAMES) {
+      const block = blockFor(name);
+      expect(block, `${name} spec block exists`).toBeTruthy();
+      // If scope is set, it must be 'sap'; absence is fine (default).
+      const scope = block!.match(/scope:\s*'(local|sap)'/)?.[1];
+      if (scope) {
+        expect(scope, `${name} declared scope is SAP`).toBe('sap');
+      }
+    }
+  });
+
+  it('root help lists only local commands under the "Local commands" section', async () => {
+    const program = makeLazyProgram([
+      { name: 'init', scope: 'local', description: 'Init', load: helloSpec([]).load },
+      { name: 'pull', description: 'Pull', load: helloSpec([]).load },
+      { name: 'doctor', scope: 'local', description: 'Doctor', load: helloSpec([]).load },
+    ]);
+    const res = await runHelp(program, ['--help']);
+    expect(res.stdout).toContain('Local commands (no SAP connection required):');
+    // The local section lists only the local commands.
+    const localSection = res.stdout.split('Local commands (no SAP connection required):')[1] ?? '';
+    expect(localSection).toContain('init');
+    expect(localSection).toContain('doctor');
+    expect(localSection).not.toContain('pull');
+  });
+
+  it('root help omits the "Local commands" section when no local specs exist', async () => {
+    const program = makeLazyProgram([
+      { name: 'pull', description: 'Pull', load: helloSpec([]).load },
+    ]);
+    const res = await runHelp(program, ['--help']);
+    expect(res.stdout).not.toContain('Local commands (no SAP connection required):');
+  });
+
+  it.skipIf(!hasBuiltCli)('built CLI root --help groups init/connection/doctor/report-stuck as local', async () => {
+    const { stdout } = await run(process.execPath, [cliEntry, '--help']);
+    expect(stdout).toContain('Local commands (no SAP connection required):');
+    // The Local section is the block between the heading and the next
+    // blank line that follows the closing "These commands do not call SAP."
+    // hint. Scope to that block so the unrelated Commands: list (and its
+    // own duplicates) don't bleed into the assertion.
+    const localSection = stdout
+      .split('Local commands (no SAP connection required):')[1]
+      ?.split('These commands do not call SAP.')[0] ?? '';
+    for (const name of LOCAL_NAMES) {
+      expect(localSection, `'${name}' is listed under the Local section`).toContain(name);
+    }
+    // SAP commands must not appear in the local section.
+    for (const name of SAP_NAMES) {
+      expect(localSection, `'${name}' must NOT be in the local section`).not.toContain(name);
+    }
+  });
+});
