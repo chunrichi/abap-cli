@@ -62,8 +62,8 @@ src/abap_cli/
 ├── dictionary/           # DDIC domain logic (ddic-json.ts)
 ├── icf/                  # ICF service version + deployment check (service-version.ts)
 ├── formats/              # file format + resolver + pull strategies
-├── output/               # unified JSON output, error codes, meta, check-issue types
-└── flows/                # push/pull/deploy/sync flows, status, diff, inspect, doctor, atc
+├── output/               # unified JSON output, error codes, meta, check-issue types — see output/README.md
+└── flows/                # push (object/fugr/textpool), pull, deploy, sync, create, config, connection, status, diff, inspect, doctor, atc
 ```
 
 ## Adding a New Command

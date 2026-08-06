@@ -6,7 +6,7 @@ import { resolveFile, buildFilename, objectDirName } from '../formats/file-resol
 import { writeAbapFile } from '../formats/abap-source.js';
 import { resolveObject, getObjectParts } from '../core/resolve.js';
 import { computeChangedParts, type ChangedPart } from './status.js';
-import { pushObject } from './push-flow.js';
+import { pushObject } from './push-object.js';
 
 export type SyncDirection = 'pull' | 'push' | 'status';
 export type SyncActionStatus = 'planned' | 'done' | 'skipped' | 'conflict' | 'failed';

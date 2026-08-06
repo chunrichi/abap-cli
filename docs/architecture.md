@@ -32,8 +32,10 @@ src/abap_cli/
 ├── core/                 # shared infrastructure: lazy registration, polyfill, object/transport resolution, limits
 ├── dictionary/           # DDIC domain logic: ddic-json.ts (abap-file-format JSON ↔ wire mapping)
 ├── formats/              # abap-file-format file resolution + pull strategies
-├── output/               # unified JSON output, error/exit codes, help text, check-issue types
-└── flows/                # workflow orchestration: push/pull/deploy/sync flows, status/diff, inspect, doctor, atc
+├── icf/                  # ICF service version constants + deployment check
+├── textpool/             # textpool capability probe + mixed-mode route (ADT/ICF)
+├── output/               # unified JSON output (CliError/printResult/printError), error/exit codes, help text, check-issue types — see output/README.md
+└── flows/                # workflow orchestration: push (object/fugr/textpool), pull, deploy, sync, create, config (params/wizard/write), connection (flow/profile), status/diff, inspect, doctor, atc
 ```
 
 ### Key decisions
@@ -41,7 +43,7 @@ src/abap_cli/
 - **ADT via `abap-adt-api`** — source objects (Class/Interface/Program/Function Group) use the standard ADT REST API: search, object structure, source GET/PUT, lock/unlock, content-based syntax check, activation, object creation, transport management.
 - **Thin client** — the CLI only orchestrates HTTP calls and file/result handling; business logic stays on the SAP side.
 - **Unified output** — every command uses `output/json.ts` (`printResult`/`printError`) so `--json` output is consistent across commands and parseable by agents.
-- **Sync orchestration** — workflow orchestration lives in `flows/` (`push-flow.ts`, `pull-flow.ts`, `deploy-flow.ts`, `sync-flow.ts`, `status`, `diff`, `inspect-ops`, `doctor-checks`, `atc`). Shared resolution lives in `core/`: `core/resolve.ts` (object URL + parts resolution), `core/transport.ts` (`resolveTransport`: `--tr` > config > user's open request > error). Commands stay thin: they parse arguments and print the `{ data, human }` result the flow returns.
+- **Sync orchestration** — workflow orchestration lives in `flows/` (`push-flow.ts` + `push-object.ts`/`push-fugr.ts`/`push-textpool.ts`, `pull-flow.ts`, `deploy-flow.ts`, `sync-flow.ts`, `create-flow.ts` + `create-schema.ts`/`create-types.ts`, `config-flow.ts`/`config-wizard.ts`/`config-write.ts`, `connection-flow.ts`/`connection-profile.ts`, `status`, `diff`, `inspect-ops`, `doctor-checks`, `atc`). Shared resolution lives in `core/`: `core/resolve.ts` (object URL + parts resolution), `core/transport.ts` (`resolveTransport`: `--tr` > config > user's open request > error). Commands stay thin: they parse arguments and print the `{ data, human }` result the flow returns.
 
 ## SAP Layer (`abap/`)
 
