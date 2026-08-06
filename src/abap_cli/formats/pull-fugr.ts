@@ -1,5 +1,5 @@
 import { CliError } from '../output/json.js';
-import { enumerateFugr } from './fugr-layout.js';
+import { enumerateFugr, readFuncIncludeNumbers } from './fugr-layout.js';
 import type { OutputFile, PullContext, PullStrategy } from './pull-strategy.js';
 
 /**
@@ -37,10 +37,10 @@ function renderRepsMetadata(description: string, includeType: 'functionGroup' | 
   ) + '\n';
 }
 
-/** Render <name>...func.json — processingType is $required (ADT already returns the enum). */
-function renderFuncMetadata(description: string, processingType: string | undefined): string {
+/** Render <name>...func.json — processingType + includeNumber are $required. */
+function renderFuncMetadata(description: string, processingType: string | undefined, includeNumber: string): string {
   return JSON.stringify(
-    { formatVersion: '1', header: { description }, processingType: processingType ?? 'normal' },
+    { formatVersion: '1', header: { description }, processingType: processingType ?? 'normal', includeNumber },
     null,
     2,
   ) + '\n';
@@ -89,16 +89,22 @@ export function fugrStrategy(): PullStrategy {
         });
       }
 
-      // One .func.abap + .func.json per function module.
+      // One .func.abap + .func.json per function module. includeNumber comes
+      // from the group's UXX include (required by func-v1.json); fall back to
+      // the module's position in the group when UXX is missing/unparsable.
+      const includeNumbers = await readFuncIncludeNumbers(client, layout.group, layout.includes);
+      let funcIndex = 0;
       for (const fm of layout.funcs) {
         const fmLow = fm.name.toLowerCase();
+        funcIndex += 1;
+        const includeNumber = includeNumbers.get(fm.name) ?? String(funcIndex).padStart(2, '0');
         files.push({
           filename: `${groupLow}.fugr.${fmLow}.func.abap`,
           content: async () => client.getObjectSource(fm.sourceUrl),
         });
         files.push({
           filename: `${groupLow}.fugr.${fmLow}.func.json`,
-          content: async () => renderFuncMetadata(fm.description, fm.processingType),
+          content: async () => renderFuncMetadata(fm.description, fm.processingType, includeNumber),
         });
       }
 

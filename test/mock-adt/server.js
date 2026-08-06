@@ -32,6 +32,9 @@ const SETUP_FAIL = process.env.MOCK_SETUP_FAIL === '1';
 // (simulates ECC where the ADT text-elements write endpoint is absent).
 const TEXTPOOL_WRITE_UNSUPPORTED = process.env.MOCK_TEXTPOOL_WRITE_UNSUPPORTED === '1';
 const DDIC_FAIL = process.env.MOCK_DDIC_FAIL === '1';
+// MOCK_REMOTE_MISSING=1 → /version-source reports no transported versions (empty source),
+// mirroring the real backend's SVRS_GET_VERSIONS empty case.
+const REMOTE_MISSING = process.env.MOCK_REMOTE_MISSING === '1';
 // Deployed zabap_vibe version served by the mock root (mirrors CLI ICF_SERVICE_VERSION).
 const ICF_SERVICE_VERSION = process.env.MOCK_ICF_VERSION || '0.2.0';
 const NOW = '2026-08-01T00:00:00Z';
@@ -44,6 +47,8 @@ const objects = new Map();
 const ddicStore = new Map();
 // 014: textpool store — key = `<TYPE>:<OBJ>:<CATEGORY>`, value = array of { id, text }.
 const textpoolStore = new Map();
+// 015: remote source store — key = `<TYPE>:<OBJ>`, value = source string served by /version-source.
+const remoteSourceStore = new Map();
 // Tracks whether the DDIC POST handler saw a pre-existing entry (used to derive
 // data.action = 'updated' vs 'created'). Local to the request handler.
 let ddicStore_existed_before = false;
@@ -182,6 +187,11 @@ addObject('ZPROG_TOP', 'PROG/I', '/sap/bc/adt/programs/includes/zprog_top', 'Dem
     content: "TABLES: t001.\n",
   },
 ]);
+
+// 015: remote (Version Management) sources served by /version-source — keyed TYPE:NAME.
+remoteSourceStore.set('REPS:ZPROG', "REPORT zprog.\nWRITE: / 'production version'.\n");
+remoteSourceStore.set('INTF:ZIF_DEMO', 'INTERFACE zif_demo.\n  METHODS run.\nENDINTERFACE.\n');
+remoteSourceStore.set('CLSD:ZCL_DEMO', 'CLASS zcl_demo DEFINITION PUBLIC.\n  PUBLIC SECTION.\n    METHODS run.\nENDCLASS.\n');
 
 // ICF service classes (013): handler + setup, targets for deploy enumeration / classrun.
 addObject('ZCL_ABAP_VIBE_ICF', 'CLAS', '/sap/bc/adt/oo/classes/zcl_abap_vibe_icf', 'ICF handler for zabap_vibe', [
@@ -750,6 +760,37 @@ const server = http.createServer(async (req, res) => {
         return ok(res, JSON.stringify({ status: 'success', data: { object: objName, type: objType, category, written: elements.length } }), 'application/json');
       }
       return ok(res, JSON.stringify({ status: 'error', error: { code: 'METHOD_NOT_ALLOWED', message: `${req.method} not supported on /textpool/${category}` } }), 'application/json');
+    }
+
+    // 015: /sap/zabap_vibe/version-source?objectType=...&objectName=...&destination=...
+    // Mirrors the real Version Management dispatch (active version 00000 source only).
+    const versionSource = /^\/sap\/zabap_vibe\/version-source(?:\/.*)?$/.exec(path);
+    if (versionSource) {
+      if (req.method !== 'GET') {
+        return ok(res, JSON.stringify({ status: 'error', error: { code: 'METHOD_NOT_ALLOWED', message: 'GET only on Version Management endpoints' } }), 'application/json');
+      }
+      const objType = (q.get('objectType') || '').toUpperCase();
+      const objName = (q.get('objectName') || '').toUpperCase();
+      const destination = (q.get('destination') || '').toUpperCase();
+      if (!objType || !objName || !destination) {
+        return ok(res, JSON.stringify({ status: 'error', error: { code: 'VERSION_PARAMETER_REQUIRED', message: 'objectType, objectName and destination query parameters are required' } }), 'application/json');
+      }
+      const SUPPORTED = ['REPS', 'REPO', 'TYPD', 'FUNC', 'CNTX', 'CINC', 'METH', 'CLSD', 'CPUB', 'CPRI', 'CPRO', 'INTF', 'XSLT'];
+      if (!SUPPORTED.includes(objType)) {
+        return ok(res, JSON.stringify({ status: 'error', error: { code: 'VERSION_TYPE_NOT_SUPPORTED', message: `unsupported Version Management object type: ${objType}` } }), 'application/json');
+      }
+      if (destination.length > 60 || !/^[A-Z0-9@._-]+$/.test(destination)) {
+        return ok(res, JSON.stringify({ status: 'error', error: { code: 'VERSION_DESTINATION_INVALID', message: 'invalid RFC destination format' } }), 'application/json');
+      }
+      if (REMOTE_MISSING) {
+        return ok(res, JSON.stringify({ status: 'success', data: { objectType: objType, objectName: objName, version: '00000', source: '' } }), 'application/json');
+      }
+      const key = `${objType}:${objName}`;
+      const source = remoteSourceStore.get(key);
+      if (source === undefined) {
+        return ok(res, JSON.stringify({ status: 'error', error: { code: 'REMOTE_VERSION_NOT_FOUND', message: `active version (00000) could not be read for ${objName}` } }), 'application/json');
+      }
+      return ok(res, JSON.stringify({ status: 'success', data: { objectType: objType, objectName: objName, version: '00000', source } }), 'application/json');
     }
 
     // object search

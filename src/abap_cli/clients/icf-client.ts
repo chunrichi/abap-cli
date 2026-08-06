@@ -78,6 +78,12 @@ export class IcfClient {
     return this.post(`/textpool/${category}?${qs.toString()}`, body);
   }
 
+  /** 015: GET /version-source — active (00000) source of an object as transported to a remote system. */
+  async getRemoteSource<T>(objectType: string, objectName: string, destination: string): Promise<IcfResponse<T>> {
+    const qs = new URLSearchParams({ objectType, objectName, destination });
+    return this.get(`/version-source?${qs.toString()}`);
+  }
+
   /** Run one HTTP call and normalize transport errors into a CliError. */
   private async request<T>(method: 'get' | 'post' | 'put', path: string, body?: unknown): Promise<IcfResponse<T>> {
     let resp: AxiosResponse<IcfResponse<T>>;

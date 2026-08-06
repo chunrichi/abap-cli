@@ -20,7 +20,13 @@ export function registerPullCommand(program: Command): void {
     .option('--include-tests', 'Include testclasses source part')
     .option('--include-all-parts', 'Include every source-code part')
     .option('--textpool', '014: also pull textpool files (.texts/.selections/.headings.<lang>.properties)')
+    .option('--remote <remoteid>', '015: pull the object\'s active version source from a remote system (Version Management)')
     .action(async (objectName: string, opts: PullOptions, cmd) => {
+      // Bare `abap pull` (no object, no --package) prints the command help, like `abap pull --help`.
+      if (!objectName && !opts.package) {
+        console.log(cmd.helpInformation());
+        return;
+      }
       const json = jsonFromCommand(cmd);
       try {
         const result = await runPull(objectName, opts);

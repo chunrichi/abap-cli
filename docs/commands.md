@@ -69,6 +69,8 @@ Download ABAP objects from SAP to local files. Classes download all include part
 abap pull [options] [object-name]
 ```
 
+Bare `abap pull` (no object name, no `--package`) prints the command help, like `abap pull --help`.
+
 | Option | Description |
 |--------|-------------|
 | `--type <type>` | Object type (CLAS, PROG, INTF, etc.) |
@@ -81,6 +83,9 @@ abap pull [options] [object-name]
 | `--include-tests` | Include the testclasses source part |
 | `--include-all-parts` | Include every source-code part |
 | `--textpool` | 014: also pull textpool files (`.texts`/`.selections`/`.headings` `<lang>.properties`) for the object |
+| `--remote <remoteid>` | 015: pull the object's active version source as transported to a remote system (Version Management) |
+
+**Remote pull (015)**: `abap pull <name> --remote <system-id>` downloads the active (00000) source of the object from another system through the ICF `/version-source` endpoint (TMS RFC destination `TMSADM@<id>.DOMAIN_<id>`). CLI types map to Version Management types: `PROG → REPS`, `INTF → INTF`, `CLAS → CLSD` (class definition). The source is written under the object's standard filename (`src/<name>/<name>.<type>.abap`); the JSON result carries `remote` and `version` fields. If the object was never transported to the remote system the backend reports success with an empty `source`.
 
 **DDIC pull (014)**: `abap pull <name> --type DOMA|DTEL|TABL|STRU` downloads the object definition from the self-built ICF service (`/sap/zabap_vibe/ddic/<type>/<name>`) as a flat `src/<name>.<type>.json` (abap-file-format layout). Unknown DDIC types (e.g. TTYP) are rejected with `DDIC_NOT_SUPPORTED`. Textpool pull uses the mixed-mode route (ADT when the cached capability allows reads, otherwise the ICF `/textpool/*` endpoint); the JSON result carries a `route` field (`adt` / `icf`).
 

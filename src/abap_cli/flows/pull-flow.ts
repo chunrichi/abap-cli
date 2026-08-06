@@ -25,6 +25,8 @@ export interface PullOptions {
   page?: string;
   /** 014: also pull textpool .properties files (texts/selections/headings). */
   textpool?: boolean;
+  /** 015: pull the object's active version source from a remote system (Version Management). */
+  remote?: string;
 }
 
 export interface PullEntry {
@@ -52,6 +54,12 @@ export async function runPull(objectName: string, opts: PullOptions): Promise<Pu
       nextSteps: ['Run `abap search <query>` first if you do not know the exact name.'],
       example: 'abap pull ZCL_DEMO',
     });
+  }
+
+  // 015: --remote pulls the active (00000) source of an object as transported to
+  // another system via the Version Management endpoint (/version-source).
+  if (opts.remote) {
+    return runPullRemote(objectName, opts.type, opts.remote, opts);
   }
 
   // 014: --textpool pulls the three .properties files (mixed-mode route).
@@ -213,6 +221,100 @@ async function runPullDdic(objectName: string, type: DdicSupportedType, opts: Pu
 /** 014: narrow an arbitrary type string to the supported DDIC types. */
 function isDdicSupportedType(t: string): t is DdicSupportedType {
   return (DDIC_SUPPORTED_TYPES as readonly string[]).includes(t);
+}
+
+/** 015: CLI object type → Version Management (VRSD) object type for remote pulls. */
+const VERSION_SOURCE_TYPES: Record<string, string> = {
+  PROG: 'REPS',
+  INTF: 'INTF',
+  CLAS: 'CLSD',
+};
+
+/** 015: pull the active (00000) source of an object as transported to a remote system. */
+async function runPullRemote(objectName: string, type: string | undefined, remoteId: string, opts: PullOptions): Promise<PullResult> {
+  const objType = (type ?? 'PROG').toUpperCase();
+  const vrsdType = VERSION_SOURCE_TYPES[objType];
+  if (!vrsdType) {
+    throw new CliError('TYPE_NOT_SUPPORTED', `Remote pull not supported for object type ${objType}`, {
+      type: objType,
+      nextSteps: [`Supported types: ${Object.keys(VERSION_SOURCE_TYPES).join(', ')}.`],
+      example: `abap pull ${objectName} --remote PRD`,
+    });
+  }
+  // Backend validates the same shape (RFC destination = TMSADM@<id>.DOMAIN_<id>).
+  const remoteUpper = remoteId.trim().toUpperCase();
+  if (remoteUpper.length > 60 || !/^[A-Z0-9@._-]+$/.test(remoteUpper)) {
+    throw new CliError('INVALID_ARGUMENT', `Invalid remote system ID '${remoteId}'`, {
+      example: `abap pull ${objectName} --remote PRD`,
+    });
+  }
+
+  const icf = await IcfClient.create();
+  const resp = await icf.getRemoteSource<{ objectType: string; objectName: string; version: string; source: string }>(
+    vrsdType,
+    objectName,
+    remoteUpper,
+  );
+  if (resp.status !== 'success' || !resp.data) {
+    // REMOTE_VERSION_NOT_FOUND normalizes to OBJECT_NOT_FOUND (exit 8, NOT_FOUND family).
+    const rawCode = resp.error?.code ?? 'SAP_ERROR';
+    const code: ErrorCode = rawCode === 'REMOTE_VERSION_NOT_FOUND' ? 'OBJECT_NOT_FOUND' : (rawCode as ErrorCode);
+    throw new CliError(code, resp.error?.message ?? `Failed to pull remote ${objType} ${objectName}`, {
+      object: objectName,
+      type: objType,
+      nextSteps: [
+        'Verify the object was transported to the remote system.',
+        'Verify the remote system ID (RFC destination) is correct and reachable.',
+      ],
+      example: `abap pull ${objectName} --remote ${remoteUpper}`,
+    });
+  }
+
+  const { source, version } = resp.data;
+  // The remote source is a single blob; write it under the object's standard
+  // abap-file-format filename (e.g. zprog.prog.abap / zcl_x.clas.abap).
+  const filename = buildFilename(objectName, objType, undefined, '.abap');
+  const relPath = path.join(opts.dir, objectDirName(objectName), filename);
+  const targetPath = path.resolve(process.cwd(), relPath);
+
+  if (await fileExists(targetPath) && !opts.overwrite && !opts.skipExisting) {
+    throw new CliError('OVERWRITE_REQUIRED', `${relPath} already exists; use --overwrite to replace it`, {
+      file: relPath,
+      nextSteps: ['Re-run with --overwrite to replace the existing file.'],
+      example: `abap pull ${objectName} --remote ${remoteUpper} --overwrite`,
+    });
+  }
+  if (await fileExists(targetPath) && opts.skipExisting) {
+    return {
+      data: {
+        object: objectName,
+        type: objType,
+        remote: remoteUpper,
+        version,
+        entries: [{ file: relPath, status: 'skipped' }],
+        written: [],
+        skipped: [relPath],
+        failed: [],
+      },
+      human: `Skipped ${objType} ${objectName} (file already exists: ${relPath})`,
+    };
+  }
+
+  await writeAbapFile(targetPath, source);
+
+  return {
+    data: {
+      object: objectName,
+      type: objType,
+      remote: remoteUpper,
+      version,
+      entries: [{ file: relPath, status: 'written' }],
+      written: [relPath],
+      skipped: [],
+      failed: [],
+    },
+    human: `Pulled ${objType} ${objectName} from ${remoteUpper} (version ${version}) to ${relPath}`,
+  };
 }
 
 /** Enumerate a package (search + packageName filter) and pull each object (FR-024). */

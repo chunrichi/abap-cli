@@ -78,7 +78,16 @@ beforeEach(() => {
     return { metaData: groupMeta };
   });
 
-  getObjectSource.mockImplementation(async (url: string) => `SOURCE ${url}`);
+  getObjectSource.mockImplementation(async (url: string) => {
+    // The UXX include lists each function module with its include number.
+    if (url.includes('lzfg_wechat_tableuxx')) {
+      return (
+        'INCLUDE LZFG_WECHAT_TABLEU01.  "TABLEFRAME_ZFG_WECHAT_TABLE\n' +
+        'INCLUDE LZFG_WECHAT_TABLEU02.  "TABLEPROC_ZFG_WECHAT_TABLE\n'
+      );
+    }
+    return `SOURCE ${url}`;
+  });
 });
 
 function read(res: { stdout: string }): { status: string; data: Record<string, unknown> } {
@@ -121,5 +130,24 @@ describe('abap pull FUGR (abap-file-format layout)', () => {
     const func = JSON.parse(fs.readFileSync(path.join(dir, 'zfg_wechat_table.fugr.tableframe_zfg_wechat_table.func.json'), 'utf-8'));
     expect(func.processingType).toBe('normal');
     expect(func.header.description).toBe('desc TABLEFRAME_ZFG_WECHAT_TABLE');
+    // includeNumber is $required by fugr/func-v1.json — parsed from the UXX include.
+    expect(func.includeNumber).toBe('01');
+
+    const func2 = JSON.parse(fs.readFileSync(path.join(dir, 'zfg_wechat_table.fugr.tableproc_zfg_wechat_table.func.json'), 'utf-8'));
+    expect(func2.includeNumber).toBe('02');
+  });
+
+  it('falls back to the module position when the UXX include is unparsable', async () => {
+    getObjectSource.mockImplementation(async (url: string) =>
+      url.includes('lzfg_wechat_tableuxx') ? 'REPORT nope.' : `SOURCE ${url}`,
+    );
+    const program = makeProgram();
+    registerPullCommand(program);
+    const res = await runCommand(program, ['pull', 'ZFG_WECHAT_TABLE', '--type', 'FUGR', '--json'], { cwd });
+    expect(res.exitCode).toBeUndefined();
+
+    const dir = path.join(cwd, 'src', 'zfg_wechat_table');
+    const func = JSON.parse(fs.readFileSync(path.join(dir, 'zfg_wechat_table.fugr.tableframe_zfg_wechat_table.func.json'), 'utf-8'));
+    expect(func.includeNumber).toBe('01');
   });
 });

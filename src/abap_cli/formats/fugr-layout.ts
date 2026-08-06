@@ -55,6 +55,34 @@ async function searchHits(client: AdtClientWrapper, query: string): Promise<Sear
   }));
 }
 
+/** UXX include name pattern (L<group>U01…) — holds the FM→include-number table. */
+const UXX_RE = /^L(.+)U(\d+)$/;
+
+/**
+ * Parse each function module's include number from the group's UXX include
+ * source (one `INCLUDE L<group>U01.  "<funcname>` line per module). The number
+ * is required by the func metadata schema (fugr/func-v1.json). Returns a map
+ * of upper-case FM name → include number ('01', '02', …).
+ */
+export async function readFuncIncludeNumbers(
+  client: AdtClientWrapper,
+  group: string,
+  includes: FugrSubObject[],
+): Promise<Map<string, string>> {
+  const numbers = new Map<string, string>();
+  const lineRe = new RegExp(`INCLUDE\\s+L${group}U(\\d+)\\s*\\.\\s*"([^\\s"]+)`, 'i');
+  for (const inc of includes) {
+    const m = UXX_RE.exec(inc.name);
+    if (!m || m[1] !== group) continue;
+    const source = await client.getObjectSource(inc.sourceUrl);
+    for (const line of source.split('\n')) {
+      const lm = lineRe.exec(line);
+      if (lm) numbers.set(lm[2]!.toUpperCase(), lm[1]!);
+    }
+  }
+  return numbers;
+}
+
 /** Enumerate a function group's main program, includes and function modules. */
 export async function enumerateFugr(client: AdtClientWrapper, objectUrl: string): Promise<FugrLayout> {
   const struc = await client.objectStructure(objectUrl);
