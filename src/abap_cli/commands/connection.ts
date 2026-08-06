@@ -3,14 +3,14 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { text, password, confirm, isCancel } from '@clack/prompts';
 import { getSystem, listSystemNames, upsertSystem, deleteSystem, type SystemProfile } from '../config/user-config.js';
-import { getPassword, storePassword, deletePassword } from '../crypto/secrets.js';
+import { getPassword, storePassword, deletePassword } from '../config/secrets.js';
 import { printError, printResult, jsonFromCommand, CliError } from '../output/json.js';
 import { collectWarning } from '../output/meta.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import { assertValidProfile } from '../config/validation.js';
 import { probeSystem } from '../clients/probe.js';
 import { probeTextpoolCapability, recordCapability } from '../textpool/textpool-capability.js';
-import { exportProfiles, importProfiles, type ProfileBundle } from '../flows/profiles.js';
+import { exportProfiles, importProfiles, type ProfileBundle } from '../config/profiles.js';
 
 /**
  * 014: one-shot textpool capability probe, recorded onto the profile (Q1:

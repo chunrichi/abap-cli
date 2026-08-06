@@ -1,9 +1,7 @@
 import type { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError } from '../output/json.js';
 import { getObjectPartsWithMeta, type ObjectPart } from '../formats/object-parts.js';
-
-/** Single source of truth for bounded result sets (FR-023). */
-export const SEARCH_RESULT_LIMIT = 20;
+import { SEARCH_RESULT_LIMIT } from './limits.js';
 
 export interface ResolvedObject {
   name: string;

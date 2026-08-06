@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { getPassword } from '../crypto/secrets.js';
+import { getPassword } from './secrets.js';
 import { getSystem } from './user-config.js';
 import { CliError } from '../output/json.js';
 

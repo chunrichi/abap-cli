@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { exportProfiles, importProfiles } from '../../src/abap_cli/flows/profiles.js';
+import { exportProfiles, importProfiles } from '../../src/abap_cli/config/profiles.js';
 
 const { upsertSystemMock, storePasswordMock } = vi.hoisted(() => ({
   upsertSystemMock: vi.fn(),
@@ -15,7 +15,7 @@ vi.mock('../../src/abap_cli/config/user-config.js', () => ({
   upsertSystem: upsertSystemMock,
 }));
 
-vi.mock('../../src/abap_cli/crypto/secrets.js', () => ({
+vi.mock('../../src/abap_cli/config/secrets.js', () => ({
   getPassword: vi.fn(async () => undefined),
   storePassword: storePasswordMock,
   deletePassword: vi.fn(),

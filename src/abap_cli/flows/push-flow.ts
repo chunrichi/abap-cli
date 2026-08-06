@@ -7,9 +7,9 @@ import { resolveFile } from '../formats/file-resolver.js';
 import { readAbapFile } from '../formats/abap-source.js';
 import { parseTextpoolProperties, textpoolCategoryFromExtension } from '../formats/textpool.js';
 import { routeTextpool } from '../textpool/textpool-router.js';
-import { resolveObject, getObjectParts, validateLocalFile } from './resolve.js';
-import { resolveTransport } from './transport.js';
-import { resolveLocalTargets } from './local-targets.js';
+import { resolveObject, getObjectParts, validateLocalFile } from '../core/resolve.js';
+import { resolveTransport } from '../core/transport.js';
+import { resolveLocalTargets } from '../core/local-targets.js';
 import { enumerateFugr, fugrPushTargetFor } from '../formats/fugr-layout.js';
 
 export type PushStage =

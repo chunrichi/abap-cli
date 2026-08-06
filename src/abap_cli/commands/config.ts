@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { select, text, password, confirm, isCancel } from '@clack/prompts';
 import { originalArgv } from '../output/meta.js';
-import { storePassword, getPassword } from '../crypto/secrets.js';
+import { storePassword, getPassword } from '../config/secrets.js';
 import {
   getSystem,
   listSystemNames,

@@ -1,5 +1,5 @@
 import type { AdtClientWrapper } from '../clients/adt-client.js';
-import type { CheckIssue } from './issues.js';
+import type { CheckIssue } from '../output/issues.js';
 
 export interface AtcRunOptions {
   variant: string;

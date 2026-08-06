@@ -3,8 +3,9 @@ import type { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError } from '../output/json.js';
 import { resolveFile } from '../formats/file-resolver.js';
 import { readAbapFile } from '../formats/abap-source.js';
-import { resolveLocalTargets } from './local-targets.js';
-import { resolveObject, getObjectParts, SEARCH_RESULT_LIMIT } from './resolve.js';
+import { resolveLocalTargets } from '../core/local-targets.js';
+import { resolveObject, getObjectParts } from '../core/resolve.js';
+import { SEARCH_RESULT_LIMIT } from '../core/limits.js';
 
 export type ChangeDirection = 'local-only' | 'remote-only' | 'divergent' | 'unchanged';
 

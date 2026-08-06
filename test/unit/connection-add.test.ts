@@ -21,7 +21,7 @@ vi.mock('../../src/abap_cli/config/user-config.js', () => ({
   saveUserConfig: vi.fn(),
 }));
 
-vi.mock('../../src/abap_cli/crypto/secrets.js', () => ({
+vi.mock('../../src/abap_cli/config/secrets.js', () => ({
   storePassword: (...args: unknown[]) => storePassword(...args),
   deletePassword: (...args: unknown[]) => deletePassword(...args),
   getPassword: vi.fn(async () => null),

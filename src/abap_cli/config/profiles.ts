@@ -1,5 +1,5 @@
-import { getSystem, listSystemNames, upsertSystem } from '../config/user-config.js';
-import { getPassword, storePassword } from '../crypto/secrets.js';
+import { getSystem, listSystemNames, upsertSystem } from './user-config.js';
+import { getPassword, storePassword } from './secrets.js';
 
 /** Portable profile bundle. Passwords excluded by default (Constitution VI). */
 export interface ProfileBundle {

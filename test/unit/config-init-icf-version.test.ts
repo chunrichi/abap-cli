@@ -6,7 +6,7 @@ import { registerConfigCommand } from '../../src/abap_cli/commands/config.js';
 import { makeProgram, runCommand } from './cli-helper.js';
 
 // Keep keychain out of the tests.
-vi.mock('../../src/abap_cli/crypto/secrets.js', () => ({
+vi.mock('../../src/abap_cli/config/secrets.js', () => ({
   getPassword: vi.fn().mockResolvedValue('pw'),
   storePassword: vi.fn(),
   deletePassword: vi.fn(),

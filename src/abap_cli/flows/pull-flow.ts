@@ -10,7 +10,8 @@ import { routeTextpool } from '../textpool/textpool-router.js';
 import { strategyFor } from '../formats/pull-strategy.js';
 import { CliError } from '../output/json.js';
 import type { ErrorCode } from '../output/error-codes.js';
-import { resolveObject, SEARCH_RESULT_LIMIT } from './resolve.js';
+import { resolveObject } from '../core/resolve.js';
+import { SEARCH_RESULT_LIMIT } from '../core/limits.js';
 
 export interface PullOptions {
   type?: string;

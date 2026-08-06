@@ -30,16 +30,19 @@ function writeSystems(dir: string, systems: Record<string, unknown>): string {
 
 describe('doctor-checks (FR-001..005)', () => {
   let home: string;
+  let cwd: string;
 
   beforeEach(() => {
     home = tmpDir();
+    // Isolate the workspace check from any real .abap.json in the repo root.
+    cwd = tmpDir();
   });
 
   it('healthy environment → all items ok and empty nextSteps (FR-001/FR-002, SC-001)', async () => {
     writeSystems(home, {
       mock: { url: 'http://localhost:8080', client: '100', username: 'MOCKUSER', language: 'EN' },
     });
-    const report = await runDoctorChecks({ home });
+    const report = await runDoctorChecks({ home, cwd });
     expect(report.environment.every((i) => i.status === 'ok')).toBe(true);
     expect(report.config.every((i) => i.status === 'ok')).toBe(true);
     expect(report.nextSteps).toEqual([]);
@@ -50,7 +53,7 @@ describe('doctor-checks (FR-001..005)', () => {
     fs.mkdirSync(cliDir, { recursive: true });
     const configPath = path.join(cliDir, 'systems.json');
     fs.writeFileSync(configPath, '{ not valid json');
-    const report = await runDoctorChecks({ home });
+    const report = await runDoctorChecks({ home, cwd });
     const env = report.environment.find((i) => i.key === 'env.config');
     expect(env?.status).toBe('err');
     expect(env?.suggestion).toBeTruthy();
@@ -59,7 +62,7 @@ describe('doctor-checks (FR-001..005)', () => {
 
   it('invalid profile → config item err (FR-002)', async () => {
     writeSystems(home, { bad: { url: 'not-a-url', username: 'x' } });
-    const report = await runDoctorChecks({ home });
+    const report = await runDoctorChecks({ home, cwd });
     const item = report.config.find((i) => i.key.startsWith('config.profile'));
     expect(item?.status).toBe('err');
   });
@@ -68,7 +71,7 @@ describe('doctor-checks (FR-001..005)', () => {
     writeSystems(home, {
       mock: { url: 'http://localhost:8080', client: '100', username: 'MOCKUSER', language: 'EN' },
     });
-    const report = await runDoctorChecks({ home, system: 'does-not-exist' });
+    const report = await runDoctorChecks({ home, cwd, system: 'does-not-exist' });
     const conn = report.connection.find((i) => i.key.includes('does-not-exist'));
     expect(conn?.status).toBe('err');
     expect(conn?.suggestion).toBeTruthy();
@@ -78,8 +81,8 @@ describe('doctor-checks (FR-001..005)', () => {
     writeSystems(home, {
       mock: { url: 'http://localhost:8080', client: '100', username: 'MOCKUSER', language: 'EN' },
     });
-    const brief = await runDoctorChecks({ home });
-    const verbose = await runDoctorChecks({ home, verbose: true });
+    const brief = await runDoctorChecks({ home, cwd });
+    const verbose = await runDoctorChecks({ home, cwd, verbose: true });
     expect(brief.environment.every((i) => i.detail === undefined)).toBe(true);
     expect(verbose.environment.some((i) => i.detail !== undefined)).toBe(true);
   });

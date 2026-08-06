@@ -4,7 +4,7 @@ import type { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError } from '../output/json.js';
 import { resolveFile, buildFilename, objectDirName } from '../formats/file-resolver.js';
 import { writeAbapFile } from '../formats/abap-source.js';
-import { resolveObject, getObjectParts } from './resolve.js';
+import { resolveObject, getObjectParts } from '../core/resolve.js';
 import { computeChangedParts, type ChangedPart } from './status.js';
 import { pushObject } from './push-flow.js';
 

@@ -3,7 +3,7 @@ import { AdtClientWrapper } from '../clients/adt-client.js';
 import { computeDiff } from '../flows/diff.js';
 import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
 import { commonErrorsAfter } from '../output/help-text.js';
-import { SEARCH_RESULT_LIMIT } from '../flows/resolve.js';
+import { SEARCH_RESULT_LIMIT } from '../core/limits.js';
 
 interface DiffOptions {
   file?: string;

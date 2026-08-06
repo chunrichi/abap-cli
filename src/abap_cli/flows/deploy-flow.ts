@@ -5,7 +5,7 @@ import type { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError, toErrorShape } from '../output/json.js';
 import { resolveFile } from '../formats/file-resolver.js';
 import { readAbapFile } from '../formats/abap-source.js';
-import { resolveObject, getObjectParts, validateLocalFile } from './resolve.js';
+import { resolveObject, getObjectParts, validateLocalFile } from '../core/resolve.js';
 import { pushObject } from './push-flow.js';
 
 export type DeployStatus = 'deployed' | 'skipped' | 'failed';

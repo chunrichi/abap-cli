@@ -4,7 +4,7 @@ import type { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError } from '../output/json.js';
 import { resolveFile } from '../formats/file-resolver.js';
 import { readAbapFile } from '../formats/abap-source.js';
-import { resolveObject, getObjectParts } from './resolve.js';
+import { resolveObject, getObjectParts } from '../core/resolve.js';
 import { computeChangedParts, type ChangedPart, type ChangeDirection } from './status.js';
 
 /** Bounded line-change summary for one part (no full unified diff, FR-015). */

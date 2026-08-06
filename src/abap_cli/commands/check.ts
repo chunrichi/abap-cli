@@ -6,9 +6,9 @@ import { resolveFile } from '../formats/file-resolver.js';
 import { listAbapFiles, readAbapFile } from '../formats/abap-source.js';
 import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
 import { commonErrorsAfter } from '../output/help-text.js';
-import { resolveObject, getObjectParts, validateLocalFile } from '../flows/resolve.js';
+import { resolveObject, getObjectParts, validateLocalFile } from '../core/resolve.js';
 import { runAtcCheck } from '../flows/atc.js';
-import type { CheckIssue } from '../flows/issues.js';
+import type { CheckIssue } from '../output/issues.js';
 
 type CheckMode = 'syntax' | 'content' | 'atc';
 

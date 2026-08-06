@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
 import { commonErrorsAfter } from '../output/help-text.js';
-import { resolveObject } from '../flows/resolve.js';
+import { resolveObject } from '../core/resolve.js';
 
 interface ActivateOptions {
   tr?: string;

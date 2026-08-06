@@ -3,7 +3,7 @@ import axios from 'axios';
 import * as https from 'https';
 import { ADTClient, createSSLConfig } from 'abap-adt-api';
 import { getSystem } from '../config/user-config.js';
-import { getPassword } from '../crypto/secrets.js';
+import { getPassword } from '../config/secrets.js';
 import { readCaCertificate } from '../config/project-config.js';
 import { CliError } from '../output/json.js';
 import { classifyHttpError } from './http-error.js';

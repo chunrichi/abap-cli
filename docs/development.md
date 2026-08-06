@@ -57,19 +57,19 @@ src/abap_cli/
 ├── index.ts              # commander entry, lazy-registers all commands
 ├── clients/              # AdtClientWrapper, ICF client, probe
 ├── commands/             # one file per command (incl. activate, deploy, inspect)
-├── config/               # project + user config
-├── crypto/secrets.ts     # keychain
+├── config/               # project + user config, keychain (secrets.ts), profile export/import
+├── core/                 # lazy registration, polyfill, object/transport resolution, limits
 ├── dictionary/           # DDIC domain logic (ddic-json.ts)
 ├── icf/                  # ICF service version + deployment check (service-version.ts)
 ├── formats/              # file format + resolver + pull strategies
-├── output/               # unified JSON output, error codes, meta
-└── flows/                # resolve, transport, push-flow, deploy-flow, status, doctor-checks
+├── output/               # unified JSON output, error codes, meta, check-issue types
+└── flows/                # push/pull/deploy/sync flows, status, diff, inspect, doctor, atc
 ```
 
 ## Adding a New Command
 
 1. Create `src/abap_cli/commands/<name>.ts` exporting `register<Name>Command(program: Command)`
-2. Register it lazily in `src/abap_cli/index.ts`: add a `COMMAND_SPECS` entry (command `name`, root-help `description`, and a `load` that dynamically `import()`s the module — see `src/abap_cli/commands/lazy.ts`). The stub's description must match the one the module registers.
+2. Register it lazily in `src/abap_cli/index.ts`: add a `COMMAND_SPECS` entry (command `name`, root-help `description`, and a `load` that dynamically `import()`s the module — see `src/abap_cli/core/lazy.ts`). The stub's description must match the one the module registers.
 3. Use `output/json.ts` (`printResult` / `printError`) so `--json` behaves consistently
 4. Add a corresponding skill prompt in `skills/abap-<name>.md` (Agent layer)
 5. Document it in [Commands](commands.md) and update the README command table

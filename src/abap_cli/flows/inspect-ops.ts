@@ -1,5 +1,6 @@
 import type { AdtClientWrapper } from '../clients/adt-client.js';
-import { resolveObject, SEARCH_RESULT_LIMIT } from './resolve.js';
+import { resolveObject } from '../core/resolve.js';
+import { SEARCH_RESULT_LIMIT } from '../core/limits.js';
 
 /** Base object metadata — always returned (FR-011). */
 export interface ObjectMetadata {

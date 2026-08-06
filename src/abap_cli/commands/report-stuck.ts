@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { writeStuckReport } from '../flows/stuck-reports.js';
+import { writeStuckReport } from '../core/stuck-reports.js';
 import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 

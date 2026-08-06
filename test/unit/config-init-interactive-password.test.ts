@@ -7,7 +7,7 @@ import { makeProgram, runCommand } from './cli-helper.js';
 
 const storePassword = vi.fn(async () => '');
 const getPassword = vi.fn(async () => null);
-vi.mock('../../src/abap_cli/crypto/secrets.js', () => ({
+vi.mock('../../src/abap_cli/config/secrets.js', () => ({
   storePassword: (...args: unknown[]) => storePassword(...args),
   getPassword: (...args: unknown[]) => getPassword(...args),
   deletePassword: vi.fn(async () => true),

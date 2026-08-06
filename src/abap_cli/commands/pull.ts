@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import { runPull, type PullOptions } from '../flows/pull-flow.js';
 import { printError, printResult, jsonFromCommand } from '../output/json.js';
 import { commonErrorsAfter } from '../output/help-text.js';
-import { SEARCH_RESULT_LIMIT } from '../flows/resolve.js';
+import { SEARCH_RESULT_LIMIT } from '../core/limits.js';
 
 export function registerPullCommand(program: Command): void {
   program

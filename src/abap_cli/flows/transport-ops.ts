@@ -1,6 +1,6 @@
 import type { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError } from '../output/json.js';
-import { resolveObject, getObjectParts } from './resolve.js';
+import { resolveObject, getObjectParts } from '../core/resolve.js';
 
 export interface TransportRequestInfo {
   number: string;

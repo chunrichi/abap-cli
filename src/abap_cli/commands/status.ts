@@ -3,7 +3,7 @@ import { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import { computeChangedParts, type ChangedPart } from '../flows/status.js';
-import { SEARCH_RESULT_LIMIT } from '../flows/resolve.js';
+import { SEARCH_RESULT_LIMIT } from '../core/limits.js';
 
 interface StatusOptions {
   remoteOnly?: boolean;

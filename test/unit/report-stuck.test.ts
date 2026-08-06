@@ -10,7 +10,7 @@ import {
   shouldAutoReport,
   setReportsDir,
   setCounterPath,
-} from '../../src/abap_cli/flows/stuck-reports.js';
+} from '../../src/abap_cli/core/stuck-reports.js';
 
 let home: string;
 let reportsDir: string;

@@ -23,9 +23,9 @@ const BOUNDARY_DIRS = [
   'src/abap_cli/commands',
   'src/abap_cli/config',
   'src/abap_cli/formats',
-  'src/abap_cli/sync',
+  'src/abap_cli/flows',
+  'src/abap_cli/core',
   'src/abap_cli/clients',
-  'src/abap_cli/crypto',
 ];
 
 // Files / lines where raw Error throws are intentional — internal assertions
@@ -34,7 +34,7 @@ const BOUNDARY_DIRS = [
 const RAW_ERROR_ALLOWLIST = new Set([
   // Internal assertion: a lazy-loaded command module did not register the
   // command it was loaded for. This is a programmer bug, not user-facing.
-  'src/abap_cli/commands/lazy.ts:throw new Error',
+  'src/abap_cli/core/lazy.ts:throw new Error',
 ]);
 
 function listBoundaryFiles(): { file: string; abs: string }[] {

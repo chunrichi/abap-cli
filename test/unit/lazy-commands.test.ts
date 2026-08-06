@@ -8,7 +8,7 @@ import { Command } from 'commander';
 import {
   registerLazyCommands,
   type LazyCommandSpec,
-} from '../../src/abap_cli/commands/lazy.js';
+} from '../../src/abap_cli/core/lazy.js';
 import { makeProgram, runCommand } from './cli-helper.js';
 
 function makeLazyProgram(specs: LazyCommandSpec[]): Command {
