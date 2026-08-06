@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { registerInitCommand } from '../../src/abap_cli/commands/init.js';
+import { registerConfigCommand } from '../../src/abap_cli/commands/config.js';
 import { makeProgram, runCommand } from './cli-helper.js';
 
 // Keep keychain out of the tests.
@@ -22,7 +22,7 @@ vi.mock('../../src/abap_cli/config/user-config.js', () => ({
   saveUserConfig: vi.fn(),
 }));
 
-describe('abap init non-interactive (FR-006, FR-022, SC-007)', () => {
+describe('abap config non-interactive (FR-006, FR-022, SC-007)', () => {
   let cwd: string;
 
   beforeEach(() => {
@@ -30,26 +30,21 @@ describe('abap init non-interactive (FR-006, FR-022, SC-007)', () => {
     upsertSystem.mockClear();
   });
 
-  it('flagless init in non-TTY fails fast with USAGE (exit 2) and no menu', async () => {
+  it('flagless abap config in non-TTY prints the subcommand help (exit 0) and does not mutate profiles', async () => {
     const program = makeProgram();
-    registerInitCommand(program);
-    const res = await runCommand(program, ['init', '--json'], { cwd, isTTY: false });
-    expect(res.exitCode).toBe(2);
-    expect(res.stdout).toBe('');
-    const parsed = JSON.parse(res.stderr);
-    expect(parsed.status).toBe('error');
-    expect(parsed.error.code).toBe('USAGE');
-    expect(parsed.error.nextSteps.length).toBeGreaterThan(0);
-    expect(parsed.error.example).toBeTruthy();
+    registerConfigCommand(program);
+    const res = await runCommand(program, ['config', '--json'], { cwd, isTTY: false });
+    expect(res.exitCode).toBeUndefined(); // no process.exit — help returned normally
+    expect(res.stdout).toMatch(/Usage: \S* config \[options\] \[command\]/);
     expect(upsertSystem).not.toHaveBeenCalled();
   });
 
-  it('non-TTY init with full params rejects profile creation (FR-022) and never mutates profiles', async () => {
+  it('non-TTY abap config with full params rejects profile creation (FR-022) and never mutates profiles', async () => {
     const program = makeProgram();
-    registerInitCommand(program);
+    registerConfigCommand(program);
     const res = await runCommand(
       program,
-      ['init', '--url', 'http://sap.example:50000', '--username', 'dev', '--password', 'pw', '--json'],
+      ['config', '--url', 'http://sap.example:50000', '--username', 'dev', '--password', 'pw', '--json'],
       { cwd, isTTY: false },
     );
     expect(res.exitCode).toBe(7); // VALIDATION_ERROR

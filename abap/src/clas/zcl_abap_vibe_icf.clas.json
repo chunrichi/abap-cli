@@ -1,1 +1,1 @@
-{"class":{"type":"CLAS","description":"ICF handler for zabap_vibe: routes /ddic/<type> and /textpool/<category> in addition to root health/version.","final":false}}
+{"class":{"type":"CLAS","description":"ICF handler for zabap_vibe.","final":false}}

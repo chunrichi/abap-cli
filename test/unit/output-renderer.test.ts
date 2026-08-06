@@ -60,8 +60,8 @@ describe('output renderer (FR-001, FR-002, FR-016, SC-008)', () => {
   it('toErrorShape surfaces details/nextSteps/example and explicit category', () => {
     const err = new CliError('CONFIG_ERROR', 'bad config', {
       details: { file: '.abap.json' },
-      nextSteps: ['run abap init'],
-      example: 'abap init --system dev',
+      nextSteps: ['run abap config'],
+      example: 'abap config init --system dev',
     });
     const shape = toErrorShape(err);
     expect(shape).toMatchObject({
@@ -69,8 +69,8 @@ describe('output renderer (FR-001, FR-002, FR-016, SC-008)', () => {
       category: 'CONFIG_ERROR',
       message: 'bad config',
       details: { file: '.abap.json' },
-      nextSteps: ['run abap init'],
-      example: 'abap init --system dev',
+      nextSteps: ['run abap config'],
+      example: 'abap config init --system dev',
     });
   });
 

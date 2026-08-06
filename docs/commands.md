@@ -27,12 +27,17 @@ Warnings never enter the error envelope: non-fatal warnings (e.g. a deprecated o
 
 Exit codes (stable contract, only additive across versions): `0` success, `1` unknown/unmapped failure (generic fallback), `2` usage, `3` config, `4` TLS, `5` auth, `6` SAP error, `7` validation, `8` not-found, `9` locked; `>=10` reserved. `error.category` in the JSON always maps 1:1 to the exit code. See the common-errors help block on every command for the full table.
 
-## `abap init`
+## `abap config`
 
-Initialize workspace configuration for SAP connection.
+Configure the workspace. The `abap config` group has two entry points:
+
+- `abap config [options]` — the **parameter form**: with `--system <name>` it references an existing profile; with a full connection set (`--url` + `--username` + `--password`) it creates a new profile and writes `.abap.json`. In non-interactive mode, profile creation is rejected (use `abap connection add` instead). Running it with no flags prints the help.
+- `abap config init` — the **interactive wizard** (no flags accepted): prompts to select an existing system profile or create a new one, then writes `.abap.json`. TTY only; in non-TTY environments it errors out (refuse to fall back, since the wizard cannot proceed without a terminal).
 
 ```bash
-abap init [options]
+abap config --system dev --tr DEVK900001 --package ZDEV
+abap config --url https://sap:44300 --client 100 --username DEV --password '***'
+abap config init      # interactive wizard
 ```
 
 | Option | Description |
@@ -44,18 +49,17 @@ abap init [options]
 | `-p, --password <password>` | SAP password (stored in keychain) |
 | `-l, --language <language>` | SAP language |
 | `--tr <transport>` | Default transport number |
-| `-t, --transport <transport>` | Deprecated alias for `--tr` |
 | `--package <package>` | Default SAP package |
 | `--insecure` | Skip SSL certificate verification (self-signed certs, development only) |
 | `--ca <path>` | Path to a CA certificate (PEM) for SSL verification |
 | `--test-connection` | Probe TLS + auth and report results (implies `--test-tls --test-auth`) |
 | `--test-tls` | Probe the TLS handshake |
 | `--test-auth` | Probe authentication (after TLS) |
-| `--yes` / `--no-input` | Non-interactive confirmation (aliases) |
+| `--yes` / `--non-interactive` | Non-interactive confirmation (aliases) |
 
-Non-interactive usage requires either `--system <name>` (reference existing) or a full connection set (`--url` + `--username` + `--password`).
+Non-interactive `abap config` requires either `--system <name>` (reference existing) or a full connection set (`--url` + `--username` + `--password`).
 
-After writing the workspace config, `abap init` performs an informational ICF deployment check (FR-012..FR-015): it probes `/sap/zabap_vibe/` and compares the deployed version with the bundled expected version. The JSON result carries an `icf` field with one of four states: `not_deployed` (hint to run `abap deploy`), `current`, `outdated` (hint to run `abap deploy` to upgrade / `--force` to overwrite), or `unreachable` (degraded to a `meta.warnings` entry — init still succeeds). The check never modifies SAP and never blocks init.
+After writing the workspace config, `abap config` performs an informational ICF deployment check (FR-012..FR-015): it probes `/sap/zabap_vibe/` and compares the deployed version with the bundled expected version. The JSON result carries an `icf` field with one of four states: `not_deployed` (hint to run `abap deploy`), `current`, `outdated` (hint to run `abap deploy` to upgrade / `--force` to overwrite), or `unreachable` (degraded to a `meta.warnings` entry — init still succeeds). The check never modifies SAP and never blocks init.
 
 ## `abap pull`
 
@@ -299,7 +303,7 @@ abap connection <command>
 | `export [names...]` | Export profiles to a portable bundle (`--file`, `--with-passwords`) |
 | `import <file>` | Import profiles from a bundle (`--overwrite`) |
 
-**Textpool capability probe (014)**: `abap connection add` / `abap connection set` and `abap init` (when it creates a profile) perform a one-shot informational probe of the ADT text-elements capability (read + write availability) and record it on the profile (`adtTextpool: { read, write, checkedAt }`, plus `systemVersion`). Textpool operations then read this cached result to pick the route (ADT vs ICF) — no runtime probe or fallback. The probe is non-blocking: on failure (e.g. SAP unreachable) the profile simply has no `adtTextpool` record and conservative defaults apply (read→ADT, write→ICF).
+**Textpool capability probe (014)**: `abap connection add` / `abap connection set` and `abap config` (when it creates a profile) perform a one-shot informational probe of the ADT text-elements capability (read + write availability) and record it on the profile (`adtTextpool: { read, write, checkedAt }`, plus `systemVersion`). Textpool operations then read this cached result to pick the route (ADT vs ICF) — no runtime probe or fallback. The probe is non-blocking: on failure (e.g. SAP unreachable) the profile simply has no `adtTextpool` record and conservative defaults apply (read→ADT, write→ICF).
 
 `add` / `set` accept the connection fields as options: `--url`, `-c/--client`, `-u/--username`, `-l/--language`, `-p/--password`, plus `--insecure` (skip SSL verification, development only) and `--ca <path>` (PEM CA certificate). `set` additionally supports `--remove-password` (drop the keychain credential) and `--clear-ca` (remove the CA setting).
 
@@ -335,12 +339,16 @@ abap deploy [options]
 
 | Option | Description |
 |--------|-------------|
-| `--tr <transport>` | Transport number |
-| `--package <package>` | Target SAP package (default `ZABAP_VIBE`) |
+| `--tr <transport>` | Transport number (required when `--package` is not `$TMP`) |
+| `--package <package>` | Target SAP package (default `$TMP` — local, no transport needed) |
 | `--dry-run` | Plan only — zero mutating SAP calls |
 | `--diff` | Per-file change summary |
 | `--force` | Bypass safety guards (`forced: true` in the result) |
 | `--yes` | Confirm in non-interactive environments |
+
+When `--package` is anything other than `$TMP`, `--tr` is required and `abap deploy` resolves the transport via the standard `--tr > project config > user modifiable requests` chain. With `--package $TMP` (the default), no transport is required and `--tr` may be omitted.
+
+`abap deploy` auto-creates any bundled source object that does not yet exist on the target system (e.g. first-time deploy on a fresh SAP), using the description from the matching `<name>.<type>.json` metadata. The result adds an `objects` array with one entry per object (`status: created | updated | unchanged | failed`) alongside the existing per-file `files` array.
 
 After deploying the bundled sources, `abap deploy` triggers the bundled ICF setup class (`ZCL_ABAP_VIBE_ICF_SETUP`) via ADT classrun, which creates/binds/activates the `/sap/zabap_vibe` SICF node (idempotent). The JSON result includes an `icfNode` field with the node state (`status`, `action`, `url`, `active`, `handler`); `--dry-run` reports `icfNode.status: "planned"` without triggering setup. A setup failure surfaces as a structured `SAP_ERROR` (exit 6).
 
@@ -452,7 +460,7 @@ Every error's `error.category` maps 1:1 to its exit code (see JSON Output Contra
 | Code | Meaning |
 |------|---------|
 | `UNKNOWN` | Unmapped exception fallback (exit 1) |
-| `CONFIG_ERROR` | Configuration missing/invalid (run `abap init` / `abap connection add` / `abap connection set`) |
+| `CONFIG_ERROR` | Configuration missing/invalid (run `abap config` / `abap connection add` / `abap connection set`) |
 | `SAP_ERROR` | ADT request failed (includes HTTP status) |
 | `TLS_ERROR` | TLS handshake / certificate failure |
 | `AUTH_ERROR` | 401/403 from SAP (bad credentials) |

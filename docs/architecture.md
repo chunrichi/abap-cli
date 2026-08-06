@@ -48,7 +48,7 @@ The bundled ICF service lives under `abap/src/clas/` (abapGit layout):
 - **`ZCL_ABAP_VIBE_ICF`** — HTTP handler (`IF_HTTP_EXTENSION`) for `/sap/zabap_vibe/`: root path returns a unified JSON envelope with service id + version; unknown paths / methods return unified error JSON.
 - **`ZCL_ABAP_VIBE_ICF_SETUP`** — `IF_OO_ADT_CLASSRUN` runner that idempotently creates/binds/activates the SICF node via the standard `CL_ICF_TREE` API (ADR gap: SICF config is not covered by ADT REST).
 
-`abap deploy` pushes the bundled sources then triggers the setup class; `abap init` checks deployment state/version. DDIC object CRUD (Domain, DataElement, Table, Structure, Table Type) is the next phase, built on the same ICF service. Development of this layer follows the **Dogfooding** principle — it is itself developed via the CLI's create → pull → edit → push loop.
+`abap deploy` pushes the bundled sources then triggers the setup class; `abap config` checks deployment state/version. DDIC object CRUD (Domain, DataElement, Table, Structure, Table Type) is the next phase, built on the same ICF service. Development of this layer follows the **Dogfooding** principle — it is itself developed via the CLI's create → pull → edit → push loop.
 
 ## Agent Layer (`skills/` + `agents/`)
 

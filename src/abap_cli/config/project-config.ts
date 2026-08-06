@@ -62,7 +62,7 @@ function currentMtimes(): { configPath: number; systemsPath: number } {
 
 /**
  * Load project configuration from .abap.json (system reference) + user-level system profile + OS keychain.
- * The file cache auto-invalidates on mtime change (abap init / connection set); the
+ * The file cache auto-invalidates on mtime change (abap config / connection set); the
  * password is re-read from the keychain every call so updates apply immediately.
  */
 export async function loadConfig(): Promise<ProjectConfig> {
@@ -101,8 +101,8 @@ async function loadFileConfig(): Promise<LoadedConfig> {
     throw new CliError(
       'CONFIG_ERROR',
       systemName
-        ? `System profile '${systemName}' not found. Run 'abap init' to configure it.`
-        : 'Missing "system" in .abap.json. Run \'abap init\' to set up.',
+        ? `System profile '${systemName}' not found. Run 'abap config' to configure it.`
+        : 'Missing "system" in .abap.json. Run \'abap config\' to set up.',
     );
   }
 
@@ -113,7 +113,7 @@ async function loadFileConfig(): Promise<LoadedConfig> {
   if (missing.length > 0) {
     throw new CliError(
       'CONFIG_ERROR',
-      `Missing required configuration: ${missing.join(', ')}. Run 'abap init' to set up.`,
+      `Missing required configuration: ${missing.join(', ')}. Run 'abap config' to set up.`,
     );
   }
 

@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { registerInitCommand } from '../../src/abap_cli/commands/init.js';
+import { registerConfigCommand } from '../../src/abap_cli/commands/config.js';
 import { makeProgram, runCommand } from './cli-helper.js';
 
 // Keep keychain out of the tests.
@@ -29,7 +29,7 @@ vi.mock('../../src/abap_cli/icf/service-version.js', () => ({
   ICF_SERVICE_VERSION: '0.1.0',
 }));
 
-describe('abap init ICF deployment check (US4, FR-012..FR-015, SC-004/005)', () => {
+describe('abap config ICF deployment check (US4, FR-012..FR-015, SC-004/005)', () => {
   let cwd: string;
 
   beforeEach(() => {
@@ -41,8 +41,8 @@ describe('abap init ICF deployment check (US4, FR-012..FR-015, SC-004/005)', () 
   async function runInitWithIcf(icf: unknown): Promise<{ exitCode?: number; stdout: string }> {
     checkIcfDeployment.mockResolvedValue(icf);
     const program = makeProgram();
-    registerInitCommand(program);
-    const res = await runCommand(program, ['init', '--system', 'dev', '--json'], { cwd, isTTY: false });
+    registerConfigCommand(program);
+    const res = await runCommand(program, ['config', '--system', 'dev', '--json'], { cwd, isTTY: false });
     return { exitCode: res.exitCode, stdout: res.stdout };
   }
 

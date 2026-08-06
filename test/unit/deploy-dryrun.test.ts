@@ -20,9 +20,11 @@ const getObjectSource = vi.fn(async (_url: string) => 'SAP VERSION');
 const runClass = vi.fn(async (_className: string) =>
   JSON.stringify({ status: 'success', action: 'already_active', node: { active: true } }),
 );
+const inactiveObjects = vi.fn(async () => []);
+const activateAll = vi.fn(async () => ({ messages: [] }));
 
 const client = {
-  lock, setObjectSource, syntaxCheck, activate, unLock, searchObject, objectStructure, getObjectSource, runClass,
+  lock, setObjectSource, syntaxCheck, activate, unLock, searchObject, objectStructure, getObjectSource, runClass, inactiveObjects, activateAll,
   getConfig: () => ({ sap: { username: 'MOCKUSER' } }),
 } as never;
 

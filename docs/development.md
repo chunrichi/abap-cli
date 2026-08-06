@@ -45,7 +45,7 @@ Point a test workspace at it:
 
 ```bash
 mkdir -p tmp/test && cd tmp/test
-SAP_PASSWORD=mockpw abap init --system mock --url http://localhost:8080 --client 100 --username MOCKUSER --password mockpw
+SAP_PASSWORD=mockpw abap config --system mock --url http://localhost:8080 --client 100 --username MOCKUSER --password mockpw
 ```
 
 Then run the workflows from [Getting Started](getting-started.md) against the mock.

@@ -15,7 +15,7 @@ Precedence for credentials: **OS keychain** for the referenced system name, fall
 
 ## System Profiles (`~/.abap-cli/systems.json`)
 
-Created/updated by `abap init` and managed by `abap connection`:
+Created/updated by `abap config` and managed by `abap connection`:
 
 ```bash
 abap connection list                  # List saved profiles
@@ -51,7 +51,7 @@ A template lives at [`.abap.json.example`](../.abap.json.example). This file is 
 | Variable | Purpose |
 |----------|---------|
 | `SAP_PASSWORD` | Password override when not in the keychain |
-| `SAP_URL` / `SAP_USER` / `SAP_CLIENT` / `SAP_LANGUAGE` | Used by `abap init` in non-interactive mode |
+| `SAP_URL` / `SAP_USER` / `SAP_CLIENT` / `SAP_LANGUAGE` | Used by `abap config` in non-interactive mode |
 | `NODE_TLS_REJECT_UNAUTHORIZED` | Set to `0` for self-signed certs (development only) |
 
 A template lives at [`.env.example`](../.env.example). `.env` files are gitignored.

@@ -69,7 +69,7 @@ function readSystems(configPath: string): { systems: Record<string, unknown>; er
     if (!fs.existsSync(configPath)) {
       return {
         systems: {},
-        error: { message: `Config file not found: ${configPath}`, suggestion: 'Run "abap init" or "abap connection add <name> ..." to create it.' },
+        error: { message: `Config file not found: ${configPath}`, suggestion: 'Run "abap config" or "abap connection add <name> ..." to create it.' },
       };
     }
     const parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as { systems?: Record<string, unknown> };

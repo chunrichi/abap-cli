@@ -13,10 +13,10 @@ import { handleTopLevelError } from './top-error.js';
 // 命令真正被调用（或请求其 --help）时才 import。
 const COMMAND_SPECS: LazyCommandSpec[] = [
   {
-    name: 'init',
+    name: 'config',
     scope: 'local',
-    description: 'Initialize workspace configuration for SAP connection',
-    load: () => import('./commands/init.js').then((m) => ({ register: m.registerInitCommand })),
+    description: 'Configure the workspace: write .abap.json from a system profile, or create one from full connection params. Run `abap config init` for the interactive wizard.',
+    load: () => import('./commands/config.js').then((m) => ({ register: m.registerConfigCommand })),
   },
   {
     name: 'pull',
@@ -109,8 +109,11 @@ const program = new Command();
 const require = createRequire(import.meta.url);
 const { version } = require('../../../package.json') as { version: string };
 
+// .name() controls the "Usage:" line in --help. It must match the bin name in
+// package.json ("abap"), not the package name — users invoke `abap`, never
+// `abap-cli`, so the help line shows the real command.
 program
-  .name('abap-cli')
+  .name('abap')
   .description('CLI tool for ABAP vibe coding — agent-driven ABAP development')
   .version(version)
   .option('--json', 'Output in JSON format')

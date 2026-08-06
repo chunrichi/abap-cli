@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
 import { select, text, password, confirm, isCancel } from '@clack/prompts';
+import { originalArgv } from '../output/meta.js';
 import { storePassword, getPassword } from '../crypto/secrets.js';
 import {
   getSystem,
@@ -37,53 +38,157 @@ function str(v: string | boolean | undefined, fallback = ''): string {
   return typeof v === 'string' ? v : fallback;
 }
 
-export function registerInitCommand(program: Command): void {
-  program
-    .command('init')
-    .description('Initialize workspace configuration for SAP connection')
+/** `abap config` (parent) help: option groups, examples, connection profiles. */
+function configParamHelp(): string {
+  return [
+    '',
+    'Option groups:',
+    '  Connection:      --system, --url, --client, --username, --password, --language, --insecure, --ca',
+    '  Workspace:       --tr, --package  (written to .abap.json as defaults)',
+    '  Test/verify:     --test-connection, --test-tls, --test-auth',
+    '  Interactive:     --yes / --non-interactive',
+    '',
+    'Examples:',
+    '  # Use an existing profile and set default transport & package',
+    '  abap config --system DEV --tr DEVK900001 --package Z_MY_PACKAGE',
+    '',
+    '  # CI / non-interactive (profile must exist)',
+    '  abap connection add CI --url https://... --username CI_USER --password ...',
+    '  abap config --system CI --yes',
+    '',
+    '  # Run the interactive wizard instead of passing parameters',
+    '  abap config init',
+    '',
+    'Connection profiles:',
+    '  --url / --username / --password are accepted only in interactive mode.',
+    '  In scripts and CI, create a profile once:',
+    '    abap connection add <name> --url <url> --username <user> --password <pass>',
+    '  Then reference it here:',
+    '    abap config --system <name>',
+    '',
+  ].join('\n');
+}
+
+/** `abap config init` (wizard) help. */
+function configInitHelpBlocks(): string {
+  return [
+    '',
+    'The wizard prompts you to either select an existing system profile or create',
+    'a new one, then writes .abap.json in the current directory. No flags are',
+    'accepted — to pass parameters directly, use `abap config <flags>` instead.',
+    '',
+    'Equivalent flow:',
+    '  abap config init             # interactive wizard (TTY only)',
+    '  abap config --system DEV     # non-interactive write',
+    '',
+  ].join('\n');
+}
+
+export function registerConfigCommand(program: Command): void {
+  const config = program
+    .command('config')
+    .description('Configure the workspace: write .abap.json from a system profile, or create one from full connection params. Run `abap config init` for the interactive wizard.')
     .addHelpText('after', commonErrorsAfter())
-    .option('--system <name>', 'Name of an existing system profile (see user config)')
-    .option('--url <url>', 'SAP system URL (interactive only; use "abap connection add" in scripts)')
+    .addHelpText('after', configParamHelp())
+    .option('--system <name>', 'Use an existing system profile (created with `abap connection add`)')
+    .option('--url <url>', 'SAP system URL (interactive mode only)')
     .option('-c, --client <client>', 'SAP client number')
     .option('-u, --username <user>', 'SAP username')
     .option('-p, --password <password>', 'SAP password')
     .option('-l, --language <language>', 'SAP language')
-    .option('--tr <transport>', 'Default transport number')
-    .option('-t, --transport <transport>', 'Deprecated alias for --tr')
-    .option('--package <package>', 'Default SAP package')
-    .option('--insecure', 'Skip SSL certificate verification (self-signed certs, development only)')
+    .option('--insecure', 'Skip SSL certificate verification (development only)')
     .option('--ca <path>', 'Path to a CA certificate (PEM) for SSL verification')
+    .option('--tr <transport>', 'Default transport number (written to .abap.json)')
+    .option('--package <package>', 'Default SAP package (written to .abap.json)')
     .option('--test-connection', 'Probe TLS + auth and report results (implies --test-tls --test-auth)')
     .option('--test-tls', 'Probe the TLS handshake')
     .option('--test-auth', 'Probe authentication (after TLS)')
-    .option('--yes', 'Non-interactive confirmation (alias: --no-input)')
-    .option('--no-input', 'Non-interactive confirmation (alias: --yes)')
+    .option('--yes', 'Skip all prompts; fail if required input is missing (alias: --non-interactive)')
+    .option('--non-interactive', 'Alias of --yes')
     .action(async (opts, cmd) => {
+      // Bare `abap config` (no flag) prints the subcommand help, like `abap connection` does.
+      if (Object.keys(opts).length === 0) {
+        console.log(cmd.helpInformation());
+        return;
+      }
       const jsonOutput = jsonFromCommand(cmd);
       try {
-        await runInit(opts, jsonOutput);
+        await runConfigFromOpts(opts, jsonOutput);
+      } catch (error: unknown) {
+        printError(jsonOutput, error);
+      }
+    });
+
+  config
+    .command('init')
+    .description('Interactive wizard: prompts to select or create a system profile, then writes .abap.json. Does not accept any flags.')
+    .addHelpText('after', configInitHelpBlocks())
+    .action(async (opts, cmd) => {
+      // Reject config-only flags after `config init` — the wizard accepts no
+      // parameters. Global flags (--json, --report-stuck, --help) are ignored.
+      // commander has already mutated process.argv by now, so we read the
+      // snapshot taken at module load (output/meta.ts#originalArgv).
+      const configFlags = new Set([
+        '--system', '--url', '-c', '--client', '-u', '--username', '-p', '--password',
+        '-l', '--language', '--insecure', '--ca', '--tr', '--package',
+        '--test-connection', '--test-tls', '--test-auth', '--yes', '--non-interactive',
+      ]);
+      const initIdx = originalArgv.indexOf('init');
+      const trailing = initIdx >= 0 ? originalArgv.slice(initIdx + 1) : [];
+      const userFlags: string[] = [];
+      for (let i = 0; i < trailing.length; i++) {
+        const a = trailing[i]!;
+        if (a.startsWith('-')) {
+          // Include the value of `-x value` style short flags; commander
+          // doesn't know the user passed it because we didn't define it.
+          if (/^-[a-z]$/i.test(a) && i + 1 < trailing.length && !trailing[i + 1]!.startsWith('-')) {
+            userFlags.push(a, trailing[i + 1]!);
+            i++;
+          } else {
+            userFlags.push(a);
+          }
+        }
+      }
+      const offending = userFlags.filter((f) => configFlags.has(f));
+      if (offending.length > 0) {
+        throw new CliError(
+          'USAGE',
+          `abap config init does not accept flags. Got: ${offending.join(' ')}. Use \`abap config <flags>\` to pass parameters directly.`,
+          {
+            nextSteps: [
+              'Drop the flags and run `abap config init` to enter the wizard.',
+              'Or run `abap config --system <name>` to write .abap.json from parameters.',
+            ],
+            example: 'abap config init',
+          },
+        );
+      }
+      const jsonOutput = jsonFromCommand(cmd);
+      try {
+        await runConfigWizard(opts, jsonOutput);
       } catch (error: unknown) {
         printError(jsonOutput, error);
       }
     });
 }
 
-async function runInit(opts: CommandOpts, jsonOutput: boolean): Promise<void> {
+/** Core parameterized write — shared by `abap config` (parent) and previously `abap config init`. */
+async function runConfigFromOpts(opts: CommandOpts, jsonOutput: boolean): Promise<void> {
   const isNonTty = !process.stdin.isTTY;
   const systemName = str(opts.system) || '';
   const hasFullParams = (opts.url || process.env.SAP_URL) &&
     (opts.username || process.env.SAP_USER) &&
     (opts.password || process.env.SAP_PASSWORD);
 
-  // FR-022: in non-interactive mode init never creates or mutates profiles.
+  // FR-022: in non-interactive mode config never creates or mutates profiles.
   if (isNonTty && hasFullParams) {
     throw new CliError(
       'VALIDATION_ERROR',
-      'In non-interactive mode, abap init does not create connection profiles. Use abap connection add.',
+      'In non-interactive mode, abap config does not create connection profiles. Use abap connection add.',
       {
         nextSteps: [
           "Create the profile: 'abap connection add <name> --url <url> --username <user> --password <pass>'.",
-          "Then reference it: 'abap init --system <name>'.",
+          "Then reference it: 'abap config --system <name>'.",
         ],
         example: 'abap connection add dev --url https://sap.example.com --username USER',
       },
@@ -95,18 +200,21 @@ async function runInit(opts: CommandOpts, jsonOutput: boolean): Promise<void> {
     await createSystemFromParams(opts, jsonOutput);
   } else if (systemName) {
     await useExistingSystem(systemName, opts, jsonOutput);
-  } else if (!isNonTty) {
-    await interactiveInit(opts, jsonOutput);
   } else {
     throw new CliError(
       'USAGE',
-      'Non-interactive environment detected. Provide --system:\n  abap init --system <name>',
+      'Non-interactive environment detected. Provide --system:\n  abap config init --system <name>',
       {
-        nextSteps: ["Run 'abap init --system <name>' to reference an existing profile."],
-        example: 'abap init --system dev --test-connection --yes',
+        nextSteps: ["Run 'abap config --system <name>' to reference an existing profile."],
+        example: 'abap config --system dev --test-connection --yes',
       },
     );
   }
+}
+
+/** `abap config init` — interactive wizard, refactored from the old interactiveInit. */
+async function runConfigWizard(opts: CommandOpts, jsonOutput: boolean): Promise<void> {
+  await interactiveInit(opts, jsonOutput);
 }
 
 /** Use an existing user-level system profile */
@@ -119,7 +227,7 @@ async function useExistingSystem(
   if (!profile) {
     throw new CliError(
       'CONFIG_ERROR',
-      `System profile '${systemName}' not found. Run 'abap init' interactively to create it.`,
+      `System profile '${systemName}' not found. Run 'abap config init' (the wizard) to create it.`,
     );
   }
 
@@ -153,17 +261,9 @@ async function useExistingSystem(
   if (jsonOutput) outputJson(systemName, config, probe, icf);
 }
 
-/**
- * Resolve the transport flag: canonical --tr wins, legacy -t/--transport is a
- * deprecated alias that emits a warning (FR-026).
- */
+/** Resolve the transport flag from --tr (only canonical option since --transport was removed). */
 function transportFromOpts(opts: CommandOpts): string {
-  const canonical = str(opts.tr);
-  const legacy = str(opts.transport);
-  if (opts.transport !== undefined) {
-    collectWarning('DEPRECATED_OPTION', "'-t/--transport' is deprecated; use '--tr <transport>'.", { option: '-t/--transport' });
-  }
-  return canonical || legacy;
+  return str(opts.tr);
 }
 
 /** Run the requested probe layers; throw a structured error if one fails. */
@@ -288,7 +388,7 @@ async function interactiveInit(opts: CommandOpts, jsonOutput: boolean): Promise<
   config.pkg = str(opts.package) || (orCancel(await text({ message: 'Default package (optional)' }))) || '';
 
   validateInputs(config);
-  await handleFileOverwrite(opts.yes === true || opts.noInput === true ? 'overwrite' : 'prompt');
+  await handleFileOverwrite(opts.yes === true || opts.nonInteractive === true ? 'overwrite' : 'prompt');
   await writeConfig(systemName, config, jsonOutput);
   if (jsonOutput) outputJson(systemName, config);
 }

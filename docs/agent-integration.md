@@ -20,7 +20,7 @@ abap-cli is designed to be driven by AI agents. Every command supports `--json` 
 
 Commands require no TTY:
 
-- Fully parameterized `abap init` (no prompts)
+- Fully parameterized `abap config` (no prompts)
 - `--json` on every command
 - No interactive confirmations in the pull/push/check/create/transport flows
 

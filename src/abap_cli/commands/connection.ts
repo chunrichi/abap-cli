@@ -191,7 +191,7 @@ function validateBundle(raw: unknown): ProfileBundle {
 function runList(jsonOutput: boolean): void {
   const names = listSystemNames();
   if (names.length === 0) {
-    printResult(jsonOutput, { systems: [] }, "No connection profiles saved. Run 'abap init' to create one.");
+    printResult(jsonOutput, { systems: [] }, "No connection profiles saved. Run 'abap config' to create one.");
     return;
   }
   const systems = names.map((name) => {
@@ -501,7 +501,7 @@ async function runDelete(name: string, jsonOutput: boolean): Promise<void> {
     }
   }
   if (warning) {
-    collectWarning('PROFILE_MISMATCH', `${warning}. Update it with 'abap init' if needed.`);
+    collectWarning('PROFILE_MISMATCH', `${warning}. Update it with 'abap config' if needed.`);
   }
 
   const data: Record<string, unknown> = { deleted: name, passwordCleaned };

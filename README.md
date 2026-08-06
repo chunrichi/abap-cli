@@ -23,7 +23,7 @@ Three-layer architecture:
 npm install -g abap-cli
 
 # Initialize workspace (interactive or parameterized)
-abap init --url https://sap:44300 --client 100 --username DEV --password '***'
+abap config --url https://sap:44300 --client 100 --username DEV --password '***'
 
 # Download an object from SAP (classes pull all include parts into a per-object dir)
 abap pull ZCL_MY_CLASS
@@ -47,7 +47,8 @@ abap push src/zcl_my_class/zcl_my_class.clas.abap --tr <REQUEST_NUMBER>
 
 | Command | Description |
 |---------|-------------|
-| `abap init` | Initialize workspace configuration (system profile + `.abap.json`) |
+| `abap config [flags]` | Parameter form: pass `--system <name>` (or full `--url/--username/--password`) to write `.abap.json`; creates a system profile when given full params |
+| `abap config init` | Interactive wizard (TTY only): select or create a system profile, then write `.abap.json` |
 | `abap pull <object>` | Download a source object to `src/<object>/` (abap-file-format: per-object dir with `<name>.<type>.json` + `.abap` parts; `--type`, `--dir`) |
 | `abap push <files...>` | Push local files: lock → write → activate → unlock (`--tr`, `--check-only`, `--all`) |
 | `abap check <files...>` | Validate local files: `--syntax` (default, against SAP) / `--content` (local) / `--atc` |

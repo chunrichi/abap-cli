@@ -19,7 +19,17 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
       BEGIN OF ty_error,
         status TYPE string,
         error  TYPE ty_error_body,
-      END OF ty_error.
+      END OF ty_error,
+      BEGIN OF ty_remote_source_data,
+        objectType  TYPE string,
+        objectName  TYPE string,
+        version     TYPE string,
+        source      TYPE string,
+      END OF ty_remote_source_data,
+      BEGIN OF ty_remote_source,
+        status TYPE string,
+        data   TYPE ty_remote_source_data,
+      END OF ty_remote_source.
     CONSTANTS gc_service TYPE string VALUE 'zabap_vibe'.
     CONSTANTS gc_version TYPE string VALUE '0.2.0'.
 
@@ -51,8 +61,16 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
       IMPORTING io_server   TYPE REF TO if_http_server
                 iv_path     TYPE string
                 iv_method   TYPE string.
+    METHODS dispatch_version_management
+      IMPORTING io_server TYPE REF TO if_http_server
+                iv_path   TYPE string
+                iv_method TYPE string.
+    METHODS query_param
+      IMPORTING iv_query TYPE string
+                iv_name  TYPE string
+      RETURNING VALUE(rv_value) TYPE string.
 
-    " ----- textpool helpers (READ_TEXT_POOL / SAVE_TEXT_POOL) -----
+    " ----- textpool helpers (RS_TEXTPOOL_READ / target-specific write) -----
     TYPES:
       BEGIN OF ty_textpool_elem,
         id   TYPE string,
@@ -75,17 +93,17 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
     " ----- DDIC shared helpers (extracted from reference implementation) -----
     TYPES:
       BEGIN OF ty_field,
-        field_name  TYPE fieldname,
+        fieldName   TYPE fieldname,
         rollname    TYPE rollname,
-        datatype    TYPE dd03p-datatype,
-        leng        TYPE dd03p-leng,
+        dataType    TYPE dd03p-datatype,
+        length      TYPE dd03p-leng,
         decimals    TYPE dd03p-decimals,
-        key_flag    TYPE abap_bool,
-        not_null    TYPE abap_bool,
+        keyFlag     TYPE abap_bool,
+        notNull     TYPE abap_bool,
         ddtext      TYPE dd03p-ddtext,
-        ref_table   TYPE dd03p-reftable,
-        ref_field   TYPE dd03p-reffield,
-        check_table TYPE dd03p-checktable,
+        refTable    TYPE dd03p-reftable,
+        refField    TYPE dd03p-reffield,
+        checkTable  TYPE dd03p-checktable,
       END OF ty_field,
       tt_field TYPE STANDARD TABLE OF ty_field WITH EMPTY KEY.
 
@@ -172,6 +190,8 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
       dispatch_ddic( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
     ELSEIF lv_path CP '/textpool/*'.
       dispatch_textpool( io_server = server iv_path = lv_path iv_method = lv_method ).
+    ELSEIF lv_path CP '/version-source*'.
+      dispatch_version_management( io_server = server iv_path = lv_path iv_method = lv_method ).
     ELSE.
       respond_error( io_server = server
                      iv_status = 404
@@ -181,18 +201,169 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
+  METHOD dispatch_version_management.
+    IF iv_method <> 'GET'.
+      respond_error( io_server = io_server
+                     iv_status = 405
+                     iv_reason = 'Method Not Allowed'
+                     iv_code = 'METHOD_NOT_ALLOWED'
+                     iv_msg = |GET only on Version Management endpoints| ).
+      RETURN.
+    ENDIF.
+
+    DATA(lv_query) = io_server->request->get_header_field( '~query_string' ).
+    DATA(lv_objtype) = to_upper( query_param( iv_query = lv_query iv_name = 'objectType' ) ).
+    DATA(lv_objname) = to_upper( query_param( iv_query = lv_query iv_name = 'objectName' ) ).
+    DATA(lv_destination) = to_upper( query_param( iv_query = lv_query iv_name = 'destination' ) ).
+
+    IF lv_objtype IS INITIAL OR lv_objname IS INITIAL OR lv_destination IS INITIAL.
+      respond_error( io_server = io_server
+                     iv_status = 400
+                     iv_reason = 'Bad Request'
+                     iv_code = 'VERSION_PARAMETER_REQUIRED'
+                     iv_msg = |objectType, objectName and destination query parameters are required| ).
+      RETURN.
+    ENDIF.
+
+    IF lv_objtype <> 'REPS' AND lv_objtype <> 'REPO' AND lv_objtype <> 'TYPD'
+        AND lv_objtype <> 'FUNC' AND lv_objtype <> 'CNTX' AND lv_objtype <> 'CINC'
+        AND lv_objtype <> 'METH' AND lv_objtype <> 'CLSD' AND lv_objtype <> 'CPUB'
+        AND lv_objtype <> 'CPRI' AND lv_objtype <> 'CPRO' AND lv_objtype <> 'INTF'
+        AND lv_objtype <> 'XSLT'.
+      respond_error( io_server = io_server
+                     iv_status = 400
+                     iv_reason = 'Bad Request'
+                     iv_code = 'VERSION_TYPE_NOT_SUPPORTED'
+                     iv_msg = |unsupported Version Management object type: { lv_objtype }| ).
+      RETURN.
+    ENDIF.
+
+    IF strlen( lv_destination ) > 60
+        OR lv_destination CN 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@._-'.
+      respond_error( io_server = io_server
+                     iv_status = 400
+                     iv_reason = 'Bad Request'
+                     iv_code = 'VERSION_DESTINATION_INVALID'
+                     iv_msg = |invalid RFC destination format| ).
+      RETURN.
+    ENDIF.
+
+    lv_destination = |TMSADM@{ lv_destination }.DOMAIN_{ lv_destination }|.
+
+    IF iv_path CP '/version-source*'.
+      " Step 1: Check if any versions exist on the remote system
+      DATA lt_versions TYPE tt_vrs_disp.
+      TRY.
+          CALL FUNCTION 'SVRS_GET_VERSIONS'
+            EXPORTING
+              iv_objtype = CONV vrsd-objtype( lv_objtype )
+              iv_objname = CONV vrsd-objname( lv_objname )
+              iv_rfcdest = CONV rfcdest( lv_destination )
+            IMPORTING
+              et_vrs_disp = lt_versions.
+        CATCH cx_root INTO DATA(lx_versions).
+          respond_error( io_server = io_server
+                         iv_status = 502
+                         iv_reason = 'Bad Gateway'
+                         iv_code = 'REMOTE_VERSIONS_FAILED'
+                         iv_msg = lx_versions->get_text( ) ).
+          RETURN.
+      ENDTRY.
+
+      " No versions — object has not been transported to production
+      IF lt_versions IS INITIAL.
+        DATA(ls_empty_source) = VALUE ty_remote_source(
+          status = 'success'
+          data = VALUE #( objectType = lv_objtype
+                          objectName = lv_objname
+                          version = '00000'
+                          source = '' ) ).
+        respond_json( io_server = io_server
+                      iv_status = 200
+                      iv_reason = 'OK'
+                      is_payload = ls_empty_source ).
+        RETURN.
+      ENDIF.
+
+      " Step 2: Versions exist — fetch source code for versno 00000 (active version)
+      DATA lt_repos TYPE STANDARD TABLE OF abaptxt255 WITH EMPTY KEY.
+      DATA lt_trdir TYPE STANDARD TABLE OF trdir WITH EMPTY KEY.
+      CALL FUNCTION 'SVRS_GET_REPS_FROM_OBJECT'
+        EXPORTING
+          object_name = CONV vrsd-objname( lv_objname )
+          object_type = CONV vrsd-objtype( lv_objtype )
+          versno      = '00000'
+          destination = CONV rfcdest( lv_destination )
+        TABLES
+          repos_tab   = lt_repos
+          trdir_tab   = lt_trdir
+        EXCEPTIONS
+          no_version  = 1
+          OTHERS      = 2.
+      IF sy-subrc <> 0.
+        respond_error( io_server = io_server
+                       iv_status = 404
+                       iv_reason = 'Not Found'
+                       iv_code = 'REMOTE_VERSION_NOT_FOUND'
+                       iv_msg = |active version (00000) could not be read for { lv_objname }| ).
+        RETURN.
+      ENDIF.
+
+      DATA lv_source TYPE string.
+      LOOP AT lt_repos INTO DATA(lv_line).
+        IF lv_source IS INITIAL.
+          lv_source = CONV string( lv_line ).
+        ELSE.
+          lv_source = lv_source && cl_abap_char_utilities=>newline && CONV string( lv_line ).
+        ENDIF.
+      ENDLOOP.
+
+      DATA(ls_source) = VALUE ty_remote_source(
+        status = 'success'
+        data = VALUE #( objectType = lv_objtype
+                        objectName = lv_objname
+                        version = '00000'
+                        source = lv_source ) ).
+      respond_json( io_server = io_server
+                    iv_status = 200
+                    iv_reason = 'OK'
+                    is_payload = ls_source ).
+      RETURN.
+    ENDIF.
+
+    respond_error( io_server = io_server
+                   iv_status = 404
+                   iv_reason = 'Not Found'
+                   iv_code = 'NOT_FOUND'
+                   iv_msg = |unknown Version Management path: { iv_path }| ).
+  ENDMETHOD.
+
+  METHOD query_param.
+    DATA lv_pattern TYPE string.
+    lv_pattern = '(?:^|&)' && iv_name && '=([^&]*)'.
+    FIND FIRST OCCURRENCE OF REGEX lv_pattern IN iv_query IGNORING CASE
+      SUBMATCHES rv_value.
+    IF sy-subrc = 0.
+      rv_value = cl_http_utility=>if_http_utility~unescape_url( escaped = rv_value ).
+    ENDIF.
+  ENDMETHOD.
+
   METHOD dispatch_textpool.
-    " 014 US4: read/write textpool via classic READ_TEXT_POOL / SAVE_TEXT_POOL
-    " (ECC fallback path). Routes /textpool/<category>?object=<name>&type=<type>.
+    " 014 US4: read textpool via RS_TEXTPOOL_READ; write support is target-specific.
+    " Routes /textpool/<category>?object=<name>&type=<type>.
     " category: texts|selections|headings; object = program/class name; type = PROG|CLAS|FUGR.
-    DATA(lv_path) = iv_path.
+    DATA lv_path        TYPE string.
     DATA lv_category TYPE string.
     DATA lv_object   TYPE string.
     DATA lv_objtype  TYPE string.
+    DATA lv_cat      TYPE string.
+    DATA lv_obj      TYPE string.
+    DATA lv_type     TYPE string.
+    lv_path = iv_path.
 
     FIND REGEX '^/textpool/(texts|selections|headings)' IN lv_path IGNORING CASE
-      SUBMATCHES DATA(lt_cat).
-    IF sy-subrc <> 0 OR lines( lt_cat ) < 1.
+      SUBMATCHES lv_cat.
+    IF sy-subrc <> 0 OR lv_cat IS INITIAL.
       respond_error( io_server = io_server
                      iv_status = 404
                      iv_reason = 'Not Found'
@@ -200,15 +371,15 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
                      iv_msg = |unsupported textpool path: { iv_path }| ).
       RETURN.
     ENDIF.
-    lv_category = to_upper( lt_cat[ 1 ] ).
+    lv_category = to_upper( lv_cat ).
 
     " Query params from the request URL.
     DATA(lv_query) = io_server->request->get_header_field( '~query_string' ).
     IF lv_query IS NOT INITIAL.
-      FIND FIRST OCCURRENCE OF REGEX 'object=([^&]+)' IN lv_query IGNORING CASE SUBMATCHES DATA(lt_obj).
-      IF sy-subrc = 0 AND lines( lt_obj ) >= 1. lv_object = to_upper( lt_obj[ 1 ] ). ENDIF.
-      FIND FIRST OCCURRENCE OF REGEX 'type=([^&]+)' IN lv_query IGNORING CASE SUBMATCHES DATA(lt_type).
-      IF sy-subrc = 0 AND lines( lt_type ) >= 1. lv_objtype = to_upper( lt_type[ 1 ] ). ENDIF.
+      FIND FIRST OCCURRENCE OF REGEX 'object=([^&]+)' IN lv_query IGNORING CASE SUBMATCHES lv_obj.
+      IF sy-subrc = 0. lv_object = to_upper( lv_obj ). ENDIF.
+      FIND FIRST OCCURRENCE OF REGEX 'type=([^&]+)' IN lv_query IGNORING CASE SUBMATCHES lv_type.
+      IF sy-subrc = 0. lv_objtype = to_upper( lv_type ). ENDIF.
     ENDIF.
     IF lv_object IS INITIAL.
       respond_error( io_server = io_server
@@ -242,26 +413,28 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_textpool_elements.
-    " READ_TEXT_POOL reads the program/class text pool; category selects the rows.
+    " RS_TEXTPOOL_READ is the non-interactive textpool reader available on the
+    " target release; category selects the returned rows.
     DATA lt_pool TYPE TABLE OF textpool.
     DATA ls_pool TYPE textpool.
-    DATA lv_id    TYPE c LENGTH 2.
-    DATA lv_retry TYPE i.
 
-    " Read the text pool (active state). ID filtering: texts='' (symbols use key 01..), selections='S', headings='H'.
-    CALL FUNCTION 'READ_TEXT_POOL'
+    CALL FUNCTION 'RS_TEXTPOOL_READ'
       EXPORTING
-        program    = iv_object
-        state      = 'A'
-      IMPORTING
-        header     = DATA(lv_hdr)
+        objectname      = CONV rs38m-programm( iv_object )
+        action          = 'SHOW'
+        authority_check = ' '
+        language        = sy-langu
       TABLES
-        pooltab    = lt_pool
+        tpool           = lt_pool
       EXCEPTIONS
-        object_not_found = 1
-        OTHERS           = 2.
+        object_not_found  = 1
+        permission_failure = 2
+        invalid_program_type = 3
+        error_occured      = 4
+        action_cancelled   = 5
+        OTHERS             = 6.
     IF sy-subrc <> 0.
-      ev_payload = |{ "status": "error", "error": { "code": "TEXTPOOL_OBJECT_NOT_FOUND", "message": "{ iv_object } not found" } }|.
+      ev_payload = `{ "status": "error", "error": { "code": "TEXTPOOL_OBJECT_NOT_FOUND", "message": "` && iv_object && ` not found" } }`.
       RETURN.
     ENDIF.
 
@@ -269,8 +442,8 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
     lv_json = `[`.
     DATA lv_first TYPE abap_bool VALUE abap_true.
     LOOP AT lt_pool INTO ls_pool.
-      " Category filter: texts → ID IS INITIAL; selections → ID = 'S'; headings → ID = 'H'.
-      IF iv_category = 'TEXTS' AND ls_pool-id IS NOT INITIAL. CONTINUE. ENDIF.
+      " Category filter: symbols → ID = 'I'; selections → ID = 'S'; headings → ID = 'H'.
+      IF iv_category = 'TEXTS' AND ls_pool-id <> 'I'. CONTINUE. ENDIF.
       IF iv_category = 'SELECTIONS' AND ls_pool-id <> 'S'. CONTINUE. ENDIF.
       IF iv_category = 'HEADINGS' AND ls_pool-id <> 'H'. CONTINUE. ENDIF.
       IF lv_first = abap_true.
@@ -278,78 +451,28 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
       ELSE.
         lv_json = lv_json && `,`.
       ENDIF.
-      lv_json = lv_json && |{ "id": "{ ls_pool-key }", "text": "{ ls_pool-entry }" }|.
+      lv_json = lv_json && `{ "id": "` && ls_pool-key && `", "text": "` && ls_pool-entry && `" }`.
     ENDLOOP.
     lv_json = lv_json && `]`.
 
-    ev_payload = |{ "status": "success", "data": { "object": "{ iv_object }", "type": "{ iv_objtype }", "category": "{ iv_category }", "elements": { lv_json } } }|.
+    ev_payload = `{ "status": "success", "data": { "object": "` && iv_object && `", "type": "` && iv_objtype && `", "category": "` && iv_category && `", "elements": ` && lv_json && ` } }`.
   ENDMETHOD.
 
   METHOD set_textpool_elements.
-    " SAVE_TEXT_POOL persists the full text pool. The body is the .properties-style
-    " entries for the given category; we merge them into the existing pool.
-    " (Full multi-category merge is handled here; the CLI sends one category per call.)
-    DATA lt_pool TYPE TABLE OF textpool.
-    DATA ls_pool TYPE textpool.
-    DATA lv_id    TYPE c LENGTH 2.
-    DATA lv_ok    TYPE abap_bool VALUE abap_true.
-
-    CALL FUNCTION 'READ_TEXT_POOL'
-      EXPORTING
-        program    = iv_object
-        state      = 'A'
-      IMPORTING
-        header     = DATA(lv_hdr)
-      TABLES
-        pooltab    = lt_pool
-      EXCEPTIONS
-        object_not_found = 1
-        OTHERS           = 2.
-    IF sy-subrc <> 0.
-      ev_payload = |{ "status": "error", "error": { "code": "TEXTPOOL_OBJECT_NOT_FOUND", "message": "{ iv_object } not found" } }|.
-      RETURN.
-    ENDIF.
-
-    " Remove existing rows for this category so re-push is idempotent.
-    DATA(lv_keep_id) = COND #( WHEN iv_category = 'SELECTIONS' THEN 'S'
-                               WHEN iv_category = 'HEADINGS'   THEN 'H'
-                               ELSE '' ).
-    DELETE lt_pool WHERE id = lv_keep_id.
-
-    " Parse the posted JSON elements (array of { id, text, maxLength? }).
-    " The body is a wire envelope: { "elements": [ ... ] }.
-    DATA: BEGIN OF ls_body, elements TYPE TABLE OF ty_textpool_elem WITH EMPTY KEY, END OF ls_body.
-    /ui2/cl_json=>deserialize( EXPORTING json = iv_body CHANGING data = ls_body ).
-    LOOP AT ls_body-elements INTO DATA(ls_elem).
-      ls_pool-id    = lv_keep_id.
-      ls_pool-key   = ls_elem-id.
-      ls_pool-entry = ls_elem-text.
-      APPEND ls_pool TO lt_pool.
-    ENDLOOP.
-
-    CALL FUNCTION 'SAVE_TEXT_POOL'
-      EXPORTING
-        program   = iv_object
-        state     = 'A'
-      TABLES
-        pooltab   = lt_pool
-      EXCEPTIONS
-        OTHERS    = 2.
-    IF sy-subrc <> 0.
-      ev_payload = |{ "status": "error", "error": { "code": "TEXTPOOL_WRITE_FAILED", "message": "SAVE_TEXT_POOL failed (subrc={ sy-subrc })" } }|.
-      RETURN.
-    ENDIF.
-
-    DATA(lv_written) = lines( ls_body-elements ).
-    ev_payload = |{ "status": "success", "data": { "object": "{ iv_object }", "type": "{ iv_objtype }", "category": "{ iv_category }", "written": { lv_written } } }|.
+    ev_payload = `{ "status": "error", "error": { "code": "TEXTPOOL_WRITE_UNSUPPORTED", "message": "Textpool writing is not available through a non-interactive API on this SAP release" } }`.
   ENDMETHOD.
 
   METHOD dispatch_ddic.
     DATA lv_type TYPE string.
     DATA lv_name TYPE string.
+    DATA lv_match_type TYPE string.
+    DATA lv_match_name TYPE string.
+    DATA lv_pkg TYPE string.
+    DATA lv_req TYPE string.
+    DATA lv_payload TYPE string.
     FIND REGEX '^/ddic/(doma|dtel|tabl|stru)(?:/(.+))?$' IN iv_path IGNORING CASE
-      SUBMATCHES DATA(lt_parts).
-    IF sy-subrc <> 0 OR lines( lt_parts ) < 1.
+      SUBMATCHES lv_match_type lv_match_name.
+    IF sy-subrc <> 0 OR lv_match_type IS INITIAL.
       respond_error( io_server = io_server
                      iv_status = 404
                      iv_reason = 'Not Found'
@@ -357,9 +480,9 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
                      iv_msg = |unsupported ddic path: { iv_path }| ).
       RETURN.
     ENDIF.
-    lv_type = to_upper( lt_parts[ 1 ] ).
-    IF lines( lt_parts ) >= 2.
-      lv_name = to_upper( lt_parts[ 2 ] ).
+    lv_type = to_upper( lv_match_type ).
+    IF lv_match_name IS NOT INITIAL.
+      lv_name = to_upper( lv_match_name ).
     ENDIF.
 
     DATA lv_package TYPE devclass.
@@ -368,43 +491,43 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
       " Extract package/transportRequest from the wire payload via static regex
       " (the per-type handlers do the full JSON deserialize for typed fields).
       FIND FIRST OCCURRENCE OF REGEX '"package"\s*:\s*"([^"]+)"' IN iv_body IGNORING CASE
-        SUBMATCHES DATA(lt_pkg).
-      IF sy-subrc = 0 AND lines( lt_pkg ) >= 1.
-        lv_package = lt_pkg[ 1 ].
+        SUBMATCHES lv_pkg.
+      IF sy-subrc = 0.
+        lv_package = lv_pkg.
       ELSE.
         lv_package = '$TMP'.
       ENDIF.
       FIND FIRST OCCURRENCE OF REGEX '"transportRequest"\s*:\s*"([^"]+)"' IN iv_body IGNORING CASE
-        SUBMATCHES DATA(lt_req).
-      IF sy-subrc = 0 AND lines( lt_req ) >= 1.
-        lv_request = lt_req[ 1 ].
+        SUBMATCHES lv_req.
+      IF sy-subrc = 0.
+        lv_request = lv_req.
       ENDIF.
 
       CASE lv_type.
         WHEN 'DOMA'.
-          create_ddic_domain( EXPORTING iv_name    = lv_name
+          create_ddic_domain( EXPORTING iv_name    = CONV domname( lv_name )
                                         iv_payload = iv_body
                                         iv_package = lv_package
                                         iv_request = lv_request
-                              IMPORTING ev_payload = DATA(lv_payload) ).
+                              IMPORTING ev_payload = lv_payload ).
         WHEN 'DTEL'.
-          create_ddic_data_element( EXPORTING iv_name    = lv_name
+          create_ddic_data_element( EXPORTING iv_name    = CONV rollname( lv_name )
                                             iv_payload = iv_body
                                             iv_package = lv_package
                                             iv_request = lv_request
-                                  IMPORTING ev_payload = DATA(lv_payload) ).
+                                  IMPORTING ev_payload = lv_payload ).
         WHEN 'TABL'.
-          create_ddic_table( EXPORTING iv_name    = lv_name
+          create_ddic_table( EXPORTING iv_name    = CONV tabname( lv_name )
                                        iv_payload = iv_body
                                        iv_package = lv_package
                                        iv_request = lv_request
-                             IMPORTING ev_payload = DATA(lv_payload) ).
+                             IMPORTING ev_payload = lv_payload ).
         WHEN 'STRU'.
-          create_ddic_structure( EXPORTING iv_name    = lv_name
+          create_ddic_structure( EXPORTING iv_name    = CONV tabname( lv_name )
                                           iv_payload = iv_body
                                           iv_package = lv_package
                                           iv_request = lv_request
-                                IMPORTING ev_payload = DATA(lv_payload) ).
+                                IMPORTING ev_payload = lv_payload ).
       ENDCASE.
       respond_raw_json( io_server = io_server
                         iv_status = 200
@@ -413,7 +536,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
     ELSEIF iv_method = 'GET'.
       get_ddic_object( EXPORTING iv_type    = lv_type
                                  iv_name    = lv_name
-                       IMPORTING ev_payload = DATA(lv_payload) ).
+                       IMPORTING ev_payload = lv_payload ).
       respond_raw_json( io_server = io_server
                         iv_status = 200
                         iv_reason = 'OK'
@@ -465,25 +588,25 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
       lv_uuid = get_uuid( ).
       CLEAR ls_object_new.
       ls_object_new-object_type = 'TABLE_FIELD'.
-      ls_object_new-object_name = <ls_field>-field_name.
+      ls_object_new-object_name = <ls_field>-fieldName.
       ls_object_new-key_guid    = lv_uuid.
       ls_object_new-parent_key  = iv_parent_key.
 
       ls_details-fieldname = 'POSITION'. ls_details-fieldvalue = lv_position. APPEND ls_details TO ls_object_new-details.
 
-      IF <ls_field>-key_flag = abap_true.
-        ls_details-fieldname = 'KEYFLAG'. ls_details-fieldvalue = <ls_field>-key_flag. APPEND ls_details TO ls_object_new-details.
+      IF <ls_field>-keyFlag = abap_true.
+        ls_details-fieldname = 'KEYFLAG'. ls_details-fieldvalue = <ls_field>-keyFlag. APPEND ls_details TO ls_object_new-details.
         ls_details-fieldname = 'NOTNULL'. ls_details-fieldvalue = 'X'. APPEND ls_details TO ls_object_new-details.
-      ELSEIF <ls_field>-not_null = abap_true.
-        ls_details-fieldname = 'NOTNULL'. ls_details-fieldvalue = <ls_field>-not_null. APPEND ls_details TO ls_object_new-details.
+      ELSEIF <ls_field>-notNull = abap_true.
+        ls_details-fieldname = 'NOTNULL'. ls_details-fieldvalue = <ls_field>-notNull. APPEND ls_details TO ls_object_new-details.
       ENDIF.
 
       IF <ls_field>-rollname IS NOT INITIAL.
         ls_details-fieldname = 'ROLLNAME'. ls_details-fieldvalue = <ls_field>-rollname. APPEND ls_details TO ls_object_new-details.
-      ELSEIF <ls_field>-datatype IS NOT INITIAL.
-        ls_details-fieldname = 'DATATYPE'. ls_details-fieldvalue = <ls_field>-datatype. APPEND ls_details TO ls_object_new-details.
-        IF <ls_field>-leng IS NOT INITIAL.
-          ls_details-fieldname = 'LENG'. ls_details-fieldvalue = <ls_field>-leng. APPEND ls_details TO ls_object_new-details.
+      ELSEIF <ls_field>-dataType IS NOT INITIAL.
+        ls_details-fieldname = 'DATATYPE'. ls_details-fieldvalue = <ls_field>-dataType. APPEND ls_details TO ls_object_new-details.
+        IF <ls_field>-length IS NOT INITIAL.
+          ls_details-fieldname = 'LENG'. ls_details-fieldvalue = <ls_field>-length. APPEND ls_details TO ls_object_new-details.
         ENDIF.
         IF <ls_field>-decimals IS NOT INITIAL.
           ls_details-fieldname = 'DECIMALS'. ls_details-fieldvalue = <ls_field>-decimals. APPEND ls_details TO ls_object_new-details.
@@ -494,12 +617,12 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
         ls_details-fieldname = 'LANGUAGE'. ls_details-fieldvalue = sy-langu. APPEND ls_details TO ls_object_new-details.
       ENDIF.
 
-      IF <ls_field>-ref_table IS NOT INITIAL AND <ls_field>-ref_field IS NOT INITIAL.
-        ls_details-fieldname = 'REFTABLE'. ls_details-fieldvalue = <ls_field>-ref_table. APPEND ls_details TO ls_object_new-details.
-        ls_details-fieldname = 'REFFIELD'. ls_details-fieldvalue = <ls_field>-ref_field. APPEND ls_details TO ls_object_new-details.
+      IF <ls_field>-refTable IS NOT INITIAL AND <ls_field>-refField IS NOT INITIAL.
+        ls_details-fieldname = 'REFTABLE'. ls_details-fieldvalue = <ls_field>-refTable. APPEND ls_details TO ls_object_new-details.
+        ls_details-fieldname = 'REFFIELD'. ls_details-fieldvalue = <ls_field>-refField. APPEND ls_details TO ls_object_new-details.
       ENDIF.
-      IF <ls_field>-check_table IS NOT INITIAL.
-        ls_details-fieldname = 'CHECKTABLE'. ls_details-fieldvalue = <ls_field>-check_table. APPEND ls_details TO ls_object_new-details.
+      IF <ls_field>-checkTable IS NOT INITIAL.
+        ls_details-fieldname = 'CHECKTABLE'. ls_details-fieldvalue = <ls_field>-checkTable. APPEND ls_details TO ls_object_new-details.
       ENDIF.
 
       APPEND ls_object_new TO et_object_new.
@@ -508,63 +631,57 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
 
   METHOD create_ddic_table.
     DATA lt_object_new TYPE comt_gox_def_header.
+    DATA lt_object_old TYPE comt_gox_def_header.
     DATA lt_bapireturn TYPE bapirettab.
     DATA lt_transport  TYPE comt_gox_trans_object.
     DATA lt_fields     TYPE tt_field.
+    DATA ls_mandt      TYPE ty_field.
+    DATA lv_start      TYPE i.
+    DATA ls_header_local TYPE coms_gox_def_header.
+    DATA lt_field_entries TYPE comt_gox_def_header.
 
     DATA: BEGIN OF ls_attr, name TYPE string, description TYPE string, deliveryClass TYPE string,
              dataClass TYPE string, sizeCategory TYPE string, clientDependent TYPE abap_bool,
-             allowMaintenance TYPE abap_bool, END OF ls_attr.
+             allowMaintenance TYPE abap_bool, fields TYPE tt_field, END OF ls_attr.
     /ui2/cl_json=>deserialize( EXPORTING json = iv_payload
                                CHANGING data = ls_attr ).
     IF ls_attr-name IS INITIAL.
       ls_attr-name = iv_name.
     ENDIF.
-
-    DATA(lv_fields_json) = ''.
-    FIND REGEX '"fields"\s*:\s*\[[^\]]*\]' IN iv_payload IGNORING CASE
-      MATCH DATA(lv_fields_json).
-    IF sy-subrc = 0 AND lv_fields_json IS NOT INITIAL.
-      DATA: BEGIN OF ls_field_outer, fields TYPE TABLE OF ty_field WITH EMPTY KEY, END OF ls_field_outer.
-      /ui2/cl_json=>deserialize( EXPORTING json = lv_fields_json
-                                 CHANGING data = ls_field_outer-fields ).
-      lt_fields = ls_field_outer-fields.
-    ENDIF.
+    lt_fields = ls_attr-fields.
 
     IF ls_attr-clientDependent = abap_true.
-      DATA ls_mandt TYPE ty_field.
-      ls_mandt-field_name = 'MANDT'.
+      ls_mandt-fieldName = 'MANDT'.
       ls_mandt-rollname   = 'MANDT'.
-      ls_mandt-key_flag   = abap_true.
-      ls_mandt-not_null   = abap_true.
+      ls_mandt-keyFlag    = abap_true.
+      ls_mandt-notNull    = abap_true.
       INSERT ls_mandt INTO lt_fields INDEX 1.
     ENDIF.
 
-    build_table_header( EXPORTING iv_table_name    = ls_attr-name
-                                  iv_description   = ls_attr-description
-                                  iv_delivery_class = ls_attr-deliveryClass
-                                  iv_data_class    = ls_attr-dataClass
-                                  iv_size_category = ls_attr-sizeCategory
-                        IMPORTING es_object_new    = DATA(ls_header_local)
-                                  et_object_new    = lt_object_new
+    build_table_header( EXPORTING iv_table_name    = CONV tabname( ls_attr-name )
+                                  iv_description   = CONV ddtext( ls_attr-description )
+                                  iv_delivery_class = CONV dd02v-contflag( ls_attr-deliveryClass )
+                                  iv_data_class    = CONV dd09l-tabart( ls_attr-dataClass )
+                                  iv_size_category = CONV dd09l-tabkat( ls_attr-sizeCategory )
+                        IMPORTING es_object_new    = ls_header_local
+                                  et_object_new     = lt_object_new
                                   et_bapireturn    = lt_bapireturn ).
-
-    DATA lv_start TYPE i.
     lv_start = COND #( WHEN ls_attr-clientDependent = abap_true THEN 2 ELSE 1 ).
 
     build_field_entries( EXPORTING iv_parent_key = ls_header_local-key_guid
-                                   iv_table_name = ls_attr-name
+                                   iv_table_name = CONV tabname( ls_attr-name )
                                    it_fields     = lt_fields
                                    iv_start_pos  = lv_start
-                         IMPORTING et_object_new = DATA(lt_field_entries)
+                         IMPORTING et_object_new = lt_field_entries
                                    et_bapireturn = lt_bapireturn ).
 
     APPEND LINES OF lt_field_entries TO lt_object_new.
 
     CALL FUNCTION 'GOX_GEN_TABLE_STD'
       EXPORTING
-        iv_object_name = ls_attr-name
+        iv_object_name = CONV char32( ls_attr-name )
         it_object_new  = lt_object_new
+        it_object_old  = lt_object_old
         iv_devclass    = iv_package
         iv_request_wb  = iv_request
       IMPORTING
@@ -582,56 +699,51 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
     IF lv_ok = abap_false.
-      ev_payload = |{ "status": "error", "error": { "code": "DDIC_CREATE_FAILED", "message": "{ lv_msg }" } }|.
+      ev_payload = |\{ "status": "error", "error": \{ "code": "DDIC_CREATE_FAILED", "message": "{ lv_msg }" \} \}|.
       RETURN.
     ENDIF.
 
-    ev_payload = |{ "status": "success", "data": { "name": "{ ls_attr-name }", "type": "TABL", "action": "created" } }|.
+    ev_payload = |\{ "status": "success", "data": \{ "name": "{ ls_attr-name }", "type": "TABL", "action": "created" \} \}|.
   ENDMETHOD.
 
   METHOD create_ddic_structure.
     DATA lt_object_new TYPE comt_gox_def_header.
+    DATA lt_object_old TYPE comt_gox_def_header.
     DATA lt_bapireturn TYPE bapirettab.
     DATA lt_transport  TYPE comt_gox_trans_object.
     DATA lt_fields     TYPE tt_field.
+    DATA ls_header_local TYPE coms_gox_def_header.
+    DATA lt_field_entries TYPE comt_gox_def_header.
 
-    DATA: BEGIN OF ls_attr, name TYPE string, description TYPE string, END OF ls_attr.
+    DATA: BEGIN OF ls_attr, name TYPE string, description TYPE string, fields TYPE tt_field, END OF ls_attr.
     /ui2/cl_json=>deserialize( EXPORTING json = iv_payload CHANGING data = ls_attr ).
     IF ls_attr-name IS INITIAL.
       ls_attr-name = iv_name.
     ENDIF.
+    lt_fields = ls_attr-fields.
 
-    DATA(lv_fields_json) = ''.
-    FIND REGEX '"fields"\s*:\s*\[[^\]]*\]' IN iv_payload IGNORING CASE
-      MATCH DATA(lv_fields_json).
-    IF sy-subrc = 0 AND lv_fields_json IS NOT INITIAL.
-      DATA: BEGIN OF ls_field_outer, fields TYPE TABLE OF ty_field WITH EMPTY KEY, END OF ls_field_outer.
-      /ui2/cl_json=>deserialize( EXPORTING json = lv_fields_json
-                                 CHANGING data = ls_field_outer-fields ).
-      lt_fields = ls_field_outer-fields.
-    ENDIF.
-
-    build_table_header( EXPORTING iv_table_name    = ls_attr-name
-                                  iv_description   = ls_attr-description
+    build_table_header( EXPORTING iv_table_name    = CONV tabname( ls_attr-name )
+                                  iv_description   = CONV ddtext( ls_attr-description )
                                   iv_tabclass      = 'INTTAB'
                                   iv_delivery_class = 'A'
                                   iv_data_class    = 'APPL0'
                                   iv_size_category = '0'
                                   iv_exclass       = '3'
-                        IMPORTING es_object_new    = DATA(ls_header_local)
+                        IMPORTING es_object_new    = ls_header_local
                                   et_object_new    = lt_object_new
                                   et_bapireturn    = lt_bapireturn ).
     build_field_entries( EXPORTING iv_parent_key = ls_header_local-key_guid
-                                   iv_table_name = ls_attr-name
+                                   iv_table_name = CONV tabname( ls_attr-name )
                                    it_fields     = lt_fields
-                         IMPORTING et_object_new = DATA(lt_field_entries)
+                         IMPORTING et_object_new = lt_field_entries
                                    et_bapireturn = lt_bapireturn ).
     APPEND LINES OF lt_field_entries TO lt_object_new.
 
     CALL FUNCTION 'GOX_GEN_TABLE_STD'
       EXPORTING
-        iv_object_name = ls_attr-name
+        iv_object_name = CONV char32( ls_attr-name )
         it_object_new  = lt_object_new
+        it_object_old  = lt_object_old
         iv_devclass    = iv_package
         iv_request_wb  = iv_request
       IMPORTING
@@ -640,15 +752,36 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
 
     DATA lv_ok TYPE abap_bool VALUE abap_true.
     DATA lv_msg TYPE string.
+    DATA lv_error TYPE string.
     LOOP AT lt_bapireturn INTO DATA(ls_err) WHERE type CA 'EAX'.
       lv_ok = abap_false.
-      IF lv_msg IS INITIAL. lv_msg = ls_err-message. ELSE. lv_msg = lv_msg && |; { ls_err-message }|. ENDIF.
+      IF ls_err-message IS INITIAL.
+        CLEAR lv_error.
+        CALL FUNCTION 'MESSAGE_TEXT_BUILD'
+          EXPORTING
+            msgid               = ls_err-id
+            msgnr               = ls_err-number
+            msgv1               = ls_err-message_v1
+            msgv2               = ls_err-message_v2
+            msgv3               = ls_err-message_v3
+            msgv4               = ls_err-message_v4
+          IMPORTING
+            message_text_output = lv_error
+          EXCEPTIONS
+            OTHERS              = 1.
+        IF lv_error IS INITIAL.
+          lv_error = |{ ls_err-type } { ls_err-id } { ls_err-number } { ls_err-message_v1 } { ls_err-message_v2 } { ls_err-message_v3 } { ls_err-message_v4 }|.
+        ENDIF.
+      ELSE.
+        lv_error = ls_err-message.
+      ENDIF.
+      IF lv_msg IS INITIAL. lv_msg = lv_error. ELSE. lv_msg = lv_msg && |; { lv_error }|. ENDIF.
     ENDLOOP.
     IF lv_ok = abap_false.
-      ev_payload = |{ "status": "error", "error": { "code": "DDIC_CREATE_FAILED", "message": "{ lv_msg }" } }|.
+      ev_payload = |\{ "status": "error", "error": \{ "code": "DDIC_CREATE_FAILED", "message": "{ lv_msg }" \} \}|.
       RETURN.
     ENDIF.
-    ev_payload = |{ "status": "success", "data": { "name": "{ ls_attr-name }", "type": "STRU", "action": "created" } }|.
+    ev_payload = |\{ "status": "success", "data": \{ "name": "{ ls_attr-name }", "type": "STRU", "action": "created" \} \}|.
   ENDMETHOD.
 
   METHOD create_ddic_data_element.
@@ -727,7 +860,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
 
     CALL FUNCTION 'GOX_GEN_DTEL_STD'
       EXPORTING
-        iv_object_name = ls_attr-name
+        iv_object_name = CONV char32( ls_attr-name )
         it_object_new  = lt_object_new
         it_object_old  = lt_object_old
         iv_devclass    = iv_package
@@ -743,10 +876,10 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
       IF lv_msg IS INITIAL. lv_msg = ls_err-message. ELSE. lv_msg = lv_msg && |; { ls_err-message }|. ENDIF.
     ENDLOOP.
     IF lv_ok = abap_false.
-      ev_payload = |{ "status": "error", "error": { "code": "DDIC_CREATE_FAILED", "message": "{ lv_msg }" } }|.
+      ev_payload = |\{ "status": "error", "error": \{ "code": "DDIC_CREATE_FAILED", "message": "{ lv_msg }" \} \}|.
       RETURN.
     ENDIF.
-    ev_payload = |{ "status": "success", "data": { "name": "{ ls_attr-name }", "type": "DTEL", "action": "created" } }|.
+    ev_payload = |\{ "status": "success", "data": \{ "name": "{ ls_attr-name }", "type": "DTEL", "action": "created" \} \}|.
   ENDMETHOD.
 
   METHOD create_ddic_domain.
@@ -798,7 +931,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
 
     CALL FUNCTION 'GOX_GEN_DOMA_STD'
       EXPORTING
-        iv_object_name = ls_attr-name
+        iv_object_name = CONV char32( ls_attr-name )
         it_object_new  = lt_object_new
         it_object_old  = lt_object_old
         iv_devclass    = iv_package
@@ -814,10 +947,10 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
       IF lv_msg IS INITIAL. lv_msg = ls_err-message. ELSE. lv_msg = lv_msg && |; { ls_err-message }|. ENDIF.
     ENDLOOP.
     IF lv_ok = abap_false.
-      ev_payload = |{ "status": "error", "error": { "code": "DDIC_CREATE_FAILED", "message": "{ lv_msg }" } }|.
+      ev_payload = |\{ "status": "error", "error": \{ "code": "DDIC_CREATE_FAILED", "message": "{ lv_msg }" \} \}|.
       RETURN.
     ENDIF.
-    ev_payload = |{ "status": "success", "data": { "name": "{ ls_attr-name }", "type": "DOMA", "action": "created" } }|.
+    ev_payload = |\{ "status": "success", "data": \{ "name": "{ ls_attr-name }", "type": "DOMA", "action": "created" \} \}|.
   ENDMETHOD.
 
   METHOD get_ddic_object.
@@ -828,7 +961,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
         DATA ls_doma TYPE dd01v.
         CALL FUNCTION 'DDIF_DOMA_GET'
           EXPORTING
-            name      = iv_name
+            name      = CONV domname( iv_name )
             state     = 'A'
             langu     = sy-langu
           IMPORTING
@@ -840,12 +973,23 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
           ev_payload = `{ "status": "error", "error": { "code": "DDIC_OBJECT_NOT_FOUND", "message": "DOMA ` && iv_name && ` not found" } }`.
           RETURN.
         ENDIF.
-        ev_payload = |{ "status": "success", "data": { "name": "{ iv_name }", "type": "DOMA", "description": "{ ls_doma-ddtext }", "dataType": "{ ls_doma-datatype }", "length": { ls_doma-leng }, "decimals": { ls_doma-decimals }, "signFlag": { ls_doma-signflag }, "lowercase": { ls_doma-lowercase }, "convExit": "{ ls_doma-convexit }" } } }|.
+         DATA lv_doma_length TYPE i.
+         DATA lv_doma_decimals TYPE i.
+         DATA lv_doma_sign_flag TYPE string.
+         DATA lv_doma_lowercase TYPE string.
+         lv_doma_length = ls_doma-leng.
+         lv_doma_decimals = ls_doma-decimals.
+         IF ls_doma-signflag = 'X'. lv_doma_sign_flag = 'true'. ELSE. lv_doma_sign_flag = 'false'. ENDIF.
+         IF ls_doma-lowercase = 'X'. lv_doma_lowercase = 'true'. ELSE. lv_doma_lowercase = 'false'. ENDIF.
+        ev_payload = |\{ "status": "success", "data": \{ "name": "{ iv_name }", "type": "DOMA",| &&
+               | "description": "{ ls_doma-ddtext }", "dataType": "{ ls_doma-datatype }",| &&
+           | "length": { lv_doma_length }, "decimals": { lv_doma_decimals }, "signFlag": { lv_doma_sign_flag },| &&
+           | "lowercase": { lv_doma_lowercase }, "convExit": "{ ls_doma-convexit }" \} \}|.
       WHEN 'DTEL'.
         DATA ls_dtel TYPE dd04v.
         CALL FUNCTION 'DDIF_DTEL_GET'
           EXPORTING
-            name     = iv_name
+            name     = CONV rollname( iv_name )
             state    = 'A'
             langu    = sy-langu
           IMPORTING
@@ -857,7 +1001,15 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
           ev_payload = `{ "status": "error", "error": { "code": "DDIC_OBJECT_NOT_FOUND", "message": "DTEL ` && iv_name && ` not found" } }`.
           RETURN.
         ENDIF.
-        ev_payload = |{ "status": "success", "data": { "name": "{ iv_name }", "type": "DTEL", "description": "{ ls_dtel-ddtext }", "domain": "{ ls_dtel-domname }", "dataType": "{ ls_dtel-datatype }", "length": { ls_dtel-leng }, "decimals": { ls_dtel-decimals }, "shortText": "{ ls_dtel-scrtext_s }", "mediumText": "{ ls_dtel-scrtext_m }", "longText": "{ ls_dtel-scrtext_l }", "headerText": "{ ls_dtel-reptext }" } } }|.
+         DATA lv_dtel_length TYPE i.
+         DATA lv_dtel_decimals TYPE i.
+         lv_dtel_length = ls_dtel-leng.
+         lv_dtel_decimals = ls_dtel-decimals.
+        ev_payload = |\{ "status": "success", "data": \{ "name": "{ iv_name }", "type": "DTEL",| &&
+               | "description": "{ ls_dtel-ddtext }", "domain": "{ ls_dtel-domname }",| &&
+           | "dataType": "{ ls_dtel-datatype }", "length": { lv_dtel_length }, "decimals": { lv_dtel_decimals },| &&
+               | "shortText": "{ ls_dtel-scrtext_s }", "mediumText": "{ ls_dtel-scrtext_m }",| &&
+               | "longText": "{ ls_dtel-scrtext_l }", "headerText": "{ ls_dtel-reptext }" \} \}|.
       WHEN 'TABL'.
         " DDIF_TABL_GET reads both transparent tables and structures; the
         " tabclass in dd02v distinguishes them.
@@ -866,7 +1018,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
         DATA lt_tabl03 TYPE TABLE OF dd03p.
         CALL FUNCTION 'DDIF_TABL_GET'
           EXPORTING
-            name     = iv_name
+            name     = CONV tabname( iv_name )
             state    = 'A'
             langu    = sy-langu
           IMPORTING
@@ -885,24 +1037,39 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
         DATA lv_fields TYPE string.
         lv_fields = `[`.
         DATA lv_first TYPE abap_bool VALUE abap_true.
+        DATA lv_tabl_length TYPE i.
+        DATA lv_tabl_decimals TYPE i.
+        DATA lv_tabl_key_flag TYPE string.
+        DATA lv_tabl_not_null TYPE string.
+        DATA lv_tabl_client_dependent TYPE string VALUE 'false'.
         LOOP AT lt_tabl03 INTO DATA(ls_field).
+          lv_tabl_length = ls_field-leng.
+          lv_tabl_decimals = ls_field-decimals.
+          IF ls_field-keyflag = 'X'. lv_tabl_key_flag = 'true'. ELSE. lv_tabl_key_flag = 'false'. ENDIF.
+          IF ls_field-notnull = 'X'. lv_tabl_not_null = 'true'. ELSE. lv_tabl_not_null = 'false'. ENDIF.
+          IF ls_field-fieldname = 'MANDT'. lv_tabl_client_dependent = 'true'. ENDIF.
           IF lv_first = abap_true.
             lv_first = abap_false.
           ELSE.
             lv_fields = lv_fields && `,`.
           ENDIF.
           lv_fields = lv_fields
-            && |{ "fieldName": "{ ls_field-fieldname }", "rollname": "{ ls_field-rollname }", "dataType": "{ ls_field-datatype }", "length": { ls_field-leng }, "decimals": { ls_field-decimals }, "keyFlag": { ls_field-keyflag }, "notNull": { ls_field-notnull } }|.
+            && |\{ "fieldName": "{ ls_field-fieldname }", "rollname": "{ ls_field-rollname }",| &&
+            | "dataType": "{ ls_field-datatype }", "length": { lv_tabl_length }, "decimals": { lv_tabl_decimals },| &&
+            | "keyFlag": { lv_tabl_key_flag }, "notNull": { lv_tabl_not_null } \}|.
         ENDLOOP.
         lv_fields = lv_fields && `]`.
-        ev_payload = |{ "status": "success", "data": { "name": "{ iv_name }", "type": "{ iv_type }", "description": "{ ls_tabl-ddtext }", "deliveryClass": "{ ls_tabl-contflag }", "dataClass": "{ ls_tabl09-tabart }", "sizeCategory": "{ ls_tabl09-tabkat }", "clientDependent": true, "fields": { lv_fields } } }|.
+        ev_payload = |\{ "status": "success", "data": \{ "name": "{ iv_name }", "type": "{ iv_type }",| &&
+               | "description": "{ ls_tabl-ddtext }", "deliveryClass": "{ ls_tabl-contflag }",| &&
+           | "dataClass": "{ ls_tabl09-tabart }", "sizeCategory": "{ ls_tabl09-tabkat }",| &&
+           | "clientDependent": { lv_tabl_client_dependent }, "fields": { lv_fields } \} \}|.
       WHEN 'STRU'.
         " Structure read via DDIF_TABL_GET (tabclass INTTAB), same shape as TABL.
         DATA ls_stru TYPE dd02v.
         DATA lt_stru03 TYPE TABLE OF dd03p.
         CALL FUNCTION 'DDIF_TABL_GET'
           EXPORTING
-            name     = iv_name
+            name     = CONV tabname( iv_name )
             state    = 'A'
             langu    = sy-langu
           IMPORTING
@@ -919,19 +1086,25 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
         DATA lv_fields2 TYPE string.
         lv_fields2 = `[`.
         DATA lv_first2 TYPE abap_bool VALUE abap_true.
+        DATA lv_stru_length TYPE i.
+        DATA lv_stru_decimals TYPE i.
+        DATA lv_stru_key_flag TYPE string.
         LOOP AT lt_stru03 INTO DATA(ls_field2).
+          lv_stru_length = ls_field2-leng.
+          lv_stru_decimals = ls_field2-decimals.
+          IF ls_field2-keyflag = 'X'. lv_stru_key_flag = 'true'. ELSE. lv_stru_key_flag = 'false'. ENDIF.
           IF lv_first2 = abap_true.
             lv_first2 = abap_false.
           ELSE.
             lv_fields2 = lv_fields2 && `,`.
           ENDIF.
           lv_fields2 = lv_fields2
-            && |{ "fieldName": "{ ls_field2-fieldname }", "rollname": "{ ls_field2-rollname }", "dataType": "{ ls_field2-datatype }", "length": { ls_field2-leng }, "decimals": { ls_field2-decimals }, "keyFlag": { ls_field2-keyflag } }|.
+              && |\{ "fieldName": "{ ls_field2-fieldname }", "rollname": "{ ls_field2-rollname }", "dataType": "{ ls_field2-datatype }", "length": { lv_stru_length }, "decimals": { lv_stru_decimals }, "keyFlag": { lv_stru_key_flag } \}|.
         ENDLOOP.
         lv_fields2 = lv_fields2 && `]`.
-        ev_payload = |{ "status": "success", "data": { "name": "{ iv_name }", "type": "STRU", "description": "{ ls_stru-ddtext }", "fields": { lv_fields2 } } }|.
+        ev_payload = |\{ "status": "success", "data": \{ "name": "{ iv_name }", "type": "STRU", "description": "{ ls_stru-ddtext }", "fields": { lv_fields2 } \} \}|.
       WHEN OTHERS.
-        ev_payload = |{ "status": "error", "error": { "code": "DDIC_NOT_SUPPORTED", "message": "unsupported DDIC type { iv_type }" } }|.
+        ev_payload = |\{ "status": "error", "error": \{ "code": "DDIC_NOT_SUPPORTED", "message": "unsupported DDIC type { iv_type }" \} \}|.
     ENDCASE.
   ENDMETHOD.
 

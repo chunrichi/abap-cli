@@ -8,14 +8,20 @@
  *    warnings that only ever appear in meta.warnings, never in the error
  *    envelope (FR-009).
  *  - buildMeta: snapshot of command, version, timestamp, durationMs, warnings.
+ *  - originalArgv: process.argv.slice(2) captured at module load, before
+ *    commander mutates process.argv. Used to detect flags that the parser
+ *    silently swallowed (e.g. unknown flags on a subcommand that doesn't
+ *    define them).
  */
+
+export const originalArgv: string[] = process.argv.slice(2);
 
 import type { Command } from 'commander';
 import { createRequire } from 'node:module';
 
 export type WarningCode =
   | 'UNLOCK_WARNING'        // push succeeded but the edit lock could not be released
-  | 'DEPRECATED_OPTION'     // deprecated option used (--max, -t/--transport)
+  | 'DEPRECATED_OPTION'     // deprecated option used (e.g. --max in search)
   | 'PASSWORD_EXPORT'       // connection export includes passwords
   | 'KEYCHAIN_WARNING'      // OS keychain store/cleanup failed (degraded continue)
   | 'FORCE_BYPASSED'        // deploy --force bypassed safety guards

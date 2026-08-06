@@ -146,7 +146,7 @@ describe('lazy command registration (P1.6)', () => {
 // --- Static consistency: stub descriptions must match the command modules ---
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const COMMAND_NAMES = [
-  'init', 'pull', 'push', 'check', 'search', 'create', 'atc', 'status',
+  'config', 'pull', 'push', 'check', 'search', 'create', 'atc', 'status',
   'transport', 'deploy', 'connection', 'doctor', 'inspect', 'diff', 'sync',
   'report-stuck',
 ];
@@ -186,7 +186,7 @@ const hasBuiltCli = fs.existsSync(cliEntry);
 describe('lazy loading at the process level (P1.6)', () => {
   it.skipIf(!hasBuiltCli)('--help lists commands without any SAP call', async () => {
     const { stdout } = await run(process.execPath, [cliEntry, '--help']);
-    for (const name of ['init', 'pull', 'transport', 'connection', 'report-stuck']) {
+    for (const name of ['config', 'pull', 'transport', 'connection', 'report-stuck']) {
       expect(stdout).toContain(name);
     }
   });
@@ -204,7 +204,7 @@ describe('lazy loading at the process level (P1.6)', () => {
 });
 
 // --- root --help groups local commands under a dedicated section (P2.9) ---
-const LOCAL_NAMES = ['init', 'connection', 'doctor', 'report-stuck'];
+const LOCAL_NAMES = ['config', 'connection', 'doctor', 'report-stuck'];
 const SAP_NAMES = ['pull', 'push', 'check', 'search', 'create', 'status', 'transport', 'deploy', 'inspect', 'diff', 'sync', 'atc'];
 
 describe('lazy command scope grouping (P2.9)', () => {
@@ -237,7 +237,7 @@ describe('lazy command scope grouping (P2.9)', () => {
 
   it('root help lists only local commands under the "Local commands" section', async () => {
     const program = makeLazyProgram([
-      { name: 'init', scope: 'local', description: 'Init', load: helloSpec([]).load },
+      { name: 'config', scope: 'local', description: 'Config', load: helloSpec([]).load },
       { name: 'pull', description: 'Pull', load: helloSpec([]).load },
       { name: 'doctor', scope: 'local', description: 'Doctor', load: helloSpec([]).load },
     ]);
@@ -245,7 +245,7 @@ describe('lazy command scope grouping (P2.9)', () => {
     expect(res.stdout).toContain('Local commands (no SAP connection required):');
     // The local section lists only the local commands.
     const localSection = res.stdout.split('Local commands (no SAP connection required):')[1] ?? '';
-    expect(localSection).toContain('init');
+    expect(localSection).toContain('config');
     expect(localSection).toContain('doctor');
     expect(localSection).not.toContain('pull');
   });
