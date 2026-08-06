@@ -3,7 +3,9 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import type { CreatableTypeIds } from 'abap-adt-api';
 import { AdtClientWrapper } from '../clients/adt-client.js';
+import { IcfClient } from '../clients/icf-client.js';
 import { CliError, printError, printResult, jsonFromCommand, printSchema, type CommandSchema } from '../output/json.js';
+import type { ErrorCode } from '../output/error-codes.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import { resolveObject, getObjectParts, type ResolvedObject, type ObjectPart } from '../sync/resolve.js';
 import { resolveTransport } from '../sync/transport.js';
@@ -11,6 +13,7 @@ import { pushObject } from '../sync/push-flow.js';
 import { buildFilename, objectDirName } from '../formats/file-resolver.js';
 import { writeAbapFile, fileExists } from '../formats/abap-source.js';
 import { defaultSkeleton, getTemplate, listTemplates } from '../formats/templates.js';
+import { readDdicJson, localToWire, validateDdicObject, DDIC_SUPPORTED_TYPES, type DdicSupportedType } from '../formats/ddic-json.js';
 
 interface CreateTypeSpec {
   objtype: CreatableTypeIds;
@@ -24,8 +27,13 @@ const TYPE_MAP: Record<string, CreateTypeSpec> = {
   FUGR: { objtype: 'FUGR/F' },
 };
 
-// DDIC objects are created via the ICF service (later phase, not implemented yet).
-const DDIC_TYPES = new Set(['DOMA', 'DTEL', 'TABL', 'STRU', 'TTYP']);
+// 014: DDIC types created via the self-built ICF service. TTYP is deferred (Q2).
+const DDIC_TYPES = new Set<string>(DDIC_SUPPORTED_TYPES);
+
+/** 014: narrow an arbitrary type string to the supported DDIC types. */
+function isDdicSupportedType(t: string): t is DdicSupportedType {
+  return (DDIC_SUPPORTED_TYPES as readonly string[]).includes(t);
+}
 
 interface CreateOptions {
   package: string;
@@ -39,6 +47,8 @@ interface CreateOptions {
   checkOnly?: boolean;
   audit?: boolean;
   schema?: boolean;
+  /** 014: DDIC abap-file-format JSON input path. */
+  file?: string;
 }
 
 export function registerCreateCommand(program: Command): void {
@@ -59,6 +69,7 @@ export function registerCreateCommand(program: Command): void {
     .option('--no-pull', 'Skip the create-then-pull local copy (default: pull after create)')
     .option('--check-only', 'Validate the proposed object without creating it')
     .option('--audit', 'Include the before-checksum (extra SAP round-trip, off by default)')
+    .option('--file <path>', '014: abap-file-format DDIC JSON input (required for DOMA/DTEL/TABL/STRU)')
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action(async (type, name, opts, cmd) => {
       const json = jsonFromCommand(cmd);
@@ -137,6 +148,85 @@ async function runCreateLocal(type: string, name: string, opts: CreateLocalOptio
   );
 }
 
+/**
+ * 014: create a DDIC object via the self-built ICF service.
+ * Reads the abap-file-format JSON from `--file`, validates it, converts to wire
+ * schema, and POSTs /ddic/<type>. Command-line --description overrides the file's
+ * description. Other required fields (package, transport for non-$TMP) are validated
+ * client-side before the round-trip.
+ */
+async function runCreateDdic(type: DdicSupportedType, objectName: string, opts: CreateOptions, json: boolean): Promise<void> {
+  const filePath = path.resolve(process.cwd(), opts.file ?? '');
+  let local: Awaited<ReturnType<typeof readDdicJson>>;
+  try {
+    local = await readDdicJson(filePath);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new CliError('INVALID_ARGUMENT', `Cannot read DDIC file ${opts.file}: ${message}`, {
+      file: opts.file,
+      nextSteps: [
+        'Verify the file exists and is valid JSON.',
+        'See quickstart.md scenario 1 for the expected layout.',
+      ],
+    });
+  }
+
+  // FR-004: client-side validation (fast-fail, no SAP round-trip for invalid input).
+  const errors = validateDdicObject(local, type);
+  if (errors.length > 0) {
+    throw new CliError('VALIDATION_ERROR', `Invalid ${type} definition in ${opts.file}: ${errors.join('; ')}`, {
+      file: opts.file,
+      type,
+      object: objectName,
+      details: errors,
+      nextSteps: [
+        'Fix the errors above and re-run.',
+        'See data-model.md §1-4 for the per-type required fields.',
+      ],
+    });
+  }
+
+  // FR-004: non-$TMP package requires a transport request.
+  if (opts.package !== '$TMP' && !opts.tr) {
+    throw new CliError('VALIDATION_ERROR', 'transportRequest is required when package is not $TMP', {
+      nextSteps: ['Re-run with --tr <REQUEST>', 'Or use --package $TMP for local objects.'],
+      example: `abap create ${type} ${objectName} --file ${opts.file} --package ${opts.package} --tr <REQUEST> --description "..."`,
+    });
+  }
+
+  // Convert to wire schema. CLI flags override file values when both are present.
+  const wire = localToWire(type, local);
+  if (opts.description) wire.description = opts.description;
+  if (opts.package) wire.package = opts.package;
+  if (opts.tr) wire.transportRequest = opts.tr;
+
+  const icf = await IcfClient.create();
+  const resp = await icf.postDdic<{ name: string; type: string; action: 'created' | 'updated' }>(type.toLowerCase(), wire);
+  if (resp.status !== 'success' || !resp.data) {
+    const code = (resp.error?.code ?? 'DDIC_CREATE_FAILED') as ErrorCode;
+    throw new CliError(code, resp.error?.message ?? `Failed to create ${type} ${objectName}`, {
+      object: objectName,
+      type,
+      details: resp.error?.details,
+      nextSteps: [
+        'Verify the file conforms to the abap-file-format JSON schema.',
+        'Re-run after fixing the cause above.',
+      ],
+    });
+  }
+
+  printResult(
+    json,
+    {
+      object: resp.data.name,
+      type,
+      action: resp.data.action,
+      file: opts.file,
+    },
+    `Created ${type} ${resp.data.name} via ICF ${resp.data.action === 'created' ? '(new)' : '(overwritten)'}`,
+  );
+}
+
 async function runCreate(type: string | undefined, name: string | undefined, opts: CreateOptions, json: boolean): Promise<void> {
   if (opts.schema) {
     printSchema(createSchema(type));
@@ -157,14 +247,29 @@ async function runCreate(type: string | undefined, name: string | undefined, opt
       example: 'abap create CLAS ZCL_MY_CLASS --package ZPKG --description "desc"',
     });
   }
-  if (!opts.description) {
+  // 014: when --file is provided the description is supplied via the JSON file
+  // (works for any DDIC type, including deferred ones like TTYP).
+  if (!opts.description && !opts.file) {
     throw new CliError('USAGE', "Missing required option '--description <desc>'", {
       example: 'abap create CLAS ZCL_MY_CLASS --package ZPKG --description "desc"',
     });
   }
   const skipActivate = opts.activate === false;
-  const spec = resolveType(type);
+  const typeUpper = type.toUpperCase();
   const objectName = normalizeName(name);
+
+  // 014: DDIC types route to the self-built ICF service (US1/2).
+  if (isDdicSupportedType(typeUpper)) {
+    if (!opts.file) {
+      throw new CliError('USAGE', `DDIC type ${typeUpper} requires --file <path> with an abap-file-format JSON`, {
+        example: `abap create ${typeUpper} ${objectName} --file src/${objectName.toLowerCase()}.${typeUpper.toLowerCase()}.json --package $TMP --description "..."`,
+      });
+    }
+    await runCreateDdic(typeUpper, objectName, opts, json);
+    return;
+  }
+
+  const spec = resolveType(type);
   const client = await AdtClientWrapper.create();
 
   // --check-only: validate the proposed object without creating it (FR-021).
@@ -267,6 +372,8 @@ async function runCreate(type: string | undefined, name: string | undefined, opt
 type CreateCommandSchema = CommandSchema & {
   type?: string;
   supported?: boolean;
+  /** 014: 'icf' for DDIC types created via the self-built ICF service. */
+  route?: 'icf';
   reason?: 'DDIC_NOT_SUPPORTED' | 'TYPE_NOT_SUPPORTED';
   message?: string;
   templates?: { name: string; description: string }[];
@@ -302,13 +409,28 @@ function createSchema(type?: string): CreateCommandSchema {
   };
 
   if (!t) return base;
+  // 014: supported DDIC types now report supported:true with the ICF route
+  // (TTYP and unknown types stay rejected).
   if (DDIC_TYPES.has(t)) {
+    return {
+      ...base,
+      type: t,
+      supported: true,
+      route: 'icf',
+      message: `DDIC type ${t} created via the self-built ICF service (014). Requires --file <abap-file-format JSON>.`,
+      options: [
+        ...base.options,
+        { name: '--file', type: 'string', valuePlaceholder: '<path>', required: true, description: 'abap-file-format DDIC JSON input' },
+      ],
+    };
+  }
+  if (t === 'TTYP') {
     return {
       ...base,
       type: t,
       supported: false,
       reason: 'DDIC_NOT_SUPPORTED',
-      message: `Object type ${t} is a DDIC object; not supported in this phase (ICF service not implemented yet)`,
+      message: `Object type ${t} is a DDIC object; deferred to a later phase (Q2).`,
     };
   }
   if (!TYPE_MAP[t]) {
@@ -317,7 +439,7 @@ function createSchema(type?: string): CreateCommandSchema {
       type: t,
       supported: false,
       reason: 'TYPE_NOT_SUPPORTED',
-      message: `Object type ${t} is not supported. Supported types: ${Object.keys(TYPE_MAP).join(', ')}`,
+      message: `Object type ${t} is not supported. Supported types: ${[...Object.keys(TYPE_MAP), ...DDIC_SUPPORTED_TYPES].join(', ')}`,
     };
   }
 

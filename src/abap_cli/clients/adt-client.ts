@@ -1,4 +1,8 @@
-import { ADTClient, createSSLConfig, session_types } from 'abap-adt-api';
+import { ADTClient, createSSLConfig, session_types, type TextElement, type TextElementCategory } from 'abap-adt-api';
+import {
+  getTextElements as adtGetTextElements,
+  setTextElements as adtSetTextElements,
+} from 'abap-adt-api/build/api/textelements.js';
 import { loadConfig, readCaCertificate, type ProjectConfig } from '../config/project-config.js';
 import { CliError } from '../output/json.js';
 import { classifyHttpError } from './http-error.js';
@@ -159,6 +163,41 @@ export class AdtClientWrapper {
   /** Run an ABAP class as an application (ADT classrun, e.g. ICF setup). */
   runClass(className: string) {
     return this._call(() => this.client.runClass(className));
+  }
+
+  // --- Text elements (textpool; 014 US4) ---
+
+  /** Read text elements (symbols/selections/headings) for an object. */
+  getTextElements(objectType: string, objectName: string, category: TextElementCategory = 'symbols') {
+    return this._call(async () => {
+      const url = this.textElementsUrlFor(objectType, objectName);
+      return adtGetTextElements(this.client.httpClient, url, category);
+    });
+  }
+
+  /** Write text elements. Caller is responsible for lock/unlock (push-flow). */
+  setTextElements(
+    objectType: string,
+    objectName: string,
+    category: TextElementCategory,
+    elements: TextElement[],
+    lockHandle: string,
+    transport?: string,
+  ) {
+    return this._call(async () => {
+      const url = this.textElementsUrlFor(objectType, objectName);
+      return adtSetTextElements(this.client.httpClient, url, category, elements, lockHandle, transport);
+    });
+  }
+
+  /** Synchronous URL builder (no round-trip); avoids double async for callers. */
+  private textElementsUrlFor(objectType: string, objectName: string): string {
+    const lower = objectName.toLowerCase();
+    const encoded = lower.includes('/') ? encodeURIComponent(lower) : lower;
+    const upperType = objectType.toUpperCase();
+    if (upperType.startsWith('CLAS')) return `/sap/bc/adt/textelements/classes/${encoded}`;
+    if (upperType.startsWith('FUGR')) return `/sap/bc/adt/textelements/functiongroups/${encoded}`;
+    return `/sap/bc/adt/textelements/programs/${encoded}`;
   }
 
   /** Main program(s) for an include part (program/function-group includes). */

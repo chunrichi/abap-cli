@@ -125,7 +125,8 @@ abap push src/zcl_my_new_class/zcl_my_new_class.clas.abap --tr DEVK900001
 - **Transport management** — `abap transport list` / `create` / `show` / `resolve` / `assign`
 - **Diagnosis & workflows** — `abap doctor`, `abap inspect`, `abap diff`, `abap sync`, `abap report-stuck`
 - **ICF service lifecycle** — `abap deploy` deploys the bundled ICF service (`/sap/zabap_vibe`) and triggers its SICF node setup; `abap init` checks deployment/version state; `abap activate` fixes stale activation (see [Commands](commands.md))
-- **DDIC objects** (Domain, DataElement, Table, etc. as `.json`) — not yet supported; rejected with a clear `DDIC_NOT_SUPPORTED` message (planned via the self-built ICF service)
+- **DDIC objects** (Domain, DataElement, Table, Structure as `.doma.json` / `.dtel.json` / `.tabl.json` / `.stru.json`) — create / overwrite / pull via the self-built ICF service (`/sap/zabap_vibe/ddic/*`). `abap create <DOMA|DTEL|TABL|STRU> <name> --file <json>` creates; `abap pull <name> --type <T>` downloads; `abap push <name>.<type>.json --tr <tr>` updates. TTYP is deferred.
+- **Textpool (text elements)** — read/write program text symbols, selection texts and list headings via `abap pull <name> --textpool` and `abap push <name>.<type>.texts|selections|headings.<lang>.properties`. Mixed mode: the ADT text-elements API is used when the system supports it; ECC/older systems route through the ICF `/textpool/*` endpoint. Capability is probed once when the connection profile is created (`abap connection add/set`, `abap init`) and cached in the profile — no runtime fallback (see [Commands](commands.md) for details).
 
 ## Deploy the Bundled ICF Service
 

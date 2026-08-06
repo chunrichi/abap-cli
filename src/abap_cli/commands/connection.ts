@@ -9,7 +9,23 @@ import { collectWarning } from '../output/meta.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import { assertValidProfile } from '../config/validation.js';
 import { probeSystem } from '../clients/probe.js';
+import { probeTextpoolCapability, recordCapability } from '../textpool/textpool-capability.js';
 import { exportProfiles, importProfiles, type ProfileBundle } from '../sync/profiles.js';
+
+/**
+ * 014: one-shot textpool capability probe, recorded onto the profile (Q1:
+ * record at connect time, reuse afterwards — no runtime fallback). Never
+ * blocks the calling command: on any failure the profile simply has no
+ * adtTextpool record and the router applies conservative defaults.
+ */
+async function recordTextpoolCapabilityIfPossible(name: string): Promise<void> {
+  try {
+    const cap = await probeTextpoolCapability();
+    await recordCapability(name, cap);
+  } catch {
+    // informational — degraded, non-blocking
+  }
+}
 
 export function registerConnectionCommand(program: Command): void {
   const connection = program
@@ -362,6 +378,8 @@ async function runAdd(
   const { updated, passwordUpdated, passwordRemoved } =
     await applyProfileOptions({ url: '', client: '100', username: '', language: 'EN' }, name, opts);
   upsertSystem(name, updated);
+  // 014: informational textpool capability probe (one-shot, non-blocking).
+  await recordTextpoolCapabilityIfPossible(name);
 
   printResult(
     jsonOutput,
@@ -397,6 +415,8 @@ async function runSet(
 
   const { updated, passwordUpdated, passwordRemoved } = await applyProfileOptions(profile, name, opts);
   upsertSystem(name, updated);
+  // 014: informational textpool capability probe (one-shot, non-blocking).
+  await recordTextpoolCapabilityIfPossible(name);
 
   printResult(
     jsonOutput,

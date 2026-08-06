@@ -76,6 +76,9 @@ abap pull [options] [object-name]
 | `--skip-existing` | Skip files that already exist locally |
 | `--include-tests` | Include the testclasses source part |
 | `--include-all-parts` | Include every source-code part |
+| `--textpool` | 014: also pull textpool files (`.texts`/`.selections`/`.headings` `<lang>.properties`) for the object |
+
+**DDIC pull (014)**: `abap pull <name> --type DOMA|DTEL|TABL|STRU` downloads the object definition from the self-built ICF service (`/sap/zabap_vibe/ddic/<type>/<name>`) as a flat `src/<name>.<type>.json` (abap-file-format layout). Unknown DDIC types (e.g. TTYP) are rejected with `DDIC_NOT_SUPPORTED`. Textpool pull uses the mixed-mode route (ADT when the cached capability allows reads, otherwise the ICF `/textpool/*` endpoint); the JSON result carries a `route` field (`adt` / `icf`).
 
 ## `abap push`
 
@@ -154,16 +157,19 @@ abap create [options] <type> <name>
 | Option | Description |
 |--------|-------------|
 | `--package <package>` | Target SAP package (required) |
-| `--description <desc>` | Object description (required) |
+| `--description <desc>` | Object description (required for source objects) |
 | `--tr <transport>` | Transport number |
 | `--no-activate` | Create and write the skeleton but do not activate |
 | `--template <template>` | Skeleton template (`minimal`, `public-method`, `report`, `selection-screen`, …) |
 | `--no-pull` | Skip the create-then-pull local copy (default: pull after create) |
 | `--check-only` | Validate the proposed object without creating it |
 | `--audit` | Include the before-checksum (extra SAP round-trip, off by default) |
+| `--file <path>` | 014: abap-file-format DDIC JSON input (required for `DOMA`/`DTEL`/`TABL`/`STRU`) |
 | `--schema` | Print the command parameter schema as JSON and exit (no SAP call) |
 
-DDIC types (DOMA/DTEL/TABL/STRU/TTYP) are rejected with `DDIC_NOT_SUPPORTED`; unknown types with `TYPE_NOT_SUPPORTED`.
+**DDIC create (014)**: `abap create DOMA|DTEL|TABL|STRU <name> --file <json> --package <pkg>` creates (or overwrites) the object via the self-built ICF service (`POST /sap/zabap_vibe/ddic/<type>`). The JSON follows the abap-file-format layout (flat or `header.description` for the description). Client-side validation enforces the namespace (Z/Y/slash) and required fields; a non-`$TMP` package requires `--tr`. Success returns `data.action` (`created` / `updated`). Unknown DDIC types (TTYP) are rejected with `DDIC_NOT_SUPPORTED`; unknown types with `TYPE_NOT_SUPPORTED`. `--description` is optional when `--file` supplies it.
+
+**Textpool push (014)**: `abap push <name>.<type>.texts|selections|headings.<lang>.properties` writes the text elements via the mixed-mode route — ADT text-elements API (lock → write → unlock) when the cached capability allows, otherwise the ICF `/textpool/*` endpoint. The JSON result carries a `route` field.
 
 `--schema` is an agent-facing introspection mode: `abap create --schema` prints the general contract (supported types, required `--package`/`--description`, all options); `abap create --schema <type>` adds the type dimension — `templates` for the type (also reflected in `--template`'s `allowedValues`) and `supported: false` with a `reason` (`DDIC_NOT_SUPPORTED` / `TYPE_NOT_SUPPORTED`) for types that cannot be created. Output is JSON on stdout, exit `0`, no SAP call; the `<type>`/`<name>` arguments are not required in this mode.
 
@@ -292,6 +298,8 @@ abap connection <command>
 | `delete <name>` | Delete a profile and its stored password |
 | `export [names...]` | Export profiles to a portable bundle (`--file`, `--with-passwords`) |
 | `import <file>` | Import profiles from a bundle (`--overwrite`) |
+
+**Textpool capability probe (014)**: `abap connection add` / `abap connection set` and `abap init` (when it creates a profile) perform a one-shot informational probe of the ADT text-elements capability (read + write availability) and record it on the profile (`adtTextpool: { read, write, checkedAt }`, plus `systemVersion`). Textpool operations then read this cached result to pick the route (ADT vs ICF) — no runtime probe or fallback. The probe is non-blocking: on failure (e.g. SAP unreachable) the profile simply has no `adtTextpool` record and conservative defaults apply (read→ADT, write→ICF).
 
 `add` / `set` accept the connection fields as options: `--url`, `-c/--client`, `-u/--username`, `-l/--language`, `-p/--password`, plus `--insecure` (skip SSL verification, development only) and `--ca <path>` (PEM CA certificate). `set` additionally supports `--remove-password` (drop the keychain credential) and `--clear-ca` (remove the CA setting).
 

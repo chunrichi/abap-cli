@@ -150,13 +150,25 @@ function absoluteSourceUrl(objectUrl: string, sourceUrl: string): string {
   return `${objectUrl.replace(/\/$/, '')}/${sourceUrl}`;
 }
 
-/** Reject DDIC (ICF route) files in this phase. */
+/** 014: DDIC types the CLI can create/pull via the ICF service.
+ *  Q2 scope: keep TTYP rejected (deferred to a later phase). */
+const DDIC_ICF_SUPPORTED = new Set(['DOMA', 'DTEL', 'TABL', 'STRU']);
+
+/**
+ * 014: validate a local file before push. Source files are passed through;
+ * DDIC files for the four supported types (DOMA/DTEL/TABL/STRU) are allowed
+ * through to the ICF POST /ddic/<type> endpoint. Unknown DDIC types
+ * (notably TTYP) still raise DDIC_NOT_SUPPORTED.
+ */
 export function validateLocalFile(resolved: { objectName: string; objectType: string; route: string }): void {
   if (resolved.route === 'icf') {
-    throw new CliError(
-      'DDIC_NOT_SUPPORTED',
-      `Object ${resolved.objectName} (${resolved.objectType}) is a DDIC object; not supported in this phase`,
-      { object: resolved.objectName, type: resolved.objectType },
-    );
+    if (!DDIC_ICF_SUPPORTED.has(resolved.objectType)) {
+      throw new CliError(
+        'DDIC_NOT_SUPPORTED',
+        `Object ${resolved.objectName} (${resolved.objectType}) is a DDIC object; not supported in this phase`,
+        { object: resolved.objectName, type: resolved.objectType },
+      );
+    }
+    // Supported DDIC type — allowed through (ICF route handles the rest).
   }
 }

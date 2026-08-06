@@ -26,14 +26,27 @@ const AUTH_FAIL = process.env.MOCK_AUTH_FAIL === '1';
 const ICF_FAIL = process.env.MOCK_ICF_FAIL === '1';
 // MOCK_SETUP_FAIL=1 → classrun of the ICF setup class returns a failure envelope.
 const SETUP_FAIL = process.env.MOCK_SETUP_FAIL === '1';
+// MOCK_DDIC_FAIL=1 → /sap/zabap_vibe/ddic/<type> POST returns 500 (created objects still
+// occupy the fixture store but the wire response is the failure envelope).
+// MOCK_TEXTPOOL_WRITE_UNSUPPORTED=1 → /textpool/<category> POST reports write unsupported
+// (simulates ECC where the ADT text-elements write endpoint is absent).
+const TEXTPOOL_WRITE_UNSUPPORTED = process.env.MOCK_TEXTPOOL_WRITE_UNSUPPORTED === '1';
+const DDIC_FAIL = process.env.MOCK_DDIC_FAIL === '1';
 // Deployed zabap_vibe version served by the mock root (mirrors CLI ICF_SERVICE_VERSION).
-const ICF_SERVICE_VERSION = process.env.MOCK_ICF_VERSION || '0.1.0';
+const ICF_SERVICE_VERSION = process.env.MOCK_ICF_VERSION || '0.2.0';
 const NOW = '2026-08-01T00:00:00Z';
 const CURRENT_USER = 'MOCKUSER';
 let putCount = 0; // global PUT counter (MOCK_ATOMIC_FAIL fails on the 2nd write)
 
 // ---------- fixture store ----------
 const objects = new Map();
+// 014: temporary in-memory store for DDIC create/overwrite payloads (round-trip tests).
+const ddicStore = new Map();
+// 014: textpool store — key = `<TYPE>:<OBJ>:<CATEGORY>`, value = array of { id, text }.
+const textpoolStore = new Map();
+// Tracks whether the DDIC POST handler saw a pre-existing entry (used to derive
+// data.action = 'updated' vs 'created'). Local to the request handler.
+let ddicStore_existed_before = false;
 
 function addObject(name, type, objectUrl, description, parts, opts = {}) {
   objects.set(name, {
@@ -643,6 +656,100 @@ const server = http.createServer(async (req, res) => {
         return ok(res, JSON.stringify({ status: 'success', action: 'already_active', node: { vhost: 'default_host', url: '/sap/zabap_vibe', handler: 'ZCL_ABAP_VIBE_ICF', active: true } }), 'application/json');
       }
       return ok(res, JSON.stringify({ status: 'success' }), 'application/json');
+    }
+
+    // 014: /sap/zabap_vibe/ddic/<type> POST (create/overwrite) and GET /<name> (pull).
+    const ddic = /^\/sap\/zabap_vibe\/ddic\/(doma|dtel|tabl|stru)(?:\/(.+))?$/.exec(path);
+    if (ddic) {
+      const ddicType = ddic[1].toUpperCase();
+      const name = ddic[2];
+      if (req.method === 'POST') {
+        if (DDIC_FAIL) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'DDIC_CREATE_FAILED', message: 'Simulated DDIC failure (MOCK_DDIC_FAIL=1)' } }), 'application/json');
+        }
+        const body = await readBody(req);
+        let payload = {};
+        try { payload = JSON.parse(body); } catch (_e) { payload = {}; }
+        const objName = (payload.name || '').toUpperCase();
+        if (!objName) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'DDIC_REQUIRED_FIELD', message: 'name is required' } }), 'application/json');
+        }
+        const firstChar = objName[0] || '';
+        if (firstChar !== 'Z' && firstChar !== 'Y' && firstChar !== '/') {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'DDIC_INVALID_NAME', message: `Invalid namespace: name must start with Z, Y, or / (got "${objName}")` } }), 'application/json');
+        }
+        if (payload.package && payload.package !== '$TMP' && !payload.transportRequest) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'DDIC_TRANSPORT_REQUIRED', message: 'transportRequest is required for non-$TMP packages' } }), 'application/json');
+        }
+        if (ddicType === 'TABL' || ddicType === 'STRU') {
+          if (!Array.isArray(payload.fields) || payload.fields.length === 0) {
+            return ok(res, JSON.stringify({ status: 'error', error: { code: 'DDIC_REQUIRED_FIELD', message: 'fields list is required and must be non-empty' } }), 'application/json');
+          }
+        }
+        if (ddicType === 'DOMA') {
+          if (!payload.dataType || payload.length === undefined) {
+            return ok(res, JSON.stringify({ status: 'error', error: { code: 'DDIC_REQUIRED_FIELD', message: 'dataType and length are required' } }), 'application/json');
+          }
+        }
+        if (ddicType === 'DTEL') {
+          if (!payload.description) {
+            return ok(res, JSON.stringify({ status: 'error', error: { code: 'DDIC_REQUIRED_FIELD', message: 'description is required' } }), 'application/json');
+          }
+          if (!payload.domain && !payload.dataType) {
+            return ok(res, JSON.stringify({ status: 'error', error: { code: 'DDIC_INVALID_FIELD', message: 'domain or built-in dataType is required' } }), 'application/json');
+          }
+        }
+        // Mirror of the wire payload so round-trip is consistent.
+        const key = ddicType + ':' + objName;
+        ddicStore_existed_before = ddicStore.has(key);
+        const stored = Object.assign({}, payload, { name: objName });
+        ddicStore.set(key, stored);
+        const action = ddicStore_existed_before ? 'updated' : 'created';
+        ddicStore_existed_before = false;
+        return ok(res, JSON.stringify({ status: 'success', data: { name: objName, type: ddicType, action } }), 'application/json');
+      }
+      if (req.method === 'GET') {
+        if (!name) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'NOT_FOUND', message: 'object name is required' } }), 'application/json');
+        }
+        const key = ddicType + ':' + decodeURIComponent(name).toUpperCase();
+        if (!ddicStore.has(key)) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'DDIC_OBJECT_NOT_FOUND', message: `${ddicType} ${name} not found in mock store` } }), 'application/json');
+        }
+        return ok(res, JSON.stringify({ status: 'success', data: ddicStore.get(key) }), 'application/json');
+      }
+      return ok(res, JSON.stringify({ status: 'error', error: { code: 'METHOD_NOT_ALLOWED', message: `${req.method} not supported on /ddic/${ddicType}` } }), 'application/json');
+    }
+
+    // 014: /sap/zabap_vibe/textpool/<category>?object=<name>&type=<type> (GET read / POST write).
+    const textpool = /^\/sap\/zabap_vibe\/textpool\/(texts|selections|headings)$/.exec(path);
+    if (textpool) {
+      const category = textpool[1];
+      const objName = (q.get('object') || '').toUpperCase();
+      const objType = (q.get('type') || 'PROG').toUpperCase();
+      if (!objName) {
+        return ok(res, JSON.stringify({ status: 'error', error: { code: 'TEXTPOOL_OBJECT_NOT_FOUND', message: 'object query parameter is required' } }), 'application/json');
+      }
+      const key = `${objType}:${objName}:${category}`;
+      if (req.method === 'GET') {
+        if (TEXTPOOL_WRITE_UNSUPPORTED && !textpoolStore.has(key)) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'TEXTPOOL_OBJECT_NOT_FOUND', message: `${objName} has no ${category} text elements` } }), 'application/json');
+        }
+        const elements = textpoolStore.get(key) || [];
+        return ok(res, JSON.stringify({ status: 'success', data: { object: objName, type: objType, category, elements } }), 'application/json');
+      }
+      if (req.method === 'POST') {
+        if (TEXTPOOL_WRITE_UNSUPPORTED) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'TEXTPOOL_WRITE_FAILED', message: 'Simulated textpool write unsupported (MOCK_TEXTPOOL_WRITE_UNSUPPORTED=1)' } }), 'application/json');
+        }
+        const body = await readBody(req);
+        let payload = { elements: [] };
+        try { payload = JSON.parse(body); } catch (_e) { payload = { elements: [] }; }
+        const elements = Array.isArray(payload.elements) ? payload.elements.map((el) => ({ id: String(el.id), text: String(el.text) })) : [];
+        textpoolStore.set(key, elements);
+        return ok(res, JSON.stringify({ status: 'success', data: { object: objName, type: objType, category, written: elements.length } }), 'application/json');
+      }
+      return ok(res, JSON.stringify({ status: 'error', error: { code: 'METHOD_NOT_ALLOWED', message: `${req.method} not supported on /textpool/${category}` } }), 'application/json');
     }
 
     // object search

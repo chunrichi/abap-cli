@@ -38,11 +38,12 @@ beforeEach(() => {
 
 describe('abap push --atomic (US8, FR-025, SC-007)', () => {
   it('a file that fails validation writes nothing (zero mutating calls)', async () => {
-    // A DDIC-route file fails structural validation (validateLocalFile).
-    fs.writeFileSync(path.join(cwd, 'src/zlocal.doma.json'), '{"domain":"ZLOCAL"}');
+    // A DDIC-route file with a type outside the 014 supported scope (TTYP)
+    // fails structural validation (validateLocalFile → DDIC_NOT_SUPPORTED).
+    fs.writeFileSync(path.join(cwd, 'src/zlocal.ttyp.json'), '{"rowType":"ZREF"}');
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/zcl_ok.clas.abap', 'src/zlocal.doma.json', '--tr', 'TRN001', '--atomic', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/zcl_ok.clas.abap', 'src/zlocal.ttyp.json', '--tr', 'TRN001', '--atomic', '--json'], { cwd });
     expect(res.exitCode).not.toBe(0);
     expect(lock).not.toHaveBeenCalled();
     expect(setObjectSource).not.toHaveBeenCalled();

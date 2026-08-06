@@ -10,8 +10,8 @@ export interface ResolvedFile {
   objectType: string;
   /** Subtype / include (e.g., main, implementations, testclasses) */
   subtype: string;
-  /** Route: 'adt' for source objects, 'icf' for DDIC objects */
-  route: 'adt' | 'icf';
+  /** Route: 'adt' for source objects, 'icf' for DDIC objects, 'textpool' for .properties */
+  route: 'adt' | 'icf' | 'textpool';
   /** File format: 'abap' for source, 'xml' for metadata, 'json' for DDIC */
   format: 'abap' | 'xml' | 'json';
 }
@@ -22,6 +22,9 @@ const EXT_ROUTE_MAP: Record<string, 'adt' | 'icf'> = {
   '.json': 'icf',
 };
 
+/** 014: textpool .properties categories (abap-file-format layout). */
+const TEXTPOOL_EXTENSIONS = new Set(['texts', 'selections', 'headings']);
+
 const SOURCE_EXTENSIONS = new Set(['.abap', '.asddls', '.asbdef', '.assrvd']);
 
 /**
@@ -31,10 +34,42 @@ const SOURCE_EXTENSIONS = new Set(['.abap', '.asddls', '.asbdef', '.assrvd']);
  *   zcl_foo.clas.implementations.abap → { objectName: "ZCL_FOO", objectType: "CLAS", subtype: "implementations", route: "adt" }
  *   zmy_domain.doma.json → { objectName: "ZMY_DOMAIN", objectType: "DOMA", subtype: "", route: "icf" }
  *   zmy_table.tabl.json → { objectName: "ZMY_TABLE", objectType: "TABL", subtype: "", route: "icf" }
+ *   zprog.prog.texts.en.properties → { objectName: "ZPROG", objectType: "PROG", subtype: "texts.en", route: "textpool" }
  */
 export function resolveFile(filePath: string): ResolvedFile {
   const basename = path.basename(filePath);
   const ext = getOuterExtension(basename);
+
+  // 014: textpool .properties — <name>.<type>.<category>.<lang>.properties
+  if (ext === '.properties') {
+    const stem = basename.slice(0, basename.length - '.properties'.length);
+    const parts = stem.split('.');
+    // parts: [name, type, category, lang] — lang may be absent in some layouts.
+    if (parts.length < 3) {
+      throw new CliError('FILE_PARSE_ERROR', `Cannot resolve textpool file: ${basename}`, {
+        file: basename,
+        nextSteps: ['Textpool files follow abap-file-format: <name>.<type>.texts|selections|headings.<lang>.properties.'],
+      });
+    }
+    const objectName = parts[0]!.toUpperCase().replace(/#/g, '/');
+    const objectType = parts[1]!.toUpperCase();
+    const category = parts[2]!;
+    if (!TEXTPOOL_EXTENSIONS.has(category)) {
+      throw new CliError('FILE_PARSE_ERROR', `Unknown textpool category '${category}' in ${basename}`, {
+        file: basename,
+        nextSteps: [`Valid categories: ${[...TEXTPOOL_EXTENSIONS].join(', ')}.`],
+      });
+    }
+    return {
+      filePath,
+      objectName,
+      objectType,
+      subtype: parts.slice(2).join('.'),
+      route: 'textpool',
+      format: 'json',
+    };
+  }
+
   const stem = basename.slice(0, basename.length - ext.length);
   const parts = stem.split('.');
 

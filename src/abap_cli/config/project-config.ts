@@ -23,6 +23,11 @@ export interface ProjectConfig {
   sap: SapConfig;
   transport: string;
   package: string;
+  /** 014: current system name (for capability reads / route decisions). */
+  systemName: string;
+  /** 014: ADT text-element capability recorded at connect/init (Q1, optional). */
+  adtTextpool?: { read: boolean; write: boolean; checkedAt: string };
+  systemVersion?: string;
 }
 
 /** Cached profile data minus the password, which is re-read on every load. */
@@ -31,6 +36,8 @@ interface LoadedConfig {
   sap: Omit<SapConfig, 'password'>;
   transport: string;
   package: string;
+  adtTextpool?: { read: boolean; write: boolean; checkedAt: string };
+  systemVersion?: string;
 }
 
 let cached: LoadedConfig | null = null;
@@ -66,7 +73,14 @@ export async function loadConfig(): Promise<ProjectConfig> {
   }
 
   const password = (await getPassword(cached.systemName)) || process.env.SAP_PASSWORD || '';
-  return { sap: { ...cached.sap, password }, transport: cached.transport, package: cached.package };
+  return {
+    sap: { ...cached.sap, password },
+    transport: cached.transport,
+    package: cached.package,
+    systemName: cached.systemName,
+    adtTextpool: cached.adtTextpool,
+    systemVersion: cached.systemVersion,
+  };
 }
 
 async function loadFileConfig(): Promise<LoadedConfig> {
@@ -116,6 +130,8 @@ async function loadFileConfig(): Promise<LoadedConfig> {
     },
     transport: workspace.transport || '',
     package: workspace.package || '',
+    adtTextpool: profile.adtTextpool,
+    systemVersion: profile.systemVersion,
   };
 }
 

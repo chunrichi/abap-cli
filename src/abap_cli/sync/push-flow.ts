@@ -2,7 +2,16 @@ import type { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError } from '../output/json.js';
 import type { Warning } from '../output/meta.js';
 
-export type PushStage = 'lock' | 'write' | 'check' | 'activate' | 'unlock';
+export type PushStage =
+  | 'lock'
+  | 'write'
+  | 'check'
+  | 'activate'
+  | 'unlock'
+  // 014 textpool stages (mixed-mode route).
+  | 'read'
+  | 'textpool-adt'
+  | 'textpool-icf';
 
 export interface PushPart {
   subtype: string;

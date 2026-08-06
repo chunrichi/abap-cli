@@ -12,6 +12,10 @@ export interface SystemProfile {
   insecure?: boolean;
   /** Path to a CA certificate (PEM) used for SSL verification. */
   ca?: string;
+  /** 014: SAP release recorded at connect time (diagnostics). */
+  systemVersion?: string;
+  /** 014: ADT text-element capability recorded once at connect/init (Q1). */
+  adtTextpool?: { read: boolean; write: boolean; checkedAt: string };
 }
 
 export interface UserConfig {

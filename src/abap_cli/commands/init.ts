@@ -15,6 +15,7 @@ import { commonErrorsAfter } from '../output/help-text.js';
 import { assertValidProfile } from '../config/validation.js';
 import { probeSystem, type ProbeLayerResult } from '../clients/probe.js';
 import { checkIcfDeployment, type IcfDeploymentInfo } from '../icf/service-version.js';
+import { probeTextpoolCapability, recordCapability } from '../textpool/textpool-capability.js';
 import type { ErrorCode } from '../output/error-codes.js';
 
 interface WorkspaceConfig {
@@ -344,7 +345,19 @@ function orCancel<T>(value: T | symbol): T {
 async function saveProfile(name: string, profile: SystemProfile, password: string, jsonOutput: boolean): Promise<void> {
   upsertSystem(name, profile);
   await storePassword(name, password);
+  // 014: one-shot textpool capability probe (Q1: record at connect, reuse later).
+  await recordCapabilityIfPossible(name);
   if (!jsonOutput) console.log(`System profile '${name}' saved. Password stored securely in OS keychain.`);
+}
+
+/** 014: informational capability probe — never blocks init (degraded, non-blocking). */
+async function recordCapabilityIfPossible(name: string): Promise<void> {
+  try {
+    const cap = await probeTextpoolCapability();
+    await recordCapability(name, cap);
+  } catch {
+    // informational — the profile simply has no adtTextpool record
+  }
 }
 
 /** Auto-derive a profile name from the system URL and username */

@@ -1,7 +1,1 @@
-{
-  "formatVersion": "1",
-  "header": {
-    "description": "ICF handler for zabap_vibe",
-    "originalLanguage": "en"
-  }
-}
+{"class":{"type":"CLAS","description":"ICF handler for zabap_vibe: routes /ddic/<type> and /textpool/<category> in addition to root health/version.","final":false}}

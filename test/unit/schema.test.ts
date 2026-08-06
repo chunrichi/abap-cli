@@ -118,13 +118,22 @@ describe('abap create --schema (P0.1 introspection)', () => {
     expect(createObject).not.toHaveBeenCalled();
   });
 
-  it('reports DDIC types as unsupported (DDIC_NOT_SUPPORTED)', async () => {
+  it('reports supported DDIC types (DOMA) as supported via ICF (014)', async () => {
     const program = makeProgram();
     registerCreateCommand(program);
     const res = await runCommand(program, ['create', '--schema', 'DOMA']);
     expect(res.exitCode).toBeUndefined();
     const { data } = parseStdout(res);
-    expect(data).toMatchObject({ type: 'DOMA', supported: false, reason: 'DDIC_NOT_SUPPORTED' });
+    expect(data).toMatchObject({ type: 'DOMA', supported: true, route: 'icf' });
+  });
+
+  it('reports TTYP as unsupported (DDIC_NOT_SUPPORTED, deferred per Q2)', async () => {
+    const program = makeProgram();
+    registerCreateCommand(program);
+    const res = await runCommand(program, ['create', '--schema', 'TTYP']);
+    expect(res.exitCode).toBeUndefined();
+    const { data } = parseStdout(res);
+    expect(data).toMatchObject({ type: 'TTYP', supported: false, reason: 'DDIC_NOT_SUPPORTED' });
   });
 
   it('reports unknown types as unsupported (TYPE_NOT_SUPPORTED)', async () => {

@@ -1,8 +1,10 @@
 import { IcfClient } from '../clients/icf-client.js';
 import { CliError } from '../output/json.js';
 
-/** Bundled expected version of the zabap_vibe ICF service (FR-013). */
-export const ICF_SERVICE_VERSION = '0.1.0';
+/** Bundled expected version of the zabap_vibe ICF service (FR-013).
+ *  Bumped 0.1.0 → 0.2.0 in 014 (DDIC CRUD + textpool support);
+ *  FR-027: root version check stays backward compatible. */
+export const ICF_SERVICE_VERSION = '0.2.0';
 
 export type IcfDeploymentStatus = 'not_deployed' | 'current' | 'outdated' | 'unreachable';
 

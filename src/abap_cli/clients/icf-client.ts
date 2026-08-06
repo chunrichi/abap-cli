@@ -56,6 +56,28 @@ export class IcfClient {
     return this.request('put', path, body);
   }
 
+  /** 014: POST /ddic/<type> — create/overwrite a DDIC object (FR-001). */
+  async postDdic<T>(type: string, body: unknown): Promise<IcfResponse<T>> {
+    return this.post(`/ddic/${type}`, body);
+  }
+
+  /** 014: GET /ddic/<type>/<name> — pull a DDIC object as wire JSON (FR-011). */
+  async getDdic<T>(type: string, name: string): Promise<IcfResponse<T>> {
+    return this.get(`/ddic/${type}/${encodeURIComponent(name)}`);
+  }
+
+  /** 014: GET /textpool/<category>?object=...&type=... — read text elements (US4). */
+  async getTextpool<T>(category: string, object: string, type: string): Promise<IcfResponse<T>> {
+    const qs = new URLSearchParams({ object, type });
+    return this.get(`/textpool/${category}?${qs.toString()}`);
+  }
+
+  /** 014: POST /textpool/<category>?object=...&type=... — write text elements (US4). */
+  async postTextpool<T>(category: string, object: string, type: string, body: unknown): Promise<IcfResponse<T>> {
+    const qs = new URLSearchParams({ object, type });
+    return this.post(`/textpool/${category}?${qs.toString()}`, body);
+  }
+
   /** Run one HTTP call and normalize transport errors into a CliError. */
   private async request<T>(method: 'get' | 'post' | 'put', path: string, body?: unknown): Promise<IcfResponse<T>> {
     let resp: AxiosResponse<IcfResponse<T>>;
