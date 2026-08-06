@@ -11,12 +11,13 @@ const activate = vi.fn(async () => '');
 const unLock = vi.fn(async () => '');
 const searchObject = vi.fn();
 const objectStructure = vi.fn();
+const transportInfo = vi.fn(async () => ({ TRANSPORTS: [] }));
 const getConfig = vi.fn(() => ({ transport: 'TRN001' }));
 
 vi.mock('../../src/abap_cli/clients/adt-client.js', () => ({
   AdtClientWrapper: {
     create: async () => ({
-      lock, setObjectSource, activate, unLock, searchObject, objectStructure, getConfig,
+      lock, setObjectSource, activate, unLock, searchObject, objectStructure, transportInfo, getConfig,
       syntaxCheck: vi.fn(async () => []),
       syntaxCheckContent: vi.fn(async () => []),
     }),

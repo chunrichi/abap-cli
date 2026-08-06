@@ -7,6 +7,8 @@ export interface ResolvedObject {
   name: string;
   type: string;
   objectUrl: string;
+  /** Package from the search hit — used to detect $TMP (transport-free) objects. */
+  packageName?: string;
   parts: ObjectPart[];
 }
 
@@ -46,7 +48,7 @@ export async function resolveObject(
   }
   // matches.length > 0 guaranteed by the checks above
   const hit = matches[0]!;
-  return { name: hit['adtcore:name'], type: hit['adtcore:type'], objectUrl: hit['adtcore:uri'], parts: [] };
+  return { name: hit['adtcore:name'], type: hit['adtcore:type'], objectUrl: hit['adtcore:uri'], packageName: hit['adtcore:packageName'], parts: [] };
 }
 
 /** Fetch all source parts (class includes or the single main part) of an object. */

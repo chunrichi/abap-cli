@@ -67,6 +67,8 @@ When a command accepts `--tr`:
 
 > Note: A local request created under `$TMP` does **not** appear in the workbench modifiable list, so automatic resolution will not find it — pass it explicitly with `--tr`.
 
+**`abap push` resolves per object, not once per run** — an object already assigned to a request reuses that request (a different `--tr` is rejected with `VALIDATION_ERROR`; see [Commands](commands.md)), and objects in `$TMP` push with no transport at all. The order above applies only to unbound non-`$TMP` objects.
+
 ## Credentials & Security
 
 - Passwords are stored via the OS keychain (`keytar`), keyed by system profile name

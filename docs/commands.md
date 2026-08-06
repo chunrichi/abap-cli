@@ -100,12 +100,22 @@ abap push [options] [files...]
 | Option | Description |
 |--------|-------------|
 | `--all` | Push all `.abap` files under the current directory (honours `.abapignore`) |
-| `--tr <transport>` | Transport number (see resolution order in [Configuration](configuration.md)) |
+| `--tr <transport>` | Transport number (see resolution order below and [Configuration](configuration.md)) |
 | `--check-only` | Only perform a syntax check, do not activate (mutex with `--no-activate`) |
 | `--no-activate` | Lock + write + skip check + skip activate + unlock |
 | `--dry-run` | Plan only — make no mutating ADT calls |
 | `--fail-fast` | Stop at the first failing file (default: keep going) |
 | `--atomic` | Validate all files first; write nothing if any file fails validation |
+
+The transport is resolved **per object**, not once per run:
+
+1. If the object is already assigned to a request (`transportInfo`), that request is reused — `--tr` is **not** required and cannot change it. Passing a different `--tr` is rejected with `VALIDATION_ERROR`; re-assign with `abap transport assign` first.
+2. Otherwise `--tr` > project transport > the user's first modifiable request > `NO_TRANSPORT`.
+3. Objects in `$TMP` are transport-free — no `--tr` needed (matches `deploy`'s `$TMP` rule).
+
+**DDIC push (014)**: `abap push <name>.<type>.json --tr <tr>` updates a DDIC object (DOMA/DTEL/TABL/STRU) via the self-built ICF service (`POST /sap/zabap_vibe/ddic/<type>`, same create/overwrite endpoint as `abap create --file`). Client-side validation enforces the namespace and required fields; `--check-only` is rejected (`VALIDATION_ERROR`). The result status is `written` with stage `ddic-icf`. A non-`$TMP` package requires a transport (same resolution as above, falling back to the file's recorded `transportRequest`).
+
+**Textpool push (014)**: `abap push <name>.<type>.texts|selections|headings.<lang>.properties` writes the text elements via the mixed-mode route — ADT text-elements API (lock → write → unlock) when the cached capability allows, otherwise the ICF `/textpool/*` endpoint. The JSON result carries a `route` field.
 
 ## `abap check`
 
@@ -177,8 +187,6 @@ abap create [options] <type> <name>
 | `--schema` | Print the command parameter schema as JSON and exit (no SAP call) |
 
 **DDIC create (014)**: `abap create DOMA|DTEL|TABL|STRU <name> --file <json> --package <pkg>` creates (or overwrites) the object via the self-built ICF service (`POST /sap/zabap_vibe/ddic/<type>`). The JSON follows the abap-file-format layout (flat or `header.description` for the description). Client-side validation enforces the namespace (Z/Y/slash) and required fields; a non-`$TMP` package requires `--tr`. Success returns `data.action` (`created` / `updated`). Unknown DDIC types (TTYP) are rejected with `DDIC_NOT_SUPPORTED`; unknown types with `TYPE_NOT_SUPPORTED`. `--description` is optional when `--file` supplies it.
-
-**Textpool push (014)**: `abap push <name>.<type>.texts|selections|headings.<lang>.properties` writes the text elements via the mixed-mode route — ADT text-elements API (lock → write → unlock) when the cached capability allows, otherwise the ICF `/textpool/*` endpoint. The JSON result carries a `route` field.
 
 `--schema` is an agent-facing introspection mode: `abap create --schema` prints the general contract (supported types, required `--package`/`--description`, all options); `abap create --schema <type>` adds the type dimension — `templates` for the type (also reflected in `--template`'s `allowedValues`) and `supported: false` with a `reason` (`DDIC_NOT_SUPPORTED` / `TYPE_NOT_SUPPORTED`) for types that cannot be created. Output is JSON on stdout, exit `0`, no SAP call; the `<type>`/`<name>` arguments are not required in this mode.
 

@@ -11,7 +11,9 @@ export type PushStage =
   // 014 textpool stages (mixed-mode route).
   | 'read'
   | 'textpool-adt'
-  | 'textpool-icf';
+  | 'textpool-icf'
+  // 014 DDIC stages (ICF route).
+  | 'ddic-icf';
 
 export interface PushPart {
   subtype: string;
@@ -69,7 +71,14 @@ export async function pushObject(
     locked = true;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new CliError('LOCK_FAILED', `Cannot lock ${object.name}: ${message}`, { details: { object: object.name } });
+    throw new CliError('LOCK_FAILED', `Cannot lock ${object.name}: ${message}`, {
+      details: { object: object.name },
+      nextSteps: [
+        `Check who holds the lock: abap inspect ${object.name} --locks`,
+        'Wait for the lock to be released, or release it manually in SE03.',
+      ],
+      example: `abap inspect ${object.name} --locks`,
+    });
   }
 
   try {

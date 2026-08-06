@@ -47,7 +47,14 @@ export async function pushFugrOne(
     locked = true;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new CliError('LOCK_FAILED', `Cannot lock ${object.name} (${resolved.subtype}): ${message}`, { details: { object: object.name } });
+    throw new CliError('LOCK_FAILED', `Cannot lock ${object.name} (${resolved.subtype}): ${message}`, {
+      details: { object: object.name, subtype: resolved.subtype },
+      nextSteps: [
+        `Check who holds the lock: abap inspect ${object.name} --locks`,
+        'Wait for the lock to be released, or release it manually in SE03.',
+      ],
+      example: `abap inspect ${object.name} --locks`,
+    });
   }
 
   try {

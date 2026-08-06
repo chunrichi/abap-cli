@@ -94,7 +94,7 @@ abap push src/zcl_my_class/zcl_my_class.clas.abap --tr DEVK900001
 
 ### When You Have No Transport Request
 
-If `push`/`create` reports `NO_TRANSPORT`, create a request from the CLI and use it explicitly:
+`abap push` resolves the transport **per object**: an object already assigned to a request reuses it, and objects in `$TMP` push with no transport at all — so a freshly `abap create`d or `abap deploy`ed `$TMP` object can be pushed without `--tr`. Only an unbound object in a real package needs an explicit request:
 
 ```bash
 # See what's available

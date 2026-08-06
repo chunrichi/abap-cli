@@ -11,18 +11,19 @@ const syntaxCheck = vi.fn(async () => []);
 const activate = vi.fn(async () => '');
 const unLock = vi.fn(async () => '');
 const searchObject = vi.fn(async (name: string) => [
-  { 'adtcore:name': name.toUpperCase(), 'adtcore:type': 'CLAS/OC', 'adtcore:uri': `/sap/bc/adt/oo/classes/${name.toLowerCase()}` },
+  { 'adtcore:name': name.toUpperCase(), 'adtcore:type': 'CLAS/OC', 'adtcore:uri': `/sap/bc/adt/oo/classes/${name.toLowerCase()}`, 'adtcore:packageName': 'ZPKG' },
 ]);
 const objectStructure = vi.fn(async (objectUrl: string) => ({
   objectUrl,
   includes: [{ 'class:includeType': 'main', 'abapsource:sourceUri': `${objectUrl}/source/main` }],
 }));
 const syntaxCheckContent = vi.fn(async () => []);
+const transportInfo = vi.fn(async () => ({ TRANSPORTS: [] }));
 
 vi.mock('../../src/abap_cli/clients/adt-client.js', () => ({
   AdtClientWrapper: {
     create: async () => ({
-      lock, setObjectSource, syntaxCheck, activate, unLock, searchObject, objectStructure, syntaxCheckContent,
+      lock, setObjectSource, syntaxCheck, activate, unLock, searchObject, objectStructure, syntaxCheckContent, transportInfo,
       getConfig: () => ({ sap: { username: 'MOCKUSER' }, transport: 'TRN001' }),
     }),
   },
