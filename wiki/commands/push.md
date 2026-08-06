@@ -1,0 +1,180 @@
+---
+type: command
+title: abap push
+description: 推送本地 ABAP 文件到 SAP — lock → set source → syntax check → activate → unlock，支持源码对象、FUGR、textpool 与 DDIC JSON，按对象解析 transport
+tags: [abap-cli, command, push, upload, abap-file-format, ddic, textpool, transport]
+created at: 2026-08-07 00:11:03
+changed at: 2026-08-07 00:11:03
+---
+
+# abap push
+
+把本地 ABAP 文件推送到 SAP 系统，核心流程是 **lock → set source → syntax check → activate → unlock**。支持四类文件：普通源码对象（CLAS/PROG/INTF）、FUGR 子对象、textpool `.properties`、以及 DDIC `.json`（014）。文件级编排在 `flows/push-flow.ts`（`runPush`），单对象核心在 `flows/push-object.ts`（`pushObject`）。
+
+## Usage
+
+```bash
+abap push [options] [files...]
+```
+
+## Options
+
+- `[files...]`: 要推送的文件路径（一个或多个）
+- `--all`: 推送当前目录下所有 `.abap` 文件（遵循 `.abapignore`）
+- `--tr <transport>`: 传输请求号（按对象解析，见下文；多数场景不再必输）
+- `--check-only`: 只做语法检查不激活（与 `--no-activate` 互斥）
+- `--no-activate`: lock + write + 跳过 check + 跳过 activate + unlock
+- `--dry-run`: 只记录计划，零变更 ADT 调用
+- `--fail-fast`: 第一个失败文件即停（默认 keep-going）
+- `--atomic`: 先结构校验所有文件，任一失败则零写入（`VALIDATION_ERROR`）
+
+无 `[files...]` 且无 `--all` 时抛 `USAGE`（exit 2）。`--check-only` 与 `--no-activate` 同时给时抛 `USAGE`（exit 2）。
+
+## 按对象 transport 解析（核心设计）
+
+`runPush` **不再**在顶层统一解析一个 transport；改为 `pushOne` 拿到对象后逐对象解析（`resolveObjectTransport`）：
+
+1. **对象已绑定请求**（`client.transportInfo(objectUrl)` → `TRANSPORTS[0].TRKORR`）— 直接复用该请求，**无需 `--tr`**；若显式传了不同的 `--tr` → 抛 `VALIDATION_ERROR`（exit 7），提示去掉 `--tr` 或先用 `abap transport assign` 换请求。push 不允许顺手改对象的请求归属。
+2. **`$TMP` 对象**（search 命中 `adtcore:packageName === '$TMP'`，经 `ResolvedObject.packageName` 携带）— transport-free，空 transport 推送，无需 `--tr`（与 `abap deploy` 的 `$TMP` 规则一致）。
+3. 其余未绑定非 `$TMP` 对象：`--tr` > 项目 config `transport` > 用户第一个可修改请求（`userTransports`）> `NO_TRANSPORT`（exit 7）。
+
+`--dry-run` 不查真实请求，用 `--tr` > config > `'DRY_RUN'` 占位。每文件 JSON 结果带该文件实际解析到的 `transport`。
+
+## 对象路由（`pushOne`）
+
+按 `resolveFile` 的 `route` 分派：
+
+| 路由 | 入口 | 行为 |
+|------|------|------|
+| 普通源码（adt） | `pushObject` | 锁对象 → 写每个 part 源码 → check/activate → 解锁（`finally` 保证） |
+| FUGR | `push-fugr.ts` | 子对象（FM/include）是独立 ADT 锁对象，逐文件锁自己的目标、写源，最后激活整个 function group |
+| Textpool | `push-textpool.ts` | 混合模式：profile 缓存能力决定走 ADT `setTextElements`（lock→write→unlock）还是 ICF `/textpool/*`；`--check-only` 不支持（`VALIDATION_ERROR`） |
+| DDIC（icf） | `pushDdicFile` | `.doma/.dtel/.tabl/.stru.json` 经 ICF `POST /ddic/<type>`（与 `abap create --file` 同一端点）；结果 `written` / stage `ddic-icf`；`--check-only` 不支持；transport 缺省时回退文件里记录的 `transportRequest` |
+
+DDIC 推送时 `--atomic` 也会结构校验 JSON（`readDdicJson` + `validateDdicObject`），不是只读文本。
+
+### 支持的文件类型
+
+按 [file-resolver.ts](../src/abap_cli/formats/file-resolver.ts) 的文件名解析规则，push 可处理的文件：
+
+| 文件 | 路由 | 说明 |
+|------|------|------|
+| `zcl_foo.clas.abap` / `.clas.definitions.abap` / `.clas.implementations.abap` / `.clas.macros.abap` / `.clas.testclasses.abap` | adt | 类及各类 include part，按 subtype 精确匹配对象的 include |
+| `zif_foo.intf.abap` / `.intf.definitions.abap` / `.intf.implementations.abap` | adt | 接口及各 part |
+| `zprog.prog.abap` | adt | 程序 main |
+| `zfg.fugr.abap` / `.fugr.sapl<name>.reps.abap` / `.fugr.l<name>top.reps.abap` / `.fugr.<fm>.func.abap` | adt | 函数组（含 include 与 FM 子对象，各自独立加锁） |
+| `zmy_table.tabl.json` / `.doma.json` / `.dtel.json` / `.stru.json` | icf | 四种 DDIC 对象（TTYP 等其余类型抛 `DDIC_NOT_SUPPORTED`） |
+| `zprog.prog.texts.en.properties`（`texts`/`selections`/`headings`） | textpool | 文本元素，混合模式路由 |
+
+**不支持的**：`.clas.json` 等源码对象的元数据 JSON — 被解析为 route `icf` 但对象类型不在四种 DDIC 之内，`validateLocalFile` 抛 `DDIC_NOT_SUPPORTED`（exit 7）。源码对象的创建/更新走 `abap create`，不是 push。
+
+**part 精确匹配**：`.clas.macros.abap` 只有在对象确实有 `macros` include 时才推送；对象没有该 include 时**报错**（`SAP_ERROR`，exit 6，`nextSteps` 指引 `abap inspect <obj> --includes`），不会静默回退把 macros 内容写进 main。只有 `main` 文件映射到对象的 main part。
+
+## 失败处理
+
+| 场景 | 错误码 | 类别 / exit | 附带信息 |
+|------|--------|-------------|----------|
+| 对象被他人锁定 | `LOCK_FAILED` | LOCKED / 9 | `nextSteps`：`abap inspect <obj> --locks` 查锁 + SE03 手动释放；FUGR 额外带 `subtype` |
+| 对象不存在 | `OBJECT_NOT_FOUND` | NOT_FOUND / 8 | `nextSteps`：`abap search <name>` 验证 / `abap connection test` 确认系统；push 不自动创建（创建走 `abap create`） |
+| 命名的 include part 不存在（如 `.macros.abap` 而对象无 macros） | `SAP_ERROR` | SAP_ERROR / 6 | `subtype` + `nextSteps`：`abap inspect <obj> --includes` 列出可用 include |
+| 激活失败 | `ACTIVATION_FAILED` | VALIDATION_ERROR / 7 | `stage: 'activate'` + 原始 `detail` |
+| 写源码失败 | `SAP_ERROR` | SAP_ERROR / 6 | `stage: 'write'` + `subtype` |
+| 语法检查失败（`--check-only`） | `SYNTAX_ERROR` | VALIDATION_ERROR / 7 | `errors` 数组（`{line, offset, severity, text, uri}`，仅 `E`） |
+| 无可用 transport | `NO_TRANSPORT` | VALIDATION_ERROR / 7 | 提示 `--tr` 或 `abap transport create` |
+
+**收尾保证**：lock 在任何路径（成功 / check-only / write-only / 激活失败）都会在 `finally` 释放；释放失败不报错，降级为 `UNLOCK_WARNING`（`meta.warnings`，exit 不变）。
+
+**按文件隔离**：每个文件独立 try/catch，失败进 `results`（`status: 'failed'` + `code`/`stage`/`message`/`nextSteps`），不中断其他文件（默认 keep-going）；`--fail-fast` 可选提前停。聚合错误以首个失败文件的错误码作为聚合 `code`；**单文件失败时透出原始 `message` 与 `nextSteps`**（不再笼统 "N file(s) failed"），多文件时给通用指引。
+
+## Examples
+
+```bash
+# 推送单个文件（对象已绑定请求或 $TMP 时无需 --tr）
+abap push src/zcl_my_class/zcl_my_class.clas.abap
+
+# 显式指定 transport
+abap push src/zprog/zprog.prog.abap --tr NDK123456
+
+# 只做语法检查
+abap push src/zcl_foo/zcl_foo.clas.abap --tr NDK123456 --check-only
+
+# 只写不激活
+abap push src/zcl_foo/zcl_foo.clas.abap --tr NDK123456 --no-activate
+
+# 推送整个目录（遵循 .abapignore）
+abap push --all --tr NDK123456
+
+# 计划模式（零变更）
+abap push src/zcl_foo/zcl_foo.clas.abap --tr NDK123456 --dry-run
+
+# 原子推送：任一文件校验失败则零写入
+abap push src/a.clas.abap src/b.clas.abap --tr NDK123456 --atomic
+
+# 推送 DDIC 对象（$TMP 无需 --tr）
+abap push src/ztest_e2e.tabl.json
+
+# 推送 textpool
+abap push src/zprog/zprog.prog.texts.en.properties
+```
+
+## Expected Output
+
+```json
+{
+  "status": "success",
+  "meta": {
+    "command": "abap push",
+    "version": "0.7.0",
+    "timestamp": "2026-08-07T00:11:03.000Z",
+    "durationMs": 111,
+    "warnings": []
+  },
+  "data": {
+    "results": [
+      {
+        "file": "src/zprog/zprog.prog.abap",
+        "status": "activated",
+        "transport": "NDK123456",
+        "stage": "unlock"
+      }
+    ],
+    "failed": 0
+  }
+}
+```
+
+每文件 `status`：`activated`（默认全流程）/ `checked-only`（`--check-only`）/ `written`（`--no-activate` 或 DDIC）/ `dry-run`（`--dry-run`，含 `plan` 数组）/ `failed`。`stage` 取值：`lock`/`write`/`check`/`activate`/`unlock`/`read`/`textpool-adt`/`textpool-icf`/`ddic-icf`。
+
+失败时错误 envelope（单文件透出原始 message）：
+
+```json
+{
+  "status": "error",
+  "meta": { "command": "abap push", "version": "0.7.0" },
+  "error": {
+    "code": "LOCK_FAILED",
+    "category": "LOCKED",
+    "message": "Cannot lock ZCL_TR: Object ZCL_TR is locked by user OTHER",
+    "details": { "results": [{ "file": "src/zcl_tr.clas.abap", "status": "failed", "code": "LOCK_FAILED", "nextSteps": ["Check who holds the lock: abap inspect ZCL_TR --locks", "Wait for the lock to be released, or release it manually in SE03."] }] }
+  }
+}
+```
+
+# More
+
+## fixme
+
+- [ ] **B** — `src/abap_cli/commands/push.ts` 的 `--tr` help 文案仍写 "required in non-TTY mode"，与新的按对象解析行为不符（已绑定请求或 `$TMP` 对象不再必输）。应改为描述解析规则。
+- [ ] **C** — textpool 的 ADT 路由在 lock 失败时走通用 HTTP 分类（`SAP_ERROR`），不是精确的 `LOCK_FAILED`（无 `inspect --locks` 指引）。与源码对象/FUGR 的锁错误体验不一致。
+
+## todo
+
+- [ ] **DDIC push 不校验对象是否已存在** — `pushDdicFile` 直接 `POST /ddic/<type>`（ICF 端 create-or-update，`data.action` 区分）。若需在 push 前区分"新建"与"更新"，可先 `GET /ddic/<type>/<name>` 探测（类似 `abap create` 的语义），但目前 ICF 语义是覆盖式更新，行为自洽。
+- [ ] **多文件失败聚合的 `nextSteps`** — 多文件失败目前给通用指引（看 `code`/`stage`、keep-going/--fail-fast）；可考虑按失败类别（LOCK_FAILED / ACTIVATION_FAILED / NO_TRANSPORT）分组聚合更具体的下一步。
+
+# references
+
+- 实现：`src/abap_cli/commands/push.ts`、`src/abap_cli/flows/push-flow.ts`（`runPush`/`pushOne`/`resolveObjectTransport`/`pushDdicFile`）、`push-object.ts`、`push-fugr.ts`、`push-textpool.ts`
+- transport 解析：`src/abap_cli/core/transport.ts`（`resolveTransport`）、`src/abap_cli/core/resolve.ts`（`ResolvedObject.packageName`）
+- SAP 后端：`abap/src/clas/zcl_abap_vibe_icf.clas.abap`（`dispatch_ddic` / `dispatch_textpool`）
+- 文档：`docs/commands.md`（`abap push` 一节）、`docs/configuration.md`（Transport Resolution Order）
