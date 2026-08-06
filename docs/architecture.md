@@ -27,12 +27,13 @@ src/abap_cli/
 │   ├── adt-client.ts     # AdtClientWrapper — thin wrapper over abap-adt-api
 │   ├── icf-client.ts     # ICF service client (DDIC, later phase)
 │   └── probe.ts          # layer-by-layer connection probe (tls → auth → adt → icf)
-├── commands/             # one file per CLI command (init, pull, push, ...)
+├── commands/             # one file per CLI command — thin: parse args, delegate to flows/, print result
 ├── config/               # .abap.json + user system profiles
 ├── crypto/secrets.ts     # OS keychain (keytar) for passwords
-├── formats/              # abap-file-format / DDIC JSON file resolution + pull strategies
+├── dictionary/           # DDIC domain logic: ddic-json.ts (abap-file-format JSON ↔ wire mapping)
+├── formats/              # abap-file-format file resolution + pull strategies
 ├── output/               # unified JSON output, error/exit codes, help text
-└── sync/                 # orchestration: resolve, transport, push flow, status/diff/sync, deploy, stuck reports
+└── flows/                # orchestration: resolve, transport, push/pull flows, status/diff/sync, deploy, stuck reports
 ```
 
 ### Key decisions
@@ -40,7 +41,7 @@ src/abap_cli/
 - **ADT via `abap-adt-api`** — source objects (Class/Interface/Program/Function Group) use the standard ADT REST API: search, object structure, source GET/PUT, lock/unlock, content-based syntax check, activation, object creation, transport management.
 - **Thin client** — the CLI only orchestrates HTTP calls and file/result handling; business logic stays on the SAP side.
 - **Unified output** — every command uses `output/json.ts` (`printResult`/`printError`) so `--json` output is consistent across commands and parseable by agents.
-- **Sync orchestration** — `sync/resolve.ts` (object URL + parts resolution), `sync/transport.ts` (`resolveTransport`: `--tr` > config > user's open request > error), `sync/push-flow.ts` (lock → write → check/activate → unlock with `finally`-guaranteed release).
+- **Sync orchestration** — all workflow orchestration lives in `flows/`: `flows/resolve.ts` (object URL + parts resolution), `flows/transport.ts` (`resolveTransport`: `--tr` > config > user's open request > error), `flows/push-flow.ts` (single-object lock → write → check/activate → unlock with `finally`-guaranteed release, plus the file-level `runPush` orchestration), `flows/pull-flow.ts` (single-object / package / DDIC / textpool pull orchestration). Commands stay thin: they parse arguments and print the `{ data, human }` result the flow returns.
 
 ## SAP Layer (`abap/`)
 

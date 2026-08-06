@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
-import { planSync } from '../sync/sync-flow.js';
+import { planSync } from '../flows/sync-flow.js';
 import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 

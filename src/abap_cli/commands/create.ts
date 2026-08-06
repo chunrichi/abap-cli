@@ -7,13 +7,14 @@ import { IcfClient } from '../clients/icf-client.js';
 import { CliError, printError, printResult, jsonFromCommand, printSchema, type CommandSchema } from '../output/json.js';
 import type { ErrorCode } from '../output/error-codes.js';
 import { commonErrorsAfter } from '../output/help-text.js';
-import { resolveObject, getObjectParts, type ResolvedObject, type ObjectPart } from '../sync/resolve.js';
-import { resolveTransport } from '../sync/transport.js';
-import { pushObject } from '../sync/push-flow.js';
+import { resolveObject, getObjectParts, type ResolvedObject } from '../flows/resolve.js';
+import type { ObjectPart } from '../formats/object-parts.js';
+import { resolveTransport } from '../flows/transport.js';
+import { pushObject } from '../flows/push-flow.js';
 import { buildFilename, objectDirName } from '../formats/file-resolver.js';
 import { writeAbapFile, fileExists } from '../formats/abap-source.js';
 import { defaultSkeleton, getTemplate, listTemplates } from '../formats/templates.js';
-import { readDdicJson, localToWire, validateDdicObject, DDIC_SUPPORTED_TYPES, type DdicSupportedType } from '../formats/ddic-json.js';
+import { readDdicJson, localToWire, validateDdicObject, DDIC_SUPPORTED_TYPES, type DdicSupportedType } from '../dictionary/ddic-json.js';
 
 interface CreateTypeSpec {
   objtype: CreatableTypeIds;

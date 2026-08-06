@@ -14,7 +14,7 @@ vi.mock('../../src/abap_cli/clients/probe.js', () => ({
   }),
 }));
 
-import { runDoctorChecks } from '../../src/abap_cli/sync/doctor-checks.js';
+import { runDoctorChecks } from '../../src/abap_cli/flows/doctor-checks.js';
 
 function tmpDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'doctor-'));
@@ -93,7 +93,7 @@ describe('abap doctor command (FR-004)', () => {
   let registerCmd: (p: ReturnType<typeof makeProgram>) => void;
 
   beforeEach(async () => {
-    vi.doMock('../../src/abap_cli/sync/doctor-checks.js', () => ({
+    vi.doMock('../../src/abap_cli/flows/doctor-checks.js', () => ({
       runDoctorChecks: runDoctorChecksMock,
       applySafeFixes: applySafeFixesMock,
     }));

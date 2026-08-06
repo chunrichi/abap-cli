@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { resolveLocalTargets } from '../../src/abap_cli/sync/local-targets.js';
-import { loadIgnorePatterns } from '../../src/abap_cli/sync/ignore.js';
+import { resolveLocalTargets } from '../../src/abap_cli/flows/local-targets.js';
+import { loadIgnorePatterns } from '../../src/abap_cli/flows/ignore.js';
 
 describe('local-targets + ignore (FR-017, FR-025)', () => {
   it('loadIgnorePatterns always includes the defaults', () => {

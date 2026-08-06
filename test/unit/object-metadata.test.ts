@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderObjectMetadataJson } from '../../src/abap_cli/formats/object-metadata.js';
-import type { ObjectMetadata } from '../../src/abap_cli/sync/resolve.js';
+import type { ObjectMetadata } from '../../src/abap_cli/formats/object-parts.js';
 
 function programTypeOf(meta: ObjectMetadata): string | undefined {
   return JSON.parse(renderObjectMetadataJson(meta)).generalInformation?.programType;

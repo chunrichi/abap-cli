@@ -3,7 +3,7 @@ import { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError, printError, printResult, jsonFromCommand, printSchema, type CommandSchema } from '../output/json.js';
 import { collectWarning } from '../output/meta.js';
 import { commonErrorsAfter } from '../output/help-text.js';
-import { SEARCH_RESULT_LIMIT } from '../sync/resolve.js';
+import { SEARCH_RESULT_LIMIT } from '../flows/resolve.js';
 import type { SearchResult } from 'abap-adt-api';
 
 interface SearchResultItem {

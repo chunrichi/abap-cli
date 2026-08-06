@@ -3,8 +3,8 @@ import { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
 import { collectWarning } from '../output/meta.js';
 import { commonErrorsAfter } from '../output/help-text.js';
-import { resolveTransport } from '../sync/transport.js';
-import { deployBundled, type DeploymentSummary } from '../sync/deploy-flow.js';
+import { resolveTransport } from '../flows/transport.js';
+import { deployBundled, type DeploymentSummary } from '../flows/deploy-flow.js';
 
 interface DeployOptions {
   tr?: string;

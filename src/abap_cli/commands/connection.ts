@@ -10,7 +10,7 @@ import { commonErrorsAfter } from '../output/help-text.js';
 import { assertValidProfile } from '../config/validation.js';
 import { probeSystem } from '../clients/probe.js';
 import { probeTextpoolCapability, recordCapability } from '../textpool/textpool-capability.js';
-import { exportProfiles, importProfiles, type ProfileBundle } from '../sync/profiles.js';
+import { exportProfiles, importProfiles, type ProfileBundle } from '../flows/profiles.js';
 
 /**
  * 014: one-shot textpool capability probe, recorded onto the profile (Q1:

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { exportProfiles, importProfiles } from '../../src/abap_cli/sync/profiles.js';
+import { exportProfiles, importProfiles } from '../../src/abap_cli/flows/profiles.js';
 
 const { upsertSystemMock, storePasswordMock } = vi.hoisted(() => ({
   upsertSystemMock: vi.fn(),

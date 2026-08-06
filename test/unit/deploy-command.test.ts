@@ -17,7 +17,7 @@ const deployBundled = vi.fn(async () => ({
   icfNode: { status: 'planned' as const },
 }));
 
-vi.mock('../../src/abap_cli/sync/deploy-flow.js', () => ({
+vi.mock('../../src/abap_cli/flows/deploy-flow.js', () => ({
   deployBundled: (...args: unknown[]) => deployBundled(...args),
 }));
 

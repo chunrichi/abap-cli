@@ -59,10 +59,11 @@ src/abap_cli/
 ├── commands/             # one file per command (incl. activate, deploy, inspect)
 ├── config/               # project + user config
 ├── crypto/secrets.ts     # keychain
+├── dictionary/           # DDIC domain logic (ddic-json.ts)
 ├── icf/                  # ICF service version + deployment check (service-version.ts)
 ├── formats/              # file format + resolver + pull strategies
 ├── output/               # unified JSON output, error codes, meta
-└── sync/                 # resolve, transport, push-flow, deploy-flow, status, doctor-checks
+└── flows/                # resolve, transport, push-flow, deploy-flow, status, doctor-checks
 ```
 
 ## Adding a New Command

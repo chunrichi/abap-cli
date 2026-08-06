@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { Command } from 'commander';
 import { setProgram } from './output/meta.js';
 import { registerLazyCommands, type LazyCommandSpec } from './commands/lazy.js';
-import { writeStuckReport, recordFailure, shouldAutoReport } from './sync/stuck-reports.js';
+import { writeStuckReport, recordFailure, shouldAutoReport } from './flows/stuck-reports.js';
 import { handleTopLevelError } from './top-error.js';
 
 // 声明式惰性注册（P1.6）：只有 name + description 在启动时加载，模块体在

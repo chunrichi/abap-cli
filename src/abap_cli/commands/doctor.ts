@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
 import { commonErrorsAfter } from '../output/help-text.js';
-import { runDoctorChecks, applySafeFixes } from '../sync/doctor-checks.js';
+import { runDoctorChecks, applySafeFixes } from '../flows/doctor-checks.js';
 
 interface DoctorOptions {
   verbose?: boolean;

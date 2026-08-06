@@ -11,7 +11,7 @@ import {
   wireFieldToLocal,
   validateDdicObject,
   DDIC_SUPPORTED_TYPES,
-} from '../../src/abap_cli/formats/ddic-json.js';
+} from '../../src/abap_cli/dictionary/ddic-json.js';
 
 describe('014/ddic-json-map', () => {
   describe('supported types', () => {

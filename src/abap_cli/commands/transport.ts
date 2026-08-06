@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
 import { commonErrorsAfter } from '../output/help-text.js';
-import { showTransport, resolveObjectTransport, assignObjectToTransport } from '../sync/transport-ops.js';
+import { showTransport, resolveObjectTransport, assignObjectToTransport } from '../flows/transport-ops.js';
 
 interface TransportEntry {
   number: string;

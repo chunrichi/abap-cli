@@ -1,4 +1,4 @@
-import type { ObjectMetadata } from '../sync/resolve.js';
+import type { ObjectMetadata } from './object-parts.js';
 
 /** Map raw ADT program:programType to the abap-file-format programType enum. */
 const ADT_PROGRAM_TYPE_TO_ENUM: Record<string, string> = {

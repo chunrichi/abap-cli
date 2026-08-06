@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
-import { inspectObject, type InspectFlags } from '../sync/inspect-ops.js';
+import { inspectObject, type InspectFlags } from '../flows/inspect-ops.js';
 import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 

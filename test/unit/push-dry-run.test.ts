@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { pushObject, type PushOptions } from '../../src/abap_cli/sync/push-flow.js';
+import { pushObject, type PushOptions } from '../../src/abap_cli/flows/push-flow.js';
 import type { AdtClientWrapper } from '../../src/abap_cli/clients/adt-client.js';
 
 function mockClient(): AdtClientWrapper {

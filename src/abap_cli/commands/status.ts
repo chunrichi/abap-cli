@@ -2,8 +2,8 @@ import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
 import { commonErrorsAfter } from '../output/help-text.js';
-import { computeChangedParts, type ChangedPart } from '../sync/status.js';
-import { SEARCH_RESULT_LIMIT } from '../sync/resolve.js';
+import { computeChangedParts, type ChangedPart } from '../flows/status.js';
+import { SEARCH_RESULT_LIMIT } from '../flows/resolve.js';
 
 interface StatusOptions {
   remoteOnly?: boolean;

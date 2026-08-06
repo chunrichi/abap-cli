@@ -1,6 +1,6 @@
 import type { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError } from '../output/json.js';
-import { getObjectPartsWithMeta } from '../sync/resolve.js';
+import { getObjectPartsWithMeta } from './object-parts.js';
 import { buildFilename } from './file-resolver.js';
 import { renderObjectMetadataJson } from './object-metadata.js';
 import { fugrStrategy } from './pull-fugr.js';
