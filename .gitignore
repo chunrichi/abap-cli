@@ -15,6 +15,9 @@ dist/
 .env.local
 .abap.json
 
+# Local ATC worklist output (check --atc --out)
+.abap/
+
 # Source maps
 *.js.map
 
@@ -35,5 +38,3 @@ Thumbs.db
 *.tmp
 *.log
 tmp/
-
-wiki/

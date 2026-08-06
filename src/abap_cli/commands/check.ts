@@ -8,6 +8,7 @@ import { CliError, printError, printResult, jsonFromCommand } from '../output/js
 import { commonErrorsAfter } from '../output/help-text.js';
 import { resolveObject, getObjectParts, validateLocalFile } from '../core/resolve.js';
 import { runAtcCheck } from '../flows/atc.js';
+import type { AtcWorkList } from 'abap-adt-api';
 import type { CheckIssue } from '../output/issues.js';
 
 type CheckMode = 'syntax' | 'content' | 'atc';
@@ -20,6 +21,8 @@ interface CheckOptions {
   all?: boolean;
   changed?: boolean;
   strict?: boolean;
+  /** ATC raw worklist output file (`--atc` only). Empty string = default path. */
+  out?: string;
 }
 
 export function registerCheckCommand(program: Command): void {
@@ -35,6 +38,7 @@ export function registerCheckCommand(program: Command): void {
     .option('--all', 'Check all .abap files under the current directory')
     .option('--changed', 'Check only files changed since the SAP version')
     .option('--strict', 'Treat warnings as failures')
+    .option('--out [file]', 'Persist raw ATC worklist to a file (only with --atc); defaults to .abap/atc/<variant>-<timestamp>.json')
     .action(async (files: string[], opts: CheckOptions, cmd) => {
       const json = jsonFromCommand(cmd);
       try {
@@ -53,6 +57,12 @@ async function runCheck(files: string[], opts: CheckOptions, json: boolean): Pro
       example: 'abap check src/zcl_ok.clas.abap --atc --variant Z_ATC_VAR',
     });
   }
+  if (mode !== 'atc' && opts.out !== undefined) {
+    throw new CliError('INVALID_ARGUMENT', '--out only applies to --atc', {
+      nextSteps: ['Use --out with --atc: abap check <file> --atc --variant Z_VARIANT --out'],
+      example: 'abap check src/zcl_ok.clas.abap --atc --variant Z_ATC_VAR --out',
+    });
+  }
 
   const fileList = await collectFiles(files, opts);
   if (fileList.length === 0) {
@@ -66,18 +76,60 @@ async function runCheck(files: string[], opts: CheckOptions, json: boolean): Pro
   const client = mode === 'content' ? null : await AdtClientWrapper.create();
 
   const issues: CheckIssue[] = [];
+  const worklists: { file: string; worklist: AtcWorkList }[] = [];
   for (const file of fileList) {
-    issues.push(...(await checkFile(client, file, mode, opts)));
+    const result = await checkFile(client, file, mode, opts);
+    issues.push(...result.issues);
+    if (result.worklist) worklists.push(result.worklist);
+  }
+
+  if (mode === 'atc' && opts.out !== undefined) {
+    await persistWorklists(opts, worklists);
   }
 
   const failed = issues.some((i) => i.severity === 'error' || (opts.strict && i.severity === 'warning'));
   if (failed) {
     const code = mode === 'syntax' ? 'SYNTAX_ERROR' : 'VALIDATION_ERROR';
     throw new CliError(code, `${issues.length} issue(s) found across ${fileList.length} file(s)`, {
-      details: { issues, files: fileList.length },
+      details: { issues, files: fileList.length, ...(opts.out !== undefined ? { out: outPath(opts) } : {}) },
     });
   }
-  printResult(json, { issues, failure: false }, humanSummary(issues));
+  printResult(json, { issues, failure: false, ...(opts.out !== undefined ? { out: outPath(opts) } : {}) }, humanSummary(issues));
+}
+
+/** Persist raw ATC worklists to the requested file (or the default path). */
+async function persistWorklists(opts: CheckOptions, worklists: { file: string; worklist: AtcWorkList }[]): Promise<void> {
+  const file = outPath(opts);
+  const payload = {
+    variant: opts.variant,
+    timestamp: new Date().toISOString(),
+    files: worklists.map((w) => ({ file: w.file, worklist: w.worklist })),
+  };
+  try {
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    await fs.writeFile(file, JSON.stringify(payload, null, 2) + '\n', 'utf-8');
+  } catch (error: unknown) {
+    throw new CliError('FILE_PARSE_ERROR', `Cannot write ATC output to ${file}: ${message(error)}`, {
+      file,
+      nextSteps: ['Pick a writable path: abap check <file> --atc --variant Z_VARIANT --out /tmp/atc.json'],
+      example: 'abap check src/zcl_ok.clas.abap --atc --variant Z_ATC_VAR --out /tmp/atc.json',
+    });
+  }
+}
+
+/** Resolve the output file: explicit path, or .abap/atc/<variant>-<timestamp>.json. */
+function outPath(opts: CheckOptions): string {
+  // commander resolves `--out` without a value to `true`.
+  if (typeof opts.out === 'string' && opts.out.trim() !== '') return path.resolve(opts.out);
+  const ts = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, '');
+  return path.resolve('.abap', 'atc', `${opts.variant}-${ts}.json`);
+}
+
+/** Result of checking one file: issues, plus the raw worklist for --atc. */
+interface CheckFileResult {
+  issues: CheckIssue[];
+  /** Raw worklist entry for --out persistence (atc mode only). */
+  worklist?: { file: string; worklist: AtcWorkList };
 }
 
 /** Resolve the single active mode flag; defaults to --syntax (FR-006). */
@@ -147,23 +199,23 @@ async function checkFile(
   file: string,
   mode: CheckMode,
   opts: CheckOptions,
-): Promise<CheckIssue[]> {
+): Promise<CheckFileResult> {
   let resolved;
   try {
     resolved = resolveFile(file);
   } catch (error: unknown) {
-    return [{ file, line: 0, severity: 'error', code: 'FILE_PARSE_ERROR', message: message(error) }];
+    return { issues: [{ file, line: 0, severity: 'error', code: 'FILE_PARSE_ERROR', message: message(error) }] };
   }
 
   let content: string;
   try {
     content = await readAbapFile(file);
   } catch (error: unknown) {
-    return [{ file, line: 0, severity: 'error', code: 'FILE_PARSE_ERROR', message: message(error) }];
+    return { issues: [{ file, line: 0, severity: 'error', code: 'FILE_PARSE_ERROR', message: message(error) }] };
   }
 
   if (mode === 'content') {
-    return contentIssues(file, resolved, content);
+    return { issues: await contentIssues(file, resolved, content) };
   }
 
   const adt = client!;
@@ -172,7 +224,7 @@ async function checkFile(
     object = await resolveObject(adt, resolved.objectName, resolved.objectType);
   } catch (error: unknown) {
     if (error instanceof CliError) {
-      return [{ file, line: 0, severity: 'error', code: error.code, message: error.message }];
+      return { issues: [{ file, line: 0, severity: 'error', code: error.code, message: error.message }] };
     }
     throw error;
   }
@@ -180,10 +232,11 @@ async function checkFile(
   if (mode === 'atc') {
     const parts = await getObjectParts(adt, object);
     const mainPart = parts.find((p) => p.subtype === 'main') ?? parts[0]!;
-    return runAtcCheck(adt, { variant: opts.variant!, mainUrl: mainPart.sourceUrl, file });
+    const result = await runAtcCheck(adt, { variant: opts.variant!, mainUrl: mainPart.sourceUrl, file });
+    return { issues: result.issues, worklist: { file, worklist: result.worklist } };
   }
 
-  return syntaxIssues(adt, file, resolved, object, content);
+  return { issues: await syntaxIssues(adt, file, resolved, object, content) };
 }
 
 async function syntaxIssues(

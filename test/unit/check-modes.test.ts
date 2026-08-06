@@ -176,4 +176,42 @@ describe('abap check modes (US2, FR-006..009, FR-011)', () => {
     expect(atcCheckVariant).toHaveBeenCalledWith('Z_ATC_VAR');
     expect(json.error.details.issues[0]).toMatchObject({ code: 'check_style', severity: 'warning', line: 3 });
   });
+
+  it('--out with an explicit file persists the raw ATC worklist', async () => {
+    const program = makeProgram();
+    registerCheckCommand(program);
+    const outFile = path.join(cwd, 'atc-out.json');
+    const res = await runCommand(program, ['check', 'src/zcl_ok.clas.abap', '--atc', '--variant', 'Z_ATC_VAR', '--strict', '--out', outFile, '--json'], { cwd });
+    expect(res.exitCode).toBe(7);
+    const { json } = parseError(res);
+    expect(json.error.details.out).toBe(outFile);
+    const saved = JSON.parse(fs.readFileSync(outFile, 'utf-8'));
+    expect(saved.variant).toBe('Z_ATC_VAR');
+    expect(saved.files).toHaveLength(1);
+    expect(saved.files[0].file).toMatch(/zcl_ok\.clas\.abap$/);
+    expect(saved.files[0].worklist.id).toBe('WL001');
+    expect(saved.files[0].worklist.objects[0].findings[0].checkId).toBe('check_style');
+  });
+
+  it('--out without a value writes to the default .abap/atc/<variant>-<timestamp>.json', async () => {
+    const program = makeProgram();
+    registerCheckCommand(program);
+    const res = await runCommand(program, ['check', 'src/zcl_ok.clas.abap', '--atc', '--variant', 'Z_ATC_VAR', '--out', '--json'], { cwd });
+    expect(res.exitCode).toBeUndefined();
+    const json = JSON.parse(res.stdout);
+    const out = json.data.out as string;
+    expect(out).toMatch(/\.abap\/atc\/Z_ATC_VAR-\d{8}T\d{6}\.json$/);
+    expect(fs.existsSync(out)).toBe(true);
+    const saved = JSON.parse(fs.readFileSync(out, 'utf-8'));
+    expect(saved.variant).toBe('Z_ATC_VAR');
+  });
+
+  it('--out is rejected outside --atc mode', async () => {
+    const program = makeProgram();
+    registerCheckCommand(program);
+    const res = await runCommand(program, ['check', 'src/zcl_ok.clas.abap', '--syntax', '--out', 'x.json', '--json'], { cwd });
+    expect(res.exitCode).toBe(2);
+    const { json } = parseError(res);
+    expect(json.error.code).toBe('INVALID_ARGUMENT');
+  });
 });

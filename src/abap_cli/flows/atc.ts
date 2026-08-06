@@ -1,3 +1,4 @@
+import type { AtcWorkList } from 'abap-adt-api';
 import type { AdtClientWrapper } from '../clients/adt-client.js';
 import type { CheckIssue } from '../output/issues.js';
 
@@ -8,14 +9,21 @@ export interface AtcRunOptions {
   file: string;
 }
 
+export interface AtcCheckResult {
+  issues: CheckIssue[];
+  /** Raw SAP worklist, persisted verbatim by `check --out` (FR-0xx). */
+  worklist: AtcWorkList;
+}
+
 /**
  * Run an ATC check for one object and map findings to the unified CheckIssue
- * shape (FR-011, research §5).
+ * shape (FR-011, research §5). The raw worklist is returned alongside so the
+ * caller can persist the full findings when the volume is large.
  */
 export async function runAtcCheck(
   client: AdtClientWrapper,
   opts: AtcRunOptions,
-): Promise<CheckIssue[]> {
+): Promise<AtcCheckResult> {
   await client.atcCheckVariant(opts.variant);
   const run = await client.createAtcRun(opts.variant, opts.mainUrl);
   const worklist = await client.atcWorklists(run.id, run.timestamp, undefined, true);
@@ -31,7 +39,7 @@ export async function runAtcCheck(
       });
     }
   }
-  return issues;
+  return { issues, worklist };
 }
 
 function priorityToSeverity(priority: number): 'info' | 'warning' | 'error' {

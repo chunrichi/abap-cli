@@ -134,6 +134,7 @@ abap check [options] [files...]
 | `--all` | Check all `.abap` files under the current directory |
 | `--changed` | Check only files changed since the SAP version |
 | `--strict` | Treat warnings as failures |
+| `--out [file]` | Persist the raw ATC worklist to a file (only with `--atc`); defaults to `.abap/atc/<variant>-<timestamp>.json` |
 
 ## `abap search`
 
@@ -410,10 +411,10 @@ abap activate <object> [options]
 
 | Option | Description |
 |--------|-------------|
-| `--tr <transport>` | Transport number |
+| `--type <type>` | Object type (CLAS, PROG, INTF, etc.) — disambiguates same-name objects |
 | `--yes` | Confirm in non-interactive environments |
 
-A root-URI-only activation can silently no-op while method/OSI items stay inactive (013 dogfooding). `abap activate` collects every inactive item of the object and activates them as a batch. Typical flow: `abap inspect <object> --activation` to check, then `abap activate <object> --yes` to fix.
+A root-URI-only activation can silently no-op while method/OSI items stay inactive (013 dogfooding). `abap activate` collects every inactive item of the object (matched on the object part of the item URI, so a same-prefix name like `ZCL_FOO_BAR` is never mistaken for `ZCL_FOO`) and activates them as a batch. Typical flow: `abap inspect <object> --activation` to check, then `abap activate <object> --yes` to fix.
 
 ## `abap diff`
 
