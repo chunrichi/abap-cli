@@ -5,7 +5,7 @@ import { commonErrorsAfter } from '../output/help-text.js';
 import { resolveObject } from '../core/resolve.js';
 
 interface ActivateOptions {
-  tr?: string;
+  type?: string;
   yes?: boolean;
 }
 
@@ -18,7 +18,7 @@ export function registerActivateCommand(program: Command): void {
     .command('activate <object>')
     .description('Activate all inactive items of an object (method/OSI level)')
     .addHelpText('after', commonErrorsAfter())
-    .option('--tr <transport>', 'Transport number')
+    .option('--type <type>', 'Object type (CLAS, PROG, INTF, etc.) — disambiguates same-name objects')
     .option('--yes', 'Confirm in non-interactive environments')
     .action(async (object: string, opts: ActivateOptions, cmd) => {
       const json = jsonFromCommand(cmd);
@@ -30,13 +30,15 @@ export function registerActivateCommand(program: Command): void {
           });
         }
         const client = await AdtClientWrapper.create();
-        const resolved = await resolveObject(client, object);
+        const resolved = await resolveObject(client, object, opts.type);
 
-        // Collect all inactive items that belong to this object.
+        // Collect all inactive items that belong to this object. Method/OSI
+        // items carry a #fragment URI; match on the object part only so a
+        // same-prefix name (ZCL_FOO vs ZCL_FOO_BAR) never leaks in.
         const inact = await client.inactiveObjects();
         const mine = (inact ?? []).filter((i) => {
           const uri = (i?.object?.['adtcore:uri'] ?? '') as string;
-          return uri.startsWith(resolved.objectUrl);
+          return uri.split('#')[0] === resolved.objectUrl;
         });
 
         if (mine.length === 0) {
@@ -48,12 +50,10 @@ export function registerActivateCommand(program: Command): void {
           return;
         }
 
-        const items = mine
-          .filter((i) => (i?.object?.['adtcore:uri'] ?? '') !== '')
-          .map((i) => {
-            const o = i.object as { 'adtcore:uri': string; 'adtcore:type': string; 'adtcore:name': string };
-            return { uri: o['adtcore:uri'], type: o['adtcore:type'], name: o['adtcore:name'], parentUri: o['adtcore:uri'].split('#')[0] ?? o['adtcore:uri'] };
-          });
+        const items = mine.map((i) => {
+          const o = i.object as { 'adtcore:uri': string; 'adtcore:type': string; 'adtcore:name': string };
+          return { uri: o['adtcore:uri'], type: o['adtcore:type'], name: o['adtcore:name'], parentUri: o['adtcore:uri'].split('#')[0] ?? o['adtcore:uri'] };
+        });
         const res = await client.activateAll(items);
         printResult(
           json,

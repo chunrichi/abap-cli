@@ -311,7 +311,9 @@ async function activateAllParts(
       | { 'adtcore:uri'?: string; 'adtcore:type'?: string; 'adtcore:name'?: string }
       | undefined;
     const uri = obj?.['adtcore:uri'];
-    if (!uri || !uri.startsWith(resolved.objectUrl)) continue;
+    // Method/OSI items carry a #fragment URI; match the object part only so a
+    // same-prefix name (ZCL_FOO vs ZCL_FOO_BAR) never leaks in (mirrors activate).
+    if (!uri || uri.split('#')[0] !== resolved.objectUrl) continue;
     items.push({
       uri,
       type: obj?.['adtcore:type'] ?? resolved.type,
