@@ -3,31 +3,28 @@ import { registerSearchCommand } from '../../src/abap_cli/commands/search.js';
 import { makeProgram, runCommand } from './cli-helper.js';
 
 /**
- * P1.8 — `abap search --page-all`. Auto-page through every result until the
- * server returns strictly fewer than `--limit` rows (the "last page"). The
- * mock client here mirrors that contract: pages of exactly `limit` until the
- * tail.
+ * `--page-all` — real ADT quickSearch has no offset: every call returns the
+ * same leading slice, so the command fetches ONCE with maxResults = limit ×
+ * pageAllMax and reports whether the server may still have more. The mock
+ * mirrors that contract (slice(0, max) per call).
  */
 
-// 53 synthetic matches: page size 20 → pages 1 (20), 2 (20), 3 (13).
-// That gives us 3 pages exactly with the default cap (50), exercising both the
-// "stop on short page" and "stop on dedup-progress" code paths.
+// 53 synthetic matches. Default --limit 20 × --page-all-max 50 = 1000 requested
+// covers them all; a tight cap (e.g. 2 pages × 20 = 40) forces truncation.
 const NAMES = Array.from({ length: 53 }, (_, i) => `ZPG_${String(i + 1).padStart(3, '0')}`);
 
-let callIndex = 0;
 const searchObject = vi.fn(async (query: string, _type?: string, maxResults = 100) => {
-  const q = (query || '').toUpperCase();
-  callIndex++;
-  const all = NAMES.filter((n) => n.includes(q));
-  // Simulate an SAP backend that returns the next slice every call.
-  const start = ((callIndex - 1) % Math.ceil(all.length / maxResults)) * maxResults;
-  return all.slice(start, start + maxResults).map((name, i) => ({
-    'adtcore:name': name,
-    'adtcore:type': 'PROG/P',
-    'adtcore:uri': `/sap/bc/adt/programs/programs/${name.toLowerCase()}`,
-    'adtcore:description': `Object ${i}`,
-    'adtcore:packageName': i % 3 === 0 ? 'ZPKG' : '$TMP',
-  }));
+  // Real ADT: `*` wildcards are stripped server-side for substring matching.
+  const q = (query || '').replace(/\*/g, '').toUpperCase();
+  return NAMES.filter((n) => n.includes(q))
+    .slice(0, maxResults)
+    .map((name, i) => ({
+      'adtcore:name': name,
+      'adtcore:type': 'PROG/P',
+      'adtcore:uri': `/sap/bc/adt/programs/programs/${name.toLowerCase()}`,
+      'adtcore:description': `Object ${i}`,
+      'adtcore:packageName': i % 3 === 0 ? 'ZPKG' : '$TMP',
+    }));
 });
 
 vi.mock('../../src/abap_cli/clients/adt-client.js', () => ({
@@ -39,48 +36,46 @@ function parseJsonOutput(res: { stdout: string; stderr: string; exitCode?: numbe
   return { json, exitCode: res.exitCode };
 }
 
-describe('abap search --page-all (P1.8)', () => {
-  beforeEach(() => {
-    searchObject.mockClear();
-    callIndex = 0;
-  });
+describe('abap search --page-all', () => {
+  beforeEach(() => searchObject.mockClear());
 
-  it('fetches every page and returns the full set with pageAll:true', async () => {
+  it('fetches once with requested = limit × pageAllMax and returns the full set', async () => {
     const program = makeProgram();
     registerSearchCommand(program);
     const res = await runCommand(program, ['search', 'ZPG', '--page-all', '--json']);
     const { json, exitCode } = parseJsonOutput(res);
     expect(exitCode).toBeUndefined();
     expect(json.status).toBe('success');
+    expect(searchObject).toHaveBeenCalledTimes(1);
+    expect(searchObject).toHaveBeenCalledWith('ZPG', undefined, 1000);
     expect(json.data.pageAll).toBe(true);
+    expect(json.data.requested).toBe(1000);
     expect(json.data.items).toHaveLength(53);
     expect(json.data.total).toBe(53);
-    expect(json.data.pagesFetched).toBe(3);
     expect(json.data.truncated).toBeUndefined();
   });
 
-  it('still works with a custom --limit and computes pagesFetched accordingly', async () => {
+  it('sizes the single request from a custom --limit', async () => {
     const program = makeProgram();
     registerSearchCommand(program);
     const res = await runCommand(program, ['search', 'ZPG', '--page-all', '--limit', '10', '--json']);
     const { json, exitCode } = parseJsonOutput(res);
     expect(exitCode).toBeUndefined();
-    expect(json.data.pageAll).toBe(true);
-    expect(json.data.limit).toBe(10);
+    expect(searchObject).toHaveBeenCalledWith('ZPG', undefined, 500);
+    expect(json.data.requested).toBe(500);
     expect(json.data.items).toHaveLength(53);
-    expect(json.data.pagesFetched).toBe(6);
   });
 
-  it('emits PAGINATION_LIMITED warning and sets truncated:true when the cap is hit', async () => {
+  it('emits PAGINATION_LIMITED and sets truncated:true when the request hits the cap', async () => {
     const program = makeProgram();
     registerSearchCommand(program);
-    // Default cap is 50 pages × 20 = 1000 items; 53 fits but a tight cap
-    // forces the warning.
+    // 2 pages × 20 = 40 requested; the server has 53 → truncated.
     const res = await runCommand(program, ['search', 'ZPG', '--page-all', '--page-all-max', '2', '--json']);
     const { json, exitCode } = parseJsonOutput(res);
     expect(exitCode).toBeUndefined();
+    expect(searchObject).toHaveBeenCalledWith('ZPG', undefined, 40);
     expect(json.data.pageAll).toBe(true);
-    // 2 pages × 20 = 40 items, truncated
+    expect(json.data.requested).toBe(40);
     expect(json.data.items).toHaveLength(40);
     expect(json.data.truncated).toBe(true);
     expect(json.meta.warnings).toEqual(
@@ -111,10 +106,9 @@ describe('abap search --page-all (P1.8)', () => {
     expect(json.data.truncated).toBe(true);
   });
 
-  it('--page-all with --exact applies the exact filter on the accumulated set', async () => {
+  it('--page-all with --exact applies the exact filter on the fetched set', async () => {
     const program = makeProgram();
     registerSearchCommand(program);
-    // Search for ZPG_007 — exact match should yield exactly 1.
     const res = await runCommand(program, ['search', 'ZPG_007', '--page-all', '--exact', '--json']);
     const { json, exitCode } = parseJsonOutput(res);
     expect(exitCode).toBeUndefined();

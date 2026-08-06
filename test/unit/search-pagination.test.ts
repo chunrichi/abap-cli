@@ -9,7 +9,8 @@ const NAMES = [
 ];
 
 const searchObject = vi.fn(async (query: string, _type?: string, maxResults = 100) => {
-  const q = (query || '').toUpperCase();
+  // Real ADT: `*` wildcards are stripped server-side for substring matching.
+  const q = (query || '').replace(/\*/g, '').toUpperCase();
   let matches = NAMES.filter((n) => n.includes(q));
   if (q.startsWith('EXACT:')) matches = NAMES.filter((n) => n === q.slice(6));
   return matches.slice(0, maxResults).map((name, i) => ({
@@ -91,5 +92,30 @@ describe('abap search pagination (US1, SC-001/SC-002)', () => {
     expect(json.meta.warnings).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: 'DEPRECATED_OPTION' })]),
     );
+  });
+
+  it('--exact on a bare name widens to *NAME* and returns only the exact object', async () => {
+    const program = makeProgram();
+    registerSearchCommand(program);
+    // --page-all so the widened *ZPAGE* set covers all 25 matches (ZPAGE is
+    // the 25th), then the exact filter keeps only ZPAGE.
+    const res = await runCommand(program, ['search', 'ZPAGE', '--exact', '--page-all', '--json']);
+    const { json, exitCode } = parseJsonOutput(res);
+    expect(exitCode).toBeUndefined();
+    // Bare-name exact must query *ZPAGE* (real ADT needs wildcards).
+    expect(searchObject).toHaveBeenCalledWith('*ZPAGE*', undefined, 1000);
+    expect(json.data.items.map((i: { name: string }) => i.name)).toEqual(['ZPAGE']);
+  });
+
+  it('--exact strips * from wildcard queries so *ZPAGE* matches exactly ZPAGE', async () => {
+    const program = makeProgram();
+    registerSearchCommand(program);
+    // --limit 30 covers the full 25-match set on the single-page path.
+    const res = await runCommand(program, ['search', '*ZPAGE*', '--exact', '--limit', '30', '--json']);
+    const { json, exitCode } = parseJsonOutput(res);
+    expect(exitCode).toBeUndefined();
+    // Wildcard already present → passed through untouched.
+    expect(searchObject).toHaveBeenCalledWith('*ZPAGE*', undefined, 30);
+    expect(json.data.items.map((i: { name: string }) => i.name)).toEqual(['ZPAGE']);
   });
 });
