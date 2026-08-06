@@ -38,3 +38,5 @@ Thumbs.db
 *.tmp
 *.log
 tmp/
+# Wiki knowledge base (local only, not version-controlled)
+wiki/
