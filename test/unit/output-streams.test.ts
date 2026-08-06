@@ -96,22 +96,21 @@ describe('P1.7 stdout/stderr separation audit (handleTopLevelError)', () => {
       expect(res.stderr).toContain('<description>');
     });
 
-    it('commander.help on bare subcommand: JSON envelope + sub help on stderr, stdout empty', () => {
+    it('commander.help on bare subcommand: JSON envelope on stderr (no help re-emit), stdout empty', () => {
       // `abap transport` (no subcommand) → commander.help with error:true.
-      // Requires the program to actually have a `transport` subcommand
-      // registered, otherwise resolveSubcommand walks back to root and
-      // commander.help dispatches as a real help exit.
+      // commander has already written the help to writeErr; the handler only
+      // emits the JSON envelope (no help re-emission — that caused the
+      // duplication bug).
       const program = new Command().name('abap-cli');
       program.command('transport').description('transport commands');
       const err = new CommanderError(1, 'commander.help', '(outputHelp)');
       const res = run(err, ['--json', 'transport'], program);
       expect(res.exitCode).toBe(2);
       expect(res.stdout).toBe('');
-      const payload = JSON.parse(res.stderr.split('\n\n')[0]);
+      const payload = JSON.parse(res.stderr);
       expect(payload.status).toBe('error');
       expect(payload.error.code).toBe('USAGE');
       expect(payload.error.message).toContain('Missing required');
-      expect(res.stderr).toContain('Usage:');
     });
 
     it('commander.unknownCommand: stdout empty, USAGE envelope on stderr', () => {
@@ -176,16 +175,18 @@ describe('P1.7 stdout/stderr separation audit (handleTopLevelError)', () => {
       expect(res.stderr).toMatch(/Error:.*description/);
     });
 
-    it('commander.help on bare subcommand: sub help on stdout, USAGE note on stderr', () => {
+    it('commander.help on bare subcommand: handler does not re-emit (commander already wrote it)', () => {
       // Bare `abap transport` only fires commander.help when the program
       // actually has a `transport` subcommand registered — empty programs
-      // dispatch it as a real help request (exit 0).
+      // dispatch it as a real help request (exit 0). commander has already
+      // written the help to writeErr via outputHelp({error:true}); the
+      // handler must not duplicate it on stdout.
       const program = new Command().name('abap-cli');
       program.command('transport').description('transport commands');
       const err = new CommanderError(1, 'commander.help', '(outputHelp)');
       const res = run(err, ['transport'], program);
       expect(res.exitCode).toBe(2);
-      expect(res.stdout).toContain('Usage:');
+      expect(res.stdout).toBe('');
       expect(res.stderr).toMatch(/Missing required argument/);
     });
 
@@ -207,43 +208,73 @@ describe('P1.7 stdout/stderr separation audit (handleTopLevelError)', () => {
   });
 
   describe('true help exits follow contract §1.4: plain text on stdout, exit 0', () => {
-    it('commander.helpDisplayed (--help): help on stdout, no stderr, exit 0', () => {
+    // commander already wrote the help (incl. addHelpText sections like
+    // "Local commands") to stdout BEFORE throwing CommanderError. The handler
+    // must NOT re-emit it — that was the source of the `--help` duplication
+    // bug. Real end-to-end coverage lives in test/unit/help-duplication.test.ts.
+    it('commander.helpDisplayed (--help): handler does not re-emit, exit 0', () => {
       const program = new Command().name('abap-cli');
       const err = new CommanderError(0, 'commander.helpDisplayed', '(outputHelp)');
       const res = run(err, ['--help'], program);
       expect(res.exitCode).toBe(0);
-      expect(res.stdout).toContain('Usage:');
+      expect(res.stdout).toBe('');
       expect(res.stderr).toBe('');
     });
 
-    it('commander.helpDisplayed with subcommands registered: still plain text stdout', () => {
+    it('commander.helpDisplayed with subcommands registered: still no re-emit, exit 0', () => {
       const program = new Command().name('abap-cli');
       const sub = program.command('pull').description('pull things');
       sub.action(() => {});
       const err = new CommanderError(0, 'commander.helpDisplayed', '(outputHelp)');
       const res = run(err, ['--help'], program);
       expect(res.exitCode).toBe(0);
-      expect(res.stdout).toContain('Usage:');
+      expect(res.stdout).toBe('');
       expect(res.stderr).toBe('');
     });
 
-    it('--json --help (commander.helpDisplayed): still plain text on stdout per contract §1.4', () => {
+    it('--json --help (commander.helpDisplayed): still no re-emit per contract §1.4', () => {
       const program = new Command().name('abap-cli');
       const err = new CommanderError(0, 'commander.helpDisplayed', '(outputHelp)');
       const res = run(err, ['--json', '--help'], program);
       expect(res.exitCode).toBe(0);
-      expect(res.stdout).toContain('Usage:');
+      expect(res.stdout).toBe('');
       expect(res.stderr).toBe('');
     });
 
     it('commander error with exitCode 0 (e.g. --version): exit 0, no output', () => {
-      // A non-help commander error with exitCode 0 still exits early — only
-      // the help/helpDisplayed branches write to the streams.
       const err = new CommanderError(0, 'commander.executableRecursive', 'recursive');
       const res = run(err, []);
       expect(res.exitCode).toBe(0);
       expect(res.stdout).toBe('');
       expect(res.stderr).toBe('');
+    });
+  });
+
+  describe('commander.help on bare subcommand (handler does not re-emit help)', () => {
+    // commander fires commander.help with outputHelp({error:true}) which
+    // already wrote the subcommand help to writeErr. Re-emitting in the
+    // handler would duplicate it, so the handler only adds the stream-
+    // separation envelope.
+    it('human mode: no stdout help, USAGE note on stderr, exit 2', () => {
+      const program = new Command().name('abap-cli');
+      program.command('transport').description('transport commands');
+      const err = new CommanderError(1, 'commander.help', '(outputHelp)');
+      const res = run(err, ['transport'], program);
+      expect(res.exitCode).toBe(2);
+      expect(res.stdout).toBe('');
+      expect(res.stderr).toMatch(/Missing required argument/);
+    });
+
+    it('JSON mode: empty stdout, JSON USAGE envelope on stderr, exit 2', () => {
+      const program = new Command().name('abap-cli');
+      program.command('transport').description('transport commands');
+      const err = new CommanderError(1, 'commander.help', '(outputHelp)');
+      const res = run(err, ['--json', 'transport'], program);
+      expect(res.exitCode).toBe(2);
+      expect(res.stdout).toBe('');
+      const payload = JSON.parse(res.stderr);
+      expect(payload.status).toBe('error');
+      expect(payload.error.code).toBe('USAGE');
     });
   });
 });

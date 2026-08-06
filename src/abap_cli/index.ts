@@ -117,7 +117,8 @@ program
   .option('--report-stuck', 'Record a stuck report when this command fails (feedback loop, FR-023)');
 
 // 顶层错误处理（FR-005/FR-007）：commander 抛错（缺参/未知选项）由这里归一化为
-// 结构化错误；--help/--version 仍走 commander 自带输出并 exit 0。
+// 结构化错误；--help/--version 让 commander 自己写 stdout（包含 addHelpText
+// 后置 section），我们在 catch 里只补 USAGE/JSON 信封和退出码，避免重复。
 program.exitOverride();
 program.configureOutput({ writeErr: () => {} });
 

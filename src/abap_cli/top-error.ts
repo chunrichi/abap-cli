@@ -87,33 +87,29 @@ export function handleTopLevelError(
   const json = isJson(ctx.argv);
 
   if (error instanceof CommanderError) {
-    if (error.code === 'commander.helpDisplayed' || error.code === 'commander.help') {
-      const firstArg = firstSubcommandArg(ctx.argv);
-      const sub = resolveSubcommand(ctx.program, firstArg, ctx.argv);
-      const helpBody = sub.helpInformation();
-      if (error.code === 'commander.help' && sub !== ctx.program) {
-        // Bare subcommand (e.g. `abap transport` with no subcommand): exit 2
-        // with the subcommand's usage and a USAGE error. JSON mode keeps
-        // stdout empty.
-        if (json) {
-          const usage = new CliError('USAGE', 'Missing required subcommand or argument.', {
-            nextSteps: ['Check the command usage: abap <command> --help.'],
-            example: `abap ${firstArg ?? '<command>'} --help`,
-          });
-          const out = renderError(json, usage, buildMeta());
-          writeBlock(streams.stderr, out.stderr.join('\n'));
-          streams.stderr.write('\n');
-          writeBlock(streams.stderr, helpBody);
-          exit(out.exitCode ?? 2);
-        }
-        writeBlock(streams.stdout, helpBody);
-        streams.stderr.write('Missing required argument(s). See the usage above.\n');
-        exit(2);
-      }
-      // Real help exit (--help/--version/no-args root): plain text on stdout,
-      // exit 0, no stderr (contract §1.4).
-      writeBlock(streams.stdout, helpBody);
+    if (error.code === 'commander.helpDisplayed') {
+      // Real help exit (--help/--version/no-args root): commander has already
+      // written the full help (including addHelpText sections) to stdout.
+      // Exit 0, no stderr (contract §1.4). Re-rendering would duplicate it.
       exit(0);
+    }
+    if (error.code === 'commander.help') {
+      // commander.help fires for bare subcommands (e.g. `abap transport` with
+      // no subcommand). commander has already written the subcommand help
+      // (via outputHelp({ error: true })) to writeErr. We only need to emit
+      // the JSON envelope in --json mode and a stderr hint in human mode.
+      const firstArg = firstSubcommandArg(ctx.argv);
+      if (json) {
+        const usage = new CliError('USAGE', 'Missing required subcommand or argument.', {
+          nextSteps: ['Check the command usage: abap <command> --help.'],
+          example: `abap ${firstArg ?? '<command>'} --help`,
+        });
+        const out = renderError(json, usage, buildMeta());
+        writeBlock(streams.stderr, out.stderr.join('\n'));
+        exit(out.exitCode ?? 2);
+      }
+      streams.stderr.write('Missing required argument(s). See the usage above.\n');
+      exit(2);
     }
     if (error.exitCode === 0) exit(0);
     if (
@@ -121,6 +117,12 @@ export function handleTopLevelError(
       error.code === 'commander.missingMandatoryOptionValue' ||
       error.code === 'commander.optionMissingArgument'
     ) {
+      // Missing-argument path: commander has already written the subcommand
+      // usage to writeErr (via _displayError → outputHelp({ error: true })).
+      // In human mode we mirror a plain help body to stdout so the user sees
+      // the full options; helpInformation() omits addHelpText sections, which
+      // is acceptable on this error path. JSON mode keeps stdout empty per
+      // contract §1.4.
       const firstArg = firstSubcommandArg(ctx.argv);
       const sub = resolveSubcommand(ctx.program, firstArg, ctx.argv);
       const helpBody = sub.helpInformation();
