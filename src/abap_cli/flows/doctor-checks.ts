@@ -196,6 +196,15 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
         errItem('config.active', `Cannot parse workspace config: ${message}`, 'Fix or delete .abap.json, then re-run abap doctor.'),
       );
     }
+  } else {
+    push(
+      config,
+      errItem(
+        'config.workspace',
+        'No workspace config (.abap.json) found in the current directory.',
+        'Run "abap config init" or "abap config --system <name>" to initialize the workspace.',
+      ),
+    );
   }
 
   // --- connection ---

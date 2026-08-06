@@ -32,7 +32,7 @@ describe('connection export/import (US8, FR-026)', () => {
     expect(bundle.systems[0].password).toBeUndefined();
   });
 
-  it('import restores profiles and routes passwords to the keychain', async () => {
+  it('import skips existing profiles by default', async () => {
     const bundle = {
       format: 'abap-cli-profiles',
       version: 1,
@@ -40,7 +40,21 @@ describe('connection export/import (US8, FR-026)', () => {
       systems: [{ name: 'mock', url: 'http://localhost:8080', client: '100', username: 'MOCKUSER', language: 'EN', password: 'secret' }],
     };
     const result = await importProfiles(bundle);
-    expect(result.imported[0].action).toBe('updated'); // mock profile already exists
+    expect(result.imported[0].action).toBe('skipped'); // mock profile already exists
+    expect(upsertSystemMock).not.toHaveBeenCalled();
+    expect(storePasswordMock).not.toHaveBeenCalled();
+  });
+
+  it('import --overwrite updates existing profiles and routes passwords to the keychain', async () => {
+    const bundle = {
+      format: 'abap-cli-profiles',
+      version: 1,
+      exportedAt: '2026-08-04T00:00:00Z',
+      systems: [{ name: 'mock', url: 'http://localhost:8080', client: '100', username: 'MOCKUSER', language: 'EN', password: 'secret' }],
+    };
+    const result = await importProfiles(bundle, { overwrite: true });
+    expect(result.imported[0].action).toBe('updated');
+    expect(upsertSystemMock).toHaveBeenCalledWith('mock', expect.objectContaining({ username: 'MOCKUSER' }));
     expect(storePasswordMock).toHaveBeenCalledWith('mock', 'secret');
   });
 });

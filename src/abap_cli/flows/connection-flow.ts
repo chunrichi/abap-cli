@@ -124,16 +124,23 @@ export async function runTest(name: string, jsonOutput: boolean): Promise<void> 
   }
 }
 
-export async function runDelete(name: string, jsonOutput: boolean): Promise<void> {
+export async function runDelete(name: string, yes: boolean, jsonOutput: boolean): Promise<void> {
   if (!getSystem(name)) {
     throw new CliError('CONFIG_ERROR', `Connection profile '${name}' not found.`);
   }
 
-  if (process.stdin.isTTY) {
-    const ok = orCancel(await confirm({ message: `Delete connection profile '${name}'?`, initialValue: false }));
-    if (!ok) {
-      console.log('Aborted. Connection profile kept.');
-      process.exit(0);
+  if (!yes) {
+    if (process.stdin.isTTY) {
+      const ok = orCancel(await confirm({ message: `Delete connection profile '${name}'?`, initialValue: false }));
+      if (!ok) {
+        console.log('Aborted. Connection profile kept.');
+        process.exit(0);
+      }
+    } else {
+      throw new CliError('VALIDATION_ERROR', 'Deleting a connection profile is a write operation; confirm with --yes.', {
+        nextSteps: ['Re-run with --yes to delete without prompting.', 'Or run interactively in a TTY.'],
+        example: `abap connection delete ${name} --yes`,
+      });
     }
   }
 

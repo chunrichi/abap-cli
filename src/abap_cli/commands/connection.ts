@@ -99,9 +99,10 @@ export function registerConnectionCommand(program: Command): void {
   connection
     .command('delete <name>')
     .description('Delete a connection profile and its stored password')
-    .action(async (name: string, _opts, cmd) => {
+    .option('--yes', 'Delete without prompting (required in non-interactive environments)')
+    .action(async (name: string, opts: { yes?: boolean }, cmd) => {
       try {
-        await runDelete(name, jsonFromCommand(cmd));
+        await runDelete(name, opts.yes === true, jsonFromCommand(cmd));
       } catch (error: unknown) {
         handleError(jsonFromCommand(cmd), error);
       }
@@ -133,14 +134,14 @@ export function registerConnectionCommand(program: Command): void {
 
   connection
     .command('import <file>')
-    .description('Import connection profiles from a bundle')
+    .description('Import connection profiles from a bundle (existing profiles are skipped)')
     .option('--overwrite', 'Update profiles that already exist')
     .action(async (file: string, opts: { overwrite?: boolean }, cmd) => {
       const json = jsonFromCommand(cmd);
       try {
         const raw = JSON.parse(fs.readFileSync(path.resolve(file), 'utf-8'));
         const bundle = validateBundle(raw);
-        const result = await importProfiles(bundle);
+        const result = await importProfiles(bundle, { overwrite: opts.overwrite });
         const human = result.imported
           .map((i) => `  ${i.name} — ${i.action}`)
           .join('\n');

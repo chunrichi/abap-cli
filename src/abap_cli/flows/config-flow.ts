@@ -98,7 +98,8 @@ async function useExistingSystem(
   validateInputs(config);
   // Probe BEFORE writing .abap.json so a failed probe leaves no workspace behind (US-5).
   const probe = await maybeProbe(systemName, opts);
-  await handleFileOverwrite('refuse');
+  // --yes/--non-interactive: skip the FILE_EXISTS refusal, like the wizard does.
+  await handleFileOverwrite(opts.yes === true || opts.nonInteractive === true ? 'overwrite' : 'refuse');
   await writeConfig(systemName, config, jsonOutput);
 
   // FR-021: optional per-layer probe (--test-tls / --test-auth / --test-connection).
@@ -166,7 +167,8 @@ async function createSystemFromParams(opts: CommandOpts, jsonOutput: boolean): P
 
   const systemName = str(opts.system) || deriveSystemName(profile);
   await saveProfile(systemName, profile, password, jsonOutput);
-  await handleFileOverwrite('refuse');
+  // --yes/--non-interactive: skip the FILE_EXISTS refusal, like the wizard does.
+  await handleFileOverwrite(opts.yes === true || opts.nonInteractive === true ? 'overwrite' : 'refuse');
   await writeConfig(systemName, config, jsonOutput);
   const icf = await icfDeploymentCheck(jsonOutput);
   if (jsonOutput) outputJson(systemName, config, undefined, icf);

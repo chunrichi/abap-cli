@@ -23,6 +23,11 @@ export interface ExportOptions {
   withPasswords?: boolean;
 }
 
+export interface ImportOptions {
+  /** Update profiles that already exist (default: skip them). */
+  overwrite?: boolean;
+}
+
 export interface ImportResult {
   imported: { name: string; action: 'created' | 'updated' | 'skipped' }[];
 }
@@ -57,13 +62,18 @@ export async function exportProfiles(opts: ExportOptions = {}): Promise<ProfileB
 }
 
 /**
- * Import a profile bundle: upsert each profile into the user config and route
- * any bundled password into the keychain (never into systems.json).
+ * Import a profile bundle. Existing profiles are skipped unless `overwrite`
+ * is set; any bundled password is routed into the keychain (never into
+ * systems.json).
  */
-export async function importProfiles(bundle: ProfileBundle): Promise<ImportResult> {
+export async function importProfiles(bundle: ProfileBundle, opts: ImportOptions = {}): Promise<ImportResult> {
   const imported: ImportResult['imported'] = [];
   for (const entry of bundle.systems) {
     const exists = getSystem(entry.name) !== null;
+    if (exists && !opts.overwrite) {
+      imported.push({ name: entry.name, action: 'skipped' });
+      continue;
+    }
     upsertSystem(entry.name, {
       url: entry.url,
       client: entry.client,

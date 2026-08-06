@@ -42,10 +42,23 @@ describe('doctor-checks (FR-001..005)', () => {
     writeSystems(home, {
       mock: { url: 'http://localhost:8080', client: '100', username: 'MOCKUSER', language: 'EN' },
     });
+    // Workspace initialized so the config section is all ok.
+    fs.writeFileSync(path.join(cwd, '.abap.json'), JSON.stringify({ system: 'mock' }, null, 2) + '\n');
     const report = await runDoctorChecks({ home, cwd });
     expect(report.environment.every((i) => i.status === 'ok')).toBe(true);
     expect(report.config.every((i) => i.status === 'ok')).toBe(true);
     expect(report.nextSteps).toEqual([]);
+  });
+
+  it('uninitialized workspace → config.workspace err + suggestion in nextSteps', async () => {
+    writeSystems(home, {
+      mock: { url: 'http://localhost:8080', client: '100', username: 'MOCKUSER', language: 'EN' },
+    });
+    const report = await runDoctorChecks({ home, cwd });
+    const item = report.config.find((i) => i.key === 'config.workspace');
+    expect(item?.status).toBe('err');
+    expect(item?.suggestion).toContain('abap config init');
+    expect(report.nextSteps).toContain(item?.suggestion);
   });
 
   it('corrupt systems.json → config item err + suggestion in nextSteps, no throw (FR-002, SC-001)', async () => {
