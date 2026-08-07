@@ -96,3 +96,10 @@ abap activate ZFOO --type CLAS --yes
 ## fixme
 
 - 未发现专门的 `activate.test.ts`；相关批量激活逻辑只在 push/deploy 流程测试中间接覆盖，建议补单测（含精确匹配 `#fragment` 与同名前缀不误伤两个用例）
+
+# references
+
+- 实现：`src/abap_cli/commands/activate.ts`（`inactiveObjects` 收集 + `activateAll`）、`src/abap_cli/clients/adt-client.ts`（`activateAll`/`inactiveObjects`）
+- 匹配规则：`uri.split('#')[0] === resolved.objectUrl`，避免同名前缀误伤（`ZCL_FOO` vs `ZCL_FOO_BAR`）
+- SAP 后端：`deploy-flow.ts` 的 `activateAllParts`（013 dogfooding，规避 root-URI activate 静默 no-op）
+- 文档：`docs/commands.md`（`abap activate` 一节）

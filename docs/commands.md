@@ -117,6 +117,57 @@ The transport is resolved **per object**, not once per run:
 
 **Textpool push (014)**: `abap push <name>.<type>.texts|selections|headings.<lang>.properties` writes the text elements via the mixed-mode route — ADT text-elements API (lock → write → unlock) when the cached capability allows, otherwise the ICF `/textpool/*` endpoint. The JSON result carries a `route` field.
 
+## `abap run`
+
+Execute an ABAP class on SAP and capture its stdout (015). Two routes:
+
+1. **classrun** (no `--method`): runs `if_oo_adt_classrun~main` via ADT classrun; stdout is returned verbatim.
+2. **wrapper** (`--method <name>`): runs the bundled `ZCL_ABAP_VIBE_RUNNER` class, which reflects the named PUBLIC STATIC method on the target class, invokes it with the JSON `--args`, and serialises the RETURNING value.
+
+`abap run` is strictly **read-only**: no transport, no activation, no lock, no file write. The wrapper class is installed by `abap deploy`.
+
+```bash
+abap run [options] <class-name>
+
+# Direct classrun (must implement if_oo_adt_classrun~main)
+abap run ZCL_MY_THING
+
+# Static-method invocation via the runner wrapper
+abap run ZCL_MY_HELPER --method compute --args '{"x":3,"y":5}'
+
+# Dry-run (zero SAP calls)
+abap run ZCL_LONG_RUN --timeout 60000 --dry-run
+
+# Agent integration: machine-readable envelope
+abap run ZCL_FOO --method bar --args '{}' --json
+```
+
+| Option | Description |
+|--------|-------------|
+| `--method <name>` | PUBLIC STATIC method to invoke (regex `^[A-Za-z_][A-Za-z0-9_]*$`). Omit for a direct classrun. |
+| `--args <json>` | JSON object mapped to the method's IMPORTING parameters (case-insensitive). Default `{}`. |
+| `--timeout <ms>` | Execution timeout in ms (100–600000, default 30000). Wrapper path is enforced server-side by `ZCL_ABAP_VIBE_RUNNER` via `cl_abap_runtime`; the classrun path relies on the ADT endpoint's server timeout, with a CLI-side fallback of `--timeout + 5000ms`. |
+| `--dry-run` | Print the request envelope (`wouldRun: true`) without invoking ADT classrun. |
+| `--schema` | Print the machine-readable command schema (arguments/options/examples/error mapping) as JSON and exit 0 — no SAP call. |
+| `--json` | Global — emit the unified 012 JSON envelope. |
+
+**Output contract**: the `--json` envelope is `{ status: 'success', meta, data }` with `data.route` (`classrun` | `wrapper`), `data.output` (raw classrun stdout), `data.parsed` (JSON-parsed output or `null`), `data.exitCode` (business exit code embedded in the classrun JSON, default 0), and `data.durationMs`. On failure `{ status: 'error', meta, error }` — stdout stays empty (P1.7).
+
+**015 error codes** (beyond the common table):
+
+| Code | Category / exit | Trigger |
+|------|-----------------|---------|
+| `METHOD_FAILED` | VALIDATION_ERROR / 7 | target method raised `cx_root` |
+| `METHOD_NOT_SUPPORTED` | VALIDATION_ERROR / 7 | method signature not runner-compatible (CHANGING/TABLES/instance/private/deep) |
+| `CLASS_NOT_RUNNABLE` | VALIDATION_ERROR / 7 | class lacks `if_oo_adt_classrun~main` |
+| `OBJECT_NOT_ACTIVE` | SAP_ERROR / 6 | class is inactive → `abap activate <class>` |
+| `LOCAL_CLASS_NOT_RUNNABLE` | SAP_ERROR / 6 | class name contains `~` (local class) |
+| `TIMEOUT` | SAP_ERROR / 6 | classrun exceeded `--timeout` |
+| `WRAPPER_NOT_DEPLOYED` | NOT_FOUND / 8 | `ZCL_ABAP_VIBE_RUNNER` missing → `abap deploy` |
+| `WRAPPER_INPUT_UNAVAILABLE` | SAP_ERROR / 6 | SAP classrun endpoint does not inject `--method` args (system limitation) → use direct classrun |
+
+**v1 scope**: only `CLAS` is supported. PROG/INTF/FUGR/TABL execution is deferred to a P2 sub-feature (no `--type` option in v1). **Known limitation (verified on vhcala4hci)**: the ADT classrun endpoint ignores request-body parameters, so `--method` on such systems reports `WRAPPER_INPUT_UNAVAILABLE`; the classrun route is fully verified end-to-end.
+
 ## `abap check`
 
 Validate local ABAP files. Exactly one mode applies; `--syntax` is the default.

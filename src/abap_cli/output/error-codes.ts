@@ -55,6 +55,15 @@ export type ErrorCode =
   | 'OBJECT_EXISTS'        // normalized legacy code (USAGE/2), used by create.ts
   | 'FILE_EXISTS'          // normalized legacy code (USAGE/2), used by init.ts
   | 'COMMAND_MOVED'        // normalized legacy code (VALIDATION_ERROR/7); command retired (e.g. atc → check --atc)
+  // 015-abap-run: classrun runner error codes
+  | 'METHOD_FAILED'           // 015: target method raised cx_root (VALIDATION_ERROR)
+  | 'METHOD_NOT_SUPPORTED'    // 015: method signature not adapter-compatible (VALIDATION_ERROR)
+  | 'CLASS_NOT_RUNNABLE'      // 015: target class lacks if_oo_adt_classrun~main (VALIDATION_ERROR)
+  | 'LOCAL_CLASS_NOT_RUNNABLE'// 015: class name contains `~` (local class) (SAP_ERROR)
+  | 'OBJECT_NOT_ACTIVE'       // 015: target class is inactive (SAP_ERROR)
+  | 'WRAPPER_NOT_DEPLOYED'    // 015: ZCL_ABAP_VIBE_RUNNER missing on target system (NOT_FOUND)
+  | 'TIMEOUT'                 // 015: classrun exceeded --timeout (SAP_ERROR)
+  | 'WRAPPER_INPUT_UNAVAILABLE' // 015: SAP classrun endpoint does not inject method args (SAP_ERROR)
   ;
 
 const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
@@ -87,6 +96,15 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   FILE_EXISTS: 'USAGE',
   PUSH_FAILED: 'VALIDATION_ERROR',
   COMMAND_MOVED: 'VALIDATION_ERROR',
+  // 015-abap-run mappings
+  METHOD_FAILED: 'VALIDATION_ERROR',
+  METHOD_NOT_SUPPORTED: 'VALIDATION_ERROR',
+  CLASS_NOT_RUNNABLE: 'VALIDATION_ERROR',
+  LOCAL_CLASS_NOT_RUNNABLE: 'SAP_ERROR',
+  OBJECT_NOT_ACTIVE: 'SAP_ERROR',
+  WRAPPER_NOT_DEPLOYED: 'NOT_FOUND',
+  TIMEOUT: 'SAP_ERROR',
+  WRAPPER_INPUT_UNAVAILABLE: 'SAP_ERROR',
 };
 
 export function categoryOf(code: ErrorCode): ErrorCategory {

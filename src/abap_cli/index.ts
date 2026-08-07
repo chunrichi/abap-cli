@@ -24,6 +24,12 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
     load: () => import('./commands/pull.js').then((m) => ({ register: m.registerPullCommand })),
   },
   {
+    name: 'run',
+    scope: 'sap',
+    description: 'Execute an ABAP class (classrun) or a static method via the bundled runner wrapper; returns stdout + exit code (read-only).',
+    load: () => import('./commands/run.js').then((m) => ({ register: m.registerRunCommand })),
+  },
+  {
     name: 'push',
     description: 'Push local ABAP files to SAP (lock → set source → syntax check → activate → unlock)',
     load: () => import('./commands/push.js').then((m) => ({ register: m.registerPushCommand })),

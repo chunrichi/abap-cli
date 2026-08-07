@@ -38,5 +38,8 @@ Thumbs.db
 *.tmp
 *.log
 tmp/
-# Wiki knowledge base (local only, not version-controlled)
-wiki/
+# Wiki knowledge base: ignore everything except the command pages + index/roadmap
+wiki/*
+!wiki/commands/
+!wiki/index.md
+!wiki/roadmap.md

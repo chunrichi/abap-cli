@@ -657,13 +657,101 @@ const server = http.createServer(async (req, res) => {
       return ok(res, JSON.stringify({ status: 'success', data: { service: 'zabap_vibe', version: ICF_SERVICE_VERSION } }), 'application/json');
     }
 
-    // ADT classrun (runClass) — simulates the remote ICF setup execution (013).
+    // ADT classrun (runClass) — simulates the remote ICF setup execution (013)
+    // and the runner wrapper execution (015).
     const classrun = /^\/sap\/bc\/adt\/oo\/classrun\/([^/?]+)/.exec(path);
     if (classrun && req.method === 'POST') {
       const className = classrun[1].toUpperCase();
       if (className === 'ZCL_ABAP_VIBE_ICF_SETUP') {
         if (SETUP_FAIL) return ok(res, JSON.stringify({ status: 'error', error: { code: 'ICF_ADMIN_REQUIRED', message: 'Simulated setup failure (MOCK_SETUP_FAIL=1)' } }), 'application/json');
         return ok(res, JSON.stringify({ status: 'success', action: 'already_active', node: { vhost: 'default_host', url: '/sap/zabap_vibe', handler: 'ZCL_ABAP_VIBE_ICF', active: true } }), 'application/json');
+      }
+      // 015: ZCL_ABAP_VIBE_RUNNER — read body params (IV_TARGET_CLASS /
+      // IV_METHOD_NAME / IV_ARGS_JSON / IV_TIMEOUT_MS), dispatch fixtures.
+      if (className === 'ZCL_ABAP_VIBE_RUNNER') {
+        if (process.env.MOCK_WRAPPER_NOT_DEPLOYED === '1') {
+          return adtError(res, 404, 'ZCL_ABAP_VIBE_RUNNER does not exist (MOCK_WRAPPER_NOT_DEPLOYED=1)');
+        }
+        const rawBody = await readBody(req);
+        let params = [];
+        try { params = JSON.parse(rawBody); } catch (_e) { params = []; }
+        const kv = Object.fromEntries(
+          (Array.isArray(params) ? params : []).map((p) => [p.name, p.value]),
+        );
+        const target = (kv.IV_TARGET_CLASS || '').toUpperCase();
+        const method = kv.IV_METHOD_NAME || '';
+
+        // No --method branch: heartbeat.
+        if (!method) {
+          return ok(res, JSON.stringify({ status: 'ok', exitCode: 0, message: 'classrun heartbeat' }), 'application/json');
+        }
+
+        // Sleep fixture for timeout tests.
+        if (target === 'ZCL_FAKE_SLEEP' || method === 'sleep') {
+          await new Promise((r) => setTimeout(r, 60000));
+          return ok(res, JSON.stringify({ status: 'ok', method, exitCode: 0 }), 'application/json');
+        }
+
+        // Lock fixture (HTTP 423).
+        if (method === 'lock') {
+          res.statusCode = 423;
+          res.setHeader('Content-Type', 'text/plain');
+          return res.end('locked');
+        }
+
+        // Error fixtures keyed by method name.
+        if (method === 'unsupported') {
+          return ok(res, JSON.stringify({
+            status: 'error', code: 'METHOD_NOT_SUPPORTED',
+            class: target || 'ZCL_ABAP_VIBE_MOCK', method,
+            message: 'method signature contains CHANGING/TABLES',
+          }), 'application/json');
+        }
+        if (method === 'fail') {
+          return ok(res, JSON.stringify({
+            status: 'error', code: 'METHOD_FAILED',
+            class: target || 'ZCL_ABAP_VIBE_MOCK', method,
+            message: 'CX_SY_ARITHMETIC_ERROR: division by zero',
+          }), 'application/json');
+        }
+        if (method === 'inactive') {
+          return ok(res, JSON.stringify({
+            status: 'error', code: 'OBJECT_NOT_ACTIVE',
+            class: target || 'ZCL_ABAP_VIBE_INACTIVE', method,
+            message: 'class is inactive',
+          }), 'application/json');
+        }
+        if (method === 'private') {
+          return ok(res, JSON.stringify({
+            status: 'error', code: 'ACCESS_DENIED',
+            class: target, method,
+            message: 'method is PRIVATE',
+          }), 'application/json');
+        }
+        if (method === 'instance') {
+          return ok(res, JSON.stringify({
+            status: 'error', code: 'INSTANCE_METHOD_NOT_SUPPORTED',
+            class: target, method,
+            message: 'runner requires STATIC methods',
+          }), 'application/json');
+        }
+
+        // Success fixtures — minimal add(a,b).
+        if (method === 'add') {
+          let args = {};
+          try { args = JSON.parse(kv.IV_ARGS_JSON || '{}'); } catch (_e) { args = {}; }
+          const a = Number(args.a ?? 0);
+          const b = Number(args.b ?? 0);
+          return ok(res, JSON.stringify({
+            status: 'ok', method, exitCode: 0, result: a + b,
+          }), 'application/json');
+        }
+
+        // Unknown method → fall through as a generic success (still routed
+        // to wrapper path; real SAP would surface METHOD_NOT_FOUND).
+        return ok(res, JSON.stringify({
+          status: 'ok', method, exitCode: 0, result: null,
+        }), 'application/json');
       }
       return ok(res, JSON.stringify({ status: 'success' }), 'application/json');
     }

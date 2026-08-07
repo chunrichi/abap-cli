@@ -88,6 +88,17 @@ abap doctor --system dev
 
 `--fix` 时 `data` 追加 `fixesApplied` 数组（当前仅重建 `~/.abap-cli` 目录）。
 
+# More
+
+## fixme
+
+- [ ] **C** — `doctor` 的 `config.workspace` 检查在未初始化目录下依赖 `.abap.json` 存在与否；015 后新增命令（`run`）属 SAP-scope，不参与 doctor 的本地段，但 `--help` 分组文案（"Local Commands"）在新增 local 命令时需同步（P2.9）。
+
+## todo
+
+- [ ] **`--fix --all` 分级修复** — roadmap 建议按"安全/需确认"分级；当前 `--fix` 只做安全可逆项，可扩展输出"修复前后 diff"。
+- [ ] **015 wrapper 健康检查** — 增加 `ZCL_ABAP_VIBE_RUNNER` 部署/激活状态检查（类似 ICF 节点检查），在 `doctor` 的 connection 段提示 `abap deploy` 是否滞后。
+
 # references
 
 - 实现：`src/abap_cli/commands/doctor.ts`、`src/abap_cli/flows/doctor-checks.ts`

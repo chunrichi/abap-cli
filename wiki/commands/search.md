@@ -102,6 +102,17 @@ abap search 'ZCL_*' --json
 
 `--page-all` 模式下的 `data` 差异：`pageAll: true`、`requested`（单次请求量）、`total`，无 `page`；`truncated: true` 时 `meta.warnings` 含 `PAGINATION_LIMITED`。
 
+# More
+
+## fixme
+
+- [ ] **C** — `--page` 的"假分页"语义（quickSearch 无 offset，取 limit×page 再本地切片）易误导 Agent：跨页结果会重复。文档已注明，但 `--schema` 的 option 描述可补充一句"优先用 `--page-all`"。
+
+## todo
+
+- [ ] **本地结果缓存** — roadmap 建议加 `--stale N` 过期提示（高频 agent 调用提速）；缓存键为 `type + query + filters`，存 `~/.abap-cli/cache/`。
+- [ ] **结果结构稳定化** — 增加 `name` 归一化（namespaced `/UI2/CL_JSON` 与 `#ui2#cl_json` 归一）供 Agent 直接用于 `abap pull`。
+
 # references
 
 - 实现：`src/abap_cli/commands/search.ts`、`src/abap_cli/clients/adt-client.ts`（`searchObject`）、`src/abap_cli/core/limits.ts`（`SEARCH_RESULT_LIMIT`）

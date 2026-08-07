@@ -100,6 +100,17 @@ abap connection import profiles.json --overwrite
 }
 ```
 
+# More
+
+## fixme
+
+- [ ] **C** — `connection import --overwrite` 语义：默认跳过已存在 profile，`--overwrite` 才更新；帮助/文档若残留"无条件覆盖"措辞需与实现对齐（014 已改，检查其余引用点）。
+
+## todo
+
+- [ ] **能力探测扩展（015 预留）** — 014 在 add/set 时探测并持久化 `adtTextpool`；015 的 `--method` 反射同样依赖"classrun 参数注入能力"，可在同一能力探测点增加 `classrunInput` 字段并持久化（避免每次运行 `WRAPPER_INPUT_UNAVAILABLE`）。
+- [ ] **密码迁移路径** — keychain 不可用（无 GUI 会话）时的降级提示与重试策略，可与 `doctor --fix` 联动。
+
 # references
 
 - 实现：`src/abap_cli/commands/connection.ts`、`src/abap_cli/flows/connection-flow.ts`、`connection-profile.ts`、`src/abap_cli/config/profiles.ts`

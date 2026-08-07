@@ -94,6 +94,17 @@ abap config init
 }
 ```
 
+# More
+
+## fixme
+
+- [ ] **C** — `config init` 交互向导在 TTY 探测依赖 `process.stdin.isTTY`；在管道/CI 包装场景（pty 层模拟 TTY）下可能误判为 TTY 而进入向导。应记录在案，必要时支持 `--non-interactive` 强制非交互。
+
+## todo
+
+- [ ] **ICF 部署检查增强** — `data.icf` 四态已就绪；可补充 `--check-only` 变体只做部署探测（当前伴随写入 `.abap.json` 后执行）。
+- [ ] **profile 引用的密码回退** — `--system` 引用时密码按 keychain → `--password` → `SAP_PASSWORD` 顺序解析；可增加显式 `--use-env` 强制仅读环境变量（避免误读 keychain）。
+
 # references
 
 - 实现：`src/abap_cli/commands/config.ts`、`src/abap_cli/flows/config-flow.ts`、`config-write.ts`、`config-wizard.ts`

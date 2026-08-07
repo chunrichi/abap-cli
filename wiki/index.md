@@ -18,6 +18,7 @@ changed at: 2026-08-06 23:10:00
 - [doctor](commands/doctor.md) — 诊断 CLI 环境
 - [pull](commands/pull.md) — 从 SAP 下载对象到本地
 - [push](commands/push.md) — 推送本地文件到 SAP
+- [run](commands/run.md) — 在 SAP 端执行类（classrun / 静态方法反射），返回 stdout 与退出码
 - [activate](commands/activate.md) — 激活对象的所有 inactive items
 
 ## Notes

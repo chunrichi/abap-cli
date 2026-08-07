@@ -160,9 +160,42 @@ export class AdtClientWrapper {
     return this._call(() => this.client.objectStructureElements(objectUrl, version));
   }
 
-  /** Run an ABAP class as an application (ADT classrun, e.g. ICF setup). */
-  runClass(className: string) {
-    return this._call(() => this.client.runClass(className));
+  /**
+   * Run an ABAP class as an application (ADT classrun, e.g. ICF setup).
+   * 015-abap-run: optional second `params` argument forwards classrun input
+   * as JSON body — the underlying abap-adt-api 8.4.1 `runClass(name)` does
+   * not accept body params, so this wrapper goes through `AdtHTTP.request`
+   * with a JSON body when `params` is provided. The SAP-side wrapper reads
+   * via `IF_OO_ADT_CLASSRUN~MAIN`. When `params` is omitted the existing
+   * abap-adt-api path is used (deploy-flow still works).
+   *
+   * Body shape: { name: string, value: string }[]  →  JSON array (SAP
+   * accepts arbitrary JSON body for classrun via /sap/bc/adt/oo/classrun/<name>).
+   */
+  async runClass(
+    className: string,
+    params?: Array<{ name: string; value: string }>,
+  ): Promise<string> {
+    if (!params) {
+      return this._call(() => this.client.runClass(className));
+    }
+    // Wrapper path: POST with JSON body so the SAP-side wrapper reads
+    // its inputs via the classrun body (IV_TARGET_CLASS / IV_METHOD_NAME /
+    // IV_ARGS_JSON / IV_TIMEOUT_MS).
+    return this._call(async () => {
+      const response = await this.client.httpClient.request(
+        `/sap/bc/adt/oo/classrun/${className.toUpperCase()}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'text/plain',
+          },
+          body: JSON.stringify(params),
+        },
+      );
+      return String(response.body);
+    });
   }
 
   // --- Text elements (textpool; 014 US4) ---
