@@ -49,7 +49,9 @@ If the target is ambiguous, ask at most 3 clarifying questions (vscode_askQuesti
 - Determine the counter by listing existing `tests/<yymmdd>*` directories; next index = max+1.
 - Also add a top-level `tests/index.md` entry linking the new run (one-line bullet:
   `<yymmddxxx>-<purpose>` — date — `<one-line summary>`). Append; never overwrite.
-- `mkdir -p <RUN_DIR>/reports` before any other write.
+- `mkdir -p <RUN_DIR>/reports <RUN_DIR>/evidence` before any other write. `<RUN_DIR>/evidence/`
+  holds verbatim per-TC stdout+stderr files written by `test-runner`; the phase report table
+  references them by path instead of inlining the full output.
 
 Then write `<RUN_DIR>/test-cases.md` with the strict checklist format:
 
@@ -103,6 +105,13 @@ Then write `<RUN_DIR>/test-cases.md` with the strict checklist format:
     `; cleanup: <done|skipped, reason>`). Never leave test objects behind.
   - run commands against the configured SAP system and verify the object on the SAP side
 
+**Evidence files (mandatory).** For every executed TC, the test-runner subagent writes the
+verbatim stdout+stderr of that TC's command into `<RUN_DIR>/evidence/<TC>.txt`. The phase
+report table does NOT inline full output (it would blow up the table for SAP JSON responses);
+instead the table's `结果是啥` column holds a short summary (≤200 chars) and the table itself
+gains a 5th column `证据` that points to `evidence/<TC>.txt`. This keeps `wc -l` row-counting
+working (summary lines stay one-line) while preserving the full real output for debugging.
+
 **Execution model — phases delegated to `test-runner` subagents.** Each phase is executed by one
 invocation of the `test-runner` subagent for context isolation. The parent (this agent) keeps
 full visibility on the master todo list and is the **sole writer** to phase report files.
@@ -154,12 +163,17 @@ For each phase, create `<RUN_DIR>/reports/phase-N-<name>.md` **before** starting
 that phase (write the table header first), then append rows as each TC completes. Columns are
 exactly:
 
-| TC | 执行了啥 | 结果是啥 | 是否成功 |
+| TC | 执行了啥 | 结果是啥 | 证据 | 是否成功 |
 
-- `执行了啥`: the exact command/operation run (e.g. `npx vitest run test/unit/foo.test.ts`)
-- `结果是啥`: the raw outcome — pass/fail count from vitest, CLI exit code + key output, SAP
-  side observation, etc. One short line, no commentary. Real-sap rows must end with
-  `; cleanup: done` (or `; cleanup: skipped, <reason>`).
+- `执行了啥`: the exact command/operation run (e.g. `npx vitest run test/unit/foo.test.ts`).
+  Truncate `--password` / `SAP_PASSWORD` values to `$SAP_PASSWORD` placeholder.
+- `结果是啥`: short summary (≤200 chars). What was observed in one line — pass/fail count from
+  vitest, CLI exit code + key indicator (status=success, error code, item count, key field
+  value), SAP side observation. Real-sap rows must end with `; cleanup: done` (or
+  `; cleanup: skipped, <reason>`). **Do NOT inline full JSON / multi-line output** here —
+  put that in the evidence file.
+- `证据`: relative path `evidence/<TC>.txt` (verbatim stdout+stderr from the test-runner
+  subagent). Open this file for full output, JSON bodies, raw error stacks, etc.
 - `是否成功`: PASS / FAIL (FAIL also note the error code or exit code in parentheses)
 
 **Per-TC self-check (not phase-end)**: as each TC row is appended (see Section 4 step 1), the
