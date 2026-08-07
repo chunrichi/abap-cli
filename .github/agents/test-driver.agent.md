@@ -59,6 +59,14 @@ Then write `<RUN_DIR>/test-cases.md` with the strict checklist format:
 - `[P]` = parallelizable (different files, no dependencies)
 - Order by dependency: basic before integration
 - Include negative/error cases with expected exit codes and error codes
+- **Coverage minimum** (hard rule, must hold before exiting Section 3): for every command under
+  test, plan at least one happy-path TC and one negative TC tagged `[Error]`. Negative TCs cover
+  the most common failure modes: missing required flag, invalid name (non-Z/Y or forbidden
+  prefix), object not found on pull/search, package-without-tr for non-`$TMP` targets,
+  permission/auth failure. If a command genuinely has no meaningful negative path (e.g. pure
+  read-only `doctor`), note the rationale in test-cases.md and skip the `[Error]` TC.
+- `[P]` flag is a human-readable hint for parallelism; the parent uses topological dependency
+  for actual execution ordering, so do not over-rely on `[P]`.
 - **Immediately register each TC as a todo item** via manage_todo_list (id = TC id, title =
   `[TC001] <环节> <步骤摘要>`). Also add two more todos: `Write phase-N report` (one per phase)
   and `Write summary.md`. The todo list is the authoritative progress tracker.
@@ -72,12 +80,35 @@ Then write `<RUN_DIR>/test-cases.md` with the strict checklist format:
   - Each real-sap TC **must include cleanup** in the report row (`结果是啥` column ends with
     `; cleanup: <done|skipped, reason>`). Never leave test objects behind.
   - run commands against the configured SAP system and verify the object on the SAP side
-- **For every TC**, immediately after execution:
+
+**Execution model — phases delegated to `test-runner` subagents.** Each phase (setup, unit,
+mock-cli, real-sap, roundtrip) is executed by one invocation of the `test-runner` subagent for
+context isolation. The parent (this agent) keeps full visibility on the master todo list and is
+the **sole writer** to phase report files. The split of work is:
+
+- **Parent (this agent)**: master todo list, run directory + index, test-cases.md, phase report
+  headers, **appending one row per TC result** returned by the subagent, mark TC `[X]`/`[ ]` in
+  test-cases.md, write summary.md, phase self-check, completion report.
+- **Subagent (`test-runner`)**: executes TCs in the phase sequentially in dependency order,
+  captures command/output/cleanup, returns a single structured JSON result. **Does not** write
+  any files or manage its own todos.
+
+Parallelism: the parent may invoke multiple `test-runner` subagents in one assistant turn when
+two or more phases are independent (e.g. unit + mock-cli can run together; real-sap must wait
+for setup). Within a phase, subagent runs TCs sequentially to preserve SAP-side object
+ordering. `[P]` in test-cases.md remains as a hint for human readers; the parent uses
+topological dependency rather than `[P]` for actual execution ordering.
+
+- **For every TC returned by the subagent**, immediately upon receiving it:
   1. Append one row to the current phase report (see section 5) — do not defer to end of phase
   2. Mark the TC `[X]` (PASS) or keep `[ ]` (FAIL) in `<RUN_DIR>/test-cases.md`
   3. Mark the TC's todo item as completed
+- If the subagent reports `stoppedAt` (blocking failure mid-phase), record it in the phase
+  report's `## 中断记录` section: last attempted TC, reason, list of `notExecuted` TCs and why.
 - PASS -> mark `[X]`; FAIL -> keep `[ ]`, record actual output / error code / exit code
-- Blocking failure -> pause and ask the user; parallel `[P]` failure -> record and continue
+- Blocking failure (connection lost, missing fixture, config broken) -> subagent stops; parent
+  asks user whether to retry / skip / abort. Non-blocking FAIL rows are recorded and the phase
+  continues.
 
 ### 5. Write test reports (one per phase)
 
@@ -97,6 +128,12 @@ exactly:
 phase report file (data rows under the header) and verify it equals the number of TCs planned
 for that phase. If mismatched, fill the gap before moving on. This prevents losing rows due to
 long-context drift.
+
+If the subagent returned `notExecuted` TCs (phase stopped early), append a `## 中断记录`
+section to the phase report listing:
+- Last attempted TC and why the phase stopped (blocking failure type / connection error / etc.)
+- All `notExecuted` TC IDs with their individual reasons
+- Resume instructions for the next run if the user wants to retry
 
 Optional trailing `## 失败分析` section at phase end if any FAIL rows exist.
 
