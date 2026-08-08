@@ -2,6 +2,7 @@ import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import * as https from 'https';
 import { loadConfig, readCaCertificate, type ProjectConfig } from '../config/project-config.js';
 import { CliError } from '../output/json.js';
+import type { ErrorCode } from '../output/error-codes.js';
 import { classifyHttpError } from './http-error.js';
 
 export interface IcfResponse<T = unknown> {
@@ -84,6 +85,27 @@ export class IcfClient {
     return this.get(`/version-source?${qs.toString()}`);
   }
 
+  /**
+   * 016-abap-select: POST /data/query — read-only table data query.
+   *
+   * The SAP-side handler validates the request against DD02L/DD03L metadata,
+   * parses the `where` clause, and executes a dynamic Open SQL statement with
+   * value parameters bound separately (see research.md R1/R2 for the
+   * injection-safety contract).
+   *
+   * Caller responsibility:
+   *   - `table` must be a non-empty string (DDIC lookup is downstream)
+   *   - `fields` (optional) — handler validates against DD03L
+   *   - `where` (optional) — handler validates syntax and field names
+   *   - `limit` (optional) — defaults to 100 on the server side; rejected > 10000
+   *   - `offset` (optional) — defaults to 0; rejected > 100000
+   *   - `orderBy` (optional) — handler validates field names and direction
+   *   - `countOnly` (optional) — when true, server returns only `data.count`
+   */
+  async postDataQuery<T>(body: unknown): Promise<IcfResponse<T>> {
+    return this.post('/data/query', body);
+  }
+
   /** Run one HTTP call and normalize transport errors into a CliError. */
   private async request<T>(method: 'get' | 'post' | 'put', path: string, body?: unknown): Promise<IcfResponse<T>> {
     let resp: AxiosResponse<IcfResponse<T>>;
@@ -92,6 +114,18 @@ export class IcfClient {
       else if (method === 'post') resp = await this.http.post<IcfResponse<T>>(path, body);
       else resp = await this.http.put<IcfResponse<T>>(path, body);
     } catch (error: unknown) {
+      // ICF endpoints return { status:'error', error:{ code, message, ... } } for
+      // validation/not-found failures (HTTP 400/404). Surface the envelope's code
+      // instead of a generic transport error so the flow maps it to the right
+      // exit code (e.g. INVALID_WHERE → 7, TABLE_NOT_FOUND → 8).
+      if (axios.isAxiosError(error)) {
+        const body = error.response?.data as { error?: { code?: string; message?: string; details?: unknown } } | undefined;
+        if (body && typeof body === 'object' && body.error && typeof body.error.code === 'string') {
+          throw new CliError(body.error.code as ErrorCode, body.error.message ?? 'ICF request failed', {
+            details: body.error.details,
+          });
+        }
+      }
       throw toHttpError(error);
     }
     return resp.data;

@@ -49,9 +49,123 @@ const ddicStore = new Map();
 const textpoolStore = new Map();
 // 015: remote source store — key = `<TYPE>:<OBJ>`, value = source string served by /version-source.
 const remoteSourceStore = new Map();
+// 016: read-only table data store — key = <TABLE>, value = { tabclass, fields, rows }.
+// Seeded below with ZTAB_FIXTURE (150 rows, clientDependent, mixed types).
+const tableStore = new Map();
 // Tracks whether the DDIC POST handler saw a pre-existing entry (used to derive
 // data.action = 'updated' vs 'created'). Local to the request handler.
 let ddicStore_existed_before = false;
+
+// 016: ZTAB_FIXTURE seed — 150 rows, 75 STATUS='X' / 75 STATUS='Y', AMOUNT 1..150.00.
+// tabsclass TRANSP, clientDependent=true; fields match the data-model.NOTE column is STRG
+// (large object) and is auto-excluded in the no-`fields` path.
+(function seedTableFixture() {
+  const fields = [
+    { name: 'MANDT', dataType: 'CLNT', length: 3, decimals: 0, keyFlag: true },
+    { name: 'ID', dataType: 'NUMC', length: 10, decimals: 0, keyFlag: true },
+    { name: 'STATUS', dataType: 'CHAR', length: 2, decimals: 0, keyFlag: false },
+    { name: 'AMOUNT', dataType: 'DEC', length: 10, decimals: 2, keyFlag: false },
+    { name: 'NAME', dataType: 'CHAR', length: 40, decimals: 0, keyFlag: false },
+    { name: 'CREATED', dataType: 'DATS', length: 8, decimals: 0, keyFlag: false },
+    { name: 'NOTE', dataType: 'STRG', length: 0, decimals: 0, keyFlag: false },
+  ];
+  const rows = [];
+  for (let i = 1; i <= 150; i++) {
+    const id = String(i).padStart(10, '0');
+    const status = i % 2 === 0 ? 'X' : 'Y';
+    const amount = (i).toFixed(2);
+    const name = `Item ${id}`;
+    const created = `2026${String(Math.floor((i % 12) + 1)).padStart(2, '0')}${String(((i - 1) % 28) + 1).padStart(2, '0')}`;
+    // NOTE contains single quotes and a semicolon to exercise injection payloads.
+    const note = `Note ${id}; contains 'apostrophe' and \"quotes\"`;
+    rows.push({ MANDT: '001', ID: id, STATUS: status, AMOUNT: amount, NAME: name, CREATED: created, NOTE: note });
+  }
+  tableStore.set('ZTAB_FIXTURE', { tabclass: 'TRANSP', clientDependent: true, fields, rows });
+  // Pool table — exercises TABLE_TYPE_NOT_SUPPORTED.
+  tableStore.set('ZPOOL_FIXTURE', { tabclass: 'POOL', clientDependent: false, fields: [], rows: [] });
+})();
+
+// 016: large-object datatype set — excluded from output when --fields is not specified.
+const LARGE_OBJECT_TYPES = new Set(['STRG', 'RSTR', 'LCHR', 'LRAW']);
+
+/**
+ * 016: filter table rows by a simple `field op value` predicate set composed with AND.
+ * `predicates` is an array of { field, op, value, valueKind } objects.
+ * `valueKind` is `'string'` or `'number'`. `op` is one of =, <>, >, >=, <, <=, LIKE.
+ *
+ * Used by the /data/query endpoint. The CLI never sends raw predicates — it sends
+ * a single where string that the SAP handler parses. The mock reuses the same
+ * parsing rules (see `parseWhereClause` below) so behaviour matches the real ICF
+ * service for the grammar documented in the spec.
+ */
+function applyWhere(rows, predicates) {
+  if (!predicates || predicates.length === 0) return rows;
+  return rows.filter((row) => predicates.every((p) => matchPredicate(row, p)));
+}
+
+function matchPredicate(row, p) {
+  const raw = row[p.field];
+  if (raw === undefined) return false;
+  const left = p.valueKind === 'number' ? Number(raw) : String(raw);
+  const right = p.valueKind === 'number' ? Number(p.value) : String(p.value);
+  switch (p.op) {
+    case '=':
+      return left === right;
+    case '<>':
+      return left !== right;
+    case '>':
+      return left > right;
+    case '>=':
+      return left >= right;
+    case '<':
+      return left < right;
+    case '<=':
+      return left <= right;
+    case 'LIKE':
+      // Translate SQL LIKE (% and _) to regex.
+      const re = new RegExp(
+        '^' +
+          String(p.value)
+            .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+            .replace(/%/g, '.*')
+            .replace(/_/g, '.') +
+          '$',
+      );
+      return re.test(String(raw));
+    default:
+      return false;
+  }
+}
+
+function applyOrderBy(rows, orderBy) {
+  if (!orderBy || orderBy.length === 0) return rows;
+  const sorted = rows.slice();
+  sorted.sort((a, b) => {
+    for (const ob of orderBy) {
+      const av = a[ob.field];
+      const bv = b[ob.field];
+      if (av === bv) continue;
+      const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+      return ob.direction === 'DESC' ? -cmp : cmp;
+    }
+    return 0;
+  });
+  return sorted;
+}
+
+function paginate(rows, offset, limit) {
+  const safeOffset = Math.max(0, Math.floor(offset || 0));
+  const safeLimit = Math.min(10000, Math.max(1, Math.floor(limit || 100)));
+  return rows.slice(safeOffset, safeOffset + safeLimit);
+}
+
+function projectFields(rows, fields) {
+  return rows.map((row) => {
+    const projected = {};
+    for (const f of fields) projected[f] = row[f] ?? '';
+    return projected;
+  });
+}
 
 function addObject(name, type, objectUrl, description, parts, opts = {}) {
   objects.set(name, {
@@ -848,6 +962,300 @@ const server = http.createServer(async (req, res) => {
         return ok(res, JSON.stringify({ status: 'success', data: { object: objName, type: objType, category, written: elements.length } }), 'application/json');
       }
       return ok(res, JSON.stringify({ status: 'error', error: { code: 'METHOD_NOT_ALLOWED', message: `${req.method} not supported on /textpool/${category}` } }), 'application/json');
+    }
+
+    // 016: /sap/zabap_vibe/data/query POST — read-only table data query.
+    // Implements the subset of the contract documented in
+    // specs/016-abap-select/contracts/icf-data-service.md used by US1 unit tests.
+    // US3 (T033) extends this with the full where grammar + safety injection.
+    if (path === '/sap/zabap_vibe/data/query') {
+      if (req.method !== 'POST') {
+        return ok(res, JSON.stringify({ status: 'error', error: { code: 'METHOD_NOT_ALLOWED', message: 'POST only on /data/query' } }), 'application/json');
+      }
+      if (process.env.MOCK_AUTH_FAIL === '1') {
+        res.statusCode = 401;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ status: 'error', error: { code: 'AUTH_ERROR', message: 'Simulated auth failure (MOCK_AUTH_FAIL=1)' } }));
+        return;
+      }
+      const body = await readBody(req);
+      let payload = {};
+      try { payload = JSON.parse(body); } catch (_e) { payload = {}; }
+      const table = String(payload.table || '').toUpperCase();
+      if (!table) {
+        return ok(res, JSON.stringify({ status: 'error', error: { code: 'INVALID_ARGUMENT', message: 'table is required' } }), 'application/json');
+      }
+      // MOCK_QUERY_FAIL=1 → simulate a runtime query failure (cx_root) for QUERY_FAILED tests.
+      if (process.env.MOCK_QUERY_FAIL === '1') {
+        return ok(res, JSON.stringify({ status: 'error', error: { code: 'QUERY_FAILED', message: 'Simulated runtime query failure (MOCK_QUERY_FAIL=1)' } }), 'application/json');
+      }
+      const meta = tableStore.get(table);
+      if (!meta) {
+        return ok(res, JSON.stringify({ status: 'error', error: { code: 'TABLE_NOT_FOUND', message: `table ${table} does not exist` } }), 'application/json');
+      }
+      if (meta.tabclass !== 'TRANSP' && meta.tabclass !== 'VIEW') {
+        return ok(res, JSON.stringify({ status: 'error', error: { code: 'TABLE_TYPE_NOT_SUPPORTED', message: `table ${table} is of type ${meta.tabclass}; only TRANSP and VIEW are queryable`, details: { objectType: meta.tabclass } } }), 'application/json');
+      }
+      // Field validation — explicit invalid-field check (large-object rejection handled here).
+      const validFields = meta.fields.map((f) => f.name);
+      const requestedFields = Array.isArray(payload.fields) && payload.fields.length > 0
+        ? payload.fields.map((f) => String(f).toUpperCase())
+        : null;
+      let outputFields;
+      let excludedFields = [];
+      if (requestedFields) {
+        for (const f of requestedFields) {
+          if (!validFields.includes(f)) {
+            return ok(res, JSON.stringify({ status: 'error', error: { code: 'INVALID_FIELD', message: `field ${f} is not in table ${table}`, details: { validFields } } }), 'application/json');
+          }
+          const fieldDef = meta.fields.find((x) => x.name === f);
+          if (LARGE_OBJECT_TYPES.has(fieldDef.dataType)) {
+            return ok(res, JSON.stringify({ status: 'error', error: { code: 'INVALID_FIELD', message: `field ${f} is a large-object field (${fieldDef.dataType}) and is not supported for projection in v1` } }), 'application/json');
+          }
+        }
+        outputFields = requestedFields;
+      } else {
+        // Auto-exclude large-object fields when no projection is specified.
+        outputFields = [];
+        meta.fields.forEach((f) => {
+          if (LARGE_OBJECT_TYPES.has(f.dataType)) excludedFields.push(f.name);
+          else outputFields.push(f.name);
+        });
+      }
+      // Limit / offset server-side validation (mirror of ICF handler).
+      const limit = payload.limit !== undefined ? Number(payload.limit) : 100;
+      const offset = payload.offset !== undefined ? Number(payload.offset) : 0;
+      if (!Number.isInteger(limit) || limit < 1 || limit > 10000) {
+        return ok(res, JSON.stringify({ status: 'error', error: { code: 'LIMIT_EXCEEDED', message: `limit must be an integer in [1, 10000] (got ${payload.limit})` } }), 'application/json');
+      }
+      if (!Number.isInteger(offset) || offset < 0 || offset > 100000) {
+        return ok(res, JSON.stringify({ status: 'error', error: { code: 'OFFSET_EXCEEDED', message: `offset must be an integer in [0, 100000] (got ${payload.offset})` } }), 'application/json');
+      }
+      // Order-by validation.
+      const orderBy = Array.isArray(payload.orderBy) ? payload.orderBy : [];
+      for (const ob of orderBy) {
+        if (!ob || typeof ob.field !== 'string' || !validFields.includes(ob.field.toUpperCase())) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'INVALID_FIELD', message: `orderBy field ${ob && ob.field} is not in table ${table}`, details: { validFields } } }), 'application/json');
+        }
+        if (ob.direction !== 'ASC' && ob.direction !== 'DESC') {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'INVALID_FIELD', message: `orderBy direction must be ASC or DESC (got ${ob.direction})` } }), 'application/json');
+        }
+      }
+      const normalizedOrderBy = orderBy.map((ob) => ({ field: ob.field.toUpperCase(), direction: ob.direction }));
+      // Where clause — strict AND-only grammar (US3). Mirrors the ABAP
+      // `parse_where_clause` implementation so mock + real SAP agree.
+      let parsedWhere;
+      if (payload.where) {
+        parsedWhere = parseWhereStrict(payload.where, meta.fields);
+        if (!parsedWhere.ok) {
+          return ok(res, JSON.stringify({
+            status: 'error',
+            error: {
+              code: parsedWhere.code,
+              message: `${parsedWhere.message} (offset ${parsedWhere.offset})`,
+              details: { offset: parsedWhere.offset },
+            },
+          }), 'application/json');
+        }
+      } else {
+        parsedWhere = { predicates: [] };
+      }
+      // Count-only path.
+      if (payload.countOnly) {
+        const counted = payload.where
+          ? meta.rows.filter((row) => applyPredicates(row, parsedWhere.predicates))
+          : meta.rows;
+        return ok(res, JSON.stringify({ status: 'success', data: { table, count: counted.length, durationMs: 1 } }), 'application/json');
+      }
+      const filtered = payload.where ? meta.rows.filter((row) => applyPredicates(row, parsedWhere.predicates)) : meta.rows;
+      const ordered = applyOrderBy(filtered, normalizedOrderBy);
+      const probe = paginate(ordered, offset, limit + 1);
+      const truncated = probe.length > limit;
+      const finalRows = truncated ? probe.slice(0, limit) : probe;
+      const projected = projectFields(finalRows, outputFields);
+      return ok(res, JSON.stringify({
+        status: 'success',
+        data: {
+          table,
+          objectType: meta.tabclass === 'VIEW' ? 'VIEW' : 'TABL',
+          fields: outputFields,
+          rows: projected,
+          rowCount: finalRows.length,
+          truncated,
+          excludedFields,
+          durationMs: 1,
+        },
+      }), 'application/json');
+    }
+
+    /**
+     * US3: strict AND-only where grammar — mirrors the ABAP `parse_where_clause`
+     * implementation so mock-adt and the real ICF service agree on the syntax.
+     * Returns { predicates: [], ok: true } on success or { ok: false, code, message, offset } on failure.
+     *
+     * Grammar:
+     *   where := condition { "AND" condition }
+     *   condition := field op value
+     *   op := "=" | "<>" | ">" | ">=" | "<" | "<=" | "LIKE"
+     *   field := [A-Za-z_][A-Za-z0-9_]*
+     *   value := "'" <chars, '' for escape> "'" | [+-]?[0-9]+(\.[0-9]+)?
+     */
+    function parseWhereStrict(where, fields) {
+      if (!where) return { ok: true, predicates: [] };
+      const validFieldNames = new Set(fields.map((f) => f.name));
+      const fieldMeta = new Map(fields.map((f) => [f.name, f]));
+
+      function findAndIndex(s) {
+        // Find AND as a standalone keyword. Since field names use only
+        // [A-Za-z_][A-Za-z0-9_]* and AND has spaces around it in valid input,
+        // a simple substring search is sufficient. Strings inside a value
+        // would fail the value-parse step (unterminated literal) — handled
+        // downstream.
+        const lower = s.toLowerCase();
+        const ix = lower.indexOf(' and ');
+        if (ix < 0) return -1;
+        return ix + 1; // start of 'AND'
+      }
+
+      let rest = where;
+      let offset = 0;
+      const predicates = [];
+
+      while (rest.length > 0) {
+        const consumed = where.length - rest.length;
+        // Trim leading whitespace for the chunk but track offset.
+        const leadingWs = rest.match(/^\s*/)[0].length;
+        const chunkStart = offset + leadingWs;
+        const andIx = findAndIndex(rest);
+        let chunk;
+        if (andIx < 0) {
+          chunk = rest.trim();
+          rest = '';
+        } else {
+          chunk = rest.substring(0, andIx).trim();
+          rest = rest.substring(andIx + 3).replace(/^\s*/, '');
+        }
+        if (!chunk) {
+          return { ok: false, code: 'INVALID_WHERE', message: 'empty condition', offset: chunkStart };
+        }
+
+        // Find the operator (longest match first).
+        const ops = ['>=', '<=', '<>', '>', '<', '=', 'LIKE'];
+        let op = null;
+        let opStart = -1;
+        let opLen = 0;
+        for (const o of ops) {
+          const ix = chunk.toUpperCase().indexOf(o.toUpperCase());
+          if (ix >= 0 && (opStart < 0 || ix < opStart)) {
+            op = o;
+            opStart = ix;
+            opLen = o.length;
+          }
+        }
+        if (opStart <= 0) {
+          return { ok: false, code: 'INVALID_WHERE', message: `condition '${chunk}' missing or invalid operator (use =, <>, >, >=, <, <=, LIKE)`, offset: chunkStart };
+        }
+
+        const fieldRaw = chunk.substring(0, opStart).trim();
+        const valueRaw = chunk.substring(opStart + opLen).trim();
+        if (!fieldRaw.match(/^[A-Za-z_][A-Za-z0-9_]*$/)) {
+          return { ok: false, code: 'INVALID_WHERE', message: `field '${fieldRaw}' is invalid`, offset: chunkStart };
+        }
+        const field = fieldRaw.toUpperCase();
+        if (field === 'MANDT') {
+          return { ok: false, code: 'INVALID_WHERE', message: 'MANDT filter rejected (implicit session client only)', offset: chunkStart };
+        }
+        if (!validFieldNames.has(field)) {
+          return { ok: false, code: 'INVALID_WHERE', message: `field '${field}' is not in table`, offset: chunkStart };
+        }
+        const fmeta = fieldMeta.get(field);
+
+        // Value extraction.
+        let valueKind = 'string';
+        let valueStr = '';
+        if (valueRaw.length > 0 && valueRaw[0] === "'") {
+          // Find the matching closing quote, honouring '' escape.
+          let i = 1;
+          while (i < valueRaw.length) {
+            if (valueRaw[i] === "'") {
+              if (i + 1 < valueRaw.length && valueRaw[i + 1] === "'") {
+                i += 2;
+                continue;
+              }
+              break;
+            }
+            i++;
+          }
+          if (i >= valueRaw.length || valueRaw[i] !== "'") {
+            return { ok: false, code: 'INVALID_WHERE', message: `unterminated string literal in condition '${chunk}'`, offset: chunkStart };
+          }
+          // Anything after the closing quote is residual — reject (e.g. trailing OR ...).
+          const residual = valueRaw.substring(i + 1).trim();
+          if (residual.length > 0) {
+            return { ok: false, code: 'INVALID_WHERE', message: `unexpected tokens after value in condition '${chunk}' (use AND to chain conditions)`, offset: chunkStart };
+          }
+          valueStr = valueRaw.substring(1, i).replace(/''/g, "'");
+          valueKind = 'string';
+        } else if (valueRaw.match(/^[+-]?\d+(\.\d+)?$/)) {
+          valueStr = valueRaw;
+          valueKind = 'number';
+        } else if (valueRaw.length > 0) {
+          valueStr = valueRaw;
+          valueKind = 'string';
+        } else {
+          return { ok: false, code: 'INVALID_WHERE', message: `missing value in condition '${chunk}'`, offset: chunkStart };
+        }
+
+        // Type adaptation.
+        if (op === 'LIKE' && !['CHAR', 'NUMC', 'DATS', 'TIMS'].includes(fmeta.dataType)) {
+          return { ok: false, code: 'INVALID_WHERE', message: `LIKE not supported on field ${field} (type ${fmeta.dataType})`, offset: chunkStart };
+        }
+        if (valueKind === 'number' && !['INT1', 'INT2', 'INT4', 'INT8', 'DEC', 'QUAN', 'CURR', 'FLTP'].includes(fmeta.dataType)) {
+          return { ok: false, code: 'INVALID_WHERE', message: `numeric value '${valueStr}' not allowed on field ${field} (type ${fmeta.dataType})`, offset: chunkStart };
+        }
+
+        predicates.push({ field, operator: op, value: valueStr, valueKind });
+        offset = chunkStart + chunk.length;
+      }
+
+      return { ok: true, predicates };
+    }
+
+    function applyPredicates(row, predicates) {
+      if (!predicates || predicates.length === 0) return true;
+      return predicates.every((p) => {
+        const raw = row[p.field];
+        if (raw === undefined) return false;
+        const left = p.valueKind === 'number' ? Number(raw) : String(raw);
+        const right = p.valueKind === 'number' ? Number(p.value) : String(p.value);
+        switch (p.operator) {
+          case '=':
+            return left === right;
+          case '<>':
+            return left !== right;
+          case '>':
+            return left > right;
+          case '>=':
+            return left >= right;
+          case '<':
+            return left < right;
+          case '<=':
+            return left <= right;
+          case 'LIKE': {
+            const re = new RegExp(
+              '^' +
+                String(p.value)
+                  .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+                  .replace(/%/g, '.*')
+                  .replace(/_/g, '.') +
+                '$',
+            );
+            return re.test(String(raw));
+          }
+          default:
+            return false;
+        }
+      });
     }
 
     // 015: /sap/zabap_vibe/version-source?objectType=...&objectName=...&destination=...

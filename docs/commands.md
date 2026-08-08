@@ -168,6 +168,93 @@ abap run ZCL_FOO --method bar --args '{}' --json
 
 **v1 scope**: only `CLAS` is supported. PROG/INTF/FUGR/TABL execution is deferred to a P2 sub-feature (no `--type` option in v1). **Known limitation (verified on vhcala4hci)**: the ADT classrun endpoint ignores request-body parameters, so `--method` on such systems reports `WRAPPER_INPUT_UNAVAILABLE`; the classrun route is fully verified end-to-end.
 
+## `abap select`
+
+Read-only table data query (016) — an `SE16N`-equivalent for agents. Hits the bundled ICF `/data/query` endpoint; no transport, no activation, no lock, no data write.
+
+```bash
+abap select --table <name> [--fields <csv>] [--where <clause>] [--limit <n>] [--offset <n>] [--order-by <csv>] [--count-only] [--dry-run] [--json]
+
+# Basic query (matches STATUS='X', returns up to 50 rows)
+abap select --table ZTAB_FIXTURE --where "STATUS = 'X'" --limit 50
+
+# Projection + sort + pagination (deterministic with --order-by)
+abap select --table ZTAB_FIXTURE --fields "ID,AMOUNT" --order-by "ID:ASC" --limit 20 --offset 40
+
+# Count matching rows (no rows transferred)
+abap select --table ZTAB_FIXTURE --where "AMOUNT > 100" --count-only
+
+# Agent integration
+abap select --table ZTAB_FIXTURE --where "STATUS = 'X'" --limit 50 --json
+
+# Dry-run: zero SAP calls
+abap select --table ZTAB_FIXTURE --where "STATUS = 'X'" --dry-run
+
+# Parameter introspection for agent self-discovery
+abap select --schema
+```
+
+| Option | Description |
+|--------|-------------|
+| `--table <name>` (required) | Target ABAP table or view name. Uppercased on the wire. |
+| `--fields <csv>` | Comma-separated field names to project. Omit for all fields (large-object fields `STRG/RSTR/LCHR/LRAW` auto-excluded, listed in `data.excludedFields`; explicit projection of large-object fields is rejected with `INVALID_FIELD`). |
+| `--where <clause>` | Filter clause: `FIELD OP VALUE [AND ...]`. Operators: `= <> > >= < <= LIKE`. Strings in single quotes (`''` to escape a quote), numbers bare, dates `YYYYMMDD`. **MANDT filter rejected** (implicit session client). v1 grammar: AND-only — no OR / parentheses / functions / subqueries. |
+| `--limit <n>` | Max rows returned (CLI range `[1, 10000]`, default `100`). The SAP handler fetches `limit+1` to detect truncation via `data.truncated`. |
+| `--offset <n>` | Pagination offset (CLI range `[0, 100000]`, default `0`). Deterministic pagination requires `--order-by`. |
+| `--order-by <csv>` | Comma-separated `FIELD:ASC|DESC` pairs, e.g. `"ID:ASC,AMOUNT:DESC"`. Field names must exist in the target table. |
+| `--count-only` | Return only the matching row count (`data.count`); `rows` / `fields` omitted. Ignores `--limit` / `--offset` / `--order-by`. |
+| `--dry-run` | Print the planned query envelope (`wouldRun: true`) without invoking the ICF endpoint. |
+| `--schema` | Print the machine-readable command schema (options / examples / error mapping) as JSON and exit 0 — no SAP call. |
+| `--json` | Global — emit the unified 012 JSON envelope. |
+
+**Output contract** (`--json` success):
+
+```jsonc
+{
+  "status": "success",
+  "meta": { "command": "abap select", "version": "0.7.0", "timestamp": "...", "durationMs": 42, "warnings": [] },
+  "data": {
+    "table": "ZTAB_FIXTURE", "objectType": "TABL",
+    "fields": ["MANDT", "ID", "STATUS", "AMOUNT", "NAME", "CREATED"],
+    "rows": [ { "MANDT": "001", "ID": "0000000001", "STATUS": "X", "AMOUNT": "1.00", "NAME": "Item 0000000001", "CREATED": "20260201" } ],
+    "rowCount": 50, "truncated": true,
+    "excludedFields": ["NOTE"],
+    "offset": 0, "limit": 50, "countOnly": false, "dryRun": false
+  }
+}
+```
+
+**Human mode** (default): ASCII table with column widths and a trailing summary line (`N row(s) (truncated — ...)` or `excluded: NOTE (large-object fields; not projected)`).
+
+**Read-only & injection-safety contract**:
+
+- The command never writes to SAP — no transport, activation, lock, or data modification. Verifiable by running identical queries before/after a `select` (table data, transport requests, and activation state are unchanged).
+- where values are bound as host variables (`@lv_where_v1`, `@lv_where_v2`, …) in the dynamic Open SQL statement — they never enter the SQL text as a literal. Injection payloads like `' OR 1=1 --`, `'; DROP TABLE ZTAB_FIXTURE --`, or `O'Brien; …` are matched as literal string values and return zero rows or `INVALID_WHERE`, not all rows or errors.
+- Field names (`--fields`, `--order-by`, where fields) are validated against the DDIC metadata (`DD03L`) before reaching the SELECT — only real, defined field names can ever appear in the SQL structure.
+- `MANDT` is filtered implicitly by the session client (Open SQL auto-restriction for client-dependent tables). Explicit `MANDT = '...'` in `--where` is rejected.
+- Large-object fields (`STRING`/`RAWSTRING`/`LONG CHAR`/`LONG RAW`) are auto-excluded from the default projection and rejected on explicit projection — keeps row payloads bounded and prevents accidental output of huge objects.
+
+**016 error codes** (beyond the common table):
+
+| Code | Category / exit | Trigger |
+|------|-----------------|---------|
+| `TABLE_NOT_FOUND` | NOT_FOUND / 8 | Table or view does not exist in DB → `abap search <name>` to verify |
+| `TABLE_TYPE_NOT_SUPPORTED` | VALIDATION_ERROR / 7 | Object exists but is pool / cluster / structure / table-type (only TABL and VIEW are queryable); `error.details.objectType` reports the actual TABCLASS |
+| `INVALID_FIELD` | VALIDATION_ERROR / 7 | `--fields` / `--order-by` contains a field that is not in the table (`error.details.validFields` lists valid fields), or an explicit projection of a large-object field |
+| `INVALID_WHERE` | VALIDATION_ERROR / 7 | Where syntax / operator / field / type / MANDT violation (`error.details.offset` reports the character position of the failing token) |
+| `LIMIT_EXCEEDED` | VALIDATION_ERROR / 7 | SAP-side limit re-validation: `limit > 10000` or non-integer (CLI rejects first via `INVALID_ARGUMENT`) |
+| `OFFSET_EXCEEDED` | VALIDATION_ERROR / 7 | SAP-side offset re-validation: `offset > 100000` or non-integer |
+| `QUERY_FAILED` | SAP_ERROR / 6 | Runtime dynamic SQL failure (e.g. `cx_sy_dynamic_osql_semantics`); `error.message` carries the exception summary |
+
+**v1 scope** (limitations documented in the spec):
+
+- Only `TABL` (transparent) and `VIEW` (DDIC views) are queryable. Pool / cluster tables, structures, table types, and CDS views are rejected (`TABLE_TYPE_NOT_SUPPORTED`).
+- Where grammar is `AND` chains only — `OR`, parentheses, function calls, and subqueries are not accepted.
+- No `--client` override: client-dependent tables return rows for the ICF session client only.
+- Large-object fields are excluded, not truncated. Choose `--fields` carefully if you need to read STRING columns (v1 does not support projection of large objects).
+- Authorization follows the connecting user (no explicit `AUTHORITY-CHECK` in v1). Limit access to trusted environments.
+- Requires the ICF service version 0.3.0 or later (`abap deploy`; `abap doctor` reports the installed version).
+
 ## `abap check`
 
 Validate local ABAP files. Exactly one mode applies; `--syntax` is the default.
@@ -550,3 +637,10 @@ Every error's `error.category` maps 1:1 to its exit code (see JSON Output Contra
 | `NOT_FOUND` | Generic not-found (parent of `OBJECT_NOT_FOUND` / `AMBIGUOUS_OBJECT`) |
 | `TRANSPORT_NOT_FOUND` | Referenced transport request does not exist |
 | `PUSH_FAILED` | Push operation failed (aggregate) |
+| `TABLE_NOT_FOUND` | Table or view does not exist (016 `abap select`) |
+| `TABLE_TYPE_NOT_SUPPORTED` | Object exists but is not TABL or VIEW (016) |
+| `INVALID_FIELD` | Field not in table / large-object projection rejected (016) |
+| `INVALID_WHERE` | Where grammar / field / type / MANDT violation (016) |
+| `LIMIT_EXCEEDED` | `limit > 10000` or non-integer, server-side re-validation (016) |
+| `OFFSET_EXCEEDED` | `offset > 100000` or non-integer, server-side re-validation (016) |
+| `QUERY_FAILED` | Runtime dynamic SQL failure (`cx_root` summary) (016) |

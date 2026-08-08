@@ -64,6 +64,14 @@ export type ErrorCode =
   | 'WRAPPER_NOT_DEPLOYED'    // 015: ZCL_ABAP_VIBE_RUNNER missing on target system (NOT_FOUND)
   | 'TIMEOUT'                 // 015: classrun exceeded --timeout (SAP_ERROR)
   | 'WRAPPER_INPUT_UNAVAILABLE' // 015: SAP classrun endpoint does not inject method args (SAP_ERROR)
+  // 016-abap-select: read-only table data query error codes
+  | 'TABLE_NOT_FOUND'          // 016: ICF /data/query — table/view does not exist (NOT_FOUND)
+  | 'TABLE_TYPE_NOT_SUPPORTED' // 016: ICF /data/query — pool/cluster/structure not queryable (VALIDATION_ERROR)
+  | 'INVALID_FIELD'            // 016: ICF /data/query — field not in table / explicit large-object projection (VALIDATION_ERROR)
+  | 'INVALID_WHERE'            // 016: ICF /data/query — where syntax/op/field/type/MANDT violation (VALIDATION_ERROR)
+  | 'LIMIT_EXCEEDED'           // 016: ICF /data/query — limit > 10000 or non-integer (VALIDATION_ERROR)
+  | 'OFFSET_EXCEEDED'          // 016: ICF /data/query — offset > 100000 or non-integer (VALIDATION_ERROR)
+  | 'QUERY_FAILED'             // 016: ICF /data/query — runtime dynamic SQL error (SAP_ERROR)
   ;
 
 const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
@@ -105,6 +113,14 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   WRAPPER_NOT_DEPLOYED: 'NOT_FOUND',
   TIMEOUT: 'SAP_ERROR',
   WRAPPER_INPUT_UNAVAILABLE: 'SAP_ERROR',
+  // 016-abap-select mappings
+  TABLE_NOT_FOUND: 'NOT_FOUND',
+  TABLE_TYPE_NOT_SUPPORTED: 'VALIDATION_ERROR',
+  INVALID_FIELD: 'VALIDATION_ERROR',
+  INVALID_WHERE: 'VALIDATION_ERROR',
+  LIMIT_EXCEEDED: 'VALIDATION_ERROR',
+  OFFSET_EXCEEDED: 'VALIDATION_ERROR',
+  QUERY_FAILED: 'SAP_ERROR',
 };
 
 export function categoryOf(code: ErrorCode): ErrorCategory {

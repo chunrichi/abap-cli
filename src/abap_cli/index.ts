@@ -30,6 +30,12 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
     load: () => import('./commands/run.js').then((m) => ({ register: m.registerRunCommand })),
   },
   {
+    name: 'select',
+    scope: 'sap',
+    description: 'Query table data read-only via the bundled ICF /data endpoint (SE16N equivalent): --table ZTAB [--fields ...] [--where ...] [--limit N] [--offset N] [--order-by ...] [--count-only].',
+    load: () => import('./commands/select.js').then((m) => ({ register: m.registerSelectCommand })),
+  },
+  {
     name: 'push',
     description: 'Push local ABAP files to SAP (lock → set source → syntax check → activate → unlock)',
     load: () => import('./commands/push.js').then((m) => ({ register: m.registerPushCommand })),
