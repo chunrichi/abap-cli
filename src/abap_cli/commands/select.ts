@@ -224,8 +224,8 @@ export function registerSelectCommand(program: Command): void {
  * Render the SelectResult as a human-readable ASCII table. Mirrors the
  * conventions used for the human output of other read-only commands (e.g.
  * `inspect`, `search`): a header row, a separator, one row per data row,
- * and a trailing summary line. Values are not quoted — they are already
- * strings from the SAP handler (YYYYMMDD dates, . decimal separator, etc.).
+ * and a trailing summary line. Values are native-typed (017 Q1 B: numbers,
+ * YYYY-MM-DD dates, strings) and are stringified via String() — null → ''.
  */
 export function formatHuman(result: SelectResult): string {
   const lines: string[] = [];

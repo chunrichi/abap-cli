@@ -216,13 +216,15 @@ abap select --schema
   "data": {
     "table": "ZTAB_FIXTURE", "objectType": "TABL",
     "fields": ["MANDT", "ID", "STATUS", "AMOUNT", "NAME", "CREATED"],
-    "rows": [ { "MANDT": "001", "ID": "0000000001", "STATUS": "X", "AMOUNT": "1.00", "NAME": "Item 0000000001", "CREATED": "20260201" } ],
+    "rows": [ { "MANDT": "001", "ID": 1, "STATUS": "X", "AMOUNT": 1, "NAME": "Item 0000000001", "CREATED": "2026-02-01" } ],
     "rowCount": 50, "truncated": true,
     "excludedFields": ["NOTE"],
     "offset": 0, "limit": 50, "countOnly": false, "dryRun": false
   }
 }
 ```
+
+> **017 (0.4.0) — native-typed row values**: `data.rows` cell values follow `/ui2/cl_json` native serialization — NUMC/INT/DEC fields are JSON numbers (leading zeros dropped, e.g. `"0000000001"` → `1`), DATS is `YYYY-MM-DD`, TIMS is `HH:MM:SS`, CHAR/CLNT stay strings. Field names remain uppercase (DDIC order, matching `data.fields`). Agents consuming `--json` should handle `string | number | boolean | null` per cell. Service version bumped 0.3.0 → **0.4.0**.
 
 **Human mode** (default): ASCII table with column widths and a trailing summary line (`N row(s) (truncated — ...)` or `excluded: NOTE (large-object fields; not projected)`).
 

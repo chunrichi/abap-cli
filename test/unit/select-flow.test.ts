@@ -37,10 +37,10 @@ describe('select-flow-basic-success (US1)', () => {
         data: {
           table: 'ZTAB_FIXTURE',
           objectType: 'TABL',
-          fields: ['MANDT', 'ID', 'STATUS'],
+          fields: ['MANDT', 'ID', 'STATUS', 'CREATED'],
           rows: [
-            { MANDT: '001', ID: '0000000001', STATUS: 'X' },
-            { MANDT: '001', ID: '0000000002', STATUS: 'X' },
+            { MANDT: '001', ID: 1, STATUS: 'X', CREATED: '2026-01-01' },
+            { MANDT: '001', ID: 2, STATUS: 'X', CREATED: '2026-01-02' },
           ],
           rowCount: 2,
           truncated: false,
@@ -56,8 +56,11 @@ describe('select-flow-basic-success (US1)', () => {
     expect(result.rowCount).toBe(2);
     expect(result.truncated).toBe(false);
     expect(result.rows).toHaveLength(2);
-    expect(result.fields).toEqual(['MANDT', 'ID', 'STATUS']);
+    expect(result.fields).toEqual(['MANDT', 'ID', 'STATUS', 'CREATED']);
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
+    // 017 Q1 B: cell values are native-typed (number / string / YYYY-MM-DD).
+    expect(result.rows[0]).toEqual({ MANDT: '001', ID: 1, STATUS: 'X', CREATED: '2026-01-01' });
+    expect(result.rows[1]!.ID).toBe(2);
   });
 
   it('sends the table name (uppercased) in the wire payload', async () => {

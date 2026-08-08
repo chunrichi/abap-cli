@@ -176,8 +176,9 @@ describe('US3 — read-only safety contract', () => {
       const json = JSON.parse(result.stdout);
       expect(json.status).toBe('success');
       expect(json.data.rowCount).toBe(2);
-      const ids = json.data.rows.map((r: { ID: string }) => r.ID);
-      expect(ids).toEqual(['0000000001', '0000000003']);
+      // 017 Q1 B: NUMC values are native integers (leading zeros dropped).
+      const ids = json.data.rows.map((r: { ID: number }) => r.ID);
+      expect(ids).toEqual([1, 3]);
     });
   });
 

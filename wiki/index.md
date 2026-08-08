@@ -23,6 +23,7 @@ changed at: 2026-08-06 23:10:00
 
 ## Notes
 
+- [SAP 层统一 JSON 生成（/ui2/cl_json）](json-generation.md) — 全 SAP 层唯一 JSON 生成方式（017）
 - [外部 CLI 项目学习点](cli-benchmark-learning.md)
 - [abap CLI 建议汇总](roadmap.md)
 

@@ -9,6 +9,36 @@ CLASS zcl_abap_vibe_icf_setup DEFINITION PUBLIC CREATE PUBLIC.
       gc_name    TYPE icfname VALUE 'zabap_vibe',
       gc_handler TYPE icf_hand VALUE 'ZCL_ABAP_VIBE_ICF',
       gc_vhost   TYPE icfhostnum VALUE 0. " default_host
+
+    " 017: message types serialized via /ui2/cl_json (camelCase wire).
+    TYPES:
+      BEGIN OF ty_setup_error_body,
+        code    TYPE string,
+        message TYPE string,
+      END OF ty_setup_error_body,
+      BEGIN OF ty_setup_error,
+        status TYPE string,
+        error  TYPE ty_setup_error_body,
+      END OF ty_setup_error,
+      BEGIN OF ty_setup_node,
+        vhost   TYPE string,
+        url     TYPE string,
+        handler TYPE string,
+        active  TYPE abap_bool,
+      END OF ty_setup_node,
+      BEGIN OF ty_setup_success,
+        status TYPE string,
+        action TYPE string,
+        node   TYPE ty_setup_node,
+      END OF ty_setup_success.
+
+    METHODS serialize_error
+      IMPORTING iv_code    TYPE string
+                iv_message TYPE string
+      RETURNING VALUE(rv_json) TYPE string.
+    METHODS serialize_success
+      IMPORTING iv_action TYPE string
+      RETURNING VALUE(rv_json) TYPE string.
 ENDCLASS.
 
 CLASS zcl_abap_vibe_icf_setup IMPLEMENTATION.
@@ -16,7 +46,6 @@ CLASS zcl_abap_vibe_icf_setup IMPLEMENTATION.
     DATA lv_guid       TYPE icfnodguid.
     DATA lv_parent     TYPE icfnodguid.
     DATA lv_action     TYPE string.
-    DATA lv_result     TYPE string.
     DATA lv_transport  TYPE trkorr.
     DATA ls_docu       TYPE icfdocu.
 
@@ -33,7 +62,9 @@ CLASS zcl_abap_vibe_icf_setup IMPLEMENTATION.
             no_authority = 5
             OTHERS       = 99.
         IF sy-subrc <> 0.
-          out->write( |\{ "status": "error", "error": \{ "code": "ICF_PARENT_NOT_FOUND", "message": "parent node { gc_parent } not found (subrc={ sy-subrc })" \} \}| ).
+          out->write( serialize_error(
+            iv_code    = 'ICF_PARENT_NOT_FOUND'
+            iv_message = |parent node { gc_parent } not found (subrc={ sy-subrc })| ) ).
           RETURN.
         ENDIF.
 
@@ -68,10 +99,14 @@ CLASS zcl_abap_vibe_icf_setup IMPLEMENTATION.
             " Node already exists → keep the existing binding, just ensure active.
             lv_action = 'already_active'.
           WHEN 26.
-            out->write( |\{ "status": "error", "error": \{ "code": "ICF_ADMIN_REQUIRED", "message": "insufficient SICF authorization to create the service node" \} \}| ).
+            out->write( serialize_error(
+              iv_code    = 'ICF_ADMIN_REQUIRED'
+              iv_message = 'insufficient SICF authorization to create the service node' ) ).
             RETURN.
           WHEN OTHERS.
-            out->write( |\{ "status": "error", "error": \{ "code": "ICF_SETUP_FAILED", "message": "insert_node subrc={ lv_ins }" \} \}| ).
+            out->write( serialize_error(
+              iv_code    = 'ICF_SETUP_FAILED'
+              iv_message = |insert_node subrc={ lv_ins }| ) ).
             RETURN.
         ENDCASE.
 
@@ -90,17 +125,38 @@ CLASS zcl_abap_vibe_icf_setup IMPLEMENTATION.
             EXCEPTIONS
               OTHERS = 99.
           IF sy-subrc <> 0.
-            out->write( |\{ "status": "error", "error": \{ "code": "ICF_SETUP_FAILED", "message": "change_node subrc={ sy-subrc }" \} \}| ).
+            out->write( serialize_error(
+              iv_code    = 'ICF_SETUP_FAILED'
+              iv_message = |change_node subrc={ sy-subrc }| ) ).
             RETURN.
           ENDIF.
         ENDIF.
 
-        lv_result = |\{ "status": "success", "action": "{ lv_action }", "node": \{ "vhost": "default_host", "url": "{ gc_icf_url }", "handler": "{ gc_handler }", "active": true \} \}|.
-        out->write( lv_result ).
+        out->write( serialize_success( iv_action = lv_action ) ).
       CATCH cx_for_icf_tree INTO DATA(lx_icf).
-        out->write( |\{ "status": "error", "error": \{ "code": "ICF_EXC_TREE", "message": "{ lx_icf->get_text( ) }" \} \}| ).
+        out->write( serialize_error(
+          iv_code    = 'ICF_EXC_TREE'
+          iv_message = lx_icf->get_text( ) ) ).
       CATCH cx_root INTO DATA(lx_root).
-        out->write( |\{ "status": "error", "error": \{ "code": "ICF_EXC_ROOT", "message": "{ lx_root->get_text( ) }" \} \}| ).
+        out->write( serialize_error(
+          iv_code    = 'ICF_EXC_ROOT'
+          iv_message = lx_root->get_text( ) ) ).
     ENDTRY.
+  ENDMETHOD.
+
+  METHOD serialize_error.
+    rv_json = /ui2/cl_json=>serialize(
+      data = VALUE ty_setup_error( status = 'error'
+                                   error = VALUE ty_setup_error_body( code = iv_code message = iv_message ) )
+      pretty_name = /ui2/cl_json=>pretty_mode-camel_case ).
+  ENDMETHOD.
+
+  METHOD serialize_success.
+    rv_json = /ui2/cl_json=>serialize(
+      data = VALUE ty_setup_success(
+        status = 'success'
+        action = iv_action
+        node = VALUE ty_setup_node( vhost = 'default_host' url = gc_icf_url handler = gc_handler active = abap_true ) )
+      pretty_name = /ui2/cl_json=>pretty_mode-camel_case ).
   ENDMETHOD.
 ENDCLASS.

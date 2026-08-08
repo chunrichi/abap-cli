@@ -36,7 +36,7 @@ const DDIC_FAIL = process.env.MOCK_DDIC_FAIL === '1';
 // mirroring the real backend's SVRS_GET_VERSIONS empty case.
 const REMOTE_MISSING = process.env.MOCK_REMOTE_MISSING === '1';
 // Deployed zabap_vibe version served by the mock root (mirrors CLI ICF_SERVICE_VERSION).
-const ICF_SERVICE_VERSION = process.env.MOCK_ICF_VERSION || '0.2.0';
+const ICF_SERVICE_VERSION = process.env.MOCK_ICF_VERSION || '0.4.0';
 const NOW = '2026-08-01T00:00:00Z';
 const CURRENT_USER = 'MOCKUSER';
 let putCount = 0; // global PUT counter (MOCK_ATOMIC_FAIL fails on the 2nd write)
@@ -159,10 +159,29 @@ function paginate(rows, offset, limit) {
   return rows.slice(safeOffset, safeOffset + safeLimit);
 }
 
-function projectFields(rows, fields) {
+// 017 Q1 B: native typed row values mirroring /ui2/cl_json serialization
+// (NUMC/DEC → JSON number, DATS → YYYY-MM-DD, TIMS → HH:MM:SS, CHAR/CLNT → string).
+function nativeValue(raw, def) {
+  const t = def ? def.dataType : 'CHAR';
+  const s = String(raw ?? '').trim();
+  if (t === 'NUMC' || t === 'DEC' || t === 'QUAN' || t === 'CURR' || t === 'INT1' || t === 'INT2' || t === 'INT4' || t === 'INT8' || t === 'FLTP') {
+    const n = Number(s);
+    return Number.isNaN(n) ? s : n;
+  }
+  if (t === 'DATS' && /^\d{8}$/.test(s)) {
+    return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
+  }
+  if (t === 'TIMS' && /^\d{6}$/.test(s)) {
+    return `${s.slice(0, 2)}:${s.slice(2, 4)}:${s.slice(4, 6)}`;
+  }
+  return String(raw ?? '');
+}
+
+function projectFields(rows, fields, fieldDefs) {
+  const defByName = new Map((fieldDefs || []).map((f) => [f.name, f]));
   return rows.map((row) => {
     const projected = {};
-    for (const f of fields) projected[f] = row[f] ?? '';
+    for (const f of fields) projected[f] = nativeValue(row[f], defByName.get(f));
     return projected;
   });
 }
@@ -1072,7 +1091,7 @@ const server = http.createServer(async (req, res) => {
       const probe = paginate(ordered, offset, limit + 1);
       const truncated = probe.length > limit;
       const finalRows = truncated ? probe.slice(0, limit) : probe;
-      const projected = projectFields(finalRows, outputFields);
+      const projected = projectFields(finalRows, outputFields, meta.fields);
       return ok(res, JSON.stringify({
         status: 'success',
         data: {

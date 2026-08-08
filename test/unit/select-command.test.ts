@@ -1,9 +1,39 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { registerSelectCommand } from '../../src/abap_cli/commands/select.js';
+import { registerSelectCommand, formatHuman } from '../../src/abap_cli/commands/select.js';
 import { renderError } from '../../src/abap_cli/output/json.js';
 import { Command } from 'commander';
+import type { SelectResult } from '../../src/abap_cli/flows/select-flow.js';
+
+describe('select human rendering — native-typed values (017 Q1 B)', () => {
+  it('formatHuman stringifies numbers/dates and renders null cells as empty', () => {
+    const result: SelectResult = {
+      table: 'ZTAB_FIXTURE',
+      objectType: 'TABL',
+      fields: ['ID', 'STATUS', 'CREATED', 'NOTE'],
+      rows: [
+        { ID: 1, STATUS: 'X', CREATED: '2026-01-01', NOTE: null },
+        { ID: 2000000000, STATUS: 'Y', CREATED: '2026-12-31', NOTE: 'ok' },
+      ],
+      rowCount: 2,
+      truncated: false,
+      excludedFields: [],
+      offset: 0,
+      limit: 100,
+      countOnly: false,
+      dryRun: false,
+      durationMs: 5,
+    };
+    const out = formatHuman(result);
+    // Native number renders as decimal (leading zeros dropped), date as YYYY-MM-DD,
+    // null cell renders empty.
+    expect(out).toContain('2026-01-01');
+    expect(out).toContain('2000000000');
+    expect(out).toContain('2 row(s)');
+    expect(out).toContain('ID');
+  });
+});
 
 describe('select command — schema (US1)', () => {
   it('--schema prints a JSON document with options + errors + examples', () => {

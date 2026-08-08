@@ -4,12 +4,12 @@ title: abap select
 description: 只读查询表数据 — 走 ICF /data/query 端点；Agent 的 SE16N 等价能力；覆盖"看这条记录"这一数据查询闭环
 tags: [abap-cli, command, select, se16n, data-query, icf, agent-loop, read-only]
 created at: 2026-08-07 23:50:00
-changed at: 2026-08-08 00:55:00
+changed at: 2026-08-09 00:00:00
 ---
 
 # abap select
 
-为 Agent 提供 **SE16N 等价**的数据查询能力：在 CLI 端用一条命令完成"看这条记录"，无需打开 SAP GUI 或 SE16N。走 013 自建 ICF 服务的新增 `POST /sap/zabap_vibe/data/query` 端点（服务版本 0.3.0），继承 014 DDIC CRUD 已建立的统一 JSON 信封与认证。
+为 Agent 提供 **SE16N 等价**的数据查询能力：在 CLI 端用一条命令完成"看这条记录"，无需打开 SAP GUI 或 SE16N。走 013 自建 ICF 服务的新增 `POST /sap/zabap_vibe/data/query` 端点（服务版本 0.4.0），继承 014 DDIC CRUD 已建立的统一 JSON 信封与认证。
 
 `abap select` 是**严格只读**命令——不获取锁、不触发 transport、不激活、不修改表数据。Agent 可放心地在 push → run → verify 闭环中反复调用：表数据、传输请求、对象激活状态查询前后零变化（spec SC-004）。
 
@@ -54,8 +54,9 @@ SAP 端单条 SELECT 由 5 个 helper 完成（research R1–R6）：
 1. `read_table_metadata`: DD02L（`TABCLASS` 校验）+ DD03L（字段、长度、小数、键、大对象判定）。
 2. `parse_where_clause`: AND 拆分 + field/op/value 扫描 + 类型适配；拒绝 OR/括号/MANDT。
 3. `build_row_type`: 由 DD03L 动态构造 `cl_abap_structdescr`，TABL/VIEW 共用同一路径。
-4. `execute_select`: `SELECT (fields) FROM (table) WHERE (lt_where) [ORDER BY (lt_ob)] UP TO @lv_limit ROWS OFFSET @lv_offset`，where 值绑定为宿主变量（`@lv_where_v1`, `@lv_where_v2`, …）。
-5. `serialize_value`: 确定性字符串规则（`d→YYYYMMDD`、`t→HHMMSS`、DEC 小数 `.`、c/n 去尾随空格）。
+4. `execute_select`: `SELECT (fields) FROM (table) WHERE (lt_where) [ORDER BY (lt_ob)] UP TO @lv_limit ROWS OFFSET @lv_offset`，where 值绑定为宿主变量（`@lv_where_v1`, `@lv_where_v2`, …）。行集用 `/ui2/cl_json` 原生序列化（`pretty_name = NONE` 保大写字段名 + 原生类型值），经 partial JSON 嵌入 camelCase 信封（017）。
+
+> ⚠️ **017（0.4.0）原生行值（Q1 B）**: `data.rows` 单元格值遵循 `/ui2/cl_json` 原生类型——NUMC/INT/DEC 为 JSON 数字（前导零丢失，`"0000000001"` → `1`）、DATS 为 `YYYY-MM-DD`、TIMS 为 `HH:MM:SS`、CHAR/CLNT 为字符串；字段名保持大写（与 `data.fields` 一致）。Agent 消费 `--json` 时每个单元格按 `string | number | boolean | null` 处理（CLI `SelectResult.rows` 类型为 `Record<string, unknown>[]`；人类模式自动 `String()`）。
 
 ## 输出契约（012 unified）
 
@@ -68,13 +69,15 @@ SAP 端单条 SELECT 由 5 个 helper 完成（research R1–R6）：
   "data": {
     "table": "ZTAB_FIXTURE", "objectType": "TABL",
     "fields": ["MANDT", "ID", "STATUS", "AMOUNT", "NAME", "CREATED"],
-    "rows": [ { "MANDT": "001", "ID": "0000000001", "STATUS": "X", "AMOUNT": "1.00", "NAME": "Item 0000000001", "CREATED": "20260201" } ],
+    "rows": [ { "MANDT": "001", "ID": 1, "STATUS": "X", "AMOUNT": 1, "NAME": "Item 0000000001", "CREATED": "2026-02-01" } ],
     "rowCount": 50, "truncated": true,
     "excludedFields": ["NOTE"],
     "offset": 0, "limit": 50, "countOnly": false, "dryRun": false, "durationMs": 42
   }
 }
 ```
+
+> 017 起行值为**原生类型**（数字 / `YYYY-MM-DD` 日期 / 字符串），见上方 017 说明。
 
 count-only 信封不含 `rows` / `fields` / `truncated`；dry-run 信封含 `wouldRun: true` 且无 SAP 调用。
 
@@ -125,9 +128,9 @@ abap select --table ZTAB_FIXTURE --where "NAME = 'O''Brien; DROP TABLE ZTAB_FIXT
 ## 版本与服务依赖
 
 - **CLI 版本**: 0.7.0（含 `select` 命令）。
-- **ICF 服务版本**: **0.3.0**（`abap deploy` 部署后可用）。`abap doctor` / `abap init` 探测 outdated 时升级。
+- **ICF 服务版本**: **0.4.0**（`abap deploy` 部署后可用）。`abap doctor` / `abap init` 探测 outdated 时升级。
 - **握手**: 复用 014 DDIC CRUD 的 `ZCL_ABAP_VIBE_ICF` 类（`/data/*` 子路由新增）。
-- **开发模式**: 014 `ICF_SERVICE_VERSION` + ABAP `gc_version` 同步 bump 0.2.0 → 0.3.0。
+- **开发模式**: 014 `ICF_SERVICE_VERSION` + ABAP `gc_version` 同步 bump 0.3.0 → 0.4.0（017：select 行值原生类型化）。
 
 ## 错误修复速查
 

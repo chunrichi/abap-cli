@@ -15,6 +15,7 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
       BEGIN OF ty_error_body,
         code    TYPE string,
         message TYPE string,
+        details TYPE REF TO data,
       END OF ty_error_body,
       BEGIN OF ty_error,
         status TYPE string,
@@ -31,7 +32,7 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
         data   TYPE ty_remote_source_data,
       END OF ty_remote_source.
     CONSTANTS gc_service TYPE string VALUE 'zabap_vibe'.
-    CONSTANTS gc_version TYPE string VALUE '0.3.0'.
+    CONSTANTS gc_version TYPE string VALUE '0.4.0'.
 
     " ----- routing + helpers -----
     METHODS respond_json
@@ -39,17 +40,31 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
                 iv_status  TYPE i
                 iv_reason  TYPE string
                 is_payload TYPE any.
-    METHODS respond_raw_json
-      IMPORTING io_server TYPE REF TO if_http_server
-                iv_status TYPE i
-                iv_reason TYPE string
-                iv_json   TYPE string.
     METHODS respond_error
       IMPORTING io_server TYPE REF TO if_http_server
                 iv_status TYPE i
                 iv_reason TYPE string
                 iv_code   TYPE string
                 iv_msg    TYPE string.
+    " 017: single JSON generation entries (US1/US2 build responses via these).
+    METHODS serialize_response
+      IMPORTING is_payload TYPE any
+      RETURNING VALUE(rv_json) TYPE string.
+    METHODS serialize_error
+      IMPORTING iv_code    TYPE string
+                iv_message TYPE string
+                iv_details TYPE any OPTIONAL
+      RETURNING VALUE(rv_json) TYPE string.
+    " 017: vhcala4hci deploys an old /UI2/CL_JSON that does NOT escape JSON
+    " string values — probe once and escape ourselves when needed.
+    CLASS-DATA gv_escape_needed TYPE abap_bool.
+    METHODS escape_probe_needed
+      RETURNING VALUE(rv_needed) TYPE abap_bool.
+    METHODS escape_json_string
+      IMPORTING iv_value TYPE string
+      RETURNING VALUE(rv_value) TYPE string.
+    METHODS escape_json_strings
+      CHANGING cv_data TYPE any.
 
     " ----- DDIC + textpool dispatchers (inlined per user adjustment) -----
     METHODS dispatch_ddic
@@ -76,19 +91,24 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
         id   TYPE string,
         text TYPE string,
       END OF ty_textpool_elem,
-      tt_textpool_elem TYPE STANDARD TABLE OF ty_textpool_elem WITH EMPTY KEY.
+      tt_textpool_elem TYPE STANDARD TABLE OF ty_textpool_elem WITH EMPTY KEY,
+      BEGIN OF ty_textpool_data,
+        object   TYPE string,
+        type     TYPE string,
+        category TYPE string,
+        elements TYPE tt_textpool_elem,
+      END OF ty_textpool_data,
+      BEGIN OF ty_textpool_get,
+        status TYPE string,
+        data   TYPE ty_textpool_data,
+      END OF ty_textpool_get.
 
     METHODS get_textpool_elements
       IMPORTING iv_category TYPE string
                 iv_object   TYPE string
                 iv_objtype  TYPE string
-      EXPORTING VALUE(ev_payload) TYPE string.
-    METHODS set_textpool_elements
-      IMPORTING iv_category TYPE string
-                iv_object   TYPE string
-                iv_objtype  TYPE string
-                iv_body     TYPE string
-      EXPORTING VALUE(ev_payload) TYPE string.
+      EXPORTING es_payload  TYPE ty_textpool_get
+                ev_error    TYPE ty_error.
 
     " ----- DDIC shared helpers (extracted from reference implementation) -----
     TYPES:
@@ -190,6 +210,32 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
                 VALUE(ev_err_msg)  TYPE string
                 VALUE(ev_err_offset) TYPE i.
 
+    " select wire payloads (017): rows is a partial-JSON piece (native values,
+    " uppercase field names via pretty_mode-none); envelope is camelCase.
+    TYPES:
+      BEGIN OF ty_select_result_data,
+        table           TYPE string,
+        object_type     TYPE string,
+        fields          TYPE string_table,
+        rows            TYPE /ui2/cl_json=>json,
+        row_count       TYPE i,
+        truncated       TYPE abap_bool,
+        excluded_fields TYPE string_table,
+        duration_ms     TYPE i,
+      END OF ty_select_result_data,
+      BEGIN OF ty_select_result,
+        status TYPE string,
+        data   TYPE ty_select_result_data,
+      END OF ty_select_result,
+      BEGIN OF ty_select_count_data,
+        table       TYPE string,
+        count       TYPE i,
+        duration_ms TYPE i,
+      END OF ty_select_count_data,
+      BEGIN OF ty_select_count,
+        status TYPE string,
+        data   TYPE ty_select_count_data,
+      END OF ty_select_count.
     METHODS execute_select
       IMPORTING is_meta      TYPE ty_query_metadata
                 iv_fields_csv TYPE string
@@ -197,17 +243,14 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
                 it_orderby    TYPE tt_query_orderby
                 iv_limit      TYPE i
                 iv_offset     TYPE i
-      EXPORTING VALUE(ev_payload) TYPE string.
+      EXPORTING es_payload   TYPE ty_select_result
+                ev_error     TYPE ty_error.
 
     METHODS execute_count
       IMPORTING is_meta      TYPE ty_query_metadata
                 it_where      TYPE tt_where_condition
-      EXPORTING VALUE(ev_payload) TYPE string.
-
-    METHODS serialize_value
-      IMPORTING iv_value TYPE any
-                iv_type  TYPE string
-      RETURNING VALUE(rv_str) TYPE string.
+      EXPORTING es_payload   TYPE ty_select_count
+                ev_error     TYPE ty_error.
 
     METHODS get_uuid
       RETURNING VALUE(rv_uuid) TYPE sysuuid-c.
@@ -233,38 +276,115 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
                 et_bapireturn TYPE bapirettab.
 
     " ----- DDIC operations (POST create/overwrite, GET pull) -----
+    TYPES:
+      BEGIN OF ty_ddic_create_data,
+        name   TYPE string,
+        type   TYPE string,
+        action TYPE string,
+      END OF ty_ddic_create_data,
+      BEGIN OF ty_ddic_create,
+        status TYPE string,
+        data   TYPE ty_ddic_create_data,
+      END OF ty_ddic_create.
+    " DDIC GET (pull) wire payloads — component names target the camelCase wire
+    " (field_name → fieldName etc.); booleans are abap_bool (→ JSON true/false).
+    TYPES:
+      BEGIN OF ty_ddic_field_out,
+        field_name TYPE string,
+        rollname   TYPE string,
+        data_type  TYPE string,
+        length     TYPE i,
+        decimals   TYPE i,
+        key_flag   TYPE abap_bool,
+        not_null   TYPE abap_bool,
+      END OF ty_ddic_field_out,
+      tt_ddic_field_out TYPE STANDARD TABLE OF ty_ddic_field_out WITH EMPTY KEY,
+      BEGIN OF ty_ddic_field_out_stru,
+        field_name TYPE string,
+        rollname   TYPE string,
+        data_type  TYPE string,
+        length     TYPE i,
+        decimals   TYPE i,
+        key_flag   TYPE abap_bool,
+      END OF ty_ddic_field_out_stru,
+      tt_ddic_field_out_stru TYPE STANDARD TABLE OF ty_ddic_field_out_stru WITH EMPTY KEY,
+      BEGIN OF ty_ddic_get_doma_data,
+        name        TYPE string,
+        type        TYPE string,
+        description TYPE string,
+        data_type   TYPE string,
+        length      TYPE i,
+        decimals    TYPE i,
+        sign_flag   TYPE abap_bool,
+        lowercase   TYPE abap_bool,
+        conv_exit   TYPE string,
+      END OF ty_ddic_get_doma_data,
+      BEGIN OF ty_ddic_get_dtel_data,
+        name        TYPE string,
+        type        TYPE string,
+        description TYPE string,
+        domain      TYPE string,
+        data_type   TYPE string,
+        length      TYPE i,
+        decimals    TYPE i,
+        short_text  TYPE string,
+        medium_text TYPE string,
+        long_text   TYPE string,
+        header_text TYPE string,
+      END OF ty_ddic_get_dtel_data,
+      BEGIN OF ty_ddic_get_tabl_data,
+        name             TYPE string,
+        type             TYPE string,
+        description      TYPE string,
+        delivery_class   TYPE string,
+        data_class       TYPE string,
+        size_category    TYPE string,
+        client_dependent TYPE abap_bool,
+        fields           TYPE tt_ddic_field_out,
+      END OF ty_ddic_get_tabl_data,
+      BEGIN OF ty_ddic_get_stru_data,
+        name        TYPE string,
+        type        TYPE string,
+        description TYPE string,
+        fields      TYPE tt_ddic_field_out_stru,
+      END OF ty_ddic_get_stru_data.
     METHODS create_ddic_table
       IMPORTING iv_name    TYPE tabname
                 iv_payload TYPE string
                 iv_package TYPE devclass
                 iv_request TYPE trkorr
-      EXPORTING VALUE(ev_payload) TYPE string.
+      EXPORTING es_payload TYPE ty_ddic_create
+                ev_error   TYPE ty_error.
 
     METHODS create_ddic_structure
       IMPORTING iv_name    TYPE tabname
                 iv_payload TYPE string
                 iv_package TYPE devclass
                 iv_request TYPE trkorr
-      EXPORTING VALUE(ev_payload) TYPE string.
+      EXPORTING es_payload TYPE ty_ddic_create
+                ev_error   TYPE ty_error.
 
     METHODS create_ddic_data_element
       IMPORTING iv_name    TYPE rollname
                 iv_payload TYPE string
                 iv_package TYPE devclass
                 iv_request TYPE trkorr
-      EXPORTING VALUE(ev_payload) TYPE string.
+      EXPORTING es_payload TYPE ty_ddic_create
+                ev_error   TYPE ty_error.
 
     METHODS create_ddic_domain
       IMPORTING iv_name    TYPE domname
                 iv_payload TYPE string
                 iv_package TYPE devclass
                 iv_request TYPE trkorr
-      EXPORTING VALUE(ev_payload) TYPE string.
+      EXPORTING es_payload TYPE ty_ddic_create
+                ev_error   TYPE ty_error.
 
     METHODS get_ddic_object
       IMPORTING iv_type    TYPE string
                 iv_name    TYPE string
-      EXPORTING VALUE(ev_payload) TYPE string.
+      EXPORTING es_payload TYPE REF TO data
+                ev_error   TYPE ty_error.
 ENDCLASS.
 
 CLASS zcl_abap_vibe_icf IMPLEMENTATION.
@@ -509,15 +629,24 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
       get_textpool_elements( EXPORTING iv_category = lv_category
                                        iv_object   = lv_object
                                        iv_objtype  = lv_objtype
-                             IMPORTING ev_payload = DATA(lv_payload_get) ).
-      respond_raw_json( io_server = io_server iv_status = 200 iv_reason = 'OK' iv_json = lv_payload_get ).
+                             IMPORTING es_payload  = DATA(ls_payload_get)
+                                       ev_error    = DATA(ls_error_get) ).
+      IF ls_error_get IS NOT INITIAL.
+        respond_error( io_server = io_server
+                       iv_status = 404
+                       iv_reason = 'Not Found'
+                       iv_code   = ls_error_get-error-code
+                       iv_msg    = ls_error_get-error-message ).
+      ELSE.
+        respond_json( io_server = io_server iv_status = 200 iv_reason = 'OK' is_payload = ls_payload_get ).
+      ENDIF.
     ELSEIF iv_method = 'POST'.
-      set_textpool_elements( EXPORTING iv_category = lv_category
-                                       iv_object   = lv_object
-                                       iv_objtype  = lv_objtype
-                                       iv_body     = io_server->request->get_cdata( )
-                             IMPORTING ev_payload = DATA(lv_payload_set) ).
-      respond_raw_json( io_server = io_server iv_status = 200 iv_reason = 'OK' iv_json = lv_payload_set ).
+      " Write is not available through a non-interactive API on this release.
+      respond_error( io_server = io_server
+                     iv_status = 200
+                     iv_reason = 'OK'
+                     iv_code   = 'TEXTPOOL_WRITE_UNSUPPORTED'
+                     iv_msg    = 'Textpool writing is not available through a non-interactive API on this SAP release' ).
     ELSE.
       respond_error( io_server = io_server
                      iv_status = 405
@@ -549,32 +678,32 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
         action_cancelled   = 5
         OTHERS             = 6.
     IF sy-subrc <> 0.
-      ev_payload = `{ "status": "error", "error": { "code": "TEXTPOOL_OBJECT_NOT_FOUND", "message": "` && iv_object && ` not found" } }`.
+      ev_error = VALUE ty_error( status = 'error'
+                                 error = VALUE ty_error_body( code = 'TEXTPOOL_OBJECT_NOT_FOUND'
+                                                              message = |{ iv_object } not found| ) ).
       RETURN.
     ENDIF.
 
-    DATA lv_json TYPE string.
-    lv_json = `[`.
-    DATA lv_first TYPE abap_bool VALUE abap_true.
+    DATA(lt_elements) = VALUE tt_textpool_elem( ).
     LOOP AT lt_pool INTO ls_pool.
       " Category filter: symbols → ID = 'I'; selections → ID = 'S'; headings → ID = 'H'.
       IF iv_category = 'TEXTS' AND ls_pool-id <> 'I'. CONTINUE. ENDIF.
       IF iv_category = 'SELECTIONS' AND ls_pool-id <> 'S'. CONTINUE. ENDIF.
       IF iv_category = 'HEADINGS' AND ls_pool-id <> 'H'. CONTINUE. ENDIF.
-      IF lv_first = abap_true.
-        lv_first = abap_false.
+      IF escape_probe_needed( ) = abap_true.
+        " Old /UI2/CL_JSON (vhcala4hci) does not escape — escape text elements.
+        APPEND VALUE ty_textpool_elem( id   = escape_json_string( CONV string( ls_pool-key ) )
+                                       text = escape_json_string( CONV string( ls_pool-entry ) ) ) TO lt_elements.
       ELSE.
-        lv_json = lv_json && `,`.
+        APPEND VALUE ty_textpool_elem( id = CONV string( ls_pool-key ) text = CONV string( ls_pool-entry ) ) TO lt_elements.
       ENDIF.
-      lv_json = lv_json && `{ "id": "` && ls_pool-key && `", "text": "` && ls_pool-entry && `" }`.
     ENDLOOP.
-    lv_json = lv_json && `]`.
 
-    ev_payload = `{ "status": "success", "data": { "object": "` && iv_object && `", "type": "` && iv_objtype && `", "category": "` && iv_category && `", "elements": ` && lv_json && ` } }`.
-  ENDMETHOD.
-
-  METHOD set_textpool_elements.
-    ev_payload = `{ "status": "error", "error": { "code": "TEXTPOOL_WRITE_UNSUPPORTED", "message": "Textpool writing is not available through a non-interactive API on this SAP release" } }`.
+    es_payload = VALUE ty_textpool_get( status = 'success'
+                                        data = VALUE ty_textpool_data( object   = iv_object
+                                                                       type     = iv_objtype
+                                                                       category = iv_category
+                                                                       elements = lt_elements ) ).
   ENDMETHOD.
 
   METHOD dispatch_ddic.
@@ -584,7 +713,6 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
     DATA lv_match_name TYPE string.
     DATA lv_pkg TYPE string.
     DATA lv_req TYPE string.
-    DATA lv_payload TYPE string.
     FIND REGEX '^/ddic/(doma|dtel|tabl|stru)(?:/(.+))?$' IN iv_path IGNORING CASE
       SUBMATCHES lv_match_type lv_match_name.
     IF sy-subrc <> 0 OR lv_match_type IS INITIAL.
@@ -618,44 +746,62 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
         lv_request = lv_req.
       ENDIF.
 
+      DATA ls_create     TYPE ty_ddic_create.
+      DATA ls_create_err TYPE ty_error.
       CASE lv_type.
         WHEN 'DOMA'.
           create_ddic_domain( EXPORTING iv_name    = CONV domname( lv_name )
                                         iv_payload = iv_body
                                         iv_package = lv_package
                                         iv_request = lv_request
-                              IMPORTING ev_payload = lv_payload ).
+                              IMPORTING es_payload = ls_create
+                                        ev_error   = ls_create_err ).
         WHEN 'DTEL'.
           create_ddic_data_element( EXPORTING iv_name    = CONV rollname( lv_name )
                                             iv_payload = iv_body
                                             iv_package = lv_package
                                             iv_request = lv_request
-                                  IMPORTING ev_payload = lv_payload ).
+                                  IMPORTING es_payload = ls_create
+                                            ev_error   = ls_create_err ).
         WHEN 'TABL'.
           create_ddic_table( EXPORTING iv_name    = CONV tabname( lv_name )
                                        iv_payload = iv_body
                                        iv_package = lv_package
                                        iv_request = lv_request
-                             IMPORTING ev_payload = lv_payload ).
+                             IMPORTING es_payload = ls_create
+                                       ev_error   = ls_create_err ).
         WHEN 'STRU'.
           create_ddic_structure( EXPORTING iv_name    = CONV tabname( lv_name )
                                           iv_payload = iv_body
                                           iv_package = lv_package
                                           iv_request = lv_request
-                                IMPORTING ev_payload = lv_payload ).
+                                IMPORTING es_payload = ls_create
+                                          ev_error   = ls_create_err ).
       ENDCASE.
-      respond_raw_json( io_server = io_server
-                        iv_status = 200
-                        iv_reason = 'OK'
-                        iv_json   = lv_payload ).
+      IF ls_create_err IS NOT INITIAL.
+        respond_error( io_server = io_server
+                       iv_status = 200
+                       iv_reason = 'OK'
+                       iv_code   = ls_create_err-error-code
+                       iv_msg    = ls_create_err-error-message ).
+      ELSE.
+        respond_json( io_server = io_server iv_status = 200 iv_reason = 'OK' is_payload = ls_create ).
+      ENDIF.
     ELSEIF iv_method = 'GET'.
       get_ddic_object( EXPORTING iv_type    = lv_type
                                  iv_name    = lv_name
-                       IMPORTING ev_payload = lv_payload ).
-      respond_raw_json( io_server = io_server
-                        iv_status = 200
-                        iv_reason = 'OK'
-                        iv_json   = lv_payload ).
+                       IMPORTING es_payload = DATA(lr_get)
+                                 ev_error   = DATA(ls_get_err) ).
+      IF ls_get_err IS NOT INITIAL.
+        respond_error( io_server = io_server
+                       iv_status = 200
+                       iv_reason = 'OK'
+                       iv_code   = ls_get_err-error-code
+                       iv_msg    = ls_get_err-error-message ).
+      ELSE.
+        ASSIGN lr_get->* TO FIELD-SYMBOL(<ls_get>).
+        respond_json( io_server = io_server iv_status = 200 iv_reason = 'OK' is_payload = <ls_get> ).
+      ENDIF.
     ELSE.
       respond_error( io_server = io_server
                      iv_status = 405
@@ -814,11 +960,16 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
     IF lv_ok = abap_false.
-      ev_payload = |\{ "status": "error", "error": \{ "code": "DDIC_CREATE_FAILED", "message": "{ lv_msg }" \} \}|.
+      ev_error = VALUE ty_error( status = 'error'
+                                 error = VALUE ty_error_body( code = 'DDIC_CREATE_FAILED'
+                                                              message = lv_msg ) ).
       RETURN.
     ENDIF.
 
-    ev_payload = |\{ "status": "success", "data": \{ "name": "{ ls_attr-name }", "type": "TABL", "action": "created" \} \}|.
+    es_payload = VALUE ty_ddic_create( status = 'success'
+                                       data = VALUE ty_ddic_create_data( name   = ls_attr-name
+                                                                         type   = 'TABL'
+                                                                         action = 'created' ) ).
   ENDMETHOD.
 
   METHOD create_ddic_structure.
@@ -893,10 +1044,15 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
       IF lv_msg IS INITIAL. lv_msg = lv_error. ELSE. lv_msg = lv_msg && |; { lv_error }|. ENDIF.
     ENDLOOP.
     IF lv_ok = abap_false.
-      ev_payload = |\{ "status": "error", "error": \{ "code": "DDIC_CREATE_FAILED", "message": "{ lv_msg }" \} \}|.
+      ev_error = VALUE ty_error( status = 'error'
+                                 error = VALUE ty_error_body( code = 'DDIC_CREATE_FAILED'
+                                                              message = lv_msg ) ).
       RETURN.
     ENDIF.
-    ev_payload = |\{ "status": "success", "data": \{ "name": "{ ls_attr-name }", "type": "STRU", "action": "created" \} \}|.
+    es_payload = VALUE ty_ddic_create( status = 'success'
+                                       data = VALUE ty_ddic_create_data( name   = ls_attr-name
+                                                                         type   = 'STRU'
+                                                                         action = 'created' ) ).
   ENDMETHOD.
 
   METHOD create_ddic_data_element.
@@ -991,10 +1147,15 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
       IF lv_msg IS INITIAL. lv_msg = ls_err-message. ELSE. lv_msg = lv_msg && |; { ls_err-message }|. ENDIF.
     ENDLOOP.
     IF lv_ok = abap_false.
-      ev_payload = |\{ "status": "error", "error": \{ "code": "DDIC_CREATE_FAILED", "message": "{ lv_msg }" \} \}|.
+      ev_error = VALUE ty_error( status = 'error'
+                                 error = VALUE ty_error_body( code = 'DDIC_CREATE_FAILED'
+                                                              message = lv_msg ) ).
       RETURN.
     ENDIF.
-    ev_payload = |\{ "status": "success", "data": \{ "name": "{ ls_attr-name }", "type": "DTEL", "action": "created" \} \}|.
+    es_payload = VALUE ty_ddic_create( status = 'success'
+                                       data = VALUE ty_ddic_create_data( name   = ls_attr-name
+                                                                         type   = 'DTEL'
+                                                                         action = 'created' ) ).
   ENDMETHOD.
 
   METHOD create_ddic_domain.
@@ -1062,10 +1223,15 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
       IF lv_msg IS INITIAL. lv_msg = ls_err-message. ELSE. lv_msg = lv_msg && |; { ls_err-message }|. ENDIF.
     ENDLOOP.
     IF lv_ok = abap_false.
-      ev_payload = |\{ "status": "error", "error": \{ "code": "DDIC_CREATE_FAILED", "message": "{ lv_msg }" \} \}|.
+      ev_error = VALUE ty_error( status = 'error'
+                                 error = VALUE ty_error_body( code = 'DDIC_CREATE_FAILED'
+                                                              message = lv_msg ) ).
       RETURN.
     ENDIF.
-    ev_payload = |\{ "status": "success", "data": \{ "name": "{ ls_attr-name }", "type": "DOMA", "action": "created" \} \}|.
+    es_payload = VALUE ty_ddic_create( status = 'success'
+                                       data = VALUE ty_ddic_create_data( name   = ls_attr-name
+                                                                         type   = 'DOMA'
+                                                                         action = 'created' ) ).
   ENDMETHOD.
 
   METHOD get_ddic_object.
@@ -1085,21 +1251,23 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
             illegal_input = 1
             OTHERS        = 2.
         IF sy-subrc <> 0 OR ls_doma-domname IS INITIAL.
-          ev_payload = `{ "status": "error", "error": { "code": "DDIC_OBJECT_NOT_FOUND", "message": "DOMA ` && iv_name && ` not found" } }`.
+          ev_error = VALUE ty_error( status = 'error'
+                                     error = VALUE ty_error_body( code = 'DDIC_OBJECT_NOT_FOUND'
+                                                                  message = |DOMA { iv_name } not found| ) ).
           RETURN.
         ENDIF.
-         DATA lv_doma_length TYPE i.
-         DATA lv_doma_decimals TYPE i.
-         DATA lv_doma_sign_flag TYPE string.
-         DATA lv_doma_lowercase TYPE string.
-         lv_doma_length = ls_doma-leng.
-         lv_doma_decimals = ls_doma-decimals.
-         IF ls_doma-signflag = 'X'. lv_doma_sign_flag = 'true'. ELSE. lv_doma_sign_flag = 'false'. ENDIF.
-         IF ls_doma-lowercase = 'X'. lv_doma_lowercase = 'true'. ELSE. lv_doma_lowercase = 'false'. ENDIF.
-        ev_payload = |\{ "status": "success", "data": \{ "name": "{ iv_name }", "type": "DOMA",| &&
-               | "description": "{ ls_doma-ddtext }", "dataType": "{ ls_doma-datatype }",| &&
-           | "length": { lv_doma_length }, "decimals": { lv_doma_decimals }, "signFlag": { lv_doma_sign_flag },| &&
-           | "lowercase": { lv_doma_lowercase }, "convExit": "{ ls_doma-convexit }" \} \}|.
+        CREATE DATA es_payload TYPE ty_ddic_get_doma_data.
+        ASSIGN es_payload->* TO FIELD-SYMBOL(<ls_doma_payload>).
+        <ls_doma_payload> = VALUE ty_ddic_get_doma_data(
+          name        = iv_name
+          type        = 'DOMA'
+          description = ls_doma-ddtext
+          data_type   = ls_doma-datatype
+          length      = ls_doma-leng
+          decimals    = ls_doma-decimals
+          sign_flag   = COND abap_bool( WHEN ls_doma-signflag = 'X' THEN abap_true ELSE abap_false )
+          lowercase   = COND abap_bool( WHEN ls_doma-lowercase = 'X' THEN abap_true ELSE abap_false )
+          conv_exit   = ls_doma-convexit ).
       WHEN 'DTEL'.
         DATA ls_dtel TYPE dd04v.
         CALL FUNCTION 'DDIF_DTEL_GET'
@@ -1113,18 +1281,25 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
             illegal_input = 1
             OTHERS        = 2.
         IF sy-subrc <> 0 OR ls_dtel-rollname IS INITIAL.
-          ev_payload = `{ "status": "error", "error": { "code": "DDIC_OBJECT_NOT_FOUND", "message": "DTEL ` && iv_name && ` not found" } }`.
+          ev_error = VALUE ty_error( status = 'error'
+                                     error = VALUE ty_error_body( code = 'DDIC_OBJECT_NOT_FOUND'
+                                                                  message = |DTEL { iv_name } not found| ) ).
           RETURN.
         ENDIF.
-         DATA lv_dtel_length TYPE i.
-         DATA lv_dtel_decimals TYPE i.
-         lv_dtel_length = ls_dtel-leng.
-         lv_dtel_decimals = ls_dtel-decimals.
-        ev_payload = |\{ "status": "success", "data": \{ "name": "{ iv_name }", "type": "DTEL",| &&
-               | "description": "{ ls_dtel-ddtext }", "domain": "{ ls_dtel-domname }",| &&
-           | "dataType": "{ ls_dtel-datatype }", "length": { lv_dtel_length }, "decimals": { lv_dtel_decimals },| &&
-               | "shortText": "{ ls_dtel-scrtext_s }", "mediumText": "{ ls_dtel-scrtext_m }",| &&
-               | "longText": "{ ls_dtel-scrtext_l }", "headerText": "{ ls_dtel-reptext }" \} \}|.
+        CREATE DATA es_payload TYPE ty_ddic_get_dtel_data.
+        ASSIGN es_payload->* TO FIELD-SYMBOL(<ls_dtel_payload>).
+        <ls_dtel_payload> = VALUE ty_ddic_get_dtel_data(
+          name        = iv_name
+          type        = 'DTEL'
+          description = ls_dtel-ddtext
+          domain      = ls_dtel-domname
+          data_type   = ls_dtel-datatype
+          length      = ls_dtel-leng
+          decimals    = ls_dtel-decimals
+          short_text  = ls_dtel-scrtext_s
+          medium_text = ls_dtel-scrtext_m
+          long_text   = ls_dtel-scrtext_l
+          header_text = ls_dtel-reptext ).
       WHEN 'TABL'.
         " DDIF_TABL_GET reads both transparent tables and structures; the
         " tabclass in dd02v distinguishes them.
@@ -1145,39 +1320,32 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
             illegal_input = 1
             OTHERS        = 2.
         IF sy-subrc <> 0 OR ls_tabl-tabname IS INITIAL.
-          ev_payload = `{ "status": "error", "error": { "code": "DDIC_OBJECT_NOT_FOUND", "message": "TABL ` && iv_name && ` not found" } }`.
+          ev_error = VALUE ty_error( status = 'error'
+                                     error = VALUE ty_error_body( code = 'DDIC_OBJECT_NOT_FOUND'
+                                                                  message = |TABL { iv_name } not found| ) ).
           RETURN.
         ENDIF.
-        " Build the fields array inline.
-        DATA lv_fields TYPE string.
-        lv_fields = `[`.
-        DATA lv_first TYPE abap_bool VALUE abap_true.
-        DATA lv_tabl_length TYPE i.
-        DATA lv_tabl_decimals TYPE i.
-        DATA lv_tabl_key_flag TYPE string.
-        DATA lv_tabl_not_null TYPE string.
-        DATA lv_tabl_client_dependent TYPE string VALUE 'false'.
+        DATA(lt_fields_out) = VALUE tt_ddic_field_out( ).
         LOOP AT lt_tabl03 INTO DATA(ls_field).
-          lv_tabl_length = ls_field-leng.
-          lv_tabl_decimals = ls_field-decimals.
-          IF ls_field-keyflag = 'X'. lv_tabl_key_flag = 'true'. ELSE. lv_tabl_key_flag = 'false'. ENDIF.
-          IF ls_field-notnull = 'X'. lv_tabl_not_null = 'true'. ELSE. lv_tabl_not_null = 'false'. ENDIF.
-          IF ls_field-fieldname = 'MANDT'. lv_tabl_client_dependent = 'true'. ENDIF.
-          IF lv_first = abap_true.
-            lv_first = abap_false.
-          ELSE.
-            lv_fields = lv_fields && `,`.
-          ENDIF.
-          lv_fields = lv_fields
-            && |\{ "fieldName": "{ ls_field-fieldname }", "rollname": "{ ls_field-rollname }",| &&
-            | "dataType": "{ ls_field-datatype }", "length": { lv_tabl_length }, "decimals": { lv_tabl_decimals },| &&
-            | "keyFlag": { lv_tabl_key_flag }, "notNull": { lv_tabl_not_null } \}|.
+          APPEND VALUE ty_ddic_field_out( field_name = ls_field-fieldname
+                                          rollname   = ls_field-rollname
+                                          data_type  = ls_field-datatype
+                                          length     = ls_field-leng
+                                          decimals   = ls_field-decimals
+                                          key_flag   = COND abap_bool( WHEN ls_field-keyflag = 'X' THEN abap_true ELSE abap_false )
+                                          not_null   = COND abap_bool( WHEN ls_field-notnull = 'X' THEN abap_true ELSE abap_false ) ) TO lt_fields_out.
         ENDLOOP.
-        lv_fields = lv_fields && `]`.
-        ev_payload = |\{ "status": "success", "data": \{ "name": "{ iv_name }", "type": "{ iv_type }",| &&
-               | "description": "{ ls_tabl-ddtext }", "deliveryClass": "{ ls_tabl-contflag }",| &&
-           | "dataClass": "{ ls_tabl09-tabart }", "sizeCategory": "{ ls_tabl09-tabkat }",| &&
-           | "clientDependent": { lv_tabl_client_dependent }, "fields": { lv_fields } \} \}|.
+        CREATE DATA es_payload TYPE ty_ddic_get_tabl_data.
+        ASSIGN es_payload->* TO FIELD-SYMBOL(<ls_tabl_payload>).
+        <ls_tabl_payload> = VALUE ty_ddic_get_tabl_data(
+          name             = iv_name
+          type             = iv_type
+          description      = ls_tabl-ddtext
+          delivery_class   = ls_tabl-contflag
+          data_class       = ls_tabl09-tabart
+          size_category    = ls_tabl09-tabkat
+          client_dependent = COND abap_bool( WHEN line_exists( lt_tabl03[ fieldname = 'MANDT' ] ) THEN abap_true ELSE abap_false )
+          fields           = lt_fields_out ).
       WHEN 'STRU'.
         " Structure read via DDIF_TABL_GET (tabclass INTTAB), same shape as TABL.
         DATA ls_stru TYPE dd02v.
@@ -1195,58 +1363,152 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
             illegal_input = 1
             OTHERS        = 2.
         IF sy-subrc <> 0 OR ls_stru-tabname IS INITIAL.
-          ev_payload = `{ "status": "error", "error": { "code": "DDIC_OBJECT_NOT_FOUND", "message": "STRU ` && iv_name && ` not found" } }`.
+          ev_error = VALUE ty_error( status = 'error'
+                                     error = VALUE ty_error_body( code = 'DDIC_OBJECT_NOT_FOUND'
+                                                                  message = |STRU { iv_name } not found| ) ).
           RETURN.
         ENDIF.
-        DATA lv_fields2 TYPE string.
-        lv_fields2 = `[`.
-        DATA lv_first2 TYPE abap_bool VALUE abap_true.
-        DATA lv_stru_length TYPE i.
-        DATA lv_stru_decimals TYPE i.
-        DATA lv_stru_key_flag TYPE string.
+        DATA(lt_stru_fields) = VALUE tt_ddic_field_out_stru( ).
         LOOP AT lt_stru03 INTO DATA(ls_field2).
-          lv_stru_length = ls_field2-leng.
-          lv_stru_decimals = ls_field2-decimals.
-          IF ls_field2-keyflag = 'X'. lv_stru_key_flag = 'true'. ELSE. lv_stru_key_flag = 'false'. ENDIF.
-          IF lv_first2 = abap_true.
-            lv_first2 = abap_false.
-          ELSE.
-            lv_fields2 = lv_fields2 && `,`.
-          ENDIF.
-          lv_fields2 = lv_fields2
-              && |\{ "fieldName": "{ ls_field2-fieldname }", "rollname": "{ ls_field2-rollname }", "dataType": "{ ls_field2-datatype }", "length": { lv_stru_length }, "decimals": { lv_stru_decimals }, "keyFlag": { lv_stru_key_flag } \}|.
+          APPEND VALUE ty_ddic_field_out_stru( field_name = ls_field2-fieldname
+                                               rollname   = ls_field2-rollname
+                                               data_type  = ls_field2-datatype
+                                               length     = ls_field2-leng
+                                               decimals   = ls_field2-decimals
+                                               key_flag   = COND abap_bool( WHEN ls_field2-keyflag = 'X' THEN abap_true ELSE abap_false ) ) TO lt_stru_fields.
         ENDLOOP.
-        lv_fields2 = lv_fields2 && `]`.
-        ev_payload = |\{ "status": "success", "data": \{ "name": "{ iv_name }", "type": "STRU", "description": "{ ls_stru-ddtext }", "fields": { lv_fields2 } \} \}|.
+        CREATE DATA es_payload TYPE ty_ddic_get_stru_data.
+        ASSIGN es_payload->* TO FIELD-SYMBOL(<ls_stru_payload>).
+        <ls_stru_payload> = VALUE ty_ddic_get_stru_data(
+          name        = iv_name
+          type        = 'STRU'
+          description = ls_stru-ddtext
+          fields      = lt_stru_fields ).
       WHEN OTHERS.
-        ev_payload = |\{ "status": "error", "error": \{ "code": "DDIC_NOT_SUPPORTED", "message": "unsupported DDIC type { iv_type }" \} \}|.
+        ev_error = VALUE ty_error( status = 'error'
+                                   error = VALUE ty_error_body( code = 'DDIC_NOT_SUPPORTED'
+                                                                message = |unsupported DDIC type { iv_type }| ) ).
     ENDCASE.
   ENDMETHOD.
 
   METHOD respond_json.
-    DATA(lv_json) = /ui2/cl_json=>serialize( data = is_payload
-                                             pretty_name = /ui2/cl_json=>pretty_mode-camel_case ).
+    DATA(lv_json) = serialize_response( is_payload ).
     io_server->response->set_status( code = iv_status reason = iv_reason ).
     io_server->response->set_content_type( content_type = 'application/json' ).
     io_server->response->set_cdata( data = lv_json ).
-  ENDMETHOD.
-
-  METHOD respond_raw_json.
-    " The DDIC handlers already produce a complete JSON envelope string; write it
-    " straight to the body without re-serializing (which would double-encode it).
-    io_server->response->set_status( code = iv_status reason = iv_reason ).
-    io_server->response->set_content_type( content_type = 'application/json' ).
-    io_server->response->set_cdata( data = iv_json ).
   ENDMETHOD.
 
   METHOD respond_error.
-    DATA(ls_error) = VALUE ty_error( status = 'error'
-                                     error = VALUE ty_error_body( code = iv_code message = iv_msg ) ).
-    DATA(lv_json) = /ui2/cl_json=>serialize( data = ls_error
-                                             pretty_name = /ui2/cl_json=>pretty_mode-camel_case ).
+    DATA(lv_json) = serialize_error( iv_code = iv_code iv_message = iv_msg ).
     io_server->response->set_status( code = iv_status reason = iv_reason ).
     io_server->response->set_content_type( content_type = 'application/json' ).
     io_server->response->set_cdata( data = lv_json ).
+  ENDMETHOD.
+
+  METHOD serialize_response.
+    " 017: single success-envelope generation entry (camelCase wire).
+    " Copy to a modifiable heap object so old /UI2/CL_JSON escaping can apply.
+    DATA lr_payload TYPE REF TO data.
+    CREATE DATA lr_payload LIKE is_payload.
+    ASSIGN lr_payload->* TO FIELD-SYMBOL(<lv_payload>).
+    <lv_payload> = is_payload.
+    IF escape_probe_needed( ) = abap_true.
+      escape_json_strings( CHANGING cv_data = <lv_payload> ).
+    ENDIF.
+    TRY.
+        rv_json = /ui2/cl_json=>serialize( data        = <lv_payload>
+                                           pretty_name = /ui2/cl_json=>pretty_mode-camel_case ).
+      CATCH cx_root.
+        rv_json = serialize_error( iv_code    = 'SERIALIZE_FAILED'
+                                   iv_message = 'response serialization failed' ).
+    ENDTRY.
+  ENDMETHOD.
+
+  METHOD serialize_error.
+    " 017: single error-envelope generation entry (compress skips unbound details).
+    DATA lv_msg TYPE string.
+    lv_msg = iv_message.
+    IF escape_probe_needed( ) = abap_true.
+      lv_msg = escape_json_string( iv_message ).
+    ENDIF.
+    DATA(ls_error) = VALUE ty_error( status = 'error'
+                                     error = VALUE ty_error_body( code = iv_code
+                                                                  message = lv_msg ) ).
+    IF iv_details IS SUPPLIED.
+      GET REFERENCE OF iv_details INTO ls_error-error-details.
+    ENDIF.
+    TRY.
+        rv_json = /ui2/cl_json=>serialize( data        = ls_error
+                                           pretty_name = /ui2/cl_json=>pretty_mode-camel_case
+                                           compress    = abap_true ).
+      CATCH cx_root.
+        " Static last-resort envelope (no dynamic content, cannot fail again).
+        rv_json = `{"status":"error","error":{"code":"SERIALIZE_FAILED","message":"internal serialization failure"}}`.
+    ENDTRY.
+  ENDMETHOD.
+
+  METHOD escape_probe_needed.
+    " Probe once: does /ui2/cl_json escape a double quote inside a string?
+    " Old /UI2/CL_JSON (vhcala4hci) returns it unescaped — then we escape.
+    DATA lv_probe TYPE string.
+    IF gv_escape_needed IS INITIAL.
+      lv_probe = /ui2/cl_json=>serialize( 'x"' ).
+      IF lv_probe CS '\"'.
+        gv_escape_needed = abap_false.
+      ELSE.
+        gv_escape_needed = abap_true.
+      ENDIF.
+    ENDIF.
+    rv_needed = gv_escape_needed.
+  ENDMETHOD.
+
+  METHOD escape_json_string.
+    " Escape backslash and double quote (order matters), then control chars.
+    rv_value = iv_value.
+    REPLACE ALL OCCURRENCES OF '\' IN rv_value WITH '\\'.
+    REPLACE ALL OCCURRENCES OF '"' IN rv_value WITH '\"'.
+    REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>cr_lf IN rv_value WITH '\r\n'.
+    REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>newline IN rv_value WITH '\n'.
+    REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>horizontal_tab IN rv_value WITH '\t'.
+  ENDMETHOD.
+
+  METHOD escape_json_strings.
+    " Recursively escape char-like elements of a structure/table (017 quirk).
+    " Fields typed /ui2/cl_json=>json (partial JSON pieces) are already escaped
+    " at their source and are skipped by absolute_name.
+    DATA lo_descr      TYPE REF TO cl_abap_typedescr.
+    DATA lo_elem       TYPE REF TO cl_abap_elemdescr.
+    DATA lo_struct     TYPE REF TO cl_abap_structdescr.
+    DATA lt_components TYPE abap_component_tab.
+    FIELD-SYMBOLS:
+      <lt_tab>  TYPE ANY TABLE,
+      <ls_line> TYPE any,
+      <lv_comp> TYPE any.
+    lo_descr = cl_abap_typedescr=>describe_by_data( cv_data ).
+    CASE lo_descr->kind.
+      WHEN cl_abap_typedescr=>kind_elem.
+        lo_elem ?= lo_descr.
+        IF lo_elem->absolute_name CS '/UI2/CL_JSON=>JSON'.
+          RETURN.
+        ENDIF.
+        IF lo_elem->type_kind CA 'cgndt'.
+          cv_data = escape_json_string( CONV string( cv_data ) ).
+        ENDIF.
+      WHEN cl_abap_typedescr=>kind_struct.
+        lo_struct ?= lo_descr.
+        lt_components = lo_struct->get_components( ).
+        LOOP AT lt_components INTO DATA(ls_comp).
+          ASSIGN COMPONENT ls_comp-name OF STRUCTURE cv_data TO <lv_comp>.
+          IF sy-subrc = 0.
+            escape_json_strings( CHANGING cv_data = <lv_comp> ).
+          ENDIF.
+        ENDLOOP.
+      WHEN cl_abap_typedescr=>kind_table.
+        ASSIGN cv_data TO <lt_tab>.
+        LOOP AT <lt_tab> ASSIGNING <ls_line>.
+          escape_json_strings( CHANGING cv_data = <ls_line> ).
+        ENDLOOP.
+    ENDCASE.
   ENDMETHOD.
 
   METHOD dispatch_data.
@@ -1442,18 +1704,27 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
 
     " 8. Count-only path (US4).
     IF ls_req-countonly = abap_true.
-      DATA(lv_count_payload) = VALUE string( ).
+      DATA ls_count     TYPE ty_select_count.
+      DATA ls_count_err TYPE ty_error.
       execute_count( EXPORTING is_meta = ls_meta
                                it_where = lt_where
-                     IMPORTING ev_payload = lv_count_payload ).
-      io_server->response->set_status( code = 200 reason = 'OK' ).
-      io_server->response->set_content_type( content_type = 'application/json' ).
-      io_server->response->set_cdata( data = lv_count_payload ).
+                     IMPORTING es_payload = ls_count
+                               ev_error   = ls_count_err ).
+      IF ls_count_err IS NOT INITIAL.
+        respond_error( io_server = io_server
+                       iv_status = 200
+                       iv_reason = 'OK'
+                       iv_code   = ls_count_err-error-code
+                       iv_msg    = ls_count_err-error-message ).
+      ELSE.
+        respond_json( io_server = io_server iv_status = 200 iv_reason = 'OK' is_payload = ls_count ).
+      ENDIF.
       RETURN.
     ENDIF.
 
     " 9. Run the data query.
-    DATA(lv_payload) = VALUE string( ).
+    DATA ls_sel     TYPE ty_select_result.
+    DATA ls_sel_err TYPE ty_error.
     TRY.
         execute_select( EXPORTING is_meta = ls_meta
                                   iv_fields_csv = lv_fields_csv
@@ -1461,7 +1732,8 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
                                   it_orderby = lt_orderby
                                   iv_limit = ls_req-limit
                                   iv_offset = ls_req-offset
-                        IMPORTING ev_payload = lv_payload ).
+                        IMPORTING es_payload = ls_sel
+                                  ev_error   = ls_sel_err ).
       CATCH cx_root INTO DATA(lx_dispatch_err).
         respond_error( io_server = io_server
                        iv_status = 500
@@ -1470,9 +1742,15 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
                        iv_msg  = |execute_select runtime error: { lx_dispatch_err->get_text( ) }| ).
         RETURN.
     ENDTRY.
-    io_server->response->set_status( code = 200 reason = 'OK' ).
-    io_server->response->set_content_type( content_type = 'application/json' ).
-    io_server->response->set_cdata( data = lv_payload ).
+    IF ls_sel_err IS NOT INITIAL.
+      respond_error( io_server = io_server
+                     iv_status = 200
+                     iv_reason = 'OK'
+                     iv_code   = ls_sel_err-error-code
+                     iv_msg    = ls_sel_err-error-message ).
+    ELSE.
+      respond_json( io_server = io_server iv_status = 200 iv_reason = 'OK' is_payload = ls_sel ).
+    ENDIF.
   ENDMETHOD.
 
   METHOD parse_data_query.
@@ -1974,10 +2252,9 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
             UP TO @lv_limit ROWS OFFSET @iv_offset.
         ENDIF.
       CATCH cx_root INTO DATA(lx_query).
-        " Runtime SQL failure — surface a structured QUERY_FAILED.
-        " (No escape(): cl_abap_format may not exist on older NetWeaver.)
-        DATA(lv_err_obj) = |\{ "status": "error", "error": \{ "code": "QUERY_FAILED", "message": "{ lx_query->get_text( ) }" \} \}|.
-        ev_payload = lv_err_obj.
+        ev_error = VALUE ty_error( status = 'error'
+                                   error = VALUE ty_error_body( code = 'QUERY_FAILED'
+                                                                message = lx_query->get_text( ) ) ).
         RETURN.
     ENDTRY.
 
@@ -1998,97 +2275,78 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
       lv_row_count = iv_limit.
     ENDIF.
 
-    " Build the JSON envelope.
-    " Projection fields from iv_fields_csv (the row type contains all fields;
-    " we emit only the projected ones here).
+    " Build the projected row set (only iv_fields_csv columns, in CSV order).
+    " The projected type reuses the full row type's component descriptors, so
+    " value serialization is native (/ui2/cl_json pretty_mode-none: uppercase
+    " field names, typed values — Q1 B).
     DATA(lt_out_fields) = VALUE string_table( ).
     SPLIT iv_fields_csv AT ',' INTO TABLE lt_out_fields.
 
-    " Build the fields array using CONCATENATE (most portable on all NetWeaver).
-    DATA lv_ff TYPE string.
-    DATA lv_fields_json TYPE string.
-    lv_fields_json = '['.
-    LOOP AT lt_out_fields INTO lv_ff.
-      IF sy-tabix > 1.
-        CONCATENATE lv_fields_json ',' '"' lv_ff '"' INTO lv_fields_json.
-      ELSE.
-        CONCATENATE lv_fields_json '"' lv_ff '"' INTO lv_fields_json.
-      ENDIF.
-    ENDLOOP.
-    CONCATENATE lv_fields_json ']' INTO lv_fields_json.
-
-    " excludedFields list (may be empty → '[]').
-    DATA lv_ex TYPE string.
-    DATA lv_excluded_json TYPE string.
-    lv_excluded_json = '['.
-    LOOP AT is_meta-excludedFields INTO lv_ex.
-      IF sy-tabix > 1.
-        CONCATENATE lv_excluded_json ',' '"' lv_ex '"' INTO lv_excluded_json.
-      ELSE.
-        CONCATENATE lv_excluded_json '"' lv_ex '"' INTO lv_excluded_json.
-      ENDIF.
-    ENDLOOP.
-    CONCATENATE lv_excluded_json ']' INTO lv_excluded_json.
-
+    DATA(lt_full_components) = lo_row_type->get_components( ).
+    DATA(lt_proj_components) = VALUE abap_component_tab( ).
     DATA lv_fname TYPE string.
-    DATA lv_meta_type TYPE string.
-    DATA lv_cell_json TYPE string.
-    DATA lv_rows_json TYPE string.
-    DATA lv_first TYPE abap_bool VALUE abap_true.
-    DATA lv_row_idx TYPE i VALUE 0.
-    DATA lv_first_cell TYPE abap_bool.
-    LOOP AT <lt_rows> ASSIGNING FIELD-SYMBOL(<ls_row>).
+    LOOP AT lt_out_fields INTO lv_fname.
+      READ TABLE lt_full_components INTO DATA(ls_comp) WITH KEY name = lv_fname.
+      IF sy-subrc = 0. APPEND ls_comp TO lt_proj_components. ENDIF.
+    ENDLOOP.
+    DATA(lo_proj_type) = cl_abap_structdescr=>create( lt_proj_components ).
+    DATA(lo_proj_table) = cl_abap_tabledescr=>create( lo_proj_type ).
+    DATA lr_proj TYPE REF TO data.
+    CREATE DATA lr_proj TYPE HANDLE lo_proj_table.
+    FIELD-SYMBOLS <lt_proj> TYPE ANY TABLE.
+    ASSIGN lr_proj->* TO <lt_proj>.
+
+    DATA(lv_row_idx) = 0.
+    FIELD-SYMBOLS:
+      <ls_src>      TYPE any,
+      <ls_dst>      TYPE any,
+      <lv_src_cell> TYPE any,
+      <lv_dst_cell> TYPE any.
+    LOOP AT <lt_rows> ASSIGNING <ls_src>.
       lv_row_idx = lv_row_idx + 1.
-      IF lv_row_idx > iv_limit.
-        EXIT.  " drop the limit+1 probe row
-      ENDIF.
-      IF lv_first = abap_false.
-        CONCATENATE lv_rows_json ',' INTO lv_rows_json.
-      ENDIF.
-      lv_first = abap_false.
-      CONCATENATE lv_rows_json '{' INTO lv_rows_json.
-      lv_first_cell = abap_true.
+      IF lv_row_idx > iv_limit. EXIT. ENDIF.  " drop the limit+1 probe row
+      INSERT INITIAL LINE INTO TABLE <lt_proj> ASSIGNING <ls_dst>.
       LOOP AT lt_out_fields INTO lv_fname.
-        ASSIGN COMPONENT lv_fname OF STRUCTURE <ls_row> TO FIELD-SYMBOL(<lv_cell>).
+        ASSIGN COMPONENT lv_fname OF STRUCTURE <ls_src> TO <lv_src_cell>.
         IF sy-subrc <> 0. CONTINUE. ENDIF.
-        lv_meta_type = ''.
-        READ TABLE lv_meta-fields INTO DATA(ls_cell_meta) WITH KEY name = lv_fname.
-        IF sy-subrc = 0. lv_meta_type = ls_cell_meta-dataType. ENDIF.
-        IF lv_first_cell = abap_false.
-          CONCATENATE lv_rows_json ',' INTO lv_rows_json.
-        ENDIF.
-        lv_first_cell = abap_false.
-        lv_cell_json = serialize_value( iv_value = <lv_cell> iv_type = lv_meta_type ).
-        CONCATENATE lv_rows_json '"' lv_fname '":' lv_cell_json INTO lv_rows_json.
+        ASSIGN COMPONENT lv_fname OF STRUCTURE <ls_dst> TO <lv_dst_cell>.
+        IF sy-subrc <> 0. CONTINUE. ENDIF.
+        <lv_dst_cell> = <lv_src_cell>.
       ENDLOOP.
-      CONCATENATE lv_rows_json '}' INTO lv_rows_json.
     ENDLOOP.
 
-    " Final envelope — CONCATENATE, one statement per line.
+    " Old /UI2/CL_JSON (vhcala4hci) does not escape — escape char-like cells.
+    IF escape_probe_needed( ) = abap_true.
+      escape_json_strings( CHANGING cv_data = <lt_proj> ).
+    ENDIF.
+
+    " Serialize rows independently: pretty_mode-none keeps DDIC-uppercase field
+    " names with native typed values; embedded as a partial JSON piece below.
+    DATA(lv_rows_json) = /ui2/cl_json=>serialize( data        = <lt_proj>
+                                                  pretty_name = /ui2/cl_json=>pretty_mode-none ).
+
+    " Envelope — camelCase naming via serialize_response at the dispatcher.
     DATA lv_object_type TYPE string.
     IF lv_meta-tabclass = 'VIEW'.
       lv_object_type = 'VIEW'.
     ELSE.
       lv_object_type = 'TABL'.
     ENDIF.
-    DATA lv_trunc_str TYPE string.
-    IF lv_truncated = abap_true.
-      lv_trunc_str = 'true'.
-    ELSE.
-      lv_trunc_str = 'false'.
-    ENDIF.
-    DATA lv_rc_str TYPE string.
-    lv_rc_str = |{ lv_row_count }|.
-    DATA lv_env TYPE string.
-    CONCATENATE '{"status":"success","data":{"table":"' lv_meta-name '","objectType":"' lv_object_type '",' INTO lv_env.
-    CONCATENATE lv_env '"fields":' lv_fields_json INTO lv_env.
-    CONCATENATE lv_env ',"rows":[' lv_rows_json ']' INTO lv_env.
-    CONCATENATE lv_env ',"rowCount":' lv_rc_str INTO lv_env.
-    CONCATENATE lv_env ',"truncated":' lv_trunc_str INTO lv_env.
-    CONCATENATE lv_env ',"excludedFields":' lv_excluded_json ',"durationMs":1}}' INTO lv_env.
-    ev_payload = lv_env.
+    es_payload = VALUE ty_select_result(
+      status = 'success'
+      data = VALUE ty_select_result_data(
+        table           = lv_meta-name
+        object_type     = lv_object_type
+        fields          = lt_out_fields
+        rows            = lv_rows_json
+        row_count       = lv_row_count
+        truncated       = lv_truncated
+        excluded_fields = is_meta-excludedFields
+        duration_ms     = 1 ) ).
     CATCH cx_root INTO DATA(lx_exec_top).
-      ev_payload = |\{ "status": "error", "error": \{ "code": "QUERY_FAILED", "message": "execute_select: { lx_exec_top->get_text( ) }" \} \}|.
+      ev_error = VALUE ty_error( status = 'error'
+                                 error = VALUE ty_error_body( code = 'QUERY_FAILED'
+                                                              message = |execute_select: { lx_exec_top->get_text( ) }| ) ).
       RETURN.
     ENDTRY.
   ENDMETHOD.
@@ -2140,77 +2398,18 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
           SELECT COUNT(*) FROM (lv_meta-name) WHERE (lt_where_tab) INTO @lv_count.
         ENDIF.
       CATCH cx_root INTO DATA(lx_q).
-        ev_payload = |\{ "status": "error", "error": \{ "code": "QUERY_FAILED", "message": "{ escape( val = lx_q->get_text( ) format = cl_abap_format=>e_html_js ) }" \} \}|.
+        ev_error = VALUE ty_error( status = 'error'
+                                   error = VALUE ty_error_body( code = 'QUERY_FAILED'
+                                                                message = lx_q->get_text( ) ) ).
         RETURN.
     ENDTRY.
 
-    ev_payload =
-      |\{ "status":"success","data":\{ "table":"{ lv_meta-name }","count":{ lv_count },"durationMs":1 \} \}|.
-  ENDMETHOD.
-
-  METHOD serialize_value.
-    " 016: deterministic string serialization per research R5.
-    " All values returned as JSON strings with stable formatting:
-    "   d      → 'YYYYMMDD'
-    "   t      → 'HHMMSS'
-    "   i/int8 → decimal
-    "   p      → decimal with '.' separator
-    "   f      → decimal (use WRITE ... TO)
-    "   c/n    → trimmed trailing spaces
-    "   x      → lowercase hex
-    "   clnt   → as-is
-    DATA(lv_type_kind) = cl_abap_typedescr=>typekind_dref.
-    TRY.
-        DATA(lv_descr) = cl_abap_typedescr=>describe_by_data( iv_value ).
-        lv_type_kind = lv_descr->type_kind.
-      CATCH cx_root.
-        " lv_type_kind stays at the default (data reference kind).
-    ENDTRY.
-
-    " iv_type is the DDIC datatype (from DD03L); default to type_kind if not supplied.
-    DATA(lv_ddic_type) = iv_type.
-    IF lv_ddic_type IS INITIAL.
-      lv_ddic_type = lv_type_kind.
-    ENDIF.
-
-    DATA(lv_str) = VALUE string( ).
-    CASE lv_ddic_type.
-      WHEN 'D' OR 'DATS'.
-        " Date — YYYYMMDD.
-        lv_str = |"{ iv_value WIDTH = 8 }"|.
-      WHEN 'T' OR 'TIMS'.
-        " Time — HHMMSS.
-        lv_str = |"{ iv_value WIDTH = 6 }"|.
-      WHEN 'I' OR 'INT8' OR 'INT4' OR 'INT2' OR 'INT1' OR 'b' OR 's' OR '8'.
-        " Integer — decimal.
-        lv_str = |{ iv_value }|.
-      WHEN 'P' OR 'DEC' OR 'QUAN' OR 'CURR' OR 'FLTP' OR 'F'.
-        " Decimal — use cl_abap_conv_out_ce to force '.' separator.
-        DATA(lv_value_string) = CONV string( iv_value ).
-        " lo_conv->get( ) is not available on all NetWeaver versions; for vhcala4hci
-        " simply format the string with condense + trailing-space trim. The
-        " numeric formatting follows SAP's default (locale-independent '.' decimal).
-        TRY.
-            lv_str = |"{ lv_value_string }"|.
-          CATCH cx_root.
-            lv_str = |"{ lv_value_string }"|.
-        ENDTRY.
-      WHEN 'C' OR 'N' OR 'CLNT' OR 'g' OR 'CHAR' OR 'NUMC'.
-        " Char / numc — trim trailing spaces, JSON-stringify.
-        lv_str = |"{ condense( val = CONV string( iv_value ) del = ` ` ) }"|.
-      WHEN 'X' OR 'RAW' OR 'y' OR 'xstring' OR 'RSTR' OR 'LRAW'.
-        " RAW — hex (lowercase).
-        lv_str = |"{ iv_value }"|.
-      WHEN OTHERS.
-        " Fallback — stringify without quotes, then JSON-escape.
-        lv_str = |"{ condense( val = CONV string( iv_value ) del = ` ` ) }"|.
-    ENDCASE.
-
-    " The caller already emits the key as "key":value; here lv_str already holds
-    " the quoted JSON value (e.g. "001"). Do NOT re-escape quotes — that would
-    " turn "001" into \"001\". If a value contains a literal double-quote the
-    " output may be invalid JSON for that cell; acceptable for v1.
-    rv_str = lv_str.
+    es_payload = VALUE ty_select_count(
+      status = 'success'
+      data = VALUE ty_select_count_data(
+        table       = lv_meta-name
+        count       = lv_count
+        duration_ms = 1 ) ).
   ENDMETHOD.
 
 ENDCLASS.

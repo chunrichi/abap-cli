@@ -67,7 +67,8 @@ export interface SelectResult {
   table: string;
   objectType: 'TABL' | 'VIEW';
   fields: string[];
-  rows: Record<string, string>[];
+  /** Native typed cell values (string | number | boolean | null) — 017 Q1 B. */
+  rows: Record<string, unknown>[];
   rowCount: number;
   truncated: boolean;
   count?: number;
@@ -86,7 +87,7 @@ interface DataQuerySuccess {
   table: string;
   objectType: 'TABL' | 'VIEW';
   fields?: string[];
-  rows?: Record<string, string>[];
+  rows?: Record<string, unknown>[];
   rowCount?: number;
   truncated?: boolean;
   count?: number;
