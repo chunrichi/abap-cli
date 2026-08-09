@@ -1,0 +1,30 @@
+# abap-cli push --all 跳过规则样板（复制到项目根 .abapignore）
+# 语法遵循 ignore npm 包（与 .gitignore 类似）
+
+# build / dist
+dist/
+build/
+out/
+
+# 第三方依赖
+node_modules/
+
+# 编辑器 / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.tmp
+
+# 测试 fixtures
+test/fixtures/
+tmp/
+
+# 本地配置
+.env
+.abap.json
+
+# 备份
+*.bak
+*.orig
+*.rej
