@@ -78,7 +78,7 @@ abap connection import profiles.json --overwrite
 ```json
 {
   "status": "ok",
-  "meta": { "command": "connection", "version": "0.7.0", "timestamp": "2026-08-06T23:10:00.000Z", "durationMs": 12, "warnings": [] },
+  "meta": { "command": "connection", "version": "0.1.0", "timestamp": "2026-08-06T23:10:00.000Z", "durationMs": 12, "warnings": [] },
   "data": {
     "deleted": "dev",
     "passwordCleaned": true

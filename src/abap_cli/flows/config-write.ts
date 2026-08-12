@@ -7,7 +7,7 @@ import { CliError, printResult } from '../output/json.js';
 import { collectWarning } from '../output/meta.js';
 import { assertValidProfile } from '../config/validation.js';
 import type { ProbeLayerResult } from '../clients/probe.js';
-import { checkIcfDeployment, type IcfDeploymentInfo } from '../icf/service-version.js';
+import { checkIcfDeployment, ICF_SERVICE_VERSION, type IcfDeploymentInfo } from '../icf/service-version.js';
 import { probeTextpoolCapability, recordCapability } from '../textpool/textpool-capability.js';
 
 interface WorkspaceConfig {
@@ -157,7 +157,7 @@ export async function icfDeploymentCheck(jsonOutput: boolean): Promise<IcfDeploy
     // Unreachable degraded check — never fails init.
     icf = {
       status: 'unreachable',
-      expectedVersion: '0.1.0',
+      expectedVersion: ICF_SERVICE_VERSION,
       error: { code: 'ICF_CHECK_DEGRADED', message: error instanceof Error ? error.message : String(error) },
     };
   }

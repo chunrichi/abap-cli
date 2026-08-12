@@ -2,7 +2,7 @@
 name: abap-data
 description: abap-cli 消费 SAP 能力 — `select`（只读表数据查询，SE16N 等价）、`run`（在 SAP 端执行 classrun 或静态方法）、`deploy`（部署自建 ICF 服务到 SAP）。use when asking how to query table data / SE16N equivalent / run a class on SAP / classrun / invoke a static method / deploy ICF service / check wrapper deployment status.
 metadata:
-  version: "0.7.0"
+  version: "0.1.0"
   scope: sap
   commands: [select, run, deploy]
 ---

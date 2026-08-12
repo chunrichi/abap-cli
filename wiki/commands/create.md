@@ -85,7 +85,7 @@ abap create local CLAS ZCL_DRAFT --template public-method --dir src/
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap create", "version": "0.7.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 1200, "warnings": [] },
+  "meta": { "command": "abap create", "version": "0.1.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 1200, "warnings": [] },
   "data": {
     "object": "ZCL_MY_CLASS",
     "type": "CLAS",
@@ -104,7 +104,7 @@ abap create local CLAS ZCL_DRAFT --template public-method --dir src/
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap create", "version": "0.7.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 900, "warnings": [] },
+  "meta": { "command": "abap create", "version": "0.1.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 900, "warnings": [] },
   "data": {
     "object": "ZDOMA_CODE",
     "type": "DOMA",
@@ -119,7 +119,7 @@ abap create local CLAS ZCL_DRAFT --template public-method --dir src/
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap create local", "version": "0.7.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 20, "warnings": [] },
+  "meta": { "command": "abap create local", "version": "0.1.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 20, "warnings": [] },
   "data": {
     "object": "ZCL_DRAFT",
     "type": "CLAS",
@@ -135,7 +135,7 @@ abap create local CLAS ZCL_DRAFT --template public-method --dir src/
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap create", "version": "0.7.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 84, "warnings": [] },
+  "meta": { "command": "abap create", "version": "0.1.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 84, "warnings": [] },
   "data": {
     "schemaVersion": 1,
     "command": "create",
@@ -166,7 +166,7 @@ abap create local CLAS ZCL_DRAFT --template public-method --dir src/
 ```json
 {
   "status": "error",
-  "meta": { "command": "abap create", "version": "0.7.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 300, "warnings": [] },
+  "meta": { "command": "abap create", "version": "0.1.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 300, "warnings": [] },
   "error": {
     "code": "OBJECT_EXISTS",
     "category": "OBJECT_EXISTS",

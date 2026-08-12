@@ -17,7 +17,7 @@ Every `--json` envelope carries a `meta` block (`command`, `version`, `timestamp
 
 ```jsonc
 // Success (stdout)
-{ "status": "success", "meta": { "command": "abap pull", "version": "0.7.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { ... } }
+{ "status": "success", "meta": { "command": "abap pull", "version": "0.1.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { ... } }
 
 // Failure (stderr — stdout is empty)
 { "status": "error", "meta": { ... }, "error": { "code": "...", "category": "...", "message": "...", "nextSteps": [...], ... } }
@@ -212,7 +212,7 @@ abap select --schema
 ```jsonc
 {
   "status": "success",
-  "meta": { "command": "abap select", "version": "0.7.0", "timestamp": "...", "durationMs": 42, "warnings": [] },
+  "meta": { "command": "abap select", "version": "0.1.0", "timestamp": "...", "durationMs": 42, "warnings": [] },
   "data": {
     "table": "ZTAB_FIXTURE", "objectType": "TABL",
     "fields": ["MANDT", "ID", "STATUS", "AMOUNT", "NAME", "CREATED"],

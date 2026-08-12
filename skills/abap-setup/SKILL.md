@@ -2,7 +2,7 @@
 name: abap-setup
 description: abap-cli 接入与诊断 — 配置工作区（`abap config` / `connection`）、诊断环境（`abap doctor`）、管理传输请求（`abap transport`）。use when asking how to connect to SAP / configure a workspace / add a system profile / diagnose the CLI environment / list / create / show / resolve / assign / release a transport request.
 metadata:
-  version: "0.7.0"
+  version: "0.1.0"
   scope: local
   commands: [config, connection, doctor, transport]
 ---

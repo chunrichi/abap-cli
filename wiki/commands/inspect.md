@@ -108,7 +108,7 @@ abap inspect ZCL_FOO --includes --locks --package --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap inspect", "version": "0.7.0", ... },
+  "meta": { "command": "abap inspect", "version": "0.1.0", ... },
   "data": {
     "metadata": { "object": "ZCL_FOO", "type": "CLAS", "uri": "/sap/bc/adt/oo/classes/zcl_foo" },
     "includes": ["main", "definitions", "implementations", "testclasses"],

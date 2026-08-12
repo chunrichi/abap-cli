@@ -76,7 +76,7 @@ abap config init
   "status": "ok",
   "meta": {
     "command": "config",
-    "version": "0.7.0",
+    "version": "0.1.0",
     "timestamp": "2026-08-06T23:10:00.000Z",
     "durationMs": 42,
     "warnings": []

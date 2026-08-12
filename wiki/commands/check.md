@@ -65,7 +65,7 @@ abap check --all --strict
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap check", "version": "0.7.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 312, "warnings": [] },
+  "meta": { "command": "abap check", "version": "0.1.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 312, "warnings": [] },
   "data": {
     "issues": [],
     "failure": false,
@@ -79,7 +79,7 @@ abap check --all --strict
 ```json
 {
   "status": "error",
-  "meta": { "command": "abap check", "version": "0.7.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 501, "warnings": [] },
+  "meta": { "command": "abap check", "version": "0.1.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 501, "warnings": [] },
   "error": {
     "code": "VALIDATION_ERROR",
     "category": "VALIDATION_ERROR",

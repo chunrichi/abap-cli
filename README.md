@@ -71,7 +71,7 @@ abap push src/zcl_my_class/zcl_my_class.clas.abap --tr <REQUEST_NUMBER>
 
 All commands support `--json` for structured output (Agent-first).
 
-## Scope (v0.7)
+## Scope (v0.1)
 
 - **Source objects** (Class, Interface, Program, Function Group) are fully supported for pull / push / check / create via the ADT REST API
 - **Create** (`abap create`) supports CLAS/INTF/PROG/FUGR: creates the object with a default skeleton, pulls it locally and activates it, so it can be immediately edited and pushed back (create → pull → edit → push loop)

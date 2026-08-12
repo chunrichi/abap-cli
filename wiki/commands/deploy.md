@@ -120,7 +120,7 @@ abap deploy --force --yes
   "status": "success",
   "meta": {
     "command": "abap deploy",
-    "version": "0.7.0",
+    "version": "0.1.0",
     "timestamp": "2026-08-09T22:40:00.000Z",
     "durationMs": 8400
   },

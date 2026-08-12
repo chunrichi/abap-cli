@@ -119,7 +119,7 @@ abap pull ZCL_MY_NEW_CLASS
 abap push src/zcl_my_new_class/zcl_my_new_class.clas.abap --tr DEVK900001
 ```
 
-## What's Supported (v0.6)
+## What's Supported (v0.1)
 
 - **Source objects** — Class (CLAS), Interface (INTF), Program (PROG), Function Group (FUGR) for pull / push / check / create via the ADT REST API
 - **Transport management** — `abap transport list` / `create` / `show` / `resolve` / `assign`

@@ -65,7 +65,7 @@ abap doctor --system dev
 ```json
 {
   "status": "ok",
-  "meta": { "command": "doctor", "version": "0.7.0", "timestamp": "2026-08-06T23:10:00.000Z", "durationMs": 18, "warnings": [] },
+  "meta": { "command": "doctor", "version": "0.1.0", "timestamp": "2026-08-06T23:10:00.000Z", "durationMs": 18, "warnings": [] },
   "data": {
     "environment": [
       { "key": "env.node", "status": "ok", "message": "" },

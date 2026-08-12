@@ -98,7 +98,7 @@ abap transport assign ZCL_DEMO --tr NDK123456 --dry-run
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap transport list", "version": "0.7.0", "timestamp": "2026-08-07T00:39:21.000Z", "durationMs": 300, "warnings": [] },
+  "meta": { "command": "abap transport list", "version": "0.1.0", "timestamp": "2026-08-07T00:39:21.000Z", "durationMs": 300, "warnings": [] },
   "data": {
     "workbench": [
       { "number": "DEVK900001", "description": "My feature work", "status": "D", "owner": "DEV" }
@@ -113,7 +113,7 @@ abap transport assign ZCL_DEMO --tr NDK123456 --dry-run
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap transport create", "version": "0.7.0", "timestamp": "2026-08-07T00:39:21.000Z", "durationMs": 500, "warnings": [] },
+  "meta": { "command": "abap transport create", "version": "0.1.0", "timestamp": "2026-08-07T00:39:21.000Z", "durationMs": 500, "warnings": [] },
   "data": { "transport": "DEVK900123", "description": "My feature work", "package": "$TMP" }
 }
 ```
@@ -123,7 +123,7 @@ abap transport assign ZCL_DEMO --tr NDK123456 --dry-run
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap transport create", "version": "0.7.0", "timestamp": "2026-08-07T00:39:21.000Z", "durationMs": 20, "warnings": [] },
+  "meta": { "command": "abap transport create", "version": "0.1.0", "timestamp": "2026-08-07T00:39:21.000Z", "durationMs": 20, "warnings": [] },
   "data": { "transport": null, "description": "My feature work", "package": "ZTMP", "dryRun": true, "ref": "/sap/bc/adt/packages/ZTMP" }
 }
 ```
@@ -133,7 +133,7 @@ abap transport assign ZCL_DEMO --tr NDK123456 --dry-run
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap transport show", "version": "0.7.0", "timestamp": "2026-08-07T00:39:21.000Z", "durationMs": 250, "warnings": [] },
+  "meta": { "command": "abap transport show", "version": "0.1.0", "timestamp": "2026-08-07T00:39:21.000Z", "durationMs": 250, "warnings": [] },
   "data": {
     "number": "NDK123456",
     "description": "Mock request 1",
@@ -152,7 +152,7 @@ abap transport assign ZCL_DEMO --tr NDK123456 --dry-run
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap transport resolve", "version": "0.7.0", "timestamp": "2026-08-07T00:39:21.000Z", "durationMs": 200, "warnings": [] },
+  "meta": { "command": "abap transport resolve", "version": "0.1.0", "timestamp": "2026-08-07T00:39:21.000Z", "durationMs": 200, "warnings": [] },
   "data": {
     "object": "ZCL_DEMO",
     "transports": [
@@ -167,7 +167,7 @@ abap transport assign ZCL_DEMO --tr NDK123456 --dry-run
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap transport assign", "version": "0.7.0", "timestamp": "2026-08-07T00:39:21.000Z", "durationMs": 400, "warnings": [] },
+  "meta": { "command": "abap transport assign", "version": "0.1.0", "timestamp": "2026-08-07T00:39:21.000Z", "durationMs": 400, "warnings": [] },
   "data": { "object": "ZCL_DEMO", "transport": "NDK123456", "assigned": true }
 }
 ```
@@ -175,7 +175,7 @@ abap transport assign ZCL_DEMO --tr NDK123456 --dry-run
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap transport assign", "version": "0.7.0", "timestamp": "2026-08-07T00:39:21.000Z", "durationMs": 300, "warnings": [] },
+  "meta": { "command": "abap transport assign", "version": "0.1.0", "timestamp": "2026-08-07T00:39:21.000Z", "durationMs": 300, "warnings": [] },
   "data": { "object": "ZCL_DEMO", "transport": "NDK123456", "assigned": false }
 }
 ```
@@ -185,7 +185,7 @@ abap transport assign ZCL_DEMO --tr NDK123456 --dry-run
 ```json
 {
   "status": "error",
-  "meta": { "command": "abap transport create", "version": "0.7.0", "timestamp": "2026-08-07T00:39:21.000Z", "durationMs": 10, "warnings": [] },
+  "meta": { "command": "abap transport create", "version": "0.1.0", "timestamp": "2026-08-07T00:39:21.000Z", "durationMs": 10, "warnings": [] },
   "error": {
     "code": "VALIDATION_ERROR",
     "category": "VALIDATION_ERROR",
@@ -200,7 +200,7 @@ abap transport assign ZCL_DEMO --tr NDK123456 --dry-run
 ```json
 {
   "status": "error",
-  "meta": { "command": "abap transport show", "version": "0.7.0", "timestamp": "2026-08-07T00:39:21.000Z", "durationMs": 200, "warnings": [] },
+  "meta": { "command": "abap transport show", "version": "0.1.0", "timestamp": "2026-08-07T00:39:21.000Z", "durationMs": 200, "warnings": [] },
   "error": {
     "code": "NOT_FOUND",
     "category": "NOT_FOUND",

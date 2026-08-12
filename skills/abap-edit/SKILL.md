@@ -2,7 +2,7 @@
 name: abap-edit
 description: abap-cli 源码对象完整生命周期 — `search` / `pull` / `push` / `check` / `create` / `activate` / `inspect` / `diff` / `status` / `sync` / `create local`，覆盖 CLAS / PROG / INTF / FUGR 源码对象以及 DOMA / DTEL / TABL / STRU DDIC 定义。use when asking how to edit SAP source code / download an ABAP class / push a local file / run syntax check or ATC / create a new object / activate inactive parts / inspect metadata / diff local vs SAP / sync status.
 metadata:
-  version: "0.7.0"
+  version: "0.1.0"
   scope: sap
   commands: [search, pull, push, check, create, activate, inspect, diff, status, sync, "create local"]
 ---

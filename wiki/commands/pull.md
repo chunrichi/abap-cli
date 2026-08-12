@@ -89,7 +89,7 @@ abap pull ZCL_DEMO --type CLAS --remote PRD --overwrite
   "status": "success",
   "meta": {
     "command": "abap pull",
-    "version": "0.7.0",
+    "version": "0.1.0",
     "timestamp": "2026-08-06T23:21:15.000Z",
     "durationMs": 42,
     "warnings": []

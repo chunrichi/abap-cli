@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- **npm 发布准备** — `files` 增加 `abap/src`（`abap deploy` 运行期依赖的打包 ABAP 源码）；补 `repository` / `homepage` / `bugs` 元数据。首次发布版本 `0.1.0`（包名 `abap-cli` 已确认可用）。
 - **Skill/agent 分发包 v1.1 自包含重构（019）** — 顶层 `skills/` `agents/` 提供 3 个 skill（`abap-setup` / `abap-edit` / `abap-data`）覆盖全部 18 个 CLI 命令 + 1 个编排 agent（`abap-developer`）；自包含结构（SKILL.md + references/scripts/assets），frontmatter 遵循 agentskills.io 开放标准，跨 Claude Code / Cursor / Copilot / Continue / Codex 兼容。整合子命令、npm 资源打包、CI 校验推迟至后续。
 - **Skill bundle 强化（020）** — 补全 4 个缺失 wiki 命令页（`deploy` / `inspect` / `diff` / `sync`）；新增 `test/unit/skill-bundle.test.ts`（25 用例）自动校验 frontmatter / 目录一致 / 命令覆盖 / 路径约束 / 行数限制。所有 91 个测试文件 / 495 个用例全过。
 - **SAP JSON 生成统一为 `/ui2/cl_json`（017）** — 三个 ABAP 类（`ZCL_ABAP_VIBE_ICF` / `_RUNNER` / `_SETUP`）约 74 处手工拼接统一为 `/ui2/cl_json=>serialize`；DDIC 拉取改结构化 wire 类型。vhcala4hci 旧版不转义 `"` / `\` ——新增一次探测 + 自转义；新版无需转义。服务版本 0.2.0 → 0.4.0。
@@ -37,7 +38,7 @@
 - **错误契约 CI 强制** — 命令边界目录每个 `throw new <Error>` 必须构造 `CliError`，由 `test/unit/cli-error-boundary.test.ts` 强制（lint 扫 + allow-list）。`config/user-config.ts` 和 `formats/file-resolver.ts` 已迁 `CliError`。
 - **stdout / stderr 分离审计** — `--json` 失败路径原先会泄漏纯文本帮助到 stdout；commander 顶层错误处理重构为 `src/abap_cli/top-error.ts`，所有路径统一走它。`--json` 模式保持 stdout 空，stderr 走 JSON 信封 + 帮助正文。
 
-## [0.7.0] - 2026-08-05
+## [0.1.0] - 2026-08-05
 
 ### Added
 - **统一 CLI 输出契约（012）** — 每个 `--json` 信封带统一 `meta` 块（`command` / `version` / `timestamp` / `durationMs` / `warnings`）；错误带显式 `error.category` 1:1 映射退出码。契约权威文档 `specs/012-unify-cli-output-contract/contracts/cli-output.md`，由 `output-contract-audit.test.ts` 强制。
@@ -74,7 +75,7 @@
 | 无形状异常 → `SAP_ERROR`（exit 6） | → `UNKNOWN`（exit 1） | 修复：无法归类的异常不再伪装 SAP 错误 |
 | `OBJECT_EXISTS` / `FILE_EXISTS` / `COMMAND_MOVED` / `PUSH_FAILED` | 保留，规范化 | 类别与退出码不变 |
 
-## [0.6.0] - 2026-08-04
+## [0.0.6] - 2026-08-04
 
 ### Added
 - `abap doctor` — 一键环境诊断（environment / config / connection 三节，逐项 ok / err + 优先级 `nextSteps`）；`--fix` 仅应用安全可逆修复
@@ -93,7 +94,7 @@
 - Mock 端到端：六个命令离线验证
 - 真实 SAP（HANA vhcala4hci）：`auth test` tls / auth / adt ok（icf 404 —— ICF 未部署，预期）；其余命令 ok
 
-## [0.5.0] - 2026-08-03
+## [0.0.5] - 2026-08-03
 
 ### Added
 - `abap search <query>` — 经 ADT 仓库搜索 API 按名搜索 ABAP 对象，返回 `{ name, type, uri, description, packageName }`；`--type` 过滤、`--max` 上限（默认 100）；空结果为成功；查询字符串透传 SAP
@@ -102,7 +103,7 @@
 ### Verified
 - Mock 端到端：基本搜索、前缀、空结果、`--type` 归一、`--max` 截断、默认上限、空查询 `USAGE`、`--max abc` `INVALID_ARGUMENT`、无头 `--json` agent 循环（search → pull）
 
-## [0.4.0] - 2026-08-02
+## [0.0.4] - 2026-08-02
 
 ### Added
 - `abap transport list [--open]` — 列出当前用户的 transport 请求（workbench + customizing），含请求号 / 描述 / 状态 / 属主；`--open` 仅留未释放
@@ -114,7 +115,7 @@
 - Mock 端到端：list / create / 闭环（list → create → push `--tr`）/ `NO_TRANSPORT` 路径 / 无头 `--json` agent 循环
 - 真实 SAP（HANA vhcala4hci）：创建本地请求、闭环验证、dogfooding 循环（CLI transport create → pull → edit → push `--tr`）
 
-## [0.3.0] - 2026-08-02
+## [0.0.3] - 2026-08-02
 
 ### Added
 - `abap create <type> <name>` — 经 ADT REST API 在 SAP 中创建新源对象（CLAS / INTF / PROG / FUGR），配 `--package` / `--description` / `--tr` / `--no-activate` / `--json`
@@ -129,7 +130,7 @@
 - Mock 端到端：create → pull 往返、edit → push 迭代、重复 create → `OBJECT_EXISTS`、`--no-activate`、`NO_TRANSPORT`、未知 / DDIC 类型拒绝、无头 agent 循环
 - 真实 SAP（HANA 4.0）端到端：pull 真实程序 + 类（5 include）、往返一致性、激活、transport 回退、经 `abap check` 的真实语法错误检测
 
-## [0.2.0] - 2026-08-02
+## [0.0.2] - 2026-08-02
 
 ### Added
 - `abap pull` — 下载源对象（Class / Interface / Program / Function Group）到 `src/`，全部类 include，abap-file-format 命名
@@ -149,7 +150,7 @@
 ### Verified
 - 真实 SAP（HANA 4.0）端到端：pull 真实程序 + 类（5 include）、往返一致性、激活、transport 回退、经 `abap check` 的真实语法错误检测
 
-## [0.1.0] - 2026-07-31
+## [0.0.1] - 2026-07-31
 
 ### Added
 - 三层架构（CLI / SAP / Agent）初始项目结构

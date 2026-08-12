@@ -77,7 +77,7 @@ abap search 'ZCL_*' --json
   "status": "success",
   "meta": {
     "command": "abap search",
-    "version": "0.7.0",
+    "version": "0.1.0",
     "timestamp": "2026-08-07T00:33:34.000Z",
     "durationMs": 311,
     "warnings": []

@@ -1,6 +1,6 @@
 {
   "name": "abap-cli",
-  "version": "0.7.0",
+  "version": "0.1.0",
   "description": "CLI tool for ABAP vibe coding — agent-driven ABAP development in any agent",
   "type": "module",
   "main": "dist/src/abap_cli/index.js",
@@ -8,8 +8,17 @@
     "abap": "dist/src/abap_cli/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "abap/src"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chunrichi/abap-cli.git"
+  },
+  "homepage": "https://github.com/chunrichi/abap-cli#readme",
+  "bugs": {
+    "url": "https://github.com/chunrichi/abap-cli/issues"
+  },
   "engines": {
     "node": ">=18"
   },

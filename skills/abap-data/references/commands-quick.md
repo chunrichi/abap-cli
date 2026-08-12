@@ -174,7 +174,7 @@ abap deploy --package ZABAP_VIBE --tr DEVK900001 --yes
 
 ### ICF 服务版本
 
-- 0.7.0 → CLI `ICF_SERVICE_VERSION` / handler `gc_version`
+- 0.1.0 → CLI `ICF_SERVICE_VERSION` / handler `gc_version`
 - `abap deploy` 自动创建/更新 `ZCL_ABAP_VIBE_ICF` + `ZCL_ABAP_VIBE_ICF_SETUP` + `ZCL_ABAP_VIBE_RUNNER`（013 + 015 + 016 + 017 累积）
 
 ### 状态流转
