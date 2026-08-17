@@ -65,10 +65,10 @@ abap create PROG ZREPORT --package $TMP --description "Report" --template report
 abap create CLAS ZCL_VALIDATE --package ZPKG --description "check" --check-only
 
 # DDIC：从 abap-file-format JSON 创建数据元素（$TMP 免 transport）
-abap create DTEL ZDTEL_NAME --file src/zdtel_name.dtel.json --package $TMP
+abap create DTEL ZDTEL_NAME --file src/dtel/zdtel_name.dtel.json --package $TMP
 
 # DDIC：非 $TMP 包必须给 transport
-abap create DOMA ZDOMA_CODE --file src/zdoma_code.doma.json --package ZPKG --tr A4HK900116
+abap create DOMA ZDOMA_CODE --file src/doma/zdoma_code.doma.json --package ZPKG --tr A4HK900116
 
 # agent 自省：通用 schema 与类型维度
 abap create --schema
@@ -94,7 +94,7 @@ abap create local CLAS ZCL_DRAFT --template public-method --dir src/
     "transport": "A4HK900116",
     "activated": true,
     "template": null,
-    "localFile": "src/zcl_my_class/zcl_my_class.clas.abap"
+    "localFile": "src/clas/zcl_my_class/zcl_my_class.clas.abap"
   }
 }
 ```
@@ -109,7 +109,7 @@ abap create local CLAS ZCL_DRAFT --template public-method --dir src/
     "object": "ZDOMA_CODE",
     "type": "DOMA",
     "action": "created",
-    "file": "src/zdoma_code.doma.json"
+    "file": "src/doma/zdoma_code.doma.json"
   }
 }
 ```
@@ -124,7 +124,7 @@ abap create local CLAS ZCL_DRAFT --template public-method --dir src/
     "object": "ZCL_DRAFT",
     "type": "CLAS",
     "template": "public-method",
-    "file": "src/zcl_draft/zcl_draft.clas.abap",
+    "file": "src/clas/zcl_draft/zcl_draft.clas.abap",
     "experimental": true
   }
 }

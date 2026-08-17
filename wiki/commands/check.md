@@ -46,15 +46,15 @@ abap check --files <f...>                 # 父命令快捷方式 = check syntax
 
 ```bash
 # 默认语法检查（对 SAP）— 子命令形式
-abap check syntax src/zcl_demo.clas.abap
+abap check syntax src/clas/zcl_demo.clas.abap
 # 快捷方式（父命令 --files）
-abap check --files src/zcl_demo.clas.abap
+abap check --files src/clas/zcl_demo.clas.abap
 
 # 本地校验，不连 SAP
-abap check content src/zcl_demo.clas.abap
+abap check content src/clas/zcl_demo.clas.abap
 
 # ATC 检查并落盘原始 worklist（默认路径）
-abap check atc src/zcl_demo.clas.abap --variant Z_ATC_VAR --out
+abap check atc src/clas/zcl_demo.clas.abap --variant Z_ATC_VAR --out
 
 # 全量检查 + 把 warning 当失败
 abap check syntax --all --strict
@@ -82,7 +82,7 @@ abap check syntax --all --strict
     "message": "1 issue(s) found across 1 file(s)",
     "details": {
       "issues": [
-        { "file": "src/zcl_demo.clas.abap", "line": 12, "severity": "warning", "code": "check_style", "message": "Method is too long" }
+        { "file": "src/clas/zcl_demo.clas.abap", "line": 12, "severity": "warning", "code": "check_style", "message": "Method is too long" }
       ],
       "files": 1,
       "out": "/Users/lei/proj/.abap/atc/Z_ATC_VAR-20260817T120000.json"

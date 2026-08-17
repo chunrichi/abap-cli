@@ -101,7 +101,7 @@ describe('abap pull FUGR (abap-file-format layout)', () => {
     const res = await runCommand(program, ['pull', 'ZFG_WECHAT_TABLE', '--type', 'FUGR', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
 
-    const dir = path.join(cwd, 'src', 'zfg_wechat_table');
+    const dir = path.join(cwd, 'src', 'fugr', 'zfg_wechat_table');
     const expected = [
       'zfg_wechat_table.fugr.json',
       'zfg_wechat_table.fugr.saplzfg_wechat_table.reps.abap',
@@ -146,7 +146,7 @@ describe('abap pull FUGR (abap-file-format layout)', () => {
     const res = await runCommand(program, ['pull', 'ZFG_WECHAT_TABLE', '--type', 'FUGR', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
 
-    const dir = path.join(cwd, 'src', 'zfg_wechat_table');
+    const dir = path.join(cwd, 'src', 'fugr', 'zfg_wechat_table');
     const func = JSON.parse(fs.readFileSync(path.join(dir, 'zfg_wechat_table.fugr.tableframe_zfg_wechat_table.func.json'), 'utf-8'));
     expect(func.includeNumber).toBe('01');
   });

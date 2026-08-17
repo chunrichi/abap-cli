@@ -15,7 +15,7 @@ changed at: 2026-08-09 22:40:00
 
 ```bash
 abap diff [options] [file]
-abap diff src/zcl_foo/zcl_foo.clas.abap
+abap diff src/clas/zcl_foo/zcl_foo.clas.abap
 abap diff --all
 abap diff --remote PRD
 abap diff --local-only --limit 50
@@ -58,7 +58,7 @@ abap diff --local-only --limit 50
     "results": [
       {
         "object": "ZCL_FOO",
-        "file": "src/zcl_foo/zcl_foo.clas.abap",
+        "file": "src/clas/zcl_foo/zcl_foo.clas.abap",
         "parts": [
           {
             "part": "main",
@@ -108,7 +108,7 @@ abap diff ZCL_FOO --remote PRD
 
 ```bash
 # 对比一个类
-abap diff src/zcl_foo/zcl_foo.clas.abap --json
+abap diff src/clas/zcl_foo/zcl_foo.clas.abap --json
 
 # 全部 .abap（含未变 part）
 abap diff --all --json
@@ -117,7 +117,7 @@ abap diff --all --json
 abap diff --local-only --limit 10 --json
 
 # 与 PRD 对比
-abap diff src/zcl_foo/zcl_foo.clas.abap --remote PRD --json
+abap diff src/clas/zcl_foo/zcl_foo.clas.abap --remote PRD --json
 ```
 
 ## Expected Output
@@ -129,7 +129,7 @@ abap diff src/zcl_foo/zcl_foo.clas.abap --remote PRD --json
     "results": [
       {
         "object": "ZCL_FOO",
-        "file": "src/zcl_foo/zcl_foo.clas.abap",
+        "file": "src/clas/zcl_foo/zcl_foo.clas.abap",
         "parts": [
           { "part": "main", "direction": "same" },
           { "part": "implementations", "direction": "both-changed",

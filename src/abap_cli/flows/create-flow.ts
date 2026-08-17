@@ -9,6 +9,7 @@ import type { ObjectPart } from '../formats/object-parts.js';
 import { resolveTransport } from '../core/transport.js';
 import { pushObject } from './push-object.js';
 import { buildFilename, objectDirName } from '../formats/file-resolver.js';
+import { folderFor } from '../formats/type-folder.js';
 import { writeAbapFile, fileExists } from '../formats/abap-source.js';
 import { defaultSkeleton, getTemplate, listTemplates } from '../formats/templates.js';
 import { readDdicJson, localToWire, validateDdicObject, type DdicSupportedType } from '../dictionary/ddic-json.js';
@@ -51,7 +52,7 @@ export async function runCreateLocal(type: string, name: string, opts: CreateLoc
   const content = template ? template.skeleton(objectName) : defaultSkeleton(typeUpper, objectName);
 
   const filename = buildFilename(objectName, typeUpper, 'main', '.abap');
-  const relPath = path.join(opts.dir, objectDirName(objectName), filename);
+  const relPath = path.join(opts.dir, folderFor(typeUpper), objectDirName(objectName), filename);
   const targetPath = path.resolve(process.cwd(), relPath);
 
   if (await fileExists(targetPath)) {

@@ -29,8 +29,8 @@ describe('abap create local (US1, US2, SC-001..003)', () => {
     expect(data.type).toBe('CLAS');
     expect(data.template).toBeNull();
     expect(data.experimental).toBe(true);
-    expect(data.file).toBe('src/zcl_draft/zcl_draft.clas.abap');
-    const file = path.join(cwd, 'src/zcl_draft/zcl_draft.clas.abap');
+    expect(data.file).toBe('src/clas/zcl_draft/zcl_draft.clas.abap');
+    const file = path.join(cwd, 'src/clas/zcl_draft/zcl_draft.clas.abap');
     expect(fs.existsSync(file)).toBe(true);
     const content = fs.readFileSync(file, 'utf-8');
     expect(content).toContain('CLASS ZCL_DRAFT DEFINITION PUBLIC.');
@@ -42,8 +42,8 @@ describe('abap create local (US1, US2, SC-001..003)', () => {
     registerCreateCommand(program);
     const res = await runCommand(program, ['create', 'local', 'INTF', 'ZIF_DRAFT', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
-    expect(parseData(res).file).toBe('src/zif_draft/zif_draft.intf.abap');
-    const content = fs.readFileSync(path.join(cwd, 'src/zif_draft/zif_draft.intf.abap'), 'utf-8');
+    expect(parseData(res).file).toBe('src/intf/zif_draft/zif_draft.intf.abap');
+    const content = fs.readFileSync(path.join(cwd, 'src/intf/zif_draft/zif_draft.intf.abap'), 'utf-8');
     expect(content).toContain('INTERFACE ZIF_DRAFT PUBLIC.');
     expect(content).toContain('ENDINTERFACE.');
   });
@@ -53,8 +53,8 @@ describe('abap create local (US1, US2, SC-001..003)', () => {
     registerCreateCommand(program);
     const res = await runCommand(program, ['create', 'local', 'PROG', 'ZPROG_DRAFT', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
-    expect(parseData(res).file).toBe('src/zprog_draft/zprog_draft.prog.abap');
-    const content = fs.readFileSync(path.join(cwd, 'src/zprog_draft/zprog_draft.prog.abap'), 'utf-8');
+    expect(parseData(res).file).toBe('src/prog/zprog_draft/zprog_draft.prog.abap');
+    const content = fs.readFileSync(path.join(cwd, 'src/prog/zprog_draft/zprog_draft.prog.abap'), 'utf-8');
     expect(content).toContain('REPORT ZPROG_DRAFT.');
   });
 
@@ -64,7 +64,7 @@ describe('abap create local (US1, US2, SC-001..003)', () => {
     const res = await runCommand(program, ['create', 'local', 'CLAS', 'ZCL_TMPL', '--template', 'public-method', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(parseData(res).template).toBe('public-method');
-    const content = fs.readFileSync(path.join(cwd, 'src/zcl_tmpl/zcl_tmpl.clas.abap'), 'utf-8');
+    const content = fs.readFileSync(path.join(cwd, 'src/clas/zcl_tmpl/zcl_tmpl.clas.abap'), 'utf-8');
     expect(content).toContain('METHODS hello');
   });
 
@@ -74,7 +74,7 @@ describe('abap create local (US1, US2, SC-001..003)', () => {
     registerCreateCommand(program);
     const res = await runCommand(program, ['create', 'local', 'CLAS', 'ZCL_OFFLINE'], { cwd });
     expect(res.exitCode).toBeUndefined();
-    expect(fs.existsSync(path.join(cwd, 'src/zcl_offline/zcl_offline.clas.abap'))).toBe(true);
+    expect(fs.existsSync(path.join(cwd, 'src/clas/zcl_offline/zcl_offline.clas.abap'))).toBe(true);
   });
 
   it('FILE_EXISTS: refuses to overwrite and exits 2', async () => {
@@ -82,13 +82,13 @@ describe('abap create local (US1, US2, SC-001..003)', () => {
     registerCreateCommand(program);
     const first = await runCommand(program, ['create', 'local', 'CLAS', 'ZCL_DRAFT', '--json'], { cwd });
     expect(first.exitCode).toBeUndefined();
-    const before = fs.readFileSync(path.join(cwd, 'src/zcl_draft/zcl_draft.clas.abap'), 'utf-8');
+    const before = fs.readFileSync(path.join(cwd, 'src/clas/zcl_draft/zcl_draft.clas.abap'), 'utf-8');
 
     const res = await runCommand(program, ['create', 'local', 'CLAS', 'ZCL_DRAFT', '--json'], { cwd });
     expect(res.exitCode).toBe(2);
     const err = parseError(res);
     expect(err.code).toBe('FILE_EXISTS');
-    const after = fs.readFileSync(path.join(cwd, 'src/zcl_draft/zcl_draft.clas.abap'), 'utf-8');
+    const after = fs.readFileSync(path.join(cwd, 'src/clas/zcl_draft/zcl_draft.clas.abap'), 'utf-8');
     expect(after).toBe(before);
   });
 
@@ -97,8 +97,8 @@ describe('abap create local (US1, US2, SC-001..003)', () => {
     registerCreateCommand(program);
     const res = await runCommand(program, ['create', 'local', 'FUGR', 'ZFGR_DRAFT', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
-    expect(parseData(res).file).toBe('src/zfgr_draft/zfgr_draft.fugr.abap');
-    const content = fs.readFileSync(path.join(cwd, 'src/zfgr_draft/zfgr_draft.fugr.abap'), 'utf-8');
+    expect(parseData(res).file).toBe('src/fugr/zfgr_draft/zfgr_draft.fugr.abap');
+    const content = fs.readFileSync(path.join(cwd, 'src/fugr/zfgr_draft/zfgr_draft.fugr.abap'), 'utf-8');
     expect(content).toContain('FUNCTION-POOL ZFGR_DRAFT.');
   });
 
@@ -107,11 +107,11 @@ describe('abap create local (US1, US2, SC-001..003)', () => {
     registerCreateCommand(program);
     const report = await runCommand(program, ['create', 'local', 'PROG', 'ZPROG_R', '--template', 'report', '--json'], { cwd });
     expect(report.exitCode).toBeUndefined();
-    expect(fs.readFileSync(path.join(cwd, 'src/zprog_r/zprog_r.prog.abap'), 'utf-8')).toContain("WRITE: / 'Hello'.");
+    expect(fs.readFileSync(path.join(cwd, 'src/prog/zprog_r/zprog_r.prog.abap'), 'utf-8')).toContain("WRITE: / 'Hello'.");
 
     const sel = await runCommand(program, ['create', 'local', 'PROG', 'ZPROG_S', '--template', 'selection-screen', '--json'], { cwd });
     expect(sel.exitCode).toBeUndefined();
-    expect(fs.readFileSync(path.join(cwd, 'src/zprog_s/zprog_s.prog.abap'), 'utf-8')).toContain('PARAMETERS: p_name TYPE string.');
+    expect(fs.readFileSync(path.join(cwd, 'src/prog/zprog_s/zprog_s.prog.abap'), 'utf-8')).toContain('PARAMETERS: p_name TYPE string.');
   });
 
   it('--dir writes to a custom output directory', async () => {
@@ -119,8 +119,8 @@ describe('abap create local (US1, US2, SC-001..003)', () => {
     registerCreateCommand(program);
     const res = await runCommand(program, ['create', 'local', 'CLAS', 'ZCL_DIR', '--dir', 'ddic/drafts', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
-    expect(parseData(res).file).toBe('ddic/drafts/zcl_dir/zcl_dir.clas.abap');
-    expect(fs.existsSync(path.join(cwd, 'ddic/drafts/zcl_dir/zcl_dir.clas.abap'))).toBe(true);
+    expect(parseData(res).file).toBe('ddic/drafts/clas/zcl_dir/zcl_dir.clas.abap');
+    expect(fs.existsSync(path.join(cwd, 'ddic/drafts/clas/zcl_dir/zcl_dir.clas.abap'))).toBe(true);
   });
 
   it('TYPE_NOT_SUPPORTED: unknown type, zero files, exit 7', async () => {

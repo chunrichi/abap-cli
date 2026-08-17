@@ -68,6 +68,8 @@ DDIC 推送时 `--atomic` 也会结构校验 JSON（`readDdicJson` + `validateDd
 
 **不支持的**：`.clas.json` 等源码对象的元数据 JSON — 被解析为 route `icf` 但对象类型不在四种 DDIC 之内，`validateLocalFile` 抛 `DDIC_NOT_SUPPORTED`（exit 7）。源码对象的创建/更新走 `abap create`，不是 push。
 
+**目录约定（与 pull / create local 对齐）**：push 路径上的目录层级（`src/<typeFolder>/<objectName>/...`）仅作约定，不影响路由与解析——`file-resolver.ts#resolveFile` 只看 `path.basename`。pull / create local 默认把产物放到对应类型的顶层子目录下（`src/clas/`、`src/prog/`、`src/intf/`、`src/fugr/`、`src/tabl/`、`src/doma/`、`src/stru/`、`src/dtel/`），push 沿用同一目录读 basename 即可；推老路径（裸 `src/<name>.<type>.abap`）也仍然能正常解析并推送。
+
 **part 精确匹配**：`.clas.macros.abap` 只有在对象确实有 `macros` include 时才推送；对象没有该 include 时**报错**（`SAP_ERROR`，exit 6，`nextSteps` 指引 `abap inspect <obj> --includes`），不会静默回退把 macros 内容写进 main。只有 `main` 文件映射到对象的 main part。
 
 ## 失败处理
@@ -90,31 +92,31 @@ DDIC 推送时 `--atomic` 也会结构校验 JSON（`readDdicJson` + `validateDd
 
 ```bash
 # 推送单个文件（对象已绑定请求或 $TMP 时无需 --tr）
-abap push src/zcl_my_class/zcl_my_class.clas.abap
+abap push src/clas/zcl_my_class/zcl_my_class.clas.abap
 
 # 显式指定 transport
-abap push src/zprog/zprog.prog.abap --tr NDK123456
+abap push src/prog/zprog/zprog.prog.abap --tr NDK123456
 
 # 只做语法检查
-abap push src/zcl_foo/zcl_foo.clas.abap --tr NDK123456 --check-only
+abap push src/clas/zcl_foo/zcl_foo.clas.abap --tr NDK123456 --check-only
 
 # 只写不激活
-abap push src/zcl_foo/zcl_foo.clas.abap --tr NDK123456 --no-activate
+abap push src/clas/zcl_foo/zcl_foo.clas.abap --tr NDK123456 --no-activate
 
 # 推送整个目录（遵循 .abapignore）
 abap push --all --tr NDK123456
 
 # 计划模式（零变更）
-abap push src/zcl_foo/zcl_foo.clas.abap --tr NDK123456 --dry-run
+abap push src/clas/zcl_foo/zcl_foo.clas.abap --tr NDK123456 --dry-run
 
 # 原子推送：任一文件校验失败则零写入
-abap push src/a.clas.abap src/b.clas.abap --tr NDK123456 --atomic
+abap push src/clas/a.clas.abap src/clas/b.clas.abap --tr NDK123456 --atomic
 
 # 推送 DDIC 对象（$TMP 无需 --tr）
-abap push src/ztest_e2e.tabl.json
+abap push src/tabl/ztest_e2e.tabl.json
 
 # 推送 textpool
-abap push src/zprog/zprog.prog.texts.en.properties
+abap push src/prog/zprog/zprog.prog.texts.en.properties
 ```
 
 ## Expected Output
@@ -132,7 +134,7 @@ abap push src/zprog/zprog.prog.texts.en.properties
   "data": {
     "results": [
       {
-        "file": "src/zprog/zprog.prog.abap",
+        "file": "src/prog/zprog/zprog.prog.abap",
         "status": "activated",
         "transport": "NDK123456",
         "stage": "unlock"
@@ -155,7 +157,7 @@ abap push src/zprog/zprog.prog.texts.en.properties
     "code": "LOCK_FAILED",
     "category": "LOCKED",
     "message": "Cannot lock ZCL_TR: Object ZCL_TR is locked by user OTHER",
-    "details": { "results": [{ "file": "src/zcl_tr.clas.abap", "status": "failed", "code": "LOCK_FAILED", "nextSteps": ["Check who holds the lock: abap inspect ZCL_TR --locks", "Wait for the lock to be released, or release it manually in SE03."] }] }
+    "details": { "results": [{ "file": "src/clas/zcl_tr.clas.abap", "status": "failed", "code": "LOCK_FAILED", "nextSteps": ["Check who holds the lock: abap inspect ZCL_TR --locks", "Wait for the lock to be released, or release it manually in SE03."] }] }
   }
 }
 ```

@@ -58,7 +58,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'textpool-'));
   fs.mkdirSync(path.join(cwd, 'src'), { recursive: true });
-  fs.mkdirSync(path.join(cwd, 'src/zprog'), { recursive: true });
+  fs.mkdirSync(path.join(cwd, 'src/prog/zprog'), { recursive: true });
   loadConfig.mockResolvedValue({ systemName: 'mock', sap: {}, transport: '', package: '$TMP' });
 });
 
@@ -69,10 +69,10 @@ describe('014/US4 textpool push (ICF route — write=false cached)', () => {
 
   it('pushes a .texts.properties via ICF POST /textpool/texts', async () => {
     icfPostTextpool.mockResolvedValue({ status: 'success', data: { written: 1 }, error: null });
-    fs.writeFileSync(path.join(cwd, 'src/zprog/zprog.prog.texts.en.properties'), '@MaxLength:10\n001=Example\n');
+    fs.writeFileSync(path.join(cwd, 'src/prog/zprog/zprog.prog.texts.en.properties'), '@MaxLength:10\n001=Example\n');
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/zprog/zprog.prog.texts.en.properties', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/prog/zprog/zprog.prog.texts.en.properties', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(icfPostTextpool).toHaveBeenCalledWith(
       'texts',
@@ -93,10 +93,10 @@ describe('014/US4 textpool push (ICF route — write=false cached)', () => {
       data: null,
       error: { code: 'TEXTPOOL_WRITE_FAILED', message: 'simulated' },
     });
-    fs.writeFileSync(path.join(cwd, 'src/zprog/zprog.prog.texts.en.properties'), '001=Example\n');
+    fs.writeFileSync(path.join(cwd, 'src/prog/zprog/zprog.prog.texts.en.properties'), '001=Example\n');
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/zprog/zprog.prog.texts.en.properties', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/prog/zprog/zprog.prog.texts.en.properties', '--json'], { cwd });
     expect(res.exitCode).not.toBeUndefined();
     const out = JSON.parse(res.stderr);
     expect(out.error.code).toBe('TEXTPOOL_WRITE_FAILED');
@@ -123,7 +123,7 @@ describe('014/US4 textpool pull (ADT route — read=true cached)', () => {
     const out = JSON.parse(res.stdout);
     expect(out.data.route).toBe('adt');
     expect(out.data.written).toHaveLength(3);
-    const texts = fs.readFileSync(path.join(cwd, 'src/zprog/zprog.prog.texts.en.properties'), 'utf-8');
+    const texts = fs.readFileSync(path.join(cwd, 'src/prog/zprog/zprog.prog.texts.en.properties'), 'utf-8');
     expect(texts).toContain('001=Example');
   });
 });

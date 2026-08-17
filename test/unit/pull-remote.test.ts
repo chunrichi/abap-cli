@@ -64,9 +64,9 @@ describe('015 remote pull', () => {
       type: 'PROG',
       remote: 'PRD',
       version: '00000',
-      entries: [{ file: 'src/zprog/zprog.prog.abap', status: 'written' }],
+      entries: [{ file: 'src/prog/zprog/zprog.prog.abap', status: 'written' }],
     });
-    const written = fs.readFileSync(path.join(cwd, 'src/zprog/zprog.prog.abap'), 'utf-8');
+    const written = fs.readFileSync(path.join(cwd, 'src/prog/zprog/zprog.prog.abap'), 'utf-8');
     expect(written).toContain('REPORT zprog.');
   });
 
@@ -81,7 +81,7 @@ describe('015 remote pull', () => {
     const res = await runCommand(program, ['pull', 'ZIF_DEMO', '--type', 'INTF', '--remote', 'PRD', '--dir', 'src', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(icfGetRemoteSource).toHaveBeenCalledWith('INTF', 'ZIF_DEMO', 'PRD');
-    expect(JSON.parse(res.stdout).data.entries[0].file).toBe('src/zif_demo/zif_demo.intf.abap');
+    expect(JSON.parse(res.stdout).data.entries[0].file).toBe('src/intf/zif_demo/zif_demo.intf.abap');
   });
 
   it('normalizes REMOTE_VERSION_NOT_FOUND to OBJECT_NOT_FOUND', async () => {
@@ -118,8 +118,8 @@ describe('015 remote pull', () => {
   });
 
   it('refuses to overwrite a differing local file without --overwrite', async () => {
-    fs.mkdirSync(path.join(cwd, 'src/zprog'), { recursive: true });
-    fs.writeFileSync(path.join(cwd, 'src/zprog/zprog.prog.abap'), 'REPORT zprog.\nold\n');
+    fs.mkdirSync(path.join(cwd, 'src/prog/zprog'), { recursive: true });
+    fs.writeFileSync(path.join(cwd, 'src/prog/zprog/zprog.prog.abap'), 'REPORT zprog.\nold\n');
     const program = makeProgram();
     registerPullCommand(program);
     const res = await runCommand(program, ['pull', 'ZPROG', '--remote', 'PRD', '--dir', 'src', '--json'], { cwd });
@@ -129,13 +129,13 @@ describe('015 remote pull', () => {
   });
 
   it('--overwrite replaces the local file', async () => {
-    fs.mkdirSync(path.join(cwd, 'src/zprog'), { recursive: true });
-    fs.writeFileSync(path.join(cwd, 'src/zprog/zprog.prog.abap'), 'REPORT zprog.\nold\n');
+    fs.mkdirSync(path.join(cwd, 'src/prog/zprog'), { recursive: true });
+    fs.writeFileSync(path.join(cwd, 'src/prog/zprog/zprog.prog.abap'), 'REPORT zprog.\nold\n');
     const program = makeProgram();
     registerPullCommand(program);
     const res = await runCommand(program, ['pull', 'ZPROG', '--remote', 'PRD', '--dir', 'src', '--overwrite', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
-    expect(fs.readFileSync(path.join(cwd, 'src/zprog/zprog.prog.abap'), 'utf-8')).toContain('REPORT zprog.');
+    expect(fs.readFileSync(path.join(cwd, 'src/prog/zprog/zprog.prog.abap'), 'utf-8')).toContain('REPORT zprog.');
   });
 });
 

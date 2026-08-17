@@ -66,9 +66,9 @@ describe('014/US3 pull DDIC', () => {
     expect(out.data).toMatchObject({
       object: 'ZDOMA_TEST',
       type: 'DOMA',
-      entries: [{ file: 'src/zdoma_test.doma.json', status: 'written' }],
+      entries: [{ file: 'src/doma/zdoma_test.doma.json', status: 'written' }],
     });
-    const written = fs.readFileSync(path.join(cwd, 'src/zdoma_test.doma.json'), 'utf-8');
+    const written = fs.readFileSync(path.join(cwd, 'src/doma/zdoma_test.doma.json'), 'utf-8');
     const parsed = JSON.parse(written);
     expect(parsed.name).toBe('ZDOMA_TEST');
     expect(parsed.dataType).toBe('QUAN');
@@ -77,12 +77,13 @@ describe('014/US3 pull DDIC', () => {
   });
 
   it('uses --overwrite to replace an existing file', async () => {
-    fs.writeFileSync(path.join(cwd, 'src/zdoma_test.doma.json'), '{"old":true}');
+    fs.mkdirSync(path.join(cwd, 'src/doma'), { recursive: true });
+    fs.writeFileSync(path.join(cwd, 'src/doma/zdoma_test.doma.json'), '{"old":true}');
     const program = makeProgram();
     registerPullCommand(program);
     const res = await runCommand(program, ['pull', 'ZDOMA_TEST', '--type', 'DOMA', '--dir', 'src', '--overwrite', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
-    const written = JSON.parse(fs.readFileSync(path.join(cwd, 'src/zdoma_test.doma.json'), 'utf-8'));
+    const written = JSON.parse(fs.readFileSync(path.join(cwd, 'src/doma/zdoma_test.doma.json'), 'utf-8'));
     expect(written.name).toBe('ZDOMA_TEST');
   });
 

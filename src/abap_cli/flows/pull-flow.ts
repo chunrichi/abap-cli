@@ -3,6 +3,7 @@ import * as fs from 'fs/promises';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { IcfClient } from '../clients/icf-client.js';
 import { objectDirName, buildFilename } from '../formats/file-resolver.js';
+import { folderFor } from '../formats/type-folder.js';
 import { fileExists, writeAbapFile } from '../formats/abap-source.js';
 import { writeDdicJson, DDIC_SUPPORTED_TYPES, wireToLocal, type DdicSupportedType } from '../dictionary/ddic-json.js';
 import { parseTextpoolProperties, serializeTextpoolProperties, type TextElementCategory } from '../formats/textpool.js';
@@ -112,7 +113,7 @@ async function runPullTextpool(objectName: string, type: string | undefined, opt
   for (const adtCat of categories) {
     const fileCat: 'texts' | 'selections' | 'headings' = adtCat === 'symbols' ? 'texts' : adtCat;
     const filename = `${objectName.toLowerCase()}.${objType.toLowerCase()}.${fileCat}.en.properties`;
-    const relPath = path.join(opts.dir, objectDirName(objectName), filename);
+    const relPath = path.join(opts.dir, folderFor(objType), objectDirName(objectName), filename);
     const targetPath = path.resolve(process.cwd(), relPath);
 
     if (await fileExists(targetPath) && !opts.overwrite && !opts.skipExisting) {
@@ -184,9 +185,10 @@ async function runPullDdic(objectName: string, type: DdicSupportedType, opts: Pu
   }
 
   const local = wireToLocal(type, resp.data as unknown as Parameters<typeof wireToLocal>[1]);
-  // DDIC files are flat: src/<name>.<type>.json (data-model §5), no subdirectory.
+  // DDIC files now sit under their type subdirectory (Q5=B: local convention).
+  // Was previously flat `src/<name>.<type>.json` — see wiki/abap-file-format-export.md.
   const filename = buildFilename(objectName, type, 'main', '.json');
-  const relPath = path.join(opts.dir, filename);
+  const relPath = path.join(opts.dir, folderFor(type), filename);
   const targetPath = path.resolve(process.cwd(), relPath);
 
   if (await fileExists(targetPath) && !opts.overwrite && !opts.skipExisting) {
@@ -274,7 +276,7 @@ async function runPullRemote(objectName: string, type: string | undefined, remot
   // The remote source is a single blob; write it under the object's standard
   // abap-file-format filename (e.g. zprog.prog.abap / zcl_x.clas.abap).
   const filename = buildFilename(objectName, objType, undefined, '.abap');
-  const relPath = path.join(opts.dir, objectDirName(objectName), filename);
+  const relPath = path.join(opts.dir, folderFor(objType), objectDirName(objectName), filename);
   const targetPath = path.resolve(process.cwd(), relPath);
 
   if (await fileExists(targetPath) && !opts.overwrite && !opts.skipExisting) {
@@ -382,8 +384,9 @@ async function pullObject(
   const skipped: string[] = [];
   const failed: string[] = [];
 
-  // abap-file-format layout: one directory per object under opts.dir.
+  // abap-file-format layout: one directory per object under <typeFolder>/<opts.dir>.
   const objectDir = objectDirName(object.name);
+  const typeFolder = folderFor(object.type);
 
   for (const file of files) {
     await writeOne(await file.content(), file.filename);
@@ -392,7 +395,7 @@ async function pullObject(
 
   /** Write one file with exists/skip/overwrite conflict handling. */
   async function writeOne(content: string, filename: string): Promise<void> {
-    const filePath = path.join(opts.dir, objectDir, filename);
+    const filePath = path.join(opts.dir, typeFolder, objectDir, filename);
     const absPath = path.resolve(process.cwd(), filePath);
     if (await fileExists(absPath)) {
       const existing = await fs.readFile(absPath, 'utf-8');
