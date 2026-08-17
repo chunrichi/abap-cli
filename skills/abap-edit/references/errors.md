@@ -2,7 +2,7 @@
 
 > 按需加载。
 
-## 本 skill 错误码（11 命令范围）
+## 本 skill 错误码（10 命令范围）
 
 | code | cat/exit | 触发命令 | 修复 |
 |---|---|---|---|
@@ -11,7 +11,7 @@
 | `LOCK_FAILED` | LOCKED/9 | push | `inspect <obj> --locks` 查持有者；SE03 手动释放 |
 | `ACTIVATION_FAILED` | VALIDATION_ERROR/7 | push / create / activate | `data.errors` 含行号；修复后重推 |
 | `SYNTAX_ERROR` | VALIDATION_ERROR/7 | check / push --check-only | `data.errors[]` 含 `{line, offset, severity, text}` |
-| `NO_TRANSPORT` | VALIDATION_ERROR/7 | push / create / sync | `transport create "..."` 后 `--tr` 重试（用 abap-setup 的 resolve-transport.sh） |
+| `NO_TRANSPORT` | VALIDATION_ERROR/7 | push / create | `transport create "..."` 后 `--tr` 重试（用 abap-setup 的 resolve-transport.sh） |
 | `DDIC_NOT_SUPPORTED` | VALIDATION_ERROR/7 | pull / create / push | 类型不在白名单（DOMA/DTEL/TABL/STRU 之外）；看 `abap create --schema` |
 | `FILE_EXISTS` | USAGE/2 | pull | `pull --overwrite` 或 `--skip-existing` |
 | `TYPE_NOT_SUPPORTED` | VALIDATION_ERROR/7 | 任意 | `abap <cmd> --schema` 看支持列表 |
@@ -37,7 +37,7 @@
 
 ## 写操作保护（P0.3）
 
-`push` / `create` / `sync` / `transport`（本 skill 涉及的）是写操作：
+`push` / `create` / `transport`（本 skill 涉及的）是写操作：
 
 - **非 TTY**：必须 `--yes` 或 `--dry-run`，否则 `VALIDATION_ERROR` (exit 7)
 - **`--dry-run`**：返回 `{ dryRun: true, ... }` 不调 SAP

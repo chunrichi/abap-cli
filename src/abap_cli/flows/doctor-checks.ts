@@ -69,7 +69,7 @@ function readSystems(configPath: string): { systems: Record<string, unknown>; er
     if (!fs.existsSync(configPath)) {
       return {
         systems: {},
-        error: { message: `Config file not found: ${configPath}`, suggestion: 'Run "abap config" or "abap connection add <name> ..." to create it.' },
+        error: { message: `Config file not found: ${configPath}`, suggestion: 'Run "abap init --profile <name>" or "abap profile add <name> ..." to create it.' },
       };
     }
     const parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as { systems?: Record<string, unknown> };
@@ -164,7 +164,7 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
         errItem(
           `config.profile.${name}`,
           `Profile '${name}' is invalid: ${message}`,
-          `Fix the profile: abap connection set ${name} --url <url> --username <user>`,
+          `Fix the profile: abap profile set ${name} --url <url> --username <user>`,
         ),
       );
     }
@@ -183,7 +183,7 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
           errItem(
             'config.active',
             `Workspace references unknown system '${activeSystem}'.`,
-            `Create the profile: abap connection set ${activeSystem} --url <url> --username <user>`,
+            `Create the profile: abap profile add ${activeSystem} --url <url> --username <user>`,
           ),
         );
       } else if (activeSystem) {
@@ -202,7 +202,7 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
       errItem(
         'config.workspace',
         'No workspace config (.abap.json) found in the current directory.',
-        'Run "abap config init" or "abap config --system <name>" to initialize the workspace.',
+        'Run "abap init" (TTY wizard) or "abap init --profile <name>" to initialize the workspace.',
       ),
     );
   }
@@ -212,7 +212,7 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
   if (systemsToProbe.length === 0) {
     push(
       connection,
-      errItem('conn.none', 'No systems configured.', 'Run "abap connection add <name> --url <url> --username <user>" to add a connection profile.'),
+      errItem('conn.none', 'No systems configured.', 'Run "abap profile add <name> --url <url> --username <user>" to add a connection profile.'),
     );
   } else {
     for (const name of systemsToProbe) {
@@ -222,7 +222,7 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
           errItem(
             `conn.${name}`,
             `System profile '${name}' not found.`,
-            `List profiles: abap connection list — create one: abap connection add ${name} --url <url> --username <user>`,
+            `List profiles: abap profile list — create one: abap profile add ${name} --url <url> --username <user>`,
           ),
         );
         continue;
@@ -240,7 +240,7 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
             errItem(
               `conn.${name}`,
               `System '${name}' unreachable: ${layerMsg}`,
-              `Diagnose per layer: abap connection test ${name}`,
+              `Diagnose per layer: abap profile test ${name}`,
               verbose ? layers.join(', ') : undefined,
             ),
           );
@@ -249,7 +249,7 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
         const message = error instanceof Error ? error.message : String(error);
         push(
           connection,
-          errItem(`conn.${name}`, `Probe of '${name}' failed: ${message}`, `Diagnose per layer: abap connection test ${name}`),
+          errItem(`conn.${name}`, `Probe of '${name}' failed: ${message}`, `Diagnose per layer: abap profile test ${name}`),
         );
       }
     }

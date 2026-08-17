@@ -23,7 +23,7 @@ import { buildMeta } from './output/meta.js';
 export interface TopErrorContext {
   program: Command;
   argv: readonly string[];
-  /** Output version, surfaced in stuck-report metadata. */
+  /** Output version, surfaced in error metadata. */
   version: string;
 }
 

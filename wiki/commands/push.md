@@ -35,7 +35,7 @@ abap push [options] [files...]
 `runPush` **不再**在顶层统一解析一个 transport；改为 `pushOne` 拿到对象后逐对象解析（`resolveObjectTransport`）：
 
 1. **对象已绑定请求**（`client.transportInfo(objectUrl)` → `TRANSPORTS[0].TRKORR`）— 直接复用该请求，**无需 `--tr`**；若显式传了不同的 `--tr` → 抛 `VALIDATION_ERROR`（exit 7），提示去掉 `--tr` 或先用 `abap transport assign` 换请求。push 不允许顺手改对象的请求归属。
-2. **`$TMP` 对象**（search 命中 `adtcore:packageName === '$TMP'`，经 `ResolvedObject.packageName` 携带）— transport-free，空 transport 推送，无需 `--tr`（与 `abap deploy` 的 `$TMP` 规则一致）。
+2. **`$TMP` 对象**（search 命中 `adtcore:packageName === '$TMP'`，经 `ResolvedObject.packageName` 携带）— transport-free，空 transport 推送，无需 `--tr`（与 `abap extension deploy` 的 `$TMP` 规则一致）。
 3. 其余未绑定非 `$TMP` 对象：`--tr` > 项目 config `transport` > 用户第一个可修改请求（`userTransports`）> `NO_TRANSPORT`（exit 7）。
 
 `--dry-run` 不查真实请求，用 `--tr` > config > `'DRY_RUN'` 占位。每文件 JSON 结果带该文件实际解析到的 `transport`。
@@ -75,7 +75,7 @@ DDIC 推送时 `--atomic` 也会结构校验 JSON（`readDdicJson` + `validateDd
 | 场景 | 错误码 | 类别 / exit | 附带信息 |
 |------|--------|-------------|----------|
 | 对象被他人锁定 | `LOCK_FAILED` | LOCKED / 9 | `nextSteps`：`abap inspect <obj> --locks` 查锁 + SE03 手动释放；FUGR 额外带 `subtype` |
-| 对象不存在 | `OBJECT_NOT_FOUND` | NOT_FOUND / 8 | `nextSteps`：`abap search <name>` 验证 / `abap connection test` 确认系统；push 不自动创建（创建走 `abap create`） |
+| 对象不存在 | `OBJECT_NOT_FOUND` | NOT_FOUND / 8 | `nextSteps`：`abap search <name>` 验证 / `abap profile test` 确认系统；push 不自动创建（创建走 `abap create`） |
 | 命名的 include part 不存在（如 `.macros.abap` 而对象无 macros） | `SAP_ERROR` | SAP_ERROR / 6 | `subtype` + `nextSteps`：`abap inspect <obj> --includes` 列出可用 include |
 | 激活失败 | `ACTIVATION_FAILED` | VALIDATION_ERROR / 7 | `stage: 'activate'` + 原始 `detail` |
 | 写源码失败 | `SAP_ERROR` | SAP_ERROR / 6 | `stage: 'write'` + `subtype` |

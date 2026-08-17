@@ -61,9 +61,9 @@ cp agents/abap-developer.md <your-project>/.github/agents/abap-developer.md
 
 | skill | 覆盖命令 | 触发场景 | 入口 |
 |---|---|---|---|
-| **`abap-setup`** | `config` `connection` `doctor` `transport` | 接入 / 诊断 / 传输请求 | [SKILL.md](./abap-setup/SKILL.md) |
-| **`abap-edit`** | `search` `pull` `push` `check` `create` `activate` `inspect` `diff` `status` `sync` `create local` + DDIC 子集 | 改源码 / 推送 / 校验 | [SKILL.md](./abap-edit/SKILL.md) |
-| **`abap-data`** | `select` `run` `deploy` | 看数据 / 跑类 / 部署 ICF | [SKILL.md](./abap-data/SKILL.md) |
+| **`abap-setup`** | `init` `profile` `doctor` `transport` | 接入 / 诊断 / 传输请求 | [SKILL.md](./abap-setup/SKILL.md) |
+| **`abap-edit`** | `search` `pull` `push` `check` `create` `activate` `inspect` `diff` `status` `create local` + DDIC 子集 | 改源码 / 推送 / 校验 | [SKILL.md](./abap-edit/SKILL.md) |
+| **`abap-data`** | `select` `run` `extension` | 看数据 / 跑类 / 部署 ICF | [SKILL.md](./abap-data/SKILL.md) |
 
 每个 skill 的内部结构：
 
@@ -86,10 +86,10 @@ skills/<name>/
 
 ## 命令覆盖核对（v1）
 
-- ✅ `abap-setup` 覆盖：`config` `connection` `doctor` `transport`
-- ✅ `abap-edit` 覆盖：`search` `pull` `push` `check` `create` `activate` `inspect` `diff` `status` `sync` `create local`
-- ✅ `abap-data` 覆盖：`select` `run` `deploy`
-- ❌ 不纳入（v1 决策）：`abap atc`（deprecated → `abap check --atc`）、`abap report-stuck`（反馈环命令）
+- ✅ `abap-setup` 覆盖：`init` `profile` `doctor` `transport`
+- ✅ `abap-edit` 覆盖：`search` `pull` `push` `check` `create` `activate` `inspect` `diff` `status` `create local`
+- ✅ `abap-data` 覆盖：`select` `run` `extension`
+- ❌ 不纳入（021 决策）：`abap atc` / `abap sync` / `abap report-stuck` 已移除（`atc` → `abap check atc`）
 
 ## 版本
 

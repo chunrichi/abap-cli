@@ -15,15 +15,15 @@ Precedence for credentials: **OS keychain** for the referenced system name, fall
 
 ## System Profiles (`~/.abap-cli/systems.json`)
 
-Created/updated by `abap config` and managed by `abap connection`:
+Created by `abap profile add` and referenced by `abap init --profile <name>`:
 
 ```bash
-abap connection list                  # List saved profiles
-abap connection show dev              # Show profile details (no secrets)
-abap connection add dev --url https://sap:44300 --username DEV --password '***'  # Create a profile
-abap connection set dev --url https://sap:44300   # Modify a field
-abap connection set dev --password '***'          # Update the stored password
-abap connection delete dev            # Delete profile + stored password
+abap profile list                  # List saved profiles
+abap profile show dev              # Show profile details (no secrets)
+abap profile add dev --url https://sap:44300 --username DEV --password '***'  # Create a profile
+abap profile set dev --url https://sap:44300   # Modify a field
+abap profile set dev --password '***'          # Update the stored password
+abap profile delete dev            # Delete profile + stored password
 ```
 
 The file is written with mode `0600` (`0700` for the directory) and is not committed.
@@ -51,7 +51,7 @@ A template lives at [`.abap.json.example`](../.abap.json.example). This file is 
 | Variable | Purpose |
 |----------|---------|
 | `SAP_PASSWORD` | Password override when not in the keychain |
-| `SAP_URL` / `SAP_USER` / `SAP_CLIENT` / `SAP_LANGUAGE` | Used by `abap config` in non-interactive mode |
+| `SAP_URL` / `SAP_USER` / `SAP_CLIENT` / `SAP_LANGUAGE` | Used by `abap init` in non-interactive mode |
 | `NODE_TLS_REJECT_UNAUTHORIZED` | Set to `0` for self-signed certs (development only) |
 
 A template lives at [`.env.example`](../.env.example). `.env` files are gitignored.

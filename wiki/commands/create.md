@@ -155,7 +155,7 @@ abap create local CLAS ZCL_DRAFT --template public-method --dir src/
       { "name": "--check-only", "type": "boolean", "description": "Validate the proposed object without creating it" },
       { "name": "--audit", "type": "boolean", "description": "Include the before-checksum (extra SAP round-trip, off by default)" }
     ],
-    "globalOptions": ["--json", "--report-stuck"],
+    "globalOptions": ["--json", ""],
     "examples": ["abap create CLAS ZCL_MY_CLASS --package ZPKG --description \"desc\""]
   }
 }

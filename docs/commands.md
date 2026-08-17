@@ -7,7 +7,6 @@ All commands support the global `--json` option for structured output (Agent-Fir
 ```
 -V, --version        output the version number
 --json               Output in JSON format
---report-stuck       Record a stuck report when this command fails (feedback loop)
 -h, --help           display help for command
 ```
 
@@ -27,23 +26,25 @@ Warnings never enter the error envelope: non-fatal warnings (e.g. a deprecated o
 
 Exit codes (stable contract, only additive across versions): `0` success, `1` unknown/unmapped failure (generic fallback), `2` usage, `3` config, `4` TLS, `5` auth, `6` SAP error, `7` validation, `8` not-found, `9` locked; `>=10` reserved. `error.category` in the JSON always maps 1:1 to the exit code. See the common-errors help block on every command for the full table.
 
-## `abap config`
+## `abap init`
 
-Configure the workspace. The `abap config` group has two entry points:
+Initialize the workspace and scaffold AI agent context (021 — replaces the legacy `abap config`). Two entry points:
 
-- `abap config [options]` — the **parameter form**: with `--system <name>` it references an existing profile; with a full connection set (`--url` + `--username` + `--password`) it creates a new profile and writes `.abap.json`. In non-interactive mode, profile creation is rejected (use `abap connection add` instead). Running it with no flags prints the help.
-- `abap config init` — the **interactive wizard** (no flags accepted): prompts to select an existing system profile or create a new one, then writes `.abap.json`. TTY only; in non-TTY environments it errors out (refuse to fall back, since the wizard cannot proceed without a terminal).
+- `abap init --profile <name> [--tr ...] [--package ...] [--yes]` — the **parameter form**: binds the workspace to an existing global profile and writes `.abap.json`. In non-interactive mode, profile creation is rejected (use `abap profile add` instead).
+- `abap init` (bare, TTY) — the **interactive wizard**: prompts to select an existing profile or create a new one, then writes `.abap.json`. In non-TTY environments a bare `abap init` errors with `USAGE` (Agent-First: never block on a prompt).
+- `abap init --agent <target>` — **scaffolds agent context** into the workspace (idempotent; re-runs are no-ops unless `--force`).
 
 ```bash
-abap config --system dev --tr DEVK900001 --package ZDEV
-abap config --url https://sap:44300 --client 100 --username DEV --password '***'
-abap config init      # interactive wizard
+abap init --profile dev --tr DEVK900001 --package ZDEV --yes
+abap init                       # interactive wizard (TTY)
+abap init --agent copilot       # scaffold AGENTS.md + skills/ + vendor entry
+abap init --agent copilot --force
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--system <name>` | Name of an existing system profile |
-| `--url <url>` | SAP system URL (interactive; in scripts use `abap connection add`) |
+| `--profile <name>` | Name of an existing global profile |
+| `--url <url>` | SAP system URL (TTY wizard only; in scripts use `abap profile add`) |
 | `-c, --client <client>` | SAP client number |
 | `-u, --username <user>` | SAP username |
 | `-p, --password <password>` | SAP password (stored in keychain) |
@@ -55,11 +56,15 @@ abap config init      # interactive wizard
 | `--test-connection` | Probe TLS + auth and report results (implies `--test-tls --test-auth`) |
 | `--test-tls` | Probe the TLS handshake |
 | `--test-auth` | Probe authentication (after TLS) |
+| `--agent <target>` | Scaffold agent context: `copilot` \| `claude` \| `cursor` \| `generic` |
+| `--force` | Overwrite existing files when scaffolding `--agent` (default: skip) |
 | `--yes` / `--non-interactive` | Non-interactive confirmation (aliases) |
 
-Non-interactive `abap config` requires either `--system <name>` (reference existing) or a full connection set (`--url` + `--username` + `--password`).
+**Agent scaffold matrix**: every target writes the cross-vendor base (`AGENTS.md` + `skills/`); `copilot` adds `.github/copilot-instructions.md`, `claude` adds `CLAUDE.md`, `cursor` adds `.cursor/rules/abap.mdc`. JSON output reports `{ written, skipped }`.
 
-After writing the workspace config, `abap config` performs an informational ICF deployment check (FR-012..FR-015): it probes `/sap/zabap_vibe/` and compares the deployed version with the bundled expected version. The JSON result carries an `icf` field with one of four states: `not_deployed` (hint to run `abap deploy`), `current`, `outdated` (hint to run `abap deploy` to upgrade / `--force` to overwrite), or `unreachable` (degraded to a `meta.warnings` entry — init still succeeds). The check never modifies SAP and never blocks init.
+After writing the workspace config, `abap init` performs an informational ICF deployment check (FR-012..FR-015): it probes `/sap/zabap_vibe/` and compares the deployed version with the bundled expected version. The JSON result carries an `icf` field with one of four states: `not_deployed` (hint to run `abap extension deploy`), `current`, `outdated` (hint to run `abap extension deploy` to upgrade), or `unreachable` (degraded to a `meta.warnings` entry — init still succeeds). The check never modifies SAP and never blocks init.
+
+To switch an already-initialized workspace to a different profile, re-run `abap init --profile <name>`.
 
 ## `abap pull`
 
@@ -111,7 +116,7 @@ The transport is resolved **per object**, not once per run:
 
 1. If the object is already assigned to a request (`transportInfo`), that request is reused — `--tr` is **not** required and cannot change it. Passing a different `--tr` is rejected with `VALIDATION_ERROR`; re-assign with `abap transport assign` first.
 2. Otherwise `--tr` > project transport > the user's first modifiable request > `NO_TRANSPORT`.
-3. Objects in `$TMP` are transport-free — no `--tr` needed (matches `deploy`'s `$TMP` rule).
+3. Objects in `$TMP` are transport-free — no `--tr` needed (matches `extension deploy`'s `$TMP` rule).
 
 **DDIC push (014)**: `abap push <name>.<type>.json --tr <tr>` updates a DDIC object (DOMA/DTEL/TABL/STRU) via the self-built ICF service (`POST /sap/zabap_vibe/ddic/<type>`, same create/overwrite endpoint as `abap create --file`). Client-side validation enforces the namespace and required fields; `--check-only` is rejected (`VALIDATION_ERROR`). The result status is `written` with stage `ddic-icf`. A non-`$TMP` package requires a transport (same resolution as above, falling back to the file's recorded `transportRequest`).
 
@@ -124,7 +129,7 @@ Execute an ABAP class on SAP and capture its stdout (015). Two routes:
 1. **classrun** (no `--method`): runs `if_oo_adt_classrun~main` via ADT classrun; stdout is returned verbatim.
 2. **wrapper** (`--method <name>`): runs the bundled `ZCL_ABAP_VIBE_RUNNER` class, which reflects the named PUBLIC STATIC method on the target class, invokes it with the JSON `--args`, and serialises the RETURNING value.
 
-`abap run` is strictly **read-only**: no transport, no activation, no lock, no file write. The wrapper class is installed by `abap deploy`.
+`abap run` is strictly **read-only**: no transport, no activation, no lock, no file write. The wrapper class is installed by `abap extension deploy`.
 
 ```bash
 abap run [options] <class-name>
@@ -163,7 +168,7 @@ abap run ZCL_FOO --method bar --args '{}' --json
 | `OBJECT_NOT_ACTIVE` | SAP_ERROR / 6 | class is inactive → `abap activate <class>` |
 | `LOCAL_CLASS_NOT_RUNNABLE` | SAP_ERROR / 6 | class name contains `~` (local class) |
 | `TIMEOUT` | SAP_ERROR / 6 | classrun exceeded `--timeout` |
-| `WRAPPER_NOT_DEPLOYED` | NOT_FOUND / 8 | `ZCL_ABAP_VIBE_RUNNER` missing → `abap deploy` |
+| `WRAPPER_NOT_DEPLOYED` | NOT_FOUND / 8 | `ZCL_ABAP_VIBE_RUNNER` missing → `abap extension deploy` |
 | `WRAPPER_INPUT_UNAVAILABLE` | SAP_ERROR / 6 | SAP classrun endpoint does not inject `--method` args (system limitation) → use direct classrun |
 
 **v1 scope**: only `CLAS` is supported. PROG/INTF/FUGR/TABL execution is deferred to a P2 sub-feature (no `--type` option in v1). **Known limitation (verified on vhcala4hci)**: the ADT classrun endpoint ignores request-body parameters, so `--method` on such systems reports `WRAPPER_INPUT_UNAVAILABLE`; the classrun route is fully verified end-to-end.
@@ -255,26 +260,26 @@ abap select --schema
 - No `--client` override: client-dependent tables return rows for the ICF session client only.
 - Large-object fields are excluded, not truncated. Choose `--fields` carefully if you need to read STRING columns (v1 does not support projection of large objects).
 - Authorization follows the connecting user (no explicit `AUTHORITY-CHECK` in v1). Limit access to trusted environments.
-- Requires the ICF service version 0.3.0 or later (`abap deploy`; `abap doctor` reports the installed version).
+- Requires the ICF service version 0.3.0 or later (`abap extension deploy`; `abap doctor` reports the installed version).
 
 ## `abap check`
 
-Validate local ABAP files. Exactly one mode applies; `--syntax` is the default.
+Validate local ABAP files (021: modes are now subcommands — `syntax` is the default).
 
 ```bash
-abap check [options] [files...]
+abap check syntax [options] [files...]    # syntax check against SAP (default)
+abap check content [options] [files...]   # local-only validation, no SAP round-trip
+abap check atc [options] [files...]       # ATC check against SAP (--variant required)
+abap check --files <f...>                 # shortcut for `check syntax <f...>`
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--syntax` | Syntax check against SAP (default mode) |
-| `--content` | Local-only validation, no SAP round-trip |
-| `--atc` | ATC check against SAP |
-| `--variant <variant>` | ATC check variant (only with `--atc`) |
+| `--variant <variant>` | ATC check variant (required with `check atc`) |
 | `--all` | Check all `.abap` files under the current directory |
 | `--changed` | Check only files changed since the SAP version |
 | `--strict` | Treat warnings as failures |
-| `--out [file]` | Persist the raw ATC worklist to a file (only with `--atc`); defaults to `.abap/atc/<variant>-<timestamp>.json` |
+| `--out [file]` | Persist the raw ATC worklist to a file (only with `check atc`); defaults to `.abap/atc/<variant>-<timestamp>.json` |
 
 ## `abap search`
 
@@ -437,12 +442,12 @@ abap transport assign <object-name> --tr <request-number>
 |--------|-------------|
 | `--tr <transport>` | Target transport request (required) |
 
-## `abap connection`
+## `abap profile`
 
-Manage global connection profiles.
+Manage global connection profiles (021 — renamed from `abap connection`; workspace binding moved to `abap init --profile`).
 
 ```bash
-abap connection <command>
+abap profile <command>
 ```
 
 | Command | Description |
@@ -451,21 +456,18 @@ abap connection <command>
 | `show <name>` | Show details of a profile (no secrets) |
 | `add <name>` | Create a new profile (`--url` + `--username` required, `--password` stores the credential) |
 | `set <name>` | Modify an existing profile (fields or password) |
-| `use <name>` | Switch the current workspace to a profile |
 | `test <name>` | Probe a profile: tls → auth → adt → icf (exit code reflects the worst failing layer: TLS→4, AUTH→5, ADT/ICF→6) |
 | `delete <name>` | Delete a profile and its stored password |
 | `export [names...]` | Export profiles to a portable bundle (`--file`, `--with-passwords`) |
 | `import <file>` | Import profiles from a bundle (`--overwrite`) |
 
-**Textpool capability probe (014)**: `abap connection add` / `abap connection set` and `abap config` (when it creates a profile) perform a one-shot informational probe of the ADT text-elements capability (read + write availability) and record it on the profile (`adtTextpool: { read, write, checkedAt }`, plus `systemVersion`). Textpool operations then read this cached result to pick the route (ADT vs ICF) — no runtime probe or fallback. The probe is non-blocking: on failure (e.g. SAP unreachable) the profile simply has no `adtTextpool` record and conservative defaults apply (read→ADT, write→ICF).
+**Textpool capability probe (014)**: `abap profile add` / `abap profile set` and `abap init` (when it creates a profile) perform a one-shot informational probe of the ADT text-elements capability (read + write availability) and record it on the profile (`adtTextpool: { read, write, checkedAt }`, plus `systemVersion`). Textpool operations then read this cached result to pick the route (ADT vs ICF) — no runtime probe or fallback. The probe is non-blocking: on failure (e.g. SAP unreachable) the profile simply has no `adtTextpool` record and conservative defaults apply (read→ADT, write→ICF).
 
 `add` / `set` accept the connection fields as options: `--url`, `-c/--client`, `-u/--username`, `-l/--language`, `-p/--password`, plus `--insecure` (skip SSL verification, development only) and `--ca <path>` (PEM CA certificate). `set` additionally supports `--remove-password` (drop the keychain credential) and `--clear-ca` (remove the CA setting).
 
-`connection test <name>` returns one object per layer `{ tls, auth, adt, icf }`, each `{ ok, skipped?, error?, nextSteps? }`. A failing layer drives a non-zero exit code while all layers are still reported (partial results, not a crash).
+`profile test <name>` returns one object per layer `{ tls, auth, adt, icf }`, each `{ ok, skipped?, error?, nextSteps? }`. A failing layer drives a non-zero exit code while all layers are still reported (partial results, not a crash).
 
-## `abap atc`
-
-ATC (ABAP Test Cockpit) checks moved to `abap check --atc`. The standalone `atc` command returns a structured `COMMAND_MOVED` redirect.
+To bind the current workspace to a profile, use `abap init --profile <name>` (the legacy `profile use` was removed in 021).
 
 ## `abap status`
 
@@ -483,12 +485,16 @@ abap status [options]
 | `--since <iso-date>` | Only files modified at or after the date |
 | `--all` | Include unchanged entries |
 
-## `abap deploy`
+## `abap extension`
+
+Manage the bundled ICF ABAP extension (021 — renamed from `abap deploy`).
+
+### `abap extension deploy`
 
 Deploy the bundled ICF ABAP service to the SAP system.
 
 ```bash
-abap deploy [options]
+abap extension deploy [options]
 ```
 
 | Option | Description |
@@ -500,11 +506,23 @@ abap deploy [options]
 | `--force` | Bypass safety guards (`forced: true` in the result) |
 | `--yes` | Confirm in non-interactive environments |
 
-When `--package` is anything other than `$TMP`, `--tr` is required and `abap deploy` resolves the transport via the standard `--tr > project config > user modifiable requests` chain. With `--package $TMP` (the default), no transport is required and `--tr` may be omitted.
+When `--package` is anything other than `$TMP`, `--tr` is required and `abap extension deploy` resolves the transport via the standard `--tr > project config > user modifiable requests` chain. With `--package $TMP` (the default), no transport is required and `--tr` may be omitted.
 
-`abap deploy` auto-creates any bundled source object that does not yet exist on the target system (e.g. first-time deploy on a fresh SAP), using the description from the matching `<name>.<type>.json` metadata. The result adds an `objects` array with one entry per object (`status: created | updated | unchanged | failed`) alongside the existing per-file `files` array.
+`abap extension deploy` auto-creates any bundled source object that does not yet exist on the target system (e.g. first-time deploy on a fresh SAP), using the description from the matching `<name>.<type>.json` metadata. The result adds an `objects` array with one entry per object (`status: created | updated | unchanged | failed`) alongside the existing per-file `files` array.
 
-After deploying the bundled sources, `abap deploy` triggers the bundled ICF setup class (`ZCL_ABAP_VIBE_ICF_SETUP`) via ADT classrun, which creates/binds/activates the `/sap/zabap_vibe` SICF node (idempotent). The JSON result includes an `icfNode` field with the node state (`status`, `action`, `url`, `active`, `handler`); `--dry-run` reports `icfNode.status: "planned"` without triggering setup. A setup failure surfaces as a structured `SAP_ERROR` (exit 6).
+After deploying the bundled sources, `abap extension deploy` triggers the bundled ICF setup class (`ZCL_ABAP_VIBE_ICF_SETUP`) via ADT classrun, which creates/binds/activates the `/sap/zabap_vibe` SICF node (idempotent). The JSON result includes an `icfNode` field with the node state (`status`, `action`, `url`, `active`, `handler`); `--dry-run` reports `icfNode.status: "planned"` without triggering setup. A setup failure surfaces as a structured `SAP_ERROR` (exit 6).
+
+### `abap extension status`
+
+Probe the SAP-side ICF extension (read-only, never modifies SAP).
+
+```bash
+abap extension status [options]
+```
+
+JSON output: `{ installed, status, remoteVersion, expectedVersion, match }`. `status` ∈ `not_deployed` | `current` | `outdated` | `unreachable`; `match` is true only when `current`. `not_deployed` / `unreachable` hint at `abap extension deploy`; an unreachable probe degrades to a `meta.warnings` entry instead of crashing.
+
+Boundary: `extension status` probes the **SAP side**; `abap doctor` diagnoses the **local** environment (config, profiles, connectivity).
 
 ## `abap doctor`
 
@@ -573,40 +591,6 @@ abap diff [options] [file]
 
 JSON output: `{ parts: [{ object, part, direction, summary? }], truncated, checked }`. `direction` ∈ `local-only` | `remote-only` | `divergent` | `unchanged`; `summary` is `{ added, removed, changedLines }`. "No differences" is a valid empty result (exit 0).
 
-## `abap sync`
-
-Chain status / pull / push into one workflow.
-
-```bash
-abap sync [options]
-```
-
-| Option | Description |
-|--------|-------------|
-| `--status` | Report local↔SAP state (default) |
-| `--pull` | Pull remote-only + divergent changes down |
-| `--push` | Push local changes up |
-| `--dry-run` | Plan only — zero mutating SAP calls |
-| `--yes` | Confirm a push that touches divergent changes |
-
-JSON output: `{ direction, dryRun, parts: [{ object, part, direction, action, status, reason? }], skipped, nextSteps }`. `--push` never silently overwrites divergent changes — they are `conflict` and the push fails fast with guidance unless `--yes` is passed. Direction flags are mutually exclusive.
-
-## `abap report-stuck`
-
-Record a stuck-agent report locally (feedback loop).
-
-```bash
-abap report-stuck [options]
-```
-
-| Option | Description |
-|--------|-------------|
-| `--goal <text>` | What the agent was trying to do |
-| `--tried <text>` | What the agent already tried |
-| `--where <cmd>` | Which command it was stuck on |
-
-JSON output: `{ id, recorded, echo: { goal, tried, where } }`. Reports are written to `~/.abap-cli/reports/<id>.json` (`STUCK-<ts>-<rand>`); credentials are never recorded. If the store is unwritable the command degrades to `recorded: false` with a `STUCK-DEGRADED-` id. The same loop is reachable via the global `--report-stuck` flag on any failing command and via `ABAP_REPORT_STUCK=1` (auto-records after repeated failures).
-
 ## Error Codes
 
 Every error's `error.category` maps 1:1 to its exit code (see JSON Output Contract). `UNKNOWN` is the generic fallback for unmapped exceptions (exit `1`). The full authoritative list lives in `specs/012-unify-cli-output-contract/contracts/cli-output.md`.
@@ -614,7 +598,7 @@ Every error's `error.category` maps 1:1 to its exit code (see JSON Output Contra
 | Code | Meaning |
 |------|---------|
 | `UNKNOWN` | Unmapped exception fallback (exit 1) |
-| `CONFIG_ERROR` | Configuration missing/invalid (run `abap config` / `abap connection add` / `abap connection set`) |
+| `CONFIG_ERROR` | Configuration missing/invalid (run `abap init` / `abap profile add` / `abap profile set`) |
 | `SAP_ERROR` | ADT request failed (includes HTTP status) |
 | `TLS_ERROR` | TLS handshake / certificate failure |
 | `AUTH_ERROR` | 401/403 from SAP (bad credentials) |
@@ -626,7 +610,7 @@ Every error's `error.category` maps 1:1 to its exit code (see JSON Output Contra
 | `DDIC_NOT_SUPPORTED` | DDIC object type, later phase (create) |
 | `INVALID_ARGUMENT` | Invalid argument (e.g. mutually exclusive flags) |
 | `USAGE` | Wrong invocation / missing required arguments |
-| `COMMAND_MOVED` | Command retired and redirected (e.g. `atc` → `check --atc`) |
+| `COMMAND_MOVED` | Command retired and redirected (e.g. removed commands in 021 → USAGE) |
 | `VALIDATION_ERROR` | Semantic rejection (e.g. `sync --push` refused over divergent changes) |
 | `FILE_EXISTS` | A required file already exists (e.g. `.abap.json` during `init`) |
 | `TRANSPORT_CREATE_FAILED` | Failed to create a transport request |

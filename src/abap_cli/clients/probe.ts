@@ -8,7 +8,7 @@ import { readCaCertificate } from '../config/project-config.js';
 import { CliError } from '../output/json.js';
 import { classifyHttpError } from './http-error.js';
 
-/** Per-layer result of `connection test <name>` (FR-024). */
+/** Per-layer result of `profile test <name>` (FR-024). */
 export interface ProbeLayerResult {
   ok: boolean;
   /** True when the layer was not run because a prerequisite failed. */
@@ -49,8 +49,8 @@ export async function probeSystem(name: string): Promise<SystemProbe> {
   const profile = getSystem(name);
   if (!profile) {
     throw new CliError('CONFIG_ERROR', `Connection profile '${name}' not found.`, {
-      nextSteps: [`Run 'abap connection add ${name} --url <url> --username <user>' to create the profile.`],
-      example: `abap connection set ${name} --url <url> --username <user> --password <pass>`,
+      nextSteps: [`Run 'abap profile add ${name} --url <url> --username <user>' to create the profile.`],
+      example: `abap profile set ${name} --url <url> --username <user> --password <pass>`,
     });
   }
   const password = (await getPassword(name)) || process.env.SAP_PASSWORD || '';

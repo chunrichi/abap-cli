@@ -107,13 +107,13 @@ abap inspect ZCL_FOO --activation --json
 
 ```bash
 # 默认 status（只读，不改任何东西）
-abap sync
+abap status/pull/push
 
 # 拉 missing
-abap sync --pull --yes
+abap status/pull/push --pull --yes
 
 # 推 divergent（冲突保护：本地与 SAP 都改了的，绝不静默覆盖）
-abap sync --push --yes
+abap status/pull/push --push --yes
 ```
 
 冲突处理：单边改 → 自动同步；双边改 → `data.conflicts[]` 列出，agent 决策。
@@ -144,7 +144,7 @@ abap pull ZCL_FOO --textpool
 abap push src/zcl_foo/zcl_foo.texts.en.properties
 ```
 
-混合模式：ADT 文本元素 API 可用时走 ADT，否则 ICF `/textpool/*`。能力在 `connection add/set` 时**一次探测**并缓存到 profile 的 `adtTextpool`，后续直接读缓存路由，无运行时回退。JSON 结果 `data.route: 'adt' | 'icf'`。
+混合模式：ADT 文本元素 API 可用时走 ADT，否则 ICF `/textpool/*`。能力在 `profile add/set` 时**一次探测**并缓存到 profile 的 `adtTextpool`，后续直接读缓存路由，无运行时回退。JSON 结果 `data.route: 'adt' | 'icf'`。
 
 ## 变体 9 — FUGR 包含错误
 

@@ -12,9 +12,9 @@ import {
 function makeTree(): Command {
   const program = new Command().name('abap');
   program.command('pull');
-  const connection = program.command('connection');
-  connection.command('test');
-  connection.command('set');
+  const profile = program.command('profile');
+  profile.command('test');
+  profile.command('set');
   return program;
 }
 
@@ -38,9 +38,9 @@ describe('output meta (FR-003, FR-004, US-1)', () => {
   it('derives a nested command name from argv + command tree', () => {
     setProgram(makeTree());
     vi.spyOn(process, 'argv', 'get').mockReturnValue(
-      ['node', 'index.js', 'connection', 'test', 'dev'] as never,
+      ['node', 'index.js', 'profile', 'test', 'dev'] as never,
     );
-    expect(buildMeta().command).toBe('abap connection test');
+    expect(buildMeta().command).toBe('abap profile test');
   });
 
   it('derives a top-level command name', () => {
@@ -117,7 +117,6 @@ describe('output meta (FR-003, FR-004, US-1)', () => {
       'KEYCHAIN_WARNING',
       'FORCE_BYPASSED',
       'PROFILE_MISMATCH',
-      'STUCK_REPORT_DEGRADED',
       'PAGINATION_LIMITED',
     ] as const;
     for (const code of codes) {

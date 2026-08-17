@@ -1,15 +1,15 @@
 ---
 name: abap-data
-description: abap-cli 消费 SAP 能力 — `select`（只读表数据查询，SE16N 等价）、`run`（在 SAP 端执行 classrun 或静态方法）、`deploy`（部署自建 ICF 服务到 SAP）。use when asking how to query table data / SE16N equivalent / run a class on SAP / classrun / invoke a static method / deploy ICF service / check wrapper deployment status.
+description: abap-cli 消费 SAP 能力 — `select`（只读表数据查询，SE16N 等价）、`run`（在 SAP 端执行 classrun 或静态方法）、`extension`（部署自建 ICF 服务到 SAP）。use when asking how to query table data / SE16N equivalent / run a class on SAP / classrun / invoke a static method / deploy ICF service / check wrapper deployment status.
 metadata:
   version: "0.1.0"
   scope: sap
-  commands: [select, run, deploy]
+  commands: [select, run, extension]
 ---
 
 # abap-data — 消费 SAP 能力
 
-`sap scope` — 这 3 个命令是**消费 SAP 能力**（读数据、跑 ABAP、部署服务），与 `abap-edit` 的写路径正交。`select` 与 `run` 是**严格只读**（无 transport / 激活 / 锁 / 写）；`deploy` 是部署自建 ICF 服务到 SAP 的安装命令。
+`sap scope` — 这 3 个命令是**消费 SAP 能力**（读数据、跑 ABAP、部署服务），与 `abap-edit` 的写路径正交。`select` 与 `run` 是**严格只读**（无 transport / 激活 / 锁 / 写）；`extension deploy` 是部署自建 ICF 服务到 SAP 的安装命令。
 
 ## 何时用
 
@@ -17,8 +17,8 @@ metadata:
 - 想调用 ABAP 静态方法拿返回值（`abap run ZCL_FOO --method compute --args '{"x":3}'`）
 - 想看某张表里有什么数据（`abap select --table ZTAB --where "STATUS='X'" --limit 50`）
 - 想精确计数（`abap select --table ZTAB --where "..." --count-only`）
-- 第一次在 SAP 系统上用 `abap run` 或 `abap select`，需要先部署 ICF 服务（`abap deploy`）
-- ICF 服务版本过期（`config` / `doctor` 报告 `outdated`）需要升级
+- 第一次在 SAP 系统上用 `abap run` 或 `abap select`，需要先部署 ICF 服务（`abap extension deploy`）
+- ICF 服务版本过期（`extension status` / `doctor` 报告 `outdated`）需要升级
 
 ## 决策树
 
@@ -34,9 +34,9 @@ metadata:
 │    ├── 静态方法（需 wrapper） → run ZCL_FOO --method compute --args '{...}'
 │    └── 业务码 → 读 data.exitCode（不是 CLI exit code）
 └── ICF 服务状态？
-    ├── 第一次 / 升级 → deploy --yes
-    ├── 看会改什么 → deploy --dry-run / --diff
-    └── 已部署但 run 报 WRAPPER_NOT_DEPLOYED → deploy --yes
+    ├── 第一次 / 升级 → extension deploy --yes
+    ├── 看会改什么 → extension deploy --dry-run / --diff
+    └── 已部署但 run 报 WRAPPER_NOT_DEPLOYED → extension deploy --yes
 ```
 
 ## 注入安全（`abap select` 三层防线，必须严守）
@@ -51,7 +51,7 @@ metadata:
 
 | 错误 | 动作 |
 |---|---|
-| `WRAPPER_NOT_DEPLOYED` (exit 8) | `deploy --yes` 安装 `ZCL_ABAP_VIBE_RUNNER` |
+| `WRAPPER_NOT_DEPLOYED` (exit 8) | `extension deploy --yes` 安装 `ZCL_ABAP_VIBE_RUNNER` |
 | `WRAPPER_INPUT_UNAVAILABLE` (exit 6) | ADT classrun 不注入 `--method` 入参；改用直接 classrun 路径 |
 | `METHOD_NOT_SUPPORTED` (exit 7) | 方法签名不可反射；改 wrapper 类签名 |
 | `METHOD_FAILED` (exit 7) | 目标方法抛 `cx_root`；读 `data.parsed` 看异常 |
@@ -71,10 +71,10 @@ metadata:
 ## 通用规则
 
 1. **`select` 完全可放心反复调用**：不修改表数据、不产生传输请求、不加锁
-2. **`run --method` 前先 `deploy`**：若 `WRAPPER_NOT_DEPLOYED`，先 `deploy --yes`
+2. **`run --method` 前先 `extension deploy`**：若 `WRAPPER_NOT_DEPLOYED`，先 `extension deploy --yes`
 3. **`run` 业务退出码 vs CLI 退出码**：`data.exitCode` 是**业务退出码**（SAP 端写），CLI 退出码是命令本身状态——`jq '.data.exitCode'` 读业务码
 4. **`select --count-only` 比 `select --limit 99999` 快**：只取 `COUNT(*)`
-5. **`deploy --dry-run` 先看 plan**：CI 部署前必看
+5. **`extension deploy --dry-run` 先看 plan**：CI 部署前必看
 
 ## references（按需加载）
 

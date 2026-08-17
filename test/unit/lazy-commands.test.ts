@@ -146,9 +146,8 @@ describe('lazy command registration (P1.6)', () => {
 // --- Static consistency: stub descriptions must match the command modules ---
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const COMMAND_NAMES = [
-  'config', 'pull', 'push', 'check', 'search', 'create', 'atc', 'status',
-  'transport', 'deploy', 'connection', 'doctor', 'inspect', 'diff', 'sync',
-  'report-stuck',
+  'init', 'pull', 'push', 'check', 'search', 'create', 'status',
+  'transport', 'extension', 'profile', 'doctor', 'inspect', 'diff',
 ];
 
 describe('lazy spec descriptions (P1.6)', () => {
@@ -186,7 +185,7 @@ const hasBuiltCli = fs.existsSync(cliEntry);
 describe('lazy loading at the process level (P1.6)', () => {
   it.skipIf(!hasBuiltCli)('--help lists commands without any SAP call', async () => {
     const { stdout } = await run(process.execPath, [cliEntry, '--help']);
-    for (const name of ['config', 'pull', 'transport', 'connection', 'report-stuck']) {
+    for (const name of ['init', 'pull', 'transport', 'profile']) {
       expect(stdout).toContain(name);
     }
   });
@@ -204,8 +203,8 @@ describe('lazy loading at the process level (P1.6)', () => {
 });
 
 // --- root --help groups local commands under a dedicated section (P2.9) ---
-const LOCAL_NAMES = ['config', 'connection', 'doctor', 'report-stuck'];
-const SAP_NAMES = ['pull', 'push', 'check', 'search', 'create', 'status', 'transport', 'deploy', 'inspect', 'diff', 'sync', 'atc'];
+const LOCAL_NAMES = ['init', 'profile', 'doctor'];
+const SAP_NAMES = ['pull', 'push', 'check', 'search', 'create', 'status', 'transport', 'extension', 'inspect', 'diff'];
 
 describe('lazy command scope grouping (P2.9)', () => {
   it('every lazy spec is annotated as either local or sap (defaults to sap)', () => {
@@ -258,7 +257,7 @@ describe('lazy command scope grouping (P2.9)', () => {
     expect(res.stdout).not.toContain('Local commands (no SAP connection required):');
   });
 
-  it.skipIf(!hasBuiltCli)('built CLI root --help groups init/connection/doctor/report-stuck as local', async () => {
+  it.skipIf(!hasBuiltCli)('built CLI root --help groups init/profile/doctor as local', async () => {
     const { stdout } = await run(process.execPath, [cliEntry, '--help']);
     expect(stdout).toContain('Local commands (no SAP connection required):');
     // The Local section is the block between the heading and the next

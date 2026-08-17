@@ -26,29 +26,31 @@ node dist/src/abap_cli/index.js --help
 
 ## First-Time Setup
 
-`abap config` configures your workspace. `abap config` is the parameter form: pass `--system` (or a full connection set) and it writes `.abap.json`; `abap config init` is the interactive wizard (no flags accepted, TTY only).
+`abap init` configures your workspace. The parameter form `abap init --profile <name> --yes` binds an existing profile; a bare `abap init` (TTY) opens the interactive wizard.
 
 ### Non-interactive (recommended)
 
 ```bash
-# Reference an existing system profile, or create one from parameters:
-abap config --system dev --url https://sap:44300 --client 100 --username DEV --password '***'
+# Create a global profile once, then bind the workspace to it:
+abap profile add dev --url https://sap:44300 --client 100 --username DEV --password '***'
+abap init --profile dev --yes
 
-# Optionally set default transport and package:
-abap config --system dev --tr DEVK900001 --package ZDEV
+# Optionally set default transport and package, and scaffold agent context:
+abap init --profile dev --tr DEVK900001 --package ZDEV --yes
+abap init --agent copilot
 ```
 
-When given a full set of connection parameters, `abap config` creates a named **system profile** (stored under `~/.abap-cli/systems.json`) and writes a `.abap.json` in the current directory referencing it. The password is stored in the OS keychain, never in plain text.
+Global **system profiles** are stored under `~/.abap-cli/systems.json`; `abap init` writes a `.abap.json` in the current directory referencing the chosen profile. The password is stored in the OS keychain, never in plain text.
 
 ### Interactive
 
 ```bash
-abap config   # runs the wizard
+abap init   # runs the wizard
 ```
 
 Prompts guide you through selecting an existing system profile or entering a new one.
 
-## What `abap config` Produces
+## What `abap init` Produces
 
 `~/.abap-cli/systems.json` — user-level system profiles (mode `0600`):
 
@@ -85,8 +87,8 @@ abap pull ZCL_MY_CLASS
 
 # 2. Edit the local file (abap-file-format naming, e.g. src/zcl_my_class/zcl_my_class.clas.abap)
 
-# 3. Check the file (default --syntax mode, checked against SAP; nothing is changed)
-abap check src/zcl_my_class/zcl_my_class.clas.abap
+# 3. Check the file (syntax mode is the default, checked against SAP; nothing is changed)
+abap check syntax src/zcl_my_class/zcl_my_class.clas.abap
 
 # 4. Push back (lock → write → activate → unlock)
 abap push src/zcl_my_class/zcl_my_class.clas.abap --tr DEVK900001
@@ -94,7 +96,7 @@ abap push src/zcl_my_class/zcl_my_class.clas.abap --tr DEVK900001
 
 ### When You Have No Transport Request
 
-`abap push` resolves the transport **per object**: an object already assigned to a request reuses it, and objects in `$TMP` push with no transport at all — so a freshly `abap create`d or `abap deploy`ed `$TMP` object can be pushed without `--tr`. Only an unbound object in a real package needs an explicit request:
+`abap push` resolves the transport **per object**: an object already assigned to a request reuses it, and objects in `$TMP` push with no transport at all — so a freshly `abap create`d or `abap extension deploy`ed `$TMP` object can be pushed without `--tr`. Only an unbound object in a real package needs an explicit request:
 
 ```bash
 # See what's available
@@ -123,10 +125,10 @@ abap push src/zcl_my_new_class/zcl_my_new_class.clas.abap --tr DEVK900001
 
 - **Source objects** — Class (CLAS), Interface (INTF), Program (PROG), Function Group (FUGR) for pull / push / check / create via the ADT REST API
 - **Transport management** — `abap transport list` / `create` / `show` / `resolve` / `assign`
-- **Diagnosis & workflows** — `abap doctor`, `abap inspect`, `abap diff`, `abap sync`, `abap report-stuck`
-- **ICF service lifecycle** — `abap deploy` deploys the bundled ICF service (`/sap/zabap_vibe`) and triggers its SICF node setup; `abap config` checks deployment/version state; `abap activate` fixes stale activation (see [Commands](commands.md))
+- **Diagnosis & workflows** — `abap doctor`, `abap inspect`, `abap diff`
+- **ICF service lifecycle** — `abap extension deploy` deploys the bundled ICF service (`/sap/zabap_vibe`) and triggers its SICF node setup; `abap extension status` reports installation/version state; `abap init` checks deployment/version state; `abap activate` fixes stale activation (see [Commands](commands.md))
 - **DDIC objects** (Domain, DataElement, Table, Structure as `.doma.json` / `.dtel.json` / `.tabl.json` / `.stru.json`) — create / overwrite / pull via the self-built ICF service (`/sap/zabap_vibe/ddic/*`). `abap create <DOMA|DTEL|TABL|STRU> <name> --file <json>` creates; `abap pull <name> --type <T>` downloads; `abap push <name>.<type>.json --tr <tr>` updates. TTYP is deferred.
-- **Textpool (text elements)** — read/write program text symbols, selection texts and list headings via `abap pull <name> --textpool` and `abap push <name>.<type>.texts|selections|headings.<lang>.properties`. Mixed mode: the ADT text-elements API is used when the system supports it; ECC/older systems route through the ICF `/textpool/*` endpoint. Capability is probed once when the connection profile is created (`abap connection add/set`, `abap config`) and cached in the profile — no runtime fallback (see [Commands](commands.md) for details).
+- **Textpool (text elements)** — read/write program text symbols, selection texts and list headings via `abap pull <name> --textpool` and `abap push <name>.<type>.texts|selections|headings.<lang>.properties`. Mixed mode: the ADT text-elements API is used when the system supports it; ECC/older systems route through the ICF `/textpool/*` endpoint. Capability is probed once when the connection profile is created (`abap profile add/set`, `abap init`) and cached in the profile — no runtime fallback (see [Commands](commands.md) for details).
 
 ## Deploy the Bundled ICF Service
 
@@ -134,12 +136,13 @@ The bundled service (handler + setup classes in `abap/src/clas/`) provides the `
 
 ```bash
 # Deploy sources and trigger SICF node creation/activation (idempotent)
-abap deploy --yes --json
+abap extension deploy --yes --json
 # → data.icfNode: { status: "success", action: "created|already_active", url: "/sap/zabap_vibe", active: true, handler: "ZCL_ABAP_VIBE_ICF" }
 
 # Verify the endpoint
-abap connection test <name> --json        # icf layer should be ok
-abap config --system <name> --json   # data.icf.status: current / not_deployed / outdated
+abap profile test <name> --json       # icf layer should be ok
+abap extension status --json          # installed / version match
+abap init --profile <name> --yes --json   # data.icf.status: current / not_deployed / outdated
 ```
 
 If a class reports `activated` but is actually stale, use the diagnostic + repair pair:

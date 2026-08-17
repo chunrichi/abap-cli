@@ -20,9 +20,9 @@ const PORT = Number(process.argv[2] || process.env.PORT || 8080);
 const NO_TRANSPORTS = process.env.MOCK_NO_TRANSPORTS === '1';
 // MOCK_ATOMIC_FAIL=1 → fail the 2nd setObjectSource (mid-batch write failure for push --atomic).
 const ATOMIC_FAIL = process.env.MOCK_ATOMIC_FAIL === '1';
-// MOCK_AUTH_FAIL=1 → compatibility graph returns 401 (auth layer failure for `connection test`).
+// MOCK_AUTH_FAIL=1 → compatibility graph returns 401 (auth layer failure for `profile test`).
 const AUTH_FAIL = process.env.MOCK_AUTH_FAIL === '1';
-// MOCK_ICF_FAIL=1 → /sap/zabap_vibe/ returns 500 (icf layer failure for `connection test`).
+// MOCK_ICF_FAIL=1 → /sap/zabap_vibe/ returns 500 (icf layer failure for `profile test`).
 const ICF_FAIL = process.env.MOCK_ICF_FAIL === '1';
 // MOCK_SETUP_FAIL=1 → classrun of the ICF setup class returns a failure envelope.
 const SETUP_FAIL = process.env.MOCK_SETUP_FAIL === '1';
@@ -518,7 +518,7 @@ function lockXml(lockHandle) {
 const createdTransports = [];
 let transportSeq = 1;
 
-// ---------- ATC (check --atc, US2/US3) ----------
+// ---------- ATC (check atc, US2/US3) ----------
 const ATC_VARIANTS = new Map([['Z_ATC_VAR', 'Mock ATC variant']]);
 const atcRuns = new Map(); // runId -> { variant, timestamp }
 let atcSeq = 0;
@@ -784,7 +784,7 @@ const server = http.createServer(async (req, res) => {
       return ok(res, '{}', 'application/json');
     }
 
-    // self-built ICF service root (probeIcf target for `connection test` / `doctor`)
+    // self-built ICF service root (probeIcf target for `profile test` / `doctor`)
     if (path === '/sap/zabap_vibe/') {
       if (ICF_FAIL) return adtError(res, 500, 'Simulated ICF failure (MOCK_ICF_FAIL=1)');
       return ok(res, JSON.stringify({ status: 'success', data: { service: 'zabap_vibe', version: ICF_SERVICE_VERSION } }), 'application/json');

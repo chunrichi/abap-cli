@@ -1,4 +1,4 @@
-# abap-edit — 11 命令完整速查
+# abap-edit — 10 命令完整速查
 
 > 按需加载。
 
@@ -94,19 +94,20 @@ abap push src/zprog/zprog.prog.texts.en.properties      # textpool
 ### `abap check`
 
 ```bash
-abap check <file>                       # --syntax（默认，对 SAP）
-abap check <file> --content             # 仅本地内容
-abap check <file> --atc --out ./atc.json # ATC（持久化 worklist）
-abap check --all
-abap check <file> --json
+abap check syntax src/zcl_demo.clas.abap            # 对 SAP 语法检查（默认）
+abap check content src/zcl_demo.clas.abap           # 仅本地内容（不调 SAP）
+abap check atc src/zcl_demo.clas.abap --variant Z_ATC_VAR --out ./atc.json  # ATC
+abap check --files src/zcl_demo.clas.abap           # 父命令快捷方式 = check syntax
+abap check syntax --all
+abap check syntax src/zcl_demo.clas.abap --json
 ```
 
 | flag | 含义 |
 |---|---|
-| `--syntax`（默认） | 对 SAP 语法检查 |
-| `--content` | 仅本地内容（不调 SAP） |
-| `--atc` | SAP ATC 检查 |
-| `--out [file]` | `--atc` 时持久化 worklist（默认 `./.abap/atc/<variant>-<ts>.json`） |
+| `syntax`（默认子命令） | 对 SAP 语法检查 |
+| `content` | 仅本地内容（不调 SAP） |
+| `atc` | SAP ATC 检查（`--variant` 必填） |
+| `--out [file]` | `check atc` 时持久化 worklist（默认 `./.abap/atc/<variant>-<ts>.json`） |
 
 ### `abap create`
 
@@ -173,18 +174,17 @@ abap diff <file> --json
 
 粗粒度本地 vs SAP 差异（changed parts 列表）。`diff` 的简化版。
 
-### `abap sync`
+### 链式编排（`abap sync` 已移除）
 
-链式 status / pull / push：
+`abap sync` 在 021 已移除。Agent 应显式编排：
 
 ```bash
-abap sync --status              # 默认
-abap sync --pull                # 拉 missing
-abap sync --push --yes          # 推 divergent（冲突保护）
-abap sync --dry-run             # 计划
+abap status --json          # 查看差异
+abap pull <obj> --json      # 拉取 remote-only / divergent
+abap push <file> --yes --json  # 推送 local changes（冲突时保护）
 ```
 
-`--pull` / `--push` 冲突时**不**静默覆盖——报错给 agent 决策。
+`pull` / `push` 遇到 divergent 时**不**静默覆盖——报错给 agent 决策。
 
 ### `abap create local`
 

@@ -14,7 +14,7 @@ changed at: 2026-08-07 22:44:00
 1. **classrun**（无 `--method`）：触发目标类的 `if_oo_adt_classrun~main`（ADT classrun 端点 `/sap/bc/adt/oo/classrun/<name>`），stdout 原样返回。
 2. **wrapper**（`--method <name>`）：运行 bundled 的 `ZCL_ABAP_VIBE_RUNNER`，经 RTTS 反射调用目标类的 PUBLIC STATIC 方法（IMPORTING + RETURNING），返回值经 `/ui2/cl_json` JSON 化输出。
 
-`abap run` 是**严格只读**命令——不获取锁、不触发 transport、不激活、不写文件。wrapper 类由 `abap deploy` 安装（缺失时报 `WRAPPER_NOT_DEPLOYED`）。
+`abap run` 是**严格只读**命令——不获取锁、不触发 transport、不激活、不写文件。wrapper 类由 `abap extension deploy` 安装（缺失时报 `WRAPPER_NOT_DEPLOYED`）。
 
 ## Usage
 
@@ -67,7 +67,7 @@ abap run --schema [--json]
 | `OBJECT_NOT_ACTIVE` | SAP_ERROR / 6 | 类未激活 → `abap activate <class>`（含 SAP 纯文本 `is inactive`） |
 | `LOCAL_CLASS_NOT_RUNNABLE` | SAP_ERROR / 6 | 类名含 `~`（本地类） |
 | `TIMEOUT` | SAP_ERROR / 6 | 超过 `--timeout` → 检查 SM51 |
-| `WRAPPER_NOT_DEPLOYED` | NOT_FOUND / 8 | `ZCL_ABAP_VIBE_RUNNER` 缺失 → `abap deploy` |
+| `WRAPPER_NOT_DEPLOYED` | NOT_FOUND / 8 | `ZCL_ABAP_VIBE_RUNNER` 缺失 → `abap extension deploy` |
 | `WRAPPER_INPUT_UNAVAILABLE` | SAP_ERROR / 6 | SAP classrun 端点不注入 `--method` 参数（系统限制）→ 改用直接 classrun |
 
 **纯文本 SAP 错误识别（真实 SAP 验证）**：SAP 对部分失败模式返回纯文本而非 JSON 信封，CLI 会识别并映射为结构化错误：
@@ -152,7 +152,7 @@ abap run --schema --json
 ## todo
 
 - [ ] **P2 — PROG（report）执行** — 通过 ADT SUBMIT 或独立入口支持 `abap run <prog> --type PROG`（roadmap 差异能力）；report 输出回 SP01 的捕获方式需先验证。
-- [ ] **`--method` 参数注入的跨版本探测** — 在 `connection add/set` 或 `abap init` 时一次性探测 SAP classrun 是否支持参数注入并持久化到 profile（类似 014 的 `adtTextpool` 能力探测），`--method` 在支持的系统上正常走 wrapper、不支持的直接提示，避免每次运行 `WRAPPER_INPUT_UNAVAILABLE`。
+- [ ] **`--method` 参数注入的跨版本探测** — 在 `profile add/set` 或 `abap init` 时一次性探测 SAP classrun 是否支持参数注入并持久化到 profile（类似 014 的 `adtTextpool` 能力探测），`--method` 在支持的系统上正常走 wrapper、不支持的直接提示，避免每次运行 `WRAPPER_INPUT_UNAVAILABLE`。
 - [ ] **`--no-wait` 异步执行** — spec FR-002 曾规划"只入队不等待返回"，v1 未实现（`--method` 参数注入可用后再评估）。
 - [ ] **真实 SAP 端到端 fixture** — `ZCL_ABAP_VIBE_RUNNER_FIXTURE_OK/BAD/FAIL` 测试类目前仅在 mock 覆盖；如需在真实 SAP 上回归 `--method` 反射，需先确认目标系统支持参数注入。
 

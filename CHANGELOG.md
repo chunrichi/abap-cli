@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- **CLI 命令树重构（021）** — 19 个顶层命令收敛为 16 个，命令组语义对齐（详见 Breaking changes 迁移表）。新增能力：`abap init --agent <target>`（幂等脚手架 AGENTS.md + skills/ + 厂商入口文件，`--force` 覆盖）；`abap extension status`（只读探测 SAP 侧 ICF 服务 installed/version/match）；`abap check syntax|content|atc` 子命令化（`--files` 父命令快捷方式）；`abap profile`（承接原 connection，保留 `set`，`use` 并入 `init --profile`）。`package.json` `files` 增补 `skills/` `agents/` `AGENTS.md` `.github`，供 `--agent` 脚手架分发。
 - **npm 发布准备** — `files` 增加 `abap/src`（`abap deploy` 运行期依赖的打包 ABAP 源码）；补 `repository` / `homepage` / `bugs` 元数据。首次发布版本 `0.1.0`（包名 `abap-cli` 已确认可用）。
 - **Skill/agent 分发包 v1.1 自包含重构（019）** — 顶层 `skills/` `agents/` 提供 3 个 skill（`abap-setup` / `abap-edit` / `abap-data`）覆盖全部 18 个 CLI 命令 + 1 个编排 agent（`abap-developer`）；自包含结构（SKILL.md + references/scripts/assets），frontmatter 遵循 agentskills.io 开放标准，跨 Claude Code / Cursor / Copilot / Continue / Codex 兼容。整合子命令、npm 资源打包、CI 校验推迟至后续。
 - **Skill bundle 强化（020）** — 补全 4 个缺失 wiki 命令页（`deploy` / `inspect` / `diff` / `sync`）；新增 `test/unit/skill-bundle.test.ts`（25 用例）自动校验 frontmatter / 目录一致 / 命令覆盖 / 路径约束 / 行数限制。所有 91 个测试文件 / 495 个用例全过。
@@ -17,6 +18,21 @@
 - **`abap --help` local / SAP 命令分组** — 每个 `LazyCommandSpec` 新增 `scope: 'local' | 'sap'`；4 个本地命令（`init` / `connection` / `doctor` / `report-stuck`）显式标注，根 `--help` 末尾追加对应分组。
 
 ### Breaking changes
+- **CLI 命令树重构（021）** — 命令合并 / 更名 / 移除，全部按 AGENTS.md "Refactor Fearlessly" 不留兼容别名；被删命令调用返回 USAGE 错误 + 迁移 hint。迁移表：
+
+  | 旧命令 | 新命令 |
+  |---|---|
+  | `abap config [flags]` | `abap init --profile <name> [--tr] [--package] [--yes]`（`--system` → `--profile`） |
+  | `abap config init` | 裸 `abap init`（TTY 向导；非 TTY 裸调用报 USAGE） |
+  | `abap connection add/list/show/set/test/delete/export/import` | `abap profile …`（同名子命令） |
+  | `abap connection use <name>` | `abap init --profile <name> --yes` |
+  | `abap deploy` | `abap extension deploy`（flags 不变） |
+  | `abap check --syntax/--content/--atc <f>` | `abap check syntax/content/atc <f>`（裸 `abap check <f>` 走 `--files` 快捷方式） |
+  | `abap atc` | 移除（→ `abap check atc <f> --variant Z_VAR`） |
+  | `abap sync` | 移除（Agent 显式编排 status → pull → push） |
+  | `abap report-stuck` + 全局 `--report-stuck` + `ABAP_REPORT_STUCK` | 全部移除（结构化 JSON 错误已覆盖反馈价值） |
+
+  旧命令名不再可用，统一按未知命令处理。存储层（`~/.abap-cli/systems.json`、keychain、`.abap.json`）与 `SystemProfile` 内部命名不变——**零数据迁移**。
 - **`abap select` 行值为原生类型，服务 0.4.0（017）** — `data.rows` 单元格按 `/ui2/cl_json` 原生序列化（NUMC/INT/DEC → number、DATS → `YYYY-MM-DD`、TIMS → `HH:MM:SS`）。迁移：`--json` 消费者将 cell 视为 `string | number | boolean | null`；CLI `SelectResult.rows` 类型为 `Record<string, unknown>[]`。ICF 0.3.0 → 0.4.0（`abap deploy` 重新部署）；其他端点 wire 不变。
 - **`abap connection delete <name>` 非交互环境需要 `--yes`** — 脚本 / CI（无 TTY）原先无条件删 profile + keychain 密码；现以 `VALIDATION_ERROR`（exit 7）拒绝。TTY 不变。
 - **`abap config init` 仅做向导；参数形式移到 `abap config`** — `abap config init` 不再接受 flag，是交互向导入口。原参数化写入改为 `abap config --system X …`。`abap config`（裸）打帮助（exit 0）同 `abap connection`。

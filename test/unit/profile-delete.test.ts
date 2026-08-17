@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { registerConnectionCommand } from '../../src/abap_cli/commands/connection.js';
+import { registerProfileCommand } from '../../src/abap_cli/commands/profile.js';
 import { makeProgram, runCommand } from './cli-helper.js';
 
 const deleteSystem = vi.fn();
@@ -26,7 +26,7 @@ vi.mock('../../src/abap_cli/config/secrets.js', () => ({
   getPassword: vi.fn(async () => null),
 }));
 
-describe('abap connection delete', () => {
+describe('abap profile delete', () => {
   let cwd: string;
 
   beforeEach(() => {
@@ -36,8 +36,8 @@ describe('abap connection delete', () => {
 
   it('non-interactive delete without --yes fails with VALIDATION_ERROR', async () => {
     const program = makeProgram();
-    registerConnectionCommand(program);
-    const res = await runCommand(program, ['connection', 'delete', 'existing', '--json'], { cwd });
+    registerProfileCommand(program);
+    const res = await runCommand(program, ['profile', 'delete', 'existing', '--json'], { cwd });
     const err = JSON.parse(res.stderr);
     expect(err.error.code).toBe('VALIDATION_ERROR');
     expect(deleteSystem).not.toHaveBeenCalled();
@@ -45,8 +45,8 @@ describe('abap connection delete', () => {
 
   it('non-interactive delete with --yes deletes the profile and password', async () => {
     const program = makeProgram();
-    registerConnectionCommand(program);
-    const res = await runCommand(program, ['connection', 'delete', 'existing', '--yes', '--json'], { cwd });
+    registerProfileCommand(program);
+    const res = await runCommand(program, ['profile', 'delete', 'existing', '--yes', '--json'], { cwd });
     const data = JSON.parse(res.stdout).data;
     expect(res.exitCode).toBeUndefined();
     expect(data).toMatchObject({ deleted: 'existing', passwordCleaned: true });
@@ -56,8 +56,8 @@ describe('abap connection delete', () => {
 
   it('deleting an unknown profile fails with CONFIG_ERROR', async () => {
     const program = makeProgram();
-    registerConnectionCommand(program);
-    const res = await runCommand(program, ['connection', 'delete', 'nope', '--yes', '--json'], { cwd });
+    registerProfileCommand(program);
+    const res = await runCommand(program, ['profile', 'delete', 'nope', '--yes', '--json'], { cwd });
     const err = JSON.parse(res.stderr);
     expect(err.error.code).toBe('CONFIG_ERROR');
     expect(deleteSystem).not.toHaveBeenCalled();

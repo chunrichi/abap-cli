@@ -12,7 +12,7 @@
 | `OBJECT_NOT_ACTIVE` | SAP_ERROR/6 | 类未激活 | 用 abap-edit 的 `activate <obj> --yes` |
 | `LOCAL_CLASS_NOT_RUNNABLE` | SAP_ERROR/6 | 类名含 `~`（本地类） | 用外部类 |
 | `TIMEOUT` | SAP_ERROR/6 | classrun 超时 | `--timeout` 增大；或拆小循环 |
-| `WRAPPER_NOT_DEPLOYED` | NOT_FOUND/8 | `ZCL_ABAP_VIBE_RUNNER` 缺失 | `abap deploy --yes` |
+| `WRAPPER_NOT_DEPLOYED` | NOT_FOUND/8 | `ZCL_ABAP_VIBE_RUNNER` 缺失 | `abap extension deploy --yes` |
 | `WRAPPER_INPUT_UNAVAILABLE` | SAP_ERROR/6 | ADT classrun 不注入 `--method` 入参 | 改用直接 classrun |
 
 ## select

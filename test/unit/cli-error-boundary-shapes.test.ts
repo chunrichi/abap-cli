@@ -45,7 +45,7 @@ describe('P0.2 — CliError shape for previously-raw throws', () => {
         expect(e.code).toBe('CONFIG_ERROR');
         expect(e.message).toMatch(/Cannot parse user config/);
         expect(Array.isArray(e.nextSteps)).toBe(true);
-        expect(e.example).toContain('connection add');
+        expect(e.example).toContain('profile add');
       } finally {
         vi.doUnmock('fs');
       }

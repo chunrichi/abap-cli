@@ -9,7 +9,11 @@
   },
   "files": [
     "dist",
-    "abap/src"
+    "abap/src",
+    "skills",
+    "agents",
+    "AGENTS.md",
+    ".github"
   ],
   "repository": {
     "type": "git",

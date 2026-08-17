@@ -21,23 +21,23 @@
 
 ## 本 skill 错误码清单（4 命令范围）
 
-### config / connection
+### init / profile
 
 | code | cat/exit | 触发 | 修复 |
 |---|---|---|---|
-| `CONFIG_ERROR` | CONFIG_ERROR/3 | `.abap.json` / `systems.json` 损坏、字段缺失 | 检查 JSON 语法；重新 `abap config` |
+| `CONFIG_ERROR` | CONFIG_ERROR/3 | `.abap.json` / `systems.json` 损坏、字段缺失 | 检查 JSON 语法；重新 `abap init` |
 | `TLS_ERROR` | TLS_ERROR/4 | TLS 握手失败 | `--insecure` 或 `--ca <pem>` |
-| `AUTH_ERROR` | AUTH_ERROR/5 | 用户名/密码错 / 会话过期 | `connection test <name>`；确认 keychain 密码 |
+| `AUTH_ERROR` | AUTH_ERROR/5 | 用户名/密码错 / 会话过期 | `profile test <name>`；确认 keychain 密码 |
 | `USAGE` | USAGE/2 | 缺必填参数 | `abap <cmd> --help` |
-| `INVALID_ARGUMENT` | USAGE/2 | 参数不合法（如 `connection add` 缺 url） | 看 `error.nextSteps` |
-| `NOT_FOUND` | NOT_FOUND/8 | profile 不存在 | `connection list` 查名字 |
+| `INVALID_ARGUMENT` | USAGE/2 | 参数不合法（如 `profile add` 缺 url） | 看 `error.nextSteps` |
+| `NOT_FOUND` | NOT_FOUND/8 | profile 不存在 | `profile list` 查名字 |
 
 ### doctor
 
 | code | cat/exit | 触发 | 修复 |
 |---|---|---|---|
-| `CONFIG_ERROR` | CONFIG_ERROR/3 | 工作区未配置或 profile 错 | `abap config init` 或 `--system <name>` |
-| `TLS_ERROR` | TLS_ERROR/4 | doctor 探针 TLS 失败 | `connection set <name> --insecure` |
+| `CONFIG_ERROR` | CONFIG_ERROR/3 | 工作区未配置或 profile 错 | `abap init` 或 `--profile <name>` |
+| `TLS_ERROR` | TLS_ERROR/4 | doctor 探针 TLS 失败 | `profile set <name> --insecure` |
 | `AUTH_ERROR` | AUTH_ERROR/5 | doctor 探针 auth 失败 | 重写密码 |
 
 `doctor --fix` 仅做安全可逆修复（TLS 校验开关、cache 清理等）。其他问题报在 `nextSteps`。

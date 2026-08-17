@@ -26,7 +26,6 @@ export type WarningCode =
   | 'KEYCHAIN_WARNING'      // OS keychain store/cleanup failed (degraded continue)
   | 'FORCE_BYPASSED'        // deploy --force bypassed safety guards
   | 'PROFILE_MISMATCH'      // stored profile differs from current config
-  | 'STUCK_REPORT_DEGRADED' // stuck report write degraded (STUCK-DEGRADED-)
   | 'PAGINATION_LIMITED'    // search --page-all hit the page cap; result truncated
   | 'ICF_CHECK_DEGRADED'    // init ICF deployment check degraded (non-blocking)
   ;
@@ -38,7 +37,7 @@ export interface Warning {
 }
 
 export interface OutputMeta {
-  /** Canonical command name, e.g. 'abap pull', 'abap connection test'. */
+  /** Canonical command name, e.g. 'abap pull', 'abap profile test'. */
   command: string;
   /** CLI version from package.json. */
   version: string;

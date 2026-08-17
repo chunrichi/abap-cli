@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { registerConnectionCommand } from '../../src/abap_cli/commands/connection.js';
+import { registerProfileCommand } from '../../src/abap_cli/commands/profile.js';
 import { makeProgram, runCommand } from './cli-helper.js';
 
 const probeSystemMock = vi.fn();
@@ -34,7 +34,7 @@ const SKIPPED = (): { ok: boolean; skipped: true; error: { code: string; message
   error: { code: 'SKIPPED', message: 'Skipped because a prerequisite layer failed.' },
 });
 
-describe('abap connection test (FR-024, FR-008 exit codes)', () => {
+describe('abap profile test (FR-024, FR-008 exit codes)', () => {
   let cwd: string;
 
   beforeEach(() => {
@@ -46,14 +46,14 @@ describe('abap connection test (FR-024, FR-008 exit codes)', () => {
   /** Run and return the result plus the command-set process.exitCode (FR-008). */
   async function runTest(args: string[]) {
     const program = makeProgram();
-    registerConnectionCommand(program);
+    registerProfileCommand(program);
     const res = await runCommand(program, args, { cwd });
     return { ...res, exitCode: res.exitCode ?? process.exitCode };
   }
 
   it('returns the four-layer payload with ok/error per layer, exit 0 when healthy', async () => {
     probeSystemMock.mockResolvedValue(ALL_OK);
-    const res = await runTest(['connection', 'test', 'real', '--json']);
+    const res = await runTest(['profile', 'test', 'real', '--json']);
     expect(res.exitCode).toBeUndefined();
     const parsed = JSON.parse(res.stdout);
     expect(parsed.status).toBe('success');
@@ -71,12 +71,12 @@ describe('abap connection test (FR-024, FR-008 exit codes)', () => {
       auth: {
         ok: false,
         error: { code: 'AUTH_ERROR', message: '401 Unauthorized' },
-        nextSteps: ['abap connection set real --password <new>'],
+        nextSteps: ['abap profile set real --password <new>'],
       },
       adt: SKIPPED(),
       icf: SKIPPED(),
     });
-    const res = await runTest(['connection', 'test', 'real', '--json']);
+    const res = await runTest(['profile', 'test', 'real', '--json']);
     expect(res.exitCode).toBe(5);
     const parsed = JSON.parse(res.stdout);
     expect(parsed.status).toBe('success');
@@ -92,13 +92,13 @@ describe('abap connection test (FR-024, FR-008 exit codes)', () => {
       tls: {
         ok: false,
         error: { code: 'TLS_ERROR', message: 'self-signed certificate' },
-        nextSteps: ['abap connection set real --ca <pem> or --insecure'],
+        nextSteps: ['abap profile set real --ca <pem> or --insecure'],
       },
       auth: SKIPPED(),
       adt: SKIPPED(),
       icf: SKIPPED(),
     });
-    const res = await runTest(['connection', 'test', 'real', '--json']);
+    const res = await runTest(['profile', 'test', 'real', '--json']);
     expect(res.exitCode).toBe(4);
     const parsed = JSON.parse(res.stdout);
     expect(parsed.data.tls.ok).toBe(false);
@@ -117,7 +117,7 @@ describe('abap connection test (FR-024, FR-008 exit codes)', () => {
       adt: { ok: true },
       icf: { ok: false, error: { code: 'SAP_ERROR', message: 'Request failed with status code 404' } },
     });
-    const res = await runTest(['connection', 'test', 'real', '--json']);
+    const res = await runTest(['profile', 'test', 'real', '--json']);
     expect(res.exitCode).toBe(6);
     const parsed = JSON.parse(res.stdout);
     expect(parsed.data.icf.ok).toBe(false);
@@ -127,10 +127,10 @@ describe('abap connection test (FR-024, FR-008 exit codes)', () => {
   it('unknown system → CONFIG_ERROR exit 3 with nextSteps', async () => {
     probeSystemMock.mockRejectedValue(
       new (await import('../../src/abap_cli/output/json.js')).CliError('CONFIG_ERROR', "Connection profile 'nope' not found.", {
-        nextSteps: ["Run 'abap connection set nope ...' to create the profile."],
+        nextSteps: ["Run 'abap profile set nope ...' to create the profile."],
       }),
     );
-    const res = await runTest(['connection', 'test', 'nope', '--json']);
+    const res = await runTest(['profile', 'test', 'nope', '--json']);
     expect(res.exitCode).toBe(3);
     const parsed = JSON.parse(res.stderr);
     expect(parsed.status).toBe('error');

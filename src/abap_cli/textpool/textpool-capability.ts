@@ -25,7 +25,7 @@ export interface CapabilityAwareProfile {
  * - read: getTextElements succeeds (all SAP systems; author-doc confirmed).
  * - write: setTextElements succeeds; unsupported systems (ECC) throw → write=false.
  * Never throws: any probe failure degrades to read=false/write=false rather than
- * blocking the calling command (init / connection add|set stay non-blocking).
+ * blocking the calling command (init / profile add|set stay non-blocking).
  */
 export async function probeTextpoolCapability(): Promise<TextpoolCapability & { systemVersion?: string }> {
   const checkedAt = new Date().toISOString();

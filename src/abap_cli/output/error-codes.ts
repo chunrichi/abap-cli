@@ -54,7 +54,7 @@ export type ErrorCode =
   | 'VALIDATION_ERROR'     // semantic rejection (exit 7); see contracts §3
   | 'OBJECT_EXISTS'        // normalized legacy code (USAGE/2), used by create.ts
   | 'FILE_EXISTS'          // normalized legacy code (USAGE/2), used by init.ts
-  | 'COMMAND_MOVED'        // normalized legacy code (VALIDATION_ERROR/7); command retired (e.g. atc → check --atc)
+  | 'COMMAND_MOVED'        // normalized legacy code (VALIDATION_ERROR/7); command retired (e.g. atc → check atc)
   // 015-abap-run: classrun runner error codes
   | 'METHOD_FAILED'           // 015: target method raised cx_root (VALIDATION_ERROR)
   | 'METHOD_NOT_SUPPORTED'    // 015: method signature not adapter-compatible (VALIDATION_ERROR)

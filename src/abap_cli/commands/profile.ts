@@ -5,27 +5,27 @@ import { printError, printResult, jsonFromCommand, CliError } from '../output/js
 import { collectWarning } from '../output/meta.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import { exportProfiles, importProfiles, type ProfileBundle } from '../config/profiles.js';
-import { runList, runShow, runUse, runTest, runDelete } from '../flows/connection-flow.js';
-import { runAdd, runSet } from '../flows/connection-profile.js';
+import { runList, runShow, runTest, runDelete } from '../flows/profile-flow.js';
+import { runAdd, runSet } from '../flows/profile-flow.js';
 
-export function registerConnectionCommand(program: Command): void {
-  const connection = program
-    .command('connection')
-    .description('Manage global connection profiles')
+export function registerProfileCommand(program: Command): void {
+  const profile = program
+    .command('profile')
+    .description('Manage global connection profiles. Run `abap init --profile <name>` to bind the current workspace.')
     .addHelpText('after', commonErrorsAfter())
     .action((_opts, cmd) => {
-      // Bare `abap connection` prints the subcommand help (exit 0), like bare `abap`.
+      // Bare `abap profile` prints the subcommand help (exit 0), like bare `abap`.
       console.log(cmd.helpInformation());
     });
 
-  connection
+  profile
     .command('list')
     .description('List all saved connection profiles')
     .action((_opts, cmd) => {
       runList(jsonFromCommand(cmd));
     });
 
-  connection
+  profile
     .command('show <name>')
     .description('Show details of a connection profile')
     .action(async (name: string, _opts, cmd) => {
@@ -36,7 +36,7 @@ export function registerConnectionCommand(program: Command): void {
       }
     });
 
-  connection
+  profile
     .command('add <name>')
     .description('Create a new connection profile')
     .option('--url <url>', 'SAP system URL')
@@ -54,7 +54,7 @@ export function registerConnectionCommand(program: Command): void {
       }
     });
 
-  connection
+  profile
     .command('set <name>')
     .description('Modify an existing connection profile (fields or password)')
     .option('--url <url>', 'New SAP system URL')
@@ -74,18 +74,7 @@ export function registerConnectionCommand(program: Command): void {
       }
     });
 
-  connection
-    .command('use <name>')
-    .description('Switch the current workspace to a connection profile')
-    .action(async (name: string, _opts, cmd) => {
-      try {
-        await runUse(name, jsonFromCommand(cmd));
-      } catch (error: unknown) {
-        handleError(jsonFromCommand(cmd), error);
-      }
-    });
-
-  connection
+  profile
     .command('test <name>')
     .description('Probe a connection profile: tls → auth → adt → icf')
     .action(async (name: string, _opts, cmd) => {
@@ -96,7 +85,7 @@ export function registerConnectionCommand(program: Command): void {
       }
     });
 
-  connection
+  profile
     .command('delete <name>')
     .description('Delete a connection profile and its stored password')
     .option('--yes', 'Delete without prompting (required in non-interactive environments)')
@@ -108,7 +97,7 @@ export function registerConnectionCommand(program: Command): void {
       }
     });
 
-  connection
+  profile
     .command('export [names...]')
     .description('Export connection profiles to a portable bundle (passwords excluded by default)')
     .option('--file <path>', 'Write the bundle to a file (default: stdout)')
@@ -132,7 +121,7 @@ export function registerConnectionCommand(program: Command): void {
       }
     });
 
-  connection
+  profile
     .command('import <file>')
     .description('Import connection profiles from a bundle (existing profiles are skipped)')
     .option('--overwrite', 'Update profiles that already exist')
@@ -162,8 +151,8 @@ function validateBundle(raw: unknown): ProfileBundle {
   const bundle = raw as Partial<ProfileBundle> | null;
   if (!bundle || bundle.format !== 'abap-cli-profiles' || !Array.isArray(bundle.systems)) {
     throw new CliError('INVALID_ARGUMENT', 'Not a valid abap-cli profiles bundle', {
-      nextSteps: ['Export a bundle first: abap connection export --file profiles.json'],
-      example: 'abap connection export --file profiles.json',
+      nextSteps: ['Export a bundle first: abap profile export --file profiles.json'],
+      example: 'abap profile export --file profiles.json',
     });
   }
   return bundle as ProfileBundle;

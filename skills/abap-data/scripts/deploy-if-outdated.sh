@@ -15,7 +15,7 @@ fi
 
 if [[ "$status" == "not_deployed" || "$status" == "outdated" ]]; then
     echo "ICF 状态: $status，开始部署" >&2
-    abap deploy --yes --json
+    abap extension deploy --yes --json
     exit 0
 fi
 

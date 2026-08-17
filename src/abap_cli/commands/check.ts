@@ -23,44 +23,99 @@ interface CheckOptions {
   strict?: boolean;
   /** ATC raw worklist output file (`--atc` only). Empty string = default path. */
   out?: string;
+  /** Shortcut for `check syntax` invoked from the parent (`--files <f...>`). */
+  files?: string[];
 }
 
 export function registerCheckCommand(program: Command): void {
-  program
+  // Note: the parent `check` has no positional argument — that would shadow
+  // the subcommands (`check syntax --all` would otherwise put `syntax` into
+  // the parent's `[files...]` variadic). The "bare `abap check <files>`"
+  // shortcut is implemented via `check --files ...` (see option below) to
+  // keep the subcommand dispatch unambiguous.
+  const check = program
     .command('check')
-    .description('Validate local ABAP files: --syntax (default, against SAP), --content (local), --atc (against SAP)')
+    .description('Validate local ABAP files. Subcommands: syntax (default), content (local-only), atc.')
     .addHelpText('after', commonErrorsAfter())
+    .option('--files <files...>', 'Shortcut: run syntax mode on the given files (equivalent to `abap check syntax <files...>`)')
+    .action(async (opts: CheckOptions, cmd) => {
+      // Bare `abap check` (no subcommand, no --files) prints subcommand help.
+      const hasShortcut = Array.isArray(opts.files) && opts.files.length > 0;
+      if (!hasShortcut) {
+        console.log(cmd.helpInformation());
+        return;
+      }
+      const files = opts.files as string[];
+      const json = jsonFromCommand(cmd);
+      try {
+        await runCheck(files, opts, 'syntax', json);
+      } catch (error: unknown) {
+        printError(json, error);
+      }
+    });
+
+  check
+    .command('syntax')
+    .description('Syntax check against SAP (the default mode)')
     .argument('[files...]', 'Files to check')
-    .option('--syntax', 'Syntax check against SAP (default mode)')
-    .option('--content', 'Local-only validation, no SAP round-trip')
-    .option('--atc', 'ATC check against SAP')
-    .option('--variant <variant>', 'ATC check variant (only with --atc)')
     .option('--all', 'Check all .abap files under the current directory')
     .option('--changed', 'Check only files changed since the SAP version')
     .option('--strict', 'Treat warnings as failures')
-    .option('--out [file]', 'Persist raw ATC worklist to a file (only with --atc); defaults to .abap/atc/<variant>-<timestamp>.json')
     .action(async (files: string[], opts: CheckOptions, cmd) => {
       const json = jsonFromCommand(cmd);
       try {
-        await runCheck(files, opts, json);
+        await runCheck(files, opts, 'syntax', json);
+      } catch (error: unknown) {
+        printError(json, error);
+      }
+    });
+
+  check
+    .command('content')
+    .description('Local-only validation, no SAP round-trip')
+    .argument('[files...]', 'Files to check')
+    .option('--all', 'Check all .abap files under the current directory')
+    .option('--changed', 'Check only files changed since the SAP version')
+    .option('--strict', 'Treat warnings as failures')
+    .action(async (files: string[], opts: CheckOptions, cmd) => {
+      const json = jsonFromCommand(cmd);
+      try {
+        await runCheck(files, opts, 'content', json);
+      } catch (error: unknown) {
+        printError(json, error);
+      }
+    });
+
+  check
+    .command('atc')
+    .description('ATC check against SAP')
+    .argument('[files...]', 'Files to check')
+    .requiredOption('--variant <variant>', 'ATC check variant')
+    .option('--all', 'Check all .abap files under the current directory')
+    .option('--changed', 'Check only files changed since the SAP version')
+    .option('--strict', 'Treat warnings as failures')
+    .option('--out [file]', 'Persist raw ATC worklist to a file; defaults to .abap/atc/<variant>-<timestamp>.json')
+    .action(async (files: string[], opts: CheckOptions, cmd) => {
+      const json = jsonFromCommand(cmd);
+      try {
+        await runCheck(files, opts, 'atc', json);
       } catch (error: unknown) {
         printError(json, error);
       }
     });
 }
 
-async function runCheck(files: string[], opts: CheckOptions, json: boolean): Promise<void> {
-  const mode = resolveMode(opts);
+async function runCheck(files: string[], opts: CheckOptions, mode: CheckMode, json: boolean): Promise<void> {
   if (mode === 'atc' && !opts.variant) {
-    throw new CliError('INVALID_ARGUMENT', '--atc requires --variant', {
-      nextSteps: ['Pass an ATC variant: abap check <file> --atc --variant Z_VARIANT'],
-      example: 'abap check src/zcl_ok.clas.abap --atc --variant Z_ATC_VAR',
+    throw new CliError('INVALID_ARGUMENT', 'check atc requires --variant', {
+      nextSteps: ['Pass an ATC variant: abap check atc <file> --variant Z_VARIANT'],
+      example: 'abap check atc src/zcl_ok.clas.abap --variant Z_ATC_VAR',
     });
   }
   if (mode !== 'atc' && opts.out !== undefined) {
-    throw new CliError('INVALID_ARGUMENT', '--out only applies to --atc', {
-      nextSteps: ['Use --out with --atc: abap check <file> --atc --variant Z_VARIANT --out'],
-      example: 'abap check src/zcl_ok.clas.abap --atc --variant Z_ATC_VAR --out',
+    throw new CliError('INVALID_ARGUMENT', '--out only applies to check atc', {
+      nextSteps: ['Use --out with check atc: abap check atc <file> --variant Z_VARIANT --out'],
+      example: 'abap check atc src/zcl_ok.clas.abap --variant Z_ATC_VAR --out',
     });
   }
 
@@ -68,7 +123,7 @@ async function runCheck(files: string[], opts: CheckOptions, json: boolean): Pro
   if (fileList.length === 0) {
     throw new CliError('USAGE', 'No files to check', {
       nextSteps: ['Provide file paths, or use --all for every .abap file.'],
-      example: 'abap check src/zcl_demo.clas.abap',
+      example: 'abap check syntax src/zcl_demo.clas.abap',
     });
   }
 
@@ -111,8 +166,8 @@ async function persistWorklists(opts: CheckOptions, worklists: { file: string; w
   } catch (error: unknown) {
     throw new CliError('FILE_PARSE_ERROR', `Cannot write ATC output to ${file}: ${message(error)}`, {
       file,
-      nextSteps: ['Pick a writable path: abap check <file> --atc --variant Z_VARIANT --out /tmp/atc.json'],
-      example: 'abap check src/zcl_ok.clas.abap --atc --variant Z_ATC_VAR --out /tmp/atc.json',
+      nextSteps: ['Pick a writable path: abap check atc <file> --variant Z_VARIANT --out /tmp/atc.json'],
+      example: 'abap check atc src/zcl_ok.clas.abap --variant Z_ATC_VAR --out /tmp/atc.json',
     });
   }
 }
@@ -132,17 +187,7 @@ interface CheckFileResult {
   worklist?: { file: string; worklist: AtcWorkList };
 }
 
-/** Resolve the single active mode flag; defaults to --syntax (FR-006). */
-function resolveMode(opts: CheckOptions): CheckMode {
-  const active = (['syntax', 'content', 'atc'] as const).filter((m) => opts[m]);
-  if (active.length > 1) {
-    throw new CliError('INVALID_ARGUMENT', `Check modes are mutually exclusive: ${active.join(', ')}`, {
-      nextSteps: ['Pick exactly one mode: --syntax (default), --content, or --atc.'],
-      example: 'abap check src/zcl_demo.clas.abap --atc --variant Z_ATC_VAR',
-    });
-  }
-  return active[0] ?? 'syntax';
-}
+/** `resolveMode` removed in 021: mode is now an explicit subcommand argument. */
 
 /** Resolve the file set from explicit files, --all, or --changed (FR-007). */
 async function collectFiles(files: string[], opts: CheckOptions): Promise<string[]> {

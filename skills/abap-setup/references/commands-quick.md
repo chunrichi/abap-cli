@@ -2,7 +2,7 @@
 
 > 按需加载。本文件只在 SKILL.md 提及 references 时被 agent 读取。
 
-## `abap config`
+## `abap init`
 
 写入工作区 `.abap.json`。两个入口：
 
@@ -10,19 +10,19 @@
 
 ```bash
 # 引用现有 profile
-abap config --system dev --tr DEVK900001 --package ZDEV --json
+abap init --profile dev --tr DEVK900001 --package ZDEV --json
 
 # 新建 profile + 写工作区
-abap config --url https://sap:44300 --client 100 --username DEV --password '***' --json
+abap init --url https://sap:44300 --client 100 --username DEV --password '***' --json
 
 # 写工作区 + 信息性 ICF 部署检查（不阻断）
-abap config --system dev --json
+abap init --profile dev --json
 # → data.icf: 'not_deployed' | 'current' | 'outdated' | 'unreachable'
 ```
 
 | flag | 含义 |
 |---|---|
-| `--system <name>` | 引用已有 profile |
+| `--profile <name>` | 引用已有 profile |
 | `--url <url>` | 新建 profile 的系统 URL |
 | `-c, --client <n>` | SAP 客户端 |
 | `-u, --username <u>` | 用户名 |
@@ -33,28 +33,28 @@ abap config --system dev --json
 | `--insecure` | 跳过 SSL 校验 |
 | `--ca <pem>` | CA 证书 |
 | `--test-connection` / `--test-tls` / `--test-auth` | 探针 |
+| `--agent <target>` | 脚手架 agent 上下文（copilot \| claude \| cursor \| generic；幂等，`--force` 覆盖） |
 | `--yes` / `--non-interactive` | 覆盖已有 `.abap.json` |
 
 ### 交互向导
 
 ```bash
-abap config init        # TTY only，失败时退出 USAGE
+abap init        # TTY only，失败时退出 USAGE
 ```
 
-## `abap connection`
+## `abap profile`
 
-管理全局 profiles（`~/.abap-cli/systems.json`，mode `0600`）。
+管理全局 profiles（`~/.abap-cli/systems.json`，mode `0600`）。绑定工作区用 `abap init --profile <name>`（021 移除 `use`）。
 
 ```bash
-abap connection list                          # 列出
-abap connection show <name>                   # 详情
-abap connection add <name> --url ... --username ... --password '***'   # 新建（存在则拒绝）
-abap connection set <name> [flags]            # 修改已有
-abap connection use <name>                    # 设为默认
-abap connection test <name> [--verbose]       # 分层测试（TLS→4, AUTH→5, ADT/ICF→6）
-abap connection delete <name> --yes           # 删除（非 TTY 需 --yes）
-abap connection export <name>                 # 导出 profile
-abap connection import <file> [--overwrite]   # 导入 profile
+abap profile list                          # 列出
+abap profile show <name>                   # 详情
+abap profile add <name> --url ... --username ... --password '***'   # 新建（存在则拒绝）
+abap profile set <name> [flags]            # 修改已有
+abap profile test <name> [--verbose]       # 分层测试（TLS→4, AUTH→5, ADT/ICF→6）
+abap profile delete <name> --yes           # 删除（非 TTY 需 --yes）
+abap profile export <name>                 # 导出 profile
+abap profile import <file> [--overwrite]   # 导入 profile
 ```
 
 ## `abap doctor`
@@ -68,7 +68,7 @@ abap doctor --fix            # 应用安全可逆修复（需 --yes）
 abap doctor --json
 ```
 
-未配置工作区时：`config.workspace` 报 err，指向 `abap config init` 或 `abap config --system <name>`。
+未配置工作区时：`config.workspace` 报 err，指向 `abap init` 或 `abap init --profile <name>`。
 
 ## `abap transport`
 

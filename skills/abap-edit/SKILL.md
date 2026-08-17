@@ -1,15 +1,15 @@
 ---
 name: abap-edit
-description: abap-cli 源码对象完整生命周期 — `search` / `pull` / `push` / `check` / `create` / `activate` / `inspect` / `diff` / `status` / `sync` / `create local`，覆盖 CLAS / PROG / INTF / FUGR 源码对象以及 DOMA / DTEL / TABL / STRU DDIC 定义。use when asking how to edit SAP source code / download an ABAP class / push a local file / run syntax check or ATC / create a new object / activate inactive parts / inspect metadata / diff local vs SAP / sync status.
+description: abap-cli 源码对象完整生命周期 — `search` / `pull` / `push` / `check` / `create` / `activate` / `inspect` / `diff` / `status` / `create local`，覆盖 CLAS / PROG / INTF / FUGR 源码对象以及 DOMA / DTEL / TABL / STRU DDIC 定义。use when asking how to edit SAP source code / download an ABAP class / push a local file / run syntax check or ATC / create a new object / activate inactive parts / inspect metadata / diff local vs SAP / status.
 metadata:
   version: "0.1.0"
   scope: sap
-  commands: [search, pull, push, check, create, activate, inspect, diff, status, sync, "create local"]
+  commands: [search, pull, push, check, create, activate, inspect, diff, status, "create local"]
 ---
 
 # abap-edit — 源码对象完整生命周期
 
-`sap scope` — 这 11 个命令（或子命令）走 SAP 系统的 ADT REST API 或自建 ICF 服务，覆盖源码对象从搜索、创建、下载、编辑、校验、推送、激活到对账的全流程。**DDIC 定义**（DOMA / DTEL / TABL / STRU）的 CRUD 通过 `pull --type` / `create --file` / `push *.json` 进入本 skill 同一套流程。
+`sap scope` — 这 10 个命令（或子命令）走 SAP 系统的 ADT REST API 或自建 ICF 服务，覆盖源码对象从搜索、创建、下载、编辑、校验、推送、激活到对账的全流程。**DDIC 定义**（DOMA / DTEL / TABL / STRU）的 CRUD 通过 `pull --type` / `create --file` / `push *.json` 进入本 skill 同一套流程。
 
 ## 何时用
 
@@ -19,7 +19,7 @@ metadata:
 - 推送前做语法检查 / 内容检查 / ATC 检查
 - 对象激活状态对不上（`push` 报 activated 但实际未激活）时用 `inspect --activation` 诊断 + `activate` 修复
 - 比较本地与 SAP 差异（diff / status）后再决定 pull 或 push
-- 一次性跑完 status / pull / push（`sync`）——CI 友好
+- 显式编排 status → pull → push——CI 友好
 - 离线起一份草稿（`create local`）再 push
 - DDIC 定义 CRUD：`pull <name> --type DOMA|DTEL|TABL|STRU`、`create <type> <name> --file <json>`、`push <name>.<type>.json`
 
@@ -27,13 +27,13 @@ metadata:
 
 ```
 改 SAP 上的对象？
-├── 已有 → search → pull → 编辑 → check --syntax → push
+├── 已有 → search → pull → 编辑 → check syntax → push
 │         ├── push 报 activated 但未真激活？→ inspect --activation → activate --yes
 │         └── 多文件？→ push --atomic
 ├── 新建 → search 确认不存在 → create <type> <name> --package ... --tr ...
 │         └── 离线草稿？→ create local → 编辑 → create ... --no-pull → push
 └── 批量 → search --package → pull --package
-    └── 链式？→ sync --pull / --push
+    └── 链式？→ status → pull → push（sync 已移除）
 
 DDIC 定义？
 ├── 拉 → pull <name> --type TABL|DOMA|DTEL|STRU
@@ -45,7 +45,7 @@ DDIC 定义？
 
 `push` 是写操作。每次推送前：
 
-1. **`check --syntax`**：语法错会被激活拒绝
+1. **`check syntax`**：语法错会被激活拒绝
 2. **transport 解析**：已绑定 / `$TMP` 无需 `--tr`；其余必填 `--tr` 或调 [abap-setup 的 resolve-transport.sh](../abap-setup/scripts/resolve-transport.sh)
 3. **`--atomic`** 多文件必加：任一失败零写入
 4. **`--dry-run`** 大改动前先看 plan
@@ -71,7 +71,7 @@ DDIC 定义？
 ## 通用规则
 
 1. **永远 `--json`**：`status` / `error.code` 分支
-2. **`check --syntax` 默认对 SAP**：无副作用，可反复跑
+2. **`check syntax` 默认对 SAP**：无副作用，可反复跑
 3. **`--atomic` 防雪崩**：多文件必加
 4. **`push` 报 activated 还要 `inspect --activation` 复核**：method/OSI 层级是 013 落地经验
 5. **DDIC JSON 结构校验**：客户端走 `validateDdicObject`；命名空间 `Z`/`Y` 开头
@@ -79,7 +79,7 @@ DDIC 定义？
 
 ## references（按需加载）
 
-- [references/commands-quick.md](./references/commands-quick.md) — 11 命令完整速查
+- [references/commands-quick.md](./references/commands-quick.md) — 10 命令完整速查
 - [references/errors.md](./references/errors.md) — 错误码全表
 - [references/workflow.md](./references/workflow.md) — 详细工作流（type/transport/包/批量变体）
 - 权威来源：

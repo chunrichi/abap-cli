@@ -13,13 +13,14 @@ changed at: 2026-08-06 23:10:00
 
 ## Commands
 
-- [config](commands/config.md) — 配置工作区（写入 `.abap.json`）
-- [connection](commands/connection.md) — 管理全局连接 profiles
+- [init](commands/init.md) — 初始化工作区：绑定 profile（写 `.abap.json`）+ 脚手架 agent 上下文
+- [profile](commands/profile.md) — 管理全局连接 profiles
 - [doctor](commands/doctor.md) — 诊断 CLI 环境
 - [pull](commands/pull.md) — 从 SAP 下载对象到本地
 - [push](commands/push.md) — 推送本地文件到 SAP
 - [run](commands/run.md) — 在 SAP 端执行类（classrun / 静态方法反射），返回 stdout 与退出码
 - [activate](commands/activate.md) — 激活对象的所有 inactive items
+- [extension](commands/extension.md) — 管理内置 ICF ABAP 扩展（deploy / status）
 
 ## Notes
 

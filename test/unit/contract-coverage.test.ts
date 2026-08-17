@@ -9,14 +9,16 @@ const contractPath010 = path.join(repoRoot, 'specs/010-new-cli-commands/contract
 const commandsDir = path.join(repoRoot, 'src/abap_cli/commands');
 
 // Flags introduced or changed by THIS feature (spec FRs / contract delta).
+// 021: `--syntax` / `--content` / `--atc` were converted into check subcommands
+// (syntax/content/atc) — the subcommand names cover the contract now.
 const FEATURE_FLAGS = [
   '--limit', '--page', '--exact', '--fuzzy', '--package', '--max', // search + pull batch
-  '--syntax', '--content', '--atc', '--variant', '--changed', '--strict', // check
+  '--variant', '--changed', '--strict', // check (subcommand-shared flags)
   '--remote-only', '--local-only', '--since', '--all', // status
   '--dry-run', '--diff', '--force', '--yes', // deploy
   '--template', '--no-pull', '--check-only', '--audit', // create
   '--atomic', // push
-  '--file', '--with-passwords', '--overwrite', // connection export/import
+  '--file', '--with-passwords', '--overwrite', // profile export/import
 ];
 
 describe('contract coverage (T035, SC-009)', () => {
@@ -36,22 +38,21 @@ describe('contract coverage (T035, SC-009)', () => {
     expect(missing).toEqual([]);
   });
 
-  it('the atc redirect, transport subcommands, and connection export/import are documented', () => {
+  it('the atc redirect, transport subcommands, and profile export/import are documented', () => {
     const contract = fs.readFileSync(contractPath, 'utf-8');
-    for (const token of ['COMMAND_MOVED', 'transport show', 'transport assign', 'transport resolve', 'connection export', 'connection import']) {
+    for (const token of ['COMMAND_MOVED', 'transport show', 'transport assign', 'transport resolve', 'profile export', 'profile import']) {
       expect(contract).toContain(token);
     }
   });
 });
 
 // --- 010-new-cli-commands: six new top-level commands (SC-009) ---
+// 021 removed sync and report-stuck; only doctor/inspect/diff remain from 010.
 const FLAGS_010 = [
   '--verbose', '--fix', '--yes', // doctor
   '--system', // doctor
   '--structure', '--includes', '--locks', '--package', // inspect
   '--all', '--remote', '--local-only', '--limit', // diff
-  '--status', '--pull', '--push', '--dry-run', // sync
-  '--goal', '--tried', '--where', // report-stuck
 ];
 
 describe('contract coverage 010 (T021, SC-009)', () => {
@@ -71,9 +72,9 @@ describe('contract coverage 010 (T021, SC-009)', () => {
     expect(missing).toEqual([]);
   });
 
-  it('all new 010 commands are registered as lazy specs in index.ts', () => {
+  it('all new 010 commands (still active) are registered as lazy specs in index.ts', () => {
     const index = fs.readFileSync(path.join(repoRoot, 'src/abap_cli/index.ts'), 'utf-8');
-    for (const cmd of ['doctor', 'inspect', 'diff', 'sync', 'report-stuck']) {
+    for (const cmd of ['doctor', 'inspect', 'diff']) {
       expect(index).toContain(`name: '${cmd}'`);
       expect(index).toContain(`./commands/${cmd}.js`);
     }

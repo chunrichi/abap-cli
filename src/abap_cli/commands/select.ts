@@ -102,7 +102,7 @@ const SCHEMA = {
     },
   ],
   exclusiveGroups: [['<no_exclusive_groups>']],
-  globalOptions: ['--json', '--report-stuck'],
+  globalOptions: ['--json'],
   examples: [
     {
       description: 'Basic query with filter and limit',

@@ -243,7 +243,7 @@ function searchSchema(): CommandSchema {
       { name: '--page-all-max', type: 'int', valuePlaceholder: '<n>', default: PAGE_ALL_DEFAULT_MAX, description: 'Page-count cap that sizes the --page-all single request' },
     ],
     exclusiveGroups: [['--exact', '--fuzzy'], ['--page', '--page-all']],
-    globalOptions: ['--json', '--report-stuck'],
+    globalOptions: ['--json'],
     examples: ['abap search ZCL_* --type CLAS --limit 50', 'abap search ZCL_DEMO --exact', 'abap search ZCL_* --page-all'],
   };
 }

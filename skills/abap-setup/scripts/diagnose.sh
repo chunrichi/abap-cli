@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# diagnose.sh — 一次性跑 doctor + connection test，输出可解析结果。
+# diagnose.sh — 一次性跑 doctor + profile test，输出可解析结果。
 # 用法：./diagnose.sh [<profile-name>]
-# 不传 profile 时 doctor 检查默认 profile；connection test 跳过。
+# 不传 profile 时 doctor 检查默认 profile；profile test 跳过。
 
 set -euo pipefail
 
@@ -14,8 +14,8 @@ if ! abap doctor --json; then
 fi
 
 if [[ -n "$profile" ]]; then
-    echo "=== connection test $profile ==="
-    abap connection test "$profile" --json
+    echo "=== profile test $profile ==="
+    abap profile test "$profile" --json
 fi
 
 echo "OK"

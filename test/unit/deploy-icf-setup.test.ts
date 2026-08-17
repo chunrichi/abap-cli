@@ -36,7 +36,7 @@ beforeEach(() => {
   fs.writeFileSync(path.join(sourceDir, 'zcl_abap_vibe_icf.clas.abap'), 'CLASS zcl_abap_vibe_icf DEFINITION PUBLIC.\nENDCLASS.\n');
 });
 
-describe('abap deploy — ICF setup trigger (US3, FR-008..010, FR-016)', () => {
+describe('abap extension deploy — ICF setup trigger (US3, FR-008..010, FR-016)', () => {
   it('non-dry-run triggers setup and reports icfNode status', async () => {
     const summary = await deployBundled(client, { transport: 'TRN001', yes: true, sourceDir });
     expect(runClass).toHaveBeenCalledWith('ZCL_ABAP_VIBE_ICF_SETUP');

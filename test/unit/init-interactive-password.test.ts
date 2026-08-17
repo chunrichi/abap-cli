@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { registerConfigCommand } from '../../src/abap_cli/commands/config.js';
+import { registerInitCommand } from '../../src/abap_cli/commands/init.js';
 import { makeProgram, runCommand } from './cli-helper.js';
 
 const storePassword = vi.fn(async () => '');
@@ -50,8 +50,8 @@ describe('abap init interactive — stored-password fallback', () => {
 
   it('when no stored password exists, the typed password is persisted to the keychain', async () => {
     const program = makeProgram();
-    registerConfigCommand(program);
-    const res = await runCommand(program, ['config', 'init', '--json'], { cwd, isTTY: true });
+    registerInitCommand(program);
+    const res = await runCommand(program, ['init', 'init', '--json'], { cwd, isTTY: true });
     expect(res.exitCode).toBeUndefined();
 
     // Asked to use the stored password, found none, typed a new one.
@@ -67,8 +67,8 @@ describe('abap init interactive — stored-password fallback', () => {
   it('when a stored password exists, it is used without re-prompting for a password', async () => {
     getPassword.mockResolvedValue('stored-pw');
     const program = makeProgram();
-    registerConfigCommand(program);
-    const res = await runCommand(program, ['config', 'init', '--json'], { cwd, isTTY: true });
+    registerInitCommand(program);
+    const res = await runCommand(program, ['init', 'init', '--json'], { cwd, isTTY: true });
     expect(res.exitCode).toBeUndefined();
     expect(passwordMock).not.toHaveBeenCalled();
     expect(storePassword).not.toHaveBeenCalled();

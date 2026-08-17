@@ -274,7 +274,7 @@ export class AdtClientWrapper {
     return this._call(() => this.client.deleteObject(objectUrl, lockHandle, transport));
   }
 
-  // --- ATC (check --atc, FR-011) ---
+  // --- ATC (check atc, FR-011) ---
 
   atcCheckVariant(variant: string) {
     return this._call(() => this.client.atcCheckVariant(variant));

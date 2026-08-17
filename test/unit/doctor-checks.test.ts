@@ -57,7 +57,7 @@ describe('doctor-checks (FR-001..005)', () => {
     const report = await runDoctorChecks({ home, cwd });
     const item = report.config.find((i) => i.key === 'config.workspace');
     expect(item?.status).toBe('err');
-    expect(item?.suggestion).toContain('abap config init');
+    expect(item?.suggestion).toContain('abap init');
     expect(report.nextSteps).toContain(item?.suggestion);
   });
 

@@ -172,16 +172,17 @@ describe('skill bundle (019-cli-skill-agent-bundle) structural audit', () => {
         allCommands.add(String(cmd));
       }
     }
-    // 17 个核心命令（`atc` 已 deprecated → check --atc；`report-stuck` 是反馈环，不纳入 skill 路由）
+    // 16 个顶层命令（021 收敛后）：init/profile/extension 替换 config/connection/deploy；
+    // atc/sync/report-stuck 已移除，不纳入 skill 路由。
     const expected = [
-      'config', 'connection', 'doctor', 'transport',
-      'search', 'pull', 'push', 'check', 'create', 'activate', 'inspect', 'diff', 'status', 'sync',
-      'select', 'run', 'deploy',
+      'init', 'profile', 'doctor', 'transport',
+      'search', 'pull', 'push', 'check', 'create', 'activate', 'inspect', 'diff', 'status',
+      'select', 'run', 'extension',
     ];
     for (const cmd of expected) {
       expect(allCommands.has(cmd), `${cmd} 未被任何 skill 覆盖`).toBe(true);
     }
-    // `create local` 是 create 的子命令，会以字符串形式被加进来（不计入 17）
+    // `create local` 是 create 的子命令，会以字符串形式被加进来（不计入 16）
     expect(allCommands.size).toBeGreaterThanOrEqual(expected.length);
     // 但要确保没有额外的"伪命令"——只允许 expected + `create local`（子命令）
     const expectedSet = new Set(expected);

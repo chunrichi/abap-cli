@@ -42,7 +42,7 @@ export function loadUserConfig(): UserConfig {
       nextSteps: [
         `Open ${CONFIG_PATH} and fix the JSON, or delete it (your system profiles will need to be re-added).`,
       ],
-      example: `abap connection add <name> --url <url> --username <user> --password <pwd>`,
+      example: `abap profile add <name> --url <url> --username <user> --password <pwd>`,
     });
   }
 }

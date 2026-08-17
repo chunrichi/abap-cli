@@ -6,17 +6,16 @@ import { createRequire } from 'node:module';
 import { Command } from 'commander';
 import { setProgram } from './output/meta.js';
 import { registerLazyCommands, type LazyCommandSpec } from './core/lazy.js';
-import { writeStuckReport, recordFailure, shouldAutoReport } from './core/stuck-reports.js';
 import { handleTopLevelError } from './top-error.js';
 
 // 声明式惰性注册（P1.6）：只有 name + description 在启动时加载，模块体在
 // 命令真正被调用（或请求其 --help）时才 import。
 const COMMAND_SPECS: LazyCommandSpec[] = [
   {
-    name: 'config',
+    name: 'init',
     scope: 'local',
-    description: 'Configure the workspace: write .abap.json from a system profile, or create one from full connection params. Run `abap config init` for the interactive wizard.',
-    load: () => import('./commands/config.js').then((m) => ({ register: m.registerConfigCommand })),
+    description: 'Initialize the workspace: bind a profile (write .abap.json) and/or scaffold AI agent context. Run bare `abap init` for the interactive wizard.',
+    load: () => import('./commands/init.js').then((m) => ({ register: m.registerInitCommand })),
   },
   {
     name: 'pull',
@@ -42,7 +41,7 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
   },
   {
     name: 'check',
-    description: 'Validate local ABAP files: --syntax (default, against SAP), --content (local), --atc (against SAP)',
+    description: 'Validate local ABAP files. Subcommands: syntax (default), content (local-only), atc.',
     load: () => import('./commands/check.js').then((m) => ({ register: m.registerCheckCommand })),
   },
   {
@@ -56,11 +55,6 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
     load: () => import('./commands/create.js').then((m) => ({ register: m.registerCreateCommand })),
   },
   {
-    name: 'atc',
-    description: 'DEPRECATED: ATC checks moved to `abap check --atc`',
-    load: () => import('./commands/atc.js').then((m) => ({ register: m.registerAtcCommand })),
-  },
-  {
     name: 'status',
     description: 'Show differences between local files and SAP system (changed parts)',
     load: () => import('./commands/status.js').then((m) => ({ register: m.registerStatusCommand })),
@@ -71,15 +65,15 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
     load: () => import('./commands/transport.js').then((m) => ({ register: m.registerTransportCommand })),
   },
   {
-    name: 'deploy',
-    description: 'Deploy bundled ICF ABAP service to SAP system (--dry-run/--diff preview available)',
-    load: () => import('./commands/deploy.js').then((m) => ({ register: m.registerDeployCommand })),
+    name: 'extension',
+    description: 'Manage the bundled ICF ABAP extension. Subcommands: deploy (install/update), status (probe installation).',
+    load: () => import('./commands/extension.js').then((m) => ({ register: m.registerExtensionCommand })),
   },
   {
-    name: 'connection',
+    name: 'profile',
     scope: 'local',
-    description: 'Manage global connection profiles',
-    load: () => import('./commands/connection.js').then((m) => ({ register: m.registerConnectionCommand })),
+    description: 'Manage global connection profiles. Run `abap init --profile <name>` to bind the current workspace.',
+    load: () => import('./commands/profile.js').then((m) => ({ register: m.registerProfileCommand })),
   },
   {
     name: 'doctor',
@@ -102,24 +96,12 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
     description: 'Compare local files against SAP (read-only)',
     load: () => import('./commands/diff.js').then((m) => ({ register: m.registerDiffCommand })),
   },
-  {
-    name: 'sync',
-    description: 'Chain status / pull / push into one workflow',
-    load: () => import('./commands/sync.js').then((m) => ({ register: m.registerSyncCommand })),
-  },
-  {
-    name: 'report-stuck',
-    scope: 'local',
-    description: 'Record a stuck-agent report locally (feedback loop)',
-    load: () => import('./commands/report-stuck.js').then((m) => ({ register: m.registerReportStuckCommand })),
-  },
 ];
 
-const program = new Command();
-
-// 单一版本来源：从 package.json 读取
 const require = createRequire(import.meta.url);
 const { version } = require('../../../package.json') as { version: string };
+
+const program = new Command();
 
 // .name() controls the "Usage:" line in --help. It must match the bin name in
 // package.json ("abap"), not the package name — users invoke `abap`, never
@@ -128,8 +110,7 @@ program
   .name('abap')
   .description('CLI tool for ABAP vibe coding — agent-driven ABAP development')
   .version(version)
-  .option('--json', 'Output in JSON format')
-  .option('--report-stuck', 'Record a stuck report when this command fails (feedback loop, FR-023)');
+  .option('--json', 'Output in JSON format');
 
 // 顶层错误处理（FR-005/FR-007）：commander 抛错（缺参/未知选项）由这里归一化为
 // 结构化错误；--help/--version 让 commander 自己写 stdout（包含 addHelpText
@@ -140,7 +121,6 @@ program.configureOutput({ writeErr: () => {} });
 // Register all commands lazily (P1.6): stubs up front, modules on demand.
 registerLazyCommands(program, COMMAND_SPECS);
 
-// 注册命令树供 buildMeta 推导规范命令名（FR-003）。
 setProgram(program);
 
 try {
@@ -149,21 +129,5 @@ try {
   // parseAsync (which awaits the chain) re-throws into this catch block.
   await program.parseAsync();
 } catch (error: unknown) {
-  // Feedback loop (FR-023): record the failure before the structured handler
-  // runs so the stuck report captures the original error unchanged.
-  recordFailure();
-  const reportFlag = process.argv.includes('--report-stuck');
-  if (reportFlag || shouldAutoReport(process.env.ABAP_REPORT_STUCK)) {
-    const err = error as { code?: string; message?: string };
-    writeStuckReport({
-      goal: 'unknown',
-      where: process.argv.slice(2).filter((a) => !a.startsWith('--report-stuck')).join(' ') || 'abap',
-      tried: `command failed: ${err.code ?? ''} ${err.message ?? ''}`,
-      command: 'abap',
-      argv: process.argv.slice(2),
-      cwd: process.cwd(),
-      cliVersion: version,
-    });
-  }
   handleTopLevelError(error, { program, argv: process.argv, version });
 }

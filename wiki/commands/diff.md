@@ -9,7 +9,7 @@ changed at: 2026-08-09 22:40:00
 
 # abap diff
 
-本地文件与 SAP 系统逐 part 对比。**只读**，**不获取锁**。给 agent 一个"哪些 part 改了什么 / 谁改得更新的"快照——是 `sync` 的安全前置（避免 silent overwrite）。
+本地文件与 SAP 系统逐 part 对比。**只读**，**不获取锁**。给 agent 一个"哪些 part 改了什么 / 谁改得更新的"快照——是 `status` / `pull` / `push` 的安全前置（避免 silent overwrite）。
 
 ## Usage
 
@@ -153,8 +153,7 @@ abap diff src/zcl_foo/zcl_foo.clas.abap --remote PRD --json
 ## 关联命令
 
 - **`abap status`**：粗粒度差异（changed parts 列表）；先 status 再 diff 看冲突
-- **`abap sync`**：`--push` 见到 `both-changed` 报 `VALIDATION_ERROR` 拒绝（除非 `--yes`）
-- **`abap pull`**：把 `remote-only` / `local-only` 拉下来同步
+- **`abap pull`**：把 `remote-only` / `local-only` 拉下来同步（`sync` 已随 021 移除，编排由 Agent 显式完成）
 - **`abap push`**：把 `local-only` 推上去
 
 ## references

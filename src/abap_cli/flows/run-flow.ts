@@ -416,7 +416,7 @@ function nextStepsFor(code: ErrorCode, className: string, method: string | null)
     case 'LOCAL_CLASS_NOT_RUNNABLE':
       return ['abap run must target a global class (no ~ in name)'];
     case 'WRAPPER_NOT_DEPLOYED':
-      return ['abap deploy (installs ZCL_ABAP_VIBE_RUNNER)'];
+      return ['abap extension deploy (installs ZCL_ABAP_VIBE_RUNNER)'];
     case 'WRAPPER_INPUT_UNAVAILABLE':
       return [
         'The target SAP system does not support classrun parameter injection',
@@ -432,7 +432,7 @@ function nextStepsFor(code: ErrorCode, className: string, method: string | null)
     case 'OBJECT_NOT_FOUND':
       return [`abap search ${method ?? className}`];
     case 'AUTH_ERROR':
-      return ['abap connection set <name> --password <new>'];
+      return ['abap profile set <name> --password <new>'];
     case 'LOCKED':
       return ['abap activate <class> (releases locks after activation)', 'release manually in SE03'];
     default:

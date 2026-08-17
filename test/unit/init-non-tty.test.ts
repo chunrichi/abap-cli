@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { registerConfigCommand } from '../../src/abap_cli/commands/config.js';
+import { registerInitCommand } from '../../src/abap_cli/commands/init.js';
 import { makeProgram, runCommand } from './cli-helper.js';
 
 // Keep keychain out of the tests.
@@ -22,7 +22,7 @@ vi.mock('../../src/abap_cli/config/user-config.js', () => ({
   saveUserConfig: vi.fn(),
 }));
 
-describe('abap config non-interactive (FR-006, FR-022, SC-007)', () => {
+describe('abap init non-interactive (FR-006, FR-022, SC-007)', () => {
   let cwd: string;
 
   beforeEach(() => {
@@ -30,27 +30,31 @@ describe('abap config non-interactive (FR-006, FR-022, SC-007)', () => {
     upsertSystem.mockClear();
   });
 
-  it('flagless abap config in non-TTY prints the subcommand help (exit 0) and does not mutate profiles', async () => {
+  it('flagless abap init in non-TTY returns a USAGE error and does not mutate profiles', async () => {
+    // 021: bare `abap init` in non-TTY is an error (Agent-First: no blocking
+    // prompt). The legacy "print help" behavior was removed.
     const program = makeProgram();
-    registerConfigCommand(program);
-    const res = await runCommand(program, ['config', '--json'], { cwd, isTTY: false });
-    expect(res.exitCode).toBeUndefined(); // no process.exit — help returned normally
-    expect(res.stdout).toMatch(/Usage: \S* config \[options\] \[command\]/);
+    registerInitCommand(program);
+    const res = await runCommand(program, ['init', '--json'], { cwd, isTTY: false });
+    expect(res.exitCode).toBe(2); // USAGE
+    const parsed = JSON.parse(res.stderr);
+    expect(parsed.status).toBe('error');
+    expect(parsed.error.code).toBe('USAGE');
     expect(upsertSystem).not.toHaveBeenCalled();
   });
 
-  it('non-TTY abap config with full params rejects profile creation (FR-022) and never mutates profiles', async () => {
+  it('non-TTY abap init with full params rejects profile creation (FR-022) and never mutates profiles', async () => {
     const program = makeProgram();
-    registerConfigCommand(program);
+    registerInitCommand(program);
     const res = await runCommand(
       program,
-      ['config', '--url', 'http://sap.example:50000', '--username', 'dev', '--password', 'pw', '--json'],
+      ['init', '--url', 'http://sap.example:50000', '--username', 'dev', '--password', 'pw', '--json'],
       { cwd, isTTY: false },
     );
     expect(res.exitCode).toBe(7); // VALIDATION_ERROR
     const parsed = JSON.parse(res.stderr);
     expect(parsed.error.code).toBe('VALIDATION_ERROR');
-    expect(parsed.error.nextSteps.join(' ')).toContain('abap connection add');
+    expect(parsed.error.nextSteps.join(' ')).toContain('abap profile add');
     expect(upsertSystem).not.toHaveBeenCalled();
     expect(fs.existsSync(path.join(cwd, '.abap.json'))).toBe(false);
   });

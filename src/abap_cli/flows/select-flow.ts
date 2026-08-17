@@ -356,7 +356,7 @@ function nextStepsFor(code: ErrorCode): string[] {
         'Check the table is active: abap activate <table>',
       ];
     case 'AUTH_ERROR':
-      return ['abap connection set <name> --password <new>'];
+      return ['abap profile set <name> --password <new>'];
     default:
       return ['abap select --help for usage'];
   }

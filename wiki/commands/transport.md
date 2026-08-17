@@ -9,7 +9,7 @@ changed at: 2026-08-07 00:39:21
 
 # abap transport
 
-管理 SAP 传输请求（CTS）。五个子命令：`list`（当前用户请求）、`create`（新建）、`show`（请求详情）、`resolve`（对象 → 请求）、`assign`（对象 → 挂请求）。`list` / `show` / `resolve` 为只读；`create` / `assign` 为写操作，非 TTY 模式必须 `--yes` 或 `--dry-run` 确认。`create` 与 `push` / `create` / `deploy` 的 `--tr` 解析形成闭环：无请求可创建，创建后即可用 `--tr` 推送。
+管理 SAP 传输请求（CTS）。五个子命令：`list`（当前用户请求）、`create`（新建）、`show`（请求详情）、`resolve`（对象 → 请求）、`assign`（对象 → 挂请求）。`list` / `show` / `resolve` 为只读；`create` / `assign` 为写操作，非 TTY 模式必须 `--yes` 或 `--dry-run` 确认。`create` 与 `push` / `create` / `extension deploy` 的 `--tr` 解析形成闭环：无请求可创建，创建后即可用 `--tr` 推送。
 
 ## Usage
 
@@ -55,13 +55,13 @@ abap transport assign <object> --tr <transport> [--dry-run] [--yes] [--json]
 
 ## 行为规则
 
-- **写保护（P0.3）**：`create` / `assign` 与 `push` / `deploy` / `sync` / `doctor --fix` 同契约 — 非 TTY 拒绝并给 `nextSteps` 指向 `--yes` 或 `--dry-run`；`--dry-run` 零 SAP 调用；TTY 模式无交互 prompt（直接执行）
+- **写保护（P0.3）**：`create` / `assign` 与 `push` / `extension deploy` / `doctor --fix` 同契约 — 非 TTY 拒绝并给 `nextSteps` 指向 `--yes` 或 `--dry-run`；`--dry-run` 零 SAP 调用；TTY 模式无交互 prompt（直接执行）
 - **`list` 桶结构**：返回 `workbench` + `customizing` 两个桶；每项含 number / description / status / owner。`--open` 只保留 `modifiable`（open）请求，否则 `modifiable + released` 合并
 - **`show` 元数据**：请求号 / 描述 / 状态 / owner / 请求内对象列表（name / type / status）
 - **`resolve` 只读**：`resolveObject` → `getObjectParts` 取 main part 的 `transportInfo`，返回该对象当前所属的全部请求（可能多个）
 - **`assign` 机制**：把对象当前源码以目标请求作 `corrNr` 写回（lock → `setObjectSource` → unlock）；已挂到目标请求 → no-op（`assigned: false`）。unlock 失败仅告警不失败
 - **解析顺序（其他命令共用）**：`--tr` > `.abap.json` transport > 用户第一个 modifiable 请求 > `NO_TRANSPORT`（exit 7）；`$TMP` 下对象免 transport（transport-free）
-- **闭环**：`create` 返回的请求号可直接用于 `push` / `create` / `deploy` 的 `--tr`，无需 SAP GUI
+- **闭环**：`create` 返回的请求号可直接用于 `push` / `create` / `extension deploy` 的 `--tr`，无需 SAP GUI
 
 ## Examples
 
@@ -223,7 +223,7 @@ abap transport assign ZCL_DEMO --tr NDK123456 --dry-run
 
 # references
 
-- 实现：`src/abap_cli/commands/transport.ts`、`src/abap_cli/flows/transport-ops.ts`、`src/abap_cli/core/transport.ts`（`resolveTransport`，push/create/deploy 共用）
+- 实现：`src/abap_cli/commands/transport.ts`、`src/abap_cli/flows/transport-ops.ts`、`src/abap_cli/core/transport.ts`（`resolveTransport`，push/create/extension deploy 共用）
 - 文档：`docs/commands.md`（`## abap transport` 章节）
 - 测试：`test/unit/transport-metadata.test.ts`（show/resolve/assign 元数据 + 写保护 6 分支）
 - 设计：`specs/006-transport-request-management/`

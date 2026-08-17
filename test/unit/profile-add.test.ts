@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { registerConnectionCommand } from '../../src/abap_cli/commands/connection.js';
+import { registerProfileCommand } from '../../src/abap_cli/commands/profile.js';
 import { makeProgram, runCommand } from './cli-helper.js';
 
 const upsertSystem = vi.fn();
@@ -31,7 +31,7 @@ function parseData(res: { stdout: string }): { status: string; data: Record<stri
   return JSON.parse(res.stdout);
 }
 
-describe('abap connection add', () => {
+describe('abap profile add', () => {
   let cwd: string;
 
   beforeEach(() => {
@@ -41,10 +41,10 @@ describe('abap connection add', () => {
 
   it('creates a new profile from --url/--username/--client/--language', async () => {
     const program = makeProgram();
-    registerConnectionCommand(program);
+    registerProfileCommand(program);
     const res = await runCommand(
       program,
-      ['connection', 'add', 'dev', '--url', 'http://sap.example:50000', '--username', 'DEV', '--client', '100', '--language', 'EN', '--json'],
+      ['profile', 'add', 'dev', '--url', 'http://sap.example:50000', '--username', 'DEV', '--client', '100', '--language', 'EN', '--json'],
       { cwd },
     );
     expect(res.exitCode).toBeUndefined();
@@ -55,10 +55,10 @@ describe('abap connection add', () => {
 
   it('stores the password in the keychain when --password is given', async () => {
     const program = makeProgram();
-    registerConnectionCommand(program);
+    registerProfileCommand(program);
     const res = await runCommand(
       program,
-      ['connection', 'add', 'qa', '--url', 'http://sap.example:50000', '--username', 'QA', '--password', 'secret', '--json'],
+      ['profile', 'add', 'qa', '--url', 'http://sap.example:50000', '--username', 'QA', '--password', 'secret', '--json'],
       { cwd },
     );
     expect(res.exitCode).toBeUndefined();
@@ -68,8 +68,8 @@ describe('abap connection add', () => {
 
   it('refuses to create a profile that already exists (CONFIG_ERROR)', async () => {
     const program = makeProgram();
-    registerConnectionCommand(program);
-    const res = await runCommand(program, ['connection', 'add', 'existing', '--url', 'http://x', '--username', 'u', '--json'], { cwd });
+    registerProfileCommand(program);
+    const res = await runCommand(program, ['profile', 'add', 'existing', '--url', 'http://x', '--username', 'u', '--json'], { cwd });
     expect(res.exitCode).not.toBe(0);
     const err = JSON.parse(res.stderr);
     expect(err.error.code).toBe('CONFIG_ERROR');
@@ -79,18 +79,18 @@ describe('abap connection add', () => {
 
   it('non-interactive without field options → USAGE error', async () => {
     const program = makeProgram();
-    registerConnectionCommand(program);
-    const res = await runCommand(program, ['connection', 'add', 'dev', '--json'], { cwd });
+    registerProfileCommand(program);
+    const res = await runCommand(program, ['profile', 'add', 'dev', '--json'], { cwd });
     expect(res.exitCode).not.toBe(0);
     const err = JSON.parse(res.stderr);
     expect(err.error.code).toBe('USAGE');
-    expect(err.error.message).toContain('abap connection add <name> --url');
+    expect(err.error.message).toContain('abap profile add <name> --url');
   });
 
   it('missing url/username → INVALID_ARGUMENT from validation', async () => {
     const program = makeProgram();
-    registerConnectionCommand(program);
-    const res = await runCommand(program, ['connection', 'add', 'dev', '--client', '100', '--json'], { cwd });
+    registerProfileCommand(program);
+    const res = await runCommand(program, ['profile', 'add', 'dev', '--client', '100', '--json'], { cwd });
     expect(res.exitCode).not.toBe(0);
     const err = JSON.parse(res.stderr);
     expect(err.error.code).toBe('INVALID_ARGUMENT');

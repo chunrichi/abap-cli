@@ -36,7 +36,7 @@ abap search --schema
 - `--page-all`: 一次请求抓取所有匹配，请求量 = `--page-all-max × --limit`（默认 50×20=1000；实测 SAP 支持到 5000 无截断）。返回条数达到请求量时输出 `PAGINATION_LIMITED` 警告并标记 `truncated: true`。与 `--page` 互斥
 - `--page-all-max <n>`: `--page-all` 的页数上限（默认 50），用于计算单次请求量
 - `--schema`: 打印命令参数契约 JSON 后退出，不发起 SAP 调用
-- 全局: `--json` 结构化输出、`--report-stuck`
+- 全局: `--json` 结构化输出、``
 
 ## 行为规则
 

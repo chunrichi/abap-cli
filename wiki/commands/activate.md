@@ -45,7 +45,7 @@ abap activate <object> [options]
 ## 相关命令
 
 - `abap inspect <object> --activation` — 只读检查激活状态（`ok` 为 true 表示每个 part 的 active source == latest）；推荐的激活前检查
-- `abap deploy` — 内部 `activateAllParts()` 复用同一逻辑，部署后确保对象完全激活（否则后续 runClass 找不到方法），失败抛 `ACTIVATION_FAILED`
+- `abap extension deploy` — 内部 `activateAllParts()` 复用同一逻辑，部署后确保对象完全激活（否则后续 runClass 找不到方法），失败抛 `ACTIVATION_FAILED`
 
 ## Examples
 

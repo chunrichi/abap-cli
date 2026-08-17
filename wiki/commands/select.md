@@ -128,7 +128,7 @@ abap select --table ZTAB_FIXTURE --where "NAME = 'O''Brien; DROP TABLE ZTAB_FIXT
 ## 版本与服务依赖
 
 - **CLI 版本**: 0.1.0（含 `select` 命令）。
-- **ICF 服务版本**: **0.4.0**（`abap deploy` 部署后可用）。`abap doctor` / `abap init` 探测 outdated 时升级。
+- **ICF 服务版本**: **0.4.0**（`abap extension deploy` 部署后可用）。`abap doctor` / `abap init` 探测 outdated 时升级。
 - **握手**: 复用 014 DDIC CRUD 的 `ZCL_ABAP_VIBE_ICF` 类（`/data/*` 子路由新增）。
 - **开发模式**: 014 `ICF_SERVICE_VERSION` + ABAP `gc_version` 同步 bump 0.3.0 → 0.4.0（017：select 行值原生类型化）。
 
@@ -148,7 +148,7 @@ QUERY_FAILED              runtime SQL failure             →  abap activate <ta
 
 - **014 `abap create TABL`**: 建表 → `abap select` 看数据 = 完整闭环。
 - **015 `abap run`**: 跑 classrun/静态方法（含 INSERT 数据） → `abap select` 看数据 = 验证闭环。
-- **`abap deploy`**: 部署 `ZCL_ABAP_VIBE_ICF`（含 `/data/query` 端点）。
+- **`abap extension deploy`**: 部署 `ZCL_ABAP_VIBE_ICF`（含 `/data/query` 端点）。
 - **`abap search`**: 在 `TABLE_NOT_FOUND` 时定位对象名。
 
 ## 引用

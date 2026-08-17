@@ -10,7 +10,7 @@ function fakeClient(stdout: string): AdtClientWrapper {
 }
 
 describe('run-flow WRAPPER_NOT_DEPLOYED', () => {
-  it('maps the wrapper-not-found envelope to WRAPPER_NOT_DEPLOYED with nextSteps abap deploy', async () => {
+  it('maps the wrapper-not-found envelope to WRAPPER_NOT_DEPLOYED with nextSteps abap extension deploy', async () => {
     const stdout = JSON.stringify({
       status: 'error', code: 'WRAPPER_NOT_DEPLOYED',
       message: 'ZCL_ABAP_VIBE_RUNNER missing on target system',
@@ -20,7 +20,7 @@ describe('run-flow WRAPPER_NOT_DEPLOYED', () => {
     } catch (e) {
       const err = e as CliError;
       expect(err.code).toBe('WRAPPER_NOT_DEPLOYED');
-      expect(err.nextSteps?.some((s) => s.includes('deploy'))).toBe(true);
+      expect(err.nextSteps?.some((s) => s.includes('abap extension deploy'))).toBe(true);
     }
   });
 });

@@ -1,5 +1,5 @@
 /**
- * abap deploy — auto-create when object does not exist on the target system.
+ * abap extension deploy — auto-create when object does not exist on the target system.
  *
  * Mirrors the first-time deploy scenario on a fresh SAP system where the
  * bundled classes are not yet known. The flow must:
@@ -69,7 +69,7 @@ beforeEach(() => {
   );
 });
 
-describe('abap deploy — auto-create missing objects (US6.1)', () => {
+describe('abap extension deploy — auto-create missing objects (US6.1)', () => {
   it('calls createObject then pushObject when the object is missing', async () => {
     const summary = await deployBundled(client, {
       transport: 'TRN001', yes: true, sourceDir, package: '$TMP',

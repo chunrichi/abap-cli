@@ -37,7 +37,7 @@ abap doctor [--verbose] [--fix] [--yes] [--system <name>]
 
 - `config.profile.<name>`: 每个 profile 字段校验
 - `config.active`: `.abap.json` 引用的 system 是否存在
-- `config.workspace`: 当前目录是否有 `.abap.json`（未初始化时 err 并提示 `abap config init`）
+- `config.workspace`: 当前目录是否有 `.abap.json`（未初始化时 err 并提示 `abap init`）
 
 ### connection
 
@@ -97,7 +97,7 @@ abap doctor --system dev
 ## todo
 
 - [ ] **`--fix --all` 分级修复** — roadmap 建议按"安全/需确认"分级；当前 `--fix` 只做安全可逆项，可扩展输出"修复前后 diff"。
-- [ ] **015 wrapper 健康检查** — 增加 `ZCL_ABAP_VIBE_RUNNER` 部署/激活状态检查（类似 ICF 节点检查），在 `doctor` 的 connection 段提示 `abap deploy` 是否滞后。
+- [ ] **015 wrapper 健康检查** — 增加 `ZCL_ABAP_VIBE_RUNNER` 部署/激活状态检查（类似 ICF 节点检查），在 `doctor` 的 connection 段提示 `abap extension deploy` 是否滞后。
 
 # references
 

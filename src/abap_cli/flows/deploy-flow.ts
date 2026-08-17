@@ -100,9 +100,9 @@ export async function deployBundled(client: AdtClientWrapper, opts: DeployOption
 
   // Non-interactive confirmation gate (FR-020): actual deploys mutate SAP.
   if (!opts.dryRun && !opts.yes && !process.stdin.isTTY) {
-    throw new CliError('VALIDATION_ERROR', 'abap deploy modifies SAP; confirm with --yes in non-interactive mode', {
+    throw new CliError('VALIDATION_ERROR', 'abap extension deploy modifies SAP; confirm with --yes in non-interactive mode', {
       nextSteps: ['Re-run with --yes to confirm the deployment.', 'Or use --dry-run to preview without changes.'],
-      example: 'abap deploy --yes',
+      example: 'abap extension deploy --yes',
     });
   }
 
@@ -138,7 +138,7 @@ export async function deployBundled(client: AdtClientWrapper, opts: DeployOption
           'Verify the user has SICF administration permissions (e.g. S_ICF_ADMIN).',
           'Check the setup class is fully activated: abap inspect ZCL_ABAP_VIBE_ICF_SETUP --activation',
           'If any part is inactive, run: abap activate ZCL_ABAP_VIBE_ICF_SETUP --yes',
-          'Re-run: abap deploy --yes to retry the setup step.',
+          'Re-run: abap extension deploy --yes to retry the setup step.',
         ],
       });
     }
@@ -187,7 +187,7 @@ async function deployOneObject(
           `Cannot auto-create objects of type ${obj.type} during deploy`,
         );
       }
-      const description = obj.parts[0]?.description || `Auto-created by abap deploy`;
+      const description = obj.parts[0]?.description || `Auto-created by abap extension deploy`;
       if (opts.dryRun) {
         // Plan-only: do not call createObject; record a planned creation.
         for (const p of obj.parts) {

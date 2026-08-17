@@ -5,6 +5,7 @@ import { collectWarning } from '../output/meta.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import { resolveTransport } from '../core/transport.js';
 import { deployBundled, type DeploymentSummary } from '../flows/deploy-flow.js';
+import { checkIcfDeployment, ICF_SERVICE_VERSION } from '../icf/service-version.js';
 
 interface DeployOptions {
   tr?: string;
@@ -15,11 +16,19 @@ interface DeployOptions {
   yes?: boolean;
 }
 
-export function registerDeployCommand(program: Command): void {
-  program
+export function registerExtensionCommand(program: Command): void {
+  const extension = program
+    .command('extension')
+    .description('Manage the bundled ICF ABAP extension. Subcommands: deploy (install/update), status (probe installation).')
+    .addHelpText('after', commonErrorsAfter())
+    .action((_opts, cmd) => {
+      // Bare `abap extension` prints subcommand help.
+      console.log(cmd.helpInformation());
+    });
+
+  extension
     .command('deploy')
     .description('Deploy bundled ICF ABAP service to SAP system (--dry-run/--diff preview available)')
-    .addHelpText('after', commonErrorsAfter())
     .option('--tr <transport>', 'Transport number (required when --package is not $TMP)')
     .option('--package <package>', 'Target SAP package (default $TMP — local, no transport needed)', '$TMP')
     .option('--dry-run', 'Plan only — make no mutating SAP calls')
@@ -39,7 +48,7 @@ export function registerDeployCommand(program: Command): void {
                 'Re-run with --tr <request> (e.g. --tr NDK123456).',
                 `Or use --package $TMP for local objects (no transport needed).`,
               ],
-              example: `abap deploy --package ${targetPackage} --tr NDK123456 --yes`,
+              example: `abap extension deploy --package ${targetPackage} --tr NDK123456 --yes`,
             },
           );
         }
@@ -64,6 +73,36 @@ export function registerDeployCommand(program: Command): void {
           collectWarning('FORCE_BYPASSED', '--force bypassed safety guards.', { force: true });
         }
         printResult(json, summary, humanSummary(summary));
+      } catch (error: unknown) {
+        printError(json, error);
+      }
+    });
+
+  extension
+    .command('status')
+    .description('Probe the SAP-side ICF extension: installed? which version? matches the bundled version?')
+    .action(async (_opts, cmd) => {
+      const json = jsonFromCommand(cmd);
+      try {
+        const info = await checkIcfDeployment();
+        if (info.status === 'unreachable') {
+          collectWarning('ICF_CHECK_DEGRADED', `ICF status probe degraded: ${info.error?.message ?? 'unreachable'}`);
+        }
+        const data = {
+          installed: info.status !== 'not_deployed' && info.status !== 'unreachable',
+          status: info.status,
+          remoteVersion: info.remoteVersion ?? null,
+          expectedVersion: info.expectedVersion,
+          match: info.status === 'current',
+        };
+        const hint = info.status === 'not_deployed'
+          ? 'ICF service not deployed. Run `abap extension deploy` to install it.'
+          : info.status === 'outdated'
+            ? `ICF service outdated (have ${info.remoteVersion}, need ${ICF_SERVICE_VERSION}). Run \`abap extension deploy\` to upgrade.`
+            : info.status === 'unreachable'
+              ? `ICF unreachable: ${info.error?.message ?? 'unknown'}`
+              : `ICF service deployed and current (version ${info.remoteVersion}).`;
+        printResult(json, data, hint);
       } catch (error: unknown) {
         printError(json, error);
       }

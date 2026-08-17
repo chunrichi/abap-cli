@@ -45,7 +45,7 @@ abap run ZCL_FOO --timeout 60000
 | 路径 | 触发 | 条件 |
 |---|---|---|
 | **classrun** | 不传 `--method` | 类实现 `if_oo_adt_classrun~main` |
-| **wrapper** | 传 `--method` | 部署 `ZCL_ABAP_VIBE_RUNNER`（`abap deploy`） |
+| **wrapper** | 传 `--method` | 部署 `ZCL_ABAP_VIBE_RUNNER`（`abap extension deploy`） |
 
 **已知限制**（vhcala4hci 验证）：ADT classrun 端点**不注入** `--method` 入参——此时 `WRAPPER_INPUT_UNAVAILABLE`，应改用直接 classrun 路径。
 
@@ -134,20 +134,20 @@ VALUE:
 
 Agent 消费时每单元格按 `string | number | boolean | null` 处理。
 
-## `abap deploy`（013）
+## `abap extension deploy`（013）
 
 ```bash
 # 部署 / 升级 bundled ICF 服务（默认 $TMP 无需 --tr）
-abap deploy --yes
+abap extension deploy --yes
 
 # 计划部署（零变更）
-abap deploy --dry-run
+abap extension deploy --dry-run
 
 # 看会改什么
-abap deploy --diff
+abap extension deploy --diff
 
 # 部署到非 $TMP 包（需 --tr）
-abap deploy --package ZABAP_VIBE --tr DEVK900001 --yes
+abap extension deploy --package ZABAP_VIBE --tr DEVK900001 --yes
 ```
 
 ### 输出信封（`--json`）
@@ -175,13 +175,13 @@ abap deploy --package ZABAP_VIBE --tr DEVK900001 --yes
 ### ICF 服务版本
 
 - 0.1.0 → CLI `ICF_SERVICE_VERSION` / handler `gc_version`
-- `abap deploy` 自动创建/更新 `ZCL_ABAP_VIBE_ICF` + `ZCL_ABAP_VIBE_ICF_SETUP` + `ZCL_ABAP_VIBE_RUNNER`（013 + 015 + 016 + 017 累积）
+- `abap extension deploy` 自动创建/更新 `ZCL_ABAP_VIBE_ICF` + `ZCL_ABAP_VIBE_ICF_SETUP` + `ZCL_ABAP_VIBE_RUNNER`（013 + 015 + 016 + 017 累积）
 
 ### 状态流转
 
-| 旧 `config` 探测状态 | 推荐动作 |
+| `extension status` 状态 | 推荐动作 |
 |---|---|
-| `not_deployed` | `abap deploy --yes` |
+| `not_deployed` | `abap extension deploy --yes` |
 | `current` | 跳过 |
-| `outdated` | `abap deploy --yes`（升级） |
+| `outdated` | `abap extension deploy --yes`（升级） |
 | `unreachable` | 不阻断；查 `meta.warnings` 找原因（ICF_CHECK_DEGRADED） |

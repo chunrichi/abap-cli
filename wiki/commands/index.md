@@ -13,8 +13,8 @@ changed at: 2026-08-07 00:39:21
 
 ## Setup & 环境
 
-- [config](config.md) — 配置工作区：从系统 profile 或完整连接参数写入 `.abap.json`；`config init` 为交互向导
-- [connection](connection.md) — 管理全局连接 profiles（增删改查、测试、导入导出）
+- [init](init.md) — 初始化工作区：绑定 profile（写 `.abap.json`）与/或脚手架 agent 上下文（`--agent`）；裸 `init` 为交互向导
+- [profile](profile.md) — 管理全局连接 profiles（增删改查、测试、导入导出）
 - [doctor](doctor.md) — 诊断 CLI 环境（环境 / 配置 / 连接三段检查，支持 `--fix`）
 - [pull](pull.md) — 从 SAP 下载对象到本地（源码 / 包批量 / DDIC JSON / textpool / 远程版本）
 - [push](push.md) — 推送本地文件到 SAP（源码 / FUGR / textpool / DDIC JSON，按对象解析 transport）
@@ -27,7 +27,7 @@ changed at: 2026-08-07 00:39:21
 
 ## 校验
 
-- [check](check.md) — 校验本地 ABAP 文件（`--syntax` 对 SAP / `--content` 本地 / `--atc` ATC；`--out` 持久化原始 ATC worklist）
+- [check](check.md) — 校验本地 ABAP 文件（子命令 `syntax` 对 SAP / `content` 本地 / `atc` ATC；`--out` 持久化原始 ATC worklist）
 
 ## 搜索
 
@@ -36,5 +36,9 @@ changed at: 2026-08-07 00:39:21
 ## 传输管理
 
 - [transport](transport.md) — 管理 SAP 传输请求（list / create / show / resolve / assign；create 与 assign 为写操作，非 TTY 需 `--yes` 或 `--dry-run`）
+
+## 扩展
+
+- [extension](extension.md) — 管理内置 ICF ABAP 扩展（deploy 部署 / status 只读探测版本匹配）
 
 # references

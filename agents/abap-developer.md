@@ -7,7 +7,7 @@ metadata:
 handoffs:
   - label: Diagnose environment
     agent: abap-setup
-    prompt: 跑 doctor + connection test，输出诊断结果
+    prompt: 跑 doctor + profile test，输出诊断结果
     send: false
   - label: Edit source code
     agent: abap-edit
@@ -15,7 +15,7 @@ handoffs:
     send: false
   - label: Run on SAP
     agent: abap-data
-    prompt: 按任务执行 run / select / deploy
+    prompt: 按任务执行 run / select / extension
     send: false
 ---
 
@@ -41,8 +41,8 @@ handoffs:
 | `NO_TRANSPORT` | Diagnose environment（transport list → create） |
 | `LOCK_FAILED` | Edit source code（inspect --locks 查持有者） |
 | `OBJECT_NOT_ACTIVE` | Edit source code（activate --yes） |
-| `AUTH_ERROR` / `TLS_ERROR` | Diagnose environment（connection test） |
-| `WRAPPER_NOT_DEPLOYED` | Run on SAP（deploy --yes） |
+| `AUTH_ERROR` / `TLS_ERROR` | Diagnose environment（profile test） |
+| `WRAPPER_NOT_DEPLOYED` | Run on SAP（extension deploy --yes） |
 | `TABLE_NOT_FOUND` | Edit source code（search <name>） |
 | `OBJECT_NOT_FOUND`（push 时） | Edit source code（search <name>） |
 | `SYNTAX_ERROR` / `ACTIVATION_FAILED` | Edit source code（读 errors 修复） |
@@ -52,7 +52,7 @@ handoffs:
 
 1. **永远 `--json`**：所有命令都支持；分支判断只看 `status` / `error.code`
 2. **失败 stdout 严格为空**：捕获 stderr 信封
-3. **凭证走 keychain**：密码用 `connection add/set` 写入；**不**通过命令行传明文
+3. **凭证走 keychain**：密码用 `profile add/set` 写入；**不**通过命令行传明文
 4. **推送先小步试**：`--check-only` 或 `--dry-run` 先看
 5. **`--atomic` 防雪崩**：多文件必加
 6. **不省略 transport**：非 `$TMP` / 非已绑定对象必须 `--tr` 或由解析兜底
@@ -85,7 +85,7 @@ abap inspect ZCL_DEMO --activation --json
 # 5. 跑 + 验证
 [handoff: Run on SAP]
 abap run ZCL_DEMO --json
-abap check src/zcl_demo/zcl_demo.clas.abap --atc --out ./atc.json --json
+abap check atc src/zcl_demo/zcl_demo.clas.abap --variant Z_ATC_VAR --out ./atc.json --json
 
 # 6. 出错时切 skill
 # NO_TRANSPORT → Diagnose environment

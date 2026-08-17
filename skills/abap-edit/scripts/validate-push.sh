@@ -14,8 +14,8 @@ file="$1"
 shift
 
 # 1. syntax check
-echo "=== check --syntax ==="
-abap check "$file" --syntax --json
+echo "=== check syntax ==="
+abap check syntax "$file" --json
 echo "语法 OK"
 
 # 2. dry-run push
