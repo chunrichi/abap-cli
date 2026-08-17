@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { probeSystem } from '../clients/probe.js';
 import { assertValidProfile } from '../config/validation.js';
+import { findWorkspaceConfig } from '../config/project-config.js';
 
 export type DoctorStatus = 'ok' | 'err';
 
@@ -171,9 +172,11 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
   }
 
   // Active workspace system (.abap.json) resolves to a configured profile.
-  const workspacePath = path.join(cwd, '.abap.json');
+  // The search starts at cwd and walks up to the nearest .abap.json (or stops at
+  // the repo root / filesystem root) — see findWorkspaceConfig.
+  const workspacePath: string | null = findWorkspaceConfig(cwd);
   let activeSystem: string | undefined;
-  if (fs.existsSync(workspacePath)) {
+  if (workspacePath) {
     try {
       const ws = JSON.parse(fs.readFileSync(workspacePath, 'utf-8')) as { system?: string };
       activeSystem = ws.system;
@@ -187,7 +190,13 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
           ),
         );
       } else if (activeSystem) {
-        push(config, okItem('config.active', verbose ? `active system: ${activeSystem}` : undefined));
+        push(
+          config,
+          okItem(
+            'config.active',
+            verbose ? `active system: ${activeSystem} (${path.relative(cwd, workspacePath) || '.abap.json'})` : undefined,
+          ),
+        );
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
@@ -201,7 +210,7 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
       config,
       errItem(
         'config.workspace',
-        'No workspace config (.abap.json) found in the current directory.',
+        'No workspace config (.abap.json) found in the current directory or any ancestor.',
         'Run "abap init" (TTY wizard) or "abap init --profile <name>" to initialize the workspace.',
       ),
     );

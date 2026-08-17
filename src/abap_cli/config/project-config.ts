@@ -42,6 +42,7 @@ interface LoadedConfig {
 
 let cached: LoadedConfig | null = null;
 let cachedMtimes: { configPath: number; systemsPath: number } | null = null;
+let cachedConfigPath: string | null = null;
 
 const SYSTEMS_PATH = path.join(os.homedir(), '.abap-cli', 'systems.json');
 
@@ -53,22 +54,59 @@ function fileMtime(p: string): number {
   }
 }
 
+/**
+ * Walk up the directory tree from `startDir` looking for the nearest `.abap.json`.
+ * - Returns the absolute path of the first `.abap.json` found.
+ * - Stops at the first ancestor that contains a `.git` directory (treats it as the
+ *   repository root — searching past it would risk picking up an unrelated workspace).
+ * - Stops at the filesystem root.
+ *
+ * This makes a parent `.abap.json` apply to nested subdirectories by default, while
+ * a child directory's own `.abap.json` always wins because the search starts there.
+ */
+export function findWorkspaceConfig(startDir: string = process.cwd()): string | null {
+  let dir = path.resolve(startDir);
+  const seen = new Set<string>();
+  while (!seen.has(dir)) {
+    seen.add(dir);
+    const candidate = path.join(dir, '.abap.json');
+    if (fs.existsSync(candidate)) return candidate;
+    // Treat the repo root as a hard boundary: do not search past .git/.
+    if (fs.existsSync(path.join(dir, '.git'))) return null;
+    const parent = path.dirname(dir);
+    if (parent === dir) return null; // reached filesystem root
+    dir = parent;
+  }
+  return null;
+}
+
 function currentMtimes(): { configPath: number; systemsPath: number } {
+  const configPath = findWorkspaceConfig() ?? path.resolve(process.cwd(), '.abap.json');
   return {
-    configPath: fileMtime(path.resolve(process.cwd(), '.abap.json')),
+    configPath: fileMtime(configPath),
     systemsPath: fileMtime(SYSTEMS_PATH),
   };
 }
 
 /**
  * Load project configuration from .abap.json (system reference) + user-level system profile + OS keychain.
- * The file cache auto-invalidates on mtime change (abap init / profile set); the
- * password is re-read from the keychain every call so updates apply immediately.
+ * The search starts at the current directory and walks up to the nearest `.abap.json`
+ * (or stops at the repository root / filesystem root). The file cache auto-invalidates
+ * on mtime change (abap init / profile set); the password is re-read from the keychain
+ * every call so updates apply immediately.
  */
 export async function loadConfig(): Promise<ProjectConfig> {
   const mtimes = currentMtimes();
-  if (!cached || !cachedMtimes || cachedMtimes.configPath !== mtimes.configPath || cachedMtimes.systemsPath !== mtimes.systemsPath) {
-    cached = await loadFileConfig();
+  if (
+    !cached ||
+    !cachedMtimes ||
+    !cachedConfigPath ||
+    cachedMtimes.configPath !== mtimes.configPath ||
+    cachedMtimes.systemsPath !== mtimes.systemsPath
+  ) {
+    const configPath = findWorkspaceConfig();
+    cached = await loadFileConfig(configPath);
+    cachedConfigPath = configPath;
     cachedMtimes = mtimes;
   }
 
@@ -83,11 +121,10 @@ export async function loadConfig(): Promise<ProjectConfig> {
   };
 }
 
-async function loadFileConfig(): Promise<LoadedConfig> {
+async function loadFileConfig(configPath: string | null): Promise<LoadedConfig> {
   // Load .abap.json — workspace references a user-level system profile
   let workspace: { system?: string; transport?: string; package?: string; sourceDir?: string } = {};
-  const configPath = path.resolve(process.cwd(), '.abap.json');
-  if (fs.existsSync(configPath)) {
+  if (configPath && fs.existsSync(configPath)) {
     try {
       workspace = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
     } catch {
@@ -155,4 +192,5 @@ export function readCaCertificate(caPath: string): string | undefined {
 export function resetConfig(): void {
   cached = null;
   cachedMtimes = null;
+  cachedConfigPath = null;
 }

@@ -99,6 +99,36 @@ describe('doctor-checks (FR-001..005)', () => {
     expect(brief.environment.every((i) => i.detail === undefined)).toBe(true);
     expect(verbose.environment.some((i) => i.detail !== undefined)).toBe(true);
   });
+
+  it('finds .abap.json in an ancestor directory when cwd has none', async () => {
+    writeSystems(home, {
+      mock: { url: 'http://localhost:8080', client: '100', username: 'MOCKUSER', language: 'EN' },
+    });
+    // Place .abap.json in the parent of cwd; cwd itself has none.
+    const child = path.join(cwd, 'pkg', 'sub');
+    fs.mkdirSync(child, { recursive: true });
+    fs.writeFileSync(path.join(cwd, '.abap.json'), JSON.stringify({ system: 'mock' }, null, 2) + '\n');
+    const report = await runDoctorChecks({ home, cwd: child });
+    const item = report.config.find((i) => i.key === 'config.active');
+    expect(item?.status).toBe('ok');
+    expect(report.config.find((i) => i.key === 'config.workspace')).toBeUndefined();
+  });
+
+  it('child .abap.json wins over an ancestor .abap.json', async () => {
+    writeSystems(home, {
+      mock: { url: 'http://localhost:8080', client: '100', username: 'MOCKUSER', language: 'EN' },
+      other: { url: 'http://localhost:8081', client: '100', username: 'MOCKUSER', language: 'EN' },
+    });
+    const child = path.join(cwd, 'pkg');
+    fs.mkdirSync(child, { recursive: true });
+    fs.writeFileSync(path.join(cwd, '.abap.json'), JSON.stringify({ system: 'mock' }, null, 2) + '\n');
+    fs.writeFileSync(path.join(child, '.abap.json'), JSON.stringify({ system: 'other' }, null, 2) + '\n');
+    const report = await runDoctorChecks({ home, cwd: child, verbose: true });
+    const item = report.config.find((i) => i.key === 'config.active');
+    expect(item?.status).toBe('ok');
+    expect(item?.detail).toContain('other');
+    expect(item?.detail).toContain('.abap.json');
+  });
 });
 
 describe('abap doctor command (FR-004)', () => {

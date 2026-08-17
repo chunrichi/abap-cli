@@ -6,6 +6,7 @@ import { getPassword, storePassword, deletePassword } from '../config/secrets.js
 import { CliError, printResult } from '../output/json.js';
 import { collectWarning } from '../output/meta.js';
 import { assertValidProfile } from '../config/validation.js';
+import { findWorkspaceConfig } from '../config/project-config.js';
 import { probeSystem } from '../clients/probe.js';
 import { probeTextpoolCapability, recordCapability } from '../textpool/textpool-capability.js';
 
@@ -186,13 +187,13 @@ export async function runDelete(name: string, yes: boolean, jsonOutput: boolean)
     );
   }
 
-  const configPath = path.resolve(process.cwd(), '.abap.json');
+  const configPath = findWorkspaceConfig();
   let warning: string | undefined;
-  if (fs.existsSync(configPath)) {
+  if (configPath && fs.existsSync(configPath)) {
     try {
       const workspace = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
       if (workspace.system === name) {
-        warning = `workspace .abap.json references '${name}'`;
+        warning = `workspace .abap.json (${path.relative(process.cwd(), configPath) || '.abap.json'}) references '${name}'`;
       }
     } catch {
       // ignore parse errors
