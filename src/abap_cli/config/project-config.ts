@@ -187,6 +187,37 @@ export function readCaCertificate(caPath: string): string | undefined {
 }
 
 /**
+ * Write the workspace config (.abap.json) to disk.
+ * Merges with existing content, only overwriting the keys provided.
+ */
+export async function writeProjectConfig(updates: {
+  systemName?: string;
+  package?: string;
+  transport?: string;
+  sourceDir?: string;
+}): Promise<void> {
+  const configPath = findWorkspaceConfig() ?? path.join(process.cwd(), '.abap.json');
+  let existing: Record<string, unknown> = {};
+  if (fs.existsSync(configPath)) {
+    try {
+      existing = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    } catch {
+      // ignore parse errors, start fresh
+    }
+  }
+  const updated: Record<string, unknown> = {
+    ...existing,
+    ...(updates.systemName !== undefined ? { system: updates.systemName } : {}),
+    ...(updates.package !== undefined ? { package: updates.package } : {}),
+    ...(updates.transport !== undefined ? { transport: updates.transport } : {}),
+    ...(updates.sourceDir !== undefined ? { sourceDir: updates.sourceDir } : {}),
+  };
+  fs.writeFileSync(configPath, JSON.stringify(updated, null, 2) + '\n', 'utf-8');
+  // Invalidate cache
+  resetConfig();
+}
+
+/**
  * Reset cached config (for testing).
  */
 export function resetConfig(): void {

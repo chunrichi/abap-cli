@@ -3,6 +3,10 @@
 ## [Unreleased]
 
 ### Added
+- **`abap config` 命令（021 补充）** — 新增 `config` 子命令，与 `init` / `profile` 形成三层职责分离：
+  - `abap config show`：显示当前 workspace 配置（.abap.json 内容）
+  - `abap config set`：修改当前 workspace 配置（`--profile` / `--package` / `--tr` / `--source-dir`）
+  - `profile` 负责全局连接档案，`config` 负责当前项目的 profile/package/tr/sourceDir 绑定
 - **HTTP service 拉取 / 推送 / 创建（022）** — `abap pull <name> --type HTTP` / `abap push <file>.http.json` / `abap create HTTP <name> --file <file>.http.json` 全部走自建 ICF `/http/<name>` 端点。`folderFor('HTTP') = 'http'`，本地布局 `<rootDir>/http/<name>.http.json`，与 abap-file-format `zif_aff_http_v1` 嵌套结构（`header` + `generalInformation`）双向兼容。新增 `dictionary/http-json.ts`（含 `localToWire` / `wireToLocal` / `validateHttpObject`，namespace Z/Y/slash 强制）；`IcfClient` 新增 `getHttp` / `postHttp`；`core/resolve.ts` 校验集合扩 `HTTP`；两个错误码 `HTTP_CREATE_FAILED`（SAP_ERROR/6）/ `HTTP_OBJECT_NOT_FOUND`（NOT_FOUND/8）；`--atomic` 推送对 HTTP 文件做结构化 JSON 校验。新增 4 个测试文件 / 29 个用例（`http-json-map` / `http-pull` / `http-push` / `http-create`）+ `type-folder.test.ts` 增 HTTP 用例。所有 95 个测试文件 / 523 个用例全过。SAP 端 dispatcher (`ZCL_ABAP_VIBE_ICF~dispatch_http`) 已留路由点，handler 完整实现（SICF insert/service_from_url 关联 handler class）留待后续 PR（022 真实部署前置）。
 - **CLI 命令树重构（021）** — 19 个顶层命令收敛为 16 个，命令组语义对齐（详见 Breaking changes 迁移表）。新增能力：`abap init --agent <target>`（幂等脚手架 AGENTS.md + skills/ + 厂商入口文件，`--force` 覆盖）；`abap extension status`（只读探测 SAP 侧 ICF 服务 installed/version/match）；`abap check syntax|content|atc` 子命令化（`--files` 父命令快捷方式）；`abap profile`（承接原 connection，保留 `set`，`use` 并入 `init --profile`）。`package.json` `files` 增补 `skills/` `agents/` `AGENTS.md` `.github`，供 `--agent` 脚手架分发。
 - **npm 发布准备** — `files` 增加 `abap/src`（`abap deploy` 运行期依赖的打包 ABAP 源码）；补 `repository` / `homepage` / `bugs` 元数据。首次发布版本 `0.1.0`（包名 `abap-cli` 已确认可用）。

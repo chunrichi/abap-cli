@@ -18,6 +18,12 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
     load: () => import('./commands/init.js').then((m) => ({ register: m.registerInitCommand })),
   },
   {
+    name: 'config',
+    scope: 'local',
+    description: 'Show or modify the current workspace configuration (.abap.json). Does not manage profiles — use `abap profile` for that.',
+    load: () => import('./commands/config.js').then((m) => ({ register: m.registerConfigCommand })),
+  },
+  {
     name: 'pull',
     description: 'Download ABAP objects from SAP to local files',
     load: () => import('./commands/pull.js').then((m) => ({ register: m.registerPullCommand })),
