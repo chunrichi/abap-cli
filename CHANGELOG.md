@@ -21,6 +21,7 @@
 - **`abap check --atc --out [file]`** — `--out` 与 `--atc` 一起用，把完整 SAP `AtcWorkList` 落本地文件；stdout 仍打印映射后的 `CheckIssue[]`。非 `--atc` 时 `--out` 拒绝。
 - **`abap doctor` 报告未初始化 workspace** — 无 `.abap.json` 时 config 节输出 `config.workspace`（err）并指引到 `abap config init`，不再静默省略。
 - **`abap --help` local / SAP 命令分组** — 每个 `LazyCommandSpec` 新增 `scope: 'local' | 'sap'`；4 个本地命令（`init` / `connection` / `doctor` / `report-stuck`）显式标注，根 `--help` 末尾追加对应分组。
+- **扩展机制（023）** — `ValidationRule` / `LifecycleHook` / `CommandExtension` 三种扩展类型，支持 `.abap.json` 配置加载 + `extensions list` 命令。新增 `src/abap_cli/extensions/`（`types.ts` / `shape.ts` / `errors.ts` / `loader.ts` / `registry.ts` / `list-command.ts`）；两个错误码 `EXTENSION_LOAD_FAILED`（CONFIG_ERROR/3）/ `EXTENSION_VALIDATION_FAILED`（VALIDATION_ERROR/7）；CLI lifecycle hooks（`preAction` / `afterCommand` / `onError`）通过 `ABAP_CLI_EXTENSIONS_STRICT=1` 开启严格模式（扩展加载失败则 exit 3）。路径扩展安全性：仅允许 cwd 和 `~/.abap-cli/extensions/` 下的文件，防止路径穿越。Graceful degradation：非严格模式下扩展加载失败记录到 `meta.extensions.failed`，CLI 仍可运行。新增 6 个 E2E 测试（`test/unit/extension-e2e.test.ts`），所有 555 个测试全过。
 
 ### Breaking changes
 - **CLI 命令树重构（021）** — 命令合并 / 更名 / 移除，全部按 AGENTS.md "Refactor Fearlessly" 不留兼容别名；被删命令调用返回 USAGE 错误 + 迁移 hint。迁移表：

@@ -4,6 +4,7 @@ import * as os from 'os';
 import { getPassword } from './secrets.js';
 import { getSystem } from './user-config.js';
 import { CliError } from '../output/json.js';
+import type { ExtensionManifest } from '../extensions/types.js';
 
 export interface SapConfig {
   url: string;
@@ -28,6 +29,8 @@ export interface ProjectConfig {
   /** 014: ADT text-element capability recorded at connect/init (Q1, optional). */
   adtTextpool?: { read: boolean; write: boolean; checkedAt: string };
   systemVersion?: string;
+  /** 023: registered extension manifests from .abap.json */
+  extensions?: ExtensionManifest[];
 }
 
 /** Cached profile data minus the password, which is re-read on every load. */
@@ -38,6 +41,7 @@ interface LoadedConfig {
   package: string;
   adtTextpool?: { read: boolean; write: boolean; checkedAt: string };
   systemVersion?: string;
+  extensions?: ExtensionManifest[];
 }
 
 let cached: LoadedConfig | null = null;
@@ -118,12 +122,13 @@ export async function loadConfig(): Promise<ProjectConfig> {
     systemName: cached.systemName,
     adtTextpool: cached.adtTextpool,
     systemVersion: cached.systemVersion,
+    extensions: cached.extensions,
   };
 }
 
 async function loadFileConfig(configPath: string | null): Promise<LoadedConfig> {
   // Load .abap.json — workspace references a user-level system profile
-  let workspace: { system?: string; transport?: string; package?: string; sourceDir?: string } = {};
+  let workspace: { system?: string; transport?: string; package?: string; sourceDir?: string; extensions?: ExtensionManifest[] } = {};
   if (configPath && fs.existsSync(configPath)) {
     try {
       workspace = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
@@ -169,6 +174,7 @@ async function loadFileConfig(configPath: string | null): Promise<LoadedConfig> 
     package: workspace.package || '',
     adtTextpool: profile.adtTextpool,
     systemVersion: profile.systemVersion,
+    extensions: workspace.extensions,
   };
 }
 
@@ -195,6 +201,7 @@ export async function writeProjectConfig(updates: {
   package?: string;
   transport?: string;
   sourceDir?: string;
+  extensions?: ExtensionManifest[];
 }): Promise<void> {
   const configPath = findWorkspaceConfig() ?? path.join(process.cwd(), '.abap.json');
   let existing: Record<string, unknown> = {};
@@ -211,6 +218,7 @@ export async function writeProjectConfig(updates: {
     ...(updates.package !== undefined ? { package: updates.package } : {}),
     ...(updates.transport !== undefined ? { transport: updates.transport } : {}),
     ...(updates.sourceDir !== undefined ? { sourceDir: updates.sourceDir } : {}),
+    ...(updates.extensions !== undefined ? { extensions: updates.extensions } : {}),
   };
   fs.writeFileSync(configPath, JSON.stringify(updated, null, 2) + '\n', 'utf-8');
   // Invalidate cache

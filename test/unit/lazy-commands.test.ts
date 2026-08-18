@@ -271,8 +271,10 @@ describe('lazy command scope grouping (P2.9)', () => {
       expect(localSection, `'${name}' is listed under the Local section`).toContain(name);
     }
     // SAP commands must not appear in the local section.
+    // Use word-boundary regex (\b) so 'extension' doesn't false-match 'extensions'.
     for (const name of SAP_NAMES) {
-      expect(localSection, `'${name}' must NOT be in the local section`).not.toContain(name);
+      const re = new RegExp(`\\b${name}\\b`);
+      expect(localSection, `'${name}' must NOT be in the local section`).not.toMatch(re);
     }
   });
 });

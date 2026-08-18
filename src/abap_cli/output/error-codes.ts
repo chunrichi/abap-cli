@@ -75,7 +75,9 @@ export type ErrorCode =
     // 022-http: HTTP service (SICF node) error codes
     | 'HTTP_CREATE_FAILED'       // 022: ICF /http/<name> POST failure (SAP_ERROR)
     | 'HTTP_OBJECT_NOT_FOUND'    // 022: ICF /http/<name> GET 404 (NOT_FOUND)
-
+  // 023-extension-mechanism: extension loading and validation
+  | 'EXTENSION_LOAD_FAILED'       // extension module failed to load (CONFIG_ERROR/exit 3)
+  | 'EXTENSION_VALIDATION_FAILED' // extension shape check failed (VALIDATION_ERROR/exit 7)
   ;
 
 const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
@@ -128,6 +130,9 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   // 022-http mappings
   HTTP_CREATE_FAILED: 'SAP_ERROR',
   HTTP_OBJECT_NOT_FOUND: 'NOT_FOUND',
+  // 023-extension-mechanism
+  EXTENSION_LOAD_FAILED: 'CONFIG_ERROR',
+  EXTENSION_VALIDATION_FAILED: 'VALIDATION_ERROR',
 };
 
 export function categoryOf(code: ErrorCode): ErrorCategory {

@@ -18,7 +18,8 @@
 
 import { CommanderError, type Command } from 'commander';
 import { CliError, renderError } from './output/json.js';
-import { buildMeta } from './output/meta.js';
+import { buildMeta, deriveCommand } from './output/meta.js';
+import type { ExtensionRegistry } from './extensions/registry.js';
 
 export interface TopErrorContext {
   program: Command;
@@ -83,6 +84,7 @@ export function handleTopLevelError(
     stderr: process.stderr,
   },
   exit: (code?: number) => never = (code) => process.exit(code as number),
+  registry?: ExtensionRegistry,
 ): never {
   const json = isJson(ctx.argv);
 
@@ -157,5 +159,18 @@ export function handleTopLevelError(
 
   const out = renderError(json, error, buildMeta());
   writeBlock(streams.stderr, out.stderr.join('\n'));
+
+  // Fire onError lifecycle hooks without blocking the exit path (failures swallowed)
+  if (registry) {
+    registry.dispatchAll('onError', {
+      command: deriveCommand(process.argv),
+      argv: process.argv.slice(2),
+      error: out.stderr[0] ? JSON.parse(out.stderr[0])?.error ?? {} : {},
+      ts: Date.now(),
+    }).catch(() => {
+      // Swallowed: onError hook failures are non-fatal
+    });
+  }
+
   exit(out.exitCode ?? 1);
 }

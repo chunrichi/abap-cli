@@ -14,6 +14,7 @@ import { readHttpJson, localToWire as httpLocalToWire, validateHttpObject } from
 import { pushObject, type PushStage } from './push-object.js';
 import { pushFugrOne } from './push-fugr.js';
 import { pushTextpoolFile } from './push-textpool.js';
+import { getExtensionRegistry } from '../extensions/registry.js';
 
 /** Options for the file-level `abap push` orchestration (distinct from pushObject's PushOptions). */
 export interface PushFileOptions {
@@ -121,6 +122,12 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
     const stages: PushStage[] = [];
     const onStage = (s: PushStage) => stages.push(s);
     try {
+      // ValidationRule hook: FR-002
+      await getExtensionRegistry().runValidation('push', {
+        command: 'push',
+        argv: process.argv.slice(2),
+        files: [file],
+      });
       const { transport, status } = await pushOne(client, file, opts, onStage, onWarning);
       if (opts.dryRun) {
         results.push({ file, status: 'dry-run', plan: stages });

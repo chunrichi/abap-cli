@@ -4,9 +4,13 @@
 import './core/polyfill.js';
 import { createRequire } from 'node:module';
 import { Command } from 'commander';
-import { setProgram } from './output/meta.js';
+import { setProgram, buildMeta } from './output/meta.js';
 import { registerLazyCommands, type LazyCommandSpec } from './core/lazy.js';
 import { handleTopLevelError } from './top-error.js';
+import { ExtensionRegistry, setExtensionRegistry } from './extensions/registry.js';
+import { setExtensionRegistry as setExtRegJson, CliError, renderError } from './output/json.js';
+import { EXIT_GENERIC_FALLBACK } from './output/exit-codes.js';
+import { loadConfig } from './config/project-config.js';
 
 // 声明式惰性注册（P1.6）：只有 name + description 在启动时加载，模块体在
 // 命令真正被调用（或请求其 --help）时才 import。
@@ -102,6 +106,12 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
     description: 'Compare local files against SAP (read-only)',
     load: () => import('./commands/diff.js').then((m) => ({ register: m.registerDiffCommand })),
   },
+  {
+    name: 'extensions',
+    scope: 'local',
+    description: 'Manage installed extensions. Subcommands: list.',
+    load: () => import('./commands/extensions.js').then((m) => ({ register: m.registerExtensionsCommand })),
+  },
 ];
 
 const require = createRequire(import.meta.url);
@@ -129,11 +139,56 @@ registerLazyCommands(program, COMMAND_SPECS);
 
 setProgram(program);
 
+// Load project config and extensions before parsing commands
+let registry: ExtensionRegistry;
+try {
+  const config = await loadConfig();
+  registry = new ExtensionRegistry();
+  await registry.loadAndRegisterExtensions(program, config.extensions ?? []);
+} catch (err) {
+  // Extension loading failures are non-fatal in lenient mode.
+  // Strict mode errors (EXTENSION_LOAD_FAILED) are fatal — exit with proper code + error envelope.
+  if (err instanceof CliError && err.code === 'EXTENSION_LOAD_FAILED') {
+    // Fatal: exit with the JSON error envelope even in human mode, so the
+    // error code is visible to the caller (test / script).  This runs before
+    // parseAsync so Commander's own error handling is not yet active.
+    const out = renderError(true, err, buildMeta());
+    for (const line of out.stderr) console.error(line);
+    process.exit(out.exitCode ?? EXIT_GENERIC_FALLBACK);
+  }
+  registry = new ExtensionRegistry();
+}
+
+// Set singletons for json.ts and list-command.ts
+setExtensionRegistry(registry);
+setExtRegJson(registry);
+
+// Install lifecycle hooks globally once (FR-007)
+program.hook('preAction', async (_thisCmd, actionCmd) => {
+  const argv = process.argv.slice(2);
+  const cmdName = actionCmd.name();
+  await registry.dispatch('beforeCommand', {
+    command: cmdName,
+    argv,
+    ts: Date.now(),
+  });
+});
+
+program.hook('postAction', async (_thisCmd, actionCmd) => {
+  const argv = process.argv.slice(2);
+  const cmdName = actionCmd.name();
+  await registry.dispatch('afterCommand', {
+    command: cmdName,
+    argv,
+    ts: Date.now(),
+  });
+});
+
 try {
   // parseAsync: lazy commands (P1.6) dispatch through an async _parseCommand,
   // so commander's sync help/error throws surface as rejections that only
   // parseAsync (which awaits the chain) re-throws into this catch block.
   await program.parseAsync();
 } catch (error: unknown) {
-  handleTopLevelError(error, { program, argv: process.argv, version });
+  handleTopLevelError(error, { program, argv: process.argv, version }, undefined, undefined, registry);
 }

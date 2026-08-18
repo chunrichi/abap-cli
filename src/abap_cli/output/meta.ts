@@ -28,12 +28,23 @@ export type WarningCode =
   | 'PROFILE_MISMATCH'      // stored profile differs from current config
   | 'PAGINATION_LIMITED'    // search --page-all hit the page cap; result truncated
   | 'ICF_CHECK_DEGRADED'    // init ICF deployment check degraded (non-blocking)
+  // 023-extension-mechanism
+  | 'EXTENSION_DEGRADED'    // extension failed to load but CLI continues (lenient mode)
   ;
 
 export interface Warning {
   code: WarningCode;
   message: string;
   details?: Record<string, unknown>;
+}
+
+/** Snapshot of loaded extensions for meta.extensions (023-extension-mechanism). */
+export interface ExtensionMeta {
+  loaded: number;
+  failed?: number;
+  byType: { command?: number; validation?: number; lifecycle?: number };
+  names: string[];
+  validationRules?: Array<{ name: string; appliesTo: string[] | '*' }>;
 }
 
 export interface OutputMeta {
@@ -47,6 +58,8 @@ export interface OutputMeta {
   durationMs: number;
   /** Structured warnings; always present, empty when none. */
   warnings: Warning[];
+  /** Loaded extension summary (only present when extensions are registered). */
+  extensions?: ExtensionMeta;
 }
 
 const startTime = Date.now();
@@ -69,6 +82,8 @@ export function collectWarning(
 }
 
 /** Snapshot of collected warnings (copy, so callers cannot mutate the store). */
+export { deriveCommand };
+
 export function getWarnings(): Warning[] {
   return warnings.slice();
 }

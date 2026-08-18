@@ -20,7 +20,13 @@
 import type { Command } from 'commander';
 import { categoryOf, type ErrorCode, type ErrorCategory } from './error-codes.js';
 import { exitCodeFor, EXIT_GENERIC_FALLBACK } from './exit-codes.js';
-import { buildMeta, type OutputMeta } from './meta.js';
+import { buildMeta, deriveCommand, type OutputMeta } from './meta.js';
+import type { ExtensionRegistry } from '../extensions/registry.js';
+
+let _registry: ExtensionRegistry | undefined;
+export function setExtensionRegistry(r: ExtensionRegistry | undefined): void {
+  _registry = r;
+}
 
 /** Resolve the top-level --json flag from any nested subcommand (FR-027). */
 export function jsonFromCommand(cmd: Command): boolean {
@@ -107,6 +113,11 @@ export interface RenderedOutput {
 /** Render a success payload. JSON (with meta) goes to stdout; human text goes
  *  to stdout with any warnings as `Warning:` lines on stderr (FR-016). */
 export function renderResult(json: boolean, data: unknown, human: string, meta: OutputMeta): RenderedOutput {
+  // Merge extension meta if registry is present
+  const extMeta = _registry?.metaFragment(deriveCommand(process.argv));
+  if (extMeta) {
+    meta = { ...meta, extensions: extMeta };
+  }
   if (json) {
     return {
       stdout: [JSON.stringify({ status: 'success', meta, data }, null, 2)],
@@ -121,6 +132,11 @@ export function renderResult(json: boolean, data: unknown, human: string, meta: 
 /** Render a failure payload. JSON (with meta) goes to stderr; human text goes
  *  to stderr with `Warning:` lines first, then `Error:` + `Try:` (FR-016). */
 export function renderError(json: boolean, error: unknown, meta: OutputMeta): RenderedOutput {
+  // Merge extension meta if registry is present
+  const extMeta = _registry?.metaFragment(deriveCommand(process.argv));
+  if (extMeta) {
+    meta = { ...meta, extensions: extMeta };
+  }
   const err = toErrorShape(error);
   const exitCode =
     'code' in err && typeof err.code === 'string'
