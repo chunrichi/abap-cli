@@ -1,7 +1,8 @@
 import type { CommandSchema } from '../output/json.js';
 import { DDIC_SUPPORTED_TYPES } from '../dictionary/ddic-json.js';
+import { HTTP_SUPPORTED_TYPES } from '../dictionary/http-json.js';
 import { listTemplates } from '../formats/templates.js';
-import { TYPE_MAP, DDIC_TYPES } from './create-types.js';
+import { TYPE_MAP, DDIC_TYPES, HTTP_TYPES } from './create-types.js';
 
 /** `create --schema` 的返回类型：在通用 schema 上补充类型维度。 */
 export type CreateCommandSchema = CommandSchema & {
@@ -59,6 +60,20 @@ export function createSchema(type?: string): CreateCommandSchema {
       ],
     };
   }
+  // 022: HTTP service routed via the self-built ICF service.
+  if (HTTP_TYPES.has(t)) {
+    return {
+      ...base,
+      type: t,
+      supported: true,
+      route: 'icf',
+      message: `HTTP service created via the self-built ICF service (022). Requires --file <abap-file-format JSON>.`,
+      options: [
+        ...base.options,
+        { name: '--file', type: 'string', valuePlaceholder: '<path>', required: true, description: 'abap-file-format HTTP service JSON input' },
+      ],
+    };
+  }
   if (t === 'TTYP') {
     return {
       ...base,
@@ -74,7 +89,7 @@ export function createSchema(type?: string): CreateCommandSchema {
       type: t,
       supported: false,
       reason: 'TYPE_NOT_SUPPORTED',
-      message: `Object type ${t} is not supported. Supported types: ${[...Object.keys(TYPE_MAP), ...DDIC_SUPPORTED_TYPES].join(', ')}`,
+      message: `Object type ${t} is not supported. Supported types: ${[...Object.keys(TYPE_MAP), ...DDIC_SUPPORTED_TYPES, ...HTTP_SUPPORTED_TYPES].join(', ')}`,
     };
   }
 

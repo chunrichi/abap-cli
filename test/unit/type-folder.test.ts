@@ -11,6 +11,8 @@ describe('folderFor (local type→subdirectory mapping, Q5=B)', () => {
     expect(folderFor('DOMA')).toBe('doma');
     expect(folderFor('STRU')).toBe('stru');
     expect(folderFor('DTEL')).toBe('dtel');
+    // 022: HTTP service lives under <root>/http/.
+    expect(folderFor('HTTP')).toBe('http');
   });
 
   it('strips ADT subtype suffixes (e.g. PROG/P, CLAS/OC) before mapping', () => {

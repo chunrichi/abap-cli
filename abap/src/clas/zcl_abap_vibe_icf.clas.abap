@@ -72,6 +72,13 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
                 iv_path     TYPE string
                 iv_method   TYPE string
                 iv_body     TYPE string.
+
+    " 022: HTTP service (SICF node) dispatcher.
+    METHODS dispatch_http
+      IMPORTING io_server TYPE REF TO if_http_server
+                iv_path   TYPE string
+                iv_method TYPE string
+                iv_body   TYPE string.
     METHODS dispatch_textpool
       IMPORTING io_server   TYPE REF TO if_http_server
                 iv_path     TYPE string
@@ -410,6 +417,9 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
       ENDIF.
     ELSEIF lv_path CP '/ddic/*'.
       dispatch_ddic( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
+    ELSEIF lv_path CP '/http/*'.
+      " 022: HTTP service (SICF node) CRUD.
+      dispatch_http( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
     ELSEIF lv_path CP '/textpool/*'.
       dispatch_textpool( io_server = server iv_path = lv_path iv_method = lv_method ).
     ELSEIF lv_path CP '/data/*'.
@@ -809,6 +819,27 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
                      iv_code = 'METHOD_NOT_ALLOWED'
                      iv_msg = |{ iv_method } not supported on /ddic/{ lv_type }| ).
     ENDIF.
+  ENDMETHOD.
+  METHOD dispatch_http.
+    " 022: HTTP service (SICF node) — POST/GET /http/<name>.
+    " Stub: full SICF CRUD handler is implemented in a follow-up patch.
+    " This minimal dispatcher returns NOT_IMPLEMENTED so the CLI route is
+    " exercised end-to-end and the integration test can verify wiring.
+    DATA lv_match_name TYPE string.
+    FIND REGEX ^/http/(.+)$ IN iv_path SUBMATCHES lv_match_name.
+    IF sy-subrc <> 0 OR lv_match_name IS INITIAL.
+      respond_error( io_server = io_server
+                     iv_status = 404
+                     iv_reason = 'Not Found'
+                     iv_code = 'NOT_FOUND'
+                     iv_msg = |unsupported http path: { iv_path }| ).
+      RETURN.
+    ENDIF.
+    respond_error( io_server = io_server
+                   iv_status = 501
+                   iv_reason = 'Not Implemented'
+                   iv_code = 'NOT_IMPLEMENTED'
+                   iv_msg = |HTTP service CRUD not yet implemented in this ICF build; SAP-side handler pending| ).
   ENDMETHOD.
 
   METHOD get_uuid.

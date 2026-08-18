@@ -10,6 +10,7 @@ import { resolveObject, getObjectParts, validateLocalFile, type ResolvedObject }
 import { resolveTransport } from '../core/transport.js';
 import { resolveLocalTargets } from '../core/local-targets.js';
 import { readDdicJson, localToWire, validateDdicObject, type DdicSupportedType } from '../dictionary/ddic-json.js';
+import { readHttpJson, localToWire as httpLocalToWire, validateHttpObject } from '../dictionary/http-json.js';
 import { pushObject, type PushStage } from './push-object.js';
 import { pushFugrOne } from './push-fugr.js';
 import { pushTextpoolFile } from './push-textpool.js';
@@ -84,10 +85,17 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
         const resolved = resolveFile(file);
         validateLocalFile(resolved);
         if (resolved.route === 'icf') {
-          // DDIC: structurally validate the JSON (readAbapFile only reads text).
-          const local = await readDdicJson(path.resolve(process.cwd(), file));
-          const errors = validateDdicObject(local, resolved.objectType);
-          if (errors.length > 0) throw new CliError('VALIDATION_ERROR', errors.join('; '));
+          // 022: HTTP service uses its own JSON shape; route via the dedicated helper.
+          if (resolved.objectType === 'HTTP') {
+            const local = await readHttpJson(path.resolve(process.cwd(), file));
+            const errors = validateHttpObject(local);
+            if (errors.length > 0) throw new CliError('VALIDATION_ERROR', errors.join('; '));
+          } else {
+            // DDIC: structurally validate the JSON (readAbapFile only reads text).
+            const local = await readDdicJson(path.resolve(process.cwd(), file));
+            const errors = validateDdicObject(local, resolved.objectType);
+            if (errors.length > 0) throw new CliError('VALIDATION_ERROR', errors.join('; '));
+          }
         } else {
           await readAbapFile(file);
         }
@@ -221,7 +229,10 @@ async function resolveObjectTransport(
   return resolveTransport(client, opts.tr, client.getConfig().transport);
 }
 
-/** 014: push a DDIC .json file (DOMA/DTEL/TABL/STRU) via ICF POST /ddic/<type>. */
+/** 014/022: push a .json file via the self-built ICF service.
+ *  DDIC types (DOMA/DTEL/TABL/STRU) → POST /ddic/<type>.
+ *  HTTP service (022)              → POST /http/<name>.
+ */
 async function pushDdicFile(
   client: AdtClientWrapper,
   resolved: { objectName: string; objectType: string },
@@ -230,13 +241,18 @@ async function pushDdicFile(
   onStage: (s: PushStage) => void,
 ): Promise<PushOneResult> {
   if (opts.checkOnly) {
-    throw new CliError('VALIDATION_ERROR', '--check-only is not supported for DDIC files', {
-      nextSteps: ['DDIC files are validated during push; drop --check-only.'],
+    throw new CliError('VALIDATION_ERROR', '--check-only is not supported for ICF-routed JSON files', {
+      nextSteps: ['DDIC/HTTP files are validated during push; drop --check-only.'],
     });
   }
   onStage('ddic-icf');
   if (opts.dryRun) {
     return { transport: opts.tr ?? client.getConfig().transport ?? 'DRY_RUN', status: 'dry-run' };
+  }
+
+  // 022: HTTP service has its own wire format; route via the dedicated helper.
+  if (resolved.objectType === 'HTTP') {
+    return pushHttpFile(client, resolved, file, opts);
   }
 
   let local: { name: string; package?: string; transportRequest?: string; [key: string]: unknown };
@@ -276,6 +292,59 @@ async function pushDdicFile(
       details: resp.error?.details,
       nextSteps: [
         'Verify the file conforms to the abap-file-format JSON schema.',
+        'Re-run after fixing the cause above.',
+      ],
+    });
+  }
+  return { transport, status: 'written' };
+}
+
+/**
+ * 022: push a HTTP service .json file via ICF POST /http/<name>.
+ * The SAP-side handler creates/updates a SICF node with the given handler class + URL.
+ */
+async function pushHttpFile(
+  client: AdtClientWrapper,
+  resolved: { objectName: string; objectType: string },
+  file: string,
+  opts: PushFileOptions,
+): Promise<PushOneResult> {
+  let local: { name: string; package?: string; transportRequest?: string; [key: string]: unknown };
+  try {
+    local = await readHttpJson(path.resolve(process.cwd(), file));
+  } catch (error: unknown) {
+    const m = error instanceof Error ? error.message : String(error);
+    throw new CliError('INVALID_ARGUMENT', `Cannot read HTTP service file ${file}: ${m}`, { file });
+  }
+  const errors = validateHttpObject(local);
+  if (errors.length > 0) {
+    throw new CliError('VALIDATION_ERROR', `Invalid HTTP service definition in ${file}: ${errors.join('; ')}`, {
+      file,
+      type: 'HTTP',
+      object: resolved.objectName,
+      details: errors,
+    });
+  }
+
+  const wire = httpLocalToWire(local);
+  // Transport: --tr > config > file's recorded request > ($TMP → none) > user's open request.
+  const packageName = (wire.package ?? '').toUpperCase();
+  let transport = opts.tr ?? client.getConfig().transport ?? local.transportRequest ?? '';
+  if (!transport && packageName !== '$TMP') {
+    transport = await resolveTransport(client, opts.tr, client.getConfig().transport);
+  }
+  wire.transportRequest = transport || undefined;
+
+  const icf = await IcfClient.create();
+  const resp = await icf.postHttp<{ name: string; type: string; action: 'created' | 'updated' }>(resolved.objectName, wire);
+  if (resp.status !== 'success' || !resp.data) {
+    const code = (resp.error?.code ?? 'HTTP_CREATE_FAILED') as ErrorCode;
+    throw new CliError(code, resp.error?.message ?? `Failed to push HTTP service ${resolved.objectName}`, {
+      object: resolved.objectName,
+      type: 'HTTP',
+      details: resp.error?.details,
+      nextSteps: [
+        'Verify the file conforms to the abap-file-format HTTP service JSON schema.',
         'Re-run after fixing the cause above.',
       ],
     });

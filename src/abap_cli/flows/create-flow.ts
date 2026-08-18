@@ -13,7 +13,8 @@ import { folderFor } from '../formats/type-folder.js';
 import { writeAbapFile, fileExists } from '../formats/abap-source.js';
 import { defaultSkeleton, getTemplate, listTemplates } from '../formats/templates.js';
 import { readDdicJson, localToWire, validateDdicObject, type DdicSupportedType } from '../dictionary/ddic-json.js';
-import { TYPE_MAP, DDIC_TYPES, isDdicSupportedType, type CreateTypeSpec } from './create-types.js';
+import { readHttpJson, localToWire as httpLocalToWire, validateHttpObject } from '../dictionary/http-json.js';
+import { TYPE_MAP, DDIC_TYPES, HTTP_TYPES, isDdicSupportedType, isHttpSupportedType, type CreateTypeSpec } from './create-types.js';
 import { createSchema } from './create-schema.js';
 
 export interface CreateOptions {
@@ -147,6 +148,85 @@ async function runCreateDdic(type: DdicSupportedType, objectName: string, opts: 
   );
 }
 
+/**
+ * 022: create an HTTP service via the self-built ICF service.
+ * Reads the abap-file-format JSON from `--file`, validates it, converts to wire
+ * schema, and POSTs /http/<name>. Command-line --description overrides the file's
+ * description. Other required fields (package, transport for non-$TMP) are validated
+ * client-side before the round-trip.
+ */
+async function runCreateHttp(type: 'HTTP', objectName: string, opts: CreateOptions, json: boolean): Promise<void> {
+  const filePath = path.resolve(process.cwd(), opts.file ?? '');
+  let local: Awaited<ReturnType<typeof readHttpJson>>;
+  try {
+    local = await readHttpJson(filePath);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new CliError('INVALID_ARGUMENT', `Cannot read HTTP service file ${opts.file}: ${message}`, {
+      file: opts.file,
+      nextSteps: [
+        'Verify the file exists and is valid JSON.',
+        'See the abap-file-format HTTP schema (http-v1.json) for the expected layout.',
+      ],
+    });
+  }
+
+  // FR-004: client-side validation (fast-fail, no SAP round-trip for invalid input).
+  const errors = validateHttpObject(local);
+  if (errors.length > 0) {
+    throw new CliError('VALIDATION_ERROR', `Invalid ${type} definition in ${opts.file}: ${errors.join('; ')}`, {
+      file: opts.file,
+      type,
+      object: objectName,
+      details: errors,
+      nextSteps: [
+        'Fix the errors above and re-run.',
+        'See the abap-file-format HTTP schema (http-v1.json) for the per-field contract.',
+      ],
+    });
+  }
+
+  // FR-004: non-$TMP package requires a transport request.
+  if (opts.package !== '$TMP' && !opts.tr) {
+    throw new CliError('VALIDATION_ERROR', 'transportRequest is required when package is not $TMP', {
+      nextSteps: ['Re-run with --tr <REQUEST>', 'Or use --package $TMP for local objects.'],
+      example: `abap create ${type} ${objectName} --file ${opts.file} --package ${opts.package} --tr <REQUEST> --description "..."`,
+    });
+  }
+
+  // Convert to wire schema. CLI flags override file values when both are present.
+  const wire = httpLocalToWire(local);
+  if (opts.description) wire.description = opts.description;
+  if (opts.package) wire.package = opts.package;
+  if (opts.tr) wire.transportRequest = opts.tr;
+
+  const icf = await IcfClient.create();
+  const resp = await icf.postHttp<{ name: string; type: string; action: 'created' | 'updated' }>(objectName, wire);
+  if (resp.status !== 'success' || !resp.data) {
+    const code = (resp.error?.code ?? 'HTTP_CREATE_FAILED') as ErrorCode;
+    throw new CliError(code, resp.error?.message ?? `Failed to create ${type} ${objectName}`, {
+      object: objectName,
+      type,
+      details: resp.error?.details,
+      nextSteps: [
+        'Verify the file conforms to the abap-file-format HTTP service JSON schema.',
+        'Re-run after fixing the cause above.',
+      ],
+    });
+  }
+
+  printResult(
+    json,
+    {
+      object: resp.data.name,
+      type,
+      action: resp.data.action,
+      file: opts.file,
+    },
+    `Created ${type} ${resp.data.name} via ICF ${resp.data.action === 'created' ? '(new)' : '(overwritten)'}`,
+  );
+}
+
 export async function runCreate(type: string | undefined, name: string | undefined, opts: CreateOptions, json: boolean): Promise<void> {
   if (opts.schema) {
     printSchema(createSchema(type));
@@ -186,6 +266,17 @@ export async function runCreate(type: string | undefined, name: string | undefin
       });
     }
     await runCreateDdic(typeUpper, objectName, opts, json);
+    return;
+  }
+
+  // 022: HTTP service routes to the self-built ICF service.
+  if (isHttpSupportedType(typeUpper)) {
+    if (!opts.file) {
+      throw new CliError('USAGE', `HTTP service requires --file <path> with an abap-file-format JSON`, {
+        example: `abap create HTTP ${objectName} --file src/${objectName.toLowerCase()}.http.json --package $TMP --description "..."`,
+      });
+    }
+    await runCreateHttp(typeUpper, objectName, opts, json);
     return;
   }
 
@@ -295,6 +386,16 @@ export function resolveType(type: string): CreateTypeSpec {
       'DDIC_NOT_SUPPORTED',
       `Object type ${t} is a DDIC object; not supported in this phase (ICF service not implemented yet)`,
       { type: t },
+    );
+  }
+  // 022: HTTP service is supported via ICF (handled upstream by runCreate → runCreateHttp).
+  // resolveType is only consulted by runCreateLocal; HTTP local draft skeletons are not
+  // generated here — keep the rejection semantics aligned with DDIC for `create local`.
+  if (HTTP_TYPES.has(t)) {
+    throw new CliError(
+      'TYPE_NOT_SUPPORTED',
+      `Object type ${t} is an HTTP service; only \`abap create ${t} <name> --file <path>\` is supported (ICF route, not \`create local\`).`,
+      { type: t, supported: [...Object.keys(TYPE_MAP), ...DDIC_TYPES, ...HTTP_TYPES] },
     );
   }
   const spec = TYPE_MAP[t];

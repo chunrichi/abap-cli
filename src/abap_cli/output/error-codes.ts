@@ -72,6 +72,10 @@ export type ErrorCode =
   | 'LIMIT_EXCEEDED'           // 016: ICF /data/query — limit > 10000 or non-integer (VALIDATION_ERROR)
   | 'OFFSET_EXCEEDED'          // 016: ICF /data/query — offset > 100000 or non-integer (VALIDATION_ERROR)
   | 'QUERY_FAILED'             // 016: ICF /data/query — runtime dynamic SQL error (SAP_ERROR)
+    // 022-http: HTTP service (SICF node) error codes
+    | 'HTTP_CREATE_FAILED'       // 022: ICF /http/<name> POST failure (SAP_ERROR)
+    | 'HTTP_OBJECT_NOT_FOUND'    // 022: ICF /http/<name> GET 404 (NOT_FOUND)
+
   ;
 
 const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
@@ -121,6 +125,9 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   LIMIT_EXCEEDED: 'VALIDATION_ERROR',
   OFFSET_EXCEEDED: 'VALIDATION_ERROR',
   QUERY_FAILED: 'SAP_ERROR',
+  // 022-http mappings
+  HTTP_CREATE_FAILED: 'SAP_ERROR',
+  HTTP_OBJECT_NOT_FOUND: 'NOT_FOUND',
 };
 
 export function categoryOf(code: ErrorCode): ErrorCategory {

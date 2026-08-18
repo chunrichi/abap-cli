@@ -6,6 +6,7 @@ import { objectDirName, buildFilename } from '../formats/file-resolver.js';
 import { folderFor } from '../formats/type-folder.js';
 import { fileExists, writeAbapFile } from '../formats/abap-source.js';
 import { writeDdicJson, DDIC_SUPPORTED_TYPES, wireToLocal, type DdicSupportedType } from '../dictionary/ddic-json.js';
+import { writeHttpJson, wireToLocal as httpWireToLocal, type HttpWirePayload } from '../dictionary/http-json.js';
 import { parseTextpoolProperties, serializeTextpoolProperties, type TextElementCategory } from '../formats/textpool.js';
 import { routeTextpool } from '../textpool/textpool-router.js';
 import { strategyFor } from '../formats/pull-strategy.js';
@@ -69,7 +70,11 @@ export async function runPull(objectName: string, opts: PullOptions): Promise<Pu
   }
 
   // 014: DDIC objects route to the self-built ICF service (FR-015).
+  // 022: HTTP service also routes to the self-built ICF service.
   const typeUpper = opts.type?.toUpperCase();
+  if (typeUpper === 'HTTP') {
+    return runPullHttp(objectName, opts);
+  }
   if (typeUpper && isDdicSupportedType(typeUpper)) {
     return runPullDdic(objectName, typeUpper, opts);
   }
@@ -219,6 +224,60 @@ async function runPullDdic(objectName: string, type: DdicSupportedType, opts: Pu
     human: `Pulled ${type} ${objectName} to ${relPath}`,
   };
 }
+
+/** 022: pull an HTTP service via ICF GET /http/<name> and write the local JSON. */
+async function runPullHttp(objectName: string, opts: PullOptions): Promise<PullResult> {
+  const icf = await IcfClient.create();
+  const resp = await icf.getHttp<HttpWirePayload>(objectName);
+  if (resp.status !== 'success' || !resp.data) {
+    // HTTP_OBJECT_NOT_FOUND normalizes to OBJECT_NOT_FOUND (exit 8, NOT_FOUND family).
+    const rawCode = resp.error?.code ?? 'SAP_ERROR';
+    const code: ErrorCode = rawCode === 'HTTP_OBJECT_NOT_FOUND' ? 'OBJECT_NOT_FOUND' : (rawCode as ErrorCode);
+    throw new CliError(code, resp.error?.message ?? `Failed to pull HTTP ${objectName}`, {
+      object: objectName,
+      type: 'HTTP',
+      nextSteps: [
+        'Verify the HTTP service exists in the target system.',
+        'Run `abap search <name>` to confirm the object name.',
+      ],
+    });
+  }
+
+  const local = httpWireToLocal(resp.data);
+  // HTTP files live under <rootDir>/http/<name>.http.json (Q5=B: local convention).
+  const filename = buildFilename(objectName, 'HTTP', 'main', '.json');
+  const relPath = path.join(opts.dir, folderFor('HTTP'), filename);
+  const targetPath = path.resolve(process.cwd(), relPath);
+
+  if (await fileExists(targetPath) && !opts.overwrite && !opts.skipExisting) {
+    throw new CliError('OVERWRITE_REQUIRED', `${relPath} already exists; use --overwrite to replace it`, {
+      file: relPath,
+      nextSteps: ['Re-run with --overwrite to replace the existing file.'],
+      example: `abap pull ${objectName} --type HTTP --overwrite`,
+    });
+  }
+  if (await fileExists(targetPath) && opts.skipExisting) {
+    return {
+      data: { object: objectName, type: 'HTTP', entries: [{ file: relPath, status: 'skipped' }], written: [], skipped: [relPath], failed: [] },
+      human: `Skipped HTTP ${objectName} (file already exists: ${relPath})`,
+    };
+  }
+
+  await writeHttpJson(targetPath, local);
+
+  return {
+    data: {
+      object: objectName,
+      type: 'HTTP',
+      entries: [{ file: relPath, status: 'written' }],
+      written: [relPath],
+      skipped: [],
+      failed: [],
+    },
+    human: `Pulled HTTP ${objectName} to ${relPath}`,
+  };
+}
+
 
 /** 014: narrow an arbitrary type string to the supported DDIC types. */
 function isDdicSupportedType(t: string): t is DdicSupportedType {
