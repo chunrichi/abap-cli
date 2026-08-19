@@ -74,7 +74,7 @@ abap profile import profiles.json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap profile add", "version": "0.1.0", "timestamp": "2026-08-17T00:00:00.000Z", "durationMs": 210, "warnings": [] },
+  "meta": { "command": "abap profile add", "version": "0.2.0", "timestamp": "2026-08-17T00:00:00.000Z", "durationMs": 210, "warnings": [] },
   "data": {
     "system": { "name": "dev", "url": "https://sap:44300", "client": "100", "username": "DEV", "language": "EN" },
     "passwordUpdated": true,
@@ -88,7 +88,7 @@ abap profile import profiles.json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap profile test", "version": "0.1.0", "timestamp": "2026-08-17T00:00:00.000Z", "durationMs": 1500, "warnings": [] },
+  "meta": { "command": "abap profile test", "version": "0.2.0", "timestamp": "2026-08-17T00:00:00.000Z", "durationMs": 1500, "warnings": [] },
   "data": {
     "tls": { "ok": true },
     "auth": { "ok": true },

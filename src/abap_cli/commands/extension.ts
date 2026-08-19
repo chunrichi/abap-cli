@@ -36,7 +36,7 @@ export function registerExtensionCommand(program: Command): void {
     .option('--force', 'Bypass safety guards (notes forced: true in the result)')
     .option('--yes', 'Confirm the deployment in non-interactive mode')
     .action(async (opts: DeployOptions, cmd) => {
-      const json = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
       try {
         const targetPackage = (opts.package ?? '$TMP').trim().toUpperCase();
         if (targetPackage !== '$TMP' && !opts.tr) {
@@ -72,9 +72,9 @@ export function registerExtensionCommand(program: Command): void {
         if (opts.force) {
           collectWarning('FORCE_BYPASSED', '--force bypassed safety guards.', { force: true });
         }
-        printResult(json, summary, humanSummary(summary));
+        printResult(mode, summary, humanSummary(summary));
       } catch (error: unknown) {
-        printError(json, error);
+        printError(mode, error);
       }
     });
 
@@ -82,7 +82,7 @@ export function registerExtensionCommand(program: Command): void {
     .command('status')
     .description('Probe the SAP-side ICF extension: installed? which version? matches the bundled version?')
     .action(async (_opts, cmd) => {
-      const json = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
       try {
         const info = await checkIcfDeployment();
         if (info.status === 'unreachable') {
@@ -102,9 +102,9 @@ export function registerExtensionCommand(program: Command): void {
             : info.status === 'unreachable'
               ? `ICF unreachable: ${info.error?.message ?? 'unknown'}`
               : `ICF service deployed and current (version ${info.remoteVersion}).`;
-        printResult(json, data, hint);
+        printResult(mode, data, hint);
       } catch (error: unknown) {
-        printError(json, error);
+        printError(mode, error);
       }
     });
 }

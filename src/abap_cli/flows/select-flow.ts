@@ -18,6 +18,7 @@
 import { CliError } from '../output/json.js';
 import type { ErrorCode } from '../output/error-codes.js';
 import { IcfClient } from '../clients/icf-client.js';
+import { getExtensionRegistry } from '../extensions/registry.js';
 
 /** SAP-side default for the wire protocol; capped at 10000 by the server. */
 export const DEFAULT_LIMIT = 100;
@@ -435,6 +436,14 @@ export async function runSelect(
   req.table = table.toUpperCase();
   const wire = buildDataQueryRequest(req);
   const icf = client ?? (await IcfClient.create());
+
+  // ValidationRule hook: FR-002
+  await getExtensionRegistry().runValidation('select', {
+    command: 'select',
+    argv: process.argv.slice(2),
+    payload: req,
+  });
+
   const t0 = performance.now();
   const resp = await icf.postDataQuery<{
     table: string;

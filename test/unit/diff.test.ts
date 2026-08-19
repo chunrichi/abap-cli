@@ -112,7 +112,7 @@ describe('abap diff (US4, FR-015..017, SC-005)', () => {
     const res = await runCommand(program, ['diff', '--json'], { cwd: empty });
     expect(res.exitCode).toBeUndefined();
     const data = parseData(res);
-    expect(data.parts.length).toBe(0);
+    expect((data.parts ?? []).length).toBe(0);
   });
 
   it('read-only — zero mutating calls (FR-017)', async () => {

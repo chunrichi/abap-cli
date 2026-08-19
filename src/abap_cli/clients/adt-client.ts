@@ -84,6 +84,11 @@ export class AdtClientWrapper {
     return this._call(() => this.client.getObjectSource(objectSourceUrl));
   }
 
+  /** Where-used: direct references to an object (ADT usageReferences). */
+  usageReferences(objectUrl: string, line?: number, column?: number) {
+    return this._call(() => this.client.usageReferences(objectUrl, line, column));
+  }
+
   setObjectSource(objectSourceUrl: string, source: string, lockHandle: string, transport?: string) {
     return this._call(() => this.client.setObjectSource(objectSourceUrl, source, lockHandle, transport));
   }

@@ -26,6 +26,7 @@ import {
   type ClassrunOutput,
 } from '../core/classrun-output.js';
 import { AdtClientWrapper } from '../clients/adt-client.js';
+import { getExtensionRegistry } from '../extensions/registry.js';
 
 export interface RunOptions {
   /** Method name (empty → direct classrun). */
@@ -251,6 +252,13 @@ export async function runRun(
   }
 
   const adt = client ?? (await AdtClientWrapper.create());
+
+  // ValidationRule hook: FR-002 — before SAP invocation
+  await getExtensionRegistry().runValidation('run', {
+    command: 'run',
+    argv: process.argv.slice(2),
+    payload: { class: className, method: method ?? null, args },
+  });
 
   const t0 = performance.now();
   let raw: string;

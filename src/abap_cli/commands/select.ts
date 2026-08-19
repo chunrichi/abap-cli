@@ -167,11 +167,11 @@ export function registerSelectCommand(program: Command): void {
         },
         cmd: Command,
       ) => {
-        const json = jsonFromCommand(cmd);
+        const mode = jsonFromCommand(cmd);
 
         // --schema branch — emit machine-readable parameter schema, no SAP call.
         if (cmd.optsWithGlobals().schema) {
-          console.log(JSON.stringify(SCHEMA, null, json ? 2 : undefined));
+          console.log(JSON.stringify(SCHEMA, null, mode === 'pretty-json' ? 2 : 0));
           return;
         }
 
@@ -200,7 +200,7 @@ export function registerSelectCommand(program: Command): void {
               countOnly: opts.countOnly,
               dryRun: true,
             });
-            printResult(json, dry, formatHuman(dry));
+            printResult(mode, dry, formatHuman(dry));
             return;
           }
 
@@ -212,9 +212,9 @@ export function registerSelectCommand(program: Command): void {
             orderBy: opts.orderBy,
             countOnly: opts.countOnly,
           });
-          printResult(json, result, formatHuman(result));
+          printResult(mode, result, formatHuman(result));
         } catch (error: unknown) {
-          printError(json, error);
+          printError(mode, error);
         }
       },
     );

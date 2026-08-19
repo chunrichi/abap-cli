@@ -27,6 +27,8 @@ export interface DdicFieldLocal {
   refTable?: string;
   refField?: string;
   checkTable?: string;
+  /** 024: TABL include/append target structure name (.INCLUDE / .INCLU--AP). */
+  precField?: string;
 }
 
 /** 014: ICF wire representation (camelCase, transport envelope). */
@@ -42,6 +44,8 @@ export interface DdicFieldWire {
   refTable?: string;
   refField?: string;
   checkTable?: string;
+  /** 024: TABL include/append target structure name (.INCLUDE / .INCLU--AP). */
+  precField?: string;
 }
 
 /** 014: DDIC payload wire shape (camelCase, matches icf-ddic-service.md). */
@@ -63,13 +67,41 @@ export interface DdicWirePayload {
   mediumText?: string;
   longText?: string;
   headerText?: string;
-  // TABL/STRU-only:
+  // TABL/STRU-only (flat pull wire — kept for round-trip tests):
   deliveryClass?: string;
   dataClass?: string;
   sizeCategory?: string;
   clientDependent?: boolean;
   allowMaintenance?: boolean;
   fields?: DdicFieldWire[];
+  // 024: TABL/STRU abap-file-format three-piece pull wire
+  // (populated by zcl_abap_vibe_tabl_format). main_json / ddic_source /
+  // settings_json are canonical strings; type/has_settings/warnings/error_*
+  // supplement for diagnostics.
+  type?: 'TABL' | 'STRU';
+  mainJson?: string;
+  ddicSource?: string;
+  settingsJson?: string;
+  hasSettings?: boolean;
+  warnings?: Array<{ code: string; message: string }>;
+  errorCode?: string;
+  errorMessage?: string;
+}
+
+/** 024: extract the canonical three-piece strings from a wire payload. */
+export function extractTablArtifactWire(wire: DdicWirePayload): {
+  mainJson: string;
+  ddicSource: string;
+  settingsJson: string | undefined;
+  hasSettings: boolean;
+} | undefined {
+  if (typeof wire.mainJson !== 'string' || typeof wire.ddicSource !== 'string') return undefined;
+  return {
+    mainJson: wire.mainJson,
+    ddicSource: wire.ddicSource,
+    settingsJson: typeof wire.settingsJson === 'string' ? wire.settingsJson : undefined,
+    hasSettings: wire.hasSettings === true,
+  };
 }
 
 /**
@@ -122,6 +154,7 @@ export function localFieldToWire(local: DdicFieldLocal): DdicFieldWire {
   if (local.refTable !== undefined) wire.refTable = local.refTable;
   if (local.refField !== undefined) wire.refField = local.refField;
   if (local.checkTable !== undefined) wire.checkTable = local.checkTable;
+  if (local.precField !== undefined) wire.precField = local.precField;
   return wire;
 }
 
@@ -138,6 +171,7 @@ export function wireFieldToLocal(wire: DdicFieldWire): DdicFieldLocal {
   if (wire.refTable !== undefined) local.refTable = wire.refTable;
   if (wire.refField !== undefined) local.refField = wire.refField;
   if (wire.checkTable !== undefined) local.checkTable = wire.checkTable;
+  if (wire.precField !== undefined) local.precField = wire.precField;
   return local;
 }
 

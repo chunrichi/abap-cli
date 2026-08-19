@@ -3,7 +3,9 @@ import { Command } from 'commander';
 import { CliError, renderError, renderResult } from '../../src/abap_cli/output/json.js';
 import {
   buildMeta,
+  buildSchemaMeta,
   collectWarning,
+  getOriginalArgv,
   getWarnings,
   resetWarnings,
   setProgram,
@@ -12,6 +14,7 @@ import {
 function makeTree(): Command {
   const program = new Command().name('abap');
   program.command('pull');
+  program.command('search');
   const profile = program.command('profile');
   profile.command('test');
   profile.command('set');
@@ -86,22 +89,22 @@ describe('output meta (FR-003, FR-004, US-1)', () => {
       { status: 'in-sync', changedParts: [] }, // sync
     ];
     for (const payload of payloads) {
-      const out = renderResult(true, payload, '', buildMeta());
+      const out = renderResult('json', payload, '', buildMeta());
       expect(Object.keys(JSON.parse(out.stdout[0]!)).sort()).toEqual(['data', 'meta', 'status']);
     }
-    const failOut = renderError(true, new CliError('USAGE', 'bad'), buildMeta());
+    const failOut = renderError('json', new CliError('USAGE', 'bad'), buildMeta());
     expect(Object.keys(JSON.parse(failOut.stderr[0]!)).sort()).toEqual(['error', 'meta', 'status']);
   });
 
   it('warnings live only in meta.warnings and never affect exit codes (US-2, FR-009)', () => {
     collectWarning('DEPRECATED_OPTION', '--max is deprecated');
-    const success = renderResult(true, { ok: 1 }, '', buildMeta());
+    const success = renderResult('json', { ok: 1 }, '', buildMeta());
     const successJson = JSON.parse(success.stdout[0]!);
     expect(successJson.meta.warnings).toHaveLength(1);
     expect(successJson.meta.warnings[0]!.code).toBe('DEPRECATED_OPTION');
     expect(success.exitCode).toBeUndefined(); // exit 0
 
-    const fail = renderError(true, new CliError('USAGE', 'bad flag'), buildMeta());
+    const fail = renderError('json', new CliError('USAGE', 'bad flag'), buildMeta());
     const failJson = JSON.parse(fail.stderr[0]!);
     expect(failJson.meta.warnings).toHaveLength(1);
     expect(failJson.error).not.toHaveProperty('warnings');
@@ -127,5 +130,30 @@ describe('output meta (FR-003, FR-004, US-1)', () => {
     for (const code of codes) {
       expect(warnings).toContainEqual({ code, message: `msg for ${code}` });
     }
+  });
+
+  it('buildSchemaMeta returns only command/version/durationMs (US3, 025)', () => {
+    setProgram(makeTree());
+    vi.spyOn(process, 'argv', 'get').mockReturnValue(['node', 'index.js', 'search', 'Z'] as never);
+    collectWarning('DEPRECATED_OPTION', 'should not appear in schema meta');
+    const schemaMeta = buildSchemaMeta();
+    expect(Object.keys(schemaMeta).sort()).toEqual(['command', 'durationMs', 'version']);
+    expect(schemaMeta.command).toBe('abap search');
+    expect(typeof schemaMeta.version).toBe('string');
+    expect(Number.isInteger(schemaMeta.durationMs)).toBe(true);
+    // No timestamp, no warnings — schema introspection stays minimal.
+    expect((schemaMeta as Record<string, unknown>).timestamp).toBeUndefined();
+    expect((schemaMeta as Record<string, unknown>).warnings).toBeUndefined();
+  });
+
+  it('getOriginalArgv returns process.argv slice lazily (US4, 025)', () => {
+    const initial = process.argv;
+    const slice = getOriginalArgv();
+    expect(Array.isArray(slice)).toBe(true);
+    // Subsequent calls return the same cached snapshot (mutation of argv later is invisible).
+    vi.spyOn(process, 'argv', 'get').mockReturnValue(['node', 'mutated'] as never);
+    expect(getOriginalArgv()).toBe(slice);
+    vi.restoreAllMocks();
+    expect(process.argv).toBe(initial);
   });
 });

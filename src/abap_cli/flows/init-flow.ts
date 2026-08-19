@@ -3,7 +3,7 @@ import * as path from 'path';
 import { confirm, isCancel, select, text, password } from '@clack/prompts';
 import { getPassword, storePassword } from '../config/secrets.js';
 import { getSystem, listSystemNames, upsertSystem, type SystemProfile } from '../config/user-config.js';
-import { CliError, printResult } from '../output/json.js';
+import { CliError, printResult, type OutputMode } from '../output/json.js';
 import { collectWarning } from '../output/meta.js';
 import { assertValidProfile } from '../config/validation.js';
 import { probeSystem, type ProbeLayerResult } from '../clients/probe.js';
@@ -44,11 +44,11 @@ export function transportFromOpts(opts: CommandOpts): string {
 }
 
 /** Save profile to user config + password to keychain */
-export async function saveProfile(name: string, profile: SystemProfile, password: string, jsonOutput: boolean): Promise<void> {
+export async function saveProfile(name: string, profile: SystemProfile, password: string, mode: OutputMode): Promise<void> {
   upsertSystem(name, profile);
   await storePassword(name, password);
   await recordCapabilityIfPossible(name);
-  if (!jsonOutput) console.log(`System profile '${name}' saved. Password stored securely in OS keychain.`);
+  if (!mode) console.log(`System profile '${name}' saved. Password stored securely in OS keychain.`);
 }
 
 /** 014: informational capability probe — never blocks init. */
@@ -103,7 +103,7 @@ export function validateInputs(config: CollectedConfig): void {
 }
 
 /** Write workspace config referencing a user-level system profile */
-export async function writeConfig(systemName: string, config: CollectedConfig, jsonOutput: boolean): Promise<void> {
+export async function writeConfig(systemName: string, config: CollectedConfig, mode: OutputMode): Promise<void> {
   const cwd = process.cwd();
 
   const workspaceConfig: WorkspaceConfig = {
@@ -113,9 +113,9 @@ export async function writeConfig(systemName: string, config: CollectedConfig, j
   };
   const configPath = path.join(cwd, '.abap.json');
   fs.writeFileSync(configPath, JSON.stringify(workspaceConfig, null, 2) + '\n', 'utf-8');
-  if (!jsonOutput) console.log(`Created ${configPath}`);
+  if (!mode) console.log(`Created ${configPath}`);
 
-  if (!jsonOutput) console.log('Workspace initialized.');
+  if (!mode) console.log('Workspace initialized.');
 }
 
 /** T013: JSON output */
@@ -139,14 +139,14 @@ export function outputJson(
     ...(probe ?? {}),
     ...(icf ? { icf } : {}),
   };
-  printResult(true, data, '');
+  printResult('json', data, '');
 }
 
 /**
  * Informational ICF deployment check (FR-012..FR-015).
  * Never throws or blocks init: unreachable degrades to a warning.
  */
-export async function icfDeploymentCheck(jsonOutput: boolean): Promise<IcfDeploymentInfo | undefined> {
+export async function icfDeploymentCheck(mode: OutputMode): Promise<IcfDeploymentInfo | undefined> {
   let icf: IcfDeploymentInfo;
   try {
     icf = await checkIcfDeployment();
@@ -161,10 +161,10 @@ export async function icfDeploymentCheck(jsonOutput: boolean): Promise<IcfDeploy
     collectWarning('ICF_CHECK_DEGRADED', `ICF deployment check degraded: ${icf.error?.message ?? 'unreachable'}`, {
       status: 'unreachable',
     });
-    if (!jsonOutput) console.log('Warning: ICF deployment check skipped (SAP unreachable).');
+    if (!mode) console.log('Warning: ICF deployment check skipped (SAP unreachable).');
     return icf;
   }
-  if (!jsonOutput) {
+  if (!mode) {
     if (icf.status === 'not_deployed') {
       console.log('ICF service not deployed — run "abap extension deploy" to deploy/update it.');
     } else if (icf.status === 'current') {
@@ -184,7 +184,7 @@ export async function icfDeploymentCheck(jsonOutput: boolean): Promise<IcfDeploy
  * profile (formerly `--system`). Full connection params still create a
  * new profile in TTY mode (FR-022 unchanged).
  */
-export async function runInitFromOpts(opts: CommandOpts, jsonOutput: boolean): Promise<void> {
+export async function runInitFromOpts(opts: CommandOpts, mode: OutputMode): Promise<void> {
   const isNonTty = !process.stdin.isTTY;
   const profileName = str(opts.profile) || str(opts.system) || '';
   const hasFullParams = (opts.url || process.env.SAP_URL) &&
@@ -207,9 +207,9 @@ export async function runInitFromOpts(opts: CommandOpts, jsonOutput: boolean): P
   }
 
   if (hasFullParams) {
-    await createSystemFromParams(opts, jsonOutput);
+    await createSystemFromParams(opts, mode);
   } else if (profileName) {
-    await useExistingSystem(profileName, opts, jsonOutput);
+    await useExistingSystem(profileName, opts, mode);
   } else {
     throw new CliError(
       'USAGE',
@@ -223,7 +223,7 @@ export async function runInitFromOpts(opts: CommandOpts, jsonOutput: boolean): P
 }
 
 /** `abap init` (TTY wizard). Replaces the legacy `runConfigWizard`. */
-export async function runInitWizard(opts: CommandOpts, jsonOutput: boolean): Promise<void> {
+export async function runInitWizard(opts: CommandOpts, mode: OutputMode): Promise<void> {
   const names = listSystemNames();
 
   let systemName = '';
@@ -244,14 +244,14 @@ export async function runInitWizard(opts: CommandOpts, jsonOutput: boolean): Pro
     if (useStored) {
       config.password = (await getPassword(systemName)) || '';
       if (!config.password) {
-        if (!jsonOutput) console.log(`No stored password for '${systemName}'.`);
+        if (!mode) console.log(`No stored password for '${systemName}'.`);
         config.password = orCancel(await password({ message: `Password for ${systemName}` }));
         await storePassword(systemName, config.password);
       }
     } else {
       config.password = orCancel(await password({ message: `Password for ${systemName}` }));
     }
-    if (!jsonOutput) console.log(`Using system profile '${systemName}' (${profile.url}).`);
+    if (!mode) console.log(`Using system profile '${systemName}' (${profile.url}).`);
   } else {
     systemName = orCancel(
       await text({
@@ -268,7 +268,7 @@ export async function runInitWizard(opts: CommandOpts, jsonOutput: boolean): Pro
       language: config.language,
       insecure: config.insecure,
       ca: config.ca,
-    }, config.password, jsonOutput);
+    }, config.password, mode);
   }
 
   config.transport = transportFromOpts(opts) || (orCancel(await text({ message: 'Transport request (optional)' }))) || '';
@@ -276,8 +276,8 @@ export async function runInitWizard(opts: CommandOpts, jsonOutput: boolean): Pro
 
   validateInputs(config);
   await handleFileOverwrite(opts.yes === true || opts.nonInteractive === true ? 'overwrite' : 'prompt');
-  await writeConfig(systemName, config, jsonOutput);
-  if (jsonOutput) outputJson(systemName, config);
+  await writeConfig(systemName, config, mode);
+  if (mode) outputJson(systemName, config);
 }
 
 /** Select an existing system profile, or signal creating a new one (returns ''). */
@@ -323,7 +323,7 @@ async function collectNewSystem(opts: CommandOpts): Promise<CollectedConfig> {
 async function useExistingSystem(
   profileName: string,
   opts: CommandOpts,
-  jsonOutput: boolean,
+  mode: OutputMode,
 ): Promise<void> {
   const profile = getSystem(profileName);
   if (!profile) {
@@ -360,10 +360,10 @@ async function useExistingSystem(
   validateInputs(config);
   const probe = await maybeProbe(profileName, opts);
   await handleFileOverwrite(opts.yes === true || opts.nonInteractive === true ? 'overwrite' : 'refuse');
-  await writeConfig(profileName, config, jsonOutput);
+  await writeConfig(profileName, config, mode);
 
-  const icf = await icfDeploymentCheck(jsonOutput);
-  if (jsonOutput) outputJson(profileName, config, probe, icf);
+  const icf = await icfDeploymentCheck(mode);
+  if (mode) outputJson(profileName, config, probe, icf);
 }
 
 /** Run the requested probe layers; throw a structured error if one fails. */
@@ -404,7 +404,7 @@ async function maybeProbe(
 }
 
 /** Create/update a system profile from CLI params */
-async function createSystemFromParams(opts: CommandOpts, jsonOutput: boolean): Promise<void> {
+async function createSystemFromParams(opts: CommandOpts, mode: OutputMode): Promise<void> {
   const profile: SystemProfile = {
     url: str(opts.url) || process.env.SAP_URL || '',
     client: str(opts.client) || process.env.SAP_CLIENT || '100',
@@ -424,9 +424,121 @@ async function createSystemFromParams(opts: CommandOpts, jsonOutput: boolean): P
   validateInputs(config);
 
   const systemName = str(opts.profile) || str(opts.system) || deriveSystemName(profile);
-  await saveProfile(systemName, profile, password, jsonOutput);
+  await saveProfile(systemName, profile, password, mode);
   await handleFileOverwrite(opts.yes === true || opts.nonInteractive === true ? 'overwrite' : 'refuse');
-  await writeConfig(systemName, config, jsonOutput);
-  const icf = await icfDeploymentCheck(jsonOutput);
-  if (jsonOutput) outputJson(systemName, config, undefined, icf);
+  await writeConfig(systemName, config, mode);
+  const icf = await icfDeploymentCheck(mode);
+  if (mode) outputJson(systemName, config, undefined, icf);
+}
+/**
+ * Read the nearest .abap.json (walking up from cwd, stopping at .git) and print
+ * it as JSON. Replaces the legacy `abap config show`. Never connects to SAP.
+ */
+export async function runInitShowConfig(_opts: CommandOpts, mode: OutputMode): Promise<void> {
+  const configPath = findNearestWorkspaceConfig();
+  if (!configPath) {
+    throw new CliError(
+      'CONFIG_ERROR',
+      'No .abap.json found (searched cwd and parent directories up to the git boundary).',
+      {
+        nextSteps: ["Run 'abap init --profile <name> --yes' to create one."],
+        example: 'abap init --profile dev --yes',
+      },
+    );
+  }
+  let parsed: Record<string, unknown> = {};
+  try {
+    parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new CliError('CONFIG_ERROR', `Cannot parse ${configPath}: ${message}.`, {
+      file: configPath,
+      nextSteps: [`Fix or delete ${configPath} and re-run 'abap init'.`],
+    });
+  }
+  const display = {
+    configPath: path.relative(process.cwd(), configPath) || '.abap.json',
+    ...parsed,
+  };
+  const human = Object.entries(parsed)
+    .map(([k, v]) => `  ${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`)
+    .join('\n');
+  printResult(mode, display, human ? `Workspace config (${display.configPath}):\n${human}` : `Workspace config (${display.configPath}) is empty.`);
+}
+
+/**
+ * Remove the listed top-level keys from the nearest .abap.json. Refuses without
+ * `--yes` in non-TTY. Replaces the legacy `abap config set` (which could only
+ * set values, never clear them).
+ */
+export async function runInitUnset(keys: string[], yes: boolean, mode: OutputMode): Promise<void> {
+  if (!yes && !process.stdin.isTTY) {
+    throw new CliError(
+      'VALIDATION_ERROR',
+      '--unset-* is a write operation; confirm with --yes.',
+      {
+        nextSteps: ["Re-run with --yes, or run interactively in a TTY."],
+        example: `abap init --unset-${keys[0] === 'transport' ? 'tr' : keys[0] === 'sourceDir' ? 'source-dir' : keys[0]} --yes`,
+      },
+    );
+  }
+  const configPath = findNearestWorkspaceConfig();
+  if (!configPath) {
+    throw new CliError(
+      'CONFIG_ERROR',
+      'No .abap.json found (searched cwd and parent directories up to the git boundary).',
+      {
+        nextSteps: ["Nothing to clear. Run 'abap init --profile <name> --yes' to create one."],
+        example: 'abap init --profile dev --yes',
+      },
+    );
+  }
+  let parsed: Record<string, unknown> = {};
+  try {
+    parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new CliError('CONFIG_ERROR', `Cannot parse ${configPath}: ${message}.`, {
+      file: configPath,
+    });
+  }
+  const removed: string[] = [];
+  const missing: string[] = [];
+  for (const k of keys) {
+    if (k in parsed) {
+      delete parsed[k];
+      removed.push(k);
+    } else {
+      missing.push(k);
+    }
+  }
+  fs.writeFileSync(configPath, JSON.stringify(parsed, null, 2) + '\n', 'utf-8');
+  // Invalidate cached config so the next loadConfig sees the change.
+  try {
+    const { resetConfig } = await import('../config/project-config.js');
+    resetConfig();
+  } catch {
+    // best-effort: tests that don't load project-config still work
+  }
+  const display = { configPath: path.relative(process.cwd(), configPath) || '.abap.json', removed, missing };
+  const human = removed.length > 0
+    ? `Removed from ${display.configPath}: ${removed.join(', ')}${missing.length > 0 ? ` (not present: ${missing.join(', ')})` : ''}.`
+    : `No changes to ${display.configPath} (keys not present: ${missing.join(', ')}).`;
+  printResult(mode, display, human);
+}
+
+/** Find the nearest .abap.json by walking up from cwd, stopping at .git/ or fs root. */
+function findNearestWorkspaceConfig(): string | null {
+  let dir = path.resolve(process.cwd());
+  const seen = new Set<string>();
+  while (!seen.has(dir)) {
+    seen.add(dir);
+    const candidate = path.join(dir, '.abap.json');
+    if (fs.existsSync(candidate)) return candidate;
+    if (fs.existsSync(path.join(dir, '.git'))) return null;
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+  return null;
 }

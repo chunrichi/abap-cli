@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
+import { CliError, printError, printResult, jsonFromCommand, type OutputMode } from '../output/json.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import { runDoctorChecks, applySafeFixes } from '../flows/doctor-checks.js';
 
@@ -20,16 +20,16 @@ export function registerDoctorCommand(program: Command): void {
     .option('--yes', 'Confirm --fix without prompting')
     .option('--system <name>', 'Scope the connection section to a named profile')
     .action(async (opts: DoctorOptions, cmd) => {
-      const json = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
       try {
-        await runDoctor(opts, json);
+        await runDoctor(opts, mode);
       } catch (error: unknown) {
-        printError(json, error);
+        printError(mode, error);
       }
     });
 }
 
-async function runDoctor(opts: DoctorOptions, json: boolean): Promise<void> {
+async function runDoctor(opts: DoctorOptions,mode: OutputMode): Promise<void> {
   if (opts.fix && !opts.yes && !process.stdin.isTTY) {
     throw new CliError('VALIDATION_ERROR', '--fix is a write operation; confirm with --yes.', {
       nextSteps: ['Re-run with --yes to apply safe, reversible fixes.', 'Review the report first: abap doctor --json'],
@@ -50,7 +50,7 @@ async function runDoctor(opts: DoctorOptions, json: boolean): Promise<void> {
     human = humanize(report);
   }
 
-  printResult(json, report, human);
+  printResult(mode, report, human);
 }
 
 function humanize(report: { environment: { key: string; status: string; message: string }[]; config: { key: string; status: string; message: string }[]; connection: { key: string; status: string; message: string }[]; nextSteps: string[] }): string {

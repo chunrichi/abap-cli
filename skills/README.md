@@ -57,13 +57,12 @@ cp agents/abap-developer.md <your-project>/.github/agents/abap-developer.md
 
 ## 索引
 
-### Skill（按用户动作切，3 个）
+### Skill（按用户动作切，2 个）
 
 | skill | 覆盖命令 | 触发场景 | 入口 |
 |---|---|---|---|
-| **`abap-setup`** | `init` `profile` `doctor` `transport` | 接入 / 诊断 / 传输请求 | [SKILL.md](./abap-setup/SKILL.md) |
-| **`abap-edit`** | `search` `pull` `push` `check` `create` `activate` `inspect` `diff` `status` `create local` + DDIC 子集 | 改源码 / 推送 / 校验 | [SKILL.md](./abap-edit/SKILL.md) |
-| **`abap-data`** | `select` `run` `extension` | 看数据 / 跑类 / 部署 ICF | [SKILL.md](./abap-data/SKILL.md) |
+| **`abap-setup`** | `init` `profile` `doctor` `transport` `extension`（deploy / status） | 接入 / 诊断 / 传输请求 / 基础设施就绪 | [SKILL.md](./abap-setup/SKILL.md) |
+| **`abap-object`** | `search` `where-used` `pull` `push` `check` `create` `activate` `inspect` `diff` `status` `create local` + DDIC 子集 + `select` `run` `tcode` | 对象全生命周期（含 DDIC）+ 对对象的只读消费 | [SKILL.md](./abap-object/SKILL.md) |
 
 每个 skill 的内部结构：
 
@@ -78,22 +77,27 @@ skills/<name>/
 └── assets/                   # 模板文件
 ```
 
-### Agent（编排 3 个 skill）
+### Agent（编排 2 个 skill）
 
 | agent | 角色 | 详细 |
 |---|---|---|
-| **`abap-developer`** | 端到端开发代理（handoffs 跳转 3 skill） | [abap-developer.md](../agents/abap-developer.md) |
+| **`abap-developer`** | 端到端开发代理（handoffs 跳转 2 skill） | [abap-developer.md](../agents/abap-developer.md) |
 
-## 命令覆盖核对（v1）
+### 为什么从 3 个 skill 收敛到 2 个
 
-- ✅ `abap-setup` 覆盖：`init` `profile` `doctor` `transport`
-- ✅ `abap-edit` 覆盖：`search` `pull` `push` `check` `create` `activate` `inspect` `diff` `status` `create local`
-- ✅ `abap-data` 覆盖：`select` `run` `extension`
+原 `abap-edit` 涵盖的 10 个命令里绝大多数是只读（`search` / `pull` / `inspect` / `check` / `diff` / `status` / `where-used`）；原 `abap-data` 涵盖的 `select` / `run` / `tcode` 本质都是**对一个对象**的只读消费。两条 skill 的真实意图维度都是"对一个对象做什么"，与 `abap-setup` 的"环境就绪"维度正交——合到一个 `abap-object` skill 一次决策。
+
+`extension deploy` 是基础设施安装动作（部署 `/sap/zabap_vibe` ICF 服务、`ZCL_ABAP_VIBE_RUNNER` wrapper 类），与 `init` / `doctor` / `profile` / `transport` 同脉络，归 `abap-setup`。
+
+## 命令覆盖核对（v0.2 — 合并后）
+
+- ✅ `abap-setup` 覆盖：`init` `profile` `doctor` `transport` `extension`（deploy/status）
+- ✅ `abap-object` 覆盖：`search` `where-used` `pull` `push` `check` `create` `activate` `inspect` `diff` `status` `create local` `select` `run` `tcode`
 - ❌ 不纳入（021 决策）：`abap atc` / `abap sync` / `abap report-stuck` 已移除（`atc` → `abap check atc`）
 
 ## 版本
 
-- **CLI 版本**：`0.1.0`
+- **CLI 版本**：`0.2.0`
 - **本特性 spec**：`specs/019-cli-skill-agent-bundle/spec.md`
 - **agentskills.io 标准**：<https://agentskills.io/>
 

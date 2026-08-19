@@ -48,9 +48,11 @@ export type ErrorCode =
   | 'DDIC_NOT_SUPPORTED'
   | 'DDIC_CREATE_FAILED'    // 014: ICF /ddic/<type> POST failure (SAP_ERROR)
   | 'DDIC_OBJECT_NOT_FOUND' // 014: ICF /ddic/<type>/<name> GET 404 (NOT_FOUND)
+  | 'DDIC_TABL_FORMAT_UNSUPPORTED' // 025: canonical TABL projection cannot represent the object (VALIDATION_ERROR)
   | 'TYPE_NOT_SUPPORTED'
   | 'OVERWRITE_REQUIRED'   // NEW (FR-018)
   | 'PUSH_FAILED'
+  | 'PULL_PARTIAL_FAILURE'  // 025: some objects in a pull succeeded, others failed (VALIDATION_ERROR)
   | 'VALIDATION_ERROR'     // semantic rejection (exit 7); see contracts §3
   | 'OBJECT_EXISTS'        // normalized legacy code (USAGE/2), used by create.ts
   | 'FILE_EXISTS'          // normalized legacy code (USAGE/2), used by init.ts
@@ -72,6 +74,18 @@ export type ErrorCode =
   | 'LIMIT_EXCEEDED'           // 016: ICF /data/query — limit > 10000 or non-integer (VALIDATION_ERROR)
   | 'OFFSET_EXCEEDED'          // 016: ICF /data/query — offset > 100000 or non-integer (VALIDATION_ERROR)
   | 'QUERY_FAILED'             // 016: ICF /data/query — runtime dynamic SQL error (SAP_ERROR)
+    // 022-http: HTTP service (SICF node) error codes
+    | 'HTTP_CREATE_FAILED'       // 022: ICF /http/<name> POST failure (SAP_ERROR)
+    | 'HTTP_OBJECT_NOT_FOUND'    // 022: ICF /http/<name> GET 404 (NOT_FOUND)
+  // 023-extension-mechanism: extension loading and validation
+  | 'EXTENSION_LOAD_FAILED'       // extension module failed to load (CONFIG_ERROR/exit 3)
+  | 'EXTENSION_VALIDATION_FAILED' // extension shape check failed (VALIDATION_ERROR/exit 7)
+  // 024-tabl-aff-pull: abap-file-format three-piece TABL/STRU pull diagnostics
+  | 'TABL_DDL_INVALID'          // DDL parse failure (VALIDATION_ERROR/exit 7)
+  | 'TABL_ARTIFACT_INCOMPLETE'  // wire missing mainJson or ddicSource (VALIDATION_ERROR/exit 7)
+  // tcode: ICF /tcode/<code> transaction lookup
+  | 'TCODE_NOT_FOUND'           // TSTC entry does not exist (NOT_FOUND/exit 8)
+  | 'TCODE_NOT_AUTHORIZED'      // S_TCODE authority check failed (AUTH_ERROR/exit 5)
   ;
 
 const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
@@ -96,10 +110,12 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   TRANSPORT_NOT_FOUND: 'VALIDATION_ERROR',
   CREATE_FAILED: 'VALIDATION_ERROR',
   DDIC_NOT_SUPPORTED: 'VALIDATION_ERROR',
+  DDIC_TABL_FORMAT_UNSUPPORTED: 'VALIDATION_ERROR',
   DDIC_CREATE_FAILED: 'SAP_ERROR',
   DDIC_OBJECT_NOT_FOUND: 'NOT_FOUND',
   TYPE_NOT_SUPPORTED: 'VALIDATION_ERROR',
   VALIDATION_ERROR: 'VALIDATION_ERROR',
+  PULL_PARTIAL_FAILURE: 'VALIDATION_ERROR',
   OBJECT_EXISTS: 'USAGE',
   FILE_EXISTS: 'USAGE',
   PUSH_FAILED: 'VALIDATION_ERROR',
@@ -121,6 +137,18 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   LIMIT_EXCEEDED: 'VALIDATION_ERROR',
   OFFSET_EXCEEDED: 'VALIDATION_ERROR',
   QUERY_FAILED: 'SAP_ERROR',
+  // 022-http mappings
+  HTTP_CREATE_FAILED: 'SAP_ERROR',
+  HTTP_OBJECT_NOT_FOUND: 'NOT_FOUND',
+  // 023-extension-mechanism
+  EXTENSION_LOAD_FAILED: 'CONFIG_ERROR',
+  EXTENSION_VALIDATION_FAILED: 'VALIDATION_ERROR',
+  // 024-tabl-aff-pull
+  TABL_DDL_INVALID: 'VALIDATION_ERROR',
+  TABL_ARTIFACT_INCOMPLETE: 'VALIDATION_ERROR',
+  // tcode
+  TCODE_NOT_FOUND: 'NOT_FOUND',
+  TCODE_NOT_AUTHORIZED: 'AUTH_ERROR',
 };
 
 export function categoryOf(code: ErrorCode): ErrorCategory {

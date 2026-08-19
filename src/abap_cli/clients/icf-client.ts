@@ -67,6 +67,21 @@ export class IcfClient {
     return this.get(`/ddic/${type}/${encodeURIComponent(name)}`);
   }
 
+  /** 022: POST /http/<name> — create/overwrite an HTTP service (SICF node). */
+  async postHttp<T>(name: string, body: unknown): Promise<IcfResponse<T>> {
+    return this.post(`/http/${encodeURIComponent(name)}`, body);
+  }
+
+  /** 022: GET /http/<name> — pull an HTTP service as wire JSON. */
+  async getHttp<T>(name: string): Promise<IcfResponse<T>> {
+    return this.get(`/http/${encodeURIComponent(name)}`);
+  }
+
+  /** GET /tcode/<tcode> — resolve a transaction code to its entry program (read-only). */
+  async getTcode<T>(tcode: string): Promise<IcfResponse<T>> {
+    return this.get(`/tcode/${encodeURIComponent(tcode)}`);
+  }
+
   /** 014: GET /textpool/<category>?object=...&type=... — read text elements (US4). */
   async getTextpool<T>(category: string, object: string, type: string): Promise<IcfResponse<T>> {
     const qs = new URLSearchParams({ object, type });

@@ -30,9 +30,36 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
       BEGIN OF ty_remote_source,
         status TYPE string,
         data   TYPE ty_remote_source_data,
-      END OF ty_remote_source.
+      END OF ty_remote_source,
+      BEGIN OF ty_http_header,
+        description         TYPE string,
+        original_language    TYPE string,
+        abap_language_version TYPE string,
+      END OF ty_http_header,
+      BEGIN OF ty_http_general_information,
+        handler_class TYPE string,
+        url           TYPE string,
+      END OF ty_http_general_information,
+      BEGIN OF ty_http_service_data,
+        format_version       TYPE string,
+        header                TYPE ty_http_header,
+        general_information   TYPE ty_http_general_information,
+      END OF ty_http_service_data,
+      BEGIN OF ty_http_service,
+        status TYPE string,
+        data   TYPE ty_http_service_data,
+      END OF ty_http_service,
+      BEGIN OF ty_http_write_data,
+        name   TYPE string,
+        type   TYPE string,
+        action TYPE string,
+      END OF ty_http_write_data,
+      BEGIN OF ty_http_write,
+        status TYPE string,
+        data   TYPE ty_http_write_data,
+      END OF ty_http_write.
     CONSTANTS gc_service TYPE string VALUE 'zabap_vibe'.
-    CONSTANTS gc_version TYPE string VALUE '0.4.0'.
+    CONSTANTS gc_version TYPE string VALUE '0.5.0'.
 
     " ----- routing + helpers -----
     METHODS respond_json
@@ -76,6 +103,11 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
       IMPORTING io_server   TYPE REF TO if_http_server
                 iv_path     TYPE string
                 iv_method   TYPE string.
+    METHODS dispatch_http
+      IMPORTING io_server   TYPE REF TO if_http_server
+                iv_path     TYPE string
+                iv_method   TYPE string
+                iv_body     TYPE string.
     METHODS dispatch_version_management
       IMPORTING io_server TYPE REF TO if_http_server
                 iv_path   TYPE string
@@ -84,6 +116,47 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
       IMPORTING iv_query TYPE string
                 iv_name  TYPE string
       RETURNING VALUE(rv_value) TYPE string.
+
+    " ----- transaction-code lookup (configured entry program only) -----
+    TYPES:
+      BEGIN OF ty_tcode_entry,
+        program TYPE string,
+        screen  TYPE string,
+      END OF ty_tcode_entry,
+      BEGIN OF ty_tcode_target,
+        kind     TYPE string,
+        name     TYPE string,
+        resolved TYPE abap_bool,
+      END OF ty_tcode_target,
+      BEGIN OF ty_tcode_resolution_step,
+        tcode    TYPE string,
+        kind     TYPE string,
+        name     TYPE string,
+        screen   TYPE string,
+        relation TYPE string,
+      END OF ty_tcode_resolution_step,
+      tt_tcode_resolution_step TYPE STANDARD TABLE OF ty_tcode_resolution_step WITH EMPTY KEY,
+      BEGIN OF ty_tcode_data,
+        tcode            TYPE string,
+        description      TYPE string,
+        entry            TYPE ty_tcode_entry,
+        target           TYPE ty_tcode_target,
+        resolution_state TYPE string,
+        resolution_chain TYPE tt_tcode_resolution_step,
+      END OF ty_tcode_data,
+      BEGIN OF ty_tcode,
+        status TYPE string,
+        data   TYPE ty_tcode_data,
+      END OF ty_tcode.
+
+    METHODS dispatch_tcode
+      IMPORTING io_server TYPE REF TO if_http_server
+                iv_path   TYPE string
+                iv_method TYPE string.
+    METHODS read_tcode
+      IMPORTING iv_tcode   TYPE tstc-tcode
+      EXPORTING es_payload TYPE ty_tcode
+                ev_error   TYPE ty_error.
 
     " ----- textpool helpers (RS_TEXTPOOL_READ / target-specific write) -----
     TYPES:
@@ -114,6 +187,7 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
     TYPES:
       BEGIN OF ty_field,
         fieldName   TYPE fieldname,
+        precField   TYPE dd03p-precfield,
         rollname    TYPE rollname,
         dataType    TYPE dd03p-datatype,
         length      TYPE dd03p-leng,
@@ -285,7 +359,11 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
       BEGIN OF ty_ddic_create,
         status TYPE string,
         data   TYPE ty_ddic_create_data,
-      END OF ty_ddic_create.
+      END OF ty_ddic_create,
+      BEGIN OF ty_ddic_get,
+        status TYPE string,
+        data   TYPE REF TO data,
+      END OF ty_ddic_get.
     " DDIC GET (pull) wire payloads — component names target the camelCase wire
     " (field_name → fieldName etc.); booleans are abap_bool (→ JSON true/false).
     TYPES:
@@ -412,6 +490,10 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
       dispatch_ddic( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
     ELSEIF lv_path CP '/textpool/*'.
       dispatch_textpool( io_server = server iv_path = lv_path iv_method = lv_method ).
+    ELSEIF lv_path CP '/http/*'.
+      dispatch_http( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
+    ELSEIF lv_path CP '/tcode/*'.
+      dispatch_tcode( io_server = server iv_path = lv_path iv_method = lv_method ).
     ELSEIF lv_path CP '/data/*'.
       " 016: read-only table data query (SE16N equivalent).
       TRY.
@@ -434,6 +516,409 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
                      iv_code = 'NOT_FOUND'
                      iv_msg = |unknown path: /sap/zabap_vibe{ lv_path }| ).
     ENDIF.
+  ENDMETHOD.
+
+  METHOD dispatch_http.
+    DATA lv_match_name   TYPE string.
+    DATA lv_url          TYPE string.
+    DATA lv_parent_url   TYPE string.
+    DATA lv_node_name_raw TYPE string.
+    DATA lv_node_name    TYPE icfname.
+    DATA lv_transport    TYPE trkorr.
+    DATA lv_transport_raw TYPE string.
+    DATA lv_guid         TYPE icfnodguid.
+    DATA lv_parent_guid  TYPE icfparguid.
+    DATA lv_service_name TYPE icfservice-icf_name.
+    DATA lv_info_url     TYPE string.
+    DATA ls_http         TYPE ty_http_service_data.
+    DATA ls_docu         TYPE icfdocu.
+    DATA ls_insert_docu  TYPE icfdocu.
+    DATA ls_icfserdesc   TYPE icfserdesc.
+    DATA ls_existing_service TYPE icfservice.
+    DATA ls_current_service TYPE icfservice.
+    DATA lt_serv_info    TYPE icfservtbl.
+    DATA ls_serv_info    LIKE LINE OF lt_serv_info.
+    DATA ls_handler      TYPE icfhandler.
+    DATA lt_existing     TYPE TABLE OF icfhandler.
+    DATA lt_icfhndlist   TYPE icfhndlist.
+    DATA lv_original_language TYPE string.
+    DATA lv_alt_name      TYPE icfservice-icfaltnme.
+    DATA lv_icf_message   TYPE string.
+    DATA lv_change_subrc  TYPE sy-subrc.
+
+    " Resolve the endpoint key to an SICF URL; a bare name means /sap/<name>.
+    FIND REGEX '^/http/(.+)$' IN iv_path IGNORING CASE SUBMATCHES lv_match_name.
+    IF sy-subrc <> 0 OR lv_match_name IS INITIAL.
+      respond_error( io_server = io_server
+                     iv_status = 400
+                     iv_reason = 'Bad Request'
+                     iv_code = 'HTTP_SERVICE_INVALID'
+                     iv_msg = 'HTTP Service name is required' ).
+      RETURN.
+    ENDIF.
+
+    IF iv_method = 'GET'.
+      IF lv_match_name CP '/*'.
+        lv_url = lv_match_name.
+      ELSE.
+        lv_url = |/sap/{ to_lower( lv_match_name ) }|.
+      ENDIF.
+
+      " Locate the node and read its canonical URL, documentation and handlers.
+      CALL METHOD cl_icf_tree=>if_icf_tree~service_from_url
+        EXPORTING
+          url        = lv_url
+          hostnumber = 0
+        IMPORTING
+          icfnodguid = lv_guid
+        EXCEPTIONS
+          wrong_url    = 4
+          no_authority = 5
+          OTHERS       = 99.
+      IF sy-subrc <> 0.
+        respond_error( io_server = io_server
+                       iv_status = 404
+                       iv_reason = 'Not Found'
+                       iv_code = 'HTTP_SERVICE_NOT_FOUND'
+                       iv_msg = |SICF service not found: { lv_url }| ).
+        RETURN.
+      ENDIF.
+
+      SELECT SINGLE *
+        FROM icfservice
+        WHERE icfnodguid = @lv_guid
+        INTO @ls_existing_service.
+      IF sy-subrc <> 0.
+        respond_error( io_server = io_server
+                       iv_status = 404
+                       iv_reason = 'Not Found'
+                       iv_code = 'HTTP_SERVICE_NOT_FOUND'
+                       iv_msg = |SICF service metadata not found: { lv_url }| ).
+        RETURN.
+      ENDIF.
+      lv_service_name = ls_existing_service-icf_name.
+      lv_parent_guid = ls_existing_service-icfparguid.
+
+      CALL METHOD cl_icf_tree=>if_icf_tree~get_info_from_serv
+        EXPORTING
+          icf_name   = lv_service_name
+          icfparguid = lv_parent_guid
+          icf_langu  = sy-langu
+        IMPORTING
+          serv_info = lt_serv_info
+          icfdocu   = ls_docu
+          url       = lv_info_url
+        EXCEPTIONS
+          wrong_name        = 1
+          wrong_parguid     = 2
+          incorrect_service = 3
+          no_authority      = 4
+          OTHERS            = 5.
+      IF sy-subrc <> 0 OR lt_serv_info IS INITIAL.
+        respond_error( io_server = io_server
+                       iv_status = 500
+                       iv_reason = 'Internal Server Error'
+                       iv_code = 'HTTP_SERVICE_READ_FAILED'
+                       iv_msg = |Could not read SICF service: { lv_url }| ).
+        RETURN.
+      ENDIF.
+
+      READ TABLE lt_serv_info INDEX 1 INTO ls_serv_info.
+      READ TABLE ls_serv_info-handlertbl INDEX 1 INTO ls_handler.
+      CASE sy-langu.
+        WHEN '1'. lv_original_language = 'ZH'.
+        WHEN '2'. lv_original_language = 'KO'.
+        WHEN 'D'. lv_original_language = 'DE'.
+        WHEN 'E'. lv_original_language = 'EN'.
+        WHEN 'F'. lv_original_language = 'FR'.
+        WHEN 'I'. lv_original_language = 'IT'.
+        WHEN 'J'. lv_original_language = 'JA'.
+        WHEN 'N'. lv_original_language = 'NL'.
+        WHEN 'P'. lv_original_language = 'PT'.
+        WHEN 'R'. lv_original_language = 'RU'.
+        WHEN 'S'. lv_original_language = 'ES'.
+        WHEN OTHERS. lv_original_language = 'EN'.
+      ENDCASE.
+      ls_http = VALUE #( format_version = '1'
+                         header = VALUE #( description = COND #( WHEN ls_docu-icf_docu IS INITIAL
+                                                                 THEN CONV string( lv_service_name )
+                                                                 ELSE CONV string( ls_docu-icf_docu ) )
+                                                                 original_language = lv_original_language
+                                                                 abap_language_version = 'standard' )
+                         general_information = VALUE #( handler_class = COND #( WHEN sy-subrc = 0
+                                                                                 THEN CONV string( ls_handler-icfhandler )
+                                                                                 ELSE `` )
+                                                        url = COND #( WHEN lv_info_url IS INITIAL
+                                                                       THEN lv_url
+                                                                       ELSE lv_info_url ) ) ).
+      respond_json( io_server = io_server
+                    iv_status = 200
+                    iv_reason = 'OK'
+                    is_payload = VALUE ty_http_service( status = 'success' data = ls_http ) ).
+      RETURN.
+    ENDIF.
+
+    IF iv_method <> 'POST'.
+      respond_error( io_server = io_server
+                     iv_status = 405
+                     iv_reason = 'Method Not Allowed'
+                     iv_code = 'METHOD_NOT_ALLOWED'
+                     iv_msg = |GET and POST only on /http/{ lv_match_name }| ).
+      RETURN.
+    ENDIF.
+
+    " Deserialize the official HTTP Service JSON and extract transport separately.
+    TRY.
+        /ui2/cl_json=>deserialize( EXPORTING json = iv_body
+                                                   pretty_name = /ui2/cl_json=>pretty_mode-camel_case
+                                          CHANGING data = ls_http ).
+      CATCH cx_root INTO DATA(lx_json).
+        respond_error( io_server = io_server
+                       iv_status = 400
+                       iv_reason = 'Bad Request'
+                       iv_code = 'HTTP_SERVICE_INVALID'
+                       iv_msg = lx_json->get_text( ) ).
+        RETURN.
+    ENDTRY.
+
+    FIND FIRST OCCURRENCE OF REGEX '"transportRequest"\s*:\s*"([^"]*)"'
+      IN iv_body IGNORING CASE SUBMATCHES lv_transport_raw.
+    IF sy-subrc = 0.
+      lv_transport = lv_transport_raw.
+    ENDIF.
+
+    lv_url = ls_http-general_information-url.
+    IF ls_http-format_version <> '1' OR ls_http-header-description IS INITIAL OR lv_url IS INITIAL.
+      respond_error( io_server = io_server
+                     iv_status = 400
+                     iv_reason = 'Bad Request'
+                     iv_code = 'HTTP_SERVICE_INVALID'
+                     iv_msg = 'formatVersion, header.description and generalInformation.url are required' ).
+      RETURN.
+    ENDIF.
+
+    WHILE strlen( lv_url ) > 1 AND substring( val = lv_url off = strlen( lv_url ) - 1 len = 1 ) = '/'.
+      lv_url = substring( val = lv_url off = 0 len = strlen( lv_url ) - 1 ).
+    ENDWHILE.
+
+    FIND REGEX '^(.+)/([^/]+)$' IN lv_url SUBMATCHES lv_parent_url lv_node_name_raw.
+    IF sy-subrc <> 0 OR lv_node_name_raw IS INITIAL OR strlen( lv_node_name_raw ) > 15.
+      respond_error( io_server = io_server
+                     iv_status = 400
+                     iv_reason = 'Bad Request'
+                     iv_code = 'HTTP_SERVICE_INVALID'
+                     iv_msg = 'generalInformation.url must contain a SICF node name of at most 15 characters' ).
+      RETURN.
+    ENDIF.
+    lv_node_name = to_lower( lv_node_name_raw ).
+    IF lv_parent_url IS INITIAL.
+      lv_parent_url = '/'.
+    ENDIF.
+
+    ls_docu-icf_langu = sy-langu.
+    ls_docu-icf_docu = ls_http-header-description.
+    ls_insert_docu = ls_docu-icf_docu.
+    IF ls_http-general_information-handler_class IS NOT INITIAL.
+      APPEND CONV icf_hand( ls_http-general_information-handler_class ) TO lt_icfhndlist.
+    ENDIF.
+
+    " Existing URLs are changed in place; new URLs create and activate a node.
+    CALL METHOD cl_icf_tree=>if_icf_tree~service_from_url
+      EXPORTING
+        url        = lv_url
+        hostnumber = 0
+      IMPORTING
+        icfnodguid = lv_guid
+      EXCEPTIONS
+        wrong_url    = 4
+        no_authority = 5
+        OTHERS       = 99.
+    IF sy-subrc = 0.
+      SELECT SINGLE *
+        FROM icfservice
+        WHERE icfnodguid = @lv_guid
+        INTO @ls_existing_service.
+      IF sy-subrc = 0 AND to_lower( ls_existing_service-icf_name ) = lv_node_name.
+      lv_service_name = ls_existing_service-icf_name.
+      lv_parent_guid = ls_existing_service-icfparguid.
+      CALL METHOD cl_icf_tree=>if_icf_tree~get_info_from_serv
+        EXPORTING
+          icf_name   = lv_service_name
+          icfparguid = lv_parent_guid
+          icf_langu  = sy-langu
+        IMPORTING
+          serv_info = lt_serv_info
+        EXCEPTIONS
+          wrong_name        = 1
+          wrong_parguid     = 2
+          incorrect_service = 3
+          no_authority      = 4
+          OTHERS            = 5.
+      IF sy-subrc <> 0 OR lt_serv_info IS INITIAL.
+        respond_error( io_server = io_server
+                       iv_status = 500
+                       iv_reason = 'Internal Server Error'
+                       iv_code = 'HTTP_SERVICE_READ_FAILED'
+                       iv_msg = |Could not read SICF service metadata: { lv_url }| ).
+        RETURN.
+      ENDIF.
+      READ TABLE lt_serv_info INDEX 1 INTO ls_serv_info.
+      lv_alt_name = ls_serv_info-service-icfaltnme.
+      IF ls_serv_info-service-icfaltnme <> ls_serv_info-service-icfaltnme_orig.
+        lv_alt_name = ls_serv_info-service-icfaltnme_orig.
+      ENDIF.
+
+      " CL_ICF_TREE rejects handlers that are already assigned to the node.
+      SELECT * FROM icfhandler
+        WHERE icf_name = @lv_service_name
+          AND icfparguid = @lv_parent_guid
+        INTO TABLE @lt_existing.
+      LOOP AT lt_existing ASSIGNING FIELD-SYMBOL(<ls_existing>).
+        DELETE TABLE lt_icfhndlist FROM <ls_existing>-icfhandler.
+      ENDLOOP.
+
+      MOVE-CORRESPONDING ls_serv_info-service TO ls_icfserdesc.
+      CALL METHOD cl_icf_tree=>if_icf_tree~change_node
+        EXPORTING
+          icf_name   = ls_serv_info-service-orig_name
+          icfaltnme  = lv_alt_name
+          icfparguid = lv_parent_guid
+          icfdocu    = ls_docu
+          doculang   = sy-langu
+          icfhandlst = lt_icfhndlist
+          icfactive  = 'X'
+          package    = '$TMP'
+          application = ''
+          icfserdesc = ls_icfserdesc
+        EXCEPTIONS
+          empty_icf_name            = 1
+          no_new_virtual_host       = 2
+          special_service_error     = 3
+          parent_not_existing       = 4
+          enqueue_error             = 5
+          node_already_existing     = 6
+          empty_docu                = 7
+          doculang_not_installed    = 8
+          security_info_error       = 9
+          user_password_error       = 10
+          password_encryption_error = 11
+          invalid_url               = 12
+          invalid_otr_concept       = 13
+          formflg401_error          = 14
+          handler_error             = 15
+          transport_error           = 16
+          tadir_error               = 17
+          package_not_found         = 18
+          wrong_application         = 19
+          not_allow_application     = 20
+          no_application            = 21
+          invalid_icfparguid        = 22
+          alt_name_invalid          = 23
+          alternate_name_exist     = 24
+          wrong_icf_name            = 25
+          no_authority              = 26
+          OTHERS                    = 27.
+      lv_change_subrc = sy-subrc.
+      IF sy-subrc <> 0.
+        MESSAGE ID sy-msgid TYPE 'S' NUMBER sy-msgno
+          WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 INTO lv_icf_message.
+        respond_error( io_server = io_server
+                       iv_status = 500
+                       iv_reason = 'Internal Server Error'
+                       iv_code = 'HTTP_SERVICE_WRITE_FAILED'
+                       iv_msg = |SICF service update failed (subrc={ lv_change_subrc }, { sy-msgid } { sy-msgno }): { lv_icf_message }|
+                         && |; name={ ls_existing_service-orig_name }, parent={ lv_parent_guid },|
+                         && | alt={ lv_alt_name }, handlers={ lines( lt_icfhndlist ) }| ).
+        RETURN.
+      ENDIF.
+
+      respond_json( io_server = io_server
+                    iv_status = 200
+                    iv_reason = 'OK'
+                    is_payload = VALUE ty_http_write(
+                      status = 'success'
+                      data = VALUE #( name = lv_service_name type = 'HTTP' action = 'updated' ) ) ).
+      RETURN.
+    ENDIF.
+    ENDIF.
+
+    CALL METHOD cl_icf_tree=>if_icf_tree~service_from_url
+      EXPORTING
+        url        = lv_parent_url
+        hostnumber = 0
+      IMPORTING
+        icfnodguid = lv_parent_guid
+      EXCEPTIONS
+        wrong_url    = 4
+        no_authority = 5
+        OTHERS       = 99.
+    IF sy-subrc <> 0.
+      respond_error( io_server = io_server
+                     iv_status = 404
+                     iv_reason = 'Not Found'
+                     iv_code = 'HTTP_SERVICE_PARENT_NOT_FOUND'
+                     iv_msg = |SICF parent node not found: { lv_parent_url }| ).
+      RETURN.
+    ENDIF.
+
+    lv_alt_name = lv_node_name.
+    CALL METHOD cl_icf_tree=>if_icf_tree~insert_node
+      EXPORTING
+        icf_name   = lv_node_name
+        icfparguid = lv_parent_guid
+        icfdocu    = ls_insert_docu
+        icfhandlst = lt_icfhndlist
+        icfactive  = 'X'
+        package    = '$TMP'
+        application = ''
+        doculang   = sy-langu
+      IMPORTING
+        icfnodguid = lv_guid
+      EXCEPTIONS
+          empty_icf_name            = 1
+          no_new_virtual_host       = 2
+          special_service_error     = 3
+          parent_not_existing       = 4
+          enqueue_error             = 5
+          node_already_existing     = 6
+          empty_docu                = 7
+          doculang_not_installed    = 8
+          security_info_error       = 9
+          user_password_error       = 10
+          password_encryption_error = 11
+          invalid_url               = 12
+          invalid_otr_concept       = 13
+          formflg401_error          = 14
+          handler_error             = 15
+          transport_error           = 16
+          tadir_error               = 17
+          package_not_found         = 18
+          wrong_application         = 19
+          not_allow_application     = 20
+          no_application            = 21
+          invalid_icfparguid        = 22
+          alt_name_invalid          = 23
+          alternate_name_exist     = 24
+          wrong_icf_name            = 25
+          no_authority              = 26
+          OTHERS                    = 27.
+    IF sy-subrc <> 0.
+        MESSAGE ID sy-msgid TYPE 'S' NUMBER sy-msgno
+          WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 INTO lv_icf_message.
+      respond_error( io_server = io_server
+                     iv_status = 500
+                     iv_reason = 'Internal Server Error'
+                     iv_code = 'HTTP_SERVICE_WRITE_FAILED'
+                       iv_msg = |SICF service creation failed (subrc={ sy-subrc }, { sy-msgid } { sy-msgno }): { lv_icf_message }| ).
+      RETURN.
+    ENDIF.
+
+    respond_json( io_server = io_server
+                  iv_status = 200
+                  iv_reason = 'OK'
+                  is_payload = VALUE ty_http_write(
+                    status = 'success'
+                    data = VALUE #( name = lv_node_name type = 'HTTP' action = 'created' ) ) ).
   ENDMETHOD.
 
   METHOD dispatch_version_management.
@@ -581,6 +1066,102 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
     IF sy-subrc = 0.
       rv_value = cl_http_utility=>if_http_utility~unescape_url( escaped = rv_value ).
     ENDIF.
+  ENDMETHOD.
+
+  METHOD dispatch_tcode.
+    " Resolve only the configured transaction entry; parameter and object
+    " transaction chains deliberately remain explicit as entry_only in v1.
+    DATA lv_tcode_raw TYPE string.
+    DATA lv_tcode     TYPE tstc-tcode.
+    DATA ls_payload   TYPE ty_tcode.
+    DATA ls_error     TYPE ty_error.
+
+    IF iv_method <> 'GET'.
+      respond_error( io_server = io_server
+                     iv_status = 405
+                     iv_reason = 'Method Not Allowed'
+                     iv_code   = 'METHOD_NOT_ALLOWED'
+                     iv_msg    = 'GET only on /tcode/<tcode>' ).
+      RETURN.
+    ENDIF.
+
+    lv_tcode_raw = to_upper( substring( val = iv_path off = strlen( '/tcode/' ) ) ).
+    IF lv_tcode_raw IS INITIAL OR strlen( lv_tcode_raw ) > 20 OR lv_tcode_raw CS ` `.
+      respond_error( io_server = io_server
+                     iv_status = 400
+                     iv_reason = 'Bad Request'
+                     iv_code   = 'INVALID_ARGUMENT'
+                     iv_msg    = 'tcode must be a non-empty transaction code of at most 20 characters without whitespace' ).
+      RETURN.
+    ENDIF.
+
+    lv_tcode = lv_tcode_raw.
+    AUTHORITY-CHECK OBJECT 'S_TCODE'
+      ID 'TCD' FIELD lv_tcode.
+    IF sy-subrc <> 0.
+      respond_error( io_server = io_server
+                     iv_status = 403
+                     iv_reason = 'Forbidden'
+                     iv_code   = 'TCODE_NOT_AUTHORIZED'
+                     iv_msg    = |not authorized to inspect transaction { lv_tcode }| ).
+      RETURN.
+    ENDIF.
+
+    read_tcode( EXPORTING iv_tcode = lv_tcode
+                IMPORTING es_payload = ls_payload
+                          ev_error = ls_error ).
+    IF ls_error IS NOT INITIAL.
+      DATA(lv_status) = COND i( WHEN ls_error-error-code = 'TCODE_NOT_FOUND' THEN 404 ELSE 500 ).
+      respond_error( io_server = io_server
+                     iv_status = lv_status
+                     iv_reason = COND string( WHEN lv_status = 404 THEN 'Not Found' ELSE 'Internal Server Error' )
+                     iv_code   = ls_error-error-code
+                     iv_msg    = ls_error-error-message ).
+      RETURN.
+    ENDIF.
+
+    respond_json( io_server = io_server
+                  iv_status = 200
+                  iv_reason = 'OK'
+                  is_payload = ls_payload ).
+  ENDMETHOD.
+
+  METHOD read_tcode.
+    " TSTC is the canonical configured initial program/screen mapping. It is
+    " intentionally not presented as a fully followed parameter-transaction chain.
+    CLEAR: es_payload, ev_error.
+    SELECT SINGLE pgmna, dypno
+      FROM tstc
+      WHERE tcode = @iv_tcode
+      INTO @DATA(ls_tstc).
+    IF sy-subrc <> 0.
+      ev_error = VALUE ty_error(
+        status = 'error'
+        error = VALUE #( code = 'TCODE_NOT_FOUND'
+                         message = |transaction { iv_tcode } was not found| ) ).
+      RETURN.
+    ENDIF.
+
+    DATA(lv_description) = VALUE string( ).
+    SELECT SINGLE ttext
+      FROM tstct
+      WHERE sprsl = @sy-langu
+        AND tcode = @iv_tcode
+      INTO @lv_description.
+
+    es_payload = VALUE ty_tcode(
+      status = 'success'
+      data = VALUE #(
+        tcode = iv_tcode
+        description = lv_description
+        entry = VALUE #( program = ls_tstc-pgmna screen = ls_tstc-dypno )
+        target = VALUE #( kind = 'program' name = ls_tstc-pgmna resolved = abap_true )
+        resolution_state = 'entry_only'
+        resolution_chain = VALUE #( ( tcode = iv_tcode
+                                      kind = 'program'
+                                      name = ls_tstc-pgmna
+                                      screen = ls_tstc-dypno
+                                      relation = 'entry' ) ) ) ).
   ENDMETHOD.
 
   METHOD dispatch_textpool.
@@ -799,8 +1380,9 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
                        iv_code   = ls_get_err-error-code
                        iv_msg    = ls_get_err-error-message ).
       ELSE.
-        ASSIGN lr_get->* TO FIELD-SYMBOL(<ls_get>).
-        respond_json( io_server = io_server iv_status = 200 iv_reason = 'OK' is_payload = <ls_get> ).
+        DATA(ls_get_response) = VALUE ty_ddic_get( status = 'success'
+                                                    data = lr_get ).
+        respond_json( io_server = io_server iv_status = 200 iv_reason = 'OK' is_payload = ls_get_response ).
       ENDIF.
     ELSE.
       respond_error( io_server = io_server
@@ -876,6 +1458,9 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
           ls_details-fieldname = 'DDTEXT'. ls_details-fieldvalue = <ls_field>-ddtext. APPEND ls_details TO ls_object_new-details.
         ENDIF.
         ls_details-fieldname = 'LANGUAGE'. ls_details-fieldvalue = sy-langu. APPEND ls_details TO ls_object_new-details.
+      ENDIF.
+      IF <ls_field>-precField IS NOT INITIAL.
+        ls_details-fieldname = 'PRECFIELD'. ls_details-fieldvalue = <ls_field>-precField. APPEND ls_details TO ls_object_new-details.
       ENDIF.
 
       IF <ls_field>-refTable IS NOT INITIAL AND <ls_field>-refField IS NOT INITIAL.
@@ -1301,89 +1886,35 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
           long_text   = ls_dtel-scrtext_l
           header_text = ls_dtel-reptext ).
       WHEN 'TABL'.
-        " DDIF_TABL_GET reads both transparent tables and structures; the
-        " tabclass in dd02v distinguishes them.
-        DATA ls_tabl TYPE dd02v.
-        DATA ls_tabl09 TYPE dd09l.
-        DATA lt_tabl03 TYPE TABLE OF dd03p.
-        CALL FUNCTION 'DDIF_TABL_GET'
-          EXPORTING
-            name     = CONV tabname( iv_name )
-            state    = 'A'
-            langu    = sy-langu
-          IMPORTING
-            dd02v_wa = ls_tabl
-            dd09l_wa = ls_tabl09
-          TABLES
-            dd03p_tab = lt_tabl03
-          EXCEPTIONS
-            illegal_input = 1
-            OTHERS        = 2.
-        IF sy-subrc <> 0 OR ls_tabl-tabname IS INITIAL.
+        DATA(ls_tabl_artifact) = zcl_abap_vibe_tabl_format=>generate(
+          iv_name        = CONV tabname( iv_name )
+          iv_object_type = 'TABL' ).
+        IF ls_tabl_artifact-success = abap_false.
           ev_error = VALUE ty_error( status = 'error'
-                                     error = VALUE ty_error_body( code = 'DDIC_OBJECT_NOT_FOUND'
-                                                                  message = |TABL { iv_name } not found| ) ).
+                                     error = VALUE ty_error_body( code = COND string( WHEN ls_tabl_artifact-error_code IS INITIAL
+                                                                                      THEN 'DDIC_OBJECT_NOT_FOUND'
+                                                                                      ELSE ls_tabl_artifact-error_code )
+                                                                  message = ls_tabl_artifact-error_message ) ).
           RETURN.
         ENDIF.
-        DATA(lt_fields_out) = VALUE tt_ddic_field_out( ).
-        LOOP AT lt_tabl03 INTO DATA(ls_field).
-          APPEND VALUE ty_ddic_field_out( field_name = ls_field-fieldname
-                                          rollname   = ls_field-rollname
-                                          data_type  = ls_field-datatype
-                                          length     = ls_field-leng
-                                          decimals   = ls_field-decimals
-                                          key_flag   = COND abap_bool( WHEN ls_field-keyflag = 'X' THEN abap_true ELSE abap_false )
-                                          not_null   = COND abap_bool( WHEN ls_field-notnull = 'X' THEN abap_true ELSE abap_false ) ) TO lt_fields_out.
-        ENDLOOP.
-        CREATE DATA es_payload TYPE ty_ddic_get_tabl_data.
+        CREATE DATA es_payload TYPE zcl_abap_vibe_tabl_format=>ty_result.
         ASSIGN es_payload->* TO FIELD-SYMBOL(<ls_tabl_payload>).
-        <ls_tabl_payload> = VALUE ty_ddic_get_tabl_data(
-          name             = iv_name
-          type             = iv_type
-          description      = ls_tabl-ddtext
-          delivery_class   = ls_tabl-contflag
-          data_class       = ls_tabl09-tabart
-          size_category    = ls_tabl09-tabkat
-          client_dependent = COND abap_bool( WHEN line_exists( lt_tabl03[ fieldname = 'MANDT' ] ) THEN abap_true ELSE abap_false )
-          fields           = lt_fields_out ).
+        <ls_tabl_payload> = ls_tabl_artifact.
       WHEN 'STRU'.
-        " Structure read via DDIF_TABL_GET (tabclass INTTAB), same shape as TABL.
-        DATA ls_stru TYPE dd02v.
-        DATA lt_stru03 TYPE TABLE OF dd03p.
-        CALL FUNCTION 'DDIF_TABL_GET'
-          EXPORTING
-            name     = CONV tabname( iv_name )
-            state    = 'A'
-            langu    = sy-langu
-          IMPORTING
-            dd02v_wa = ls_stru
-          TABLES
-            dd03p_tab = lt_stru03
-          EXCEPTIONS
-            illegal_input = 1
-            OTHERS        = 2.
-        IF sy-subrc <> 0 OR ls_stru-tabname IS INITIAL.
+        DATA(ls_stru_artifact) = zcl_abap_vibe_tabl_format=>generate(
+          iv_name        = CONV tabname( iv_name )
+          iv_object_type = 'STRU' ).
+        IF ls_stru_artifact-success = abap_false.
           ev_error = VALUE ty_error( status = 'error'
-                                     error = VALUE ty_error_body( code = 'DDIC_OBJECT_NOT_FOUND'
-                                                                  message = |STRU { iv_name } not found| ) ).
+                                     error = VALUE ty_error_body( code = COND string( WHEN ls_stru_artifact-error_code IS INITIAL
+                                                                                      THEN 'DDIC_OBJECT_NOT_FOUND'
+                                                                                      ELSE ls_stru_artifact-error_code )
+                                                                  message = ls_stru_artifact-error_message ) ).
           RETURN.
         ENDIF.
-        DATA(lt_stru_fields) = VALUE tt_ddic_field_out_stru( ).
-        LOOP AT lt_stru03 INTO DATA(ls_field2).
-          APPEND VALUE ty_ddic_field_out_stru( field_name = ls_field2-fieldname
-                                               rollname   = ls_field2-rollname
-                                               data_type  = ls_field2-datatype
-                                               length     = ls_field2-leng
-                                               decimals   = ls_field2-decimals
-                                               key_flag   = COND abap_bool( WHEN ls_field2-keyflag = 'X' THEN abap_true ELSE abap_false ) ) TO lt_stru_fields.
-        ENDLOOP.
-        CREATE DATA es_payload TYPE ty_ddic_get_stru_data.
+        CREATE DATA es_payload TYPE zcl_abap_vibe_tabl_format=>ty_result.
         ASSIGN es_payload->* TO FIELD-SYMBOL(<ls_stru_payload>).
-        <ls_stru_payload> = VALUE ty_ddic_get_stru_data(
-          name        = iv_name
-          type        = 'STRU'
-          description = ls_stru-ddtext
-          fields      = lt_stru_fields ).
+        <ls_stru_payload> = ls_stru_artifact.
       WHEN OTHERS.
         ev_error = VALUE ty_error( status = 'error'
                                    error = VALUE ty_error_body( code = 'DDIC_NOT_SUPPORTED'
@@ -2149,7 +2680,8 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
     DATA(lo_table_type) = cl_abap_tabledescr=>create( lo_row_type ).
     DATA lr_rows TYPE REF TO data.
     CREATE DATA lr_rows TYPE HANDLE lo_table_type.
-    ASSIGN lr_rows->* TO FIELD-SYMBOL(<lt_rows>).
+    FIELD-SYMBOLS <lt_rows> TYPE ANY TABLE.
+    ASSIGN lr_rows->* TO <lt_rows>.
 
     " Pre-declare host vars (ABAP forbids re-`DATA` inside CASE branches).
     DATA: lv_where_v1     TYPE string,

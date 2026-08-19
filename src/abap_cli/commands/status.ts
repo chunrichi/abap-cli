@@ -24,7 +24,7 @@ export function registerStatusCommand(program: Command): void {
     .option('--since <iso-date>', 'Only compare local files modified since this date (YYYY-MM-DD[THH:mm:ss])')
     .option('--all', 'Include unchanged objects')
     .action(async (opts: StatusOptions, cmd) => {
-      const json = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
       try {
         const client = await AdtClientWrapper.create();
         const result = await computeChangedParts(client, {
@@ -34,9 +34,9 @@ export function registerStatusCommand(program: Command): void {
           since: opts.since,
           all: opts.all,
         });
-        printResult(json, result, humanSummary(result.changedParts));
+        printResult(mode, result, humanSummary(result.changedParts));
       } catch (error: unknown) {
-        printError(json, error);
+        printError(mode, error);
       }
     });
 }

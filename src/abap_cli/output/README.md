@@ -26,8 +26,8 @@ Top-level commander 错误（unknown command / missing arg / unknown option）�
 |------|------|
 | [error-codes.ts](error-codes.ts) | `ErrorCode` 枚举 + `ErrorCategory` 分类（单一事实来源 FR-008） |
 | [exit-codes.ts](exit-codes.ts) | 分类 → 退出码映射（0–9，稳定契约，改码需扩展合同文档） |
-| [json.ts](json.ts) | `CliError` 类、`printResult` / `printError` / `renderError`、`printSchema`、`jsonFromCommand`、`CommandSchema` 类型 |
-| [meta.ts](meta.ts) | 信封 `meta` 块（command/version/timestamp/durationMs/warnings）+ `collectWarning` / `originalArgv` |
+| [json.ts](json.ts) | `OutputMode` / `isJsonMode`、`CliError` 类、`printResult` / `printError` / `renderError`、`printSchema`、`jsonFromCommand`、`CommandSchema` 类型 + `stripEmpty` token-efficient helper |
+| [meta.ts](meta.ts) | 普通信封 `meta` 块（command/version/timestamp/durationMs/warnings）与 schema 精简 meta（command/version/durationMs）+ `collectWarning` / `getOriginalArgv` |
 | [help-text.ts](help-text.ts) | `commonErrorsAfter()`：挂在每个命令 `--help` 尾部的错误码/退出码表 |
 | [issues.ts](issues.ts) | `CheckIssue` 输出数据模型（check 命令的 finding，不涉及错误信封） |
 
@@ -42,5 +42,17 @@ Top-level commander 错误（unknown command / missing arg / unknown option）�
   `meta.warnings`（`collectWarning`），永不出现在错误信封里。
 - **stdout/stderr 分离**：`--json` 失败时 stdout 必须为空，信封 + 帮助体走
   stderr（详见 `../top-error.ts` 注释与 `test/unit/output-streams.test.ts`）。
+- **三种输出模式**（025-abap-output-merge）：`OutputMode = 'human' | 'json'
+  | 'pretty-json'`。`--json` 默认**紧凑**（省 LM agent token），`--pretty-json`
+  缩进 2（人看/调试）。`isJsonMode()` 判断是否 JSON 模式，`jsonFromCommand(cmd)`
+  统一解析两者（pretty 优先）。
+- **Token-efficient `stripEmpty()`**（025）：`renderResult` 的 json 分支递归
+  删除 `data` 中的空 `{}` / 空 `[]`（保留 `null`、`false`、`0`、`''`）。Agent
+  永远不会消费空集合，可节省 ~5–20% token。human 模式不调用。
+- **`buildSchemaMeta()`**（025）：`--schema` 响应使用精简 meta（仅
+  `command` / `version` / `durationMs`），不含 `timestamp` 与 `warnings`。
+  让 schema introspection 跨运行稳定且最小。
+- **`getOriginalArgv()` 懒加载**（025）：取代 module-top 的 `originalArgv`
+  常量；首次调用时再读 `process.argv.slice(2)`。
 - **变更提示**：改错误码表时同时更新 `error-codes.ts`、`exit-codes.ts`、
   `help-text.ts` 和 `specs/012-unify-cli-output-contract/contracts/cli-output.md`。

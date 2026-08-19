@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { printError, jsonFromCommand } from '../output/json.js';
+import { printError, jsonFromCommand, type OutputMode } from '../output/json.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import { runCreate, runCreateLocal, type CreateOptions, type CreateLocalOptions } from '../flows/create-flow.js';
 
@@ -24,11 +24,11 @@ export function registerCreateCommand(program: Command): void {
     .option('--file <path>', '014: abap-file-format DDIC JSON input (required for DOMA/DTEL/TABL/STRU)')
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action(async (type, name, opts, cmd) => {
-      const json = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
       try {
-        await runCreate(type, name, opts, json);
+        await runCreate(type, name, opts, mode);
       } catch (error: unknown) {
-        printError(json, error);
+        printError(mode, error);
       }
     });
 
@@ -54,12 +54,12 @@ function registerCreateLocalCommand(createCmd: Command): void {
     .option('--template <template>', 'Skeleton template (minimal, public-method, report, selection-screen, ...)')
     .option('--dir <path>', 'Output directory', 'src/')
     .action(async (type, name, opts, cmd) => {
-      const json = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
       try {
         // 父子同名选项 --template：commander 把值路由到父命令 create 上（子命令自身为 undefined）。
-        await runCreateLocal(type, name, { ...opts, template: cmd.parent?.opts().template }, json);
+        await runCreateLocal(type, name, { ...opts, template: cmd.parent?.opts().template }, mode);
       } catch (error: unknown) {
-        printError(json, error);
+        printError(mode, error);
       }
     });
 }

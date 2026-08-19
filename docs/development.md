@@ -23,9 +23,11 @@ node dist/src/abap_cli/index.js --help
 Verification is done via:
 
 1. **`npm run build`** — TypeScript compile gate
-2. **`npm test` (vitest)** — unit tests in `test/unit/` covering command option contracts, error codes, and config handling
-3. **Local mock ADT server** — offline end-to-end checks (no SAP needed)
-4. **Real SAP integration** — protocol-level verification against a live system
+2. **`npm test` (vitest)** — unit tests in `test/unit/` covering command option contracts, error codes, output envelope, config handling, and SAP wire mappings
+3. **`output-contract-audit.test.ts`** — automated check that all CLI errors carry the correct category/exit-code mapping and that every `--json` envelope has a stable `meta` block
+4. **`skill-bundle.test.ts`** — automated check that the shipped skill prompts cover every CLI command and respect frontmatter/path/length constraints
+5. **Local mock ADT server** — offline end-to-end checks (no SAP needed)
+6. **Real SAP integration** — protocol-level verification against a live system (`tests/<run-id>-*` directories)
 
 ## Local Mock ADT Server
 
@@ -55,15 +57,17 @@ Then run the workflows from [Getting Started](getting-started.md) against the mo
 ```
 src/abap_cli/
 ├── index.ts              # commander entry, lazy-registers all commands
+├── top-error.ts          # top-level commander error routing (--json safe)
 ├── clients/              # AdtClientWrapper, ICF client, probe
-├── commands/             # one file per command (incl. activate, deploy, inspect)
-├── config/               # project + user config, keychain (secrets.ts), profile export/import
+├── commands/             # one file per command (init / profile / pull / push / check / create / search / status / diff / inspect / activate / run / select / where-used / tcode / transport / doctor / extension)
+├── config/               # project + user config, keychain (secrets.ts), profile export/import, validation
 ├── core/                 # lazy registration, polyfill, object/transport resolution, limits
-├── dictionary/           # DDIC domain logic (ddic-json.ts)
+├── dictionary/           # DDIC + HTTP domain logic (ddic-json.ts, http-json.ts, tabl-artifact.ts)
+├── extensions/           # 023 extension mechanism (types, loader, registry, list command)
 ├── icf/                  # ICF service version + deployment check (service-version.ts)
-├── formats/              # file format + resolver + pull strategies
+├── formats/              # file format + resolver + pull strategies + object-parts
 ├── output/               # unified JSON output, error codes, meta, check-issue types — see output/README.md
-└── flows/                # push (object/fugr/textpool), pull, deploy, sync, create, config, connection, status, diff, inspect, doctor, atc
+└── flows/                # init (bind/modify/inspect/clear), profile, create (+ schema/types), pull, push (object/fugr/textpool), run, select, tcode, where-used, status, diff, inspect, doctor, atc
 ```
 
 ## Adding a New Command

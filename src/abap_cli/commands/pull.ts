@@ -27,12 +27,12 @@ export function registerPullCommand(program: Command): void {
         console.log(cmd.helpInformation());
         return;
       }
-      const json = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
       try {
         const result = await runPull(objectName, opts);
-        printResult(json, result.data, result.human);
+        printResult(mode, result.data, result.human);
       } catch (error: unknown) {
-        printError(json, error);
+        printError(mode, error);
       }
     });
 }

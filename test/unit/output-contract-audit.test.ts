@@ -78,7 +78,7 @@ describe('output contract audit (FR-012, US-4, SC-001/002/005)', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('--schema outputs share the unified envelope with meta (US-1)', async () => {
+  it('--schema outputs share the unified envelope with reduced meta (US-3, 025)', async () => {
     const program = makeProgram();
     registerSearchCommand(program);
     registerCreateCommand(program);
@@ -90,14 +90,25 @@ describe('output contract audit (FR-012, US-4, SC-001/002/005)', () => {
     expect(createKeys).toEqual(['data', 'meta', 'status']);
     for (const res of [search, create]) {
       const parsed = JSON.parse(res.stdout);
+      // buildSchemaMeta: only command/version/durationMs (no timestamp/warnings).
+      expect(Object.keys(parsed.meta).sort()).toEqual(['command', 'durationMs', 'version']);
       expect(parsed.meta).toMatchObject({
         command: expect.any(String),
         version: expect.any(String),
-        timestamp: expect.any(String),
         durationMs: expect.any(Number),
-        warnings: expect.any(Array),
       });
+      expect(parsed.meta).not.toHaveProperty('timestamp');
+      expect(parsed.meta).not.toHaveProperty('warnings');
     }
+  });
+
+  it('DDIC_TABL_FORMAT_UNSUPPORTED and PULL_PARTIAL_FAILURE map to VALIDATION_ERROR (US5, 025)', () => {
+    expect(categoryOf('DDIC_TABL_FORMAT_UNSUPPORTED')).toBe('VALIDATION_ERROR');
+    expect(categoryOf('PULL_PARTIAL_FAILURE')).toBe('VALIDATION_ERROR');
+    expect(EXIT_CODES.VALIDATION_ERROR).toBe(7);
+    // Both codes should appear in the §5 contract table (they were added in 025).
+    expect(contract).toContain('`DDIC_TABL_FORMAT_UNSUPPORTED`');
+    expect(contract).toContain('`PULL_PARTIAL_FAILURE`');
   });
 });
 

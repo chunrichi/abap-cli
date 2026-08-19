@@ -34,7 +34,8 @@ The file is written with mode `0600` (`0700` for the directory) and is not commi
 {
   "system": "dev",
   "transport": "",
-  "package": ""
+  "package": "",
+  "sourceDir": ""
 }
 ```
 
@@ -43,6 +44,17 @@ The file is written with mode `0600` (`0700` for the directory) and is not commi
 | `system` | Name of the system profile to connect to (required) |
 | `transport` | Default transport number used when `--tr` is not given |
 | `package` | Default package used by commands that create objects |
+| `sourceDir` | Base directory for `push --all` / `check --all` (falls back to cwd) |
+
+The same `abap init` command is also the entry point for **inspecting and clearing** these fields (026):
+
+```bash
+abap init --show-config               # print the current .abap.json (read-only)
+abap init --unset-package --yes       # remove the `package` key
+abap init --unset-tr --unset-source-dir --yes   # remove multiple keys
+```
+
+Setting fields (`--profile`, `--tr`, `--package`, `--source-dir`) is also done through `abap init`; the command merges with the existing `.abap.json` rather than replacing it.
 
 A template lives at [`.abap.json.example`](../.abap.json.example). This file is gitignored (see `.gitignore`); commit an example, never the real one.
 

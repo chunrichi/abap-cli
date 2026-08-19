@@ -17,8 +17,9 @@
  */
 
 import { CommanderError, type Command } from 'commander';
-import { CliError, renderError } from './output/json.js';
-import { buildMeta } from './output/meta.js';
+import { CliError, isJsonMode, renderError, type OutputMode } from './output/json.js';
+import { buildMeta, deriveCommand } from './output/meta.js';
+import type { ExtensionRegistry } from './extensions/registry.js';
 
 export interface TopErrorContext {
   program: Command;
@@ -58,9 +59,17 @@ function writeBlock(stream: { write: (s: string) => unknown }, block: string): v
   stream.write(block.endsWith('\n') ? block : `${block}\n`);
 }
 
-/** Decide whether an argv contains the `--json` flag. */
-export function isJson(argv: readonly string[]): boolean {
-  return argv.includes('--json');
+/** Resolve the top-level output mode from argv (025 US1).
+ *  `--pretty-json` wins over `--json`. */
+export function isJson(argv: readonly string[]): OutputMode {
+  if (argv.includes('--pretty-json')) return 'pretty-json';
+  if (argv.includes('--json')) return 'json';
+  return 'human';
+}
+
+/** Back-compat boolean predicate (true when any JSON mode is requested). */
+export function isAnyJson(argv: readonly string[]): boolean {
+  return isJsonMode(isJson(argv));
 }
 
 /** Stream handles for the handler; injected so unit tests can capture them. */
@@ -83,8 +92,9 @@ export function handleTopLevelError(
     stderr: process.stderr,
   },
   exit: (code?: number) => never = (code) => process.exit(code as number),
+  registry?: ExtensionRegistry,
 ): never {
-  const json = isJson(ctx.argv);
+  const json: OutputMode = isJson(ctx.argv);
 
   if (error instanceof CommanderError) {
     if (error.code === 'commander.helpDisplayed') {
@@ -99,7 +109,7 @@ export function handleTopLevelError(
       // (via outputHelp({ error: true })) to writeErr. We only need to emit
       // the JSON envelope in --json mode and a stderr hint in human mode.
       const firstArg = firstSubcommandArg(ctx.argv);
-      if (json) {
+      if (isJsonMode(json)) {
         const usage = new CliError('USAGE', 'Missing required subcommand or argument.', {
           nextSteps: ['Check the command usage: abap <command> --help.'],
           example: `abap ${firstArg ?? '<command>'} --help`,
@@ -126,7 +136,7 @@ export function handleTopLevelError(
       const firstArg = firstSubcommandArg(ctx.argv);
       const sub = resolveSubcommand(ctx.program, firstArg, ctx.argv);
       const helpBody = sub.helpInformation();
-      if (json) {
+      if (isJsonMode(json)) {
         const usage = new CliError('USAGE', error.message.replace(/^error: /, ''), {
           nextSteps: ['Check the command usage: abap <command> --help.'],
           example: `abap ${firstArg ?? '<command>'} --help`,
@@ -157,5 +167,18 @@ export function handleTopLevelError(
 
   const out = renderError(json, error, buildMeta());
   writeBlock(streams.stderr, out.stderr.join('\n'));
+
+  // Fire onError lifecycle hooks without blocking the exit path (failures swallowed)
+  if (registry) {
+    registry.dispatchAll('onError', {
+      command: deriveCommand(process.argv),
+      argv: process.argv.slice(2),
+      error: out.stderr[0] ? JSON.parse(out.stderr[0])?.error ?? {} : {},
+      ts: Date.now(),
+    }).catch(() => {
+      // Swallowed: onError hook failures are non-fatal
+    });
+  }
+
   exit(out.exitCode ?? 1);
 }

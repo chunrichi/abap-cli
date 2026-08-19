@@ -59,6 +59,24 @@
 - **`--dry-run`**：返回 `{ dryRun: true, ... }` 不改 SAP
 - **`--yes`**：跳过确认
 
+### extension deploy / status
+
+| code | cat/exit | 触发 | 修复 |
+|---|---|---|---|
+| `OBJECT_EXISTS` | USAGE/2 | `--atomic` 推送已存在对象 | 加 `--overwrite`（如支持） |
+| `ACTIVATION_FAILED` | VALIDATION_ERROR/7 | ICF handler 激活失败 | 复检：`inspect <obj> --activation` → `activate --yes`（abap-object skill 内） |
+| `SAP_ERROR` | SAP_ERROR/6 | SAP 端 deploy 失败 | 看 `data.objects[]` 哪个失败 |
+| `ICF_CHECK_DEGRADED` | warning（meta.warnings） | ICF 部署健康探测不可达 | 不阻断；查 SAP 端 `/sap/zabap_vibe/` 是否可达 |
+
+### extension status 状态值
+
+| `data.status` | 含义 | 推荐动作 |
+|---|---|---|
+| `not_deployed` | ICF 服务没装过 | `extension deploy --yes` |
+| `current` | 安装且版本匹配 | 跳过 |
+| `outdated` | 安装但版本过期 | `extension deploy --yes` 升级 |
+| `unreachable` | 探测不可达 | 不阻断；查 `meta.warnings`（ICF_CHECK_DEGRADED） |
+
 ## 完整 012 契约参考
 
 - <https://github.com/SAP/abap-cli/blob/main/docs/commands.md#json-output-contract>

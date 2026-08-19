@@ -21,7 +21,7 @@ describe('abap run --json failure separation (P1.7)', () => {
     registerRunCommand(program);
     const res = await runCommand(program, ['run', 'ZCL_FOO', '--method', 'x', '--json']);
     expect(res.stdout).toBe('');
-    expect(res.stderr).toContain('"status": "error"');
+    expect(res.stderr).toContain('"status":"error"');
     expect(res.stderr).toContain('METHOD_NOT_SUPPORTED');
     expect(res.exitCode).toBe(7);
   });

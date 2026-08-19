@@ -102,7 +102,7 @@ abap run --schema --json
   "status": "success",
   "meta": {
     "command": "abap run",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "timestamp": "2026-08-07T14:30:39.705Z",
     "durationMs": 93,
     "warnings": []
@@ -127,7 +127,7 @@ abap run --schema --json
 ```json
 {
   "status": "error",
-  "meta": { "command": "abap run", "version": "0.1.0", "durationMs": 93, "warnings": [] },
+  "meta": { "command": "abap run", "version": "0.2.0", "durationMs": 93, "warnings": [] },
   "error": {
     "code": "METHOD_NOT_SUPPORTED",
     "category": "VALIDATION_ERROR",

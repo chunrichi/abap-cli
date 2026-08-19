@@ -4,9 +4,13 @@
 import './core/polyfill.js';
 import { createRequire } from 'node:module';
 import { Command } from 'commander';
-import { setProgram } from './output/meta.js';
+import { setProgram, buildMeta } from './output/meta.js';
 import { registerLazyCommands, type LazyCommandSpec } from './core/lazy.js';
 import { handleTopLevelError } from './top-error.js';
+import { ExtensionRegistry, setExtensionRegistry } from './extensions/registry.js';
+import { setExtensionRegistry as setExtRegJson, CliError, renderError } from './output/json.js';
+import { EXIT_GENERIC_FALLBACK } from './output/exit-codes.js';
+import { loadConfig } from './config/project-config.js';
 
 // 声明式惰性注册（P1.6）：只有 name + description 在启动时加载，模块体在
 // 命令真正被调用（或请求其 --help）时才 import。
@@ -14,7 +18,7 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
   {
     name: 'init',
     scope: 'local',
-    description: 'Initialize the workspace: bind a profile (write .abap.json) and/or scaffold AI agent context. Run bare `abap init` for the interactive wizard.',
+    description: 'Initialize the workspace (bind a profile, write .abap.json), inspect/modify the existing binding (--show-config / --unset-*), and/or scaffold AI agent context (--agent). Run bare `abap init` for the interactive wizard.',
     load: () => import('./commands/init.js').then((m) => ({ register: m.registerInitCommand })),
   },
   {
@@ -87,6 +91,18 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
     load: () => import('./commands/inspect.js').then((m) => ({ register: m.registerInspectCommand })),
   },
   {
+    name: 'where-used',
+    scope: 'sap',
+    description: 'Find direct references to a SAP object (read-only): where-used ZCL_MY_CLASS [--type CLAS] [--ref-type ...] [--package ...] [--limit N].',
+    load: () => import('./commands/where-used.js').then((m) => ({ register: m.registerWhereUsedCommand })),
+  },
+  {
+    name: 'tcode',
+    scope: 'sap',
+    description: 'Resolve a transaction code to its configured ABAP entry program and screen (read-only).',
+    load: () => import('./commands/tcode.js').then((m) => ({ register: m.registerTcodeCommand })),
+  },
+  {
     name: 'activate',
     description: 'Activate all inactive items of an object (method/OSI level)',
     load: () => import('./commands/activate.js').then((m) => ({ register: m.registerActivateCommand })),
@@ -95,6 +111,12 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
     name: 'diff',
     description: 'Compare local files against SAP (read-only)',
     load: () => import('./commands/diff.js').then((m) => ({ register: m.registerDiffCommand })),
+  },
+  {
+    name: 'extensions',
+    scope: 'local',
+    description: 'Manage installed extensions. Subcommands: list.',
+    load: () => import('./commands/extensions.js').then((m) => ({ register: m.registerExtensionsCommand })),
   },
 ];
 
@@ -110,7 +132,8 @@ program
   .name('abap')
   .description('CLI tool for ABAP vibe coding — agent-driven ABAP development')
   .version(version)
-  .option('--json', 'Output in JSON format');
+  .option('--json', 'Output in JSON format (compact, token-efficient for LM agents)')
+  .option('--pretty-json', 'Output in pretty JSON format (indented; overrides --json)');
 
 // 顶层错误处理（FR-005/FR-007）：commander 抛错（缺参/未知选项）由这里归一化为
 // 结构化错误；--help/--version 让 commander 自己写 stdout（包含 addHelpText
@@ -123,11 +146,56 @@ registerLazyCommands(program, COMMAND_SPECS);
 
 setProgram(program);
 
+// Load project config and extensions before parsing commands
+let registry: ExtensionRegistry;
+try {
+  const config = await loadConfig();
+  registry = new ExtensionRegistry();
+  await registry.loadAndRegisterExtensions(program, config.extensions ?? []);
+} catch (err) {
+  // Extension loading failures are non-fatal in lenient mode.
+  // Strict mode errors (EXTENSION_LOAD_FAILED) are fatal — exit with proper code + error envelope.
+  if (err instanceof CliError && err.code === 'EXTENSION_LOAD_FAILED') {
+    // Fatal: exit with the JSON error envelope even in human mode, so the
+    // error code is visible to the caller (test / script).  This runs before
+    // parseAsync so Commander's own error handling is not yet active.
+    const out = renderError('json', err, buildMeta());
+    for (const line of out.stderr) console.error(line);
+    process.exit(out.exitCode ?? EXIT_GENERIC_FALLBACK);
+  }
+  registry = new ExtensionRegistry();
+}
+
+// Set singletons for json.ts and list-command.ts
+setExtensionRegistry(registry);
+setExtRegJson(registry);
+
+// Install lifecycle hooks globally once (FR-007)
+program.hook('preAction', async (_thisCmd, actionCmd) => {
+  const argv = process.argv.slice(2);
+  const cmdName = actionCmd.name();
+  await registry.dispatch('beforeCommand', {
+    command: cmdName,
+    argv,
+    ts: Date.now(),
+  });
+});
+
+program.hook('postAction', async (_thisCmd, actionCmd) => {
+  const argv = process.argv.slice(2);
+  const cmdName = actionCmd.name();
+  await registry.dispatch('afterCommand', {
+    command: cmdName,
+    argv,
+    ts: Date.now(),
+  });
+});
+
 try {
   // parseAsync: lazy commands (P1.6) dispatch through an async _parseCommand,
   // so commander's sync help/error throws surface as rejections that only
   // parseAsync (which awaits the chain) re-throws into this catch block.
   await program.parseAsync();
 } catch (error: unknown) {
-  handleTopLevelError(error, { program, argv: process.argv, version });
+  handleTopLevelError(error, { program, argv: process.argv, version }, undefined, undefined, registry);
 }

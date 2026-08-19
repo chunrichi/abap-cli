@@ -21,7 +21,7 @@ export function registerActivateCommand(program: Command): void {
     .option('--type <type>', 'Object type (CLAS, PROG, INTF, etc.) — disambiguates same-name objects')
     .option('--yes', 'Confirm in non-interactive environments')
     .action(async (object: string, opts: ActivateOptions, cmd) => {
-      const json = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
       try {
         if (!opts.yes && !process.stdin.isTTY) {
           throw new CliError('VALIDATION_ERROR', 'abap activate modifies SAP; confirm with --yes in non-interactive mode', {
@@ -42,8 +42,7 @@ export function registerActivateCommand(program: Command): void {
         });
 
         if (mine.length === 0) {
-          printResult(
-            json,
+          printResult(mode,
             { object: resolved.name, activated: 0, message: 'no inactive items to activate' },
             `${resolved.name}: no inactive items to activate.`,
           );
@@ -55,13 +54,12 @@ export function registerActivateCommand(program: Command): void {
           return { uri: o['adtcore:uri'], type: o['adtcore:type'], name: o['adtcore:name'], parentUri: o['adtcore:uri'].split('#')[0] ?? o['adtcore:uri'] };
         });
         const res = await client.activateAll(items);
-        printResult(
-          json,
+        printResult(mode,
           { object: resolved.name, activated: items.length, messages: res.messages },
           `Activated ${items.length} inactive item(s) of ${resolved.name}.`,
         );
       } catch (error: unknown) {
-        printError(json, error);
+        printError(mode, error);
       }
     });
 }

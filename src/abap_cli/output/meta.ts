@@ -8,13 +8,22 @@
  *    warnings that only ever appear in meta.warnings, never in the error
  *    envelope (FR-009).
  *  - buildMeta: snapshot of command, version, timestamp, durationMs, warnings.
- *  - originalArgv: process.argv.slice(2) captured at module load, before
- *    commander mutates process.argv. Used to detect flags that the parser
- *    silently swallowed (e.g. unknown flags on a subcommand that doesn't
+ *  - buildSchemaMeta: reduced metadata for deterministic schema introspection.
+ *  - getOriginalArgv: lazy snapshot of process.argv.slice(2) captured on first
+ *    call, before commander mutates process.argv. Used to detect flags that the
+ *    parser silently swallowed (e.g. unknown flags on a subcommand that doesn't
  *    define them).
  */
 
-export const originalArgv: string[] = process.argv.slice(2);
+let _originalArgv: string[] | undefined;
+
+/** Lazy snapshot of process.argv.slice(2) captured on first call, before
+ *  commander mutates process.argv. Replaces the module-top `originalArgv`
+ *  constant so we don't freeze argv at import time. */
+export function getOriginalArgv(): string[] {
+  if (!_originalArgv) _originalArgv = process.argv.slice(2);
+  return _originalArgv;
+}
 
 import type { Command } from 'commander';
 import { createRequire } from 'node:module';
@@ -28,12 +37,23 @@ export type WarningCode =
   | 'PROFILE_MISMATCH'      // stored profile differs from current config
   | 'PAGINATION_LIMITED'    // search --page-all hit the page cap; result truncated
   | 'ICF_CHECK_DEGRADED'    // init ICF deployment check degraded (non-blocking)
+  // 023-extension-mechanism
+  | 'EXTENSION_DEGRADED'    // extension failed to load but CLI continues (lenient mode)
   ;
 
 export interface Warning {
   code: WarningCode;
   message: string;
   details?: Record<string, unknown>;
+}
+
+/** Snapshot of loaded extensions for meta.extensions (023-extension-mechanism). */
+export interface ExtensionMeta {
+  loaded: number;
+  failed?: number;
+  byType: { command?: number; validation?: number; lifecycle?: number };
+  names: string[];
+  validationRules?: Array<{ name: string; appliesTo: string[] | '*' }>;
 }
 
 export interface OutputMeta {
@@ -47,6 +67,8 @@ export interface OutputMeta {
   durationMs: number;
   /** Structured warnings; always present, empty when none. */
   warnings: Warning[];
+  /** Loaded extension summary (only present when extensions are registered). */
+  extensions?: ExtensionMeta;
 }
 
 const startTime = Date.now();
@@ -69,6 +91,8 @@ export function collectWarning(
 }
 
 /** Snapshot of collected warnings (copy, so callers cannot mutate the store). */
+export { deriveCommand };
+
 export function getWarnings(): Warning[] {
   return warnings.slice();
 }
@@ -113,5 +137,19 @@ export function buildMeta(): OutputMeta {
     timestamp: new Date().toISOString(),
     durationMs: Math.max(0, Date.now() - startTime),
     warnings: getWarnings(),
+  };
+}
+
+/** Reduced metadata used by the agent-facing `--schema` response (025 US3):
+ *  excludes timestamp and warnings so the contract stays stable and minimal. */
+export type SchemaOutputMeta = Pick<OutputMeta, 'command' | 'version' | 'durationMs'>;
+
+/** Build the reduced meta block used by `--schema`. */
+export function buildSchemaMeta(): SchemaOutputMeta {
+  const meta = buildMeta();
+  return {
+    command: meta.command,
+    version: meta.version,
+    durationMs: meta.durationMs,
   };
 }

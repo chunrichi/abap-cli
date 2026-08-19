@@ -66,21 +66,24 @@ export async function getObjectParts(
  *  Q2 scope: keep TTYP rejected (deferred to a later phase). */
 const DDIC_ICF_SUPPORTED = new Set(['DOMA', 'DTEL', 'TABL', 'STRU']);
 
+/** 022: object types the CLI can create/pull/push via the self-built ICF service. */
+const ICF_ROUTED_TYPES = new Set<string>([...DDIC_ICF_SUPPORTED, 'HTTP']);
+
 /**
- * 014: validate a local file before push. Source files are passed through;
- * DDIC files for the four supported types (DOMA/DTEL/TABL/STRU) are allowed
- * through to the ICF POST /ddic/<type> endpoint. Unknown DDIC types
- * (notably TTYP) still raise DDIC_NOT_SUPPORTED.
+ * 014/022: validate a local file before push. Source files are passed through;
+ * DDIC files for the four supported types (DOMA/DTEL/TABL/STRU) and HTTP service
+ * (.http.json) are allowed through to the matching ICF endpoint. Unknown
+ * DDIC-looking types (notably TTYP) still raise DDIC_NOT_SUPPORTED.
  */
 export function validateLocalFile(resolved: { objectName: string; objectType: string; route: string }): void {
   if (resolved.route === 'icf') {
-    if (!DDIC_ICF_SUPPORTED.has(resolved.objectType)) {
+    if (!ICF_ROUTED_TYPES.has(resolved.objectType)) {
       throw new CliError(
         'DDIC_NOT_SUPPORTED',
         `Object ${resolved.objectName} (${resolved.objectType}) is a DDIC object; not supported in this phase`,
         { object: resolved.objectName, type: resolved.objectType },
       );
     }
-    // Supported DDIC type — allowed through (ICF route handles the rest).
+    // Supported ICF-routed type — allowed through (handler picks the endpoint).
   }
 }
