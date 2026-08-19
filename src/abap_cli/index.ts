@@ -138,7 +138,8 @@ program
   .name('abap')
   .description('CLI tool for ABAP vibe coding — agent-driven ABAP development')
   .version(version)
-  .option('--json', 'Output in JSON format');
+  .option('--json', 'Output in JSON format (compact, token-efficient for LM agents)')
+  .option('--pretty-json', 'Output in pretty JSON format (indented; overrides --json)');
 
 // 顶层错误处理（FR-005/FR-007）：commander 抛错（缺参/未知选项）由这里归一化为
 // 结构化错误；--help/--version 让 commander 自己写 stdout（包含 addHelpText
@@ -164,7 +165,7 @@ try {
     // Fatal: exit with the JSON error envelope even in human mode, so the
     // error code is visible to the caller (test / script).  This runs before
     // parseAsync so Commander's own error handling is not yet active.
-    const out = renderError(true, err, buildMeta());
+    const out = renderError('json', err, buildMeta());
     for (const line of out.stderr) console.error(line);
     process.exit(out.exitCode ?? EXIT_GENERIC_FALLBACK);
   }

@@ -30,7 +30,7 @@ export function registerWhereUsedCommand(program: Command): void {
     .option('--limit <n>', `Max returned references (default ${DEFAULT_WHERE_USED_LIMIT}, max ${MAX_WHERE_USED_LIMIT})`)
     .option('--schema', 'Print the command parameter schema as JSON and exit 0')
     .action(async (object: string | undefined, opts: WhereUsedCliOptions, cmd: Command) => {
-      const json = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
       try {
         if (cmd.optsWithGlobals().schema) {
           printSchema(whereUsedSchema());
@@ -47,9 +47,9 @@ export function registerWhereUsedCommand(program: Command): void {
         };
         const client = await AdtClientWrapper.create();
         const result = await runWhereUsed(client, target, options);
-        printResult(json, result, formatHuman(result));
+        printResult(mode, result, formatHuman(result));
       } catch (error: unknown) {
-        printError(json, error);
+        printError(mode, error);
       }
     });
 }

@@ -2,7 +2,7 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { IcfClient } from '../clients/icf-client.js';
-import { CliError, printResult, printSchema } from '../output/json.js';
+import { CliError, printResult, printSchema, type OutputMode } from '../output/json.js';
 import type { ErrorCode } from '../output/error-codes.js';
 import { resolveObject, getObjectParts, type ResolvedObject } from '../core/resolve.js';
 import type { ObjectPart } from '../formats/object-parts.js';
@@ -38,7 +38,7 @@ export interface CreateLocalOptions {
   dir: string;
 }
 
-export async function runCreateLocal(type: string, name: string, opts: CreateLocalOptions, json: boolean): Promise<void> {
+export async function runCreateLocal(type: string, name: string, opts: CreateLocalOptions,mode: OutputMode): Promise<void> {
   const objectName = normalizeName(name);
   resolveType(type); // throws TYPE_NOT_SUPPORTED / DDIC_NOT_SUPPORTED before any write
   const typeUpper = type.toUpperCase();
@@ -62,8 +62,7 @@ export async function runCreateLocal(type: string, name: string, opts: CreateLoc
 
   await writeAbapFile(targetPath, content);
 
-  printResult(
-    json,
+  printResult(mode,
     { object: objectName, type: typeUpper, template: templateName ?? null, file: relPath, experimental: true },
     `Created local draft ${typeUpper} ${objectName} at ${relPath} (experimental, not in SAP)`,
   );
@@ -76,7 +75,7 @@ export async function runCreateLocal(type: string, name: string, opts: CreateLoc
  * description. Other required fields (package, transport for non-$TMP) are validated
  * client-side before the round-trip.
  */
-async function runCreateDdic(type: DdicSupportedType, objectName: string, opts: CreateOptions, json: boolean): Promise<void> {
+async function runCreateDdic(type: DdicSupportedType, objectName: string, opts: CreateOptions,mode: OutputMode): Promise<void> {
   const filePath = path.resolve(process.cwd(), opts.file ?? '');
   let local: Awaited<ReturnType<typeof readDdicJson>>;
   try {
@@ -136,8 +135,7 @@ async function runCreateDdic(type: DdicSupportedType, objectName: string, opts: 
     });
   }
 
-  printResult(
-    json,
+  printResult(mode,
     {
       object: resp.data.name,
       type,
@@ -155,7 +153,7 @@ async function runCreateDdic(type: DdicSupportedType, objectName: string, opts: 
  * description. Other required fields (package, transport for non-$TMP) are validated
  * client-side before the round-trip.
  */
-async function runCreateHttp(type: 'HTTP', objectName: string, opts: CreateOptions, json: boolean): Promise<void> {
+async function runCreateHttp(type: 'HTTP', objectName: string, opts: CreateOptions,mode: OutputMode): Promise<void> {
   const filePath = path.resolve(process.cwd(), opts.file ?? '');
   let local: Awaited<ReturnType<typeof readHttpJson>>;
   try {
@@ -215,8 +213,7 @@ async function runCreateHttp(type: 'HTTP', objectName: string, opts: CreateOptio
     });
   }
 
-  printResult(
-    json,
+  printResult(mode,
     {
       object: resp.data.name,
       type,
@@ -227,7 +224,7 @@ async function runCreateHttp(type: 'HTTP', objectName: string, opts: CreateOptio
   );
 }
 
-export async function runCreate(type: string | undefined, name: string | undefined, opts: CreateOptions, json: boolean): Promise<void> {
+export async function runCreate(type: string | undefined, name: string | undefined, opts: CreateOptions,mode: OutputMode): Promise<void> {
   if (opts.schema) {
     printSchema(createSchema(type));
     return;
@@ -265,7 +262,7 @@ export async function runCreate(type: string | undefined, name: string | undefin
         example: `abap create ${typeUpper} ${objectName} --file src/${objectName.toLowerCase()}.${typeUpper.toLowerCase()}.json --package $TMP --description "..."`,
       });
     }
-    await runCreateDdic(typeUpper, objectName, opts, json);
+    await runCreateDdic(typeUpper, objectName, opts, mode);
     return;
   }
 
@@ -276,7 +273,7 @@ export async function runCreate(type: string | undefined, name: string | undefin
         example: `abap create HTTP ${objectName} --file src/${objectName.toLowerCase()}.http.json --package $TMP --description "..."`,
       });
     }
-    await runCreateHttp(typeUpper, objectName, opts, json);
+    await runCreateHttp(typeUpper, objectName, opts, mode);
     return;
   }
 
@@ -291,8 +288,7 @@ export async function runCreate(type: string | undefined, name: string | undefin
       packagename: opts.package,
       description: opts.description,
     } as Parameters<AdtClientWrapper['validateNewObject']>[0]);
-    printResult(
-      json,
+    printResult(mode,
       { object: objectName, type: type.toUpperCase(), checkOnly: true, valid: result.success, issues: result.success ? [] : [result.SHORT_TEXT] },
       `Validation ${result.success ? 'passed' : 'failed'} for ${objectName} (no object created).`,
     );
@@ -362,8 +358,7 @@ export async function runCreate(type: string | undefined, name: string | undefin
     localFile = relPath;
   }
 
-  printResult(
-    json,
+  printResult(mode,
     {
       object: objectName,
       type: type.toUpperCase(),

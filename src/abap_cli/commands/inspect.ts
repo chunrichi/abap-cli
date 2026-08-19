@@ -17,7 +17,7 @@ export function registerInspectCommand(program: Command): void {
     .option('--package', 'Include the object package name')
     .option('--activation', 'Verify active vs latest source (read-only; detect stale activation)')
     .action(async (object: string | undefined, opts: InspectOptions, cmd) => {
-      const json = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
       try {
         if (!object) {
           throw new CliError('USAGE', 'inspect requires an object name.', {
@@ -42,9 +42,9 @@ export function registerInspectCommand(program: Command): void {
               ]
             : []),
         ].join('\n');
-        printResult(json, result, human);
+        printResult(mode, result, human);
       } catch (error: unknown) {
-        printError(json, error);
+        printError(mode, error);
       }
     });
 }

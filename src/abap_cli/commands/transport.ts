@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
-import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
+import { CliError, printError, printResult, jsonFromCommand, type OutputMode } from '../output/json.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import { showTransport, resolveObjectTransport, assignObjectToTransport } from '../flows/transport-ops.js';
 
@@ -27,11 +27,11 @@ export function registerTransportCommand(program: Command): void {
     .description('List transport requests for current user')
     .option('--open', 'Show only open (unreleased) transports')
     .action(async (opts, cmd) => {
-      const json = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
       try {
-        await runList(Boolean(opts.open), json);
+        await runList(Boolean(opts.open), mode);
       } catch (error: unknown) {
-        printError(json, error);
+        printError(mode, error);
       }
     });
 
@@ -43,11 +43,11 @@ export function registerTransportCommand(program: Command): void {
     .option('--dry-run', 'Plan only — make no mutating SAP calls')
     .option('--yes', 'Confirm the create in non-interactive mode')
     .action(async (description, opts, cmd) => {
-      const json = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
       try {
-        await runCreate(description, opts, json);
+        await runCreate(description, opts, mode);
       } catch (error: unknown) {
-        printError(json, error);
+        printError(mode, error);
       }
     });
 
@@ -55,13 +55,13 @@ export function registerTransportCommand(program: Command): void {
     .command('show <req>')
     .description('Show structured metadata for a transport request')
     .action(async (req: string, _opts, cmd) => {
-      const json = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
       try {
         const client = await AdtClientWrapper.create();
         const data = await showTransport(client, req);
-        printResult(json, data, formatShow(data));
+        printResult(mode, data, formatShow(data));
       } catch (error: unknown) {
-        printError(json, error);
+        printError(mode, error);
       }
     });
 
@@ -69,13 +69,13 @@ export function registerTransportCommand(program: Command): void {
     .command('resolve <object>')
     .description('Show which transport request(s) an object belongs to (read-only)')
     .action(async (object: string, _opts, cmd) => {
-      const json = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
       try {
         const client = await AdtClientWrapper.create();
         const data = await resolveObjectTransport(client, object);
-        printResult(json, data, formatResolve(data));
+        printResult(mode, data, formatResolve(data));
       } catch (error: unknown) {
-        printError(json, error);
+        printError(mode, error);
       }
     });
 
@@ -86,11 +86,11 @@ export function registerTransportCommand(program: Command): void {
     .option('--dry-run', 'Plan only — make no mutating SAP calls')
     .option('--yes', 'Confirm the assign in non-interactive mode')
     .action(async (object: string, opts: AssignOptions, cmd) => {
-      const json = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
       try {
-        await runAssign(object, opts, json);
+        await runAssign(object, opts, mode);
       } catch (error: unknown) {
-        printError(json, error);
+        printError(mode, error);
       }
     });
 }
@@ -107,7 +107,7 @@ interface AssignOptions {
   yes?: boolean;
 }
 
-async function runCreate(description: string, opts: CreateOptions, json: boolean): Promise<void> {
+async function runCreate(description: string, opts: CreateOptions,mode: OutputMode): Promise<void> {
   if (!description.trim()) {
     throw new CliError('INVALID_ARGUMENT', 'Transport description must not be empty');
   }
@@ -125,8 +125,7 @@ async function runCreate(description: string, opts: CreateOptions, json: boolean
   const ref = `/sap/bc/adt/packages/${encodeURIComponent(devClass)}`;
 
   if (opts.dryRun) {
-    printResult(
-      json,
+    printResult(mode,
       { transport: null, description: description.trim(), package: devClass, dryRun: true, ref },
       `Would create transport request in ${devClass} (dry-run)`,
     );
@@ -142,14 +141,13 @@ async function runCreate(description: string, opts: CreateOptions, json: boolean
     throw new CliError('TRANSPORT_CREATE_FAILED', `Failed to create transport request: ${message}`);
   }
 
-  printResult(
-    json,
+  printResult(mode,
     { transport, description: description.trim(), package: devClass },
     `Created transport request ${transport} (${devClass})`,
   );
 }
 
-async function runAssign(object: string, opts: AssignOptions, json: boolean): Promise<void> {
+async function runAssign(object: string, opts: AssignOptions,mode: OutputMode): Promise<void> {
   if (!process.stdin.isTTY && !opts.dryRun && !opts.yes) {
     throw new CliError('VALIDATION_ERROR', 'transport assign is a write operation; confirm with --yes or pass --dry-run.', {
       nextSteps: [
@@ -161,8 +159,7 @@ async function runAssign(object: string, opts: AssignOptions, json: boolean): Pr
   }
 
   if (opts.dryRun) {
-    printResult(
-      json,
+    printResult(mode,
       { object, transport: opts.tr, assigned: false, dryRun: true },
       `Would attach ${object} to transport ${opts.tr} (dry-run)`,
     );
@@ -171,10 +168,10 @@ async function runAssign(object: string, opts: AssignOptions, json: boolean): Pr
 
   const client = await AdtClientWrapper.create();
   const data = await assignObjectToTransport(client, object, opts.tr);
-  printResult(json, data, formatAssign(data));
+  printResult(mode, data, formatAssign(data));
 }
 
-async function runList(openOnly: boolean, json: boolean): Promise<void> {
+async function runList(openOnly: boolean,mode: OutputMode): Promise<void> {
   const client = await AdtClientWrapper.create();
   const user = client.getConfig().sap.username;
   const result = await client.userTransports(user);
@@ -200,7 +197,7 @@ async function runList(openOnly: boolean, json: boolean): Promise<void> {
     customizing: collect(result.customizing, openOnly),
   };
 
-  printResult(json, data, formatList(data));
+  printResult(mode, data, formatList(data));
 }
 
 function formatList(data: ListData): string {

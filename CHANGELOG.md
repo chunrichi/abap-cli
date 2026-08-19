@@ -3,6 +3,22 @@
 ## [Unreleased]
 
 ### Added
+- **三种 JSON 输出模式（025 — abap 通用输出层合并）** — 新增全局 `--pretty-json` 选项（与 `--json` 共存时 pretty 优先）。`OutputMode = 'human' | 'json' | 'pretty-json'`；`--json` 默认**紧凑无缩进**（省 LM agent token），`--pretty-json` 缩进 2（人看/调试）。新增 `isJsonMode()` helper；`jsonFromCommand(cmd)` 升级返回 `OutputMode`。`printResult/printError/renderResult/renderError` 第一参数由 `boolean` 升级为 `OutputMode`（breaking）。`top-error.ts` 的 `isJson(argv)` 同步返回 `OutputMode`。所有 18 个 commands + 3 个 flows 的 call site 已迁移。
+- **`stripEmpty()` token-efficient（025）** — `renderResult` 的 json/pretty-json 分支递归清空 `data` 中的空 `{}` / 空 `[]`（保留 `null`/`false`/`0`/`''`），节省 ~5–20% LM agent token。human 模式不调用。空数组字段（如 `data.changedParts`）若为空会被移除 — 调用者改用 `?? []` 兜底。
+- **`buildSchemaMeta()` 精简 meta（025）** — `--schema` 响应使用 `SchemaOutputMeta = Pick<OutputMeta, 'command' | 'version' | 'durationMs'>`，不再含 `timestamp`/`warnings`。`printSchema()` 改用之。Schema introspection 跨运行稳定且最小。
+- **`getOriginalArgv()` 懒加载（025）** — 取代 `meta.ts` module-top 的 `originalArgv` 常量；首次访问时再读 `process.argv.slice(2)`。代码卫生改进，避免在 import 阶段冻结 argv。
+- **新 ErrorCode（025）** — `DDIC_TABL_FORMAT_UNSUPPORTED`（VALIDATION_ERROR/7，canonical TABL 投影无法表示对象）；`PULL_PARTIAL_FAILURE`（VALIDATION_ERROR/7，部分对象 pull 成功/失败统计）。`error-codes.ts`、`help-text.ts` 与 `specs/012-unify-cli-output-contract/contracts/cli-output.md` §5 同步登记。Audit test `output-contract-audit.test.ts` 新增断言。
+
+### Breaking changes
+- **`OutputMode` 类型升级（025）** — `printResult(mode: OutputMode, ...)` / `printError(mode: OutputMode, ...)` / `renderResult` / `renderError` 第一参数由 `json: boolean` 升级为三态 `OutputMode`。`jsonFromCommand(cmd)` 返回类型同步升级。`top-error.ts` `isJson(argv)` 返回 `OutputMode`。内部调用点已全部迁移；外部 consumer（如 abap 扩展层）需同步更新签名。
+
+### Migration
+- `json: boolean` → `mode: OutputMode`（或直接用 `jsonFromCommand(cmd)` 返回值）
+- `--json` 用户行为不变（紧凑 JSON 输出）；新增 `--pretty-json` 提供缩进版本
+- `printResult(true|false, ...)` → `printResult('json'|'human', ...)`（legacy boolean 调用全部迁移完毕）
+- `--schema` 响应 `meta` 不再含 `timestamp`/`warnings`（消费方若依赖需调整）
+
+### Added
 - **`abap tcode` 命令** — 只读解析事务码到其配置的 ABAP 入口程序 / 屏幕，走已有的 ICF `GET /tcode/<code>`（SAP 端 `dispatch_tcode` / `read_tcode` 已就位，TSTC → TSTCT，含 `S_TCODE` 权限检查）。新增 `commands/tcode.ts` + `flows/tcode-flow.ts`（`validateTcode` 本地校验 CHAR20 / 空白，`interpretTcode` 为纯函数便于测试）；`IcfClient` 新增 `getTcode`；两个错误码 `TCODE_NOT_FOUND`（NOT_FOUND/8）/ `TCODE_NOT_AUTHORIZED`（AUTH_ERROR/5）。参数-事务链本版本统一报 `entry_only`。相较早期分支实现移除了 flow 层的 `durationMs`——envelope `meta.durationMs` 已承载该信息（022 token-efficient 约定）。
 - **`abap where-used` 命令（别名 `references`）** — 只读查询对象的直接引用，走 ADT `usageReferences`。新增 `commands/where-used.ts` + `flows/where-used-ops.ts`；`AdtClientWrapper` 新增 `usageReferences` 包装（复用 `_call` 错误分类）。支持 `--type` / `--ref-type` / `--package`（大小写不敏感）/ `--limit`（默认 100，上限 500）/ `--schema`；支持类型 CLAS / INTF / PROG / FUGR / TABL，非法类型报 `TYPE_NOT_SUPPORTED`。ADT 对同一引用按使用点重复返回，按 `uri + usageInformation` 去重；截断时通过 `nextSteps` 提示提高 `--limit` 或收窄过滤。
 - **TABL/STRU 三件套 pull（024）** — `abap pull <name> --type TABL|STRU` 现在写出 abap-file-format 三件套：`src/tabl/<name>.tabl.json` + `<name>.tabl.ddic` + (TABL only) `<name>.tabl.settings.json`；STRU 无 `settings.json`（`zcl_abap_vibe_tabl_format` 对 STRU 不生成）。新文件 `src/abap_cli/dictionary/tabl-artifact.ts`（`parseTablDdic` DDL → fields、`tablArtifactPaths`/`isTablArtifactFile` 支持 `.tabl.*` 与 `.stru.*`）；`dictionary/ddic-json.ts` 扩展 `DdicFieldLocal`/`DdicFieldWire` 加入 `precField`（INCLUDE/APPEND 字段）、新增 `extractTablArtifactWire`、wire payload 扩展三件套字段（`mainJson` / `ddicSource` / `settingsJson` / `hasSettings` / `type` / `warnings`）；`flows/pull-flow.ts` `runPullDdic` 检测三件套 wire → 走 `writePullDdicTabl`（先校验 DDL 再写文件，保证不落部分文件），`--overwrite` 覆盖三件套，DOMA/DTEL 沿用 flat wire 路径零回归。ICF 服务版本 0.4.0 → 0.5.0（SAP 端 `zcl_abap_vibe_tabl_format` 已就位）。两个新错误码：`TABL_DDL_INVALID`（VALIDATION_ERROR/7）+ `TABL_ARTIFACT_INCOMPLETE`（VALIDATION_ERROR/7，含 partial-wire 检测避免静默降级）。新增 2 个测试文件 / 16 个用例（`tabl-artifact` 10 + `ddic-pull` 增 6 场景）；所有 98 个测试文件 / 571 个用例全过。push 路径仍走 014 的单文件 wire（flat push），三件套 push 留作 follow-up。

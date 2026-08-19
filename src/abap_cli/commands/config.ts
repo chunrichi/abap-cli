@@ -16,7 +16,7 @@ export function registerConfigCommand(program: Command): void {
     .command('show')
     .description('Display the current workspace configuration')
     .action(async (_opts, cmd) => {
-      const json = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
       try {
         const cfg = await loadConfig();
         // Omit sensitive fields for display
@@ -35,9 +35,9 @@ export function registerConfigCommand(program: Command): void {
             // password intentionally omitted
           },
         };
-        printResult(json, display, 'Current workspace configuration');
+        printResult(mode, display, 'Current workspace configuration');
       } catch (error: unknown) {
-        printError(json, error);
+        printError(mode, error);
       }
     });
 
@@ -54,10 +54,10 @@ export function registerConfigCommand(program: Command): void {
       tr?: string;
       sourceDir?: string;
     }, cmd) => {
-      const json = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
       try {
         if (Object.keys(opts).length === 0) {
-          printError(json, new CliError('USAGE',
+          printError(mode, new CliError('USAGE',
             'No options provided. Provide at least one of: --profile, --package, --tr, --source-dir',
             { nextSteps: ["Run 'abap config set --package Z_MY_PKG'."], example: 'abap config set --package Z_MY_PKG --tr DEVK900001' }));
           return;
@@ -83,9 +83,9 @@ export function registerConfigCommand(program: Command): void {
           transport: cfg.transport,
           sourceDir: cfg.sap.sourceDir,
         });
-        printResult(json, { updated: opts }, 'Workspace configuration updated');
+        printResult(mode, { updated: opts }, 'Workspace configuration updated');
       } catch (error: unknown) {
-        printError(json, error);
+        printError(mode, error);
       }
     });
 }

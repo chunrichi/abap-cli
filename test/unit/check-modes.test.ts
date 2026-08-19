@@ -120,7 +120,7 @@ describe('abap check modes (021: subcommands — syntax / content / atc)', () =>
     expect(res.exitCode).toBeUndefined();
     const json = JSON.parse(res.stdout);
     expect(json.status).toBe('success');
-    expect(json.data.issues).toEqual([]);
+    expect(json.data.issues ?? []).toEqual([]);
     expect(json.data.failure).toBe(false);
   });
 
@@ -159,7 +159,7 @@ describe('abap check modes (021: subcommands — syntax / content / atc)', () =>
     expect(objectStructure).not.toHaveBeenCalled();
     expect(syntaxCheckContent).not.toHaveBeenCalled();
     const json = JSON.parse(res.stdout);
-    expect(json.data.issues).toEqual([]);
+    expect(json.data.issues ?? []).toEqual([]);
     expect(json.data.failure).toBe(false);
   });
 

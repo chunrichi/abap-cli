@@ -72,9 +72,13 @@ function run(
 describe('P1.7 stdout/stderr separation audit (handleTopLevelError)', () => {
   describe('isJson helper', () => {
     it('detects --json anywhere in argv', () => {
-      expect(isJson(['node', 'abap', '--json', 'pull'])).toBe(true);
-      expect(isJson(['node', 'abap', 'pull', '--json'])).toBe(true);
-      expect(isJson(['node', 'abap', 'pull'])).toBe(false);
+      expect(isJson(['node', 'abap', '--json', 'pull'])).toBe('json');
+      expect(isJson(['node', 'abap', 'pull', '--json'])).toBe('json');
+      expect(isJson(['node', 'abap', 'pull'])).toBe('human');
+    });
+    it('--pretty-json wins over --json (025 US1)', () => {
+      expect(isJson(['node', 'abap', 'pull', '--pretty-json'])).toBe('pretty-json');
+      expect(isJson(['node', 'abap', '--json', '--pretty-json', 'pull'])).toBe('pretty-json');
     });
   });
 

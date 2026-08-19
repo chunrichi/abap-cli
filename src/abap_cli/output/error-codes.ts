@@ -48,9 +48,11 @@ export type ErrorCode =
   | 'DDIC_NOT_SUPPORTED'
   | 'DDIC_CREATE_FAILED'    // 014: ICF /ddic/<type> POST failure (SAP_ERROR)
   | 'DDIC_OBJECT_NOT_FOUND' // 014: ICF /ddic/<type>/<name> GET 404 (NOT_FOUND)
+  | 'DDIC_TABL_FORMAT_UNSUPPORTED' // 025: canonical TABL projection cannot represent the object (VALIDATION_ERROR)
   | 'TYPE_NOT_SUPPORTED'
   | 'OVERWRITE_REQUIRED'   // NEW (FR-018)
   | 'PUSH_FAILED'
+  | 'PULL_PARTIAL_FAILURE'  // 025: some objects in a pull succeeded, others failed (VALIDATION_ERROR)
   | 'VALIDATION_ERROR'     // semantic rejection (exit 7); see contracts §3
   | 'OBJECT_EXISTS'        // normalized legacy code (USAGE/2), used by create.ts
   | 'FILE_EXISTS'          // normalized legacy code (USAGE/2), used by init.ts
@@ -108,10 +110,12 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   TRANSPORT_NOT_FOUND: 'VALIDATION_ERROR',
   CREATE_FAILED: 'VALIDATION_ERROR',
   DDIC_NOT_SUPPORTED: 'VALIDATION_ERROR',
+  DDIC_TABL_FORMAT_UNSUPPORTED: 'VALIDATION_ERROR',
   DDIC_CREATE_FAILED: 'SAP_ERROR',
   DDIC_OBJECT_NOT_FOUND: 'NOT_FOUND',
   TYPE_NOT_SUPPORTED: 'VALIDATION_ERROR',
   VALIDATION_ERROR: 'VALIDATION_ERROR',
+  PULL_PARTIAL_FAILURE: 'VALIDATION_ERROR',
   OBJECT_EXISTS: 'USAGE',
   FILE_EXISTS: 'USAGE',
   PUSH_FAILED: 'VALIDATION_ERROR',

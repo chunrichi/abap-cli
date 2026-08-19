@@ -5,7 +5,7 @@
 
 import type { ExtensionContext } from './types.js';
 import { getExtensionRegistry } from './registry.js';
-import { printResult } from '../output/json.js';
+import { printResult, type OutputMode } from '../output/json.js';
 
 export interface ListExtensionEntry {
   name: string;
@@ -19,7 +19,11 @@ export async function listExtensionsAction(
   _ctx: ExtensionContext,
   opts: Record<string, unknown>,
 ): Promise<void> {
-  const json = (opts._json as boolean | undefined) ?? false;
+  const mode: OutputMode = opts._prettyJson
+    ? 'pretty-json'
+    : (opts._json as boolean | undefined)
+    ? 'json'
+    : 'human';
   const registry = getExtensionRegistry();
   const snap = registry.loaded;
   const failed = registry.failed;
@@ -37,5 +41,5 @@ export async function listExtensionsAction(
           }${e.error ? ` [${e.error}]` : ''}`)
         .join('\n');
 
-  printResult(json, { extensions: entries }, human);
+  printResult(mode, { extensions: entries }, human);
 }

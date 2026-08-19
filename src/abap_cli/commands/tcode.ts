@@ -47,10 +47,10 @@ export function registerTcodeCommand(program: Command): void {
     .argument('[tcode]', 'Transaction code (e.g. SE38)')
     .option('--schema', 'Print the command parameter schema as JSON and exit 0')
     .action(async (tcode: string | undefined, _opts: unknown, cmd: Command) => {
-      const json = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
 
       if (cmd.optsWithGlobals().schema) {
-        console.log(JSON.stringify(SCHEMA, null, json ? 2 : undefined));
+        console.log(JSON.stringify(SCHEMA, null, mode === 'pretty-json' ? 2 : 0));
         return;
       }
       if (!tcode) {
@@ -60,9 +60,9 @@ export function registerTcodeCommand(program: Command): void {
 
       try {
         const result = await runTcode(tcode);
-        printResult(json, result, formatHuman(result));
+        printResult(mode, result, formatHuman(result));
       } catch (error: unknown) {
-        printError(json, error);
+        printError(mode, error);
       }
     });
 }

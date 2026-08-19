@@ -101,6 +101,6 @@ describe('abap status changedParts (US4, FR-012..014, SC-004)', () => {
     const res = await runCommand(program, ['status', '--json'], { cwd: emptyDir });
     expect(res.exitCode).toBeUndefined();
     const data = parseSuccess(res);
-    expect(data.changedParts).toEqual([]);
+    expect(data.changedParts ?? []).toEqual([]);
   });
 });

@@ -17,12 +17,12 @@ export function registerPushCommand(program: Command): void {
     .option('--fail-fast', 'Stop at the first failing file (default: --keep-going)')
     .option('--atomic', 'Validate all files first; write nothing if any file fails validation')
     .action(async (files: string[], opts: PushFileOptions, cmd) => {
-      const json = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
       try {
         const result = await runPush(files, opts);
-        printResult(json, result.data, result.human);
+        printResult(mode, result.data, result.human);
       } catch (error: unknown) {
-        printError(json, error);
+        printError(mode, error);
       }
     });
 }

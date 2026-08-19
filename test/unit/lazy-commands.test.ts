@@ -197,7 +197,7 @@ describe('lazy loading at the process level (P1.6)', () => {
 
   it.skipIf(!hasBuiltCli)('search --schema runs without loading SAP clients', async () => {
     const { stdout } = await run(process.execPath, [cliEntry, 'search', '--schema']);
-    expect(stdout).toContain('"status": "success"');
+    expect(stdout).toContain('"status":"success"');
     expect(stdout).toContain('"schemaVersion"');
   });
 });

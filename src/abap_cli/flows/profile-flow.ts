@@ -3,7 +3,7 @@ import * as path from 'path';
 import { text, password, confirm, isCancel } from '@clack/prompts';
 import { getSystem, upsertSystem, deleteSystem, listSystemNames, type SystemProfile } from '../config/user-config.js';
 import { getPassword, storePassword, deletePassword } from '../config/secrets.js';
-import { CliError, printResult } from '../output/json.js';
+import { CliError, printResult, type OutputMode } from '../output/json.js';
 import { collectWarning } from '../output/meta.js';
 import { assertValidProfile } from '../config/validation.js';
 import { findWorkspaceConfig } from '../config/project-config.js';
@@ -77,10 +77,10 @@ async function applyProfileOptions(
 }
 
 /** List saved connection profiles. */
-export function runList(jsonOutput: boolean): void {
+export function runList(mode: OutputMode): void {
   const names = listSystemNames();
   if (names.length === 0) {
-    printResult(jsonOutput, { systems: [] }, "No connection profiles saved. Run 'abap profile add <name> --url <url> --username <user>' to create one.");
+    printResult(mode, { systems: [] }, "No connection profiles saved. Run 'abap profile add <name> --url <url> --username <user>' to create one.");
     return;
   }
   const systems = names.map((name) => {
@@ -91,10 +91,10 @@ export function runList(jsonOutput: boolean): void {
     const p = getSystem(name)!;
     return `  ${name} — ${p.username}@${p.url}`;
   })].join('\n');
-  printResult(jsonOutput, { systems }, human);
+  printResult(mode, { systems }, human);
 }
 
-export async function runShow(name: string, jsonOutput: boolean): Promise<void> {
+export async function runShow(name: string, mode: OutputMode): Promise<void> {
   const profile = getSystem(name);
   if (!profile) {
     throw new CliError('CONFIG_ERROR', `Connection profile '${name}' not found.`);
@@ -120,7 +120,7 @@ export async function runShow(name: string, jsonOutput: boolean): Promise<void> 
     `  insecure: ${detail.insecure}`,
     `  ca:       ${detail.ca || '(none)'}`,
   ].join('\n');
-  printResult(jsonOutput, { system: detail }, human);
+  printResult(mode, { system: detail }, human);
 }
 
 /** Exit code for the worst failing layer (FR-008): TLS→4, AUTH→5, SAP→6. */
@@ -137,7 +137,7 @@ function worstExitCode(probe: { tls: { ok: boolean }; auth: { ok: boolean }; adt
 }
 
 /** Probe a profile across tls → auth → adt → icf and report per-layer results. */
-export async function runTest(name: string, jsonOutput: boolean): Promise<void> {
+export async function runTest(name: string, mode: OutputMode): Promise<void> {
   const probe = await probeSystem(name);
   const human = [
     `Connection probe '${name}':`,
@@ -147,14 +147,14 @@ export async function runTest(name: string, jsonOutput: boolean): Promise<void> 
       return `  ${layer}: ${status}${detail}`;
     }),
   ].join('\n');
-  printResult(jsonOutput, probe, human);
+  printResult(mode, probe, human);
   const exitCode = worstExitCode(probe);
   if (exitCode !== undefined) {
     process.exitCode = exitCode;
   }
 }
 
-export async function runDelete(name: string, yes: boolean, jsonOutput: boolean): Promise<void> {
+export async function runDelete(name: string, yes: boolean, mode: OutputMode): Promise<void> {
   if (!getSystem(name)) {
     throw new CliError('CONFIG_ERROR', `Connection profile '${name}' not found.`);
   }
@@ -204,14 +204,14 @@ export async function runDelete(name: string, yes: boolean, jsonOutput: boolean)
   }
 
   const data: Record<string, unknown> = { deleted: name, passwordCleaned };
-  printResult(jsonOutput, data, `Connection profile '${name}' deleted.`);
+  printResult(mode, data, `Connection profile '${name}' deleted.`);
 }
 
 /** Create a new profile; refuses when the name is already taken. */
 export async function runAdd(
   name: string,
   opts: Record<string, string | boolean>,
-  jsonOutput: boolean,
+  mode: OutputMode,
 ): Promise<void> {
   if (getSystem(name)) {
     throw new CliError('CONFIG_ERROR', `Connection profile '${name}' already exists.`, {
@@ -221,7 +221,7 @@ export async function runAdd(
   }
   if (!hasProfileOptions(opts)) {
     if (process.stdin.isTTY) {
-      await interactiveSet(name, { url: '', client: '100', username: '', language: 'EN' }, jsonOutput);
+      await interactiveSet(name, { url: '', client: '100', username: '', language: 'EN' }, mode);
       return;
     }
     throw new CliError(
@@ -237,7 +237,7 @@ export async function runAdd(
   await recordTextpoolCapabilityIfPossible(name);
 
   printResult(
-    jsonOutput,
+    mode,
     { system: { name, ...updated }, passwordUpdated, passwordRemoved },
     `Connection profile '${name}' created.`,
   );
@@ -246,7 +246,7 @@ export async function runAdd(
 export async function runSet(
   name: string,
   opts: Record<string, string | boolean>,
-  jsonOutput: boolean,
+  mode: OutputMode,
 ): Promise<void> {
   const profile = getSystem(name);
   if (!profile) {
@@ -258,7 +258,7 @@ export async function runSet(
 
   if (!hasProfileOptions(opts)) {
     if (process.stdin.isTTY) {
-      await interactiveSet(name, profile, jsonOutput);
+      await interactiveSet(name, profile, mode);
       return;
     }
     throw new CliError(
@@ -273,7 +273,7 @@ export async function runSet(
   await recordTextpoolCapabilityIfPossible(name);
 
   printResult(
-    jsonOutput,
+    mode,
     { system: { name, ...updated }, passwordUpdated, passwordRemoved },
     `Connection profile '${name}' updated.`,
   );
@@ -283,7 +283,7 @@ export async function runSet(
 async function interactiveSet(
   name: string,
   profile: SystemProfile,
-  jsonOutput: boolean,
+  mode: OutputMode,
 ): Promise<void> {
   const updated: SystemProfile = { ...profile };
   const url = orCancel(await text({ message: 'URL', initialValue: updated.url }));
@@ -310,7 +310,7 @@ async function interactiveSet(
   upsertSystem(name, updated);
 
   printResult(
-    jsonOutput,
+    mode,
     { system: { name, ...updated }, passwordUpdated, passwordRemoved },
     `Connection profile '${name}' updated.`,
   );

@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
-import { printError, printResult, jsonFromCommand, CliError } from '../output/json.js';
+import { printError, printResult, jsonFromCommand, CliError, type OutputMode } from '../output/json.js';
 import { collectWarning } from '../output/meta.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import { exportProfiles, importProfiles, type ProfileBundle } from '../config/profiles.js';
@@ -103,7 +103,7 @@ export function registerProfileCommand(program: Command): void {
     .option('--file <path>', 'Write the bundle to a file (default: stdout)')
     .option('--with-passwords', 'Include passwords in the bundle (warned opt-in)')
     .action(async (names: string[], opts: { file?: string; withPasswords?: boolean }, cmd) => {
-      const json = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
       try {
         if (opts.withPasswords) {
           collectWarning('PASSWORD_EXPORT', 'Exporting profiles WITH passwords. Keep the bundle secure.');
@@ -112,12 +112,12 @@ export function registerProfileCommand(program: Command): void {
         const human = `Exported ${bundle.systems.length} profile(s)${opts.withPasswords ? ' (with passwords)' : ''}.`;
         if (opts.file) {
           fs.writeFileSync(path.resolve(opts.file), JSON.stringify(bundle, null, 2) + '\n', 'utf-8');
-          printResult(json, { file: opts.file, count: bundle.systems.length }, `${human} → ${opts.file}`);
+          printResult(mode, { file: opts.file, count: bundle.systems.length }, `${human} → ${opts.file}`);
         } else {
-          printResult(json, bundle, human);
+          printResult(mode, bundle, human);
         }
       } catch (error: unknown) {
-        handleError(json, error);
+        handleError(mode, error);
       }
     });
 
@@ -126,7 +126,7 @@ export function registerProfileCommand(program: Command): void {
     .description('Import connection profiles from a bundle (existing profiles are skipped)')
     .option('--overwrite', 'Update profiles that already exist')
     .action(async (file: string, opts: { overwrite?: boolean }, cmd) => {
-      const json = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
       try {
         const raw = JSON.parse(fs.readFileSync(path.resolve(file), 'utf-8'));
         const bundle = validateBundle(raw);
@@ -134,16 +134,16 @@ export function registerProfileCommand(program: Command): void {
         const human = result.imported
           .map((i) => `  ${i.name} — ${i.action}`)
           .join('\n');
-        printResult(json, result, `Imported ${result.imported.length} profile(s):\n${human}`);
+        printResult(mode, result, `Imported ${result.imported.length} profile(s):\n${human}`);
       } catch (error: unknown) {
-        handleError(json, error);
+        handleError(mode, error);
       }
     });
 }
 
 /** Report command errors via the unified JSON-aware handler */
-function handleError(jsonOutput: boolean, error: unknown): never {
-  printError(jsonOutput, error);
+function handleError(mode: OutputMode, error: unknown): never {
+  printError(mode, error);
 }
 
 /** Validate that a raw import payload is a ProfileBundle. */

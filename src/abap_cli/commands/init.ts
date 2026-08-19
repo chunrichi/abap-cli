@@ -69,19 +69,19 @@ export function registerInitCommand(program: Command): void {
     .option('--yes', 'Skip all prompts; fail if required input is missing (alias: --non-interactive)')
     .option('--non-interactive', 'Alias of --yes')
     .action(async (opts, cmd) => {
-      const jsonOutput = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
 
       // --agent can run independently of any profile/workspace fields.
       if (typeof opts.agent === 'string') {
         const target = opts.agent as AgentTarget;
         if (!AGENT_VALUES.includes(target)) {
-          printError(jsonOutput, new CliError('USAGE',
+          printError(mode, new CliError('USAGE',
             `Unknown --agent value '${target}'. Allowed: ${AGENT_VALUES.join(', ')}`,
             { nextSteps: ['Run `abap init --agent copilot` (or claude/cursor/generic).'], example: 'abap init --agent copilot' }));
           return;
         }
         const result = await scaffoldAgents(target, opts.force === true);
-        printResult(jsonOutput, result, `Scaffolded agent context (${result.written.length} written, ${result.skipped.length} skipped).`);
+        printResult(mode, result, `Scaffolded agent context (${result.written.length} written, ${result.skipped.length} skipped).`);
         return;
       }
 
@@ -90,23 +90,23 @@ export function registerInitCommand(program: Command): void {
       const hasAnyFlag = Object.keys(opts).length > 0;
       if (!hasAnyFlag) {
         if (!process.stdin.isTTY) {
-          printError(jsonOutput, new CliError('USAGE',
+          printError(mode, new CliError('USAGE',
             'Non-interactive environment detected. Provide flags: --profile/--tr/--package (or --agent).',
             { nextSteps: ["Run 'abap init --profile <name> --yes'.", "Or 'abap init --agent copilot'."], example: 'abap init --profile DEV --yes' }));
           return;
         }
         try {
-          await runInitWizard(opts, jsonOutput);
+          await runInitWizard(opts, mode);
         } catch (error: unknown) {
-          printError(jsonOutput, error);
+          printError(mode, error);
         }
         return;
       }
 
       try {
-        await runInitFromOpts(opts, jsonOutput);
+        await runInitFromOpts(opts, mode);
       } catch (error: unknown) {
-        printError(jsonOutput, error);
+        printError(mode, error);
       }
     });
 }

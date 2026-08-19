@@ -62,19 +62,21 @@ describe('abap search --schema (P0.1 introspection)', () => {
     expect(cap).toMatchObject({ type: 'int', default: 50 });
   });
 
-  it('--schema output carries the unified meta block (US-1)', async () => {
+  it('--schema output carries the reduced meta block (US-3, 025)', async () => {
     const program = makeProgram();
     registerSearchCommand(program);
     const res = await runCommand(program, ['search', '--schema']);
     const parsed = parseStdout(res);
     expect(Object.keys(parsed).sort()).toEqual(['data', 'meta', 'status']);
+    // buildSchemaMeta: command/version/durationMs only.
+    expect(Object.keys(parsed.meta).sort()).toEqual(['command', 'durationMs', 'version']);
     expect(parsed.meta).toMatchObject({
       command: expect.any(String),
       version: expect.any(String),
-      timestamp: expect.any(String),
       durationMs: expect.any(Number),
-      warnings: expect.any(Array),
     });
+    expect(parsed.meta).not.toHaveProperty('timestamp');
+    expect(parsed.meta).not.toHaveProperty('warnings');
   });
 
   it('a bare search without a query still fails with USAGE (exit 2)', async () => {

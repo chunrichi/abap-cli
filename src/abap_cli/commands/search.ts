@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
-import { CliError, printError, printResult, jsonFromCommand, printSchema, type CommandSchema } from '../output/json.js';
+import { CliError, printError, printResult, jsonFromCommand, printSchema, type CommandSchema, type OutputMode } from '../output/json.js';
 import { collectWarning } from '../output/meta.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import { SEARCH_RESULT_LIMIT } from '../core/limits.js';
@@ -50,16 +50,16 @@ export function registerSearchCommand(program: Command): void {
     .option('--page-all-max <n>', `Page-count cap that sizes the --page-all single request (default ${PAGE_ALL_DEFAULT_MAX})`)
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action(async (query: string | undefined, opts: SearchOptions, cmd) => {
-      const json = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
       try {
-        await runSearch(query, opts, json);
+        await runSearch(query, opts, mode);
       } catch (error: unknown) {
-        printError(json, error);
+        printError(mode, error);
       }
     });
 }
 
-async function runSearch(query: string | undefined, opts: SearchOptions, json: boolean): Promise<void> {
+async function runSearch(query: string | undefined, opts: SearchOptions,mode: OutputMode): Promise<void> {
   if (opts.schema) {
     printSchema(searchSchema());
     return;
@@ -126,7 +126,7 @@ async function runSearch(query: string | undefined, opts: SearchOptions, json: b
       ...(truncated ? { truncated: true } : {}),
       ...(hint ? { hint } : {}),
     };
-    printResult(json, data, humanSummaryAll(query, type, items, truncated));
+    printResult(mode, data, humanSummaryAll(query, type, items, truncated));
     return;
   }
 
@@ -150,7 +150,7 @@ async function runSearch(query: string | undefined, opts: SearchOptions, json: b
       : '';
 
   const data = { items, page, limit, truncated, ...(hint ? { hint } : {}) };
-  printResult(json, data, humanSummary(query, type, items, truncated));
+  printResult(mode, data, humanSummary(query, type, items, truncated));
 }
 
 function toResultItem(r: SearchResult): SearchResultItem {

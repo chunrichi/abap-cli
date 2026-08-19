@@ -10,7 +10,7 @@ describe('abap run output streams', () => {
 
   it('human success: output text on stdout only', () => {
     const out = renderResult(
-      false,
+      'human',
       { className: 'ZCL_FOO', exitCode: 0, output: 'hello', parsed: null },
       'hello',
       meta,
@@ -23,7 +23,7 @@ describe('abap run output streams', () => {
     const err = new CliError('METHOD_NOT_SUPPORTED', 'bad signature', {
       nextSteps: ['Use classrun instead'],
     });
-    const out = renderError(false, err, meta);
+    const out = renderError('human', err, meta);
     expect(out.stdout).toHaveLength(0);
     expect(out.stderr.join('')).toContain('Error: bad signature');
     expect(out.stderr.join('')).toContain('Try:');
@@ -31,7 +31,7 @@ describe('abap run output streams', () => {
 
   it('--json success: JSON envelope on stdout, stderr empty', () => {
     const out = renderResult(
-      true,
+      'json',
       { className: 'ZCL_FOO', exitCode: 0, output: '{"status":"ok"}' },
       'human ignored',
       meta,
@@ -43,7 +43,7 @@ describe('abap run output streams', () => {
 
   it('--json failure: stdout strictly empty, JSON envelope on stderr', () => {
     const err = new CliError('METHOD_FAILED', 'method failed', { nextSteps: ['inspect'] });
-    const out = renderError(true, err, meta);
+    const out = renderError('json', err, meta);
     expect(out.stdout).toHaveLength(0);
     const parsed = JSON.parse(out.stderr.join(''));
     expect(parsed.status).toBe('error');

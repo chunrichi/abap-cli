@@ -23,7 +23,7 @@ export function registerDiffCommand(program: Command): void {
     .option('--local-only', 'Only local-only differences')
     .option('--limit <n>', `Bounds the result (default ${SEARCH_RESULT_LIMIT})`)
     .action(async (file: string | undefined, opts: DiffOptions, cmd) => {
-      const json = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
       try {
         if (file && (opts.all || opts.remote || opts.localOnly)) {
           throw new CliError('INVALID_ARGUMENT', 'A file argument cannot be combined with --all/--remote/--local-only.', {
@@ -49,9 +49,9 @@ export function registerDiffCommand(program: Command): void {
               })),
           ...(result.truncated ? ['Result truncated — use --limit <n> or narrow with --remote/--local-only.'] : []),
         ].join('\n');
-        printResult(json, result, human);
+        printResult(mode, result, human);
       } catch (error: unknown) {
-        printError(json, error);
+        printError(mode, error);
       }
     });
 }

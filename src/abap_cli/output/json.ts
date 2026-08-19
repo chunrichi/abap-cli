@@ -20,7 +20,7 @@
 import type { Command } from 'commander';
 import { categoryOf, type ErrorCode, type ErrorCategory } from './error-codes.js';
 import { exitCodeFor, EXIT_GENERIC_FALLBACK } from './exit-codes.js';
-import { buildMeta, deriveCommand, type OutputMeta } from './meta.js';
+import { buildMeta, buildSchemaMeta, deriveCommand, type OutputMeta } from './meta.js';
 import type { ExtensionRegistry } from '../extensions/registry.js';
 
 let _registry: ExtensionRegistry | undefined;
@@ -28,9 +28,21 @@ export function setExtensionRegistry(r: ExtensionRegistry | undefined): void {
   _registry = r;
 }
 
-/** Resolve the top-level --json flag from any nested subcommand (FR-027). */
-export function jsonFromCommand(cmd: Command): boolean {
-  return cmd.optsWithGlobals().json ?? false;
+/** Three-state output mode (FR-001/025-abap-output-merge US1). */
+export type OutputMode = 'human' | 'json' | 'pretty-json';
+
+/** True when `mode` emits a JSON envelope rather than human text. */
+export function isJsonMode(mode: OutputMode): boolean {
+  return mode !== 'human';
+}
+
+/** Resolve the top-level output flags from any nested subcommand (FR-027).
+ *  `--pretty-json` wins over `--json` when both are set. */
+export function jsonFromCommand(cmd: Command): OutputMode {
+  const opts = cmd.optsWithGlobals<{ json?: boolean; prettyJson?: boolean }>();
+  if (opts.prettyJson) return 'pretty-json';
+  if (opts.json) return 'json';
+  return 'human';
 }
 
 export interface CliErrorOptions {
@@ -111,16 +123,21 @@ export interface RenderedOutput {
 }
 
 /** Render a success payload. JSON (with meta) goes to stdout; human text goes
- *  to stdout with any warnings as `Warning:` lines on stderr (FR-016). */
-export function renderResult(json: boolean, data: unknown, human: string, meta: OutputMeta): RenderedOutput {
+ *  to stdout with any warnings as `Warning:` lines on stderr (FR-016).
+ *
+ *  Token-efficient design (025 US1/US2):
+ *   - Compact JSON (`null`) by default for `json` mode; indent 2 only for `pretty-json`.
+ *   - Recursively strip empty `{}`/`[]` from `data` to save LM agent tokens.
+ *   - Top-level `data` object is always preserved, even if it becomes `{}`. */
+export function renderResult(mode: OutputMode, data: unknown, human: string, meta: OutputMeta): RenderedOutput {
   // Merge extension meta if registry is present
   const extMeta = _registry?.metaFragment(deriveCommand(process.argv));
   if (extMeta) {
     meta = { ...meta, extensions: extMeta };
   }
-  if (json) {
+  if (isJsonMode(mode)) {
     return {
-      stdout: [JSON.stringify({ status: 'success', meta, data }, null, 2)],
+      stdout: [JSON.stringify({ status: 'success', meta, data: stripEmpty(data) }, null, mode === 'pretty-json' ? 2 : undefined)],
       stderr: [],
       exitCode: undefined,
     };
@@ -131,7 +148,7 @@ export function renderResult(json: boolean, data: unknown, human: string, meta: 
 
 /** Render a failure payload. JSON (with meta) goes to stderr; human text goes
  *  to stderr with `Warning:` lines first, then `Error:` + `Try:` (FR-016). */
-export function renderError(json: boolean, error: unknown, meta: OutputMeta): RenderedOutput {
+export function renderError(mode: OutputMode, error: unknown, meta: OutputMeta): RenderedOutput {
   // Merge extension meta if registry is present
   const extMeta = _registry?.metaFragment(deriveCommand(process.argv));
   if (extMeta) {
@@ -142,10 +159,10 @@ export function renderError(json: boolean, error: unknown, meta: OutputMeta): Re
     'code' in err && typeof err.code === 'string'
       ? exitCodeFor(categoryOf(err.code as ErrorCode))
       : EXIT_GENERIC_FALLBACK;
-  if (json) {
+  if (isJsonMode(mode)) {
     return {
       stdout: [],
-      stderr: [JSON.stringify({ status: 'error', meta, error: err }, null, 2)],
+      stderr: [JSON.stringify({ status: 'error', meta, error: err }, null, mode === 'pretty-json' ? 2 : undefined)],
       exitCode,
     };
   }
@@ -157,15 +174,15 @@ export function renderError(json: boolean, error: unknown, meta: OutputMeta): Re
 }
 
 /** Shim — writes to stdout/stderr and returns. `meta` defaults to buildMeta(). */
-export function printResult(json: boolean, data: unknown, human: string, meta?: OutputMeta): void {
-  const out = renderResult(json, data, human, meta ?? buildMeta());
+export function printResult(mode: OutputMode, data: unknown, human: string, meta?: OutputMeta): void {
+  const out = renderResult(mode, data, human, meta ?? buildMeta());
   for (const line of out.stdout) console.log(line);
   for (const line of out.stderr) console.error(line);
 }
 
 /** Shim — writes to stderr and exits with the category's exit code. */
-export function printError(json: boolean, error: unknown, meta?: OutputMeta): never {
-  const out = renderError(json, error, meta ?? buildMeta());
+export function printError(mode: OutputMode, error: unknown, meta?: OutputMeta): never {
+  const out = renderError(mode, error, meta ?? buildMeta());
   for (const line of out.stderr) console.error(line);
   process.exit(out.exitCode ?? EXIT_GENERIC_FALLBACK);
 }
@@ -206,7 +223,43 @@ export interface CommandSchema {
   examples?: string[];
 }
 
-/** Print a command schema. Always JSON — it is a machine-readable contract. */
+/** Print a command schema. Always JSON — it is a machine-readable contract.
+ *  Uses the reduced `buildSchemaMeta()` envelope (no timestamp/warnings) so
+ *  schema introspection stays deterministic across runs. */
 export function printSchema(schema: CommandSchema): void {
-  printResult(true, schema, '');
+  printResult('json', schema, '', buildSchemaMeta() as OutputMeta);
+}
+
+// --- Token-efficient output helpers (025 US2) ---
+
+/** Recursively strip empty arrays and empty objects from `value` to save LM-agent
+ *  tokens. Agent consumers rarely need `"skipped": []` or `"warnings": []` when
+ *  there are none. `null` is preserved (not the same as empty). */
+function stripEmpty(value: unknown): unknown {
+  if (value === null || value === undefined) return value;
+
+  if (Array.isArray(value)) {
+    return value.map(stripEmpty);
+  }
+
+  if (typeof value !== 'object') return value;
+
+  const obj = value as Record<string, unknown>;
+  const result: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    const cleaned = stripEmpty(v);
+    if (cleaned !== null && typeof cleaned === 'object') {
+      if (Array.isArray(cleaned)) {
+        if (cleaned.length === 0) continue; // skip empty array
+        result[k] = cleaned;
+      } else if (Object.keys(cleaned).length === 0) {
+        continue; // skip empty object
+      } else {
+        result[k] = cleaned;
+      }
+    } else {
+      result[k] = cleaned;
+    }
+  }
+  return result;
 }

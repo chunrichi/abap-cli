@@ -4,7 +4,7 @@ import * as path from 'path';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { resolveFile } from '../formats/file-resolver.js';
 import { listAbapFiles, readAbapFile } from '../formats/abap-source.js';
-import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
+import { CliError, printError, printResult, jsonFromCommand, type OutputMode } from '../output/json.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import { resolveObject, getObjectParts, validateLocalFile } from '../core/resolve.js';
 import { runAtcCheck } from '../flows/atc.js';
@@ -46,11 +46,11 @@ export function registerCheckCommand(program: Command): void {
         return;
       }
       const files = opts.files as string[];
-      const json = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
       try {
-        await runCheck(files, opts, 'syntax', json);
+        await runCheck(files, opts, 'syntax', mode);
       } catch (error: unknown) {
-        printError(json, error);
+        printError(mode, error);
       }
     });
 
@@ -62,11 +62,11 @@ export function registerCheckCommand(program: Command): void {
     .option('--changed', 'Check only files changed since the SAP version')
     .option('--strict', 'Treat warnings as failures')
     .action(async (files: string[], opts: CheckOptions, cmd) => {
-      const json = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
       try {
-        await runCheck(files, opts, 'syntax', json);
+        await runCheck(files, opts, 'syntax', mode);
       } catch (error: unknown) {
-        printError(json, error);
+        printError(mode, error);
       }
     });
 
@@ -78,11 +78,11 @@ export function registerCheckCommand(program: Command): void {
     .option('--changed', 'Check only files changed since the SAP version')
     .option('--strict', 'Treat warnings as failures')
     .action(async (files: string[], opts: CheckOptions, cmd) => {
-      const json = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
       try {
-        await runCheck(files, opts, 'content', json);
+        await runCheck(files, opts, 'content', mode);
       } catch (error: unknown) {
-        printError(json, error);
+        printError(mode, error);
       }
     });
 
@@ -96,23 +96,23 @@ export function registerCheckCommand(program: Command): void {
     .option('--strict', 'Treat warnings as failures')
     .option('--out [file]', 'Persist raw ATC worklist to a file; defaults to .abap/atc/<variant>-<timestamp>.json')
     .action(async (files: string[], opts: CheckOptions, cmd) => {
-      const json = jsonFromCommand(cmd);
+      const mode = jsonFromCommand(cmd);
       try {
-        await runCheck(files, opts, 'atc', json);
+        await runCheck(files, opts, 'atc', mode);
       } catch (error: unknown) {
-        printError(json, error);
+        printError(mode, error);
       }
     });
 }
 
-async function runCheck(files: string[], opts: CheckOptions, mode: CheckMode, json: boolean): Promise<void> {
-  if (mode === 'atc' && !opts.variant) {
+async function runCheck(files: string[], opts: CheckOptions, checkMode: CheckMode, outMode: OutputMode): Promise<void> {
+  if (checkMode === 'atc' && !opts.variant) {
     throw new CliError('INVALID_ARGUMENT', 'check atc requires --variant', {
       nextSteps: ['Pass an ATC variant: abap check atc <file> --variant Z_VARIANT'],
       example: 'abap check atc src/zcl_ok.clas.abap --variant Z_ATC_VAR',
     });
   }
-  if (mode !== 'atc' && opts.out !== undefined) {
+  if (checkMode !== 'atc' && opts.out !== undefined) {
     throw new CliError('INVALID_ARGUMENT', '--out only applies to check atc', {
       nextSteps: ['Use --out with check atc: abap check atc <file> --variant Z_VARIANT --out'],
       example: 'abap check atc src/zcl_ok.clas.abap --variant Z_ATC_VAR --out',
@@ -128,28 +128,28 @@ async function runCheck(files: string[], opts: CheckOptions, mode: CheckMode, js
   }
 
   // --content is local-only: no SAP client is created (zero SAP calls).
-  const client = mode === 'content' ? null : await AdtClientWrapper.create();
+  const client = checkMode === 'content' ? null : await AdtClientWrapper.create();
 
   const issues: CheckIssue[] = [];
   const worklists: { file: string; worklist: AtcWorkList }[] = [];
   for (const file of fileList) {
-    const result = await checkFile(client, file, mode, opts);
+    const result = await checkFile(client, file, checkMode, opts);
     issues.push(...result.issues);
     if (result.worklist) worklists.push(result.worklist);
   }
 
-  if (mode === 'atc' && opts.out !== undefined) {
+  if (checkMode === 'atc' && opts.out !== undefined) {
     await persistWorklists(opts, worklists);
   }
 
   const failed = issues.some((i) => i.severity === 'error' || (opts.strict && i.severity === 'warning'));
   if (failed) {
-    const code = mode === 'syntax' ? 'SYNTAX_ERROR' : 'VALIDATION_ERROR';
+    const code = checkMode === 'syntax' ? 'SYNTAX_ERROR' : 'VALIDATION_ERROR';
     throw new CliError(code, `${issues.length} issue(s) found across ${fileList.length} file(s)`, {
       details: { issues, files: fileList.length, ...(opts.out !== undefined ? { out: outPath(opts) } : {}) },
     });
   }
-  printResult(json, { issues, failure: false, ...(opts.out !== undefined ? { out: outPath(opts) } : {}) }, humanSummary(issues));
+  printResult(outMode, { issues, failure: false, ...(opts.out !== undefined ? { out: outPath(opts) } : {}) }, humanSummary(issues));
 }
 
 /** Persist raw ATC worklists to the requested file (or the default path). */
