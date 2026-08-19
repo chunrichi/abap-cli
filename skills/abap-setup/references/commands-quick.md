@@ -1,4 +1,4 @@
-# abap-setup — 4 命令完整速查
+# abap-setup — 4 + 2 命令完整速查
 
 > 按需加载。本文件只在 SKILL.md 提及 references 时被 agent 读取。
 
@@ -113,3 +113,78 @@ abap transport release DEVK900001 --tr <target> --yes
 
 - **TTY**：无确认提示
 - **非 TTY**：必须 `--yes` 或 `--dry-run`，否则 `VALIDATION_ERROR` (exit 7)
+
+## `abap extension`（基础设施就绪）
+
+部署和探测 bundled ICF 服务（`/sap/zabap_vibe`）。安装 `ZCL_ABAP_VIBE_ICF` + `ZCL_ABAP_VIBE_ICF_SETUP` + `ZCL_ABAP_VIBE_RUNNER`，是 `abap-object` 的 `run` / `select` / `tcode` 的硬性依赖。
+
+### `abap extension deploy`
+
+```bash
+# 部署 / 升级 bundled ICF 服务（默认 $TMP 无需 --tr）
+abap extension deploy --yes
+
+# 计划部署（零变更）
+abap extension deploy --dry-run
+
+# 看会改什么
+abap extension deploy --diff
+
+# 部署到非 $TMP 包（需 --tr）
+abap extension deploy --package ZABAP_VIBE --tr DEVK900001 --yes
+```
+
+#### 输出信封（`--json`）
+
+```jsonc
+{
+    "status": "success",
+    "data": {
+        "icfNode": {
+            "status": "deployed" | "planned" | "unchanged" | "failed",
+            "path": "/sap/zabap_vibe"
+        },
+        "objects": [
+            { "name": "ZCL_ABAP_VIBE_ICF", "type": "CLAS",
+              "status": "created" | "updated" | "unchanged" | "failed" }
+        ],
+        "files": [
+            { "file": "src/zcl_abap_vibe_icf/zcl_abap_vibe_icf.clas.abap",
+              "status": "pushed" | "failed" }
+        ]
+    }
+}
+```
+
+#### ICF 服务版本
+
+- 服务版本随 CLI 升级；CLI 启动时缓存 `ICF_SERVICE_VERSION` / handler 端 `gc_version`
+- `abap extension deploy` 自动创建/更新 `ZCL_ABAP_VIBE_ICF` + `ZCL_ABAP_VIBE_ICF_SETUP` + `ZCL_ABAP_VIBE_RUNNER`（013 + 015 + 016 + 017 + tcode 累积）
+
+#### 写操作约束
+
+`deploy` 是写操作：
+
+- **非 TTY**：必须 `--yes` 或 `--dry-run`，否则 `VALIDATION_ERROR` (exit 7)
+- **`--dry-run`**：返回 `{ dryRun: true, icfNode.status: "planned" }` 不调 SAP
+
+### `abap extension status`
+
+```bash
+abap extension status                  # 仅探测
+abap extension status --json
+# → data: { installed, status, remoteVersion, expectedVersion, match }
+```
+
+| `status` | 含义 | 推荐动作 |
+|---|---|---|
+| `not_deployed` | ICF 服务没装过 | `abap extension deploy --yes` |
+| `current` | 安装且版本匹配 | 跳过 |
+| `outdated` | 安装但版本过期 | `abap extension deploy --yes` 升级 |
+| `unreachable` | 探测不可达 | 不阻断；查 `meta.warnings`（ICF_CHECK_DEGRADED） |
+
+### 与 doctor / init 的关系
+
+- `extension status` 查 SAP 侧
+- `doctor` 查本地（环境 / 配置 / profile 可达性）
+- `init --profile <name>` 一次性做 `doctor` + ICF 探测，结果落在 `data.icf`

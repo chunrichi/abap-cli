@@ -1,6 +1,6 @@
-# abap-edit — 详细工作流
+# abap-object — 详细工作流
 
-> 按需加载。本文件展开 SKILL.md 决策树，处理各种变体（FUGR / DDIC / 包批量 / 远程 / stale 激活修复）。
+> 按需加载。本文件展开 SKILL.md 决策树，处理各种变体（FUGR / DDIC / 包批量 / 远程 / stale 激活修复 / where-used / select 翻页）。
 
 ## 变体 1 — FUGR（Function Group）
 
@@ -103,20 +103,15 @@ abap inspect ZCL_FOO --activation --json
 
 匹配规则：`uri.split('#')[0] === objectUrl`（method/OSI 项带 `#fragment`，inactive 项必须严格匹配对象部分，避免 `ZCL_FOO_BAR` 被前缀误判为 `ZCL_FOO`）。
 
-## 变体 6 — sync 链式
+## 变体 6 — 链式 sync 已移除
 
 ```bash
-# 默认 status（只读，不改任何东西）
-abap status/pull/push
-
-# 拉 missing
-abap status/pull/push --pull --yes
-
-# 推 divergent（冲突保护：本地与 SAP 都改了的，绝不静默覆盖）
-abap status/pull/push --push --yes
+abap sync
+# → USAGE: abap sync 已移除（021 决策）
+#       用: abap status --json / abap pull / abap push --yes
 ```
 
-冲突处理：单边改 → 自动同步；双边改 → `data.conflicts[]` 列出，agent 决策。
+Agent 显式编排 `status → pull / push`，冲突保护机制一致：单边改 → 自动同步；双边改 → `data.conflicts[]` 列出，agent 决策。
 
 ## 变体 7 — 离线草稿
 
@@ -149,3 +144,46 @@ abap push src/zcl_foo/zcl_foo.texts.en.properties
 ## 变体 9 — FUGR 包含错误
 
 `.clas.macros.abap` 只有在对象**确实有** macros include 时才能推；对象没有该 include 时**报错**（`SAP_ERROR` exit 6，`subtype` + `nextSteps` 指向 `inspect --includes`），**不**静默回退把 macros 内容写进 main。只有 `main` 文件映射到对象的 main part。
+
+## 变体 10 — where-used 重构冲击评估
+
+```bash
+# 评估 ZCL_FOO 改名 / 删方法前的直接影响面
+abap where-used ZCL_FOO --type CLAS --limit 500 --json
+# → data.references[]: [{ objectUrl, objectType, name, packageName }, ...]
+```
+
+- **支持的类型**：`CLAS` / `INTF` / `PROG` / `FUGR` / `TABL`
+- **默认 limit**：`100`；最大 `500`
+- **输出**：`data.references[i].objectUrl` 可直接喂给 `abap pull`
+- **未索引**：报 `OBJECT_NOT_INDEXED`——回退用 `search` + 本地代码搜索
+
+使用模式：
+
+```bash
+# 1. 评估冲击
+refs=$(abap where-used ZCL_FOO --type CLAS --limit 500 --json | jq -r '.data.references[].objectUrl')
+
+# 2. 拉每个引用方到本地审视
+echo "$refs" | head -20 | while read url; do
+    abap pull "$url" --json
+done
+
+# 3. 修改完后 push
+```
+
+## 变体 11 — select 翻页
+
+```bash
+# 单页 + 翻页（按 ID 升序保证稳定）
+abap select --table ZT_FOO --fields "ID,STATUS" --order-by "ID:ASC" --limit 100 --offset 0
+abap select --table ZT_FOO --fields "ID,STATUS" --order-by "ID:ASC" --limit 100 --offset 100
+
+# 全量（用辅助脚本）
+node ./scripts/pages-select.mjs ZT_FOO --where "STATUS = 'X'" --order-by "ID:ASC" --page-size 200
+
+# 仅计数（最快）
+abap select --table ZT_FOO --where "AMOUNT > 100" --count-only
+```
+
+`data.truncated: true` 表示还有后续页。`--count-only` 走 `COUNT(*)` SQL，不取明细。

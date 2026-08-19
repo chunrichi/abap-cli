@@ -12,8 +12,8 @@ const agentsRoot = path.join(repoRoot, 'agents');
 // CLI 命令清单（与 src/abap_cli/index.ts 的 LazyCommandSpec 对齐）
 const EXPECTED_COMMANDS = new Set([
   'config', 'connection', 'doctor', 'transport',
-  'search', 'pull', 'push', 'check', 'create', 'activate', 'inspect', 'diff', 'status', 'sync',
-  'select', 'run', 'deploy',
+  'search', 'where-used', 'pull', 'push', 'check', 'create', 'activate', 'inspect', 'diff', 'status', 'sync',
+  'select', 'run', 'tcode', 'deploy',
   // 'create local' 子命令特殊处理
 ]);
 
@@ -105,9 +105,9 @@ function getAllSkills(): SkillInfo[] {
 describe('skill bundle (019-cli-skill-agent-bundle) structural audit', () => {
   const skills = getAllSkills();
 
-  it('discovers exactly 3 skills (abap-setup / abap-edit / abap-data)', () => {
+  it('discovers exactly 2 skills (abap-setup / abap-object; 0.2 合并)', () => {
     const names = skills.map((s) => s.dirName).sort();
-    expect(names).toEqual(['abap-data', 'abap-edit', 'abap-setup']);
+    expect(names).toEqual(['abap-object', 'abap-setup']);
   });
 
   it.each(skills.map((s) => [s.dirName, s] as const))(
@@ -172,17 +172,17 @@ describe('skill bundle (019-cli-skill-agent-bundle) structural audit', () => {
         allCommands.add(String(cmd));
       }
     }
-    // 16 个顶层命令（021 收敛后）：init/profile/extension 替换 config/connection/deploy；
+    // 17 个顶层命令（0.2 — 合并 abap-object 后）：新增 where-used / tcode；
     // atc/sync/report-stuck 已移除，不纳入 skill 路由。
     const expected = [
-      'init', 'profile', 'doctor', 'transport',
-      'search', 'pull', 'push', 'check', 'create', 'activate', 'inspect', 'diff', 'status',
-      'select', 'run', 'extension',
+      'init', 'profile', 'doctor', 'transport', 'extension',
+      'search', 'where-used', 'pull', 'push', 'check', 'create', 'activate', 'inspect', 'diff', 'status',
+      'select', 'run', 'tcode',
     ];
     for (const cmd of expected) {
       expect(allCommands.has(cmd), `${cmd} 未被任何 skill 覆盖`).toBe(true);
     }
-    // `create local` 是 create 的子命令，会以字符串形式被加进来（不计入 16）
+    // `create local` 是 create 的子命令，会以字符串形式被加进来（不计入 17）
     expect(allCommands.size).toBeGreaterThanOrEqual(expected.length);
     // 但要确保没有额外的"伪命令"——只允许 expected + `create local`（子命令）
     const expectedSet = new Set(expected);

@@ -9,7 +9,7 @@ changed at: 2026-08-09 22:40:00
 
 # abap inspect
 
-只读探测 SAP 对象元数据，**不获取锁、不修改 SAP**。给 agent 一个稳定的"对象是什么样 / 现在状态如何"探针——是 `abap-edit` skill 决策树的关键工具。
+只读探测 SAP 对象元数据，**不获取锁、不修改 SAP**。给 agent 一个稳定的"对象是什么样 / 现在状态如何"探针——是 `abap-object` skill 决策树的关键工具。
 
 ## Usage
 
@@ -136,4 +136,4 @@ abap inspect ZCL_FOO --includes --locks --package --json
 
 - 用户文档：[docs/commands.md#abap-inspect](../../docs/commands.md#abap-inspect)
 - 设计决策：[specs/013-icf-interface-implementation/spec.md](../../specs/013-icf-interface-implementation/spec.md)
-- 修复脚本：[skills/abap-edit/scripts/inspect-activation.sh](../../skills/abap-edit/scripts/inspect-activation.sh)
+- 修复脚本：直接走 `abap inspect <obj> --activation --json` + `abap activate <obj> --yes --json`（`inspect-activation.sh` 已并入 abap-object 时删除，agent 可按 SKILL.md 错误恢复表按需现写）

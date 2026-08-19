@@ -146,7 +146,7 @@ abap init --agent copilot --force
 {
   "status": "success",
   "meta": { "command": "abap init --agent", "version": "0.2.0", "timestamp": "2026-08-17T00:00:00.000Z", "durationMs": 90, "warnings": [] },
-  "data": { "written": ["AGENTS.md", "skills/abap-setup/SKILL.md", ".github/copilot-instructions.md"], "skipped": ["skills/abap-edit/SKILL.md"] }
+  "data": { "written": ["AGENTS.md", "skills/abap-setup/SKILL.md", ".github/copilot-instructions.md"], "skipped": ["skills/abap-object/SKILL.md"] }
 }
 ```
 
