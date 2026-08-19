@@ -40,18 +40,32 @@ src/abap_cli/
 
 ### Key decisions
 
-- **ADT via `abap-adt-api`** — source objects (Class/Interface/Program/Function Group) use the standard ADT REST API: search, object structure, source GET/PUT, lock/unlock, content-based syntax check, activation, object creation, transport management.
+- **ADT via `abap-adt-api`** — source objects (Class/Interface/Program/Function Group) use the standard ADT REST API: search, object structure, source GET/PUT, lock/unlock, content-based syntax check, activation, object creation, transport management, usage references (`where-used`).
 - **Thin client** — the CLI only orchestrates HTTP calls and file/result handling; business logic stays on the SAP side.
-- **Unified output** — every command uses `output/json.ts` (`printResult`/`printError`) so `--json` output is consistent across commands and parseable by agents.
-- **Sync orchestration** — workflow orchestration lives in `flows/` (`push-flow.ts` + `push-object.ts`/`push-fugr.ts`/`push-textpool.ts`, `pull-flow.ts`, `deploy-flow.ts`, `init-flow.ts`/`init-agents.ts`, `profile-flow.ts`, `create-flow.ts` + `create-schema.ts`/`create-types.ts`, `run-flow.ts`, `select-flow.ts`, `status`, `diff`, `inspect-ops`, `doctor-checks`, `atc`). Shared resolution lives in `core/`: `core/resolve.ts` (object URL + parts resolution, packageName from the search hit), `core/transport.ts` (`resolveTransport`: `--tr` > config > user's open request > error). `push-flow.ts` resolves the transport **per object** (`transportInfo` binding first, `$TMP` free) and routes DDIC `.json` files through the ICF `/ddic/<type>` endpoint. Commands stay thin: they parse arguments and print the `{ data, human }` result the flow returns.
+- **Unified output** — every command uses `output/json.ts` (`printResult`/`printError`) so `--json` output is consistent across commands and parseable by agents. `OutputMode` is `'human' | 'json' | 'pretty-json'`; `--json` is compact (token-efficient), `--pretty-json` is indented. `stripEmpty()` recursively trims empty `{}` / `[]` from `data` in JSON modes.
+- **Workflow orchestration** lives in `flows/`: `init-flow.ts` (init / `--show-config` / `--unset-*`), `init-agents.ts` (scaffold), `profile-flow.ts` (profile add/set/test/list/show/delete/export/import), `create-flow.ts` + `create-schema.ts` + `create-types.ts` (source + DDIC + HTTP create), `pull-flow.ts` (source / DDIC three-piece / textpool / remote), `push-flow.ts` + `push-object.ts` + `push-fugr.ts` + `push-textpool.ts` (per-object transport resolution; DDIC via ICF), `run-flow.ts` (classrun / wrapper static method), `select-flow.ts` (SE16N equivalent), `tcode-flow.ts` (TSTC → TSTCT), `where-used-ops.ts` (impact assessment), `status.ts` (changed parts), `diff.ts` (per-part compare), `inspect-ops.ts` (`--structure` / `--includes` / `--locks` / `--activation`), `doctor-checks.ts`, `atc.ts`. Shared resolution lives in `core/`: `core/resolve.ts` (object URL + parts resolution, packageName from the search hit), `core/transport.ts` (`resolveTransport`: `--tr` > config > user's open request > error). `push-flow.ts` resolves the transport **per object** (`transportInfo` binding first, `$TMP` free) and routes DDIC `.json` files through the ICF `/ddic/<type>` endpoint. Commands stay thin: they parse arguments and print the `{ data, human }` result the flow returns.
 
 ## SAP Layer (`abap/`)
 
 The bundled ICF service lives under `abap/src/clas/` (abapGit layout):
 - **`ZCL_ABAP_VIBE_ICF`** — HTTP handler (`IF_HTTP_EXTENSION`) for `/sap/zabap_vibe/`: root path returns a unified JSON envelope with service id + version; unknown paths / methods return unified error JSON.
 - **`ZCL_ABAP_VIBE_ICF_SETUP`** — `IF_OO_ADT_CLASSRUN` runner that idempotently creates/binds/activates the SICF node via the standard `CL_ICF_TREE` API (ADR gap: SICF config is not covered by ADT REST).
+- **`ZCL_ABAP_VIBE_RUNNER`** — reflection-based wrapper invoked by `abap run --method <name>` to call PUBLIC STATIC methods on arbitrary classes and serialise the `RETURNING` value.
+- **`ZCL_ABAP_VIBE_TABL_FORMAT`** — generates abap-file-format three-piece layouts for `TABL` (canonical `tabl.json` + `tabl.ddic` + `tabl.settings.json`); STRU emits the two-piece variant (024).
 
-`abap extension deploy` pushes the bundled sources then triggers the setup class; `abap extension status` / `abap init` check deployment state/version. DDIC object CRUD (Domain, DataElement, Table, Structure, Table Type) is the next phase, built on the same ICF service. Development of this layer follows the **Dogfooding** principle — it is itself developed via the CLI's create → pull → edit → push loop.
+Endpoints exposed under `/sap/zabap_vibe/` (current service version `0.5.0`):
+
+| Endpoint | Used by |
+|---|---|
+| `/` (root, version probe) | `abap extension status`, `abap init` ICF check |
+| `/ddic/<type>` (POST/GET — `DOMA`/`DTEL`/`TABL`/`STRU`) | `abap create` / `abap push` / `abap pull` for DDIC |
+| `/http/<name>` (POST/GET — HTTP service) | `abap create HTTP` / `abap push <file>.http.json` / `abap pull --type HTTP` |
+| `/textpool/*` (POST/GET) | `abap pull --textpool` / `abap push <file>.texts/selections/headings.*.properties` on systems without ADT text-elements support |
+| `/tcode/<code>` (GET) | `abap tcode` (TSTC → TSTCT) |
+| `/version-source` (POST) | `abap pull --remote <system>` (TMS RFC destination) |
+| `/data/query` (POST) | `abap select --table <name>` (SE16N equivalent, read-only) |
+
+`abap extension deploy` pushes the bundled sources then triggers the setup class; `abap extension status` / `abap init` check deployment state/version. JSON generation on the SAP side is unified on `/ui2/cl_json=>serialize` (017) — about 74 handcrafted JSON concatenations across the ICF handler / runner / setup classes were replaced. Development of this layer follows the **Dogfooding** principle — it is itself developed via the CLI's create → pull → edit → push loop.
 
 ## Agent Layer (`skills/` + `agents/`)
 

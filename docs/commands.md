@@ -12,11 +12,11 @@ All commands support the global `--json` option for structured output (Agent-Fir
 
 ## JSON Output Contract
 
-Every `--json` envelope carries a `meta` block (`command`, `version`, `timestamp`, `durationMs`, `warnings`). The unified contract is authoritative in `specs/012-unify-cli-output-contract/contracts/cli-output.md`.
+Every `--json` envelope carries a `meta` block (`command`, `version`, `timestamp`, `durationMs`, `warnings`). `--pretty-json` emits the same shape with 2-space indentation (human/agent readability); `--json` is compact (token-efficient). The unified contract is authoritative in `specs/012-unify-cli-output-contract/contracts/cli-output.md`. The `--schema` mode (`abap <cmd> --schema`) returns a reduced `meta` containing only `command` / `version` / `durationMs` — no `timestamp` / `warnings` — for stable agent introspection.
 
 ```jsonc
 // Success (stdout)
-{ "status": "success", "meta": { "command": "abap pull", "version": "0.1.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { ... } }
+{ "status": "success", "meta": { "command": "abap pull", "version": "0.2.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { ... } }
 
 // Failure (stderr — stdout is empty)
 { "status": "error", "meta": { ... }, "error": { "code": "...", "category": "...", "message": "...", "nextSteps": [...], ... } }
@@ -28,22 +28,27 @@ Exit codes (stable contract, only additive across versions): `0` success, `1` un
 
 ## `abap init`
 
-Initialize the workspace and scaffold AI agent context (021 — replaces the legacy `abap config`). Two entry points:
+Initialize the workspace — the **single entry point** for workspace binding, modification, inspection, and agent scaffolding (026 — replaces the legacy `abap config`). Four modes share one command:
 
-- `abap init --profile <name> [--tr ...] [--package ...] [--yes]` — the **parameter form**: binds the workspace to an existing global profile and writes `.abap.json`. In non-interactive mode, profile creation is rejected (use `abap profile add` instead).
-- `abap init` (bare, TTY) — the **interactive wizard**: prompts to select an existing profile or create a new one, then writes `.abap.json`. In non-TTY environments a bare `abap init` errors with `USAGE` (Agent-First: never block on a prompt).
-- `abap init --agent <target>` — **scaffolds agent context** into the workspace (idempotent; re-runs are no-ops unless `--force`).
+- **First-time bind** — `abap init --profile <name> [--tr] [--package] [--source-dir] [--yes]` writes `.abap.json`. In non-interactive mode, profile creation is rejected (use `abap profile add`).
+- **Modify fields** — same options against an existing `.abap.json`: only the fields you pass are updated; everything else is preserved (merge, not replace).
+- **Inspect** — `abap init --show-config` prints the current `.abap.json` (read-only; never connects to SAP; walks up to the nearest config, stops at the git boundary).
+- **Clear fields** — `abap init --unset-package` / `--unset-tr` / `--unset-source-dir` removes the listed top-level keys; non-TTY requires `--yes`.
+- **Agent scaffold** — `abap init --agent <target>` scaffolds `AGENTS.md` + `skills/` (+ vendor entry); idempotent unless `--force`.
+- **Interactive wizard** — bare `abap init` (TTY only) opens the wizard. In non-TTY, a bare call errors with `USAGE` (Agent-First: never block on a prompt).
 
 ```bash
-abap init --profile dev --tr DEVK900001 --package ZDEV --yes
+abap init --profile dev --tr DEVK900001 --package ZDEV --source-dir ./src --yes
 abap init                       # interactive wizard (TTY)
 abap init --agent copilot       # scaffold AGENTS.md + skills/ + vendor entry
 abap init --agent copilot --force
+abap init --show-config         # print current .abap.json (read-only)
+abap init --unset-package --yes # remove `package` from .abap.json
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--profile <name>` | Name of an existing global profile |
+| `--profile <name>` | Name of an existing global profile (binds the workspace; use `abap profile add` to create one) |
 | `--url <url>` | SAP system URL (TTY wizard only; in scripts use `abap profile add`) |
 | `-c, --client <client>` | SAP client number |
 | `-u, --username <user>` | SAP username |
@@ -51,6 +56,11 @@ abap init --agent copilot --force
 | `-l, --language <language>` | SAP language |
 | `--tr <transport>` | Default transport number |
 | `--package <package>` | Default SAP package |
+| `--source-dir <path>` | Base directory for `push --all` / `check --all` (026) |
+| `--show-config` | Print current `.abap.json` as JSON; read-only, no SAP call (026) |
+| `--unset-package` | Remove `package` from `.abap.json` (026) |
+| `--unset-tr` | Remove `transport` from `.abap.json` (026) |
+| `--unset-source-dir` | Remove `sourceDir` from `.abap.json` (026) |
 | `--insecure` | Skip SSL certificate verification (self-signed certs, development only) |
 | `--ca <path>` | Path to a CA certificate (PEM) for SSL verification |
 | `--test-connection` | Probe TLS + auth and report results (implies `--test-tls --test-auth`) |
@@ -217,7 +227,7 @@ abap select --schema
 ```jsonc
 {
   "status": "success",
-  "meta": { "command": "abap select", "version": "0.1.0", "timestamp": "...", "durationMs": 42, "warnings": [] },
+  "meta": { "command": "abap select", "version": "0.2.0", "timestamp": "...", "durationMs": 42, "warnings": [] },
   "data": {
     "table": "ZTAB_FIXTURE", "objectType": "TABL",
     "fields": ["MANDT", "ID", "STATUS", "AMOUNT", "NAME", "CREATED"],
@@ -590,6 +600,52 @@ abap diff [options] [file]
 | `--limit <n>` | Bounds the result (default `20`) |
 
 JSON output: `{ parts: [{ object, part, direction, summary? }], truncated, checked }`. `direction` ∈ `local-only` | `remote-only` | `divergent` | `unchanged`; `summary` is `{ added, removed, changedLines }`. "No differences" is a valid empty result (exit 0).
+
+## `abap where-used` (alias `references`)
+
+Read-only query of the object's direct references via ADT `usageReferences` (027). Used before refactoring or deletion to assess impact.
+
+```bash
+abap where-used [options] <object>
+abap references <object>          # alias
+```
+
+| Option | Description |
+|--------|-------------|
+| `--type <type>` | Object type: `CLAS` \| `INTF` \| `PROG` \| `FUGR` \| `TABL` (required when not inferable from the name) |
+| `--ref-type <t>` | Restrict by reference type (e.g. `USAGE`, `INHERITANCE`, `IMPLEMENTATION`) |
+| `--package <pkg>` | Restrict to references inside a package (case-insensitive) |
+| `--limit <n>` | Maximum references returned (default `100`, hard cap `500`). ADT returns duplicates for the same reference across usage sites — duplicates are collapsed on `uri + usageInformation` before truncation. |
+| `--schema` | Print the parameter schema as JSON and exit (no SAP call) |
+
+JSON output: `{ object, type, references: [{ uri, type, name, usageInformation }], truncated, total }`. Truncation surfaces a `nextSteps` hint to raise `--limit` or narrow filters. Unknown types fail with `TYPE_NOT_SUPPORTED`.
+
+**Read-only contract**: no lock, no transport, no activation. Safe to call before deciding whether to refactor / delete.
+
+## `abap tcode`
+
+Read-only resolution of a transaction code to its configured ABAP entry program + screen (TSTC → TSTCT) via the bundled ICF `/tcode/<code>` endpoint. Includes `S_TCODE` authorization check.
+
+```bash
+abap tcode [options] <code>
+```
+
+| Option | Description |
+|--------|-------------|
+| `--schema` | Print the parameter schema as JSON and exit (no SAP call) |
+
+| Argument | Description |
+|----------|-------------|
+| `code` | Transaction code (CHAR20, non-blank). Validated locally before the SAP call. |
+
+JSON output: `{ code, program, screen?, dynpro?, description? }`. Parameter-transaction chains (`report … AND RETURN`) report `entry_only` in this version.
+
+**Error codes**:
+
+| Code | Category / exit | Trigger |
+|------|-----------------|---------|
+| `TCODE_NOT_FOUND` | NOT_FOUND / 8 | TSTC has no row for `<code>` |
+| `TCODE_NOT_AUTHORIZED` | AUTH_ERROR / 5 | User lacks `S_TCODE` for `<code>` |
 
 ## Error Codes
 

@@ -93,7 +93,7 @@ skills/<name>/
 
 ## 版本
 
-- **CLI 版本**：`0.1.0`
+- **CLI 版本**：`0.2.0`
 - **本特性 spec**：`specs/019-cli-skill-agent-bundle/spec.md`
 - **agentskills.io 标准**：<https://agentskills.io/>
 

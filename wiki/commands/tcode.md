@@ -48,7 +48,7 @@ abap tcode --schema --json
 ```jsonc
 {
   "status": "success",
-  "meta": { "command": "abap tcode", "version": "0.1.0", "timestamp": "...", "durationMs": 42, "warnings": [] },
+  "meta": { "command": "abap tcode", "version": "0.2.0", "timestamp": "...", "durationMs": 42, "warnings": [] },
   "data": {
     "tcode": "SE38",
     "description": "ABAP Editor",
@@ -113,5 +113,5 @@ abap where-used ZPROG_FOO --json      # 谁引用了它（影响面）
 
 ## 版本与服务依赖
 
-- **CLI 版本**: 0.1.0（含 `tcode` 命令）。
+- **CLI 版本**: 0.2.0（含 `tcode` 命令）。
 - **ICF 服务**: `ZCL_ABAP_VIBE_ICF` 的 `dispatch_tcode` / `read_tcode`（GET only）。`abap extension deploy` 部署后可用；`abap doctor` 探测版本匹配。

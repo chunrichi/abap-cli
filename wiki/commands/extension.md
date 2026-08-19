@@ -74,7 +74,7 @@ abap extension status --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap extension deploy", "version": "0.1.0", "timestamp": "2026-08-17T00:00:00.000Z", "durationMs": 8400, "warnings": [] },
+  "meta": { "command": "abap extension deploy", "version": "0.2.0", "timestamp": "2026-08-17T00:00:00.000Z", "durationMs": 8400, "warnings": [] },
   "data": {
     "objects": [ { "object": "ZCL_ABAP_VIBE_ICF", "type": "CLAS", "status": "updated" } ],
     "files": [ { "file": "abap/src/clas/zcl_abap_vibe_icf.clas.abap", "status": "written" } ],
@@ -88,7 +88,7 @@ abap extension status --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap extension status", "version": "0.1.0", "timestamp": "2026-08-17T00:00:00.000Z", "durationMs": 300, "warnings": [] },
+  "meta": { "command": "abap extension status", "version": "0.2.0", "timestamp": "2026-08-17T00:00:00.000Z", "durationMs": 300, "warnings": [] },
   "data": { "installed": true, "status": "current", "remoteVersion": "0.4.0", "expectedVersion": "0.4.0", "match": true }
 }
 ```

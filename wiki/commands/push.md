@@ -126,7 +126,7 @@ abap push src/prog/zprog/zprog.prog.texts.en.properties
   "status": "success",
   "meta": {
     "command": "abap push",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "timestamp": "2026-08-07T00:11:03.000Z",
     "durationMs": 111,
     "warnings": []
@@ -152,7 +152,7 @@ abap push src/prog/zprog/zprog.prog.texts.en.properties
 ```json
 {
   "status": "error",
-  "meta": { "command": "abap push", "version": "0.1.0" },
+  "meta": { "command": "abap push", "version": "0.2.0" },
   "error": {
     "code": "LOCK_FAILED",
     "category": "LOCKED",

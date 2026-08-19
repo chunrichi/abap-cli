@@ -73,8 +73,25 @@ Prompts guide you through selecting an existing system profile or entering a new
 {
   "system": "dev",
   "transport": "",
-  "package": ""
+  "package": "",
+  "sourceDir": ""
 }
+```
+
+The same `abap init` command is also the entry point for **modifying** an existing `.abap.json` (026):
+
+```bash
+# Switch default transport or package (merge, not replace — other fields stay)
+abap init --tr DEVK900002 --package Z_NEW --yes
+
+# Rebind to a different profile (preserves transport / package unless overridden)
+abap init --profile qa --yes
+
+# Inspect the current binding (read-only, no SAP call)
+abap init --show-config
+
+# Clear a single field
+abap init --unset-package --yes
 ```
 
 See [Configuration](configuration.md) for details.
@@ -121,13 +138,15 @@ abap pull ZCL_MY_NEW_CLASS
 abap push src/zcl_my_new_class/zcl_my_new_class.clas.abap --tr DEVK900001
 ```
 
-## What's Supported (v0.1)
+## What's Supported (v0.2)
 
 - **Source objects** — Class (CLAS), Interface (INTF), Program (PROG), Function Group (FUGR) for pull / push / check / create via the ADT REST API
+- **DDIC objects** (Domain, DataElement, Table, Structure as `.doma.json` / `.dtel.json` / `.tabl.json` / `.stru.json`) — create / overwrite / pull via the self-built ICF service (`/sap/zabap_vibe/ddic/*`). TABL/STRU pull writes abap-file-format three-piece layouts (024). `abap create <DOMA|DTEL|TABL|STRU> <name> --file <json>` creates; `abap pull <name> --type <T>` downloads; `abap push <name>.<type>.json --tr <tr>` updates. TTYP is deferred.
+- **HTTP service** (022) — `abap pull <name> --type HTTP` / `abap push <file>.http.json` / `abap create HTTP <name> --file <file>.http.json` via ICF `/http/<name>`. Compatible with abap-file-format `zif_aff_http_v1`.
+- **Read-only execution & data access** — `abap run` (classrun / static method, push → run → verify), `abap select` (SE16N equivalent), `abap where-used` (impact assessment before refactor / delete), `abap tcode` (TSTC → TSTCT)
 - **Transport management** — `abap transport list` / `create` / `show` / `resolve` / `assign`
-- **Diagnosis & workflows** — `abap doctor`, `abap inspect`, `abap diff`
+- **Diagnosis & workflows** — `abap doctor`, `abap inspect`, `abap diff`, `abap status`, `abap activate`
 - **ICF service lifecycle** — `abap extension deploy` deploys the bundled ICF service (`/sap/zabap_vibe`) and triggers its SICF node setup; `abap extension status` reports installation/version state; `abap init` checks deployment/version state; `abap activate` fixes stale activation (see [Commands](commands.md))
-- **DDIC objects** (Domain, DataElement, Table, Structure as `.doma.json` / `.dtel.json` / `.tabl.json` / `.stru.json`) — create / overwrite / pull via the self-built ICF service (`/sap/zabap_vibe/ddic/*`). `abap create <DOMA|DTEL|TABL|STRU> <name> --file <json>` creates; `abap pull <name> --type <T>` downloads; `abap push <name>.<type>.json --tr <tr>` updates. TTYP is deferred.
 - **Textpool (text elements)** — read/write program text symbols, selection texts and list headings via `abap pull <name> --textpool` and `abap push <name>.<type>.texts|selections|headings.<lang>.properties`. Mixed mode: the ADT text-elements API is used when the system supports it; ECC/older systems route through the ICF `/textpool/*` endpoint. Capability is probed once when the connection profile is created (`abap profile add/set`, `abap init`) and cached in the profile — no runtime fallback (see [Commands](commands.md) for details).
 
 ## Deploy the Bundled ICF Service

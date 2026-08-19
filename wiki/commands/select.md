@@ -65,7 +65,7 @@ SAP 端单条 SELECT 由 5 个 helper 完成（research R1–R6）：
 ```jsonc
 {
   "status": "success",
-  "meta": { "command": "abap select", "version": "0.1.0", "timestamp": "...", "durationMs": 42, "warnings": [] },
+  "meta": { "command": "abap select", "version": "0.2.0", "timestamp": "...", "durationMs": 42, "warnings": [] },
   "data": {
     "table": "ZTAB_FIXTURE", "objectType": "TABL",
     "fields": ["MANDT", "ID", "STATUS", "AMOUNT", "NAME", "CREATED"],
@@ -127,7 +127,7 @@ abap select --table ZTAB_FIXTURE --where "NAME = 'O''Brien; DROP TABLE ZTAB_FIXT
 
 ## 版本与服务依赖
 
-- **CLI 版本**: 0.1.0（含 `select` 命令）。
+- **CLI 版本**: 0.2.0（含 `select` 命令）。
 - **ICF 服务版本**: **0.4.0**（`abap extension deploy` 部署后可用）。`abap doctor` / `abap init` 探测 outdated 时升级。
 - **握手**: 复用 014 DDIC CRUD 的 `ZCL_ABAP_VIBE_ICF` 类（`/data/*` 子路由新增）。
 - **开发模式**: 014 `ICF_SERVICE_VERSION` + ABAP `gc_version` 同步 bump 0.3.0 → 0.4.0（017：select 行值原生类型化）。

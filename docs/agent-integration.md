@@ -6,7 +6,7 @@ abap-cli is designed to be driven by AI agents. Every command supports `--json` 
 
 ```jsonc
 // Success — written to stdout
-{ "status": "success", "meta": { "command": "abap pull", "version": "0.1.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { ... } }
+{ "status": "success", "meta": { "command": "abap pull", "version": "0.2.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { ... } }
 
 // Failure — written to stderr (stdout empty), exit code non-zero
 { "status": "error", "meta": { ... }, "error": { "code": "NO_TRANSPORT", "category": "VALIDATION_ERROR", "message": "...", ... } }

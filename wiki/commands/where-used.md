@@ -56,7 +56,7 @@ abap where-used ZCL_UTIL --limit 500 --json
 ```jsonc
 {
   "status": "success",
-  "meta": { "command": "abap where-used", "version": "0.1.0", "timestamp": "...", "durationMs": 180, "warnings": [] },
+  "meta": { "command": "abap where-used", "version": "0.2.0", "timestamp": "...", "durationMs": 180, "warnings": [] },
   "data": {
     "queryStatus": "found",
     "target": {
@@ -140,5 +140,5 @@ abap check syntax --files ...                     # 4. 改完校验
 
 ## 版本与服务依赖
 
-- **CLI 版本**: 0.1.0（含 `where-used` 命令）。
+- **CLI 版本**: 0.2.0（含 `where-used` 命令）。
 - **依赖**: ADT 标准端点 `usageReferences`（`abap-adt-api`），**无需部署 ICF 扩展**。

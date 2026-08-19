@@ -108,7 +108,7 @@ abap init --agent copilot --force
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap init", "version": "0.1.0", "timestamp": "2026-08-20T00:00:00.000Z", "durationMs": 512, "warnings": [] },
+  "meta": { "command": "abap init", "version": "0.2.0", "timestamp": "2026-08-20T00:00:00.000Z", "durationMs": 512, "warnings": [] },
   "data": {
     "configPath": ".abap.json",
     "system": "dev",
@@ -125,7 +125,7 @@ abap init --agent copilot --force
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap init --show-config", "version": "0.1.0", "timestamp": "2026-08-20T00:00:00.000Z", "durationMs": 4, "warnings": [] },
+  "meta": { "command": "abap init --show-config", "version": "0.2.0", "timestamp": "2026-08-20T00:00:00.000Z", "durationMs": 4, "warnings": [] },
   "data": { "configPath": ".abap.json", "system": "dev", "transport": "DEVK900001", "package": "ZDEV", "sourceDir": "./packages/core/src" }
 }
 ```
@@ -135,7 +135,7 @@ abap init --agent copilot --force
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap init --unset-package", "version": "0.1.0", "timestamp": "2026-08-20T00:00:00.000Z", "durationMs": 6, "warnings": [] },
+  "meta": { "command": "abap init --unset-package", "version": "0.2.0", "timestamp": "2026-08-20T00:00:00.000Z", "durationMs": 6, "warnings": [] },
   "data": { "configPath": ".abap.json", "removed": ["package"], "missing": [] }
 }
 ```
@@ -145,7 +145,7 @@ abap init --agent copilot --force
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap init --agent", "version": "0.1.0", "timestamp": "2026-08-17T00:00:00.000Z", "durationMs": 90, "warnings": [] },
+  "meta": { "command": "abap init --agent", "version": "0.2.0", "timestamp": "2026-08-17T00:00:00.000Z", "durationMs": 90, "warnings": [] },
   "data": { "written": ["AGENTS.md", "skills/abap-setup/SKILL.md", ".github/copilot-instructions.md"], "skipped": ["skills/abap-edit/SKILL.md"] }
 }
 ```
