@@ -77,6 +77,11 @@ export class IcfClient {
     return this.get(`/http/${encodeURIComponent(name)}`);
   }
 
+  /** GET /tcode/<tcode> — resolve a transaction code to its entry program (read-only). */
+  async getTcode<T>(tcode: string): Promise<IcfResponse<T>> {
+    return this.get(`/tcode/${encodeURIComponent(tcode)}`);
+  }
+
   /** 014: GET /textpool/<category>?object=...&type=... — read text elements (US4). */
   async getTextpool<T>(category: string, object: string, type: string): Promise<IcfResponse<T>> {
     const qs = new URLSearchParams({ object, type });

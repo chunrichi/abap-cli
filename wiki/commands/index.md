@@ -4,7 +4,7 @@ title: Commands
 description: abap CLI 命令参考索引
 tags: [abap-cli, commands, index]
 created at: 2026-08-06 23:10:00
-changed at: 2026-08-07 00:39:21
+changed at: 2026-08-19 23:00:00
 ---
 
 # Commands
@@ -29,9 +29,11 @@ changed at: 2026-08-07 00:39:21
 
 - [check](check.md) — 校验本地 ABAP 文件（子命令 `syntax` 对 SAP / `content` 本地 / `atc` ATC；`--out` 持久化原始 ATC worklist）
 
-## 搜索
+## 搜索与探查
 
 - [search](search.md) — 在 SAP 中按名称搜索 ABAP 对象（通配符 / 类型与包过滤 / 精确匹配 / 全量抓取）
+- [where-used](where-used.md) — 查询对象的直接引用（where-used list），改动前评估影响面；只读，走 ADT `usageReferences`
+- [tcode](tcode.md) — 解析事务码到其配置的 ABAP 入口程序与屏幕；只读，走 ICF `/tcode/<code>`（TSTC → TSTCT）
 
 ## 传输管理
 

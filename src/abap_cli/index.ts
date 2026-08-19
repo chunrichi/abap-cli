@@ -97,6 +97,18 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
     load: () => import('./commands/inspect.js').then((m) => ({ register: m.registerInspectCommand })),
   },
   {
+    name: 'where-used',
+    scope: 'sap',
+    description: 'Find direct references to a SAP object (read-only): where-used ZCL_MY_CLASS [--type CLAS] [--ref-type ...] [--package ...] [--limit N].',
+    load: () => import('./commands/where-used.js').then((m) => ({ register: m.registerWhereUsedCommand })),
+  },
+  {
+    name: 'tcode',
+    scope: 'sap',
+    description: 'Resolve a transaction code to its configured ABAP entry program and screen (read-only).',
+    load: () => import('./commands/tcode.js').then((m) => ({ register: m.registerTcodeCommand })),
+  },
+  {
     name: 'activate',
     description: 'Activate all inactive items of an object (method/OSI level)',
     load: () => import('./commands/activate.js').then((m) => ({ register: m.registerActivateCommand })),

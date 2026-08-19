@@ -81,6 +81,9 @@ export type ErrorCode =
   // 024-tabl-aff-pull: abap-file-format three-piece TABL/STRU pull diagnostics
   | 'TABL_DDL_INVALID'          // DDL parse failure (VALIDATION_ERROR/exit 7)
   | 'TABL_ARTIFACT_INCOMPLETE'  // wire missing mainJson or ddicSource (VALIDATION_ERROR/exit 7)
+  // tcode: ICF /tcode/<code> transaction lookup
+  | 'TCODE_NOT_FOUND'           // TSTC entry does not exist (NOT_FOUND/exit 8)
+  | 'TCODE_NOT_AUTHORIZED'      // S_TCODE authority check failed (AUTH_ERROR/exit 5)
   ;
 
 const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
@@ -139,6 +142,9 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   // 024-tabl-aff-pull
   TABL_DDL_INVALID: 'VALIDATION_ERROR',
   TABL_ARTIFACT_INCOMPLETE: 'VALIDATION_ERROR',
+  // tcode
+  TCODE_NOT_FOUND: 'NOT_FOUND',
+  TCODE_NOT_AUTHORIZED: 'AUTH_ERROR',
 };
 
 export function categoryOf(code: ErrorCode): ErrorCategory {
