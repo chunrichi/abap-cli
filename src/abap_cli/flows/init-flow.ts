@@ -430,3 +430,115 @@ async function createSystemFromParams(opts: CommandOpts, mode: OutputMode): Prom
   const icf = await icfDeploymentCheck(mode);
   if (mode) outputJson(systemName, config, undefined, icf);
 }
+/**
+ * Read the nearest .abap.json (walking up from cwd, stopping at .git) and print
+ * it as JSON. Replaces the legacy `abap config show`. Never connects to SAP.
+ */
+export async function runInitShowConfig(_opts: CommandOpts, mode: OutputMode): Promise<void> {
+  const configPath = findNearestWorkspaceConfig();
+  if (!configPath) {
+    throw new CliError(
+      'CONFIG_ERROR',
+      'No .abap.json found (searched cwd and parent directories up to the git boundary).',
+      {
+        nextSteps: ["Run 'abap init --profile <name> --yes' to create one."],
+        example: 'abap init --profile dev --yes',
+      },
+    );
+  }
+  let parsed: Record<string, unknown> = {};
+  try {
+    parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new CliError('CONFIG_ERROR', `Cannot parse ${configPath}: ${message}.`, {
+      file: configPath,
+      nextSteps: [`Fix or delete ${configPath} and re-run 'abap init'.`],
+    });
+  }
+  const display = {
+    configPath: path.relative(process.cwd(), configPath) || '.abap.json',
+    ...parsed,
+  };
+  const human = Object.entries(parsed)
+    .map(([k, v]) => `  ${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`)
+    .join('\n');
+  printResult(mode, display, human ? `Workspace config (${display.configPath}):\n${human}` : `Workspace config (${display.configPath}) is empty.`);
+}
+
+/**
+ * Remove the listed top-level keys from the nearest .abap.json. Refuses without
+ * `--yes` in non-TTY. Replaces the legacy `abap config set` (which could only
+ * set values, never clear them).
+ */
+export async function runInitUnset(keys: string[], yes: boolean, mode: OutputMode): Promise<void> {
+  if (!yes && !process.stdin.isTTY) {
+    throw new CliError(
+      'VALIDATION_ERROR',
+      '--unset-* is a write operation; confirm with --yes.',
+      {
+        nextSteps: ["Re-run with --yes, or run interactively in a TTY."],
+        example: `abap init --unset-${keys[0] === 'transport' ? 'tr' : keys[0] === 'sourceDir' ? 'source-dir' : keys[0]} --yes`,
+      },
+    );
+  }
+  const configPath = findNearestWorkspaceConfig();
+  if (!configPath) {
+    throw new CliError(
+      'CONFIG_ERROR',
+      'No .abap.json found (searched cwd and parent directories up to the git boundary).',
+      {
+        nextSteps: ["Nothing to clear. Run 'abap init --profile <name> --yes' to create one."],
+        example: 'abap init --profile dev --yes',
+      },
+    );
+  }
+  let parsed: Record<string, unknown> = {};
+  try {
+    parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new CliError('CONFIG_ERROR', `Cannot parse ${configPath}: ${message}.`, {
+      file: configPath,
+    });
+  }
+  const removed: string[] = [];
+  const missing: string[] = [];
+  for (const k of keys) {
+    if (k in parsed) {
+      delete parsed[k];
+      removed.push(k);
+    } else {
+      missing.push(k);
+    }
+  }
+  fs.writeFileSync(configPath, JSON.stringify(parsed, null, 2) + '\n', 'utf-8');
+  // Invalidate cached config so the next loadConfig sees the change.
+  try {
+    const { resetConfig } = await import('../config/project-config.js');
+    resetConfig();
+  } catch {
+    // best-effort: tests that don't load project-config still work
+  }
+  const display = { configPath: path.relative(process.cwd(), configPath) || '.abap.json', removed, missing };
+  const human = removed.length > 0
+    ? `Removed from ${display.configPath}: ${removed.join(', ')}${missing.length > 0 ? ` (not present: ${missing.join(', ')})` : ''}.`
+    : `No changes to ${display.configPath} (keys not present: ${missing.join(', ')}).`;
+  printResult(mode, display, human);
+}
+
+/** Find the nearest .abap.json by walking up from cwd, stopping at .git/ or fs root. */
+function findNearestWorkspaceConfig(): string | null {
+  let dir = path.resolve(process.cwd());
+  const seen = new Set<string>();
+  while (!seen.has(dir)) {
+    seen.add(dir);
+    const candidate = path.join(dir, '.abap.json');
+    if (fs.existsSync(candidate)) return candidate;
+    if (fs.existsSync(path.join(dir, '.git'))) return null;
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+  return null;
+}

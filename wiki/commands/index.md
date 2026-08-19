@@ -13,7 +13,7 @@ changed at: 2026-08-19 23:00:00
 
 ## Setup & 环境
 
-- [init](init.md) — 初始化工作区：绑定 profile（写 `.abap.json`）与/或脚手架 agent 上下文（`--agent`）；裸 `init` 为交互向导
+- [init](init.md) — 工作区的唯一入口：首次绑定（写 `.abap.json`） / 修改字段（`--profile` `--tr` `--package` `--source-dir`，merge 不替换） / 自省（`--show-config`） / 清空（`--unset-package` `--unset-tr` `--unset-source-dir`） / 脚手架 agent 上下文（`--agent`）；裸 `init` 为交互向导
 - [profile](profile.md) — 管理全局连接 profiles（增删改查、测试、导入导出）
 - [doctor](doctor.md) — 诊断 CLI 环境（环境 / 配置 / 连接三段检查，支持 `--fix`）
 - [pull](pull.md) — 从 SAP 下载对象到本地（源码 / 包批量 / DDIC JSON / textpool / 远程版本）

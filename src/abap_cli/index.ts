@@ -18,14 +18,8 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
   {
     name: 'init',
     scope: 'local',
-    description: 'Initialize the workspace: bind a profile (write .abap.json) and/or scaffold AI agent context. Run bare `abap init` for the interactive wizard.',
+    description: 'Initialize the workspace (bind a profile, write .abap.json), inspect/modify the existing binding (--show-config / --unset-*), and/or scaffold AI agent context (--agent). Run bare `abap init` for the interactive wizard.',
     load: () => import('./commands/init.js').then((m) => ({ register: m.registerInitCommand })),
-  },
-  {
-    name: 'config',
-    scope: 'local',
-    description: 'Show or modify the current workspace configuration (.abap.json). Does not manage profiles — use `abap profile` for that.',
-    load: () => import('./commands/config.js').then((m) => ({ register: m.registerConfigCommand })),
   },
   {
     name: 'pull',

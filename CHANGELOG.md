@@ -2,7 +2,23 @@
 
 ## [Unreleased]
 
+### Breaking changes
+- **移除 `abap config` 命令（026）** — `config show` → `abap init --show-config`；`config set` 仍然可通过 `abap init --profile / --tr / --package / --source-dir` 实现（首次创建和后续修改走同一条路径：merge 已存在的 `.abap.json`，不替换）；新增 `abap init --unset-package / --unset-tr / --unset-source-dir` 用于清空单字段。理由：`init` 已经覆盖"绑定 + 修改"，`config` 是冗余语义层，且内部扩展分支（abap）从未保留此命令。删除 `src/abap_cli/commands/config.ts`；`index.ts` 的 `COMMAND_SPECS` 不再包含 `config`。
+
+### Migration
+- `abap config show` → `abap init --show-config`
+- `abap config set --profile X` → `abap init --profile X --yes`
+- `abap config set --package ZDEV` → `abap init --package ZDEV --yes`
+- `abap config set --tr DEVK9` → `abap init --tr DEVK9 --yes`
+- `abap config set --source-dir ./packages/core/src` → `abap init --source-dir ./packages/core/src --yes`
+- 清除某字段：`abap init --unset-package --yes` / `--unset-tr --yes` / `--unset-source-dir --yes`
+- 非交互环境写操作：所有 `abap init` 修改类调用都需 `--yes`（与既有 `init` 行为一致）
+
 ### Added
+- **`abap init --show-config`（026）** — 只读打印当前 `.abap.json`（向上找最近的，git 边界停）。不连接 SAP，agent 任意时刻可调用以自省当前 workspace 绑定。替换 `abap config show`。
+- **`abap init --unset-package / --unset-tr / --unset-source-dir`（026）** — 从 `.abap.json` 移除指定顶层 key；非 TTY 需 `--yes`。替换原 `abap config set` 不支持清空的缺陷。
+- **`abap init --source-dir <path>`（026）** — 写入 `.abap.json` 的 `sourceDir`（`push --all` / `check --all` 的基目录）。原本只有 `config set` 才有这个选项，现在 `init` 直接对齐。
+- **`abap config` → `abap init` 合并后** — 三层职责最终清晰：`profile`（全局连接档案） / `init`（工作区绑定 + 修改 + 自省 + agent 脚手架，唯一入口） / `doctor`（诊断）。
 - **三种 JSON 输出模式（025 — abap 通用输出层合并）** — 新增全局 `--pretty-json` 选项（与 `--json` 共存时 pretty 优先）。`OutputMode = 'human' | 'json' | 'pretty-json'`；`--json` 默认**紧凑无缩进**（省 LM agent token），`--pretty-json` 缩进 2（人看/调试）。新增 `isJsonMode()` helper；`jsonFromCommand(cmd)` 升级返回 `OutputMode`。`printResult/printError/renderResult/renderError` 第一参数由 `boolean` 升级为 `OutputMode`（breaking）。`top-error.ts` 的 `isJson(argv)` 同步返回 `OutputMode`。所有 18 个 commands + 3 个 flows 的 call site 已迁移。
 - **`stripEmpty()` token-efficient（025）** — `renderResult` 的 json/pretty-json 分支递归清空 `data` 中的空 `{}` / 空 `[]`（保留 `null`/`false`/`0`/`''`），节省 ~5–20% LM agent token。human 模式不调用。空数组字段（如 `data.changedParts`）若为空会被移除 — 调用者改用 `?? []` 兜底。
 - **`buildSchemaMeta()` 精简 meta（025）** — `--schema` 响应使用 `SchemaOutputMeta = Pick<OutputMeta, 'command' | 'version' | 'durationMs'>`，不再含 `timestamp`/`warnings`。`printSchema()` 改用之。Schema introspection 跨运行稳定且最小。
