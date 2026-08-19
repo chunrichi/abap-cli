@@ -171,7 +171,10 @@ async function loadProjectConfig(): Promise<{ systemName: string }> {
   return { systemName: cfg.systemName };
 }
 
-/** 014: pull a DDIC object via ICF GET /ddic/<type>/<name> and write the local JSON. */
+/** 014: pull a DDIC object via ICF GET /ddic/<type>/<name> and write the local JSON.
+ *  024: TABL/STRU switch to the abap-file-format three-piece layout
+ *  (main + ddic + settings.json) when the wire carries canonical strings from
+ *  zcl_abap_vibe_tabl_format. DOMA/DTEL stay on the flat single-file layout. */
 async function runPullDdic(objectName: string, type: DdicSupportedType, opts: PullOptions): Promise<PullResult> {
   const icf = await IcfClient.create();
   const resp = await icf.getDdic<Record<string, unknown>>(type.toLowerCase(), objectName);
@@ -185,6 +188,26 @@ async function runPullDdic(objectName: string, type: DdicSupportedType, opts: Pu
       nextSteps: [
         'Verify the object exists in the target system.',
         'Run `abap search <name>` to confirm the object name and type.',
+      ],
+    });
+  }
+
+  // 024: TABL/STRU three-piece layout when wire carries canonical strings.
+// When the wire has ddicSource but is missing mainJson, fall through to the
+// flat wire path (legacy data) — writePullDdicTabl will detect the partial
+// state and reject with TABL_ARTIFACT_INCOMPLETE.
+  if ((type === 'TABL' || type === 'STRU') && typeof resp.data.mainJson === 'string' && typeof resp.data.ddicSource === 'string') {
+    return writePullDdicTabl(objectName, type, resp.data as unknown as Parameters<typeof wireToLocal>[1], opts);
+  }
+  if ((type === 'TABL' || type === 'STRU') && (typeof resp.data.mainJson !== 'undefined' || typeof resp.data.ddicSource !== 'undefined')) {
+    // Wire carries SOME three-piece strings but not all — partial state must
+    // not be silently downgraded to the flat layout.
+    throw new CliError('TABL_ARTIFACT_INCOMPLETE', `TABL/STRU wire for ${type} ${objectName} carries partial abap-file-format three-piece data (mainJson=${typeof resp.data.mainJson}, ddicSource=${typeof resp.data.ddicSource})`, {
+      object: objectName,
+      type,
+      nextSteps: [
+        'Verify the ICF service is version 0.5.0 or newer (run `abap doctor`).',
+        'Re-deploy the ICF bundle so zcl_abap_vibe_tabl_format is active.',
       ],
     });
   }
@@ -222,6 +245,116 @@ async function runPullDdic(objectName: string, type: DdicSupportedType, opts: Pu
       failed: [],
     },
     human: `Pulled ${type} ${objectName} to ${relPath}`,
+  };
+}
+
+/** 024: write the abap-file-format three-piece layout for TABL/STRU.
+ *  Always requires mainJson + ddicSource; settings.json is written when present
+ *  (TABL yes, STRU no — zcl_abap_vibe_tabl_format controls). */
+async function writePullDdicTabl(
+  objectName: string,
+  type: DdicSupportedType,
+  wire: Parameters<typeof wireToLocal>[1],
+  opts: PullOptions,
+): Promise<PullResult> {
+  const { extractTablArtifactWire } = await import('../dictionary/ddic-json.js');
+  const { parseTablDdic, tablArtifactPaths } = await import('../dictionary/tabl-artifact.js');
+  const pieces = extractTablArtifactWire(wire);
+  if (!pieces) {
+    throw new CliError('TABL_ARTIFACT_INCOMPLETE', `TABL/STRU wire for ${type} ${objectName} is missing mainJson or ddicSource`, {
+      object: objectName,
+      type,
+      nextSteps: [
+        'Verify the ICF service is version 0.5.0 or newer (run `abap doctor`).',
+        'Re-deploy the ICF bundle so zcl_abap_vibe_tabl_format is active.',
+      ],
+    });
+  }
+
+  // Validate DDL up front so we never write partial files.
+  try {
+    parseTablDdic(pieces.ddicSource);
+  } catch (error) {
+    throw new CliError('TABL_DDL_INVALID', error instanceof Error ? error.message : `Invalid Table and Structure DDL for ${type} ${objectName}`, {
+      object: objectName,
+      type,
+      nextSteps: [
+        'Inspect the DDL source in the error details.',
+        'Report the object to the abap maintainers if the DDL looks correct.',
+      ],
+    });
+  }
+
+  const objectLower = objectName.toLowerCase();
+  const baseName = `${objectLower}.${type.toLowerCase()}`;
+  const folder = path.join(opts.dir, folderFor(type));
+  const mainRel = path.join(folder, `${baseName}.json`);
+  const ddicRel = path.join(folder, `${baseName}.ddic`);
+  const settingsRel = pieces.hasSettings && pieces.settingsJson !== undefined
+    ? path.join(folder, `${baseName}.settings.json`)
+    : undefined;
+  const mainAbs = path.resolve(process.cwd(), mainRel);
+  const ddicAbs = path.resolve(process.cwd(), ddicRel);
+  const settingsAbs = settingsRel ? path.resolve(process.cwd(), settingsRel) : undefined;
+  const allFiles = [mainRel, ddicRel, ...(settingsRel ? [settingsRel] : [])];
+  const allAbs = [mainAbs, ddicAbs, ...(settingsAbs ? [settingsAbs] : [])];
+
+  const existing = await Promise.all(allAbs.map(fileExists));
+  const anyExists = existing.some(Boolean);
+  if (anyExists && !opts.overwrite && !opts.skipExisting) {
+    const conflicting = allAbs.filter((_, idx) => existing[idx]).map((_, idx) => allFiles[idx]!);
+    throw new CliError('OVERWRITE_REQUIRED', `${conflicting.join(', ')} already exists; use --overwrite to replace`, {
+      file: conflicting.join(', '),
+      nextSteps: ['Re-run with --overwrite to replace the existing files.'],
+      example: `abap pull ${objectName} --type ${type} --overwrite`,
+    });
+  }
+  if (anyExists && opts.skipExisting) {
+    const skipped = allFiles.filter((_, idx) => existing[idx]);
+    return {
+      data: {
+        object: objectName,
+        type,
+        entries: skipped.map((file) => ({ file, status: 'skipped' })),
+        written: [],
+        skipped,
+        failed: [],
+        layout: 'tabl-aff-three-piece',
+      },
+      human: `Skipped ${type} ${objectName} (files already exist: ${skipped.join(', ')})`,
+    };
+  }
+
+  // Cross-check tabl-artifact helper (sanity): paths() should agree on casing.
+  const helperPaths = tablArtifactPaths(mainAbs);
+  if (helperPaths.main !== mainAbs || helperPaths.ddic !== ddicAbs) {
+    throw new CliError('TABL_ARTIFACT_INCOMPLETE', `Tabl artifact path helper disagrees with computed paths for ${objectName}`, {
+      object: objectName,
+      type,
+    });
+  }
+
+  await fs.mkdir(path.dirname(mainAbs), { recursive: true });
+  await fs.writeFile(mainAbs, pieces.mainJson.endsWith('\n') ? pieces.mainJson : pieces.mainJson + '\n', 'utf-8');
+  await fs.writeFile(ddicAbs, pieces.ddicSource.endsWith('\n') ? pieces.ddicSource : pieces.ddicSource + '\n', 'utf-8');
+  if (settingsAbs && pieces.settingsJson !== undefined) {
+    await fs.writeFile(settingsAbs, pieces.settingsJson.endsWith('\n') ? pieces.settingsJson : pieces.settingsJson + '\n', 'utf-8');
+  }
+
+  return {
+    data: {
+      object: objectName,
+      type,
+      entries: allFiles.map((file) => ({ file, status: 'written' })),
+      written: allFiles,
+      skipped: [],
+      failed: [],
+      layout: settingsRel ? 'tabl-aff-three-piece' : 'tabl-aff-two-piece',
+      warnings: Array.isArray(wire.warnings) ? wire.warnings : undefined,
+    },
+    human: settingsRel
+      ? `Pulled ${type} ${objectName} to ${mainRel}, ${ddicRel}, ${settingsRel}`
+      : `Pulled ${type} ${objectName} to ${mainRel}, ${ddicRel}`,
   };
 }
 

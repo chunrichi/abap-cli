@@ -110,3 +110,132 @@ describe('014/US3 pull DDIC', () => {
     expect(out.error.code).toBe('DDIC_NOT_SUPPORTED');
   });
 });
+
+// 024: abap-file-format three-piece pull wire for TABL/STRU.
+// zcl_abap_vibe_tabl_format returns { mainJson, ddicSource, settingsJson,
+// hasSettings, type, warnings? } in response.data; the CLI must write three
+// files under src/tabl/<name>.tabl.{json,ddic,settings.json} (TABL) or
+// two files (STRU; no settings).
+describe('024 pull TABL/STRU abap-file-format three-piece layout', () => {
+  const TABL_WIRE = {
+    name: 'ZAFFEXAMPLE',
+    type: 'TABL' as const,
+    mainJson: '{\n  "formatVersion": "1",\n  "header": {\n    "description": "Example"\n  }\n}\n',
+    ddicSource: "@EndUserText.label : 'Example'\ndefine table zaffexample {\n\n  key client : abap.clnt not null;\n}\n",
+    settingsJson: '{\n  "formatVersion": "1",\n  "generalInformation": {\n    "dataClassCategory": "APPL1"\n  }\n}\n',
+    hasSettings: true,
+  };
+
+  const STRU_WIRE = {
+    name: 'ZSTRUEXAMPLE',
+    type: 'STRU' as const,
+    mainJson: '{\n  "formatVersion": "1",\n  "header": {\n    "description": "Stru"\n  }\n}\n',
+    ddicSource: "@EndUserText.label : 'Stru'\ndefine structure zstruexample {\n  field1 : abap.char(10);\n}\n",
+    settingsJson: undefined,
+    hasSettings: false,
+  };
+
+  it('writes main + ddic + settings.json when the wire carries all three pieces (TABL)', async () => {
+    icfGetDdic.mockResolvedValueOnce({ status: 'success', data: TABL_WIRE, error: null });
+    const program = makeProgram();
+    registerPullCommand(program);
+    const res = await runCommand(program, ['pull', 'ZAFFEXAMPLE', '--type', 'TABL', '--dir', 'src', '--json'], { cwd });
+    expect(res.exitCode).toBeUndefined();
+    expect(icfGetDdic).toHaveBeenCalledWith('tabl', 'ZAFFEXAMPLE');
+    const out = JSON.parse(res.stdout);
+    expect(out.data.layout).toBe('tabl-aff-three-piece');
+    expect(out.data.written).toEqual([
+      'src/tabl/zaffexample.tabl.json',
+      'src/tabl/zaffexample.tabl.ddic',
+      'src/tabl/zaffexample.tabl.settings.json',
+    ]);
+    for (const relPath of out.data.written as string[]) {
+      expect(fs.existsSync(path.join(cwd, relPath))).toBe(true);
+    }
+    const main = JSON.parse(fs.readFileSync(path.join(cwd, 'src/tabl/zaffexample.tabl.json'), 'utf-8'));
+    expect(main.formatVersion).toBe('1');
+    expect(main.header.description).toBe('Example');
+    const ddic = fs.readFileSync(path.join(cwd, 'src/tabl/zaffexample.tabl.ddic'), 'utf-8');
+    expect(ddic).toMatch(/^@EndUserText\.label/);
+    expect(ddic).toMatch(/define table zaffexample/);
+    const settings = JSON.parse(fs.readFileSync(path.join(cwd, 'src/tabl/zaffexample.tabl.settings.json'), 'utf-8'));
+    expect(settings.generalInformation.dataClassCategory).toBe('APPL1');
+  });
+
+  it('writes only main + ddic for STRU when settingsJson is absent', async () => {
+    icfGetDdic.mockResolvedValueOnce({ status: 'success', data: STRU_WIRE, error: null });
+    const program = makeProgram();
+    registerPullCommand(program);
+    const res = await runCommand(program, ['pull', 'ZSTRUEXAMPLE', '--type', 'STRU', '--dir', 'src', '--json'], { cwd });
+    expect(res.exitCode).toBeUndefined();
+    expect(icfGetDdic).toHaveBeenCalledWith('stru', 'ZSTRUEXAMPLE');
+    const out = JSON.parse(res.stdout);
+    expect(out.data.layout).toBe('tabl-aff-two-piece');
+    expect(out.data.written).toEqual([
+      'src/stru/zstruexample.stru.json',
+      'src/stru/zstruexample.stru.ddic',
+    ]);
+    expect(fs.existsSync(path.join(cwd, 'src/stru/zstruexample.stru.settings.json'))).toBe(false);
+  });
+
+  it('rejects three-piece wire with malformed DDL (TABL_DDL_INVALID, exit 7)', async () => {
+    icfGetDdic.mockResolvedValueOnce({
+      status: 'success',
+      data: { ...TABL_WIRE, ddicSource: 'this is not DDL at all' },
+      error: null,
+    });
+    const program = makeProgram();
+    registerPullCommand(program);
+    const res = await runCommand(program, ['pull', 'ZAFFEXAMPLE', '--type', 'TABL', '--dir', 'src', '--json'], { cwd });
+    expect(res.exitCode).toBe(7);
+    const out = JSON.parse(res.stderr);
+    expect(out.error.code).toBe('TABL_DDL_INVALID');
+    // No partial files on disk.
+    expect(fs.existsSync(path.join(cwd, 'src/tabl'))).toBe(false);
+  });
+
+  it('rejects three-piece wire missing mainJson (TABL_ARTIFACT_INCOMPLETE, exit 7)', async () => {
+    const wireMissingMain: typeof TABL_WIRE = { ...TABL_WIRE };
+    delete (wireMissingMain as Record<string, unknown>).mainJson;
+    icfGetDdic.mockResolvedValueOnce({
+      status: 'success',
+      data: wireMissingMain,
+      error: null,
+    });
+    const program = makeProgram();
+    registerPullCommand(program);
+    const res = await runCommand(program, ['pull', 'ZAFFEXAMPLE', '--type', 'TABL', '--dir', 'src', '--json'], { cwd });
+    expect(res.exitCode).toBe(7);
+    const out = JSON.parse(res.stderr);
+    expect(out.error.code).toBe('TABL_ARTIFACT_INCOMPLETE');
+  });
+
+  it('rejects three-piece wire when all three pieces already exist (OVERWRITE_REQUIRED, exit 2)', async () => {
+    fs.mkdirSync(path.join(cwd, 'src/tabl'), { recursive: true });
+    fs.writeFileSync(path.join(cwd, 'src/tabl/zaffexample.tabl.json'), '{}');
+    fs.writeFileSync(path.join(cwd, 'src/tabl/zaffexample.tabl.ddic'), '');
+    fs.writeFileSync(path.join(cwd, 'src/tabl/zaffexample.tabl.settings.json'), '{}');
+    icfGetDdic.mockResolvedValueOnce({ status: 'success', data: TABL_WIRE, error: null });
+    const program = makeProgram();
+    registerPullCommand(program);
+    const res = await runCommand(program, ['pull', 'ZAFFEXAMPLE', '--type', 'TABL', '--dir', 'src', '--json'], { cwd });
+    expect(res.exitCode).toBe(2);
+    const out = JSON.parse(res.stderr);
+    expect(out.error.code).toBe('OVERWRITE_REQUIRED');
+  });
+
+  it('overwrites all three pieces when --overwrite is set', async () => {
+    fs.mkdirSync(path.join(cwd, 'src/tabl'), { recursive: true });
+    fs.writeFileSync(path.join(cwd, 'src/tabl/zaffexample.tabl.json'), '{"old":true}');
+    fs.writeFileSync(path.join(cwd, 'src/tabl/zaffexample.tabl.ddic'), 'old-ddl');
+    fs.writeFileSync(path.join(cwd, 'src/tabl/zaffexample.tabl.settings.json'), '{"old":true}');
+    icfGetDdic.mockResolvedValueOnce({ status: 'success', data: TABL_WIRE, error: null });
+    const program = makeProgram();
+    registerPullCommand(program);
+    const res = await runCommand(program, ['pull', 'ZAFFEXAMPLE', '--type', 'TABL', '--dir', 'src', '--overwrite', '--json'], { cwd });
+    expect(res.exitCode).toBeUndefined();
+    const main = JSON.parse(fs.readFileSync(path.join(cwd, 'src/tabl/zaffexample.tabl.json'), 'utf-8'));
+    expect(main).not.toHaveProperty('old');
+    expect(main.formatVersion).toBe('1');
+  });
+});

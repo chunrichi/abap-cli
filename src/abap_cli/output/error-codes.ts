@@ -78,6 +78,9 @@ export type ErrorCode =
   // 023-extension-mechanism: extension loading and validation
   | 'EXTENSION_LOAD_FAILED'       // extension module failed to load (CONFIG_ERROR/exit 3)
   | 'EXTENSION_VALIDATION_FAILED' // extension shape check failed (VALIDATION_ERROR/exit 7)
+  // 024-tabl-aff-pull: abap-file-format three-piece TABL/STRU pull diagnostics
+  | 'TABL_DDL_INVALID'          // DDL parse failure (VALIDATION_ERROR/exit 7)
+  | 'TABL_ARTIFACT_INCOMPLETE'  // wire missing mainJson or ddicSource (VALIDATION_ERROR/exit 7)
   ;
 
 const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
@@ -133,6 +136,9 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   // 023-extension-mechanism
   EXTENSION_LOAD_FAILED: 'CONFIG_ERROR',
   EXTENSION_VALIDATION_FAILED: 'VALIDATION_ERROR',
+  // 024-tabl-aff-pull
+  TABL_DDL_INVALID: 'VALIDATION_ERROR',
+  TABL_ARTIFACT_INCOMPLETE: 'VALIDATION_ERROR',
 };
 
 export function categoryOf(code: ErrorCode): ErrorCategory {

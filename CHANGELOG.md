@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- **TABL/STRU 三件套 pull（024）** — `abap pull <name> --type TABL|STRU` 现在写出 abap-file-format 三件套：`src/tabl/<name>.tabl.json` + `<name>.tabl.ddic` + (TABL only) `<name>.tabl.settings.json`；STRU 无 `settings.json`（`zcl_abap_vibe_tabl_format` 对 STRU 不生成）。新文件 `src/abap_cli/dictionary/tabl-artifact.ts`（`parseTablDdic` DDL → fields、`tablArtifactPaths`/`isTablArtifactFile` 支持 `.tabl.*` 与 `.stru.*`）；`dictionary/ddic-json.ts` 扩展 `DdicFieldLocal`/`DdicFieldWire` 加入 `precField`（INCLUDE/APPEND 字段）、新增 `extractTablArtifactWire`、wire payload 扩展三件套字段（`mainJson` / `ddicSource` / `settingsJson` / `hasSettings` / `type` / `warnings`）；`flows/pull-flow.ts` `runPullDdic` 检测三件套 wire → 走 `writePullDdicTabl`（先校验 DDL 再写文件，保证不落部分文件），`--overwrite` 覆盖三件套，DOMA/DTEL 沿用 flat wire 路径零回归。ICF 服务版本 0.4.0 → 0.5.0（SAP 端 `zcl_abap_vibe_tabl_format` 已就位）。两个新错误码：`TABL_DDL_INVALID`（VALIDATION_ERROR/7）+ `TABL_ARTIFACT_INCOMPLETE`（VALIDATION_ERROR/7，含 partial-wire 检测避免静默降级）。新增 2 个测试文件 / 16 个用例（`tabl-artifact` 10 + `ddic-pull` 增 6 场景）；所有 98 个测试文件 / 571 个用例全过。push 路径仍走 014 的单文件 wire（flat push），三件套 push 留作 follow-up。
 - **`abap config` 命令（021 补充）** — 新增 `config` 子命令，与 `init` / `profile` 形成三层职责分离：
   - `abap config show`：显示当前 workspace 配置（.abap.json 内容）
   - `abap config set`：修改当前 workspace 配置（`--profile` / `--package` / `--tr` / `--source-dir`）

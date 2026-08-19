@@ -1,0 +1,7 @@
+{
+    "class": {
+        "type": "CLAS",
+        "description": "Canonical ABAP file format generator for DDIC tables.",
+        "final": true
+    }
+}

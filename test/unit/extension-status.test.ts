@@ -56,12 +56,12 @@ describe('abap extension status (021: new subcommand)', () => {
 
   it('returns installed=true and match=true when remote version equals expected', async () => {
     mockGet.mockReset();
-    mockGet.mockResolvedValueOnce({ status: 'success', data: { version: '0.4.0' } });
+    mockGet.mockResolvedValueOnce({ status: 'success', data: { version: '0.5.0' } });
     const { data } = await run(['extension', 'status', '--json']);
     const d = data as { installed: boolean; match: boolean; remoteVersion: string; expectedVersion: string };
     expect(d.installed).toBe(true);
     expect(d.match).toBe(true);
-    expect(d.remoteVersion).toBe('0.4.0');
+    expect(d.remoteVersion).toBe('0.5.0');
   });
 
   it('returns installed=true but match=false when version differs', async () => {
