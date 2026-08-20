@@ -16,9 +16,9 @@ interface ActivateOptions {
 export function registerActivateCommand(program: Command): void {
   program
     .command('activate <object>')
-    .description('Activate all inactive items of an object (method/OSI level)')
+    .description('Activate inactive ABAP objects')
     .addHelpText('after', commonErrorsAfter())
-    .option('--type <type>', 'Object type (CLAS, PROG, INTF, etc.) — disambiguates same-name objects')
+    .option('--type <type>', 'Object type (CLAS, PROG, INTF, etc.)')
     .option('--yes', 'Confirm in non-interactive environments')
     .action(async (object: string, opts: ActivateOptions, cmd) => {
       const mode = jsonFromCommand(cmd);

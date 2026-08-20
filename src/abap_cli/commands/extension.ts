@@ -19,7 +19,7 @@ interface DeployOptions {
 export function registerExtensionCommand(program: Command): void {
   const extension = program
     .command('extension')
-    .description('Manage the bundled ICF ABAP extension. Subcommands: deploy (install/update), status (probe installation).')
+    .description('Manage the bundled ICF ABAP extension (deploy / status)')
     .addHelpText('after', commonErrorsAfter())
     .action((_opts, cmd) => {
       // Bare `abap extension` prints subcommand help.
@@ -28,13 +28,13 @@ export function registerExtensionCommand(program: Command): void {
 
   extension
     .command('deploy')
-    .description('Deploy bundled ICF ABAP service to SAP system (--dry-run/--diff preview available)')
+    .description('Deploy bundled ICF ABAP service to SAP')
     .option('--tr <transport>', 'Transport number (required when --package is not $TMP)')
     .option('--package <package>', 'Target SAP package (default $TMP — local, no transport needed)', '$TMP')
     .option('--dry-run', 'Plan only — make no mutating SAP calls')
     .option('--diff', 'Report per-file source differences')
-    .option('--force', 'Bypass safety guards (notes forced: true in the result)')
-    .option('--yes', 'Confirm the deployment in non-interactive mode')
+    .option('--force', 'Bypass safety guards')
+    .option('--yes', 'Confirm in non-interactive mode')
     .action(async (opts: DeployOptions, cmd) => {
       const mode = jsonFromCommand(cmd);
       try {
@@ -80,7 +80,7 @@ export function registerExtensionCommand(program: Command): void {
 
   extension
     .command('status')
-    .description('Probe the SAP-side ICF extension: installed? which version? matches the bundled version?')
+    .description('Probe the SAP-side ICF extension installation')
     .action(async (_opts, cmd) => {
       const mode = jsonFromCommand(cmd);
       try {

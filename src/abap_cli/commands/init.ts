@@ -59,7 +59,7 @@ const AGENT_VALUES: AgentTarget[] = ['generic', 'copilot', 'claude', 'cursor'];
 export function registerInitCommand(program: Command): void {
   const init = program
     .command('init')
-    .description('Initialize the workspace (bind a profile, write .abap.json), inspect/modify the existing binding (--show-config / --unset-*), and/or scaffold AI agent context (--agent). Run bare `abap init` for the interactive wizard.')
+    .description('Initialize the workspace (bind a profile, write .abap.json) and/or scaffold AI agent context')
     .addHelpText('after', commonErrorsAfter())
     .addHelpText('after', initParamHelp())
     .option('--profile <name>', 'Use an existing global profile (created with `abap profile add`)')

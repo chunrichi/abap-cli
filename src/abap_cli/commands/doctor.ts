@@ -13,12 +13,12 @@ interface DoctorOptions {
 export function registerDoctorCommand(program: Command): void {
   program
     .command('doctor')
-    .description('Diagnose the CLI environment: environment, config, connections')
+    .description('Diagnose CLI environment and configuration')
     .addHelpText('after', commonErrorsAfter())
-    .option('--verbose', 'Include detail (versions, paths, underlying messages)')
-    .option('--fix', 'Apply only safe, reversible fixes (requires --yes in non-interactive environments)')
+    .option('--verbose', 'Include detail (versions, paths, messages)')
+    .option('--fix', 'Apply safe, reversible fixes (requires --yes)')
     .option('--yes', 'Confirm --fix without prompting')
-    .option('--system <name>', 'Scope the connection section to a named profile')
+    .option('--system <name>', 'Scope to a named profile')
     .action(async (opts: DoctorOptions, cmd) => {
       const mode = jsonFromCommand(cmd);
       try {

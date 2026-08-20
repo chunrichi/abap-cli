@@ -9,13 +9,13 @@ interface InspectOptions extends InspectFlags {}
 export function registerInspectCommand(program: Command): void {
   program
     .command('inspect [object]')
-    .description('Inspect SAP object metadata read-only (no local files required)')
+    .description('View ABAP object metadata')
     .addHelpText('after', commonErrorsAfter())
     .option('--structure', 'Include object structure elements')
     .option('--includes', 'Include class include parts')
-    .option('--locks', 'Include lock / transport ownership (read-only)')
+    .option('--locks', 'Include transport ownership (not ADT editor-session state)')
     .option('--package', 'Include the object package name')
-    .option('--activation', 'Verify active vs latest source (read-only; detect stale activation)')
+    .option('--activation', 'Verify active vs latest source (detect stale activation)')
     .action(async (object: string | undefined, opts: InspectOptions, cmd) => {
       const mode = jsonFromCommand(cmd);
       try {

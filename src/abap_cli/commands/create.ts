@@ -6,7 +6,7 @@ import { runCreate, runCreateLocal, type CreateOptions, type CreateLocalOptions 
 export function registerCreateCommand(program: Command): void {
   const createCmd = program
     .command('create')
-    .description('Create a new ABAP source object (CLAS, INTF, PROG, FUGR) and activate it')
+    .description('Create and activate a new ABAP object (CLAS, INTF, PROG, FUGR)')
     .addHelpText('after', commonErrorsAfter())
     // [type]/[name]（可选）是因为 --schema 模式下不需要 name；真实创建仍需两者。
     .argument('[type]', 'Object type (CLAS, INTF, PROG, FUGR)')
@@ -16,14 +16,14 @@ export function registerCreateCommand(program: Command): void {
     .option('--package <package>', 'Target SAP package (required)')
     .option('--description <desc>', 'Object description (required)')
     .option('--tr <transport>', 'Transport number')
-    .option('--no-activate', 'Create the object but do not activate it')
+    .option('--no-activate', 'Create without activating')
     .option('--template <template>', 'Skeleton template (minimal, public-method, report, selection-screen, ...)')
     .option('--no-pull', 'Skip the create-then-pull local copy (default: pull after create)')
-    .option('--check-only', 'Validate the proposed object without creating it')
+    .option('--check-only', 'Validate without creating')
     .option('--audit', 'Include the before-checksum (extra SAP round-trip, off by default)')
     .option('--file <path>', '014: abap-file-format DDIC JSON input (required for DOMA/DTEL/TABL/STRU)')
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
-    .option('--yes', 'Skip confirmation prompt for write operations')
+    .option('--yes', 'Confirm in non-interactive mode')
     .action(async (type, name, opts, cmd) => {
       const mode = jsonFromCommand(cmd);
       try {

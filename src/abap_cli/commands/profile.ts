@@ -11,7 +11,7 @@ import { runAdd, runSet } from '../flows/profile-flow.js';
 export function registerProfileCommand(program: Command): void {
   const profile = program
     .command('profile')
-    .description('Manage global connection profiles. Run `abap init --profile <name>` to bind the current workspace.')
+    .description('Manage global connection profiles')
     .addHelpText('after', commonErrorsAfter())
     .action((_opts, cmd) => {
       // Bare `abap profile` prints the subcommand help (exit 0), like bare `abap`.
@@ -76,7 +76,7 @@ export function registerProfileCommand(program: Command): void {
 
   profile
     .command('test <name>')
-    .description('Probe a connection profile: tls → auth → adt → icf')
+    .description('Probe a connection profile end-to-end')
     .action(async (name: string, _opts, cmd) => {
       try {
         await runTest(name, jsonFromCommand(cmd));
@@ -88,7 +88,7 @@ export function registerProfileCommand(program: Command): void {
   profile
     .command('delete <name>')
     .description('Delete a connection profile and its stored password')
-    .option('--yes', 'Delete without prompting (required in non-interactive environments)')
+    .option('--yes', 'Delete without prompting')
     .action(async (name: string, opts: { yes?: boolean }, cmd) => {
       try {
         await runDelete(name, opts.yes === true, jsonFromCommand(cmd));
@@ -99,7 +99,7 @@ export function registerProfileCommand(program: Command): void {
 
   profile
     .command('export [names...]')
-    .description('Export connection profiles to a portable bundle (passwords excluded by default)')
+    .description('Export connection profiles to a bundle')
     .option('--file <path>', 'Write the bundle to a file (default: stdout)')
     .option('--with-passwords', 'Include passwords in the bundle (warned opt-in)')
     .action(async (names: string[], opts: { file?: string; withPasswords?: boolean }, cmd) => {
@@ -123,7 +123,7 @@ export function registerProfileCommand(program: Command): void {
 
   profile
     .command('import <file>')
-    .description('Import connection profiles from a bundle (existing profiles are skipped)')
+    .description('Import connection profiles from a bundle')
     .option('--overwrite', 'Update profiles that already exist')
     .action(async (file: string, opts: { overwrite?: boolean }, cmd) => {
       const mode = jsonFromCommand(cmd);

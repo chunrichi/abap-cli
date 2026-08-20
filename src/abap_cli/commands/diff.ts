@@ -16,12 +16,12 @@ interface DiffOptions {
 export function registerDiffCommand(program: Command): void {
   program
     .command('diff [file]')
-    .description('Compare local files against SAP (read-only)')
+    .description('Compare local files against SAP')
     .addHelpText('after', commonErrorsAfter())
     .option('--all', 'Compare the whole workspace')
-    .option('--remote', 'Only remote-only differences')
-    .option('--local-only', 'Only local-only differences')
-    .option('--limit <n>', `Bounds the result (default ${SEARCH_RESULT_LIMIT})`)
+    .option('--remote', 'Remote-only differences')
+    .option('--local-only', 'Local-only differences')
+    .option('--limit <n>', `Result bound (default ${SEARCH_RESULT_LIMIT})`)
     .action(async (file: string | undefined, opts: DiffOptions, cmd) => {
       const mode = jsonFromCommand(cmd);
       try {

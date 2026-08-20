@@ -10,12 +10,12 @@ import { listExtensionsAction } from '../extensions/list-command.js';
 export function registerExtensionsCommand(program: Command): void {
   const extensions = program
     .command('extensions')
-    .description('Manage installed extensions. Subcommands: list.')
+    .description('Manage installed extensions')
     .addHelpText('after', commonErrorsAfter());
 
   extensions
     .command('list')
-    .description('List all registered extensions (loaded and failed), with their source and status')
+    .description('List registered extensions')
     .action(async (_opts, cmd) => {
       const json = cmd.optsWithGlobals().json ?? false;
       // ctx is a minimal ExtensionContext — no command/argv needed for list

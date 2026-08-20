@@ -19,7 +19,7 @@ interface ListData {
 export function registerTransportCommand(program: Command): void {
   const transportCmd = program
     .command('transport')
-    .description('Manage SAP transport requests')
+    .description('Manage transport requests')
     .addHelpText('after', commonErrorsAfter());
 
   transportCmd
@@ -37,11 +37,11 @@ export function registerTransportCommand(program: Command): void {
 
   transportCmd
     .command('create')
-    .description('Create a new transport request (write — requires --yes / --dry-run in non-TTY mode)')
+    .description('Create a transport request')
     .argument('<description>', 'Transport description')
     .option('--package <package>', 'Target SAP package (default $TMP)')
     .option('--dry-run', 'Plan only — make no mutating SAP calls')
-    .option('--yes', 'Confirm the create in non-interactive mode')
+    .option('--yes', 'Confirm in non-interactive mode')
     .action(async (description, opts, cmd) => {
       const mode = jsonFromCommand(cmd);
       try {
@@ -53,7 +53,7 @@ export function registerTransportCommand(program: Command): void {
 
   transportCmd
     .command('show <req>')
-    .description('Show structured metadata for a transport request')
+    .description('Show transport request metadata')
     .action(async (req: string, _opts, cmd) => {
       const mode = jsonFromCommand(cmd);
       try {
@@ -67,7 +67,7 @@ export function registerTransportCommand(program: Command): void {
 
   transportCmd
     .command('resolve <object>')
-    .description('Show which transport request(s) an object belongs to (read-only)')
+    .description('Show which transport an object belongs to')
     .action(async (object: string, _opts, cmd) => {
       const mode = jsonFromCommand(cmd);
       try {
@@ -81,10 +81,10 @@ export function registerTransportCommand(program: Command): void {
 
   transportCmd
     .command('assign <object>')
-    .description('Attach an object to a transport request (write — requires --yes / --dry-run in non-TTY mode; no-op when already assigned)')
+    .description('Attach an object to a transport request')
     .requiredOption('--tr <transport>', 'Target transport request')
     .option('--dry-run', 'Plan only — make no mutating SAP calls')
-    .option('--yes', 'Confirm the assign in non-interactive mode')
+    .option('--yes', 'Confirm in non-interactive mode')
     .action(async (object: string, opts: AssignOptions, cmd) => {
       const mode = jsonFromCommand(cmd);
       try {

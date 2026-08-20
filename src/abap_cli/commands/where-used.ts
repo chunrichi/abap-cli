@@ -22,13 +22,13 @@ export function registerWhereUsedCommand(program: Command): void {
   program
     .command('where-used')
     .alias('references')
-    .description('Find direct references to a SAP object (read-only)')
+    .description('Find SAP object references (read-only)')
     .argument('[object]', 'SAP object name')
     .option('--type <type>', 'Target object type')
     .option('--ref-type <type>', 'Filter references by object type')
     .option('--package <package>', 'Filter references by package')
     .option('--limit <n>', `Max returned references (default ${DEFAULT_WHERE_USED_LIMIT}, max ${MAX_WHERE_USED_LIMIT})`)
-    .option('--schema', 'Print the command parameter schema as JSON and exit 0')
+    .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action(async (object: string | undefined, opts: WhereUsedCliOptions, cmd: Command) => {
       const mode = jsonFromCommand(cmd);
       try {

@@ -18,7 +18,7 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
   {
     name: 'init',
     scope: 'local',
-    description: 'Initialize the workspace (bind a profile, write .abap.json), inspect/modify the existing binding (--show-config / --unset-*), and/or scaffold AI agent context (--agent). Run bare `abap init` for the interactive wizard.',
+    description: 'Initialize the workspace (bind a profile, write .abap.json) and/or scaffold AI agent context',
     load: () => import('./commands/init.js').then((m) => ({ register: m.registerInitCommand })),
   },
   {
@@ -29,23 +29,23 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
   {
     name: 'run',
     scope: 'sap',
-    description: 'Execute an ABAP class (classrun) or a static method via the bundled runner wrapper; returns stdout + exit code (read-only).',
+    description: 'Execute ABAP class (classrun) or PUBLIC STATIC method; returns stdout + exit code',
     load: () => import('./commands/run.js').then((m) => ({ register: m.registerRunCommand })),
   },
   {
     name: 'select',
     scope: 'sap',
-    description: 'Query table data read-only via the bundled ICF /data endpoint (SE16N equivalent): --table ZTAB [--fields ...] [--where ...] [--limit N] [--offset N] [--order-by ...] [--count-only].',
+    description: 'Query table data read-only (SE16N equivalent) via the bundled ICF /data endpoint',
     load: () => import('./commands/select.js').then((m) => ({ register: m.registerSelectCommand })),
   },
   {
     name: 'push',
-    description: 'Push local ABAP files to SAP (lock → set source → syntax check → activate → unlock)',
+    description: 'Push local ABAP files to SAP',
     load: () => import('./commands/push.js').then((m) => ({ register: m.registerPushCommand })),
   },
   {
     name: 'check',
-    description: 'Validate local ABAP files. Subcommands: syntax (default), content (local-only), atc.',
+    description: 'Validate ABAP source code (syntax / content / atc)',
     load: () => import('./commands/check.js').then((m) => ({ register: m.registerCheckCommand })),
   },
   {
@@ -55,67 +55,67 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
   },
   {
     name: 'create',
-    description: 'Create a new ABAP source object (CLAS, INTF, PROG, FUGR) and activate it',
+    description: 'Create and activate a new ABAP object (CLAS, INTF, PROG, FUGR)',
     load: () => import('./commands/create.js').then((m) => ({ register: m.registerCreateCommand })),
   },
   {
     name: 'status',
-    description: 'Show differences between local files and SAP system (changed parts)',
+    description: 'Show local vs SAP sync status',
     load: () => import('./commands/status.js').then((m) => ({ register: m.registerStatusCommand })),
   },
   {
     name: 'transport',
-    description: 'Manage SAP transport requests',
+    description: 'Manage transport requests',
     load: () => import('./commands/transport.js').then((m) => ({ register: m.registerTransportCommand })),
   },
   {
     name: 'extension',
-    description: 'Manage the bundled ICF ABAP extension. Subcommands: deploy (install/update), status (probe installation).',
+    description: 'Manage the bundled ICF ABAP extension (deploy / status)',
     load: () => import('./commands/extension.js').then((m) => ({ register: m.registerExtensionCommand })),
   },
   {
     name: 'profile',
     scope: 'local',
-    description: 'Manage global connection profiles. Run `abap init --profile <name>` to bind the current workspace.',
+    description: 'Manage global connection profiles',
     load: () => import('./commands/profile.js').then((m) => ({ register: m.registerProfileCommand })),
   },
   {
     name: 'doctor',
     scope: 'local',
-    description: 'Diagnose the CLI environment: environment, config, connections',
+    description: 'Diagnose CLI environment and configuration',
     load: () => import('./commands/doctor.js').then((m) => ({ register: m.registerDoctorCommand })),
   },
   {
     name: 'inspect',
-    description: 'Inspect SAP object metadata read-only (no local files required)',
+    description: 'View ABAP object metadata',
     load: () => import('./commands/inspect.js').then((m) => ({ register: m.registerInspectCommand })),
   },
   {
     name: 'where-used',
     scope: 'sap',
-    description: 'Find direct references to a SAP object (read-only): where-used ZCL_MY_CLASS [--type CLAS] [--ref-type ...] [--package ...] [--limit N].',
+    description: 'Find SAP object references (read-only)',
     load: () => import('./commands/where-used.js').then((m) => ({ register: m.registerWhereUsedCommand })),
   },
   {
     name: 'tcode',
     scope: 'sap',
-    description: 'Resolve a transaction code to its configured ABAP entry program and screen (read-only).',
+    description: 'Resolve transaction code to its ABAP entry program (read-only)',
     load: () => import('./commands/tcode.js').then((m) => ({ register: m.registerTcodeCommand })),
   },
   {
     name: 'activate',
-    description: 'Activate all inactive items of an object (method/OSI level)',
+    description: 'Activate inactive ABAP objects',
     load: () => import('./commands/activate.js').then((m) => ({ register: m.registerActivateCommand })),
   },
   {
     name: 'diff',
-    description: 'Compare local files against SAP (read-only)',
+    description: 'Compare local files against SAP',
     load: () => import('./commands/diff.js').then((m) => ({ register: m.registerDiffCommand })),
   },
   {
     name: 'extensions',
     scope: 'local',
-    description: 'Manage installed extensions. Subcommands: list.',
+    description: 'Manage installed extensions',
     load: () => import('./commands/extensions.js').then((m) => ({ register: m.registerExtensionsCommand })),
   },
 ];
@@ -132,8 +132,8 @@ program
   .name('abap')
   .description('CLI tool for ABAP vibe coding — agent-driven ABAP development')
   .version(version)
-  .option('--json', 'Output in JSON format (compact, token-efficient for LM agents)')
-  .option('--pretty-json', 'Output in pretty JSON format (indented; overrides --json)');
+  .option('--json', 'Output in JSON format (compact, default for agents)')
+  .option('--pretty-json', 'Output in pretty JSON format (overrides --json)');
 
 // 顶层错误处理（FR-005/FR-007）：commander 抛错（缺参/未知选项）由这里归一化为
 // 结构化错误；--help/--version 让 commander 自己写 stdout（包含 addHelpText

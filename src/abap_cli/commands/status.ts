@@ -16,12 +16,12 @@ interface StatusOptions {
 export function registerStatusCommand(program: Command): void {
   program
     .command('status')
-    .description('Show differences between local files and SAP system (changed parts)')
+    .description('Show local vs SAP sync status')
     .addHelpText('after', commonErrorsAfter())
-    .option('--remote-only', 'Show only objects that exist on SAP but not locally')
-    .option('--local-only', 'Show only objects that exist locally but not on SAP')
-    .option('--limit <n>', `Maximum result count (default ${SEARCH_RESULT_LIMIT})`)
-    .option('--since <iso-date>', 'Only compare local files modified since this date (YYYY-MM-DD[THH:mm:ss])')
+    .option('--remote-only', 'Objects on SAP but not locally')
+    .option('--local-only', 'Objects locally but not on SAP')
+    .option('--limit <n>', `Max result count (default ${SEARCH_RESULT_LIMIT})`)
+    .option('--since <iso-date>', 'Compare files modified since date (YYYY-MM-DD[THH:mm:ss])')
     .option('--all', 'Include unchanged objects')
     .action(async (opts: StatusOptions, cmd) => {
       const mode = jsonFromCommand(cmd);
