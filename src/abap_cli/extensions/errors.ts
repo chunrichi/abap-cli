@@ -47,3 +47,19 @@ export function extensionValidationFailed(
     : `ValidationRule '${ruleName}' rejected '${file}'.`;
   return new CliError('EXTENSION_VALIDATION_FAILED', message, { details });
 }
+
+/**
+ * Create a VALIDATION_ERROR CliError when a `beforeCommand` hook vetoes a
+ * command. Lets an extension gate or disable commands without touching core.
+ */
+export function extensionCommandBlocked(
+  hookName: string,
+  command: string,
+  reason: string,
+): CliError {
+  return new CliError(
+    'EXTENSION_COMMAND_BLOCKED',
+    `Command '${command}' was blocked by '${hookName}': ${reason}`,
+    { details: { hook: hookName, command, reason } },
+  );
+}

@@ -69,12 +69,23 @@ export interface LifecycleErrorContext extends LifecycleContext {
 export type LifecycleHookEvent = 'beforeParse' | 'beforeCommand' | 'afterCommand' | 'onError';
 
 /**
+ * A `beforeCommand` hook may veto execution by returning this. The command is
+ * aborted with EXTENSION_COMMAND_BLOCKED before its action runs.
+ */
+export interface LifecycleVeto {
+  block: true;
+  /** Human-readable reason surfaced in the error message. */
+  reason: string;
+}
+
+/**
  * Sync or async hook function.
  * Errors are always swallowed — use onError for error handling.
+ * Only `beforeCommand` honours a returned {block:true} veto.
  */
 export type LifecycleFn = (
   ctx: LifecycleContext | LifecycleErrorContext,
-) => void | Promise<void>;
+) => void | LifecycleVeto | Promise<void | LifecycleVeto>;
 
 /** A single LifecycleHook instance. */
 export interface LifecycleHook {

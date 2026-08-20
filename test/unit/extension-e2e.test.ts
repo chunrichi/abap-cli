@@ -245,14 +245,72 @@ export default {
     const extensions = (data.extensions as Array<Record<string, unknown>>) ?? [];
     const conflict = extensions.find((e) => e.name === 'pull');
     expect(conflict).toBeDefined();
-    // Note: Extension loads successfully (lazy extension mechanism doesn't detect
-    // conflict with built-in command until invocation time). The built-in 'pull'
-    // takes precedence when actually invoked.
-    expect(conflict!.status).toBe('loaded');
+    // A CommandExtension may not shadow a built-in command: it is rejected at
+    // load time so the built-in always wins.
+    expect(conflict!.status).toBe('failed');
 
     // Verify the built-in pull is still accessible (shows help, not extension output)
     const pullResult = await runCli(['pull', '--help'], workspace);
     expect(pullResult.exitCode).toBe(0);
     expect(pullResult.stdout).toContain('Download ABAP objects from SAP');
+  });
+
+  it('T028 CommandExtension is actually invocable', { timeout: 60_000 }, async () => {
+    workspace = mkdtempSync(join(os.tmpdir(), 'abap-ext-e2e-t028-'));
+
+    const extFile = join(workspace, 'hello.mjs');
+    writeFileSync(extFile, `
+export default {
+  type: 'command',
+  name: 'myorg-hello',
+  description: 'Say hello from an extension',
+  command: 'myorg-hello [name]',
+  action: (ctx, opts, name) => { console.log('hello ' + (name ?? 'world')); },
+};
+`);
+
+    writeFileSync(join(workspace, '.abap.json'), JSON.stringify({
+      system: 'mock',
+      transport: 'TRA123',
+      package: 'ZTEST',
+      extensions: [
+        { type: 'command', name: 'myorg-hello', source: { sourceType: 'path', path: extFile } },
+      ],
+    }, null, 2));
+
+    const result = await runCli(['myorg-hello', 'abap'], workspace);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('hello abap');
+  });
+
+  it('T029 beforeCommand hook can veto a command', { timeout: 60_000 }, async () => {
+    workspace = mkdtempSync(join(os.tmpdir(), 'abap-ext-e2e-t029-'));
+
+    const extFile = join(workspace, 'policy.mjs');
+    writeFileSync(extFile, `
+export default {
+  type: 'lifecycle',
+  name: 'command-policy',
+  event: 'beforeCommand',
+  hook: (ctx) => {
+    if (ctx.command === 'search') return { block: true, reason: 'disabled by policy' };
+  },
+};
+`);
+
+    writeFileSync(join(workspace, '.abap.json'), JSON.stringify({
+      system: 'mock',
+      transport: 'TRA123',
+      package: 'ZTEST',
+      extensions: [
+        { type: 'lifecycle', name: 'command-policy', source: { sourceType: 'path', path: extFile } },
+      ],
+    }, null, 2));
+
+    const blocked = await runCli(['search', 'ZCL_FOO', '--json'], workspace);
+    expect(blocked.exitCode).toBe(7);
+    const json = parseJson(blocked);
+    expect(json.status).toBe('error');
+    expect((json.error as Record<string, unknown>).code).toBe('EXTENSION_COMMAND_BLOCKED');
   });
 });

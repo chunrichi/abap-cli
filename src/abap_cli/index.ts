@@ -174,7 +174,7 @@ setExtRegJson(registry);
 program.hook('preAction', async (_thisCmd, actionCmd) => {
   const argv = process.argv.slice(2);
   const cmdName = actionCmd.name();
-  await registry.dispatch('beforeCommand', {
+  await registry.dispatchBeforeCommand({
     command: cmdName,
     argv,
     ts: Date.now(),
@@ -195,6 +195,10 @@ try {
   // parseAsync: lazy commands (P1.6) dispatch through an async _parseCommand,
   // so commander's sync help/error throws surface as rejections that only
   // parseAsync (which awaits the chain) re-throws into this catch block.
+  await registry.dispatch('beforeParse', {
+    command: process.argv[2] ?? '',
+    argv: process.argv.slice(2),
+  });
   await program.parseAsync();
 } catch (error: unknown) {
   handleTopLevelError(error, { program, argv: process.argv, version }, undefined, undefined, registry);
