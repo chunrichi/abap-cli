@@ -57,7 +57,7 @@ abap transport assign <object> --tr <transport> [--dry-run] [--yes] [--json]
 
 - **写保护（P0.3）**：`create` / `assign` 与 `push` / `extension deploy` / `doctor --fix` 同契约 — 非 TTY 拒绝并给 `nextSteps` 指向 `--yes` 或 `--dry-run`；`--dry-run` 零 SAP 调用；TTY 模式无交互 prompt（直接执行）
 - **`list` 桶结构**：返回 `workbench` + `customizing` 两个桶；每项含 number / description / status / owner。`--open` 只保留 `modifiable`（open）请求，否则 `modifiable + released` 合并
-- **`show` 元数据**：请求号 / 描述 / 状态 / owner / 请求内对象列表（name / type / status）
+- **`show` 元数据**：请求号 / 描述 / 状态 / owner / 请求内对象列表（name / type / status）。额外含 `tasks: TransportTaskInfo[]`（嵌套 task 列表，每项含 number / description / status / owner / `objects[]`）与 `deduplicated: number`（所有引用数 - 直接对象数；嵌套任务贡献的对象数）；用于 `abap pull --tr <request>` 的去重决策（T4.2）
 - **`resolve` 只读**：`resolveObject` → `getObjectParts` 取 main part 的 `transportInfo`，返回该对象当前所属的全部请求（可能多个）
 - **`assign` 机制**：把对象当前源码以目标请求作 `corrNr` 写回（lock → `setObjectSource` → unlock）；已挂到目标请求 → no-op（`assigned: false`）。unlock 失败仅告警不失败
 - **解析顺序（其他命令共用）**：`--tr` > `.abap.json` transport > 用户第一个 modifiable 请求 > `NO_TRANSPORT`（exit 7）；`$TMP` 下对象免 transport（transport-free）
@@ -142,10 +142,24 @@ abap transport assign ZCL_DEMO --tr NDK123456 --dry-run
     "objects": [
       { "name": "ZCL_DEMO", "type": "CLAS/OC", "status": "Active" },
       { "name": "ZPROG", "type": "PROG/P", "status": "Active" }
-    ]
+    ],
+    "tasks": [
+      {
+        "number": "NDK123457",
+        "description": "Sub-task",
+        "status": "D",
+        "owner": "MOCKUSER",
+        "objects": [
+          { "name": "ZCL_SUB", "type": "CLAS/OC", "status": "Active" }
+        ]
+      }
+    ],
+    "deduplicated": 1
   }
 }
 ```
+
+`deduplicated` = 嵌套任务贡献的对象数（这里 1：ZCL_SUB 由 task 引入但不在请求直接 `objects` 中）；`tasks` 为空数组时 `deduplicated` 为 0。
 
 `transport resolve`：
 
@@ -223,7 +237,7 @@ abap transport assign ZCL_DEMO --tr NDK123456 --dry-run
 
 # references
 
-- 实现：`src/abap_cli/commands/transport.ts`、`src/abap_cli/flows/transport-ops.ts`、`src/abap_cli/core/transport.ts`（`resolveTransport`，push/create/extension deploy 共用）
+- 实现：`src/abap_cli/commands/transport.ts`、`src/abap_cli/flows/transport-ops.ts`（`TransportRequestInfo` / `TransportTaskInfo` / `TransportObjectInfo` 类型 + `showTransport` 嵌套任务展开）、`src/abap_cli/core/transport.ts`（`resolveTransport`，push/create/extension deploy 共用）、`src/abap_cli/core/confirmation.ts`
 - 文档：`docs/commands.md`（`## abap transport` 章节）
-- 测试：`test/unit/transport-metadata.test.ts`（show/resolve/assign 元数据 + 写保护 6 分支）
+- 测试：`test/unit/transport-metadata.test.ts`（show/resolve/assign 元数据 + 写保护 6 分支）、`test/unit/pull-tr.test.ts`（`--tr` 拉取 + 去重）
 - 设计：`specs/006-transport-request-management/`

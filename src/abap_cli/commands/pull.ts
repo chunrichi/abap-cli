@@ -21,9 +21,10 @@ export function registerPullCommand(program: Command): void {
     .option('--include-all-parts', 'Include every source-code part')
     .option('--textpool', '014: also pull textpool files (.texts/.selections/.headings.<lang>.properties)')
     .option('--remote <remoteid>', '015: pull the object\'s active version source from a remote system (Version Management)')
+    .option('--tr <request>', 'T4.2: pull all objects bound to a transport request (mutually exclusive with object name and --package)')
     .action(async (objectName: string, opts: PullOptions, cmd) => {
-      // Bare `abap pull` (no object, no --package) prints the command help, like `abap pull --help`.
-      if (!objectName && !opts.package) {
+      // Bare `abap pull` (no object, no --package, no --tr) prints the command help, like `abap pull --help`.
+      if (!objectName && !opts.package && !opts.tr) {
         console.log(cmd.helpInformation());
         return;
       }

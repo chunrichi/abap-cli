@@ -58,7 +58,7 @@ describe('abap push per-object transport resolution', () => {
     transportInfo.mockResolvedValue({ TRANSPORTS: [{ TRKORR: 'BND123456', TRSTATUS: 'D' }] });
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/zcl_tr.clas.abap', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/zcl_tr.clas.abap', '--yes', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(setObjectSource).toHaveBeenCalledWith(
       '/sap/bc/adt/oo/classes/zcl_tr/source/main',
@@ -74,7 +74,7 @@ describe('abap push per-object transport resolution', () => {
     transportInfo.mockResolvedValue({ TRANSPORTS: [{ TRKORR: 'BND123456', TRSTATUS: 'D' }] });
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/zcl_tr.clas.abap', '--tr', 'BND123456', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/zcl_tr.clas.abap', '--tr', 'BND123456', '--yes', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(setObjectSource).toHaveBeenCalledWith(expect.any(String), expect.any(String), 'lock-1', 'BND123456');
   });
@@ -83,7 +83,7 @@ describe('abap push per-object transport resolution', () => {
     transportInfo.mockResolvedValue({ TRANSPORTS: [{ TRKORR: 'BND123456', TRSTATUS: 'D' }] });
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/zcl_tr.clas.abap', '--tr', 'OTHER001', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/zcl_tr.clas.abap', '--tr', 'OTHER001', '--yes', '--json'], { cwd });
     expect(res.exitCode).not.toBe(0);
     const out = JSON.parse(res.stderr);
     expect(out.error.code).toBe('VALIDATION_ERROR');
@@ -99,7 +99,7 @@ describe('abap push per-object transport resolution', () => {
     ]);
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/zcl_tr.clas.abap', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/zcl_tr.clas.abap', '--yes', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(setObjectSource).toHaveBeenCalledWith(
       '/sap/bc/adt/oo/classes/zcl_tr/source/main',
@@ -119,7 +119,7 @@ describe('abap push per-object transport resolution', () => {
     });
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/zcl_tr.clas.abap', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/zcl_tr.clas.abap', '--yes', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(setObjectSource).toHaveBeenCalledWith(expect.any(String), expect.any(String), 'lock-1', 'OPEN0001');
   });
@@ -127,7 +127,7 @@ describe('abap push per-object transport resolution', () => {
   it('still raises NO_TRANSPORT when nothing is available', async () => {
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/zcl_tr.clas.abap', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/zcl_tr.clas.abap', '--yes', '--json'], { cwd });
     expect(res.exitCode).not.toBe(0);
     const out = JSON.parse(res.stderr);
     expect(out.error.code).toBe('NO_TRANSPORT');
@@ -137,7 +137,7 @@ describe('abap push per-object transport resolution', () => {
   it('uses --tr for an unbound non-$TMP object', async () => {
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/zcl_tr.clas.abap', '--tr', 'EXPL0001', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/zcl_tr.clas.abap', '--tr', 'EXPL0001', '--yes', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(setObjectSource).toHaveBeenCalledWith(expect.any(String), expect.any(String), 'lock-1', 'EXPL0001');
   });
@@ -146,7 +146,7 @@ describe('abap push per-object transport resolution', () => {
     lock.mockRejectedValueOnce(new Error('Object ZCL_TR is locked by user OTHER'));
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/zcl_tr.clas.abap', '--tr', 'EXPL0001', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/zcl_tr.clas.abap', '--tr', 'EXPL0001', '--yes', '--json'], { cwd });
     expect(res.exitCode).toBe(9);
     const out = JSON.parse(res.stderr);
     expect(out.error.code).toBe('LOCK_FAILED');
@@ -164,7 +164,7 @@ describe('abap push per-object transport resolution', () => {
     fs.writeFileSync(path.join(cwd, 'src/zcl_tr.clas.macros.abap'), 'DEFINE macro_x.\nEND-OF-DEFINITION.\n');
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/zcl_tr.clas.macros.abap', '--tr', 'EXPL0001', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/zcl_tr.clas.macros.abap', '--tr', 'EXPL0001', '--yes', '--json'], { cwd });
     expect(res.exitCode).not.toBe(0);
     const out = JSON.parse(res.stderr);
     expect(out.error.code).toBe('SAP_ERROR');
@@ -186,7 +186,7 @@ describe('abap push per-object transport resolution', () => {
     fs.writeFileSync(path.join(cwd, 'src/zcl_tr.clas.macros.abap'), 'DEFINE macro_x.\nEND-OF-DEFINITION.\n');
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/zcl_tr.clas.macros.abap', '--tr', 'EXPL0001', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/zcl_tr.clas.macros.abap', '--tr', 'EXPL0001', '--yes', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(setObjectSource).toHaveBeenCalledWith(
       '/sap/bc/adt/oo/classes/zcl_tr/source/macros',

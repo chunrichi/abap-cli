@@ -16,6 +16,7 @@ export function registerPushCommand(program: Command): void {
     .option('--dry-run', 'Plan only — make no mutating ADT calls (FR-012)')
     .option('--fail-fast', 'Stop at the first failing file (default: --keep-going)')
     .option('--atomic', 'Validate all files first; write nothing if any file fails validation')
+    .option('--yes', 'Skip confirmation prompt for write operations')
     .action(async (files: string[], opts: PushFileOptions, cmd) => {
       const mode = jsonFromCommand(cmd);
       try {

@@ -53,7 +53,7 @@ describe('abap create options (US7, FR-021..023, SC-008)', () => {
   it('--check-only validates without creating (zero create calls)', async () => {
     const program = makeProgram();
     registerCreateCommand(program);
-    const res = await runCommand(program, ['create', 'CLAS', 'ZCL_CHK', '--package', 'ZPKG', '--description', 'T', '--check-only', '--json'], { cwd });
+    const res = await runCommand(program, ['create', 'CLAS', 'ZCL_CHK', '--package', 'ZPKG', '--description', 'T', '--check-only', '--yes', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(createObject).not.toHaveBeenCalled();
     expect(validateNewObject).toHaveBeenCalled();
@@ -64,7 +64,7 @@ describe('abap create options (US7, FR-021..023, SC-008)', () => {
   it('--template generates the registry skeleton and reports the template name', async () => {
     const program = makeProgram();
     registerCreateCommand(program);
-    const res = await runCommand(program, ['create', 'CLAS', 'ZCL_TMPL', '--package', 'ZPKG', '--description', 'T', '--template', 'public-method', '--no-pull', '--json'], { cwd });
+    const res = await runCommand(program, ['create', 'CLAS', 'ZCL_TMPL', '--package', 'ZPKG', '--description', 'T', '--template', 'public-method', '--no-pull', '--yes', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     const data = parseData(res);
     expect(data.template).toBe('public-method');
@@ -76,7 +76,7 @@ describe('abap create options (US7, FR-021..023, SC-008)', () => {
   it('--no-pull skips the pull-back (no localFile)', async () => {
     const program = makeProgram();
     registerCreateCommand(program);
-    const res = await runCommand(program, ['create', 'CLAS', 'ZCL_NOPULL', '--package', 'ZPKG', '--description', 'T', '--no-pull', '--json'], { cwd });
+    const res = await runCommand(program, ['create', 'CLAS', 'ZCL_NOPULL', '--package', 'ZPKG', '--description', 'T', '--no-pull', '--yes', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     const data = parseData(res);
     expect(data.localFile).toBeUndefined();
@@ -86,7 +86,7 @@ describe('abap create options (US7, FR-021..023, SC-008)', () => {
   it('default create writes the local file (create-then-pull)', async () => {
     const program = makeProgram();
     registerCreateCommand(program);
-    const res = await runCommand(program, ['create', 'CLAS', 'ZCL_PULL', '--package', 'ZPKG', '--description', 'T', '--json'], { cwd });
+    const res = await runCommand(program, ['create', 'CLAS', 'ZCL_PULL', '--package', 'ZPKG', '--description', 'T', '--yes', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     const data = parseData(res);
     expect(data.localFile).toMatch(/zcl_pull\/zcl_pull\.clas\.abap$/);

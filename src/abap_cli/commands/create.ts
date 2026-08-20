@@ -23,6 +23,7 @@ export function registerCreateCommand(program: Command): void {
     .option('--audit', 'Include the before-checksum (extra SAP round-trip, off by default)')
     .option('--file <path>', '014: abap-file-format DDIC JSON input (required for DOMA/DTEL/TABL/STRU)')
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
+    .option('--yes', 'Skip confirmation prompt for write operations')
     .action(async (type, name, opts, cmd) => {
       const mode = jsonFromCommand(cmd);
       try {

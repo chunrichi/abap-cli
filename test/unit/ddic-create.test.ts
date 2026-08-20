@@ -76,7 +76,7 @@ describe('014/US1 create TABL', () => {
       'create', 'TABL', 'ZTAB_TEST',
       '--file', 'src/ztab_test.tabl.json',
       '--package', '$TMP',
-      '--json',
+      '--yes', '--json',
     ], { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(icfPostDdic).toHaveBeenCalledWith('tabl', expect.objectContaining({
@@ -112,7 +112,7 @@ describe('014/US1 create TABL', () => {
       'create', 'TABL', 'ZTAB_CLI',
       '--file', 'src/ztab_test.tabl.json',
       '--package', '$TMP',
-      '--json',
+      '--yes', '--json',
     ], { cwd });
     expect(res.exitCode).toBeUndefined();
     const callBody = icfPostDdic.mock.calls[0]![1] as any;
@@ -130,7 +130,7 @@ describe('014/US1 create TABL', () => {
       '--file', 'src/ztab_test.tabl.json',
       '--package', '$TMP',
       '--description', 'CLI override',
-      '--json',
+      '--yes', '--json',
     ], { cwd });
     const callBody = icfPostDdic.mock.calls[0]![1] as any;
     expect(callBody.description).toBe('CLI override');
@@ -144,7 +144,7 @@ describe('014/US1 create TABL', () => {
       'create', 'TABL', 'XTAB',
       '--file', 'src/ztab_test.tabl.json',
       '--package', '$TMP',
-      '--json',
+      '--yes', '--json',
     ], { cwd });
     expect(res.exitCode).toBe(7); // VALIDATION_ERROR
     expect(icfPostDdic).not.toHaveBeenCalled();
@@ -160,7 +160,7 @@ describe('014/US1 create TABL', () => {
       'create', 'TABL', 'ZTAB_EMPTY',
       '--file', 'src/ztab_test.tabl.json',
       '--package', '$TMP',
-      '--json',
+      '--yes', '--json',
     ], { cwd });
     expect(res.exitCode).toBe(7);
     expect(icfPostDdic).not.toHaveBeenCalled();
@@ -174,7 +174,7 @@ describe('014/US1 create TABL', () => {
       'create', 'TABL', 'ZTAB_NOTMP',
       '--file', 'src/ztab_test.tabl.json',
       '--package', 'ZPKG',
-      '--json',
+      '--yes', '--json',
     ], { cwd });
     expect(res.exitCode).toBe(7);
     expect(icfPostDdic).not.toHaveBeenCalled();
@@ -192,7 +192,7 @@ describe('014/US1 create TABL', () => {
       'create', 'TTYP', 'ZTAB_X',
       '--file', 'src/ztab_x.ttyp.json',
       '--package', '$TMP',
-      '--json',
+      '--yes', '--json',
     ], { cwd });
     expect(res.exitCode).toBe(7);
     // create.ts raises TYPE_NOT_SUPPORTED for unknown DDIC types (TTYP).
@@ -213,7 +213,7 @@ describe('014/US1 create TABL', () => {
       'create', 'TABL', 'ZTAB_500',
       '--file', 'src/ztab_test.tabl.json',
       '--package', '$TMP',
-      '--json',
+      '--yes', '--json',
     ], { cwd });
     expect(res.exitCode).toBe(6);
     const out = JSON.parse(res.stderr);
@@ -242,7 +242,7 @@ describe('014/US2 create STRU/DTEL/DOMA', () => {
       'create', 'STRU', 'ZSTRU_TEST',
       '--file', 'src/zstru_test.stru.json',
       '--package', '$TMP',
-      '--json',
+      '--yes', '--json',
     ], { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(icfPostDdic).toHaveBeenCalledWith('stru', expect.objectContaining({
@@ -274,7 +274,7 @@ describe('014/US2 create STRU/DTEL/DOMA', () => {
       'create', 'DTEL', 'ZDTEL_TEST',
       '--file', 'src/zdtel_test.dtel.json',
       '--package', '$TMP',
-      '--json',
+      '--yes', '--json',
     ], { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(icfPostDdic).toHaveBeenCalledWith('dtel', expect.objectContaining({
@@ -306,7 +306,7 @@ describe('014/US2 create STRU/DTEL/DOMA', () => {
       'create', 'DOMA', 'ZDOMA_TEST',
       '--file', 'src/zdoma_test.doma.json',
       '--package', '$TMP',
-      '--json',
+      '--yes', '--json',
     ], { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(icfPostDdic).toHaveBeenCalledWith('doma', expect.objectContaining({
@@ -329,7 +329,7 @@ describe('014/US2 create STRU/DTEL/DOMA', () => {
       'create', 'DTEL', 'ZDTEL_BAD',
       '--file', 'src/zdtel_bad.dtel.json',
       '--package', '$TMP',
-      '--json',
+      '--yes', '--json',
     ], { cwd });
     expect(res.exitCode).toBe(7);
     expect(icfPostDdic).not.toHaveBeenCalled();
@@ -345,7 +345,7 @@ describe('014/US2 create STRU/DTEL/DOMA', () => {
       'create', 'DOMA', 'ZDOMA_BAD',
       '--file', 'src/zdoma_bad.doma.json',
       '--package', '$TMP',
-      '--json',
+      '--yes', '--json',
     ], { cwd });
     expect(res.exitCode).toBe(7);
     expect(icfPostDdic).not.toHaveBeenCalled();

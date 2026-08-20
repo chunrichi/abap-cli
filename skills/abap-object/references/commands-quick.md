@@ -57,6 +57,7 @@ abap pull --package ZDEV --limit 50 --page 1         # 包批量
 abap pull ZT_X --type TABL                           # DDIC 定义
 abap pull ZT_X --type TABL --overwrite               # 覆盖已存在
 abap pull ZCL_FOO --skip-existing                    # 跳过已存在
+abap pull --tr DEVK900001                            # T4.2: 拉请求下全部对象（直接 + 嵌套 task 去重）
 ```
 
 | flag | 含义 |
@@ -72,23 +73,28 @@ abap pull ZCL_FOO --skip-existing                    # 跳过已存在
 | `--include-all-parts` | 含全部 part |
 | `--textpool` | 拉文本元素 |
 | `--remote <id>` | 远程系统（Version Management） |
+| `--tr <request>` | T4.2: 拉请求下全部对象；与对象名/`--package` **互斥**；空字符串 → `INVALID_ARGUMENT` |
 
 文件名遵循 abap-file-format：`src/<name>/<name>.<type>.abap`（每对象一目录）或 `src/<name>.<type>.json`（DDIC）。
+
+`--tr <request>`（T4.2）走 `transportDetails` 取直接 + 嵌套 task 对象，按 `type::name` 去重后逐个走对应路由（HTTP → ICF `/http/<name>`、DDIC → ICF `/ddic/<type>/<name>`、其余 → ADT）；单对象失败不中断，部分失败 `data.partial: true`。
 
 ### `abap push`
 
 ```bash
-abap push src/zcl_foo/zcl_foo.clas.abap --tr DEVK900001
-abap push src/zcl_foo/zcl_foo.clas.abap                # 已绑定 / $TMP 无需 --tr
-abap push --all                                         # 全部 .abap（遵循 .abapignore）
+abap push src/zcl_foo/zcl_foo.clas.abap --tr DEVK900001 --yes
+abap push src/zcl_foo/zcl_foo.clas.abap --yes          # 已绑定 / $TMP 无需 --tr；非 TTY 需 --yes
+abap push --all --yes                                   # 全部 .abap（遵循 .abapignore）
 abap push <file> --check-only                           # 仅语法检查
 abap push <file> --no-activate                          # lock + write + skip
-abap push <files...> --atomic                           # 全量校验后写
-abap push <files...> --fail-fast                        # 失败即停
-abap push <file> --dry-run                              # 计划模式
-abap push src/zmy_table.tabl.json --tr DEVK900001       # DDIC JSON
+abap push <files...> --atomic --yes                     # 全量校验后写
+abap push <files...> --fail-fast --yes                  # 失败即停
+abap push <file> --dry-run                              # 计划模式（零 SAP 调用）
+abap push src/zmy_table.tabl.json --tr DEVK900001 --yes # DDIC JSON
 abap push src/zprog/zprog.prog.texts.en.properties      # textpool
 ```
+
+> 写操作：非 TTY 必须 `--yes` 或 `--dry-run`（`core/confirmation.ts` 统一守卫，exit 7）。
 
 #### 按对象 transport 解析（核心）
 
@@ -129,12 +135,12 @@ abap check syntax src/zcl_demo.clas.abap --json
 ### `abap create`
 
 ```bash
-abap create CLAS ZCL_NEW --package ZDEV --description "..." --tr DEVK900001
-abap create CLAS ZCL_NEW --no-activate              # 不激活
-abap create CLAS ZCL_NEW --template empty           # 自定义模板
-abap create local CLAS ZCL_NEW --dir ./src          # 离线草稿
-abap create TABL ZT_X --file ./zt_x.tabl.json --tr DEVK900001  # DDIC
-abap create <type> --schema                         # 自省
+abap create CLAS ZCL_NEW --package ZDEV --description "..." --tr DEVK900001 --yes
+abap create CLAS ZCL_NEW --no-activate --yes         # 不激活
+abap create CLAS ZCL_NEW --template empty --yes      # 自定义模板
+abap create local CLAS ZCL_NEW --dir ./src           # 离线草稿（不连 SAP，零 --yes）
+abap create TABL ZT_X --file ./zt_x.tabl.json --tr DEVK900001 --yes  # DDIC
+abap create <type> --schema                          # 自省（无 SAP 调用）
 abap create <type> <name> --json
 ```
 
@@ -151,6 +157,7 @@ abap create <type> <name> --json
 | `--file <path>` | DDIC JSON 文件路径 |
 | `--dir <path>` | `create local` 输出目录 |
 | `--schema` | 自省 |
+| `--yes` | 非 TTY 写操作确认（`core/confirmation.ts` 统一守卫） |
 
 ### `abap activate`
 

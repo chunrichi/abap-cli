@@ -9,6 +9,7 @@ import { readAbapFile } from '../formats/abap-source.js';
 import { resolveObject, getObjectParts, validateLocalFile, type ResolvedObject } from '../core/resolve.js';
 import { resolveTransport } from '../core/transport.js';
 import { resolveLocalTargets } from '../core/local-targets.js';
+import { requireWriteConfirmation } from '../core/confirmation.js';
 import { readDdicJson, localToWire, validateDdicObject, type DdicSupportedType } from '../dictionary/ddic-json.js';
 import { readHttpJson, localToWire as httpLocalToWire, validateHttpObject } from '../dictionary/http-json.js';
 import { pushObject, type PushStage } from './push-object.js';
@@ -25,6 +26,7 @@ export interface PushFileOptions {
   dryRun?: boolean;
   failFast?: boolean;
   atomic?: boolean;
+  yes?: boolean;
 }
 
 export interface PushFileResult {
@@ -68,6 +70,11 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
       },
     );
   }
+  requireWriteConfirmation(
+    'abap push',
+    { ...opts, supportsDryRun: true },
+    'abap push <files...> --tr <transport> --yes',
+  );
   const target = await resolveLocalTargets({ files: files.length > 0 ? files : undefined, all: opts.all });
   if (target.files.length === 0) {
     throw new CliError('USAGE', 'Specify files or use --all', {

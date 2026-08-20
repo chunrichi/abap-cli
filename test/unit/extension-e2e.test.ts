@@ -95,7 +95,7 @@ export default {
     const badFile = join(badDir, 'myprog.prog.abap');
     writeFileSync(badFile, 'REPORT ZTEST.');
 
-    const result = await runCli(['push', badFile, '--json'], workspace);
+    const result = await runCli(['push', badFile, '--yes', '--json'], workspace);
     expect(result.exitCode).toBe(7);
     // Error code appears in JSON envelope on stderr
     expect(result.stderr).toContain('EXTENSION_VALIDATION_FAILED');

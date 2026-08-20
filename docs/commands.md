@@ -84,7 +84,7 @@ Download ABAP objects from SAP to local files. Classes download all include part
 abap pull [options] [object-name]
 ```
 
-Bare `abap pull` (no object name, no `--package`) prints the command help, like `abap pull --help`.
+Bare `abap pull` (no object name, no `--package`, no `--tr`) prints the command help, like `abap pull --help`.
 
 | Option | Description |
 |--------|-------------|
@@ -99,6 +99,9 @@ Bare `abap pull` (no object name, no `--package`) prints the command help, like 
 | `--include-all-parts` | Include every source-code part |
 | `--textpool` | 014: also pull textpool files (`.texts`/`.selections`/`.headings` `<lang>.properties`) for the object |
 | `--remote <remoteid>` | 015: pull the object's active version source as transported to a remote system (Version Management) |
+| `--tr <request>` | T4.2: pull all objects bound to a transport request (direct objects + nested tasks, deduplicated by `type::name`). Mutually exclusive with `<object-name>` and `--package`. Empty string → `INVALID_ARGUMENT`. |
+
+**Transport pull (T4.2)**: `abap pull --tr <request>` calls `transportDetails` to collect every object reference (direct `objects` + `tasks[].objects`), deduplicates by `type::name`, and routes each through the standard pull pipeline (HTTP service → ICF `/http/<name>`; DDIC → ICF `/ddic/<type>/<name>`; source objects → ADT). Single-object failures do not abort the batch; the response `data` carries `transport`, `requested`, `pulled`, `failed`, `deduplicated`, `entries[]` (`{object, type, status, code?, detail?}`), `written[]`, `skipped[]`, and `partial: true` when any object failed.
 
 **Remote pull (015)**: `abap pull <name> --remote <system-id>` downloads the active (00000) source of the object from another system through the ICF `/version-source` endpoint (TMS RFC destination `TMSADM@<id>.DOMAIN_<id>`). CLI types map to Version Management types: `PROG → REPS`, `INTF → INTF`, `CLAS → CLSD` (class definition). The source is written under the object's standard filename (`src/<name>/<name>.<type>.abap`); the JSON result carries `remote` and `version` fields. If the object was never transported to the remote system the backend reports success with an empty `source`.
 
@@ -121,6 +124,7 @@ abap push [options] [files...]
 | `--dry-run` | Plan only — make no mutating ADT calls |
 | `--fail-fast` | Stop at the first failing file (default: keep going) |
 | `--atomic` | Validate all files first; write nothing if any file fails validation |
+| `--yes` | Skip confirmation prompt for write operations; non-TTY without `--yes` (or `--dry-run`) returns `VALIDATION_ERROR` (exit 7) with `nextSteps` + `example`. The shared helper is `src/abap_cli/core/confirmation.ts#requireWriteConfirmation` (same contract as `create` / `transport create|assign` / `extension deploy`). |
 
 The transport is resolved **per object**, not once per run:
 
@@ -341,6 +345,7 @@ abap create [options] <type> <name>
 | `--audit` | Include the before-checksum (extra SAP round-trip, off by default) |
 | `--file <path>` | 014: abap-file-format DDIC JSON input (required for `DOMA`/`DTEL`/`TABL`/`STRU`) |
 | `--schema` | Print the command parameter schema as JSON and exit (no SAP call) |
+| `--yes` | Skip confirmation prompt for write operations; non-TTY without `--yes` returns `VALIDATION_ERROR` (exit 7). The shared helper is `src/abap_cli/core/confirmation.ts#requireWriteConfirmation` (same contract as `push` / `transport create|assign` / `extension deploy`). |
 
 **DDIC create (014)**: `abap create DOMA|DTEL|TABL|STRU <name> --file <json> --package <pkg>` creates (or overwrites) the object via the self-built ICF service (`POST /sap/zabap_vibe/ddic/<type>`). The JSON follows the abap-file-format layout (flat or `header.description` for the description). Client-side validation enforces the namespace (Z/Y/slash) and required fields; a non-`$TMP` package requires `--tr`. Success returns `data.action` (`created` / `updated`). Unknown DDIC types (TTYP) are rejected with `DDIC_NOT_SUPPORTED`; unknown types with `TYPE_NOT_SUPPORTED`. `--description` is optional when `--file` supplies it.
 
@@ -431,6 +436,8 @@ Show structured metadata for a transport request (read-only).
 ```bash
 abap transport show <request-number>
 ```
+
+JSON output (`data` carries `number` / `description` / `status` / `owner` / `objects[]` plus `tasks: TransportTaskInfo[]` and `deduplicated: number`). `tasks` enumerates nested tasks (each with `number` / `description` / `status` / `owner` / `objects[]`); `deduplicated` counts the objects contributed by nested tasks (i.e. `total references − direct objects.length`), which is exactly what `abap pull --tr <request>` removes when deduplicating. Used by `pull --tr` (T4.2) to enumerate every object bound to the request.
 
 ### `abap transport resolve <object>`
 

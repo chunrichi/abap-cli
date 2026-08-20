@@ -81,7 +81,7 @@ describe('abap push FUGR (sub-object mapping)', () => {
     const file = writeFile('src/zfg_wechat_table/zfg_wechat_table.fugr.tableframe_zfg_wechat_table.func.abap', 'FUNCTION TABLEFRAME_ZFG_WECHAT_TABLE.\nENDFUNCTION.');
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', file, '--tr', 'TRN001', '--json'], { cwd });
+    const res = await runCommand(program, ['push', file, '--tr', 'TRN001', '--yes', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     // The function module is locked independently from the group.
     expect(lock).toHaveBeenCalledWith(`${GROUP}/fmodules/tableframe_zfg_wechat_table`);
@@ -99,7 +99,7 @@ describe('abap push FUGR (sub-object mapping)', () => {
     const file = writeFile('src/zfg_wechat_table/zfg_wechat_table.fugr.saplzfg_wechat_table.reps.abap', 'FUNCTION-POOL ZFG_WECHAT_TABLE.');
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', file, '--tr', 'TRN001', '--json'], { cwd });
+    const res = await runCommand(program, ['push', file, '--tr', 'TRN001', '--yes', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(lock).toHaveBeenCalledWith(GROUP);
     expect(setObjectSource).toHaveBeenCalledWith(`${GROUP}/source/main`, expect.stringContaining('FUNCTION-POOL'), 'lock-1', 'TRN001');
@@ -109,7 +109,7 @@ describe('abap push FUGR (sub-object mapping)', () => {
     const file = writeFile('src/zfg_wechat_table/zfg_wechat_table.fugr.lzfg_wechat_tabletop.reps.abap', 'INCLUDE LZFG_WECHAT_TABLETOP.');
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', file, '--tr', 'TRN001', '--json'], { cwd });
+    const res = await runCommand(program, ['push', file, '--tr', 'TRN001', '--yes', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(lock).toHaveBeenCalledWith(`${GROUP}/includes/lzfg_wechat_tabletop`);
     expect(setObjectSource).toHaveBeenCalledWith(
@@ -125,7 +125,7 @@ describe('abap push FUGR (sub-object mapping)', () => {
     const file = writeFile('src/zfg_wechat_table/zfg_wechat_table.fugr.lzfg_wechat_tablef99.reps.abap', 'INCLUDE LZFG_WECHAT_TABLEF99.');
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', file, '--tr', 'TRN001', '--json'], { cwd });
+    const res = await runCommand(program, ['push', file, '--tr', 'TRN001', '--yes', '--json'], { cwd });
     expect(res.exitCode).not.toBe(0);
     expect(setObjectSource).not.toHaveBeenCalled();
   });

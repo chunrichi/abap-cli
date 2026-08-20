@@ -27,6 +27,7 @@ abap push [options] [files...]
 - `--dry-run`: 只记录计划，零变更 ADT 调用
 - `--fail-fast`: 第一个失败文件即停（默认 keep-going）
 - `--atomic`: 先结构校验所有文件，任一失败则零写入（`VALIDATION_ERROR`）
+- `--yes`: 非交互确认写操作；非 TTY 且无 `--yes`/`--dry-run` → `VALIDATION_ERROR`（exit 7）
 
 无 `[files...]` 且无 `--all` 时抛 `USAGE`（exit 2）。`--check-only` 与 `--no-activate` 同时给时抛 `USAGE`（exit 2）。
 
@@ -88,14 +89,16 @@ DDIC 推送时 `--atomic` 也会结构校验 JSON（`readDdicJson` + `validateDd
 
 **按文件隔离**：每个文件独立 try/catch，失败进 `results`（`status: 'failed'` + `code`/`stage`/`message`/`nextSteps`），不中断其他文件（默认 keep-going）；`--fail-fast` 可选提前停。聚合错误以首个失败文件的错误码作为聚合 `code`；**单文件失败时透出原始 `message` 与 `nextSteps`**（不再笼统 "N file(s) failed"），多文件时给通用指引。
 
+**写保护**：与 `create` / `transport create|assign` / `extension deploy` 共用 `core/confirmation.ts#requireWriteConfirmation`，非 TTY 必须 `--yes` 或 `--dry-run`，否则 `VALIDATION_ERROR`（exit 7）并附 `nextSteps` + `example`（如 `abap push <files...> --tr <transport> --yes`）。
+
 ## Examples
 
 ```bash
 # 推送单个文件（对象已绑定请求或 $TMP 时无需 --tr）
-abap push src/clas/zcl_my_class/zcl_my_class.clas.abap
+abap push src/clas/zcl_my_class/zcl_my_class.clas.abap --yes
 
 # 显式指定 transport
-abap push src/prog/zprog/zprog.prog.abap --tr NDK123456
+abap push src/prog/zprog/zprog.prog.abap --tr NDK123456 --yes
 
 # 只做语法检查
 abap push src/clas/zcl_foo/zcl_foo.clas.abap --tr NDK123456 --check-only
@@ -176,7 +179,7 @@ abap push src/prog/zprog/zprog.prog.texts.en.properties
 
 # references
 
-- 实现：`src/abap_cli/commands/push.ts`、`src/abap_cli/flows/push-flow.ts`（`runPush`/`pushOne`/`resolveObjectTransport`/`pushDdicFile`）、`push-object.ts`、`push-fugr.ts`、`push-textpool.ts`
+- 实现：`src/abap_cli/commands/push.ts`、`src/abap_cli/flows/push-flow.ts`（`runPush`/`pushOne`/`resolveObjectTransport`/`pushDdicFile`）、`push-object.ts`、`push-fugr.ts`、`push-textpool.ts`、`src/abap_cli/core/confirmation.ts`
 - transport 解析：`src/abap_cli/core/transport.ts`（`resolveTransport`）、`src/abap_cli/core/resolve.ts`（`ResolvedObject.packageName`）
 - SAP 后端：`abap/src/clas/zcl_abap_vibe_icf.clas.abap`（`dispatch_ddic` / `dispatch_textpool`）
 - 文档：`docs/commands.md`（`abap push` 一节）、`docs/configuration.md`（Transport Resolution Order）
