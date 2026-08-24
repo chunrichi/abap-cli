@@ -1,5 +1,7 @@
 # 项目要求
 
+**大胆探索，小心求证，勇于重构**
+
 ## rules
 
 - 设计实现时考虑 LM Agent 使用优化以及 Token-efficient
