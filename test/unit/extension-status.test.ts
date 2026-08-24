@@ -1,10 +1,22 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 const mockGet = vi.fn();
 vi.mock('../../src/abap_cli/clients/icf-client.js', () => ({
   IcfClient: {
     create: async () => ({ get: mockGet }),
   },
+}));
+
+const probeAdtRuntime = vi.fn();
+vi.mock('../../src/abap_cli/adc/runtime-probe.js', () => ({
+  probeAdtRuntime: (...a: unknown[]) => probeAdtRuntime(...a),
+  steampunkDeployHint: () => ['hint'],
+}));
+
+const loadConfig = vi.fn();
+vi.mock('../../src/abap_cli/config/project-config.js', () => ({
+  loadConfig: (...a: unknown[]) => loadConfig(...a),
+  readCaCertificate: () => undefined,
 }));
 
 import { Command } from 'commander';
@@ -43,29 +55,41 @@ async function run(args: string[]): Promise<{ data: unknown; exitCode: number | 
 }
 
 describe('abap extension status (021: new subcommand)', () => {
+  beforeEach(() => {
+    probeAdtRuntime.mockReset();
+    loadConfig.mockReset();
+    loadConfig.mockResolvedValue({ systemName: 'btptrial', sap: { url: 'https://btp.example' } });
+  });
+
   it('returns installed=false when not deployed (404 path)', async () => {
     mockGet.mockReset();
+    probeAdtRuntime.mockResolvedValueOnce({ runtime: 'unknown', source: 'none', icfSetupBlocked: false });
     mockGet.mockRejectedValueOnce(new CliError('NOT_FOUND', 'not found', { details: { httpStatus: 404 } }));
     const { data, exitCode } = await run(['extension', 'status', '--json']);
     // eslint-disable-next-line no-console
     expect(exitCode).toBeUndefined();
-    const d = data as { installed: boolean; status: string };
+    const d = data as { installed: boolean; status: string; runtime: string; icfSetupBlocked: boolean };
     expect(d.installed).toBe(false);
     expect(d.status).toBe('not_deployed');
+    expect(d.runtime).toBe('unknown');
+    expect(d.icfSetupBlocked).toBe(false);
   });
 
   it('returns installed=true and match=true when remote version equals expected', async () => {
     mockGet.mockReset();
+    probeAdtRuntime.mockResolvedValueOnce({ runtime: 'netweaver750', source: 'informationsystem', icfSetupBlocked: false });
     mockGet.mockResolvedValueOnce({ status: 'success', data: { version: '0.5.0' } });
     const { data } = await run(['extension', 'status', '--json']);
-    const d = data as { installed: boolean; match: boolean; remoteVersion: string; expectedVersion: string };
+    const d = data as { installed: boolean; match: boolean; remoteVersion: string; expectedVersion: string; runtime: string };
     expect(d.installed).toBe(true);
     expect(d.match).toBe(true);
     expect(d.remoteVersion).toBe('0.5.0');
+    expect(d.runtime).toBe('netweaver750');
   });
 
   it('returns installed=true but match=false when version differs', async () => {
     mockGet.mockReset();
+    probeAdtRuntime.mockResolvedValueOnce({ runtime: 'netweaver740', source: 'discovery', icfSetupBlocked: false });
     mockGet.mockResolvedValueOnce({ status: 'success', data: { version: '0.3.0' } });
     const { data } = await run(['extension', 'status', '--json']);
     const d = data as { installed: boolean; match: boolean; remoteVersion: string };
@@ -76,10 +100,22 @@ describe('abap extension status (021: new subcommand)', () => {
 
   it('returns installed=false on unreachable (non-blocking)', async () => {
     mockGet.mockReset();
+    probeAdtRuntime.mockResolvedValueOnce({ runtime: 'unknown', source: 'none', icfSetupBlocked: false });
     mockGet.mockRejectedValueOnce(new Error('ECONNREFUSED'));
     const { data } = await run(['extension', 'status', '--json']);
     const d = data as { installed: boolean; status: string };
     expect(d.installed).toBe(false);
     expect(d.status).toBe('unreachable');
+  });
+
+  it('030: surfaces Steampunk runtime + icfSetupBlocked=true on trial', async () => {
+    mockGet.mockReset();
+    probeAdtRuntime.mockResolvedValueOnce({ runtime: 'steampunk', source: 'informationsystem', icfSetupBlocked: true, sapComponent: 'SAPBTP' });
+    mockGet.mockRejectedValueOnce(new CliError('NOT_FOUND', 'not found', { details: { httpStatus: 404 } }));
+    const { data } = await run(['extension', 'status', '--json']);
+    const d = data as { runtime: string; icfSetupBlocked: boolean; status: string };
+    expect(d.runtime).toBe('steampunk');
+    expect(d.icfSetupBlocked).toBe(true);
+    expect(d.status).toBe('not_deployed');
   });
 });

@@ -7,6 +7,8 @@ import { resolveFile } from '../formats/file-resolver.js';
 import { readAbapFile } from '../formats/abap-source.js';
 import { resolveObject, getObjectParts, validateLocalFile } from '../core/resolve.js';
 import { pushObject } from './push-object.js';
+import { probeAdtRuntime, steampunkDeployHint, type AdtRuntime } from '../adc/runtime-probe.js';
+import { collectWarning } from '../output/meta.js';
 
 export type DeployStatus = 'deployed' | 'skipped' | 'failed';
 
@@ -43,6 +45,10 @@ export interface DeploymentSummary {
   dryRun: boolean;
   /** ICF node state after the setup step (absent when no setup ran). */
   icfNode?: DeployIcfNode;
+  /** 030: detected ADT runtime tier (steampunk / netweaver740 / netweaver750 / unknown). */
+  runtime?: AdtRuntime;
+  /** 030: deploy kind — `full` on on-prem, `source-only` on Steampunk (no auto-SICF). */
+  deployKind?: 'full' | 'source-only';
 }
 
 export interface DeployOptions {
@@ -55,6 +61,9 @@ export interface DeployOptions {
   package?: string;
   /** Overridable for tests; defaults to the bundled abap/src directory. */
   sourceDir?: string;
+  /** 030: profile name for ADT runtime detection. Optional — when absent
+   *  the runtime falls back to 'unknown' and deploy uses on-prem behaviour. */
+  profileName?: string;
 }
 
 // dist/src/abap_cli/sync → project root (ESM has no __dirname).
@@ -110,6 +119,14 @@ export async function deployBundled(client: AdtClientWrapper, opts: DeployOption
   const objectResults: DeployObjectResult[] = [];
   const fileResults: DeployFileResult[] = [];
 
+  // 030: detect ADT runtime tier to branch deploy behaviour (Steampunk blocks
+  // cl_icf_tree). Probe failure is non-blocking and falls back to on-prem.
+  const runtimeResult = opts.profileName
+    ? await probeAdtRuntime(opts.profileName).catch(() => undefined)
+    : undefined;
+  const runtime: AdtRuntime = runtimeResult?.runtime ?? 'unknown';
+  const isSteampunk = runtime === 'steampunk';
+
   for (const obj of bundled) {
     const objectResult = await deployOneObject(client, obj, opts, fileResults);
     objectResults.push(objectResult);
@@ -117,8 +134,21 @@ export async function deployBundled(client: AdtClientWrapper, opts: DeployOption
 
   // ICF setup: create/bind/activate the SICF node after source deploy (FR-008).
   // --dry-run only plans the step; it never triggers a mutating call (FR-009).
+  // 030: on Steampunk the setup step is source-only — cl_icf_tree is blocked
+  // by the Released APIs whitelist. We surface this as a structured warning
+  // and emit a Cloud Foundry destination hint via steampunkDeployHint().
   let icfNode: DeployIcfNode | undefined;
-  if (opts.dryRun) {
+  if (isSteampunk) {
+    icfNode = { status: 'planned' };
+    if (!opts.dryRun) {
+      const hint = steampunkDeployHint(client.getConfig().sap.url);
+      collectWarning(
+        'STEAMPUNK_ICF_MANUAL',
+        'ICF service node cannot be registered automatically on this BTP system; expose the handler via a Cloud Foundry destination.',
+        { runtime, nextSteps: hint },
+      );
+    }
+  } else if (opts.dryRun) {
     icfNode = { status: 'planned' };
   } else {
     const setup = await runIcfSetup(client);
@@ -149,6 +179,8 @@ export async function deployBundled(client: AdtClientWrapper, opts: DeployOption
     objects: objectResults,
     forced: !!opts.force,
     dryRun: !!opts.dryRun,
+    runtime,
+    deployKind: isSteampunk ? 'source-only' : 'full',
     ...(icfNode ? { icfNode } : {}),
   };
 }

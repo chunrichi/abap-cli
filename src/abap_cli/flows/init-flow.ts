@@ -185,10 +185,10 @@ export function outputJson(
  * Informational ICF deployment check (FR-012..FR-015).
  * Never throws or blocks init: unreachable degrades to a warning.
  */
-export async function icfDeploymentCheck(mode: OutputMode): Promise<IcfDeploymentInfo | undefined> {
+export async function icfDeploymentCheck(mode: OutputMode, profileName?: string): Promise<IcfDeploymentInfo | undefined> {
   let icf: IcfDeploymentInfo;
   try {
-    icf = await checkIcfDeployment();
+    icf = await checkIcfDeployment(profileName);
   } catch (error: unknown) {
     icf = {
       status: 'unreachable',
@@ -575,7 +575,7 @@ async function createSystemFromParams(opts: CommandOpts, mode: OutputMode): Prom
   if (str(opts.certPassphrase)) await storeCertPassphrase(systemName, str(opts.certPassphrase)!);
   await handleFileOverwrite(opts.yes === true || opts.nonInteractive === true ? 'overwrite' : 'refuse');
   await writeConfig(systemName, config, mode);
-  const icf = await icfDeploymentCheck(mode);
+  const icf = await icfDeploymentCheck(mode, systemName);
   if (mode) outputJson(systemName, config, undefined, icf);
 }
 
