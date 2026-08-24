@@ -11,7 +11,7 @@ const deletePassword = vi.fn(async () => '');
 vi.mock('../../src/abap_cli/config/user-config.js', () => ({
   getSystem: (name: string) =>
     name === 'existing'
-      ? { url: 'http://sap.example:50000', client: '001', username: 'dev', language: 'EN' }
+      ? { url: 'http://sap.example:50000', client: '001', username: 'dev', language: 'EN', auth: { method: 'basic' } }
       : null,
   listSystemNames: () => ['existing'],
   upsertSystem: vi.fn(),

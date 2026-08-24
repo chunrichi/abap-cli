@@ -17,7 +17,7 @@ const upsertSystem = vi.fn();
 vi.mock('../../src/abap_cli/config/user-config.js', () => ({
   getSystem: (name: string) =>
     name === 'real'
-      ? { url: 'http://sap.example:50000', client: '001', username: 'dev', language: 'EN' }
+      ? { url: 'http://sap.example:50000', client: '001', username: 'dev', language: 'EN', auth: { method: 'basic' } }
       : null,
   listSystemNames: () => ['real'],
   upsertSystem: (...args: unknown[]) => upsertSystem(...args),

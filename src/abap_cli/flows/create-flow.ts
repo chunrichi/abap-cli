@@ -302,7 +302,12 @@ export async function runCreate(type: string | undefined, name: string | undefin
     return;
   }
 
-  const transport = await resolveTransport(client, opts.tr, client.getConfig().transport);
+  const transport = await resolveTransport(
+    client,
+    opts.tr,
+    client.getConfig().transport,
+    { transportOptional: opts.package === '$TMP' },
+  );
 
   // Refuse to overwrite: create is a "new object" operation.
   await assertNotExists(client, objectName);

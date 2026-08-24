@@ -1,15 +1,22 @@
-import { ADTClient, createSSLConfig, session_types, type TextElement, type TextElementCategory } from 'abap-adt-api';
+import { ADTClient, session_types, type ClientOptions, type TextElement, type TextElementCategory } from 'abap-adt-api';
+import type { BearerFetcher } from 'abap-adt-api/build/AdtHTTP.js';
 import {
   getTextElements as adtGetTextElements,
   setTextElements as adtSetTextElements,
 } from 'abap-adt-api/build/api/textelements.js';
-import { loadConfig, readCaCertificate, type ProjectConfig } from '../config/project-config.js';
+import { loadConfig, type ProjectConfig } from '../config/project-config.js';
 import { CliError } from '../output/json.js';
 import { classifyHttpError } from './http-error.js';
+import { buildAuth } from '../auth/adapter.js';
 
 /**
  * Thin wrapper around abap-adt-api ADTClient.
  * Initializes from project config and exposes the most common operations.
+ *
+ * Login strategy is selected by `config.sap.authMethod` (025): `basic` keeps
+ * the original username/password behavior, `cert` injects an X.509
+ * `https.Agent` via `buildAuth`. The chosen strategy is recorded on
+ * `this.authLabel` so downstream code can surface it in doctor / probe output.
  *
  * Every method that round-trips to the ADT endpoint runs through `_call`,
  * which classifies TLS / AUTH / SAP errors via the shared HTTP classifier.
@@ -17,16 +24,19 @@ import { classifyHttpError } from './http-error.js';
 export class AdtClientWrapper {
   private client: ADTClient;
   private config: ProjectConfig;
+  /** Short label of the auth strategy actually used (e.g. "basic" / "cert"). */
+  private authLabel: string;
 
-  private constructor(config: ProjectConfig) {
+  private constructor(config: ProjectConfig, auth: { passwordOrFetcher: string | BearerFetcher; options: ClientOptions; label: string }) {
     this.config = config;
+    this.authLabel = auth.label;
     this.client = new ADTClient(
       this.config.sap.url,
       this.config.sap.username,
-      this.config.sap.password,
+      auth.passwordOrFetcher,
       this.config.sap.client,
       this.config.sap.language,
-      createSSLConfig(this.config.sap.insecure, readCaCertificate(this.config.sap.caPath)),
+      auth.options,
     );
     this.client.stateful = session_types.stateful;
   }
@@ -43,7 +53,8 @@ export class AdtClientWrapper {
   static async create(): Promise<AdtClientWrapper> {
     try {
       const config = await loadConfig();
-      return new AdtClientWrapper(config);
+      const auth = await buildAuth(config.sap, config.systemName);
+      return new AdtClientWrapper(config, auth);
     } catch (error: unknown) {
       if (error instanceof CliError) throw error;
       const message = error instanceof Error ? error.message : String(error);
@@ -59,6 +70,11 @@ export class AdtClientWrapper {
     return this.config;
   }
 
+  /** Short label of the auth strategy actually used ("basic" / "cert"). */
+  get authMethod(): string {
+    return this.authLabel;
+  }
+
   /**
    * Run an ADT call; if the underlying client throws, classify the error
    * (TLS / AUTH / SAP) and rethrow as a `CliError`. Existing CliError instances
@@ -70,7 +86,7 @@ export class AdtClientWrapper {
       return await fn();
     } catch (error: unknown) {
       if (error instanceof CliError) throw error;
-      throw classifyHttpError(error, { name: this.config.sap.username });
+      throw classifyHttpError(error, { name: this.config.systemName, authMethod: this.authLabel });
     }
   }
 
@@ -264,8 +280,38 @@ export class AdtClientWrapper {
 
   // --- Object creation ---
 
+  /**
+   * Create a CLAS / INTF / PROG / FUGR using the wrapper at
+   * `./create-object.ts` which sets `Content-Type: application/xml` (BTP / Steampunk
+   * safe) instead of the library's `application/*`. Falls back to the upstream
+   * library for unsupported types.
+   *
+   * Set `ABAP_CLI_LEGACY_CREATE=1` to skip the wrapper and use the library
+   * directly (the legacy `application/*` Content-Type).
+   */
   createObject(options: Parameters<ADTClient['createObject']>[0]) {
-    return this._call(() => this.client.createObject(options));
+    return this._call(async () => {
+      if (process.env.ABAP_CLI_LEGACY_CREATE === '1') {
+        return this.client.createObject(options);
+      }
+      const { createObjectSafe } = await import('./create-object.js');
+      const responsible = this.config.sap.username.toUpperCase();
+      await createObjectSafe(
+        this.client.httpClient,
+        {
+          objtype: options.objtype,
+          name: options.name,
+          parentName: options.parentName,
+          description: options.description,
+          parentPath: options.parentPath,
+          ...(options.transport ? { transport: options.transport } : {}),
+          ...(options.language ? { language: options.language } : {}),
+          ...(options.masterLanguage ? { masterLanguage: options.masterLanguage } : {}),
+        },
+        { responsible },
+        () => this.client.createObject(options),
+      );
+    });
   }
 
   /** Validate a proposed object without creating it (FR-021, `create --check-only`). */

@@ -7,6 +7,7 @@ import { commonErrorsAfter } from '../output/help-text.js';
 import { exportProfiles, importProfiles, type ProfileBundle } from '../config/profiles.js';
 import { runList, runShow, runTest, runDelete } from '../flows/profile-flow.js';
 import { runAdd, runSet } from '../flows/profile-flow.js';
+import { runLogin } from '../flows/sso-flow.js';
 
 export function registerProfileCommand(program: Command): void {
   const profile = program
@@ -46,6 +47,13 @@ export function registerProfileCommand(program: Command): void {
     .option('-p, --password <password>', 'Password (stores credential in keychain)')
     .option('--insecure', 'Skip SSL certificate verification (self-signed certs, development only)')
     .option('--ca <path>', 'Path to a CA certificate (PEM) for SSL verification')
+    .option('--auth-method <method>', 'Login strategy: basic (default) | cert (X.509 client cert, 025) | browser_sso (BTP trial / SAML, 026) | oauth_password (BTP / CF service-key JWT, 027)')
+    .option('--cert-path <path>', 'X.509 client cert file (PEM) — used when --auth-method=cert')
+    .option('--cert-key <path>', 'X.509 private key file (PEM) — used when --auth-method=cert')
+    .option('--cert-ca <path>', 'Optional X.509 client CA override — used when --auth-method=cert')
+    .option('--cert-passphrase <passphrase>', 'Passphrase for .p12 / encrypted key — written to keychain')
+    .option('--sso-cookie-file <path>', 'SSO cookie jar path — used when --auth-method=browser_sso')
+    .option('--service-key <path>', 'BTP service key JSON — used when --auth-method=oauth_password (extracts uaa.url/clientid/clientsecret)')
     .action(async (name: string, opts, cmd) => {
       try {
         await runAdd(name, opts, jsonFromCommand(cmd));
@@ -66,6 +74,17 @@ export function registerProfileCommand(program: Command): void {
     .option('--insecure', 'Skip SSL certificate verification (self-signed certs, development only)')
     .option('--ca <path>', 'Path to a CA certificate (PEM) for SSL verification')
     .option('--clear-ca', 'Remove the CA certificate setting')
+    .option('--auth-method <method>', 'Login strategy: basic | cert | browser_sso (026) | oauth_password (027)')
+    .option('--cert-path <path>', 'X.509 client cert file (PEM)')
+    .option('--cert-key <path>', 'X.509 private key file (PEM)')
+    .option('--cert-ca <path>', 'X.509 client CA override (PEM)')
+    .option('--cert-passphrase <passphrase>', 'Passphrase for .p12 / encrypted key — written to keychain')
+    .option('--remove-cert-passphrase', 'Remove the stored cert passphrase from keychain')
+    .option('--clear-cert-auth', 'Reset to basic auth (drops authMethod and certAuth)')
+    .option('--sso-cookie-file <path>', 'SSO cookie jar path — used when --auth-method=browser_sso')
+    .option('--clear-sso-cookie-file', 'Reset SSO cookie file path to the default')
+    .option('--service-key <path>', 'BTP service key JSON — used when --auth-method=oauth_password (extracts uaa.url/clientid/clientsecret)')
+    .option('--clear-oauth-password', 'Drop oauthPassword config (reset to authMethod)')
     .action(async (name: string, opts, cmd) => {
       try {
         await runSet(name, opts, jsonFromCommand(cmd));
@@ -80,6 +99,17 @@ export function registerProfileCommand(program: Command): void {
     .action(async (name: string, _opts, cmd) => {
       try {
         await runTest(name, jsonFromCommand(cmd));
+      } catch (error: unknown) {
+        handleError(jsonFromCommand(cmd), error);
+      }
+    });
+
+  profile
+    .command('login <name>')
+    .description('Capture browser-SSO cookies for a profile (BTP trial / SAML); writes the cookie jar file')
+    .action(async (name: string, _opts, cmd) => {
+      try {
+        await runLogin(name, jsonFromCommand(cmd));
       } catch (error: unknown) {
         handleError(jsonFromCommand(cmd), error);
       }

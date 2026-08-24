@@ -5,6 +5,7 @@ import { getPassword } from './secrets.js';
 import { getSystem } from './user-config.js';
 import { CliError } from '../output/json.js';
 import type { ExtensionManifest } from '../extensions/types.js';
+import type { AuthConfig } from '../auth/v2-types.js';
 
 export interface SapConfig {
   url: string;
@@ -16,6 +17,8 @@ export interface SapConfig {
   insecure: boolean;
   /** Path to a CA certificate (PEM) used for SSL verification. */
   caPath: string;
+  /** Canonical v2 auth config (discriminated union). */
+  auth: AuthConfig;
   /** Base directory for `push --all` / `check --all`; falls back to cwd. */
   sourceDir: string;
 }
@@ -168,6 +171,7 @@ async function loadFileConfig(configPath: string | null): Promise<LoadedConfig> 
       language: profile.language || 'EN',
       insecure: profile.insecure ?? (process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0'),
       caPath: profile.ca || '',
+      auth: profile.auth,
       sourceDir: workspace.sourceDir || process.cwd(),
     },
     transport: workspace.transport || '',

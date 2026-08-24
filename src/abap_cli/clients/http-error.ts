@@ -26,17 +26,46 @@ const AUTH_NEXT_STEPS = [
 ];
 const AUTH_EXAMPLE = 'abap profile set <name> --password <new>';
 
+/** Cert-specific guidance for cert/mTLS login failures (025). */
+const AUTH_CERT_NEXT_STEPS = [
+  "Confirm the cert subject is mapped to a SAP user via CERTRULE / STRUST.",
+  "Re-run: 'abap profile test <name> --json' to see the TLS layer detail.",
+  "If the passphrase changed: 'abap profile set <name> --cert-passphrase <new>'.",
+];
+const AUTH_CERT_EXAMPLE = 'abap profile set <name> --cert-passphrase <new>';
+
+/** Browser-SSO guidance — cookies have a 30-min TTL; the renewal flow is `profile login`. */
+const AUTH_SSO_NEXT_STEPS = [
+  "SSO cookies expire (TTL 30 min). Re-run: 'abap profile login <name>' to capture fresh cookies.",
+  "If you changed IdP credentials, run login again immediately.",
+  "Run 'abap profile test <name> --json' to see the cookie file path.",
+];
+const AUTH_SSO_EXAMPLE = 'abap profile login <name>';
+
+/**
+ * Choose the "what now?" hint for a 401/403 based on the auth method actually
+ * used to log in. Cert auth needs a completely different next step (mapping)
+ * than basic auth (password change / keychain rotation); browser_sso needs a
+ * cookie refresh rather than a credential reset.
+ */
+function authHints(method: string | undefined): { nextSteps: string[]; example: string } {
+  if (method === 'cert') return { nextSteps: AUTH_CERT_NEXT_STEPS, example: AUTH_CERT_EXAMPLE };
+  if (method === 'browser_sso') return { nextSteps: AUTH_SSO_NEXT_STEPS, example: AUTH_SSO_EXAMPLE };
+  return { nextSteps: AUTH_NEXT_STEPS, example: AUTH_EXAMPLE };
+}
+
 /**
  * Classify any thrown value from an HTTP client into a CliError with the right
  * ErrorCode and the canonical nextSteps/example for that category.
  *
  * Detection happens on `error.code` (Node system errors propagated through
  * axios's `error.cause` chain) and `error.response.status` — never by
- * string-matching the response body.
+ * string-matching the response body. The optional `context.authMethod` lets
+ * the classifier pick cert-specific guidance on 401/403 (025).
  */
 export function classifyHttpError(
   error: unknown,
-  context?: { name?: string },
+  context?: { name?: string; authMethod?: string },
 ): CliError {
   // abap-adt-api wraps AxiosError into HttpClientException with a `status`
   // number field, or AdtErrorException with the status on `.err`. Normalise
@@ -64,10 +93,11 @@ export function classifyHttpError(
       });
     }
     if (status === 401 || status === 403) {
+      const hints = authHints(context?.authMethod);
       return new CliError('AUTH_ERROR', httpEx.message || 'authentication failed', {
-        details: { httpStatus: status, ...(context?.name ? { system: context.name } : {}) },
-        nextSteps: AUTH_NEXT_STEPS,
-        example: AUTH_EXAMPLE,
+        details: { httpStatus: status, ...(context?.name ? { system: context.name, authMethod: context.authMethod } : { authMethod: context?.authMethod }) },
+        nextSteps: hints.nextSteps,
+        example: hints.example,
       });
     }
     const opts: CliErrorOptions = {
@@ -102,10 +132,11 @@ export function classifyHttpError(
     const status = error.response?.status;
     if (status === 401 || status === 403) {
       const body = error.response?.data as { message?: string } | undefined;
+      const hints = authHints(context?.authMethod);
       return new CliError('AUTH_ERROR', body?.message || error.message, {
-        details: { httpStatus: status, ...(context?.name ? { system: context.name } : {}) },
-        nextSteps: AUTH_NEXT_STEPS,
-        example: AUTH_EXAMPLE,
+        details: { httpStatus: status, ...(context?.name ? { system: context.name, authMethod: context.authMethod } : { authMethod: context?.authMethod }) },
+        nextSteps: hints.nextSteps,
+        example: hints.example,
       });
     }
     if (typeof status === 'number') {

@@ -34,7 +34,7 @@ describe('abap init ICF deployment check (US4, FR-012..FR-015, SC-004/005)', () 
 
   beforeEach(() => {
     cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'init-icf-'));
-    getSystem.mockReturnValue({ url: 'https://sap.example:50000', username: 'dev', client: '001', language: 'EN' });
+    getSystem.mockReturnValue({ url: 'https://sap.example:50000', username: 'dev', client: '001', language: 'EN', auth: { method: 'basic' } });
     checkIcfDeployment.mockReset();
   });
 
