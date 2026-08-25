@@ -38,7 +38,7 @@ abap profile <command> [args...]
 | `basic`（默认） | 标准 basic auth（on-prem, IAS 未启 SSO） | 否 | password 走 keychain |
 | `cert` | mTLS / X.509 客户端证书 | 否 | cert/key path;passphrase 走 keychain |
 | `browser_sso` | BTP trial / SAML SSO（手动粘 cookie） | 是（手动） | cookie 文件 0o600 |
-| `oauth_password` | BTP trial / CF service-key + 用户 JWT（**免粘贴**） | 否 | service-key 在 profile JSON, password 从环境变量 |
+| `oauth_password` | BTP trial / CF service-key + 用户 JWT（**免粘贴**） | 否 | service-key 在 profile JSON, password 走 keychain |
 
 ### oauth_password 设置（027）
 
@@ -54,10 +54,8 @@ abap profile add btptrial \
   --auth-method oauth_password \
   --service-key ~/Downloads/default_key.json
 
-# 3. 设置环境变量（SAP ID 密码, 与 basic 同对待的"环境秘密"）
-export BTP_PASSWORD='...'
-# 或特定 profile:
-export BTP_PASSWORD_BTPTRIAL='...'
+# 3. 存密码到 OS keychain（首次运行无密码时会 TTY 提示并自动写入）
+abap profile set btptrial --password '...'
 
 # 4. 所有 abap 命令直接走 Bearer JWT
 abap profile test btptrial --json
@@ -65,7 +63,7 @@ abap search '*' --limit 5 --json
 abap transport list --json
 ```
 
-**安全说明**: 用户密码不存盘。`profile delete` 不需要清理密码。Service key JSON 存 `~/.abap-cli/systems.json`(同 systems.json 同一文件,)。如需额外隔离用 `--clear-oauth-password`。
+**安全说明**: 用户密码存 OS keychain（不进 profile JSON）。`profile delete` 会清理 keychain 密码。Service key JSON 存 `~/.abap-cli/systems.json`（同 systems.json 同一文件）。如需额外隔离用 `--clear-oauth-password`。
 
 ## Options（add / set 共用）
 
@@ -81,6 +79,7 @@ abap transport list --json
 - `--cert-ca <pem>`: 可选，覆盖 profile 级 CA，仅用于 mTLS 握手
 - `--cert-passphrase <pwd>`: .p12 / 加密私钥口令；写入 OS keychain（独立 account）
 - `--sso-cookie-file <path>`: SSO cookie jar 路径（`auth-method=browser_sso` 时可选，默认 `~/.abap-cli/<profile>.sso.cookies.json`，mode 0o600）
+- `--auth-option <key=value>`: 通用认证字段（可重复）。新认证方法的字段从 bag 读，无需新增 Commander option。示例：`--auth-option certPath=/abs/cert.pem --auth-option keyPath=/abs/key.pem`。legacy flag（`--cert-path` / `--cert-key` / `--cert-ca` / `--sso-cookie-file` / `--service-key`）会自动映射进 bag（`--auth-option` 同名 key 优先）。
 
 `set` 额外支持：`--remove-password`（删 keychain 凭证）、`--clear-ca`（移除 CA 设置）、`--remove-cert-passphrase`（删 keychain 中证书口令）、`--clear-cert-auth`（同时移除 `authMethod` 与 `certAuth`，回到 basic）、`--clear-sso-cookie-file`（重置 cookie 文件路径到默认）。
 

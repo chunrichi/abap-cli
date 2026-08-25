@@ -117,7 +117,7 @@ export async function loadConfig(): Promise<ProjectConfig> {
     cachedMtimes = mtimes;
   }
 
-  const password = (await getPassword(cached.systemName)) || process.env.SAP_PASSWORD || '';
+  const password = (await getPassword(cached.systemName)) || '';
   return {
     sap: { ...cached.sap, password },
     transport: cached.transport,

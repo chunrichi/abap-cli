@@ -1,6 +1,12 @@
 import axios from 'axios';
 import { CliError, type CliErrorOptions } from '../output/json.js';
 import type { ErrorCode } from '../output/error-codes.js';
+// Side-effect import: ensures all auth strategies are registered before
+// `getAuthHints()` is called (each strategies/*.ts calls `registerStrategy`
+// at module load). Required when http-error.ts is imported before the CLI
+// commands have pulled in adapter.ts.
+import '../auth/registry-bootstrap.js';
+import { getAuthHints as lookupAuthHints } from '../auth/strategy.js';
 
 /** Node TLS error codes — see [research §4](../../../../specs/008-cli-foundation/research.md). */
 const TLS_ERROR_CODES = new Set<string>([
@@ -20,39 +26,13 @@ const TLS_NEXT_STEPS = [
 ];
 const TLS_EXAMPLE = 'abap profile set <name> --ca ./sap-dev-ca.pem';
 
-const AUTH_NEXT_STEPS = [
-  "Verify credentials: 'abap profile test <name> --json'.",
-  "If password expired: 'abap profile set <name> --password <new>'.",
-];
-const AUTH_EXAMPLE = 'abap profile set <name> --password <new>';
-
-/** Cert-specific guidance for cert/mTLS login failures (025). */
-const AUTH_CERT_NEXT_STEPS = [
-  "Confirm the cert subject is mapped to a SAP user via CERTRULE / STRUST.",
-  "Re-run: 'abap profile test <name> --json' to see the TLS layer detail.",
-  "If the passphrase changed: 'abap profile set <name> --cert-passphrase <new>'.",
-];
-const AUTH_CERT_EXAMPLE = 'abap profile set <name> --cert-passphrase <new>';
-
-/** Browser-SSO guidance — cookies have a 30-min TTL; the renewal flow is `profile login`. */
-const AUTH_SSO_NEXT_STEPS = [
-  "SSO cookies expire (TTL 30 min). Re-run: 'abap profile login <name>' to capture fresh cookies.",
-  "If you changed IdP credentials, run login again immediately.",
-  "Run 'abap profile test <name> --json' to see the cookie file path.",
-];
-const AUTH_SSO_EXAMPLE = 'abap profile login <name>';
-
 /**
  * Choose the "what now?" hint for a 401/403 based on the auth method actually
- * used to log in. Cert auth needs a completely different next step (mapping)
- * than basic auth (password change / keychain rotation); browser_sso needs a
- * cookie refresh rather than a credential reset.
+ * used to log in. The hint set is owned by the registered AuthStrategy, so
+ * new methods just declare their own `hints` and this file stays untouched.
+ * Unknown / unset method falls back to the generic basic-auth guidance.
  */
-function authHints(method: string | undefined): { nextSteps: string[]; example: string } {
-  if (method === 'cert') return { nextSteps: AUTH_CERT_NEXT_STEPS, example: AUTH_CERT_EXAMPLE };
-  if (method === 'browser_sso') return { nextSteps: AUTH_SSO_NEXT_STEPS, example: AUTH_SSO_EXAMPLE };
-  return { nextSteps: AUTH_NEXT_STEPS, example: AUTH_EXAMPLE };
-}
+const authHints = lookupAuthHints;
 
 /**
  * Classify any thrown value from an HTTP client into a CliError with the right

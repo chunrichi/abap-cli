@@ -34,7 +34,8 @@ function baseSap(overrides: Record<string, unknown> = {}) {
 describe('auth/adapter.buildAuth (oauth_password, 027)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubEnv('BTP_PASSWORD', 'test-password');
+    // Non-TTY so readPassword throws instead of prompting (stable in CI pools).
+    Object.defineProperty(process.stdin, 'isTTY', { value: false, configurable: true });
   });
 
   it('returns a BearerFetcher when oauth config is present', async () => {
@@ -55,8 +56,7 @@ it('canonical type cannot represent oauth_password without oauth block — verif
     });
   });
 
-  it('throws AUTH_ERROR when BTP_PASSWORD env var is missing and fetcher is invoked', async () => {
-    vi.stubEnv('BTP_PASSWORD', '');
+  it('throws AUTH_ERROR when no stored password and fetcher is invoked', async () => {
     const sap = baseSap();
     const built = await buildAuth(sap, 'trial');
     const fetcher = built.passwordOrFetcher as () => Promise<string>;
@@ -66,12 +66,14 @@ it('canonical type cannot represent oauth_password without oauth block — verif
     });
   });
 
-  it('prefers per-profile env BTP_PASSWORD_<NAME> over generic BTP_PASSWORD', async () => {
-    vi.stubEnv('BTP_PASSWORD', 'generic');
-    vi.stubEnv('BTP_PASSWORD_TRIAL', 'per-profile');
+  it('uses the stored keychain password when present', async () => {
+    getPassword.mockResolvedValueOnce('stored-pass');
     const fetcher = ((await buildAuth(baseSap(), 'trial')).passwordOrFetcher) as () => Promise<string>;
-    // The fetcher reaches the network call path; the test UAA isn't real so it
-    // will fail with HTTP — the assertion just confirms the fetcher is wired up.
-    await expect(fetcher()).rejects.toThrow();
+    // The fetcher reaches the token request path (mock UAA is unreachable);
+    // the assertion confirms the stored password was consumed, not "Missing".
+    await expect(fetcher()).rejects.not.toMatchObject({
+      code: 'AUTH_ERROR',
+      message: expect.stringContaining('Missing BTP password'),
+    });
   });
 });

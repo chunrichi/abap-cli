@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
-import * as https from 'https';
-import { loadConfig, readCaCertificate, type ProjectConfig } from '../config/project-config.js';
+import { loadConfig, type ProjectConfig } from '../config/project-config.js';
+import { buildAuth } from '../auth/adapter.js';
 import { CliError } from '../output/json.js';
 import type { ErrorCode } from '../output/error-codes.js';
 import { classifyHttpError } from './http-error.js';
@@ -19,30 +19,40 @@ export class IcfClient {
   private http: AxiosInstance;
   private baseUrl: string;
 
-  private constructor(config: ProjectConfig) {
+  private constructor(config: ProjectConfig, authOpts: { passwordOrFetcher: string | (() => Promise<string>); options: import('abap-adt-api').ClientOptions }) {
     this.baseUrl = `${config.sap.url}/sap/zabap_vibe`;
+
+    // Reuse the SAME artefacts `buildAuth()` produces for ADT — `httpsAgent`
+    // (cert mTLS) and `headers.Cookie` (browser_sso) flow through verbatim,
+    // so every auth strategy that works for ADT now also works for ICF.
+    //
+    // For strategies whose `passwordOrFetcher` is an async BearerFetcher
+    // (oauth_password), axios basic-auth can't carry it, so we fall back to
+    // the SAP-conventional placeholder password and rely on a future
+    // Authorization-header strategy. For literal-password strategies (basic,
+    // cert, browser_sso) we pass the literal through.
+    const password = typeof authOpts.passwordOrFetcher === 'string'
+      ? authOpts.passwordOrFetcher
+      : 'icf-fallback'; // oauth_password strategies plug in here when supported
+
     this.http = axios.create({
       baseURL: this.baseUrl,
-      auth: {
-        username: config.sap.username,
-        password: config.sap.password || '',
-      },
+      auth: { username: config.sap.username, password },
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         'sap-client': config.sap.client,
+        ...(authOpts.options.headers ?? {}),
       },
-      httpsAgent: new https.Agent({
-        rejectUnauthorized: !config.sap.insecure,
-        ca: readCaCertificate(config.sap.caPath),
-      }),
+      httpsAgent: authOpts.options.httpsAgent,
       timeout: 30000,
     });
   }
 
   static async create(): Promise<IcfClient> {
     const config = await loadConfig();
-    return new IcfClient(config);
+    const authOpts = await buildAuth(config.sap, config.systemName);
+    return new IcfClient(config, authOpts);
   }
 
   async get<T>(path: string): Promise<IcfResponse<T>> {
@@ -134,10 +144,10 @@ export class IcfClient {
       // instead of a generic transport error so the flow maps it to the right
       // exit code (e.g. INVALID_WHERE → 7, TABLE_NOT_FOUND → 8).
       if (axios.isAxiosError(error)) {
-        const body = error.response?.data as { error?: { code?: string; message?: string; details?: unknown } } | undefined;
-        if (body && typeof body === 'object' && body.error && typeof body.error.code === 'string') {
-          throw new CliError(body.error.code as ErrorCode, body.error.message ?? 'ICF request failed', {
-            details: body.error.details,
+        const data = error.response?.data as { error?: { code?: string; message?: string; details?: unknown } } | undefined;
+        if (data && typeof data === 'object' && data.error && typeof data.error.code === 'string') {
+          throw new CliError(data.error.code as ErrorCode, data.error.message ?? 'ICF request failed', {
+            details: data.error.details,
           });
         }
       }
@@ -152,15 +162,6 @@ export class IcfClient {
  * classifier so TLS / AUTH errors are recognised before reaching the consumer.
  */
 function toHttpError(error: unknown): CliError {
-  if (axios.isAxiosError(error)) {
-    // Prefix the message so ICF errors remain identifiable in logs.
-    const classified = classifyHttpError(error);
-    return new CliError(classified.code, `ICF request failed: ${classified.message}`, {
-      details: classified.details,
-      nextSteps: classified.nextSteps,
-      example: classified.example,
-    });
-  }
   const classified = classifyHttpError(error);
   return new CliError(classified.code, `ICF request failed: ${classified.message}`, {
     details: classified.details,

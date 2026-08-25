@@ -11,9 +11,10 @@ import { findWorkspaceConfig } from '../config/project-config.js';
 import { probeSystem } from '../clients/probe.js';
 import { probeTextpoolCapability, recordCapability } from '../textpool/textpool-capability.js';
 import { assertValidProfile } from '../config/validation.js';
-import type { AuthConfig, AuthMethodV2, CertAuthBlock, OAuthPasswordBlock, SsoAuthBlock } from '../auth/v2-types.js';
+import type { AuthConfig, AuthMethodV2 } from '../auth/v2-types.js';
 import { defaultAuth, parseAuthMethodV2 } from '../auth/v2-types.js';
 import { canonicalToV1Fields } from '../auth/normalize.js';
+import { authOptionsFromCli, legacyFlagsToBag, resolveAuthFromOptions } from '../auth/strategy.js';
 
 /** Exit 130 on Ctrl+C (@clack cancel), otherwise return the value */
 export function orCancel<T>(value: T | symbol): T {
@@ -34,12 +35,12 @@ async function recordTextpoolCapabilityIfPossible(name: string): Promise<void> {
   }
 }
 
-/** True when any profile field option (incl. password / cert / sso / oauth / authMethod) is present. */
-function hasProfileOptions(opts: Record<string, string | boolean>): boolean {
+/** True when any profile field option (incl. password / cert / sso / oauth / authMethod / auth-option) is present. */
+function hasProfileOptions(opts: Record<string, string | boolean | string[]>): boolean {
   const has = (key: string) => opts[key] !== undefined;
   return has('url') || has('client') || has('username') || has('language') ||
     has('insecure') || has('ca') || has('clearCa') || has('password') || !!opts.removePassword ||
-    has('authMethod') ||
+    has('authMethod') || has('authOption') ||
     has('certPath') || has('certKey') || has('certCa') || has('certPassphrase') ||
     !!opts.removeCertPassphrase || !!opts.clearCertAuth ||
     has('ssoCookieFile') || !!opts.clearSsoCookieFile ||
@@ -49,88 +50,25 @@ function hasProfileOptions(opts: Record<string, string | boolean>): boolean {
 /**
  * Resolve the canonical `auth` config from CLI options + existing profile.
  *
- * The auth config is rebuilt as a whole — never patched field-by-field — so
- * the result is always type-consistent (no chance of an old `certAuth` block
- * leaking into a new `oauth_password` profile).
+ * No per-method dispatch lives in this file — the registered `AuthStrategy`
+ * for `method` owns its own field parsing via `fromOptions()`. Legacy flags
+ * (`--cert-path`, `--service-key`, …) are folded into the `--auth-option`
+ * bag so existing scripts continue to work, but new auth methods don't need
+ * any legacy flag plumbing here.
  */
-function resolveAuthFromOpts(base: SystemProfile, opts: Record<string, string | boolean>): AuthConfig {
-  const has = (key: string) => opts[key] !== undefined;
+function resolveAuthFromOpts(base: SystemProfile, opts: Record<string, string | boolean | string[]>): AuthConfig {
+  // No method switch → keep existing auth.
+  if (opts.authMethod === undefined) return base.auth;
 
-  // When the user explicitly switches method, build the new block from scratch.
-  // Otherwise keep the existing auth.
-  if (!has('authMethod')) return base.auth;
+  const method = parseAuthMethodV2(opts.authMethod);
 
-  const method: AuthMethodV2 = parseAuthMethodV2(opts.authMethod);
+  // Merge legacy flags + --auth-option into one bag. --auth-option wins on
+  // collision so users can override the legacy sugar via the generic flag.
+  const legacyBag = legacyFlagsToBag(opts);
+  const fromCli = authOptionsFromCli(opts, method).bag;
+  const bag: Record<string, string> = { ...legacyBag, ...fromCli };
 
-  if (method === 'basic') {
-    return { method: 'basic' };
-  }
-  if (method === 'cert') {
-    // Both certPath and certKey must be supplied on the same set call — partial
-    // updates would leave a half-configured cert profile that's caught by the
-    // adapter's path-existence checks but confuses users.
-    const existingCert = base.auth.method === 'cert' ? base.auth.cert : undefined;
-    const certPath = has('certPath') ? (opts.certPath as string) : existingCert?.certPath;
-    const keyPath = has('certKey') ? (opts.certKey as string) : existingCert?.keyPath;
-    if (!has('certPath') && !has('certKey')) {
-      throw new CliError('INVALID_ARGUMENT',
-        'Switching to --auth-method=cert requires both --cert-path and --cert-key on the same command. Partial cert config would be silently ignored.',
-        { example: 'abap profile set <name> --auth-method cert --cert-path /abs/cert.pem --cert-key /abs/key.pem' });
-    }
-    if (!certPath || !keyPath) {
-      throw new CliError('INVALID_ARGUMENT',
-        'Switching to --auth-method=cert requires both --cert-path AND --cert-key.',
-        { example: 'abap profile set <name> --auth-method cert --cert-path /abs/cert.pem --cert-key /abs/key.pem' });
-    }
-    const block: CertAuthBlock = {
-      certPath,
-      keyPath,
-      ...((has('certCa') ? { caPath: opts.certCa as string } : existingCert?.caPath ? { caPath: existingCert.caPath } : {})),
-    };
-    return { method: 'cert', cert: block };
-  }
-  if (method === 'browser_sso') {
-    const existingSso = base.auth.method === 'browser_sso' ? base.auth.sso : undefined;
-    const block: SsoAuthBlock = has('ssoCookieFile')
-      ? { cookieFile: opts.ssoCookieFile as string }
-      : (existingSso ?? {});
-    return { method: 'browser_sso', sso: block };
-  }
-  if (method === 'oauth_password') {
-    if (opts.clearOauthPassword) {
-      throw new CliError('INVALID_ARGUMENT', '--clear-oauth-password requires explicit --auth-method.');
-    }
-    // Service-key path required when first creating an oauth_password profile;
-    // otherwise inherit the existing oauth block (only serviceKeyFile may
-    // change via re-supplying --service-key).
-    if (opts.serviceKey) {
-      const skPath = opts.serviceKey as string;
-      if (!fs.existsSync(skPath)) {
-        throw new CliError('CONFIG_ERROR', `Service key file not found: '${skPath}'.`, {
-          nextSteps: [`Download the service key from BTP Cockpit → Service Marketplace → ABAP environment → Service Keys.`],
-        });
-      }
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(fs.readFileSync(skPath, 'utf-8'));
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
-        throw new CliError('CONFIG_ERROR', `Failed to parse service key JSON: ${msg}`);
-      }
-      const { uaaUrl, clientId, clientSecret } = parseBtpServiceKey(parsed);
-      const block: OAuthPasswordBlock = { uaaUrl, clientId, clientSecret, serviceKeyFile: skPath };
-      return { method: 'oauth_password', oauth: block };
-    }
-    if (base.auth.method === 'oauth_password') {
-      return base.auth;
-    }
-    throw new CliError('INVALID_ARGUMENT',
-      'Switching to --auth-method=oauth_password requires --service-key on the same command.',
-      { example: 'abap profile set <name> --auth-method oauth_password --service-key ~/Downloads/default_key.json' });
-  }
-
-  // Unreachable — parseAuthMethodV2 throws for unknown values.
-  throw new CliError('INVALID_ARGUMENT', `Unknown authMethod '${String(opts.authMethod)}'.`);
+  return resolveAuthFromOptions({ method, bag }, base.auth);
 }
 
 /** Merge CLI field options into a base profile; stores/removes password on request. */

@@ -48,7 +48,7 @@ export async function probeAdtRuntime(profileName: string): Promise<RuntimeProbe
       error: { code: 'CONFIG_ERROR', message: `Connection profile '${profileName}' not found.` },
     };
   }
-  const password = (await getPassword(profileName)) || process.env.SAP_PASSWORD || '';
+  const password = (await getPassword(profileName)) || '';
   const sap: SapConfig = {
     url: profile.url,
     client: profile.client || '100',

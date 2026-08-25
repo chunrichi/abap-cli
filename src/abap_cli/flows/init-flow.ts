@@ -11,6 +11,7 @@ import { checkIcfDeployment, ICF_SERVICE_VERSION, type IcfDeploymentInfo } from 
 import { probeTextpoolCapability, recordCapability } from '../textpool/textpool-capability.js';
 import type { AuthConfig, OAuthPasswordBlock, SsoAuthBlock, CertAuthBlock } from '../auth/v2-types.js';
 import { defaultAuth, parseAuthMethodV2 } from '../auth/v2-types.js';
+import { authOptionsFromCli, resolveAuthFromOptions } from '../auth/strategy.js';
 
 interface WorkspaceConfig {
   system: string;
@@ -228,7 +229,7 @@ export async function runInitFromOpts(opts: CommandOpts, mode: OutputMode): Prom
   const profileName = str(opts.profile) || str(opts.system) || '';
   const hasFullParams = (opts.url || process.env.SAP_URL) &&
     (opts.username || process.env.SAP_USER) &&
-    (opts.password || process.env.SAP_PASSWORD);
+    !!opts.password;
 
   // FR-022: in non-interactive mode init never creates or mutates profiles.
   if (isNonTty && hasFullParams) {
@@ -346,44 +347,15 @@ async function selectSystem(names: string[]): Promise<string> {
 function resolveAuthFromOpts(opts: CommandOpts): AuthConfig {
   if (!opts.authMethod) return defaultAuth();
   const method = parseAuthMethodV2(opts.authMethod);
-  if (method === 'basic') return { method: 'basic' };
-  if (method === 'cert') {
-    const certPath = str(opts.certPath);
-    const keyPath = str(opts.certKey);
-    if (!certPath || !keyPath) {
-      throw new CliError('INVALID_ARGUMENT', '--auth-method=cert requires both --cert-path and --cert-key.', {
-        example: 'abap init --auth-method cert --cert-path /abs/cert.pem --cert-key /abs/key.pem ...',
-      });
-    }
-    const block: CertAuthBlock = { certPath, keyPath, ...(str(opts.certCa) ? { caPath: str(opts.certCa) } : {}) };
-    return { method: 'cert', cert: block };
-  }
-  if (method === 'browser_sso') {
-    const block: SsoAuthBlock = str(opts.ssoCookieFile) ? { cookieFile: str(opts.ssoCookieFile) } : {};
-    return { method: 'browser_sso', sso: block };
-  }
-  if (method === 'oauth_password') {
-    if (!str(opts.serviceKey)) {
-      throw new CliError('INVALID_ARGUMENT', '--auth-method=oauth_password requires --service-key.', {
-        example: 'abap init --auth-method oauth_password --service-key ~/Downloads/default_key.json ...',
-      });
-    }
-    const skPath = str(opts.serviceKey);
-    if (!fs.existsSync(skPath)) {
-      throw new CliError('CONFIG_ERROR', `Service key file not found: '${skPath}'.`);
-    }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(fs.readFileSync(skPath, 'utf-8'));
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      throw new CliError('CONFIG_ERROR', `Failed to parse service key JSON: ${msg}`);
-    }
-    const { uaaUrl, clientId, clientSecret } = parseBtpServiceKey(parsed);
-    const block: OAuthPasswordBlock = { uaaUrl, clientId, clientSecret, serviceKeyFile: skPath };
-    return { method: 'oauth_password', oauth: block };
-  }
-  throw new CliError('INVALID_ARGUMENT', `Unknown authMethod '${method}'.`);
+  const bag = {
+    ...(opts.certPath ? { certPath: str(opts.certPath) } : {}),
+    ...(opts.certKey ? { keyPath: str(opts.certKey) } : {}),
+    ...(opts.certCa ? { caPath: str(opts.certCa) } : {}),
+    ...(opts.ssoCookieFile ? { cookieFile: str(opts.ssoCookieFile) } : {}),
+    ...(opts.serviceKey ? { serviceKey: str(opts.serviceKey) } : {}),
+    ...(authOptionsFromCli(opts, method).bag),
+  };
+  return resolveAuthFromOptions({ method, bag }, defaultAuth());
 }
 
 /** Prompt for a brand-new system profile. */
@@ -417,8 +389,8 @@ async function collectNewSystem(opts: CommandOpts): Promise<CollectedConfig> {
 /**
  * Resolve the user password by auth method. Lookup order (matches
  * `auth/adapter.ts` so every profile type behaves identically):
- *   - basic:         keychain > --password > SAP_PASSWORD > TTY prompt (and store)
- *   - oauth_password: keychain > --password > BTP_PASSWORD_<profile> > BTP_PASSWORD > TTY prompt (and store)
+ *   - basic:         keychain > --password > TTY prompt (and store)
+ *   - oauth_password: keychain > --password > TTY prompt (and store)
  *   - cert / browser_sso: never asked (their auth supplies credentials)
  */
 async function resolvePassword(profileName: string, auth: AuthConfig, explicit: string | undefined): Promise<string> {
@@ -426,15 +398,6 @@ async function resolvePassword(profileName: string, auth: AuthConfig, explicit: 
   const stored = (await getPassword(profileName)) || '';
   if (stored) return stored;
   if (explicit) return explicit;
-  if (auth.method === 'oauth_password') {
-    const perProfile = process.env[`BTP_PASSWORD_${profileName.toUpperCase()}`];
-    if (perProfile) return perProfile;
-    const generic = process.env.BTP_PASSWORD;
-    if (generic) return generic;
-  } else {
-    const generic = process.env.SAP_PASSWORD;
-    if (generic) return generic;
-  }
   if (process.stdin.isTTY) {
     const { password } = await import('@clack/prompts');
     const entered = await password({
@@ -487,13 +450,12 @@ async function useExistingSystem(
   if (!config.password && profile.auth.method === 'oauth_password') {
     throw new CliError(
       'CONFIG_ERROR',
-      `No BTP password available for oauth_password profile '${profileName}'. Set BTP_PASSWORD_${profileName.toUpperCase()} or BTP_PASSWORD, or re-run with --password.`,
+      `No BTP password available for oauth_password profile '${profileName}'. Store it via abap profile set --password, or re-run with --password.`,
       {
         nextSteps: [
-          `export BTP_PASSWORD_${profileName.toUpperCase()}='<your SAP ID password>'`,
-          `or export BTP_PASSWORD='<your SAP ID password>'`,
+          `Store once: abap profile set ${profileName} --password <your SAP ID password> (writes to keychain, never to disk).`,
         ],
-        example: `BTP_PASSWORD='***' abap init --profile ${profileName} --yes`,
+        example: `abap profile set ${profileName} --password <your SAP ID password>  # then abap init --profile ${profileName}`,
       },
     );
   }
@@ -558,7 +520,7 @@ async function createSystemFromParams(opts: CommandOpts, mode: OutputMode): Prom
     ca: str(opts.ca) || undefined,
     auth,
   };
-  const password = str(opts.password) || process.env.SAP_PASSWORD || '';
+  const password = str(opts.password) || '';
 
   const config: CollectedConfig = {
     ...profile,

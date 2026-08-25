@@ -47,7 +47,7 @@ Point a test workspace at it:
 
 ```bash
 mkdir -p tmp/test && cd tmp/test
-SAP_PASSWORD=mockpw abap init --profile mock --url http://localhost:8080 --client 100 --username MOCKUSER --password mockpw --yes
+abap init --profile mock --url http://localhost:8080 --client 100 --username MOCKUSER --password mockpw --yes
 ```
 
 Then run the workflows from [Getting Started](getting-started.md) against the mock.
@@ -108,7 +108,7 @@ Use the `jsonFrom(cmd)` helper (walk `cmd.parent` to the root) rather than `cmd.
 
 - **Reuse, don't duplicate** — config (`loadConfig`), transport resolution (`resolveTransport`), and output helpers are shared; do not re-implement them
 - **All commands support `--json`** (Constitution Quality Gate)
-- **Credentials never in output** — passwords only via keychain / `SAP_PASSWORD`
+- **Credentials never in output** — passwords only via keychain / `--password` / TTY prompt
 - **SAP-side code via Dogfooding** — develop `abap/` ICF code using the CLI's own pull → edit → push loop (no Eclipse/SAP GUI)
 
 ## Contributing

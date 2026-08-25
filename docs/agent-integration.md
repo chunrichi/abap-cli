@@ -105,6 +105,6 @@ abap push src/zcl_demo/zcl_demo.clas.abap --tr "$transport" --json
 
 - **Always use `--json`** in automation; reserve human-readable output for interactive terminals.
 - **Check `status` and `error.code`**, not free-text messages.
-- **Never echo credentials** — passwords come from the OS keychain or `SAP_PASSWORD`; never pass them on command lines that are logged.
+- **Never echo credentials** — passwords come from the OS keychain (or `--password` / a TTY prompt); never pass them on command lines that are logged.
 - **Prefer explicit `--tr`** when a specific transport is required; automatic resolution only finds requests in the user's modifiable list.
 - **Loop safely** — each step is idempotent at the boundary (create reports `OBJECT_EXISTS` rather than overwriting; push reports per-file results).

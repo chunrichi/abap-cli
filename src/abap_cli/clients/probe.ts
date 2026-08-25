@@ -7,7 +7,7 @@ import { readCaCertificate, type SapConfig } from '../config/project-config.js';
 import { CliError } from '../output/json.js';
 import { classifyHttpError } from './http-error.js';
 import { buildAuth } from '../auth/adapter.js';
-import type { AuthMethodV2 } from '../auth/v2-types.js';
+import type { AuthConfig, AuthMethodV2 } from '../auth/v2-types.js';
 import { defaultCookieFile as defaultCookieFileFor, readCookieStore } from '../auth/sso-cookie.js';
 
 /** Per-layer result of `profile test <name>` (FR-024). */
@@ -28,6 +28,12 @@ export interface SystemProbe {
   icf: ProbeLayerResult;
 }
 
+/**
+ * Probe-only config. Carries the canonical `AuthConfig` straight from
+ * `SystemProfile.auth` so adding a new auth method does NOT require editing
+ * this file's per-method spread (only the registry needs to know about the
+ * new method).
+ */
 interface ProbeConfig {
   url: string;
   client: string;
@@ -37,10 +43,9 @@ interface ProbeConfig {
   insecure: boolean;
   /** PEM content (loaded from the profile's caPath or cert-level caPath). */
   caPem?: string;
-  authMethod: AuthMethodV2;
-  ssoCookieFile?: string;
-  certPaths?: { certPath: string; keyPath: string };
-  oauthBlock?: { uaaUrl: string; clientId: string; clientSecret: string; serviceKeyFile?: string };
+  auth: AuthConfig;
+  /** Convenience accessor — keeps call-sites concise. */
+  readonly authMethod: AuthMethodV2;
 }
 
 const SKIP = (authMethod?: AuthMethodV2): ProbeLayerResult => ({
@@ -63,8 +68,9 @@ export async function probeSystem(name: string): Promise<SystemProbe> {
       example: `abap profile set ${name} --url <url> --username <user> --password <pass>`,
     });
   }
-  const password = (await getPassword(name)) || process.env.SAP_PASSWORD || '';
+  const password = (await getPassword(name)) || '';
   const authMethod: AuthMethodV2 = profile.auth.method;
+  const auth: AuthConfig = profile.auth;
   const config: ProbeConfig = {
     url: profile.url,
     client: profile.client || '100',
@@ -73,23 +79,8 @@ export async function probeSystem(name: string): Promise<SystemProbe> {
     password,
     insecure: profile.insecure ?? process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0',
     caPem: readCaCertificate(profile.ca || ''),
-    authMethod,
-    ...(profile.auth.method === 'browser_sso' && profile.auth.sso.cookieFile
-      ? { ssoCookieFile: profile.auth.sso.cookieFile }
-      : {}),
-    ...(profile.auth.method === 'cert'
-      ? { certPaths: { certPath: profile.auth.cert.certPath, keyPath: profile.auth.cert.keyPath } }
-      : {}),
-    ...(profile.auth.method === 'oauth_password'
-      ? {
-          oauthBlock: {
-            uaaUrl: profile.auth.oauth.uaaUrl,
-            clientId: profile.auth.oauth.clientId,
-            clientSecret: profile.auth.oauth.clientSecret,
-            ...(profile.auth.oauth.serviceKeyFile ? { serviceKeyFile: profile.auth.oauth.serviceKeyFile } : {}),
-          },
-        }
-      : {}),
+    auth,
+    get authMethod() { return auth.method; },
   };
 
   const tlsResult = await probeTls(name, config);
@@ -112,8 +103,8 @@ export async function probeSystem(name: string): Promise<SystemProbe> {
  *  or expired — same reason (026).
  */
 function probeTls(name: string, config: ProbeConfig): Promise<ProbeLayerResult> {
-  if (config.authMethod === 'browser_sso') {
-    const cookieFile = config.ssoCookieFile || defaultCookieFileFor(name);
+  if (config.auth.method === 'browser_sso') {
+    const cookieFile = config.auth.sso.cookieFile || defaultCookieFileFor(name);
     const store = readCookieStore(cookieFile);
     if (!store) {
       return Promise.resolve({
@@ -129,13 +120,14 @@ function probeTls(name: string, config: ProbeConfig): Promise<ProbeLayerResult> 
       });
     }
   }
-  if (config.certPaths) {
+  if (config.auth.method === 'cert') {
+    const cert = config.auth.cert;
     const missing: string[] = [];
-    if (!config.certPaths.certPath || !fs.existsSync(config.certPaths.certPath)) {
-      missing.push(`certPath='${config.certPaths.certPath || ''}' (not found)`);
+    if (!cert.certPath || !fs.existsSync(cert.certPath)) {
+      missing.push(`certPath='${cert.certPath || ''}' (not found)`);
     }
-    if (!config.certPaths.keyPath || !fs.existsSync(config.certPaths.keyPath)) {
-      missing.push(`keyPath='${config.certPaths.keyPath || ''}' (not found)`);
+    if (!cert.keyPath || !fs.existsSync(cert.keyPath)) {
+      missing.push(`keyPath='${cert.keyPath || ''}' (not found)`);
     }
     if (missing.length > 0) {
       return Promise.resolve({
@@ -191,25 +183,10 @@ function probeTls(name: string, config: ProbeConfig): Promise<ProbeLayerResult> 
 }
 
 /** Build the SapConfig that `buildAuth` consumes — reuses the canonical
- * type so probe and runtime agree on every field. */
-function buildProbeSap(name: string, config: ProbeConfig): SapConfig {
-  // Reconstruct the AuthConfig from the flat probe config (probe just needs
-  // the fields it actually tests; other fields can be defaults).
-  const auth = config.authMethod === 'cert' && config.certPaths
-    ? { method: 'cert' as const, cert: { certPath: config.certPaths.certPath, keyPath: config.certPaths.keyPath } }
-    : config.authMethod === 'browser_sso'
-      ? { method: 'browser_sso' as const, sso: config.ssoCookieFile ? { cookieFile: config.ssoCookieFile } : {} }
-      : config.authMethod === 'oauth_password' && config.oauthBlock
-        ? {
-            method: 'oauth_password' as const,
-            oauth: {
-              uaaUrl: config.oauthBlock.uaaUrl,
-              clientId: config.oauthBlock.clientId,
-              clientSecret: config.oauthBlock.clientSecret,
-              ...(config.oauthBlock.serviceKeyFile ? { serviceKeyFile: config.oauthBlock.serviceKeyFile } : {}),
-            },
-          }
-        : { method: 'basic' as const };
+ * type so probe and runtime agree on every field. `auth` is taken verbatim
+ * from `ProbeConfig` (which already carries the canonical AuthConfig), so
+ * adding a new method does not require editing this function. */
+function buildProbeSap(_name: string, config: ProbeConfig): SapConfig {
   return {
     url: config.url,
     client: config.client,
@@ -218,7 +195,7 @@ function buildProbeSap(name: string, config: ProbeConfig): SapConfig {
     language: config.language,
     insecure: config.insecure,
     caPath: '', // CA goes through options.httpsAgent / tls.connect ca param
-    auth,
+    auth: config.auth,
     sourceDir: process.cwd(),
   };
 }

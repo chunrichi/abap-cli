@@ -29,7 +29,7 @@ describe('init-flow.validateInputs — auth method skip-password rules', () => {
     expect(() => validateInputs(c as unknown as CollectedConfig)).not.toThrow();
   });
 
-  it('oauth_password skips basic-password requirement (uses BTP_PASSWORD instead)', () => {
+  it('oauth_password skips basic-password requirement', () => {
     const c = {
       ...baseProfile, password: '', transport: '', pkg: '',
       auth: { method: 'oauth_password' as const, oauth: { uaaUrl: 'https://x', clientId: 'c', clientSecret: 's' } },

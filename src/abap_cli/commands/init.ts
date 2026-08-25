@@ -73,6 +73,7 @@ export function registerInitCommand(program: Command): void {
     .option('--insecure', 'Skip SSL certificate verification (development only)')
     .option('--ca <path>', 'Path to a CA certificate (PEM) for SSL verification')
     .option('--auth-method <method>', 'Login strategy: basic (default) | cert (X.509 client cert, 025) | browser_sso (BTP trial / SAML, 026) | oauth_password (BTP / CF service-key JWT, 027)')
+    .option('--auth-option <kv>', 'Generic auth option, repeatable as key=value (e.g. --auth-option certPath=/abs/cert.pem). New auth methods add no Commander options — they read from this bag.')
     .option('--cert-path <path>', 'X.509 client cert file (PEM) — used with --auth-method=cert')
     .option('--cert-key <path>', 'X.509 private key file (PEM) — used with --auth-method=cert')
     .option('--cert-ca <path>', 'Optional X.509 client CA override — used with --auth-method=cert')
