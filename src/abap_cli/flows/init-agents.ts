@@ -131,7 +131,7 @@ function rewriteOne(vendorDir: string): (p: string) => string {
 const REPO_METADATA_FILES: ReadonlySet<string> = new Set(['README.md']);
 
 /**
- * Scaffold the cross-vendor base: `skills/<name>/...` and `agents/abap-developer.md`
+ * Scaffold the cross-vendor base: `skills/<name>/...` and `agents/abap-developer.agent.md`
  * under `<vendorDir>/`. Does NOT write `AGENTS.md` or `copilot-instructions.md`.
  */
 function scaffoldGeneric(
@@ -151,7 +151,7 @@ function scaffoldGeneric(
   );
   // copyOne already prepends 'agents/' to the relative path inside destRoot,
   // so destRoot here is the vendor dir, not vendor/agents.
-  copyOne(root, 'agents/abap-developer.md', base, force, out);
+  copyOne(root, 'agents/abap-developer.agent.md', base, force, out);
 }
 
 /** Claude overlay: write `CLAUDE.md` at workspace root (Claude Code discovery). */
@@ -182,10 +182,10 @@ function scaffoldCursor(force: boolean, out: ScaffoldingResult): void {
  * Scaffold agent context into the workspace under vendor-specific directories.
  *
  * Path layout (after `init --agent <target>`):
- *   copilot → .github/skills/<skill>/  +  .github/agents/abap-developer.md
- *   claude  → .claude/skills/<skill>/  +  .claude/agents/abap-developer.md  +  CLAUDE.md
- *   cursor  → .cursor/skills/<skill>/  +  .cursor/agents/abap-developer.md  +  .cursor/rules/abap.mdc
- *   generic → .agents/skills/<skill>/  +  .agents/agents/abap-developer.md
+ *   copilot → .github/skills/<skill>/  +  .github/agents/abap-developer.agent.md
+ *   claude  → .claude/skills/<skill>/  +  .claude/agents/abap-developer.agent.md  +  CLAUDE.md
+ *   cursor  → .cursor/skills/<skill>/  +  .cursor/agents/abap-developer.agent.md  +  .cursor/rules/abap.mdc
+ *   generic → .agents/skills/<skill>/  +  .agents/agents/abap-developer.agent.md
  *
  * Never writes `AGENTS.md` or `copilot-instructions.md` (those are repo-level
  * files, not user-workspace context). Idempotent: re-runs are no-ops unless
@@ -219,7 +219,7 @@ This workspace uses abap-cli. Run \`abap --help\` to see all commands. Claude sh
 prefer \`abap <command> --json\` for machine-readable output.
 
 Skills live under \`.claude/skills/\` (abap-setup, abap-object). The
-abap-developer agent (\`.claude/agents/abap-developer.md\`) orchestrates them.
+abap-developer agent (\`.claude/agents/abap-developer.agent.md\`) orchestrates them.
 `;
 
 const CURSOR_MDC_TEMPLATE = `---

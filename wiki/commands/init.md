@@ -70,10 +70,10 @@ abap init --agent copilot|claude|cursor|generic [--force]
 
 | 值 | 写入路径 |
 |---|---|
-| `copilot` | `.github/skills/<name>/` + `.github/agents/abap-developer.md` |
-| `claude`  | `.claude/skills/<name>/` + `.claude/agents/abap-developer.md` + `CLAUDE.md` |
-| `cursor`  | `.cursor/skills/<name>/` + `.cursor/agents/abap-developer.md` + `.cursor/rules/abap.mdc` |
-| `generic` | `.agents/skills/<name>/` + `.agents/agents/abap-developer.md` |
+| `copilot` | `.github/skills/<name>/` + `.github/agents/abap-developer.agent.md` |
+| `claude`  | `.claude/skills/<name>/` + `.claude/agents/abap-developer.agent.md` + `CLAUDE.md` |
+| `cursor`  | `.cursor/skills/<name>/` + `.cursor/agents/abap-developer.agent.md` + `.cursor/rules/abap.mdc` |
+| `generic` | `.agents/skills/<name>/` + `.agents/agents/abap-developer.agent.md` |
 
 **不写入** `AGENTS.md` / `copilot-instructions.md` / `skills/README.md`（仓库级文件，不属于用户 workspace 上下文）。`skills/README.md`（仓库分层边界说明）也被 init 排除。
 
@@ -154,7 +154,7 @@ abap init --agent copilot --force
     "written": [
       ".claude/skills/abap-setup/SKILL.md",
       ".claude/skills/abap-object/SKILL.md",
-      ".claude/agents/abap-developer.md",
+      ".claude/agents/abap-developer.agent.md",
       "CLAUDE.md"
     ],
     "skipped": []

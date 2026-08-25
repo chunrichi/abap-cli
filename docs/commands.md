@@ -71,10 +71,10 @@ abap init --unset-package --yes # remove `package` from .abap.json
 | `--yes` / `--non-interactive` | Non-interactive confirmation (aliases) |
 
 **Agent scaffold matrix** (writes into vendor-specific dirs, never into the workspace root):
-- `copilot` → `.github/skills/<name>/SKILL.md` + `.github/agents/abap-developer.md`
-- `claude`  → `.claude/skills/<name>/SKILL.md` + `.claude/agents/abap-developer.md` + `CLAUDE.md`
-- `cursor`  → `.cursor/skills/<name>/SKILL.md` + `.cursor/agents/abap-developer.md` + `.cursor/rules/abap.mdc`
-- `generic` → `.agents/skills/<name>/SKILL.md` + `.agents/agents/abap-developer.md`
+- `copilot` → `.github/skills/<name>/SKILL.md` + `.github/agents/abap-developer.agent.md`
+- `claude`  → `.claude/skills/<name>/SKILL.md` + `.claude/agents/abap-developer.agent.md` + `CLAUDE.md`
+- `cursor`  → `.cursor/skills/<name>/SKILL.md` + `.cursor/agents/abap-developer.agent.md` + `.cursor/rules/abap.mdc`
+- `generic` → `.agents/skills/<name>/SKILL.md` + `.agents/agents/abap-developer.agent.md`
 
 Never writes `AGENTS.md`, `copilot-instructions.md`, or `skills/README.md` (those are repository-level files, not user-workspace context). Idempotent: re-runs are no-ops unless `--force`. JSON output reports `{ written, skipped }`.
 

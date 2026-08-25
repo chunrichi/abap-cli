@@ -228,9 +228,9 @@ describe('skill bundle (019-cli-skill-agent-bundle) structural audit', () => {
     expect(content).toContain('自包含');
   });
 
-  it('agents/abap-developer.md exists with frontmatter handoffs', () => {
-    const agentPath = path.join(agentsRoot, 'abap-developer.md');
-    expect(fs.existsSync(agentPath), 'agents/abap-developer.md 缺失').toBe(true);
+  it('agents/abap-developer.agent.md exists with frontmatter handoffs', () => {
+    const agentPath = path.join(agentsRoot, 'abap-developer.agent.md');
+    expect(fs.existsSync(agentPath), 'agents/abap-developer.agent.md 缺失').toBe(true);
     const content = fs.readFileSync(agentPath, 'utf-8');
     const fm = parseFrontmatter(content);
     expect(fm.name).toBe('abap-developer');
@@ -252,8 +252,8 @@ describe('skill bundle — size constraints (FR6)', () => {
     },
   );
 
-  it('agents/abap-developer.md ≤ 120 lines', () => {
-    const agentPath = path.join(agentsRoot, 'abap-developer.md');
+  it('agents/abap-developer.agent.md ≤ 120 lines', () => {
+    const agentPath = path.join(agentsRoot, 'abap-developer.agent.md');
     if (!fs.existsSync(agentPath)) return;
     const content = fs.readFileSync(agentPath, 'utf-8');
     const lineCount = content.split('\n').length;

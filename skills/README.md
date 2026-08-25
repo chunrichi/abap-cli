@@ -11,7 +11,7 @@ abap-cli 用户的 AI agent 上下文集合。**自包含**——分发时每个
 | `.github/skills/` `abap-style/` `okf/` | 本仓库 AI 贡献者的元方法 | vibe_with_abap 开发者 | ❌ |
 | `.github/agents/`（spec-kit、test-driver 等） | 本仓库工作流 | vibe_with_abap 开发者 | ❌ |
 | **顶层 `skills/`（本目录）** | **abap-cli 用户的 agent 路由层** | **abap-cli 用户** | **❌（v1）** |
-| **顶层 `agents/abap-developer.md`** | **abap-cli 用户的端到端开发代理** | **abap-cli 用户** | **❌（v1）** |
+| **顶层 `agents/abap-developer.agent.md`** | **abap-cli 用户的端到端开发代理** | **abap-cli 用户** | **❌（v1）** |
 
 不要把两套目录混用：本目录是**给 abap-cli 安装者看的**，`.github/skills/` 是**给本仓库贡献者看的**。
 
@@ -49,10 +49,10 @@ npx skills add <owner>/abap-cli
 ```bash
 # 完整拷（含 references/ scripts/ assets/）
 cp -r skills/ <your-project>/.claude/skills/abap-cli
-cp -r agents/abap-developer.md <your-project>/.claude/agents/abap-developer.md
+cp -r agents/abap-developer.agent.md <your-project>/.claude/agents/abap-developer.agent.md
 # 或 GitHub Copilot：
 cp -r skills/ <your-project>/.github/skills/abap-cli
-cp agents/abap-developer.md <your-project>/.github/agents/abap-developer.md
+cp agents/abap-developer.agent.md <your-project>/.github/agents/abap-developer.agent.md
 ```
 
 ## 索引
@@ -81,7 +81,7 @@ skills/<name>/
 
 | agent | 角色 | 详细 |
 |---|---|---|
-| **`abap-developer`** | 端到端开发代理（handoffs 跳转 2 skill） | [abap-developer.md](../agents/abap-developer.md) |
+| **`abap-developer`** | 端到端开发代理（handoffs 跳转 2 skill） | [abap-developer.agent.md](../agents/abap-developer.agent.md) |
 
 ### 为什么从 3 个 skill 收敛到 2 个
 

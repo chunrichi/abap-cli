@@ -41,7 +41,7 @@ describe('init --agent (scaffoldAgents)', () => {
       expectFile(path.join(cwd, vendorDir, 'skills', 'abap-object', 'SKILL.md'));
 
       // Agent copied to vendor agents dir.
-      expectFile(path.join(cwd, vendorDir, 'agents', 'abap-developer.md'));
+      expectFile(path.join(cwd, vendorDir, 'agents', 'abap-developer.agent.md'));
     });
 
     it('claude also writes CLAUDE.md at workspace root', async () => {
