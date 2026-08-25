@@ -1,9 +1,18 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 const probeAdtRuntime = vi.fn();
+const getOrProbeRuntime = vi.fn();
 vi.mock('../../src/abap_cli/adc/runtime-probe.js', () => ({
   probeAdtRuntime: (...a: unknown[]) => probeAdtRuntime(...a),
   steampunkDeployHint: () => ['hint line 1', 'hint line 2'],
+}));
+
+vi.mock('../../src/abap_cli/config/runtime-cache.js', () => ({
+  // 034: cache is empty in tests — every deploy probe forces a network call,
+  // which is what the original 030 assertions targeted.
+  getOrProbeRuntime: (...a: unknown[]) => getOrProbeRuntime(...a),
+  clearRuntimeCache: () => undefined,
+  readCachedRuntime: () => undefined,
 }));
 
 const pushObject = vi.fn();
@@ -46,6 +55,9 @@ function makeClient(): unknown {
 describe('deploy-flow — 030 Steampunk runtime branching', () => {
   beforeEach(() => {
     probeAdtRuntime.mockReset();
+    getOrProbeRuntime.mockReset();
+    // 034: cache miss by default — deploy must probe the network.
+    getOrProbeRuntime.mockResolvedValue(undefined);
     pushObject.mockReset();
     pushObject.mockResolvedValue({
       status: 'updated',
@@ -108,5 +120,24 @@ describe('deploy-flow — 030 Steampunk runtime branching', () => {
     expect(summary.deployKind).toBe('source-only');
     expect(summary.dryRun).toBe(true);
     expect(summary.icfNode?.status).toBe('planned');
+  });
+
+  it('034: with a cached runtime tier, deploy reuses it without probing the network', async () => {
+    // Cache hit only — probeAdtRuntime must NOT be called.
+    getOrProbeRuntime.mockResolvedValueOnce({
+      tier: 'steampunk',
+      icfSetupBlocked: true,
+      source: 'discovery',
+      probedAt: new Date().toISOString(),
+    });
+    const summary = await deployBundled(makeClient() as never, {
+      transport: 'DRY_RUN',
+      dryRun: true,
+      profileName: 'btptrial',
+      sourceDir: '/tmp/__nonexistent_deploy_dir_030',
+    });
+    expect(summary.runtime).toBe('steampunk');
+    expect(summary.deployKind).toBe('source-only');
+    expect(probeAdtRuntime).not.toHaveBeenCalled();
   });
 });

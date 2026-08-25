@@ -10,6 +10,7 @@ import { parseBtpServiceKey } from '../auth/types.js';
 import { findWorkspaceConfig } from '../config/project-config.js';
 import { probeSystem } from '../clients/probe.js';
 import { probeTextpoolCapability, recordCapability } from '../textpool/textpool-capability.js';
+import { getOrProbeRuntime } from '../config/runtime-cache.js';
 import { assertValidProfile } from '../config/validation.js';
 import type { AuthConfig, AuthMethodV2 } from '../auth/v2-types.js';
 import { defaultAuth, parseAuthMethodV2 } from '../auth/v2-types.js';
@@ -241,6 +242,15 @@ function worstExitCode(probe: { tls: { ok: boolean }; auth: { ok: boolean }; adt
 /** Probe a profile across tls → auth → adt → icf and report per-layer results. */
 export async function runTest(name: string, mode: OutputMode): Promise<void> {
   const probe = await probeSystem(name);
+  // 034: when the adt layer succeeded, refresh the runtime cache so subsequent
+  // deploy / init calls can read it without a network round-trip.
+  if (probe.adt.ok) {
+    try {
+      await getOrProbeRuntime(name, { force: true });
+    } catch {
+      // Cache refresh is best-effort; probe results still surface below.
+    }
+  }
   const human = [
     `Connection probe '${name}':`,
     ...Object.entries(probe).map(([layer, r]) => {

@@ -204,6 +204,56 @@ describe('probeAdtRuntime — 030 ADT runtime tier detection', () => {
     expect(r.runtime).toBe('unknown');
     expect(r.icfSetupBlocked).toBe(false);
   });
+
+  // 034: apiCapabilities surface for the strategy registry. On Steampunk the
+  // httpService collection is present, on on-prem the ICF collection is
+  // present; both flags are reported together so deploy-flow can branch
+  // without re-probing.
+  it('Steampunk: apiCapabilities marks httpService=available, icf=missing', async () => {
+    request.mockRejectedValueOnce(new Error('404'));
+    request.mockResolvedValueOnce(
+      makeAtom({
+        body:
+          '<app:service><app:workspace>' +
+          '<app:collection href="/sap/bc/adt/ucon/httpservices"><atom:title>HTTP Service</atom:title></app:collection>' +
+          '<app:collection href="/sap/bc/adt/aps/cloud/com/sco1/steampunkAllowedInst/values"><atom:title>Steampunk Allowed Instances</atom:title></app:collection>' +
+          '</app:workspace></app:service>',
+      }),
+    );
+    const r = await probeAdtRuntime('btptrial');
+    expect(r.runtime).toBe('steampunk');
+    expect(r.apiCapabilities?.icf.available).toBe(false);
+    expect(r.apiCapabilities?.httpService.available).toBe(true);
+    expect(r.apiCapabilities?.steampunkMarkers).toEqual(expect.arrayContaining(['steampunk']));
+  });
+
+  it('on-prem: apiCapabilities reports icf=available (informationsystem path skips primaryPath)', async () => {
+    request.mockResolvedValueOnce(makeAtom({ sapComponent: 'S4CORE' }));
+    const r = await probeAdtRuntime('s4prem');
+    expect(r.runtime).toBe('netweaver750');
+    expect(r.source).toBe('informationsystem');
+    expect(r.apiCapabilities?.icf.available).toBe(true);
+    expect(r.apiCapabilities?.httpService.available).toBe(false);
+  });
+
+  it('on-prem via discovery: apiCapabilities reports icf=available with primaryPath', async () => {
+    request.mockResolvedValueOnce(makeAtom({ sapComponent: 'CUSTOM' }));
+    request.mockResolvedValueOnce(
+      makeAtom({
+        hasIcf: true,
+        body:
+          '<app:service><app:workspace>' +
+          '<app:collection href="/sap/bc/adt/icf/sicf"><atom:title>SICF</atom:title></app:collection>' +
+          '</app:workspace></app:service>',
+      }),
+    );
+    const r = await probeAdtRuntime('eccdev');
+    expect(r.runtime).toBe('netweaver750');
+    expect(r.source).toBe('discovery');
+    expect(r.apiCapabilities?.icf.available).toBe(true);
+    expect(r.apiCapabilities?.icf.primaryPath).toBe('/sap/bc/adt/icf/sicf');
+    expect(r.apiCapabilities?.httpService.available).toBe(false);
+  });
 });
 
 describe('steampunkDeployHint — 030 BTP Cockpit destination guide', () => {

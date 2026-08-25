@@ -25,6 +25,29 @@ export interface SystemProfile {
   systemVersion?: string;
   /** ADT text-element capability recorded once at connect/init (Q1). */
   adtTextpool?: { read: boolean; write: boolean; checkedAt: string };
+  /** 034: Cached ADT runtime tier from the last successful `probeAdtRuntime` /
+   *  `profile test`. Used by `extension deploy` to pick an ICF register
+   *  strategy without re-probing the network. Refreshed by `profile test`
+   *  and `init`. Absent on first use — `probeAdtRuntime` runs lazily. */
+  runtime?: CachedRuntime;
+}
+
+/** Subset of RuntimeProbeResult that is safe to serialise on disk (034).
+ *  Mirrors runtime-probe.ts fields but lives here to avoid a circular import. */
+export interface CachedRuntime {
+  tier: 'netweaver740' | 'netweaver750' | 'steampunk' | 'unknown';
+  sapComponent?: string;
+  release?: string;
+  icfSetupBlocked: boolean;
+  /** Endpoint where the verdict was sourced from. */
+  source: 'informationsystem' | 'discovery' | 'none';
+  /** Optional API capability summary (when probed via discovery). */
+  apiCapabilities?: {
+    icf: { available: boolean; primaryPath?: string };
+    httpService: { available: boolean; acceptsMime?: string; createAuthRequired?: boolean };
+    steampunkMarkers?: string[];
+  };
+  probedAt: string;
 }
 
 export interface UserConfig {
@@ -101,6 +124,7 @@ function normaliseStoredProfile(name: string, raw: unknown): SystemProfile {
     auth,
     ...(typeof r.systemVersion === 'string' ? { systemVersion: r.systemVersion } : {}),
     ...(r.adtTextpool && typeof r.adtTextpool === 'object' ? { adtTextpool: r.adtTextpool as SystemProfile['adtTextpool'] } : {}),
+    ...(r.runtime && typeof r.runtime === 'object' ? { runtime: r.runtime as SystemProfile['runtime'] } : {}),
   };
 }
 

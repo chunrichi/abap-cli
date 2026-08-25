@@ -19,7 +19,36 @@ export interface RuntimeProbeResult {
   sapComponent?: string;
   /** Optional release string (`sap:rel`) when the Atom XML exposes it. */
   release?: string;
+  /** IcfApi + HttpServiceApi detected from the discovery endpoint (034).
+   *  Used by `extension deploy` to pick the right register strategy without
+   *  re-probing the network. Absent on 'none' source. */
+  apiCapabilities?: IcfApiCapabilities;
   error?: { code: string; message: string };
+}
+
+/** Capability flags reported alongside the runtime tier (034).
+ *  - `icf`: classic `/sap/bc/adt/icf` collection (on-prem SICF admin).
+ *           absent → cl_icf_tree is the wrong tool (Steampunk).
+ *  - `httpService`: `/sap/bc/adt/ucon/httpservices` collection (Steampunk
+ *           HTTP service API). `acceptsMime` is the verified Content-Type
+ *           the POST handler accepts (empty when only GET was probed). */
+export interface IcfApiCapabilities {
+  icf: {
+    available: boolean;
+    /** Optional path to the first /sap/bc/adt/icf/* collection (when available). */
+    primaryPath?: string;
+  };
+  httpService: {
+    available: boolean;
+    /** Content-Type the POST handler accepts (e.g. `application/vnd.sap.as+xml`).
+     *  Empty when the probe did not exercise POST. */
+    acceptsMime?: string;
+    /** True when POST requires workbench change authorisation (S_ABPLNGVS)
+     *  — common on BTP trial where developer users lack it. */
+    createAuthRequired?: boolean;
+  };
+  /** Markers seen in the discovery payload — debug aid, not contract. */
+  steampunkMarkers?: string[];
 }
 
 /**
@@ -153,6 +182,9 @@ function classifyInformationsystem(xml: string): RuntimeProbeResult {
       icfSetupBlocked: false,
       sapComponent,
       release,
+      // 034: on-prem S/4HANA always exposes /sap/bc/adt/icf. Mark it here so
+      // deploy-flow can skip the ICF collection availability check.
+      apiCapabilities: { icf: { available: true }, httpService: { available: false } },
     };
   }
 
@@ -164,6 +196,7 @@ function classifyInformationsystem(xml: string): RuntimeProbeResult {
       icfSetupBlocked: false,
       sapComponent,
       release,
+      apiCapabilities: { icf: { available: true }, httpService: { available: false } },
     };
   }
 
@@ -207,11 +240,26 @@ async function probeFromDiscovery(client: unknown): Promise<RuntimeProbeResult> 
     /steampunk/i.test(discXml) ||
     /hana\.ondemand\.com/i.test(discXml) ||
     /sapbtp|abap[\s_-]?env/i.test(discXml);
+  // 034: extract ICF / HTTP service collection hrefs so deploy-flow can pick
+  // a register strategy without re-probing the network.
+  const icfHrefMatch = /href\s*=\s*"([^"]*\/sap\/bc\/adt\/icf\/[^"]+)"/i.exec(discXml);
+  const icfPrimaryPath = icfHrefMatch ? icfHrefMatch[1] : undefined;
+  const hasHttpService = /href\s*=\s*"[^"]*\/sap\/bc\/adt\/ucon\/httpservices[^"]*"/i.test(discXml);
+  const markers: string[] = [];
+  if (/steampunk/i.test(discXml)) markers.push('steampunk');
+  if (/hana\.ondemand\.com/i.test(discXml)) markers.push('hana.ondemand');
+  if (/sapbtp|abap[\s_-]?env/i.test(discXml)) markers.push('abapenv');
+  const apiCapabilities: IcfApiCapabilities = {
+    icf: { available: hasIcfCollection, ...(icfPrimaryPath ? { primaryPath: icfPrimaryPath } : {}) },
+    httpService: { available: hasHttpService },
+    ...(markers.length > 0 ? { steampunkMarkers: markers } : {}),
+  };
   if (hasSteampunkMarker && !hasIcfCollection) {
     return {
       runtime: 'steampunk',
       source: 'discovery',
       icfSetupBlocked: true,
+      apiCapabilities,
     };
   }
   if (hasIcfCollection) {
@@ -219,6 +267,7 @@ async function probeFromDiscovery(client: unknown): Promise<RuntimeProbeResult> 
       runtime: 'netweaver750',
       source: 'discovery',
       icfSetupBlocked: false,
+      apiCapabilities,
     };
   }
   // No ICF collection AND no Steampunk marker — ambiguous. Stay conservative
@@ -228,6 +277,7 @@ async function probeFromDiscovery(client: unknown): Promise<RuntimeProbeResult> 
     runtime: 'unknown',
     source: 'discovery',
     icfSetupBlocked: false,
+    apiCapabilities,
   };
 }
 
