@@ -111,6 +111,39 @@ abap extension status --json
 1. `GET /sap/bc/adt/repository/informationsystem`（Atom XML）读 `sap-component` / `sap:rel`
 2. 备用 `GET /sap/bc/adt/discovery` 看 workspace 是否声明 `/sap/bc/adt/icf/*` collection
 
+`probeAdtRuntime` 同时收集 `data.apiCapabilities` 字段（034），给策略注册器（见下）路由判断用：
+
+```jsonc
+{
+  "runtime": "steampunk",
+  "icfSetupBlocked": true,
+  "apiCapabilities": {
+    "icf":         { "available": false },                       // no /sap/bc/adt/icf/*
+    "httpService": { "available": true },                        // /sap/bc/adt/ucon/httpservices
+    "steampunkMarkers": [ "steampunk", "hana.ondemand" ]
+  },
+  "probedAt": "2026-08-25T15:29:25.941Z"
+}
+```
+
+on-prem S/4HANA 形态：`{ runtime: "netweaver750", apiCapabilities: { icf: { available: true }, httpService: { available: false } } }`。
+
+### Runtime cache（034）
+
+`profile test` 在 adt layer 成功时主动刷 runtime 到 `~/.abap-cli/systems.json` 的 `systems[].runtime` 字段。`extension deploy` 优先读 cache，缺时再 `probeAdtRuntime`。`getOrProbeRuntime(name, { force? })` / `readCachedRuntime(name)` / `clearRuntimeCache(name)` 在 [src/abap_cli/config/runtime-cache.ts](../../src/abap_cli/config/runtime-cache.ts)。
+
+### ICF register 策略注册器（034）
+
+`extension deploy` 的 ICF 分支通过 `IcfRegisterStrategy` 接口 + registry dispatch。三档内置 strategy：
+
+| strategyId | runtime | 行为 |
+|---|---|---|
+| `on-prem-cl-icf-tree` | `netweaver740` / `netweaver750` / `unknown` | 调 `ZCL_ABAP_VIBE_ICF_SETUP` classrun 建 SICF 节点 |
+| `steampunk-cockpit-fallback` | `steampunk` | 030 行为 — 弹 Cloud Foundry destination hint（`STEAMPUNK_ICF_MANUAL` warning）|
+| `steampunk-swb` | 预留 — `supports()` 当前总是 false | 等 SAP 文档化 `/sap/bc/adt/ucon/httpservices` POST body schema 后翻转 |
+
+新增第 4 档 strategy 不需要改 deploy-flow：在 [src/abap_cli/adc/strategies/](../../src/abap_cli/adc/strategies/) 下新建文件，`icf-bootstrap.ts` 加一行 `registerIcfStrategy(new MyStrategy())` 即可。
+
 ### 为什么 Steampunk 不能自动注册 ICF 节点
 
 BTP ABAP environment 受 SAP Steampunk Released APIs 白名单限制：

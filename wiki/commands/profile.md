@@ -98,6 +98,7 @@ abap transport list --json
 - **`login <name>`**：起 127.0.0.1:<random> HTTP server（仅 loopback）+ 弹浏览器到 SAP discovery URL；用户在浏览器走 SAML/IAS 登录后把 `Cookie:` 头贴进 helper 页提交 → cookie jar 写盘 → 返回 `{cookieFile, capturedCookies, helperUrl, sapAuthUrl}`。TTL 30 分钟。
 - **`delete` 非 TTY 无 `--yes`** → `VALIDATION_ERROR`（exit 7）；`--json` 返回 `passwordCleaned` / `certPassphraseCleaned` / `cookieJarCleaned`
 - **textpool 能力探测（014）**：add/set 时一次性非阻断探测 ADT text-elements 读写能力并缓存到 profile（`adtTextpool`）——textpool 操作据此选路由，无运行时回退
+- **ADT runtime cache（034）**：`profile test` 在 adt layer 成功时主动探测 ADT runtime tier + API capabilities 并缓存到 `systems[].runtime: { tier, icfSetupBlocked, source, apiCapabilities: { icf, httpService, steampunkMarkers? }, probedAt }`。`extension deploy` 优先读 cache，缺时再 `probeAdtRuntime`。trial 实测：cache 写入后 `extension deploy --dry-run` 直接命中，不重新探测 discovery。`profile test --json` 本身不变（runtime 仍只在 adt 路径内部缓存）。
 - **`use` 已移除**：绑定工作区用 `abap init --profile <name>`
 
 ## Examples
