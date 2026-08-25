@@ -70,7 +70,13 @@ abap init --unset-package --yes # remove `package` from .abap.json
 | `--force` | Overwrite existing files when scaffolding `--agent` (default: skip) |
 | `--yes` / `--non-interactive` | Non-interactive confirmation (aliases) |
 
-**Agent scaffold matrix**: every target writes the cross-vendor base (`AGENTS.md` + `skills/`); `copilot` adds `.github/copilot-instructions.md`, `claude` adds `CLAUDE.md`, `cursor` adds `.cursor/rules/abap.mdc`. JSON output reports `{ written, skipped }`.
+**Agent scaffold matrix** (writes into vendor-specific dirs, never into the workspace root):
+- `copilot` → `.github/skills/<name>/SKILL.md` + `.github/agents/abap-developer.md`
+- `claude`  → `.claude/skills/<name>/SKILL.md` + `.claude/agents/abap-developer.md` + `CLAUDE.md`
+- `cursor`  → `.cursor/skills/<name>/SKILL.md` + `.cursor/agents/abap-developer.md` + `.cursor/rules/abap.mdc`
+- `generic` → `.agents/skills/<name>/SKILL.md` + `.agents/agents/abap-developer.md`
+
+Never writes `AGENTS.md`, `copilot-instructions.md`, or `skills/README.md` (those are repository-level files, not user-workspace context). Idempotent: re-runs are no-ops unless `--force`. JSON output reports `{ written, skipped }`.
 
 After writing the workspace config, `abap init` performs an informational ICF deployment check (FR-012..FR-015): it probes `/sap/zabap_vibe/` and compares the deployed version with the bundled expected version. The JSON result carries an `icf` field with one of four states: `not_deployed` (hint to run `abap extension deploy`), `current`, `outdated` (hint to run `abap extension deploy` to upgrade), or `unreachable` (degraded to a `meta.warnings` entry — init still succeeds). The check never modifies SAP and never blocks init.
 

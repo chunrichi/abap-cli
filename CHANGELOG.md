@@ -5,6 +5,8 @@
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-25
+
 ### Added
 - **034 — ADT runtime API capabilities + 持久化 cache**：`probeAdtRuntime` 探测输出新增 `apiCapabilities: { icf: { available, primaryPath? }, httpService: { available, acceptsMime?, createAuthRequired? }, steampunkMarkers? }` —— 仅通过 discovery endpoint 收集（trial 真测：`{ icf: { available: false }, httpService: { available: true }, steampunkMarkers: ['steampunk','hana.ondemand'] }`；on-prem S4CORE： `{ icf: { available: true }, httpService: { available: false } }`）。`SystemProfile` 加 `runtime?: CachedRuntime` 字段，由 `profile test`（adt layer 成功时）刷新到 `~/.abap-cli/systems.json`。`extension deploy` 优先读 cache，缺时再 `probeAdtRuntime`。新增 `src/abap_cli/config/runtime-cache.ts`：`getOrProbeRuntime(name, { force? })` / `readCachedRuntime(name)` / `clearRuntimeCache(name)`。**真 BTP trial 端到端验证**：`profile test btptrial --json` 后 `~/.abap-cli/systems.json` 的 `systems.btptrial.runtime` 含 `tier: "steampunk"` + `apiCapabilities`，随后 `extension deploy --dry-run --json` 命中 cache，`runtime: "steampunk"` / `deployKind: "source-only"` / `icfNode: {status: "planned"}` 不变。
 - **034 — ICF register strategy registry**：`extension deploy` 的 ICF 分支重构为 `IcfRegisterStrategy` 接口 + `icf-register-registry.ts` + `icf-bootstrap.ts`。三个内置 strategy： `OnPremClIcfTreeStrategy`（包装 `ZCL_ABAP_VIBE_ICF_SETUP` classrun，030 行为不变 — on-prem / unknown 默认走它）、 `SteampunkCockpitFallbackStrategy`（保留 030 Cockpit destination hint 行为）、 `SteampunkSwbStrategy`（未来 SAP-side SWB 接入占位 — `supports()` 当前总是 false，等 SAP 文档化 `/sap/bc/adt/ucon/httpservices` POST body schema 后翻转；trial 实测 `POST` 返回 500 SY530、 `PUT` 返回 403 S_ABPLNGVS，普通用户无法注册）。`registerIcfStrategy()` 是唯一新增策略的入口；deploy-flow 不再包含硬编码 if/else 逻辑。新增 `src/abap_cli/adc/icf-{register-strategy,register-registry,bootstrap}.ts` + `adc/strategies/{on-prem-cl-icf-tree,steampunk-cockpit-fallback,steampunk-swb}.ts`。
@@ -17,6 +19,13 @@
 - **`oauth_password` 密码查找链调整**：`init-flow.resolvePassword` 与 `auth/strategies/oauth-password.ts` 现在按 **`OS keychain` → `--password` → TTY prompt** 查找（TTY prompt 输入后自动 store 到 keychain）。`init` wizard 在 `oauth_password` 也走 keychain prompt/store 流程（之前只对 `basic` 生效）。验证：`unset BTP_PASSWORD* && abap profile test btptrial` 直接从 keychain 取密码，tls/auth/adt 全 ok。
 - **create-object body 去掉 `adtcore:responsible` 属性**：实测 BTP trial `CLASS_TRANSFORMATION` ST 拒绝带 `adtcore:responsible` 的 body（offset ≈370）。保留 comments 解释原因 + 验证记录。
 - **CHANGELOG 压缩**：将 [Unreleased] 区段从 025 → 028 累积的 100+ 行展开压成核心条目。025 / 026 / 027 / 028 / extension / trial-real 诊断等已 release 的内容整体下移到 `docs/CHANGELOG-history.md`（即将提交）。
+- **`init --agent` 路径分层**（breaking）：每个 vendor 写入 agent 框架约定的子目录，不再污染 workspace 根。
+  - `copilot` → `.github/skills/<name>/` + `.github/agents/abap-developer.md`
+  - `claude`  → `.claude/skills/<name>/` + `.claude/agents/abap-developer.md` + `CLAUDE.md`
+  - `cursor`  → `.cursor/skills/<name>/` + `.cursor/agents/abap-developer.md` + `.cursor/rules/abap.mdc`
+  - `generic` → `.agents/skills/<name>/` + `.agents/agents/abap-developer.md`
+  - **不再**写入 `AGENTS.md` / `copilot-instructions.md` / `skills/README.md`。
+  - **Migration**：先前已 `init --agent copilot` 把 `skills/` `agents/` `AGENTS.md` 倒在 workspace 根的目录手工删除即可（`rm -rf skills agents AGENTS.md .github/copilot-instructions.md`），重新跑 `abap init --agent copilot` 即可落到 `.github/` 正确位置。
 
 ### Removed
 - **移除所有 env 密码读取**（breaking）：`SAP_PASSWORD` / `SAP_PASSWORD_<PROFILE>` / `BTP_PASSWORD` / `BTP_PASSWORD_<PROFILE>` / `CERT_PASSPHRASE_<PROFILE>` / `ABAP_CLI_SECRETS_BACKEND` 不再被读取。密码只来自 `--password` flag、OS keychain、TTY prompt。
