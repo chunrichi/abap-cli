@@ -2,12 +2,28 @@ import type { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError } from '../output/json.js';
 import { resolveObject, getObjectParts } from '../core/resolve.js';
 
+export interface TransportObjectInfo {
+  name: string;
+  type: string;
+  status: string;
+}
+
+export interface TransportTaskInfo {
+  number: string;
+  description: string;
+  status: string;
+  owner: string;
+  objects: TransportObjectInfo[];
+}
+
 export interface TransportRequestInfo {
   number: string;
   description: string;
   status: string;
   owner: string;
-  objects: { name: string; type: string; status: string }[];
+  objects: TransportObjectInfo[];
+  tasks: TransportTaskInfo[];
+  deduplicated: number;
 }
 
 export interface TransportAssignResult {
@@ -21,20 +37,70 @@ export interface TransportResolveResult {
   transports: { number: string; status: string; owner: string; text: string }[];
 }
 
+interface RawTransportObject {
+  'tm:name': string;
+  'tm:type': string;
+  'tm:obj_info'?: string;
+}
+
+interface RawTransportTask {
+  'tm:number'?: string;
+  'tm:desc'?: string;
+  'tm:status'?: string;
+  'tm:owner'?: string;
+  objects?: RawTransportObject[];
+}
+
+interface RawTransportDetails {
+  'tm:number': string;
+  'tm:desc': string;
+  'tm:status': string;
+  'tm:owner': string;
+  objects?: RawTransportObject[];
+  tasks?: RawTransportTask[];
+}
+
+function toObjectInfo(o: RawTransportObject): TransportObjectInfo {
+  return {
+    name: o['tm:name'],
+    type: o['tm:type'],
+    status: o['tm:obj_info'] ?? '',
+  };
+}
+
+function toTaskInfo(t: RawTransportTask): TransportTaskInfo {
+  return {
+    number: t['tm:number'] ?? '',
+    description: t['tm:desc'] ?? '',
+    status: t['tm:status'] ?? '',
+    owner: t['tm:owner'] ?? '',
+    objects: (t.objects ?? []).map(toObjectInfo),
+  };
+}
+
+/** Collect every object reference across the request and its nested tasks. */
+function collectAllReferences(details: RawTransportDetails): TransportObjectInfo[] {
+  const direct = (details.objects ?? []).map(toObjectInfo);
+  const fromTasks = (details.tasks ?? []).flatMap((t) => (t.objects ?? []).map(toObjectInfo));
+  return [...direct, ...fromTasks];
+}
+
 /** Structured metadata for `transport show <req>` (FR-015, research §8). */
 export async function showTransport(client: AdtClientWrapper, number: string): Promise<TransportRequestInfo> {
   try {
-    const details = await client.transportDetails(number);
+    const details = (await client.transportDetails(number)) as RawTransportDetails;
+    const directObjects = (details.objects ?? []).map(toObjectInfo);
+    const tasks = (details.tasks ?? []).map(toTaskInfo);
+    const references = collectAllReferences(details);
+    const deduplicated = references.length - directObjects.length;
     return {
       number: details['tm:number'],
       description: details['tm:desc'],
       status: details['tm:status'],
       owner: details['tm:owner'],
-      objects: (details.objects ?? []).map((o) => ({
-        name: o['tm:name'],
-        type: o['tm:type'],
-        status: o['tm:obj_info'],
-      })),
+      objects: directObjects,
+      tasks,
+      deduplicated,
     };
   } catch (error: unknown) {
     throw mapTransportError(error, number);

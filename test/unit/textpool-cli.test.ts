@@ -72,7 +72,7 @@ describe('014/US4 textpool push (ICF route — write=false cached)', () => {
     fs.writeFileSync(path.join(cwd, 'src/prog/zprog/zprog.prog.texts.en.properties'), '@MaxLength:10\n001=Example\n');
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/prog/zprog/zprog.prog.texts.en.properties', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/prog/zprog/zprog.prog.texts.en.properties', '--yes', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(icfPostTextpool).toHaveBeenCalledWith(
       'texts',
@@ -96,7 +96,7 @@ describe('014/US4 textpool push (ICF route — write=false cached)', () => {
     fs.writeFileSync(path.join(cwd, 'src/prog/zprog/zprog.prog.texts.en.properties'), '001=Example\n');
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/prog/zprog/zprog.prog.texts.en.properties', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/prog/zprog/zprog.prog.texts.en.properties', '--yes', '--json'], { cwd });
     expect(res.exitCode).not.toBeUndefined();
     const out = JSON.parse(res.stderr);
     expect(out.error.code).toBe('TEXTPOOL_WRITE_FAILED');

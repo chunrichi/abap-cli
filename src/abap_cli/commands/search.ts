@@ -40,7 +40,7 @@ export function registerSearchCommand(program: Command): void {
     // [query]（可选）是因为 --schema 模式下不需要查询词；真实搜索仍需 query。
     .argument('[query]', 'Search query (supports * wildcard)')
     .option('--type <type>', 'Filter by object type')
-    .option('--limit <n>', `Maximum results per page (default ${SEARCH_RESULT_LIMIT})`)
+    .option('--limit <n>', `Max results per page (default ${SEARCH_RESULT_LIMIT})`)
     .option('--page <n>', 'Page number (1-based)', '1')
     .option('--exact', 'Exact name match (mutually exclusive with --fuzzy)')
     .option('--fuzzy', 'Substring match (default)')

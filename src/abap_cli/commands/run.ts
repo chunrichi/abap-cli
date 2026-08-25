@@ -106,13 +106,13 @@ export function registerRunCommand(program: Command): void {
   program
     .command('run')
     .description(
-      'Execute an ABAP class (classrun) or a static method via the bundled runner wrapper; returns stdout + exit code (read-only).',
+      'Execute ABAP class (classrun) or PUBLIC STATIC method; returns stdout + exit code',
     )
     .addHelpText('after', commonErrorsAfter())
-    .argument('[class-name]', 'Target ABAP class name (e.g. ZCL_MY_THING)')
-    .option('--method <name>', 'PUBLIC STATIC method name to invoke via ZCL_ABAP_VIBE_RUNNER')
-    .option('--args <json>', 'JSON object of method arguments', '{}')
-    .option('--timeout <ms>', 'Execution timeout in milliseconds (100–600000)', '30000')
+    .argument('[class-name]', 'Class name (e.g. ZCL_MY_THING)')
+    .option('--method <name>', 'PUBLIC STATIC method to invoke via ZCL_ABAP_VIBE_RUNNER')
+    .option('--args <json>', 'Method arguments JSON', '{}')
+    .option('--timeout <ms>', 'Execution timeout in ms (100–600000)', '30000')
     .option('--dry-run', 'Print the request envelope without invoking ADT classrun')
     .option('--schema', 'Print the command parameter schema as JSON and exit 0')
     .action(

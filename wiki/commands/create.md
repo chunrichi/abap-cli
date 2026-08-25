@@ -33,6 +33,7 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 - `--audit`: 额外一次 SAP 往返记录 before-checksum（默认关）
 - `--file <path>`: 014 — abap-file-format DDIC JSON 输入（`DOMA`/`DTEL`/`TABL`/`STRU` 必填）
 - `--schema`: 打印参数 schema 为 JSON 并退出（无 SAP 调用；`<type>`/`<name>` 可不传）
+- `--yes`: 非交互确认写操作；非 TTY 且无 `--yes` → `VALIDATION_ERROR`（exit 7）。`create` 本身暂无 `--dry-run` flag（014 走的是 `--check-only`），但 `requireWriteConfirmation` 仍识别 `dryRun` 字段作为 future flag 占位
 
 ### `create local` 专属
 
@@ -51,12 +52,13 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 - **`--check-only` 仅源对象**：DDIC 路由不接受（走 `--file` 校验）
 - **create-then-pull**：成功后把激活后的源码写回 `src/<obj>/<obj>.<type>.abap`（`--no-pull` 关闭）
 - **`create local` 落库路径**：本地草稿 → `abap create <type> <name> --package <pkg> --description <desc> --no-pull` → `abap push src/<obj>/<obj>.<type>.abap --tr <transport>`（帮助文本中给出）
+- **写保护**：非 TTY 必须 `--yes`（或 `--dry-run` 占位），由 `core/confirmation.ts#requireWriteConfirmation` 统一处理，TTY 模式直接执行不提示
 
 ## Examples
 
 ```bash
 # 创建并激活一个类（默认骨架 + create-then-pull 写本地副本）
-abap create CLAS ZCL_MY_CLASS --package ZPKG --description "My class"
+abap create CLAS ZCL_MY_CLASS --package ZPKG --description "My class" --yes
 
 # 带模板 + 不激活 + 不拉本地副本
 abap create PROG ZREPORT --package $TMP --description "Report" --template report --no-activate --no-pull
@@ -189,6 +191,6 @@ abap create local CLAS ZCL_DRAFT --template public-method --dir src/
 
 # references
 
-- 实现：`src/abap_cli/commands/create.ts`、`src/abap_cli/flows/create-flow.ts`、`src/abap_cli/flows/create-types.ts`、`src/abap_cli/flows/create-schema.ts`、`src/abap_cli/formats/templates.ts`、`src/abap_cli/dictionary/ddic-json.ts`
+- 实现：`src/abap_cli/commands/create.ts`、`src/abap_cli/flows/create-flow.ts`、`src/abap_cli/flows/create-types.ts`、`src/abap_cli/flows/create-schema.ts`、`src/abap_cli/formats/templates.ts`、`src/abap_cli/dictionary/ddic-json.ts`、`src/abap_cli/core/confirmation.ts`
 - 文档：`docs/commands.md`（`## abap create` 章节）
 - 设计：`specs/005-create-command/`、`specs/011-create-local/`、`specs/014-ddic-crud-textpool/`

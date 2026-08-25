@@ -8,6 +8,7 @@ import { resolveObject, getObjectParts, type ResolvedObject } from '../core/reso
 import type { ObjectPart } from '../formats/object-parts.js';
 import { resolveTransport } from '../core/transport.js';
 import { pushObject } from './push-object.js';
+import { requireWriteConfirmation } from '../core/confirmation.js';
 import { buildFilename, objectDirName } from '../formats/file-resolver.js';
 import { folderFor } from '../formats/type-folder.js';
 import { writeAbapFile, fileExists } from '../formats/abap-source.js';
@@ -29,6 +30,7 @@ export interface CreateOptions {
   checkOnly?: boolean;
   audit?: boolean;
   schema?: boolean;
+  yes?: boolean;
   /** 014: DDIC abap-file-format JSON input path. */
   file?: string;
 }
@@ -251,6 +253,11 @@ export async function runCreate(type: string | undefined, name: string | undefin
       example: 'abap create CLAS ZCL_MY_CLASS --package ZPKG --description "desc"',
     });
   }
+  requireWriteConfirmation(
+    'abap create',
+    { ...opts, supportsDryRun: true },
+    `abap create ${type ?? '<type>'} ${name ?? '<name>'} --package ${opts.package} --yes`,
+  );
   const skipActivate = opts.activate === false;
   const typeUpper = type.toUpperCase();
   const objectName = normalizeName(name);
@@ -295,7 +302,12 @@ export async function runCreate(type: string | undefined, name: string | undefin
     return;
   }
 
-  const transport = await resolveTransport(client, opts.tr, client.getConfig().transport);
+  const transport = await resolveTransport(
+    client,
+    opts.tr,
+    client.getConfig().transport,
+    { transportOptional: opts.package === '$TMP' },
+  );
 
   // Refuse to overwrite: create is a "new object" operation.
   await assertNotExists(client, objectName);

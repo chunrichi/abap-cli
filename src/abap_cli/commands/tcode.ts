@@ -43,7 +43,7 @@ const SCHEMA = {
 export function registerTcodeCommand(program: Command): void {
   program
     .command('tcode')
-    .description('Resolve a transaction code to its ABAP entry program (read-only)')
+    .description('Resolve transaction code to its ABAP entry program (read-only)')
     .argument('[tcode]', 'Transaction code (e.g. SE38)')
     .option('--schema', 'Print the command parameter schema as JSON and exit 0')
     .action(async (tcode: string | undefined, _opts: unknown, cmd: Command) => {

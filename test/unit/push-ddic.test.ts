@@ -65,7 +65,7 @@ describe('014 abap push DDIC (.json via ICF)', () => {
     writeTableJson('ZPKG');
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/ztab_test.tabl.json', '--tr', 'TRN001', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/ztab_test.tabl.json', '--tr', 'TRN001', '--yes', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(icfPostDdic).toHaveBeenCalledWith('tabl', expect.objectContaining({
       name: 'ZTAB_TEST',
@@ -85,7 +85,7 @@ describe('014 abap push DDIC (.json via ICF)', () => {
     writeTableJson('$TMP');
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/ztab_test.tabl.json', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/ztab_test.tabl.json', '--yes', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(icfPostDdic).toHaveBeenCalledWith('tabl', expect.objectContaining({
       name: 'ZTAB_TEST',
@@ -100,7 +100,7 @@ describe('014 abap push DDIC (.json via ICF)', () => {
     writeTableJson('ZPKG');
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/ztab_test.tabl.json', '--check-only', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/ztab_test.tabl.json', '--check-only', '--yes', '--json'], { cwd });
     expect(res.exitCode).not.toBe(0);
     const out = JSON.parse(res.stderr);
     expect(out.error.code).toBe('VALIDATION_ERROR');
@@ -112,7 +112,7 @@ describe('014 abap push DDIC (.json via ICF)', () => {
     fs.writeFileSync(path.join(cwd, 'src/ztab_test.tabl.json'), JSON.stringify({ name: 'ZTAB_TEST', deliveryClass: 'A' }, null, 2));
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/ztab_test.tabl.json', '--tr', 'TRN001', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/ztab_test.tabl.json', '--tr', 'TRN001', '--yes', '--json'], { cwd });
     expect(res.exitCode).not.toBe(0);
     const out = JSON.parse(res.stderr);
     expect(out.error.code).toBe('VALIDATION_ERROR');
@@ -123,7 +123,7 @@ describe('014 abap push DDIC (.json via ICF)', () => {
     writeTableJson('ZPKG');
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/ztab_test.tabl.json', '--tr', 'TRN001', '--dry-run', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/ztab_test.tabl.json', '--tr', 'TRN001', '--dry-run', '--yes', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(icfPostDdic).not.toHaveBeenCalled();
     const out = JSON.parse(res.stdout);

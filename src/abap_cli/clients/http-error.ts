@@ -1,6 +1,12 @@
 import axios from 'axios';
 import { CliError, type CliErrorOptions } from '../output/json.js';
 import type { ErrorCode } from '../output/error-codes.js';
+// Side-effect import: ensures all auth strategies are registered before
+// `getAuthHints()` is called (each strategies/*.ts calls `registerStrategy`
+// at module load). Required when http-error.ts is imported before the CLI
+// commands have pulled in adapter.ts.
+import '../auth/registry-bootstrap.js';
+import { getAuthHints as lookupAuthHints } from '../auth/strategy.js';
 
 /** Node TLS error codes — see [research §4](../../../../specs/008-cli-foundation/research.md). */
 const TLS_ERROR_CODES = new Set<string>([
@@ -20,11 +26,13 @@ const TLS_NEXT_STEPS = [
 ];
 const TLS_EXAMPLE = 'abap profile set <name> --ca ./sap-dev-ca.pem';
 
-const AUTH_NEXT_STEPS = [
-  "Verify credentials: 'abap profile test <name> --json'.",
-  "If password expired: 'abap profile set <name> --password <new>'.",
-];
-const AUTH_EXAMPLE = 'abap profile set <name> --password <new>';
+/**
+ * Choose the "what now?" hint for a 401/403 based on the auth method actually
+ * used to log in. The hint set is owned by the registered AuthStrategy, so
+ * new methods just declare their own `hints` and this file stays untouched.
+ * Unknown / unset method falls back to the generic basic-auth guidance.
+ */
+const authHints = lookupAuthHints;
 
 /**
  * Classify any thrown value from an HTTP client into a CliError with the right
@@ -32,11 +40,12 @@ const AUTH_EXAMPLE = 'abap profile set <name> --password <new>';
  *
  * Detection happens on `error.code` (Node system errors propagated through
  * axios's `error.cause` chain) and `error.response.status` — never by
- * string-matching the response body.
+ * string-matching the response body. The optional `context.authMethod` lets
+ * the classifier pick cert-specific guidance on 401/403 (025).
  */
 export function classifyHttpError(
   error: unknown,
-  context?: { name?: string },
+  context?: { name?: string; authMethod?: string },
 ): CliError {
   // abap-adt-api wraps AxiosError into HttpClientException with a `status`
   // number field, or AdtErrorException with the status on `.err`. Normalise
@@ -64,10 +73,11 @@ export function classifyHttpError(
       });
     }
     if (status === 401 || status === 403) {
+      const hints = authHints(context?.authMethod);
       return new CliError('AUTH_ERROR', httpEx.message || 'authentication failed', {
-        details: { httpStatus: status, ...(context?.name ? { system: context.name } : {}) },
-        nextSteps: AUTH_NEXT_STEPS,
-        example: AUTH_EXAMPLE,
+        details: { httpStatus: status, ...(context?.name ? { system: context.name, authMethod: context.authMethod } : { authMethod: context?.authMethod }) },
+        nextSteps: hints.nextSteps,
+        example: hints.example,
       });
     }
     const opts: CliErrorOptions = {
@@ -102,10 +112,11 @@ export function classifyHttpError(
     const status = error.response?.status;
     if (status === 401 || status === 403) {
       const body = error.response?.data as { message?: string } | undefined;
+      const hints = authHints(context?.authMethod);
       return new CliError('AUTH_ERROR', body?.message || error.message, {
-        details: { httpStatus: status, ...(context?.name ? { system: context.name } : {}) },
-        nextSteps: AUTH_NEXT_STEPS,
-        example: AUTH_EXAMPLE,
+        details: { httpStatus: status, ...(context?.name ? { system: context.name, authMethod: context.authMethod } : { authMethod: context?.authMethod }) },
+        nextSteps: hints.nextSteps,
+        example: hints.example,
       });
     }
     if (typeof status === 'number') {

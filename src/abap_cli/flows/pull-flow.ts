@@ -13,11 +13,14 @@ import { strategyFor } from '../formats/pull-strategy.js';
 import { CliError } from '../output/json.js';
 import type { ErrorCode } from '../output/error-codes.js';
 import { resolveObject } from '../core/resolve.js';
+import { showTransport } from './transport-ops.js';
 import { SEARCH_RESULT_LIMIT } from '../core/limits.js';
 
 export interface PullOptions {
   type?: string;
   package?: string;
+  /** T4.2: pull all objects bound to a transport request (mutually exclusive with object name and --package). */
+  tr?: string;
   dir: string;
   overwrite?: boolean;
   skipExisting?: boolean;
@@ -47,6 +50,28 @@ export interface PullResult {
 }
 
 export async function runPull(objectName: string, opts: PullOptions): Promise<PullResult> {
+  // T4.2: --tr selector — mutually exclusive with object name and --package.
+  if (opts.tr !== undefined) {
+    const selectorCount = Number(Boolean(objectName)) + Number(Boolean(opts.package)) + Number(opts.tr !== undefined);
+    if (selectorCount > 1) {
+      throw new CliError(
+        'INVALID_ARGUMENT',
+        '--tr cannot be combined with an object name or --package',
+        {
+          nextSteps: ['Choose exactly one pull selector: an object name, --package, or --tr.'],
+          example: 'abap pull --tr NDK123456',
+        },
+      );
+    }
+    if (!opts.tr.trim()) {
+      throw new CliError('INVALID_ARGUMENT', '--tr must not be empty', {
+        example: 'abap pull --tr NDK123456',
+      });
+    }
+    const client = await AdtClientWrapper.create();
+    return runTransportPull(client, opts.tr.trim(), opts);
+  }
+
   const client = await AdtClientWrapper.create();
   if (opts.package) {
     return runPackagePull(client, opts);
@@ -644,4 +669,99 @@ function humanSummary(
     for (const f of result.skipped) lines.push(`  ${f}`);
   }
   return lines.join('\n');
+}
+
+/**
+ * T4.2: pull every object bound to a transport request.
+ * Iterates direct objects + nested task objects, deduplicates,
+ * routes each through the standard pull pipeline.
+ */
+async function runTransportPull(client: AdtClientWrapper, requestNumber: string, opts: PullOptions): Promise<PullResult> {
+  const transport = await showTransport(client, requestNumber);
+  const seen = new Set<string>();
+  const ordered: { name: string; type: string }[] = [];
+
+  for (const obj of transport.objects) {
+    const key = `${obj.type}::${obj.name}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      ordered.push({ name: obj.name, type: obj.type });
+    }
+  }
+  for (const task of transport.tasks) {
+    for (const obj of task.objects) {
+      const key = `${obj.type}::${obj.name}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        ordered.push({ name: obj.name, type: obj.type });
+      }
+    }
+  }
+
+  const entries: PullEntry[] = [];
+  const written: string[] = [];
+  const skipped: string[] = [];
+  let pulled = 0;
+  let failed = 0;
+
+  for (const item of ordered) {
+    try {
+      // HTTP service — ICF route.
+      if (item.type === 'HTTP') {
+        const res = await runPullHttp(item.name, opts);
+        const entry: PullEntry = { object: item.name, type: item.type, status: 'written' };
+        entries.push(entry);
+        written.push(item.name);
+        pulled++;
+        continue;
+      }
+      // DDIC — ICF route.
+      const ddicType = item.type.toUpperCase();
+      if (isDdicSupportedType(ddicType)) {
+        const res = await runPullDdic(item.name, ddicType, opts);
+        const entry: PullEntry = { object: item.name, type: item.type, status: 'written' };
+        entries.push(entry);
+        written.push(item.name);
+        pulled++;
+        continue;
+      }
+      // Source object — ADT route.
+      const object = await resolveObject(client, item.name, item.type);
+      const result = await pullObject(client, object, opts);
+      entries.push({
+        object: object.name,
+        type: object.type,
+        status: result.failed.length > 0 ? 'failed' : 'written',
+        ...(result.failed.length > 0 ? { detail: result.failed[0] } : {}),
+      });
+      written.push(...result.written);
+      skipped.push(...result.skipped);
+      if (result.failed.length > 0) failed++;
+      else pulled++;
+    } catch (error: unknown) {
+      const code = error instanceof CliError ? error.code : 'PULL_FAILED';
+      const detail = error instanceof Error ? error.message : String(error);
+      entries.push({ object: item.name, type: item.type, status: 'failed', code, detail });
+      failed++;
+    }
+  }
+
+  const data: Record<string, unknown> = {
+    transport: requestNumber,
+    requested: ordered.length,
+    pulled,
+    failed,
+    deduplicated: transport.deduplicated,
+    entries,
+    written,
+    skipped,
+  };
+  if (failed > 0) {
+    data.partial = true;
+  }
+  const human = [
+    `Pulled ${pulled}/${ordered.length} objects from transport ${requestNumber}` + (failed > 0 ? ` (${failed} failed)` : ''),
+    ...written.map((f) => `  wrote ${f}`),
+  ].join('\n');
+  return { data, human };
 }

@@ -66,12 +66,16 @@ abap init --agent copilot|claude|cursor|generic [--force]
 
 ## Agent Scaffold Matrix
 
-| 值 | 写入 |
+每个 vendor 写入**自己的 agent 框架约定的目录**，不再污染 workspace 根目录：
+
+| 值 | 写入路径 |
 |---|---|
-| `generic`（所有值的基础） | `AGENTS.md` + `skills/`（跨厂商标准） |
-| `copilot` | generic + `.github/copilot-instructions.md` |
-| `claude` | generic + `CLAUDE.md` |
-| `cursor` | generic + `.cursor/rules/abap.mdc` |
+| `copilot` | `.github/skills/<name>/` + `.github/agents/abap-developer.md` |
+| `claude`  | `.claude/skills/<name>/` + `.claude/agents/abap-developer.md` + `CLAUDE.md` |
+| `cursor`  | `.cursor/skills/<name>/` + `.cursor/agents/abap-developer.md` + `.cursor/rules/abap.mdc` |
+| `generic` | `.agents/skills/<name>/` + `.agents/agents/abap-developer.md` |
+
+**不写入** `AGENTS.md` / `copilot-instructions.md` / `skills/README.md`（仓库级文件，不属于用户 workspace 上下文）。`skills/README.md`（仓库分层边界说明）也被 init 排除。
 
 JSON 输出 `{ written: [...], skipped: [...] }`（token-efficient）。
 
@@ -145,10 +149,20 @@ abap init --agent copilot --force
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap init --agent", "version": "0.2.0", "timestamp": "2026-08-17T00:00:00.000Z", "durationMs": 90, "warnings": [] },
-  "data": { "written": ["AGENTS.md", "skills/abap-setup/SKILL.md", ".github/copilot-instructions.md"], "skipped": ["skills/abap-object/SKILL.md"] }
+  "meta": { "command": "abap init --agent", "version": "0.2.1", "timestamp": "2026-08-26T00:00:00.000Z", "durationMs": 86, "warnings": [] },
+  "data": {
+    "written": [
+      ".claude/skills/abap-setup/SKILL.md",
+      ".claude/skills/abap-object/SKILL.md",
+      ".claude/agents/abap-developer.md",
+      "CLAUDE.md"
+    ],
+    "skipped": []
+  }
 }
 ```
+
+> 路径相对 workspace 根；`AGENTS.md` / `copilot-instructions.md` / `skills/README.md` 都不会被写入。
 
 # More
 

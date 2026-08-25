@@ -141,17 +141,17 @@ export function registerSelectCommand(program: Command): void {
   program
     .command('select')
     .description(
-      'Query table data read-only via the bundled ICF /data endpoint (SE16N equivalent)',
+      'Query table data read-only (SE16N equivalent) via the bundled ICF /data endpoint',
     )
     .addHelpText('after', commonErrorsAfter())
-    .option('--table <name>', 'Target ABAP table or view name (e.g. ZTAB_FIXTURE)')
-    .option('--fields <csv>', 'Comma-separated field names to project')
+    .option('--table <name>', 'Table or view name (e.g. ZTAB_FIXTURE)')
+    .option('--fields <csv>', 'Comma-separated field names')
     .option('--where <clause>', 'Filter clause (FIELD OP VALUE joined by AND)')
-    .option('--limit <n>', 'Maximum rows returned (1–10000, default 100)', '100')
+    .option('--limit <n>', 'Max rows returned (1–10000, default 100)', '100')
     .option('--offset <n>', 'Row offset for pagination (0–100000, default 0)', '0')
     .option('--order-by <csv>', 'Comma-separated FIELD:ASC|DESC pairs')
     .option('--count-only', 'Return only the matching row count')
-    .option('--dry-run', 'Plan only — print the request envelope without invoking the ICF endpoint')
+    .option('--dry-run', 'Print request envelope without invoking ICF endpoint')
     .option('--schema', 'Print the command parameter schema as JSON and exit 0')
     .action(
       async (

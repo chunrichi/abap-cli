@@ -24,11 +24,12 @@ import type {
   ValidationFailure,
   LifecycleContext,
   LifecycleErrorContext,
+  LifecycleVeto,
   ExtensionLoadResult,
 } from './types.js';
 import { validateExtension } from './shape.js';
 import { loadExtensionModule } from './loader.js';
-import { extensionValidationFailed, extensionLoadFailed } from './errors.js';
+import { extensionValidationFailed, extensionLoadFailed, extensionCommandBlocked } from './errors.js';
 import type { ExtensionMeta } from '../output/meta.js';
 import { collectWarning } from '../output/meta.js';
 
@@ -103,8 +104,11 @@ export class ExtensionRegistry {
         continue;
       }
       const src = manifest.source as Record<string, unknown>;
-      if (src.sourceType !== 'path' || typeof src.path !== 'string') {
-        this._failed.push({ name, type: manifest.type, source: manifest.source, status: 'failed', error: 'INVALID_SOURCE: Extension source must be {sourceType:"path", path:string}' });
+      const validSource =
+        (src.sourceType === 'path' && typeof src.path === 'string') ||
+        (src.sourceType === 'npm' && typeof src.packageName === 'string');
+      if (!validSource) {
+        this._failed.push({ name, type: manifest.type, source: manifest.source, status: 'failed', error: 'INVALID_SOURCE: Extension source must be {sourceType:"path", path:string} or {sourceType:"npm", packageName:string}' });
         continue;
       }
 
@@ -146,7 +150,8 @@ export class ExtensionRegistry {
 
       // Register by type
       if (isCommandExtension(ext)) {
-        if (this._commandNames.has(ext.name)) {
+        const builtIn = program.commands.some((c) => c.name() === ext.name);
+        if (this._commandNames.has(ext.name) || builtIn) {
           this._failed.push({
             name: ext.name,
             type: 'command',
@@ -184,20 +189,16 @@ export class ExtensionRegistry {
     return this;
   }
 
-  /** Register a CommandExtension with Commander's lazy command API. */
+  /** Register a CommandExtension as a real commander sub-command. */
   private _registerCommandExtension(program: Command, ext: CommandExtension): void {
-    const lazySpec = {
-      name: ext.name,
-      description: ext.description,
-      command: ext.command,
-      action: (ctx: ExtensionContext, opts: Record<string, unknown>, ...args: string[]) =>
-        ext.action(ctx, opts, ...args),
-    };
-    // Store on program via a custom property; index.ts reads this after extensions load
-    // and registers the commands before parseAsync.
-    const existing = (program as unknown as Record<string, object[]>).lazyExtensions ?? [];
-    existing.push(lazySpec as object);
-    (program as unknown as Record<string, object[]>).lazyExtensions = existing;
+    const cmd = program.command(ext.command).description(ext.description);
+    cmd.action(async (...args: unknown[]) => {
+      // Commander appends (options, command) after the declared positionals.
+      const positionals = args.slice(0, -2) as string[];
+      const opts = (args[args.length - 2] ?? {}) as Record<string, unknown>;
+      const ctx: ExtensionContext = { command: ext.name, argv: process.argv.slice(2) };
+      await ext.action(ctx, opts, ...positionals);
+    });
   }
 
   /**
@@ -258,12 +259,35 @@ export class ExtensionRegistry {
   async dispatchAll(
     event: string,
     ctx: LifecycleContext | LifecycleErrorContext,
-  ): Promise<PromiseSettledResult<void>[]> {
+  ): Promise<PromiseSettledResult<void | LifecycleVeto>[]> {
     const hooks = (this._hooks as Record<string, LifecycleHook[]>)[event] ?? [];
     // Wrap in Promise.resolve().then() so synchronous throws are captured
     return Promise.allSettled(
       hooks.map((h) => Promise.resolve().then(() => h.hook(ctx as LifecycleContext))),
     );
+  }
+
+  /**
+   * Dispatch `beforeCommand`, honouring a hook's veto.
+   * Throws CliError(EXTENSION_COMMAND_BLOCKED) on the first {block:true}.
+   * Hook exceptions are still swallowed as EXTENSION_DEGRADED warnings.
+   */
+  async dispatchBeforeCommand(ctx: LifecycleContext): Promise<void> {
+    for (const h of this._hooks.beforeCommand) {
+      let result: void | LifecycleVeto;
+      try {
+        result = await h.hook(ctx);
+      } catch {
+        collectWarning('EXTENSION_DEGRADED', `LifecycleHook '${h.name}' (beforeCommand) threw`, {
+          hook: h.name,
+          event: 'beforeCommand',
+        });
+        continue;
+      }
+      if (result && result.block === true) {
+        throw extensionCommandBlocked(h.name, ctx.command, result.reason);
+      }
+    }
   }
 
   /**

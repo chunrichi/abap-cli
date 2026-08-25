@@ -35,7 +35,7 @@ export function registerCheckCommand(program: Command): void {
   // keep the subcommand dispatch unambiguous.
   const check = program
     .command('check')
-    .description('Validate local ABAP files. Subcommands: syntax (default), content (local-only), atc.')
+    .description('Validate ABAP source code (syntax / content / atc)')
     .addHelpText('after', commonErrorsAfter())
     .option('--files <files...>', 'Shortcut: run syntax mode on the given files (equivalent to `abap check syntax <files...>`)')
     .action(async (opts: CheckOptions, cmd) => {
@@ -56,7 +56,7 @@ export function registerCheckCommand(program: Command): void {
 
   check
     .command('syntax')
-    .description('Syntax check against SAP (the default mode)')
+    .description('Syntax check against SAP')
     .argument('[files...]', 'Files to check')
     .option('--all', 'Check all .abap files under the current directory')
     .option('--changed', 'Check only files changed since the SAP version')
@@ -72,7 +72,7 @@ export function registerCheckCommand(program: Command): void {
 
   check
     .command('content')
-    .description('Local-only validation, no SAP round-trip')
+    .description('Local-only validation, no SAP call')
     .argument('[files...]', 'Files to check')
     .option('--all', 'Check all .abap files under the current directory')
     .option('--changed', 'Check only files changed since the SAP version')
@@ -88,13 +88,13 @@ export function registerCheckCommand(program: Command): void {
 
   check
     .command('atc')
-    .description('ATC check against SAP')
+    .description('ATC check against SAP (requires --variant)')
     .argument('[files...]', 'Files to check')
     .requiredOption('--variant <variant>', 'ATC check variant')
     .option('--all', 'Check all .abap files under the current directory')
     .option('--changed', 'Check only files changed since the SAP version')
     .option('--strict', 'Treat warnings as failures')
-    .option('--out [file]', 'Persist raw ATC worklist to a file; defaults to .abap/atc/<variant>-<timestamp>.json')
+    .option('--out [file]', 'Persist raw ATC worklist to a file (only with --atc); defaults to .abap/atc/<variant>-<timestamp>.json')
     .action(async (files: string[], opts: CheckOptions, cmd) => {
       const mode = jsonFromCommand(cmd);
       try {

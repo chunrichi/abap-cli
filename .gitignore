@@ -47,3 +47,4 @@ wiki/*
 !wiki/commands/
 !wiki/index.md
 !wiki/roadmap.md
+.claude-memory/

@@ -33,12 +33,18 @@ Three layers, each with its own directory:
 
 ## Test
 
-### Testable real environment
+### Testable real environment OP
 
 - URL: http://vhcala4hci:50000
 - User: developer
 - Password: Abap123456@
 - Client: 001
+
+- The folder: tmp/s4h
+
+### Testable real environment BTPTrial
+
+- The folder: tmp/trial
 
 ## When Working on This Project
 

@@ -71,7 +71,7 @@ abap extension status --json
 # 2. 创建 + 拉取
 [handoff: Operate on object]
 abap search ZCL_DEMO --exact --json
-abap create CLAS ZCL_DEMO --package ZDEV --description "demo" --tr DEVK900001 --json
+abap create CLAS ZCL_DEMO --package ZDEV --description "demo" --tr DEVK900001 --yes --json
 abap pull ZCL_DEMO --json
 
 # 3. 编辑（agent 内部按用户规则）
@@ -79,7 +79,7 @@ abap pull ZCL_DEMO --json
 # 4. 推送 + 校验
 [handoff: Operate on object]
 abap check src/zcl_demo/zcl_demo.clas.abap --json
-abap push src/zcl_demo/zcl_demo.clas.abap --tr DEVK900001 --json
+abap push src/zcl_demo/zcl_demo.clas.abap --tr DEVK900001 --yes --json
 abap inspect ZCL_DEMO --activation --json
 
 # 5. 跑 + 验证

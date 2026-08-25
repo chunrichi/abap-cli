@@ -44,7 +44,7 @@ describe('abap push --atomic (US8, FR-025, SC-007)', () => {
     fs.writeFileSync(path.join(cwd, 'src/zlocal.ttyp.json'), '{"rowType":"ZREF"}');
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/zcl_ok.clas.abap', 'src/zlocal.ttyp.json', '--tr', 'TRN001', '--atomic', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/zcl_ok.clas.abap', 'src/zlocal.ttyp.json', '--tr', 'TRN001', '--atomic', '--yes', '--json'], { cwd });
     expect(res.exitCode).not.toBe(0);
     expect(lock).not.toHaveBeenCalled();
     expect(setObjectSource).not.toHaveBeenCalled();
@@ -54,7 +54,7 @@ describe('abap push --atomic (US8, FR-025, SC-007)', () => {
   it('an all-valid batch is written and activated', async () => {
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/zcl_ok.clas.abap', '--tr', 'TRN001', '--atomic', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/zcl_ok.clas.abap', '--tr', 'TRN001', '--atomic', '--yes', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(lock).toHaveBeenCalled();
     expect(setObjectSource).toHaveBeenCalled();

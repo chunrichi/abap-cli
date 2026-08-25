@@ -43,10 +43,7 @@ function startMock(env: Record<string, string> = {}): Promise<{ proc: ChildProce
 function runCli(args: string[], port: number): Promise<{ stdout: string; stderr: string; exit: number }> {
   return new Promise((resolveP, rejectP) => {
     const proc = spawn('node', [CLI, ...args], {
-      env: {
-        ...process.env,
-        SAP_PASSWORD: 'mockpw',
-      },
+      env: { ...process.env },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stdout = '';

@@ -3,10 +3,27 @@ import * as path from 'path';
 import { fileURLToPath } from 'node:url';
 import { CliError } from '../output/json.js';
 
-/** Agent targets and their file mappings. `generic` is the base; vendor values stack on top. */
+/** Agent targets. Each target writes into a vendor-specific sub-directory. */
 export type AgentTarget = 'generic' | 'copilot' | 'claude' | 'cursor';
 
 const AGENT_TARGETS: AgentTarget[] = ['generic', 'copilot', 'claude', 'cursor'];
+
+/**
+ * Vendor-specific destination directories (relative to workspace root).
+ * - copilot → .github/    (GitHub Copilot standard)
+ * - claude  → .claude/    (Claude Code standard)
+ * - cursor  → .cursor/    (Cursor standard)
+ * - generic → .agents/    (neutral fallback when no vendor-specific dir is known)
+ *
+ * Each vendor gets a `skills/` and an `agents/` sub-tree, matching how agent
+ * frameworks discover skills (SKILL.md) and agents (handoffs).
+ */
+const VENDOR_DIR: Record<AgentTarget, string> = {
+  copilot: '.github',
+  claude: '.claude',
+  cursor: '.cursor',
+  generic: '.agents',
+};
 
 export interface ScaffoldingResult {
   written: string[];
@@ -15,22 +32,36 @@ export interface ScaffoldingResult {
 
 /** Path to the bundled assets directory (resolved relative to this module). */
 function bundledDir(): string {
-  // Layout: <pkg-root>/dist/src/abap_cli/flows/init-agents.js
-  // Assets live at <pkg-root>/skills and <pkg-root>/agents.
+  // Resolves to the package root in BOTH layouts:
+  //   dist build : <pkg-root>/dist/src/abap_cli/flows/init-agents.js  → 4 levels up
+  //   src / test : <pkg-root>/src/abap_cli/flows/init-agents.ts        → 3 levels up
+  // Walk up until we find a directory containing `package.json` (cheap sanity
+  // check) so dev-mode invocations don't break.
   const here = path.dirname(fileURLToPath(import.meta.url));
+  let candidate = path.resolve(here);
+  for (let i = 0; i < 6; i++) {
+    if (fs.existsSync(path.join(candidate, 'package.json'))) return candidate;
+    candidate = path.dirname(candidate);
+  }
+  // Fallback to original 4-level-up guess for backward compat.
   return path.resolve(here, '..', '..', '..', '..');
 }
 
-/** Copy a single file from <assetsRoot>/<relPath> to <dest>/<relPath>. Skips if dest exists and !force. */
-function copyOne(assetsRoot: string, relPath: string, dest: string, force: boolean, out: ScaffoldingResult): void {
-  const target = path.join(dest, relPath);
+/** Copy one file: <assetsRoot>/<relPath> → <destRoot>/<relPath>. Skips if dest exists and !force. */
+function copyOne(
+  assetsRoot: string,
+  relPath: string,
+  destRoot: string,
+  force: boolean,
+  out: ScaffoldingResult,
+): void {
+  const target = path.join(destRoot, relPath);
   if (fs.existsSync(target) && !force) {
     out.skipped.push(relPath);
     return;
   }
   const source = path.join(assetsRoot, relPath);
   if (!fs.existsSync(source)) {
-    // Asset missing in package — count as skipped with a clear path.
     out.skipped.push(`${relPath} (asset missing)`);
     return;
   }
@@ -39,15 +70,28 @@ function copyOne(assetsRoot: string, relPath: string, dest: string, force: boole
   out.written.push(relPath);
 }
 
-/** Copy a directory tree recursively. */
-function copyTree(srcDir: string, destDir: string, force: boolean, baseRel: string, out: ScaffoldingResult): void {
+/**
+ * Copy a directory tree recursively, but skip any entry whose name matches one
+ * of `excludeNames` (matched as exact basename). Used to drop `skills/README.md`,
+ * which is repository-internal metadata (describes the repo's two `skills/` sets)
+ * and has no value in a user workspace.
+ */
+function copyTree(
+  srcDir: string,
+  destDir: string,
+  force: boolean,
+  baseRel: string,
+  out: ScaffoldingResult,
+  excludeNames: ReadonlySet<string>,
+): void {
   if (!fs.existsSync(srcDir)) return;
   for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
+    if (excludeNames.has(entry.name)) continue;
     const rel = path.join(baseRel, entry.name);
     const src = path.join(srcDir, entry.name);
     const dst = path.join(destDir, entry.name);
     if (entry.isDirectory()) {
-      copyTree(src, dst, force, rel, out);
+      copyTree(src, dst, force, rel, out, excludeNames);
     } else if (entry.isFile()) {
       const targetExists = fs.existsSync(dst);
       if (targetExists && !force) {
@@ -61,18 +105,56 @@ function copyTree(srcDir: string, destDir: string, force: boolean, baseRel: stri
   }
 }
 
-/** Copy AGENTS.md from the package root to the workspace. */
-function scaffoldGeneric(root: string, force: boolean, out: ScaffoldingResult): void {
-  // skills/ tree + agents/abap-developer.md + AGENTS.md (cross-vendor standard).
-  copyTree(path.join(root, 'skills'), path.join(process.cwd(), 'skills'), force, 'skills', out);
-  copyOne(root, 'agents/abap-developer.md', process.cwd(), force, out);
-  copyOne(root, 'AGENTS.md', process.cwd(), force, out);
+/** Rewrite every recorded path in `out` so it carries the vendor dir prefix
+ * (e.g. `skills/abap-object/SKILL.md` → `.github/skills/abap-object/SKILL.md`).
+ * Token-efficient: agents see the actual final location, not an ambiguous
+ * repo-rooted path that would only be true for the `generic` vendor. */
+function rewritePaths(out: ScaffoldingResult, vendorDir: string): void {
+  out.written = out.written.map(rewriteOne(vendorDir));
+  out.skipped = out.skipped.map(rewriteOne(vendorDir));
 }
 
-/** Vendor-specific overlays. All build on top of `generic`. */
-function scaffoldCopilot(force: boolean, out: ScaffoldingResult): void {
-  copyOne(path.join(bundledDir(), '.github'), 'copilot-instructions.md', path.join(process.cwd(), '.github'), force, out);
+function rewriteOne(vendorDir: string): (p: string) => string {
+  return (p: string) => {
+    if (p.startsWith(`${vendorDir}/`)) return p;
+    if (p.startsWith('skills/') || p.startsWith('agents/')) return `${vendorDir}/${p}`;
+    // Already vendor-prefixed overlays (CLAUDE.md, .cursor/rules/abap.mdc) — leave alone.
+    return p;
+  };
 }
+
+/**
+ * Files that must never be copied into a user workspace.
+ * - `skills/README.md` is the repository's own layering doc (talks about the
+ *   repo's `.github/skills/` vs top-level `skills/` split, meaningless to a user).
+ */
+const REPO_METADATA_FILES: ReadonlySet<string> = new Set(['README.md']);
+
+/**
+ * Scaffold the cross-vendor base: `skills/<name>/...` and `agents/abap-developer.md`
+ * under `<vendorDir>/`. Does NOT write `AGENTS.md` or `copilot-instructions.md`.
+ */
+function scaffoldGeneric(
+  root: string,
+  vendorDir: string,
+  force: boolean,
+  out: ScaffoldingResult,
+): void {
+  const base = path.join(process.cwd(), vendorDir);
+  copyTree(
+    path.join(root, 'skills'),
+    path.join(base, 'skills'),
+    force,
+    'skills',
+    out,
+    REPO_METADATA_FILES,
+  );
+  // copyOne already prepends 'agents/' to the relative path inside destRoot,
+  // so destRoot here is the vendor dir, not vendor/agents.
+  copyOne(root, 'agents/abap-developer.md', base, force, out);
+}
+
+/** Claude overlay: write `CLAUDE.md` at workspace root (Claude Code discovery). */
 function scaffoldClaude(force: boolean, out: ScaffoldingResult): void {
   const target = path.join(process.cwd(), 'CLAUDE.md');
   if (fs.existsSync(target) && !force) {
@@ -82,6 +164,8 @@ function scaffoldClaude(force: boolean, out: ScaffoldingResult): void {
   fs.writeFileSync(target, CLAUDE_MD_TEMPLATE, 'utf-8');
   out.written.push('CLAUDE.md');
 }
+
+/** Cursor overlay: write `.cursor/rules/abap.mdc` (Cursor rule format). */
 function scaffoldCursor(force: boolean, out: ScaffoldingResult): void {
   const dir = path.join(process.cwd(), '.cursor', 'rules');
   const target = path.join(dir, 'abap.mdc');
@@ -94,7 +178,19 @@ function scaffoldCursor(force: boolean, out: ScaffoldingResult): void {
   out.written.push('.cursor/rules/abap.mdc');
 }
 
-/** Scaffold the requested agent(s). Idempotent: re-runs are no-ops unless force=true. */
+/**
+ * Scaffold agent context into the workspace under vendor-specific directories.
+ *
+ * Path layout (after `init --agent <target>`):
+ *   copilot → .github/skills/<skill>/  +  .github/agents/abap-developer.md
+ *   claude  → .claude/skills/<skill>/  +  .claude/agents/abap-developer.md  +  CLAUDE.md
+ *   cursor  → .cursor/skills/<skill>/  +  .cursor/agents/abap-developer.md  +  .cursor/rules/abap.mdc
+ *   generic → .agents/skills/<skill>/  +  .agents/agents/abap-developer.md
+ *
+ * Never writes `AGENTS.md` or `copilot-instructions.md` (those are repo-level
+ * files, not user-workspace context). Idempotent: re-runs are no-ops unless
+ * `force=true`.
+ */
 export async function scaffoldAgents(target: AgentTarget, force: boolean): Promise<ScaffoldingResult> {
   if (!AGENT_TARGETS.includes(target)) {
     throw new CliError('USAGE', `Unknown agent target: ${target}. Allowed: ${AGENT_TARGETS.join(', ')}`, {
@@ -104,11 +200,16 @@ export async function scaffoldAgents(target: AgentTarget, force: boolean): Promi
   }
   const out: ScaffoldingResult = { written: [], skipped: [] };
   const root = bundledDir();
-  // All targets include the generic base.
-  scaffoldGeneric(root, force, out);
-  if (target === 'copilot') scaffoldCopilot(force, out);
-  if (target === 'claude') scaffoldClaude(force, out);
-  if (target === 'cursor') scaffoldCursor(force, out);
+  const vendorDir = VENDOR_DIR[target];
+  scaffoldGeneric(root, vendorDir, force, out);
+  if (target === 'copilot') {
+    // base only; copilot discovers skills/agents directly under .github/.
+  } else if (target === 'claude') {
+    scaffoldClaude(force, out);
+  } else if (target === 'cursor') {
+    scaffoldCursor(force, out);
+  }
+  rewritePaths(out, vendorDir);
   return out;
 }
 
@@ -117,7 +218,8 @@ const CLAUDE_MD_TEMPLATE = `# abap-cli — Claude Code integration
 This workspace uses abap-cli. Run \`abap --help\` to see all commands. Claude should
 prefer \`abap <command> --json\` for machine-readable output.
 
-See \`AGENTS.md\` in this workspace for full project conventions.
+Skills live under \`.claude/skills/\` (abap-setup, abap-object). The
+abap-developer agent (\`.claude/agents/abap-developer.md\`) orchestrates them.
 `;
 
 const CURSOR_MDC_TEMPLATE = `---
@@ -128,5 +230,5 @@ alwaysApply: true
 
 This workspace uses abap-cli. Run \`abap --help\` for the full command tree. Always prefer \`abap <command> --json\`.
 
-See \`AGENTS.md\` in this workspace for project conventions.
+Skills live under \`.cursor/skills/\` (abap-setup, abap-object).
 `;

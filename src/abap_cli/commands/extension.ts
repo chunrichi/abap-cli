@@ -6,6 +6,7 @@ import { commonErrorsAfter } from '../output/help-text.js';
 import { resolveTransport } from '../core/transport.js';
 import { deployBundled, type DeploymentSummary } from '../flows/deploy-flow.js';
 import { checkIcfDeployment, ICF_SERVICE_VERSION } from '../icf/service-version.js';
+import { loadConfig } from '../config/project-config.js';
 
 interface DeployOptions {
   tr?: string;
@@ -19,7 +20,7 @@ interface DeployOptions {
 export function registerExtensionCommand(program: Command): void {
   const extension = program
     .command('extension')
-    .description('Manage the bundled ICF ABAP extension. Subcommands: deploy (install/update), status (probe installation).')
+    .description('Manage the bundled ICF ABAP extension (deploy / status)')
     .addHelpText('after', commonErrorsAfter())
     .action((_opts, cmd) => {
       // Bare `abap extension` prints subcommand help.
@@ -28,13 +29,13 @@ export function registerExtensionCommand(program: Command): void {
 
   extension
     .command('deploy')
-    .description('Deploy bundled ICF ABAP service to SAP system (--dry-run/--diff preview available)')
+    .description('Deploy bundled ICF ABAP service to SAP')
     .option('--tr <transport>', 'Transport number (required when --package is not $TMP)')
     .option('--package <package>', 'Target SAP package (default $TMP — local, no transport needed)', '$TMP')
     .option('--dry-run', 'Plan only — make no mutating SAP calls')
     .option('--diff', 'Report per-file source differences')
-    .option('--force', 'Bypass safety guards (notes forced: true in the result)')
-    .option('--yes', 'Confirm the deployment in non-interactive mode')
+    .option('--force', 'Bypass safety guards')
+    .option('--yes', 'Confirm in non-interactive mode')
     .action(async (opts: DeployOptions, cmd) => {
       const mode = jsonFromCommand(cmd);
       try {
@@ -53,12 +54,13 @@ export function registerExtensionCommand(program: Command): void {
           );
         }
         const client = await AdtClientWrapper.create();
+        const projectConfig = client.getConfig();
         const transport = opts.dryRun
-          ? (opts.tr ?? client.getConfig().transport ?? 'DRY_RUN')
+          ? (opts.tr ?? projectConfig.transport ?? 'DRY_RUN')
           : await resolveTransport(
               client,
               opts.tr,
-              client.getConfig().transport,
+              projectConfig.transport,
               { transportOptional: targetPackage === '$TMP' },
             );
         const summary = await deployBundled(client, {
@@ -68,6 +70,7 @@ export function registerExtensionCommand(program: Command): void {
           force: opts.force,
           yes: opts.yes,
           package: targetPackage,
+          profileName: projectConfig.systemName,
         });
         if (opts.force) {
           collectWarning('FORCE_BYPASSED', '--force bypassed safety guards.', { force: true });
@@ -80,11 +83,12 @@ export function registerExtensionCommand(program: Command): void {
 
   extension
     .command('status')
-    .description('Probe the SAP-side ICF extension: installed? which version? matches the bundled version?')
+    .description('Probe the SAP-side ICF extension installation')
     .action(async (_opts, cmd) => {
       const mode = jsonFromCommand(cmd);
       try {
-        const info = await checkIcfDeployment();
+        const projectConfig = await loadConfig();
+        const info = await checkIcfDeployment(projectConfig.systemName);
         if (info.status === 'unreachable') {
           collectWarning('ICF_CHECK_DEGRADED', `ICF status probe degraded: ${info.error?.message ?? 'unreachable'}`);
         }
@@ -94,11 +98,17 @@ export function registerExtensionCommand(program: Command): void {
           remoteVersion: info.remoteVersion ?? null,
           expectedVersion: info.expectedVersion,
           match: info.status === 'current',
+          // 030: runtime tier + whether cl_icf_tree is blocked (Steampunk).
+          runtime: info.runtime ?? 'unknown',
+          icfSetupBlocked: info.icfSetupBlocked === true,
         };
+        const runtimeHint = info.runtime === 'steampunk'
+          ? ' (Steampunk: SICF service cannot be auto-registered, expose via Cloud Foundry destination — see wiki/commands/extension.md#steampunk)'
+          : '';
         const hint = info.status === 'not_deployed'
-          ? 'ICF service not deployed. Run `abap extension deploy` to install it.'
+          ? `ICF service not deployed${runtimeHint}. Run \`abap extension deploy\` to install it.`
           : info.status === 'outdated'
-            ? `ICF service outdated (have ${info.remoteVersion}, need ${ICF_SERVICE_VERSION}). Run \`abap extension deploy\` to upgrade.`
+            ? `ICF service outdated (have ${info.remoteVersion}, need ${ICF_SERVICE_VERSION})${runtimeHint}. Run \`abap extension deploy\` to upgrade.`
             : info.status === 'unreachable'
               ? `ICF unreachable: ${info.error?.message ?? 'unknown'}`
               : `ICF service deployed and current (version ${info.remoteVersion}).`;
@@ -137,6 +147,9 @@ function humanSummary(summary: DeploymentSummary): string {
     } else {
       lines.push(`ICF node: ${node.status}`);
     }
+  }
+  if (summary.deployKind) {
+    lines.push(`Deploy kind: ${summary.deployKind}${summary.runtime ? ` (runtime: ${summary.runtime})` : ''}`);
   }
   if (summary.forced) lines.push('(forced)');
   return lines.join('\n');

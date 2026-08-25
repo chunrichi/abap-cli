@@ -34,15 +34,17 @@ abap pull
 - `--include-all-parts`: 包含所有源码部分（含 testclasses）
 - `--textpool`: 同时拉取 textpool `.properties` 文件（`.texts`/`.selections`/`.headings.<lang>.properties`）
 - `--remote <remoteid>`: 拉取对象在远程系统的 active 版本源码（Version Management，`/version-source` 端点）
+- `--tr <request>`: T4.2 — 拉取 transport 请求内全部对象（直接对象 + 嵌套 task 对象，去重），与对象名/`--package` **互斥**；空字符串 → `INVALID_ARGUMENT`
 
 ## 路由与布局
 
-按优先级分派四条路线：
+按优先级分派五条路线：
 
-1. **`--package`** — `searchObject` 全量搜索 + 按 `adtcore:packageName` 过滤，分页（`limit × page`）逐对象拉取；单对象失败不中断整体（记为 `failed`），截断时提示 `--page N+1`。**分页的原因**：SAP quickSearch 端点的 `maxResults` 有上限（默认 `SEARCH_RESULT_LIMIT` = 20），一次请求拿不全整个包。实现上每次请求 `limit × page` 条结果、按包名过滤后取 `(page-1)*limit` 到 `page*limit` 的窗口——所以 `--limit` 越大单轮拉得越多，`--page` 递增继续拉下一批。单对象 pull（`abap pull ZCL_X`）无分页。
-2. **`--remote <id>`** — 走 ICF `/version-source`（TMS RFC destination `TMSADM@<id>.DOMAIN_<id>`）。CLI 类型 → VRSD 类型映射：`PROG → REPS`、`INTF → INTF`、`CLAS → CLSD`（类定义）。源码写入对象标准文件名 `src/<typeFolder>/<name>/<name>.<type>.abap`（顶层目录按类型分类，见下文）。对象从未传输到远端时后端返回空 `source`（成功）。
-3. **`--textpool`** — 拉取三个 `.properties` 文件，走混合模式路由（profile 缓存的能力决定走 ADT `getTextElements` 还是 ICF `/textpool/*`），JSON 结果带 `route` 字段（`adt`/`icf`）；文件落在 `src/<typeFolder>/<name>/<name>.<type>.<category>.<lang>.properties`。
-4. **DDIC 类型**（DOMA/DTEL/TABL/STRU）— 走 ICF `GET /ddic/<type>/<name>`，`wireToLocal` 转成本地 JSON，写为 `src/<typeFolder>/<name>.<type>.json`（顶层目录按类型分类）。TTYP 等未支持类型抛 `DDIC_NOT_SUPPORTED`。
+1. **`--tr <request>`**（T4.2）— 调 `transportDetails` 取请求下**所有对象引用**：直接对象（`objects`）+ 嵌套 task 对象（`tasks[].objects`）；按 `type::name` 去重得到有序对象列表，再逐个走下面第 3-5 条路由。单对象失败不中断整体（记为 `failed`），部分失败时 `data.partial: true`；响应额外含 `transport` / `requested` / `deduplicated`（来自 transport `tasks` 的 `TransportRequestInfo.deduplicated`）。HTTP/DDIC 路由走 ICF、其余走 ADT。
+2. **`--package`** — `searchObject` 全量搜索 + 按 `adtcore:packageName` 过滤，分页（`limit × page`）逐对象拉取；单对象失败不中断整体（记为 `failed`），截断时提示 `--page N+1`。**分页的原因**：SAP quickSearch 端点的 `maxResults` 有上限（默认 `SEARCH_RESULT_LIMIT` = 20），一次请求拿不全整个包。实现上每次请求 `limit × page` 条结果、按包名过滤后取 `(page-1)*limit` 到 `page*limit` 的窗口——所以 `--limit` 越大单轮拉得越多，`--page` 递增继续拉下一批。单对象 pull（`abap pull ZCL_X`）无分页。
+3. **`--remote <id>`** — 走 ICF `/version-source`（TMS RFC destination `TMSADM@<id>.DOMAIN_<id>`）。CLI 类型 → VRSD 类型映射：`PROG → REPS`、`INTF → INTF`、`CLAS → CLSD`（类定义）。源码写入对象标准文件名 `src/<typeFolder>/<name>/<name>.<type>.abap`（顶层目录按类型分类，见下文）。对象从未传输到远端时后端返回空 `source`（成功）。
+4. **`--textpool`** — 拉取三个 `.properties` 文件，走混合模式路由（profile 缓存的能力决定走 ADT `getTextElements` 还是 ICF `/textpool/*`），JSON 结果带 `route` 字段（`adt`/`icf`）；文件落在 `src/<typeFolder>/<name>/<name>.<type>.<category>.<lang>.properties`。
+5. **DDIC 类型**（DOMA/DTEL/TABL/STRU）— 走 ICF `GET /ddic/<type>/<name>`，`wireToLocal` 转成本地 JSON，写为 `src/<typeFolder>/<name>.<type>.json`（顶层目录按类型分类）。TTYP 等未支持类型抛 `DDIC_NOT_SUPPORTED`。
 
 源码对象（CLAS/PROG/INTF）布局：`<name>.<type>.json` 元数据 + 每个 include part 一个 `.abap`；`--include-all-parts` 控制是否包含 testclasses。FUGR 为多文件布局（`.fugr.json`、`sapl<name>.reps.*`、`l<name>top.reps.*`、每个 FM 一个 `.func.*`）。
 
@@ -84,6 +86,9 @@ abap pull ZCL_MY_CLASS --overwrite
 # 拉取远程（PRD）系统的 active 版本源码
 abap pull ZPROG --remote PRD
 abap pull ZCL_DEMO --type CLAS --remote PRD --overwrite
+
+# T4.2: 拉取某 transport 请求下全部对象（直接 + 嵌套 task 去重）
+abap pull --tr NDK123456
 ```
 
 ## Expected Output
@@ -113,7 +118,31 @@ abap pull ZCL_DEMO --type CLAS --remote PRD --overwrite
 }
 ```
 
-`--package` 模式下 `data` 额外含 `package`/`page`/`limit`/`truncated`（截断时含 `hint`）；`--textpool` 模式含 `route`；单对象普通模式含 `object`/`type`/`entries`/`written`/`skipped`/`failed`。
+`--package` 模式下 `data` 额外含 `package`/`page`/`limit`/`truncated`（截断时含 `hint`）；`--textpool` 模式含 `route`；单对象普通模式含 `object`/`type`/`entries`/`written`/`skipped`/`failed`；`--tr` 模式含 `transport` / `requested` / `pulled` / `failed` / `deduplicated` / `entries[]`（`{object, type, status, [code, detail]}`）/ `written[]` / `skipped[]`，部分失败时 `partial: true`。
+
+`--tr` 模式输出示例：
+
+```json
+{
+  "status": "success",
+  "meta": { "command": "abap pull", "version": "0.2.0", "timestamp": "...", "durationMs": 1200, "warnings": [] },
+  "data": {
+    "transport": "NDK123456",
+    "requested": 3,
+    "pulled": 3,
+    "failed": 0,
+    "deduplicated": 0,
+    "entries": [
+      { "object": "ZCL_A", "type": "CLAS", "status": "written" },
+      { "object": "ZCL_B", "type": "CLAS", "status": "written" },
+      { "object": "ZPROG", "type": "PROG", "status": "written" }
+    ],
+    "written": ["src/clas/zcl_a/...", "src/clas/zcl_b/...", "src/prog/zprog/..."],
+    "skipped": [],
+    "failed": []
+  }
+}
+```
 
 ## 与 abap-file-format 规范符合性
 

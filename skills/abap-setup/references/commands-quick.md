@@ -85,7 +85,7 @@ abap transport create "Feature work"
 abap transport create "Customizing" --package $PKG
 abap transport create "task" --tr <target>    # 释放到目标请求
 
-# 查看
+# 查看（含嵌套 task 对象与 `deduplicated` 计数，供 `abap pull --tr <request>` 去重）
 abap transport show DEVK900001
 
 # 查对象归属

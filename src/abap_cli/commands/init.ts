@@ -59,7 +59,7 @@ const AGENT_VALUES: AgentTarget[] = ['generic', 'copilot', 'claude', 'cursor'];
 export function registerInitCommand(program: Command): void {
   const init = program
     .command('init')
-    .description('Initialize the workspace (bind a profile, write .abap.json), inspect/modify the existing binding (--show-config / --unset-*), and/or scaffold AI agent context (--agent). Run bare `abap init` for the interactive wizard.')
+    .description('Initialize the workspace (bind a profile, write .abap.json) and/or scaffold AI agent context')
     .addHelpText('after', commonErrorsAfter())
     .addHelpText('after', initParamHelp())
     .option('--profile <name>', 'Use an existing global profile (created with `abap profile add`)')
@@ -72,6 +72,14 @@ export function registerInitCommand(program: Command): void {
     .option('-l, --language <language>', 'SAP language')
     .option('--insecure', 'Skip SSL certificate verification (development only)')
     .option('--ca <path>', 'Path to a CA certificate (PEM) for SSL verification')
+    .option('--auth-method <method>', 'Login strategy: basic (default) | cert (X.509 client cert, 025) | browser_sso (BTP trial / SAML, 026) | oauth_password (BTP / CF service-key JWT, 027)')
+    .option('--auth-option <kv>', 'Generic auth option, repeatable as key=value (e.g. --auth-option certPath=/abs/cert.pem). New auth methods add no Commander options — they read from this bag.')
+    .option('--cert-path <path>', 'X.509 client cert file (PEM) — used with --auth-method=cert')
+    .option('--cert-key <path>', 'X.509 private key file (PEM) — used with --auth-method=cert')
+    .option('--cert-ca <path>', 'Optional X.509 client CA override — used with --auth-method=cert')
+    .option('--cert-passphrase <pwd>', 'Passphrase for .p12 / encrypted key — written to keychain')
+    .option('--sso-cookie-file <path>', 'SSO cookie jar path — used with --auth-method=browser_sso')
+    .option('--service-key <path>', 'BTP service key JSON — used with --auth-method=oauth_password')
     .option('--tr <transport>', 'Default transport number (written to .abap.json)')
     .option('--package <package>', 'Default SAP package (written to .abap.json)')
     .option('--source-dir <path>', 'Base directory for `push --all` / `check --all` (written to .abap.json)')

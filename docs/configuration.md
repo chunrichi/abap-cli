@@ -9,9 +9,8 @@ abap-cli keeps configuration in two places: a **user-level** system profile stor
 | User-level | `~/.abap-cli/systems.json` | Named system profiles (URL, client, user, language) | No |
 | OS keychain | (keytar) | Password per system profile name | Yes |
 | Workspace | `<project>/.abap.json` | References a system profile + default transport/package | No |
-| Environment | `SAP_PASSWORD` etc. | Overrides for automation | Yes (but ephemeral) |
 
-Precedence for credentials: **OS keychain** for the referenced system name, falling back to `SAP_PASSWORD` environment variable.
+Precedence for credentials: **OS keychain** for the referenced system name; passwords are also accepted via `--password` on the command line and (interactively) from a TTY prompt.
 
 ## System Profiles (`~/.abap-cli/systems.json`)
 
@@ -62,9 +61,10 @@ A template lives at [`.abap.json.example`](../.abap.json.example). This file is 
 
 | Variable | Purpose |
 |----------|---------|
-| `SAP_PASSWORD` | Password override when not in the keychain |
 | `SAP_URL` / `SAP_USER` / `SAP_CLIENT` / `SAP_LANGUAGE` | Used by `abap init` in non-interactive mode |
 | `NODE_TLS_REJECT_UNAUTHORIZED` | Set to `0` for self-signed certs (development only) |
+
+Passwords are **not** read from environment variables — they come from the OS keychain, `--password`, or a TTY prompt. `SAP_PASSWORD` / `BTP_PASSWORD` overrides were removed.
 
 A template lives at [`.env.example`](../.env.example). `.env` files are gitignored.
 

@@ -7,6 +7,11 @@ import { resolveFile } from '../formats/file-resolver.js';
 import { readAbapFile } from '../formats/abap-source.js';
 import { resolveObject, getObjectParts, validateLocalFile } from '../core/resolve.js';
 import { pushObject } from './push-object.js';
+import { probeAdtRuntime, steampunkDeployHint, type AdtRuntime, type RuntimeProbeResult } from '../adc/runtime-probe.js';
+import { getOrProbeRuntime } from '../config/runtime-cache.js';
+import { executeIcfRegister } from '../adc/icf-register-registry.js';
+import '../adc/icf-bootstrap.js';
+import { collectWarning } from '../output/meta.js';
 
 export type DeployStatus = 'deployed' | 'skipped' | 'failed';
 
@@ -43,6 +48,10 @@ export interface DeploymentSummary {
   dryRun: boolean;
   /** ICF node state after the setup step (absent when no setup ran). */
   icfNode?: DeployIcfNode;
+  /** 030: detected ADT runtime tier (steampunk / netweaver740 / netweaver750 / unknown). */
+  runtime?: AdtRuntime;
+  /** 030: deploy kind — `full` on on-prem, `source-only` on Steampunk (no auto-SICF). */
+  deployKind?: 'full' | 'source-only';
 }
 
 export interface DeployOptions {
@@ -55,6 +64,9 @@ export interface DeployOptions {
   package?: string;
   /** Overridable for tests; defaults to the bundled abap/src directory. */
   sourceDir?: string;
+  /** 030: profile name for ADT runtime detection. Optional — when absent
+   *  the runtime falls back to 'unknown' and deploy uses on-prem behaviour. */
+  profileName?: string;
 }
 
 // dist/src/abap_cli/sync → project root (ESM has no __dirname).
@@ -110,6 +122,21 @@ export async function deployBundled(client: AdtClientWrapper, opts: DeployOption
   const objectResults: DeployObjectResult[] = [];
   const fileResults: DeployFileResult[] = [];
 
+  // 030: detect ADT runtime tier to branch deploy behaviour (Steampunk blocks
+  // cl_icf_tree). Probe failure is non-blocking and falls back to on-prem.
+  // 034: prefer the cached runtime written by `profile test` / `init`; only
+    // re-probe the network when the cache is absent or empty.
+  const cachedRuntime = opts.profileName
+    ? await getOrProbeRuntime(opts.profileName).catch(() => undefined)
+    : undefined;
+  const runtimeResult = cachedRuntime
+    ? { runtime: cachedRuntime.tier as AdtRuntime, icfSetupBlocked: cachedRuntime.icfSetupBlocked }
+    : opts.profileName
+      ? await probeAdtRuntime(opts.profileName).catch(() => undefined)
+      : undefined;
+  const runtime: AdtRuntime = runtimeResult?.runtime ?? 'unknown';
+  const isSteampunk = runtime === 'steampunk';
+
   for (const obj of bundled) {
     const objectResult = await deployOneObject(client, obj, opts, fileResults);
     objectResults.push(objectResult);
@@ -117,31 +144,71 @@ export async function deployBundled(client: AdtClientWrapper, opts: DeployOption
 
   // ICF setup: create/bind/activate the SICF node after source deploy (FR-008).
   // --dry-run only plans the step; it never triggers a mutating call (FR-009).
+  // 030: on Steampunk the setup step is source-only — cl_icf_tree is blocked
+  // by the Released APIs whitelist. We surface this as a structured warning
+  // and emit a Cloud Foundry destination hint via steampunkDeployHint().
+  // 034: dispatch through the ICF register registry — the chosen strategy
+  // decides whether to mutate, plan, or hint. Dry-run always short-circuits
+  // to 'planned' regardless of strategy; the registry call still runs so the
+  // summary reports which strategy would have been selected.
   let icfNode: DeployIcfNode | undefined;
-  if (opts.dryRun) {
+  const strategySpec = {
+    name: 'zabap_vibe',
+    description: 'ABAP Vibe - ICF Services',
+    handler: 'ZCL_ABAP_VIBE_ICF',
+    urlPath: '/sap/zabap_vibe',
+    state: 'active' as const,
+    ...(opts.transport ? { transport: opts.transport } : {}),
+  };
+  // Build a synthetic probe result for the registry dispatch — the registry
+  // only inspects `runtime` and `apiCapabilities`, both available here.
+  const probeForRegistry: RuntimeProbeResult = {
+    runtime,
+    source: 'none',
+    icfSetupBlocked: cachedRuntime?.icfSetupBlocked ?? (runtimeResult?.icfSetupBlocked ?? false),
+    ...(cachedRuntime?.apiCapabilities
+      ? { apiCapabilities: cachedRuntime.apiCapabilities }
+      : (runtimeResult as { apiCapabilities?: RuntimeProbeResult['apiCapabilities'] } | undefined)?.apiCapabilities
+        ? { apiCapabilities: (runtimeResult as { apiCapabilities: RuntimeProbeResult['apiCapabilities'] }).apiCapabilities }
+        : {}),
+  };
+  const outcome = opts.dryRun
+    ? { status: 'planned' as const, strategyId: 'on-prem-cl-icf-tree' as const }
+    : await executeIcfRegister(client, strategySpec, probeForRegistry);
+
+  if (outcome.status === 'planned') {
     icfNode = { status: 'planned' };
-  } else {
-    const setup = await runIcfSetup(client);
-    if (setup.status === 'success') {
-      icfNode = {
-        status: 'success',
-        action: setup.action,
-        url: '/sap/zabap_vibe',
-        active: setup.active,
-        handler: 'ZCL_ABAP_VIBE_ICF',
-      };
-    } else {
-      // Setup failure is a hard error: sources may be deployed but the node is not ready.
-      throw new CliError('SAP_ERROR', `ICF setup failed: ${setup.message}`, {
-        details: { code: setup.code ?? 'ICF_SETUP_FAILED' },
-        nextSteps: [
-          'Verify the user has SICF administration permissions (e.g. S_ICF_ADMIN).',
-          'Check the setup class is fully activated: abap inspect ZCL_ABAP_VIBE_ICF_SETUP --activation',
-          'If any part is inactive, run: abap activate ZCL_ABAP_VIBE_ICF_SETUP --yes',
-          'Re-run: abap extension deploy --yes to retry the setup step.',
-        ],
-      });
+    if (!opts.dryRun && outcome.hint && outcome.hint.length > 0) {
+      // 034: only Steampunk emits the user-facing "configure Cockpit"
+      // warning. On-prem / unknown plans stay silent — they are normal
+      // pre-deploy outputs, not failures.
+      if (outcome.strategyId === 'steampunk-cockpit-fallback') {
+        collectWarning(
+          'STEAMPUNK_ICF_MANUAL',
+          'ICF service node cannot be registered automatically on this BTP system; expose the handler via a Cloud Foundry destination.',
+          { runtime, nextSteps: outcome.hint },
+        );
+      }
     }
+  } else if (outcome.status === 'success') {
+    icfNode = {
+      status: 'success',
+      action: outcome.action,
+      url: '/sap/zabap_vibe',
+      active: outcome.active,
+      handler: 'ZCL_ABAP_VIBE_ICF',
+    };
+  } else {
+    // Setup failure is a hard error: sources may be deployed but the node is not ready.
+    throw new CliError('SAP_ERROR', `ICF setup failed: ${outcome.error?.message ?? 'unknown'}`, {
+      details: { code: outcome.error?.code ?? 'ICF_SETUP_FAILED', strategyId: outcome.strategyId },
+      nextSteps: [
+        'Verify the user has SICF administration permissions (e.g. S_ICF_ADMIN).',
+        'Check the setup class is fully activated: abap inspect ZCL_ABAP_VIBE_ICF_SETUP --activation',
+        'If any part is inactive, run: abap activate ZCL_ABAP_VIBE_ICF_SETUP --yes',
+        'Re-run: abap extension deploy --yes to retry the setup step.',
+      ],
+    });
   }
 
   return {
@@ -149,6 +216,8 @@ export async function deployBundled(client: AdtClientWrapper, opts: DeployOption
     objects: objectResults,
     forced: !!opts.force,
     dryRun: !!opts.dryRun,
+    runtime,
+    deployKind: isSteampunk ? 'source-only' : 'full',
     ...(icfNode ? { icfNode } : {}),
   };
 }
@@ -418,39 +487,6 @@ async function readObjectMetadata(
     }
   }
   return { description: '' };
-}
-
-/**
- * Trigger the bundled ICF setup class via ADT classrun and parse its JSON output.
- * The setup class prints a structured envelope: { status, action, node, error }.
- */
-async function runIcfSetup(client: AdtClientWrapper): Promise<{
-  status: 'success' | 'error';
-  action?: 'created' | 'updated' | 'already_active';
-  active?: boolean;
-  code?: string;
-  message?: string;
-}> {
-  const raw = await client.runClass('ZCL_ABAP_VIBE_ICF_SETUP');
-  try {
-    const parsed = JSON.parse(raw) as {
-      status?: string;
-      action?: string;
-      node?: { active?: boolean };
-      error?: { code?: string; message?: string };
-    };
-    if (parsed.status === 'error') {
-      return { status: 'error', code: parsed.error?.code, message: parsed.error?.message };
-    }
-    return {
-      status: 'success',
-      action: parsed.action as 'created' | 'updated' | 'already_active',
-      active: parsed.node?.active,
-    };
-  } catch {
-    // Unparseable output → treat as a setup failure with the raw text for context.
-    return { status: 'error', code: 'ICF_SETUP_OUTPUT', message: raw };
-  }
 }
 
 /** Recursively list .abap and .xml files under dir. */

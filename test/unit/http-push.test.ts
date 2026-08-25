@@ -62,7 +62,7 @@ describe('022 abap push HTTP service (.json via ICF)', () => {
     writeHttpJson('ZPKG');
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/zhttp_test.http.json', '--tr', 'TRN001', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/zhttp_test.http.json', '--tr', 'TRN001', '--yes', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(icfPostHttp).toHaveBeenCalledWith('ZHTTP_TEST', expect.objectContaining({
       name: 'ZHTTP_TEST',
@@ -82,7 +82,7 @@ describe('022 abap push HTTP service (.json via ICF)', () => {
     writeHttpJson('$TMP');
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/zhttp_test.http.json', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/zhttp_test.http.json', '--yes', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(icfPostHttp).toHaveBeenCalledWith('ZHTTP_TEST', expect.objectContaining({
       name: 'ZHTTP_TEST',
@@ -97,7 +97,7 @@ describe('022 abap push HTTP service (.json via ICF)', () => {
     writeHttpJson('ZPKG');
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/zhttp_test.http.json', '--check-only', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/zhttp_test.http.json', '--check-only', '--yes', '--json'], { cwd });
     expect(res.exitCode).not.toBe(0);
     const out = JSON.parse(res.stderr);
     expect(out.error.code).toBe('VALIDATION_ERROR');
@@ -109,7 +109,7 @@ describe('022 abap push HTTP service (.json via ICF)', () => {
     fs.writeFileSync(path.join(cwd, 'src/zhttp_test.http.json'), JSON.stringify({ name: 'ZHTTP_TEST' }, null, 2));
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/zhttp_test.http.json', '--tr', 'TRN001', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/zhttp_test.http.json', '--tr', 'TRN001', '--yes', '--json'], { cwd });
     expect(res.exitCode).not.toBe(0);
     const out = JSON.parse(res.stderr);
     expect(out.error.code).toBe('VALIDATION_ERROR');
@@ -120,7 +120,7 @@ describe('022 abap push HTTP service (.json via ICF)', () => {
     writeHttpJson('ZPKG');
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/zhttp_test.http.json', '--tr', 'TRN001', '--dry-run', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/zhttp_test.http.json', '--tr', 'TRN001', '--dry-run', '--yes', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(icfPostHttp).not.toHaveBeenCalled();
     const out = JSON.parse(res.stdout);

@@ -64,7 +64,7 @@ describe('022 create HTTP service', () => {
       'create', 'HTTP', 'ZHTTP_TEST',
       '--file', 'src/zhttp_test.http.json',
       '--package', '$TMP',
-      '--json',
+      '--yes', '--json',
     ], { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(icfPostHttp).toHaveBeenCalledWith('ZHTTP_TEST', expect.objectContaining({
@@ -89,7 +89,7 @@ describe('022 create HTTP service', () => {
       '--file', 'src/zhttp_test.http.json',
       '--package', '$TMP',
       '--description', 'CLI override',
-      '--json',
+      '--yes', '--json',
     ], { cwd });
     const callBody = icfPostHttp.mock.calls[0]![1] as any;
     expect(callBody.description).toBe('CLI override');
@@ -103,7 +103,7 @@ describe('022 create HTTP service', () => {
       'create', 'HTTP', 'XHTTP',
       '--file', 'src/zhttp_test.http.json',
       '--package', '$TMP',
-      '--json',
+      '--yes', '--json',
     ], { cwd });
     expect(res.exitCode).toBe(7); // VALIDATION_ERROR
     expect(icfPostHttp).not.toHaveBeenCalled();
@@ -119,7 +119,7 @@ describe('022 create HTTP service', () => {
       'create', 'HTTP', 'ZHTTP_TEST',
       '--file', 'src/zhttp_test.http.json',
       '--package', '$TMP',
-      '--json',
+      '--yes', '--json',
     ], { cwd });
     expect(res.exitCode).toBe(7);
     expect(icfPostHttp).not.toHaveBeenCalled();
@@ -133,7 +133,7 @@ describe('022 create HTTP service', () => {
       'create', 'HTTP', 'ZHTTP_NOTMP',
       '--file', 'src/zhttp_test.http.json',
       '--package', 'ZPKG',
-      '--json',
+      '--yes', '--json',
     ], { cwd });
     expect(res.exitCode).toBe(7);
     expect(icfPostHttp).not.toHaveBeenCalled();
@@ -155,7 +155,7 @@ describe('022 create HTTP service', () => {
       'create', 'HTTP', 'ZHTTP_500',
       '--file', 'src/zhttp_test.http.json',
       '--package', '$TMP',
-      '--json',
+      '--yes', '--json',
     ], { cwd });
     expect(res.exitCode).toBe(6);
     const out = JSON.parse(res.stderr);
@@ -167,7 +167,7 @@ describe('022 create --schema HTTP', () => {
   it('reports HTTP as supported with icf route and --file requirement', async () => {
     const program = makeProgram();
     registerCreateCommand(program);
-    const res = await runCommand(program, ['create', '--schema', 'HTTP', '--json'], { cwd });
+    const res = await runCommand(program, ['create', '--schema', 'HTTP', '--yes', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     const out = JSON.parse(res.stdout);
     expect(out.data.supported).toBe(true);
