@@ -119,8 +119,14 @@ function classifyInformationsystem(xml: string): RuntimeProbeResult {
   const relMatch = /sap:rel\s*=\s*"([^"]+)"/i.exec(xml);
   const release = relMatch ? relMatch[1] : undefined;
 
-  // Steampunk / BTP ABAP environment
-  if (sapComponent && /(BTP|SAPBTP|ABAPENV)/i.test(sapComponent)) {
+  // Steampunk / BTP ABAP environment.
+  // Verified 2026-08-25: BTP trial's /sap/bc/adt/repository/informationsystem
+  // returns 404, so this branch mostly fires on hypothetical future BTP
+  // variants that expose sap-component. Still keep the keywords broad.
+  if (
+    sapComponent &&
+    /(BTP|SAPBTP|ABAPENV|Steampunk)/i.test(sapComponent)
+  ) {
     return {
       runtime: 'steampunk',
       source: 'informationsystem',
@@ -129,7 +135,7 @@ function classifyInformationsystem(xml: string): RuntimeProbeResult {
       release,
     };
   }
-  if (lower.includes('sapbtp') || lower.includes('sap btp')) {
+  if (/(steampunk|sapbtp|abap[\s_-]?env|hana\.ondemand)/i.test(lower)) {
     return {
       runtime: 'steampunk',
       source: 'informationsystem',
@@ -187,12 +193,21 @@ async function probeFromDiscovery(client: unknown): Promise<RuntimeProbeResult> 
       error: { code: 'SAP_ERROR', message: error instanceof Error ? error.message : String(error) },
     };
   }
-  const lower = discXml.toLowerCase();
-  // Steampunk discovery hides the /sap/bc/adt/icf collection and lacks
-  // `adtcore:services` for the legacy SICF admin endpoints.
+  // /sap/bc/adt/icf collection is the legacy SICF admin API. Classic on-prem
+  // (NW 7.40 + S/4HANA on-prem) always exposes it; Steampunk hides it because
+  // CL_ICF_TREE is not in the Released APIs whitelist. This is the strongest
+  // single signal we have from the discovery endpoint.
   const hasIcfCollection = /href\s*=\s*"[^"]*\/sap\/bc\/adt\/icf\//i.test(discXml);
-  const looksSteampunk = /sapbtp|abap.+environment|cloud\s*foundry/i.test(lower) && !hasIcfCollection;
-  if (looksSteampunk) {
+  // Steampunk markers observed in real BTP trial responses (verified 2026-08-25):
+  //   - "Steampunk" / "steampunk" — appears in collection paths like
+  //     /sap/bc/adt/aps/cloud/com/sco1/steampunkAllowedInst/values
+  //   - "hana.ondemand" — BTP ABAP environment URL pattern
+  //   - "abap-env" / "ABAPENV" — Steampunk sap-component namespace
+  const hasSteampunkMarker =
+    /steampunk/i.test(discXml) ||
+    /hana\.ondemand\.com/i.test(discXml) ||
+    /sapbtp|abap[\s_-]?env/i.test(discXml);
+  if (hasSteampunkMarker && !hasIcfCollection) {
     return {
       runtime: 'steampunk',
       source: 'discovery',
@@ -206,10 +221,11 @@ async function probeFromDiscovery(client: unknown): Promise<RuntimeProbeResult> 
       icfSetupBlocked: false,
     };
   }
-  // Empty discovery on authenticated NW 7.40 sometimes happens — fall back
-  // to the conservative on-prem verdict so legacy flows still work.
+  // No ICF collection AND no Steampunk marker — ambiguous. Stay conservative
+  // and report unknown so deploy-flow falls back to on-prem behaviour (the
+  // cl_icf_tree failure mode is loud enough to surface as a runtime error).
   return {
-    runtime: 'netweaver740',
+    runtime: 'unknown',
     source: 'discovery',
     icfSetupBlocked: false,
   };
