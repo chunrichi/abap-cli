@@ -33,7 +33,7 @@ export function registerWhereUsedCommand(program: Command): void {
       const mode = jsonFromCommand(cmd);
       try {
         if (cmd.optsWithGlobals().schema) {
-          printSchema(whereUsedSchema());
+          printSchema(whereUsedSchema(), mode);
           return;
         }
         const target = requireObject(object);

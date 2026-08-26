@@ -5,6 +5,10 @@
 
 ## [Unreleased]
 
+### Changed
+- **P1 — `--schema` 统一为 unified envelope**：`run` / `select` / `tcode` / `where-used` 的 `--schema` 此前直接在 stdout 输出裸 schema 对象（`{command, arguments, ...}`），与 `search` / `create` 的 unified envelope 不一致。现全部改为输出 `{ status: 'success', meta, data }`（`data` 为原 schema，`meta` 为精简版 `command` / `version` / `durationMs`，支持 `--pretty-json` 缩进）。**Migration**：Agent 消费 `abap run|select|tcode|where-used --schema` 时，从 `JSON.parse(stdout)` 改为 `JSON.parse(stdout).data`；未使用 `--schema` 的输出不受影响。
+- **P1 — envelope JSON Schema + 全命令契约测试**：新增 `src/abap_cli/output/cli-output.schema.json`（draft-07，success/error 两种 envelope 的单一事实源，覆盖 meta / error / extensionMeta 结构、error.category 枚举、error.code 命名模式）与 `test/unit/envelope-schema.test.ts`。测试扫描 `src/abap_cli/commands/*.ts` 的全部注册命令：① 每个命令的失败路径（未知选项）必须在 stderr 输出 schema-valid 的错误 envelope、stdout 严格为空、exit 2；② 每个带 `--schema` 的命令（create/run/search/select/tcode/where-used）成功路径输出 schema-valid 的 envelope 且 meta 仅含 `command`/`version`/`durationMs`；③ 扩展错误必须使用专用 `EXTENSION_*` code（不伪装内建错误）。
+
 ### Fixed
 - **P0 — Windows / cross-platform path contract**：所有 `--json` 输出的路径字段统一为 POSIX 相对路径（`/`），Agent 在 Windows / Linux / macOS 下消费到同一种结构。新增 `src/abap_cli/core/path-output.ts` 提供 `toOutputPath` / `toRelativeOutputPath` / `normalizePullData` 三个边界 helper（`isPathLike` 为内部判别）。Node 的 `path.join` / `path.relative` 仍用于 fs I/O（host-native 必需），但所有进入 `data` envelope / human 文本的路径都先经过规范化。受影响字段：
   - `create`：`data.file`（local 创建草稿 + DDIC/HTTP `--file`）、`data.localFile`（create-then-pull）、`error.details.file`、`human` 中的 `relPath`。

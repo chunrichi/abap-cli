@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { jsonFromCommand, printError, printResult } from '../output/json.js';
+import { jsonFromCommand, printError, printResult, printSchema } from '../output/json.js';
 import { runTcode, type TcodeResult } from '../flows/tcode-flow.js';
 
 const SCHEMA = {
@@ -50,7 +50,7 @@ export function registerTcodeCommand(program: Command): void {
       const mode = jsonFromCommand(cmd);
 
       if (cmd.optsWithGlobals().schema) {
-        console.log(JSON.stringify(SCHEMA, null, mode === 'pretty-json' ? 2 : 0));
+        printSchema(SCHEMA, mode);
         return;
       }
       if (!tcode) {

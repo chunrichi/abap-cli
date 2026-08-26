@@ -12,7 +12,7 @@ All commands support the global `--json` option for structured output (Agent-Fir
 
 ## JSON Output Contract
 
-Every `--json` envelope carries a `meta` block (`command`, `version`, `timestamp`, `durationMs`, `warnings`). `--pretty-json` emits the same shape with 2-space indentation (human/agent readability); `--json` is compact (token-efficient). The unified contract is authoritative in `specs/012-unify-cli-output-contract/contracts/cli-output.md`. The `--schema` mode (`abap <cmd> --schema`) returns a reduced `meta` containing only `command` / `version` / `durationMs` — no `timestamp` / `warnings` — for stable agent introspection.
+Every `--json` envelope carries a `meta` block (`command`, `version`, `timestamp`, `durationMs`, `warnings`). `--pretty-json` emits the same shape with 2-space indentation (human/agent readability); `--json` is compact (token-efficient). The unified contract is authoritative in `specs/012-unify-cli-output-contract/contracts/cli-output.md`, and its machine-readable form is `src/abap_cli/output/cli-output.schema.json` (JSON Schema, draft-07) — enforced for every registered command by `test/unit/envelope-schema.test.ts`. The `--schema` mode (`abap <cmd> --schema`) returns a reduced `meta` containing only `command` / `version` / `durationMs` — no `timestamp` / `warnings` — for stable agent introspection.
 
 ```jsonc
 // Success (stdout)

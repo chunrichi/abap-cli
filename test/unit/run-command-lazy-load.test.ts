@@ -67,6 +67,7 @@ describe('run command lazy load (P1.6)', () => {
     ]);
     const res = await runCommand(program, ['run', '--schema']);
     expect(loaded).toBe(true);
-    expect(JSON.parse(res.stdout).command).toBe('run');
+    // --schema emits the unified envelope; the schema lives in data.
+    expect((JSON.parse(res.stdout) as { data: { command: string } }).data.command).toBe('run');
   });
 });

@@ -223,11 +223,15 @@ export interface CommandSchema {
   examples?: string[];
 }
 
-/** Print a command schema. Always JSON — it is a machine-readable contract.
- *  Uses the reduced `buildSchemaMeta()` envelope (no timestamp/warnings) so
- *  schema introspection stays deterministic across runs. */
-export function printSchema(schema: CommandSchema): void {
-  printResult('json', schema, '', buildSchemaMeta() as OutputMeta);
+/** Print a command schema. Always a JSON envelope — it is a machine-readable
+ *  contract. Uses the reduced `buildSchemaMeta()` (no timestamp/warnings) so
+ *  schema introspection stays deterministic across runs. `--pretty-json`
+ *  indents; human mode still emits compact JSON (a schema is JSON by nature).
+ *  The payload may be the base `CommandSchema` or a richer command-specific
+ *  shape (scope/errors/examples) — it is never read, only wrapped. */
+export function printSchema(schema: object, mode: OutputMode = 'json'): void {
+  const jsonMode = mode === 'pretty-json' ? 'pretty-json' : 'json';
+  printResult(jsonMode, schema, '', buildSchemaMeta() as OutputMeta);
 }
 
 // --- Token-efficient output helpers (025 US2) ---

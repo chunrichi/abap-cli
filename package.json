@@ -9,6 +9,7 @@
   },
   "files": [
     "dist",
+    "src/abap_cli/output/cli-output.schema.json",
     "abap/src",
     "skills",
     "agents",

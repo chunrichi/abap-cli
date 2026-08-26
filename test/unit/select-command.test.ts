@@ -57,8 +57,10 @@ describe('select command — schema (US1)', () => {
     } finally {
       console.log = original;
     }
-    // The JSON goes to stdout via console.log; verify the SCHEMA object is reasonable.
-    const schema = JSON.parse(log[log.length - 1] ?? '{}');
+    // The unified JSON envelope goes to stdout via console.log; the schema lives in data.
+    const envelope = JSON.parse(log[log.length - 1] ?? '{}');
+    expect(envelope.status).toBe('success');
+    const schema = envelope.data;
     expect(schema.command).toBe('select');
     expect(Array.isArray(schema.options)).toBe(true);
     expect(schema.options.length).toBeGreaterThanOrEqual(8);

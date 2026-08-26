@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { printError, printResult, jsonFromCommand, CliError } from '../output/json.js';
+import { printError, printResult, printSchema, jsonFromCommand, CliError } from '../output/json.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import {
   buildDryRun,
@@ -171,7 +171,7 @@ export function registerSelectCommand(program: Command): void {
 
         // --schema branch — emit machine-readable parameter schema, no SAP call.
         if (cmd.optsWithGlobals().schema) {
-          console.log(JSON.stringify(SCHEMA, null, mode === 'pretty-json' ? 2 : 0));
+          printSchema(SCHEMA, mode);
           return;
         }
 
