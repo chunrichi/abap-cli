@@ -5,6 +5,22 @@
 
 ## [Unreleased]
 
+### Fixed
+- **P0 — Windows / cross-platform path contract**：所有 `--json` 输出的路径字段统一为 POSIX 相对路径（`/`），Agent 在 Windows / Linux / macOS 下消费到同一种结构。新增 `src/abap_cli/core/path-output.ts` 提供 `toOutputPath` / `toRelativeOutputPath` / `normalizePullData` 三个边界 helper（`isPathLike` 为内部判别）。Node 的 `path.join` / `path.relative` 仍用于 fs I/O（host-native 必需），但所有进入 `data` envelope / human 文本的路径都先经过规范化。受影响字段：
+  - `create`：`data.file`（local 创建草稿 + DDIC/HTTP `--file`）、`data.localFile`（create-then-pull）、`error.details.file`、`human` 中的 `relPath`。
+  - `pull`：`data.file` / `data.entries[].file` / `data.entries[].files` / `data.written` / `data.skipped` / `data.failed`（单对象、textpool、DDIC 单文件、TABL/STRU three-piece、HTTP、remote、package 批量、transport 批量六条路径全覆盖）；human 消息和 `OVERWRITE_REQUIRED` 错误文本中的 `file` 字段同步。
+  - `push`：`data.results[].file` + human 文本；`--atomic` 失败的 `details.failures[].file`、DDIC/HTTP 校验与 `FILE_PARSE_ERROR` 的 `details.file` / message。
+  - `deploy`：`data.files[].file`。
+  - `init --agent`：`data.written` / `data.skipped`。
+  - `init`：`data.configPath`（`--show-config` / `--unset-*`）与 `CONFIG_ERROR` 的 `details.file`。
+  - `profile`：`profile export --file` 的 `data.file` + human；`PROFILE_MISMATCH` warning 文本中的 workspace 相对路径。
+  - `doctor`：`config.active` verbose 文本中的 workspace 相对路径。
+  - `check`：`data.issues[].file`、`data.out`（仅 `--atc --out` 时报告；显式路径回显用户输入、默认值输出相对 POSIX `.abap/atc/<variant>-<ts>.json`，且与真实落盘文件一致）、persisted ATC JSON 的 `files[].file`。
+  - `status` / `diff`：`data.parts[].detail`（`local file: <path>` 改为相对 cwd 的 POSIX 路径）。
+- **绝对路径字段统一转为 cwd-relative POSIX**：`push` 的 `data.results[].file`、`check` 的 `data.issues[].file` 与 persisted worklists、`status`/`diff` 的 detail 原本是 `path.resolve` 的绝对路径，跨平台前缀不一致（`C:/...` vs `/...`）。现全部输出 cwd 相对 POSIX 路径（新增 `toRelativeOutputPath` helper），Agent 在任意平台看到同一形状。`diff` 内部读取 detail 路径时用 `path.resolve(cwd, ...)` 转回绝对路径供 fs 使用。
+- `path: "src/clas/..."` 形式的字面量（用户 `--file` 参数 / `out` 配置等）若包含 `\` 也自动转为 `/`，避免 Agent 在 Windows 上解析失败。
+- **测试基线**：上游 Windows 报告的 54/756 失败是 `path.join` 输出 `\` 与测试期望 `/` 的冲突，本次新增 19 条 `path-output.test.ts`（含 `toRelativeOutputPath` 5 条，覆盖显式 `cwd` 参数）+ 修正 `pull-layout.test.ts` 用 `path.join` 写死 `/` 的两处断言 + `check-modes.test.ts` 的 `out` 断言改为跨平台正确（并补 `--out` 未传时不报告 `out` 的回归断言）+ `push-transport.test.ts` 补失败分支 `details.results[].file` 归一化断言。本机 macOS / Linux 上 787/787 全绿，Windows CI 同代码也将看到同样结构化结果。
+
 ## [0.2.1] - 2026-08-25
 
 ### Added

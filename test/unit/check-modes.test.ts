@@ -102,6 +102,8 @@ describe('abap check modes (021: subcommands — syntax / content / atc)', () =>
     expect(json.error.details.issues[0]).toMatchObject({ severity: 'error' });
     expect(json.error.details.issues[0].line).toBe(2);
     expect(typeof json.error.details.issues[0].code).toBe('string');
+    // P0: without --out, no `out` field is reported (nothing was persisted).
+    expect(json.error.details.out).toBeUndefined();
   });
 
   it('`check --files <f>` is a shortcut for `check syntax <f>`', async () => {
@@ -161,6 +163,8 @@ describe('abap check modes (021: subcommands — syntax / content / atc)', () =>
     const json = JSON.parse(res.stdout);
     expect(json.data.issues ?? []).toEqual([]);
     expect(json.data.failure).toBe(false);
+    // P0: content mode persists nothing, so no `out` field is reported.
+    expect(json.data.out).toBeUndefined();
   });
 
   it('`check atc --variant` runs an ATC check and maps findings to issues', async () => {
@@ -171,6 +175,8 @@ describe('abap check modes (021: subcommands — syntax / content / atc)', () =>
     const { json } = parseError(res);
     expect(atcCheckVariant).toHaveBeenCalledWith('Z_ATC_VAR');
     expect(json.error.details.issues[0]).toMatchObject({ code: 'check_style', severity: 'warning', line: 3 });
+    // P0: without --out, nothing is persisted and no `out` field is reported.
+    expect(json.error.details.out).toBeUndefined();
   });
 
   it('`check atc --out <file>` persists the raw ATC worklist', async () => {
@@ -180,7 +186,8 @@ describe('abap check modes (021: subcommands — syntax / content / atc)', () =>
     const res = await runCommand(program, ['check', 'atc', 'src/zcl_ok.clas.abap', '--variant', 'Z_ATC_VAR', '--strict', '--out', outFile, '--json'], { cwd });
     expect(res.exitCode).toBe(7);
     const { json } = parseError(res);
-    expect(json.error.details.out).toBe(outFile);
+    // P0: the envelope echoes the user's --out verbatim, only separators normalized.
+    expect(json.error.details.out).toBe(outFile.replace(/\\/g, '/'));
     const saved = JSON.parse(fs.readFileSync(outFile, 'utf-8'));
     expect(saved.variant).toBe('Z_ATC_VAR');
     expect(saved.files).toHaveLength(1);
@@ -196,9 +203,10 @@ describe('abap check modes (021: subcommands — syntax / content / atc)', () =>
     expect(res.exitCode).toBeUndefined();
     const json = JSON.parse(res.stdout);
     const out = json.data.out as string;
-    expect(out).toMatch(/\.abap\/atc\/Z_ATC_VAR-\d{8}T\d{6}\.json$/);
-    expect(fs.existsSync(out)).toBe(true);
-    const saved = JSON.parse(fs.readFileSync(out, 'utf-8'));
+    // P0: the default out is a cwd-relative POSIX path.
+    expect(out).toMatch(/^\.abap\/atc\/Z_ATC_VAR-\d{8}T\d{6}\.json$/);
+    expect(fs.existsSync(path.join(cwd, out))).toBe(true);
+    const saved = JSON.parse(fs.readFileSync(path.join(cwd, out), 'utf-8'));
     expect(saved.variant).toBe('Z_ATC_VAR');
   });
 

@@ -6,6 +6,7 @@ import { parseBtpServiceKey } from '../auth/types.js';
 import { getSystem, listSystemNames, upsertSystem, type SystemProfile } from '../config/user-config.js';
 import { CliError, printResult, type OutputMode } from '../output/json.js';
 import { collectWarning } from '../output/meta.js';
+import { toOutputPath } from '../core/path-output.js';
 import { probeSystem, type ProbeLayerResult } from '../clients/probe.js';
 import { checkIcfDeployment, ICF_SERVICE_VERSION, type IcfDeploymentInfo } from '../icf/service-version.js';
 import { probeTextpoolCapability, recordCapability } from '../textpool/textpool-capability.js';
@@ -118,7 +119,7 @@ export async function handleFileOverwrite(mode: 'prompt' | 'overwrite' | 'refuse
   if (mode === 'refuse') {
     throw new CliError(
       'FILE_EXISTS',
-      `.abap.json already exists. Delete it first or run interactively:\n  rm ${configPath}`,
+      `.abap.json already exists. Delete it first or run interactively:\n  rm ${toOutputPath(configPath)}`,
     );
   }
 
@@ -152,7 +153,7 @@ export async function writeConfig(systemName: string, config: CollectedConfig, m
   };
   const configPath = path.join(cwd, '.abap.json');
   fs.writeFileSync(configPath, JSON.stringify(workspaceConfig, null, 2) + '\n', 'utf-8');
-  if (!mode) console.log(`Created ${configPath}`);
+  if (!mode) console.log(`Created ${toOutputPath(configPath)}`);
 
   if (!mode) console.log('Workspace initialized.');
 }
@@ -562,13 +563,14 @@ export async function runInitShowConfig(_opts: CommandOpts, mode: OutputMode): P
     parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new CliError('CONFIG_ERROR', `Cannot parse ${configPath}: ${message}.`, {
-      file: configPath,
-      nextSteps: [`Fix or delete ${configPath} and re-run 'abap init'.`],
+    const outPath = toOutputPath(configPath);
+    throw new CliError('CONFIG_ERROR', `Cannot parse ${outPath}: ${message}.`, {
+      file: outPath,
+      nextSteps: [`Fix or delete ${outPath} and re-run 'abap init'.`],
     });
   }
   const display = {
-    configPath: path.relative(process.cwd(), configPath) || '.abap.json',
+    configPath: toOutputPath(path.relative(process.cwd(), configPath)) || '.abap.json',
     ...parsed,
   };
   const human = Object.entries(parsed)
@@ -609,8 +611,9 @@ export async function runInitUnset(keys: string[], yes: boolean, mode: OutputMod
     parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new CliError('CONFIG_ERROR', `Cannot parse ${configPath}: ${message}.`, {
-      file: configPath,
+    const outPath = toOutputPath(configPath);
+    throw new CliError('CONFIG_ERROR', `Cannot parse ${outPath}: ${message}.`, {
+      file: outPath,
     });
   }
   const removed: string[] = [];
@@ -631,7 +634,7 @@ export async function runInitUnset(keys: string[], yes: boolean, mode: OutputMod
   } catch {
     // best-effort: tests that don't load project-config still work
   }
-  const display = { configPath: path.relative(process.cwd(), configPath) || '.abap.json', removed, missing };
+  const display = { configPath: toOutputPath(path.relative(process.cwd(), configPath)) || '.abap.json', removed, missing };
   const human = removed.length > 0
     ? `Removed from ${display.configPath}: ${removed.join(', ')}${missing.length > 0 ? ` (not present: ${missing.join(', ')})` : ''}.`
     : `No changes to ${display.configPath} (keys not present: ${missing.join(', ')}).`;

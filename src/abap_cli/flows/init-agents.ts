@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'node:url';
 import { CliError } from '../output/json.js';
+import { toOutputPath } from '../core/path-output.js';
 
 /** Agent targets. Each target writes into a vendor-specific sub-directory. */
 export type AgentTarget = 'generic' | 'copilot' | 'claude' | 'cursor';
@@ -210,7 +211,11 @@ export async function scaffoldAgents(target: AgentTarget, force: boolean): Promi
     scaffoldCursor(force, out);
   }
   rewritePaths(out, vendorDir);
-  return out;
+  // P0: normalize every emitted path to POSIX separators (Windows path contract).
+  return {
+    written: out.written.map(toOutputPath),
+    skipped: out.skipped.map(toOutputPath),
+  };
 }
 
 const CLAUDE_MD_TEMPLATE = `# abap-cli — Claude Code integration

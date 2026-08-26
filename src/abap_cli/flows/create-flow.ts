@@ -17,6 +17,7 @@ import { readDdicJson, localToWire, validateDdicObject, type DdicSupportedType }
 import { readHttpJson, localToWire as httpLocalToWire, validateHttpObject } from '../dictionary/http-json.js';
 import { TYPE_MAP, DDIC_TYPES, HTTP_TYPES, isDdicSupportedType, isHttpSupportedType, type CreateTypeSpec } from './create-types.js';
 import { createSchema } from './create-schema.js';
+import { toOutputPath } from '../core/path-output.js';
 
 export interface CreateOptions {
   package: string;
@@ -59,14 +60,16 @@ export async function runCreateLocal(type: string, name: string, opts: CreateLoc
   const targetPath = path.resolve(process.cwd(), relPath);
 
   if (await fileExists(targetPath)) {
-    throw new CliError('FILE_EXISTS', `${relPath} already exists. Delete it first or use another name`, { file: relPath });
+    const outPath = toOutputPath(relPath);
+    throw new CliError('FILE_EXISTS', `${outPath} already exists. Delete it first or use another name`, { file: outPath });
   }
 
   await writeAbapFile(targetPath, content);
 
+  const outPath = toOutputPath(relPath);
   printResult(mode,
-    { object: objectName, type: typeUpper, template: templateName ?? null, file: relPath, experimental: true },
-    `Created local draft ${typeUpper} ${objectName} at ${relPath} (experimental, not in SAP)`,
+    { object: objectName, type: typeUpper, template: templateName ?? null, file: outPath, experimental: true },
+    `Created local draft ${typeUpper} ${objectName} at ${outPath} (experimental, not in SAP)`,
   );
 }
 
@@ -84,8 +87,9 @@ async function runCreateDdic(type: DdicSupportedType, objectName: string, opts: 
     local = await readDdicJson(filePath);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new CliError('INVALID_ARGUMENT', `Cannot read DDIC file ${opts.file}: ${message}`, {
-      file: opts.file,
+    const outFile = toOutputPath(opts.file);
+    throw new CliError('INVALID_ARGUMENT', `Cannot read DDIC file ${outFile}: ${message}`, {
+      file: outFile,
       nextSteps: [
         'Verify the file exists and is valid JSON.',
         'See quickstart.md scenario 1 for the expected layout.',
@@ -96,8 +100,9 @@ async function runCreateDdic(type: DdicSupportedType, objectName: string, opts: 
   // FR-004: client-side validation (fast-fail, no SAP round-trip for invalid input).
   const errors = validateDdicObject(local, type);
   if (errors.length > 0) {
-    throw new CliError('VALIDATION_ERROR', `Invalid ${type} definition in ${opts.file}: ${errors.join('; ')}`, {
-      file: opts.file,
+    const outFile = toOutputPath(opts.file);
+    throw new CliError('VALIDATION_ERROR', `Invalid ${type} definition in ${outFile}: ${errors.join('; ')}`, {
+      file: outFile,
       type,
       object: objectName,
       details: errors,
@@ -112,7 +117,7 @@ async function runCreateDdic(type: DdicSupportedType, objectName: string, opts: 
   if (opts.package !== '$TMP' && !opts.tr) {
     throw new CliError('VALIDATION_ERROR', 'transportRequest is required when package is not $TMP', {
       nextSteps: ['Re-run with --tr <REQUEST>', 'Or use --package $TMP for local objects.'],
-      example: `abap create ${type} ${objectName} --file ${opts.file} --package ${opts.package} --tr <REQUEST> --description "..."`,
+      example: `abap create ${type} ${objectName} --file ${toOutputPath(opts.file)} --package ${opts.package} --tr <REQUEST> --description "..."`,
     });
   }
 
@@ -142,7 +147,7 @@ async function runCreateDdic(type: DdicSupportedType, objectName: string, opts: 
       object: resp.data.name,
       type,
       action: resp.data.action,
-      file: opts.file,
+      file: toOutputPath(opts.file),
     },
     `Created ${type} ${resp.data.name} via ICF ${resp.data.action === 'created' ? '(new)' : '(overwritten)'}`,
   );
@@ -162,8 +167,9 @@ async function runCreateHttp(type: 'HTTP', objectName: string, opts: CreateOptio
     local = await readHttpJson(filePath);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new CliError('INVALID_ARGUMENT', `Cannot read HTTP service file ${opts.file}: ${message}`, {
-      file: opts.file,
+    const outFile = toOutputPath(opts.file);
+    throw new CliError('INVALID_ARGUMENT', `Cannot read HTTP service file ${outFile}: ${message}`, {
+      file: outFile,
       nextSteps: [
         'Verify the file exists and is valid JSON.',
         'See the abap-file-format HTTP schema (http-v1.json) for the expected layout.',
@@ -174,8 +180,9 @@ async function runCreateHttp(type: 'HTTP', objectName: string, opts: CreateOptio
   // FR-004: client-side validation (fast-fail, no SAP round-trip for invalid input).
   const errors = validateHttpObject(local);
   if (errors.length > 0) {
-    throw new CliError('VALIDATION_ERROR', `Invalid ${type} definition in ${opts.file}: ${errors.join('; ')}`, {
-      file: opts.file,
+    const outFile = toOutputPath(opts.file);
+    throw new CliError('VALIDATION_ERROR', `Invalid ${type} definition in ${outFile}: ${errors.join('; ')}`, {
+      file: outFile,
       type,
       object: objectName,
       details: errors,
@@ -190,7 +197,7 @@ async function runCreateHttp(type: 'HTTP', objectName: string, opts: CreateOptio
   if (opts.package !== '$TMP' && !opts.tr) {
     throw new CliError('VALIDATION_ERROR', 'transportRequest is required when package is not $TMP', {
       nextSteps: ['Re-run with --tr <REQUEST>', 'Or use --package $TMP for local objects.'],
-      example: `abap create ${type} ${objectName} --file ${opts.file} --package ${opts.package} --tr <REQUEST> --description "..."`,
+      example: `abap create ${type} ${objectName} --file ${toOutputPath(opts.file)} --package ${opts.package} --tr <REQUEST> --description "..."`,
     });
   }
 
@@ -220,7 +227,7 @@ async function runCreateHttp(type: 'HTTP', objectName: string, opts: CreateOptio
       object: resp.data.name,
       type,
       action: resp.data.action,
-      file: opts.file,
+      file: toOutputPath(opts.file),
     },
     `Created ${type} ${resp.data.name} via ICF ${resp.data.action === 'created' ? '(new)' : '(overwritten)'}`,
   );
@@ -367,7 +374,8 @@ export async function runCreate(type: string | undefined, name: string | undefin
     const filename = buildFilename(object.name, object.type, mainPart.subtype, '.abap');
     const relPath = path.join('src', objectDirName(object.name), filename);
     await writeAbapFile(path.resolve(process.cwd(), relPath), content);
-    localFile = relPath;
+    // Normalize to POSIX for the JSON output boundary (P0 — Windows path contract).
+    localFile = toOutputPath(relPath);
   }
 
   printResult(mode,

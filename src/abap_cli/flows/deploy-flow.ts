@@ -12,6 +12,7 @@ import { getOrProbeRuntime } from '../config/runtime-cache.js';
 import { executeIcfRegister } from '../adc/icf-register-registry.js';
 import '../adc/icf-bootstrap.js';
 import { collectWarning } from '../output/meta.js';
+import { toOutputPath } from '../core/path-output.js';
 
 export type DeployStatus = 'deployed' | 'skipped' | 'failed';
 
@@ -212,7 +213,7 @@ export async function deployBundled(client: AdtClientWrapper, opts: DeployOption
   }
 
   return {
-    files: fileResults,
+    files: fileResults.map((f) => ({ ...f, file: toOutputPath(f.file) })),
     objects: objectResults,
     forced: !!opts.force,
     dryRun: !!opts.dryRun,

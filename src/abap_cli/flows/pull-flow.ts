@@ -13,6 +13,7 @@ import { strategyFor } from '../formats/pull-strategy.js';
 import { CliError } from '../output/json.js';
 import type { ErrorCode } from '../output/error-codes.js';
 import { resolveObject } from '../core/resolve.js';
+import { toOutputPath, normalizePullData } from '../core/path-output.js';
 import { showTransport } from './transport-ops.js';
 import { SEARCH_RESULT_LIMIT } from '../core/limits.js';
 
@@ -116,7 +117,7 @@ export async function runPull(objectName: string, opts: PullOptions): Promise<Pu
   const object = await resolveObject(client, objectName, opts.type);
   const result = await pullObject(client, object, opts);
   return {
-    data: { object: object.name, type: object.type, entries: result.entries, written: result.written, skipped: result.skipped, failed: result.failed },
+    data: normalizePullData({ object: object.name, type: object.type, entries: result.entries, written: result.written, skipped: result.skipped, failed: result.failed }),
     human: humanSummary(object, result),
   };
 }
@@ -147,15 +148,17 @@ async function runPullTextpool(objectName: string, type: string | undefined, opt
     const targetPath = path.resolve(process.cwd(), relPath);
 
     if (await fileExists(targetPath) && !opts.overwrite && !opts.skipExisting) {
-      throw new CliError('OVERWRITE_REQUIRED', `${relPath} already exists; use --overwrite to replace it`, {
-        file: relPath,
+      const outPath = toOutputPath(relPath);
+      throw new CliError('OVERWRITE_REQUIRED', `${outPath} already exists; use --overwrite to replace it`, {
+        file: outPath,
         nextSteps: ['Re-run with --overwrite to replace the existing file.'],
         example: `abap pull ${objectName} --textpool --overwrite`,
       });
     }
     if (await fileExists(targetPath) && opts.skipExisting) {
-      entries.push({ object: objectName, type: objType, status: 'skipped', files: [relPath] });
-      skipped.push(relPath);
+      const outPath = toOutputPath(relPath);
+      entries.push({ object: objectName, type: objType, status: 'skipped', files: [outPath] });
+      skipped.push(outPath);
       continue;
     }
 
@@ -167,8 +170,9 @@ async function runPullTextpool(objectName: string, type: string | undefined, opt
       const resp = await icf.getTextpool<{ elements?: Array<{ id: string; text: string }> }>(fileCat, objectName, objType);
       if (resp.status !== 'success' || !resp.data) {
         const code = resp.error?.code === 'TEXTPOOL_OBJECT_NOT_FOUND' ? 'OBJECT_NOT_FOUND' : (resp.error?.code as ErrorCode | undefined) ?? 'SAP_ERROR';
-        entries.push({ object: objectName, type: objType, status: 'failed', code, detail: resp.error?.message, files: [relPath] });
-        failed.push(relPath);
+        const outPath = toOutputPath(relPath);
+        entries.push({ object: objectName, type: objType, status: 'failed', code, detail: resp.error?.message, files: [outPath] });
+        failed.push(outPath);
         continue;
       }
       // Reuse the shared properties serializer so ADT/ICF output is identical (FR-023).
@@ -179,12 +183,13 @@ async function runPullTextpool(objectName: string, type: string | undefined, opt
     }
 
     await writeAbapFile(targetPath, content);
-    entries.push({ object: objectName, type: objType, status: 'written', files: [relPath] });
-    written.push(relPath);
+    const outPath = toOutputPath(relPath);
+    entries.push({ object: objectName, type: objType, status: 'written', files: [outPath] });
+    written.push(outPath);
   }
 
   return {
-    data: { object: objectName, type: objType, route, entries, written, skipped, failed },
+    data: normalizePullData({ object: objectName, type: objType, route, entries, written, skipped, failed }),
     human: `Pulled textpool for ${objType} ${objectName} (route: ${route})`,
   };
 }
@@ -245,31 +250,34 @@ async function runPullDdic(objectName: string, type: DdicSupportedType, opts: Pu
   const targetPath = path.resolve(process.cwd(), relPath);
 
   if (await fileExists(targetPath) && !opts.overwrite && !opts.skipExisting) {
-    throw new CliError('OVERWRITE_REQUIRED', `${relPath} already exists; use --overwrite to replace it`, {
-      file: relPath,
+    const outPath = toOutputPath(relPath);
+    throw new CliError('OVERWRITE_REQUIRED', `${outPath} already exists; use --overwrite to replace it`, {
+      file: outPath,
       nextSteps: ['Re-run with --overwrite to replace the existing file.'],
       example: `abap pull ${objectName} --type ${type} --overwrite`,
     });
   }
   if (await fileExists(targetPath) && opts.skipExisting) {
+    const outPath = toOutputPath(relPath);
     return {
-      data: { object: objectName, type, entries: [{ file: relPath, status: 'skipped' }], written: [], skipped: [relPath], failed: [] },
-      human: `Skipped ${type} ${objectName} (file already exists: ${relPath})`,
+      data: normalizePullData({ object: objectName, type, entries: [{ file: outPath, status: 'skipped' }], written: [], skipped: [outPath], failed: [] }),
+      human: `Skipped ${type} ${objectName} (file already exists: ${outPath})`,
     };
   }
 
   await writeDdicJson(targetPath, local);
+  const outPath = toOutputPath(relPath);
 
   return {
-    data: {
+    data: normalizePullData({
       object: objectName,
       type,
-      entries: [{ file: relPath, status: 'written' }],
-      written: [relPath],
+      entries: [{ file: outPath, status: 'written' }],
+      written: [outPath],
       skipped: [],
       failed: [],
-    },
-    human: `Pulled ${type} ${objectName} to ${relPath}`,
+    }),
+    human: `Pulled ${type} ${objectName} to ${outPath}`,
   };
 }
 
@@ -328,25 +336,27 @@ async function writePullDdicTabl(
   const anyExists = existing.some(Boolean);
   if (anyExists && !opts.overwrite && !opts.skipExisting) {
     const conflicting = allAbs.filter((_, idx) => existing[idx]).map((_, idx) => allFiles[idx]!);
-    throw new CliError('OVERWRITE_REQUIRED', `${conflicting.join(', ')} already exists; use --overwrite to replace`, {
-      file: conflicting.join(', '),
+    const conflictingOut = conflicting.map(toOutputPath);
+    throw new CliError('OVERWRITE_REQUIRED', `${conflictingOut.join(', ')} already exists; use --overwrite to replace`, {
+      file: conflictingOut.join(', '),
       nextSteps: ['Re-run with --overwrite to replace the existing files.'],
       example: `abap pull ${objectName} --type ${type} --overwrite`,
     });
   }
   if (anyExists && opts.skipExisting) {
     const skipped = allFiles.filter((_, idx) => existing[idx]);
+    const skippedOut = skipped.map(toOutputPath);
     return {
-      data: {
+      data: normalizePullData({
         object: objectName,
         type,
-        entries: skipped.map((file) => ({ file, status: 'skipped' })),
+        entries: skippedOut.map((file) => ({ file, status: 'skipped' })),
         written: [],
-        skipped,
+        skipped: skippedOut,
         failed: [],
         layout: 'tabl-aff-three-piece',
-      },
-      human: `Skipped ${type} ${objectName} (files already exist: ${skipped.join(', ')})`,
+      }),
+      human: `Skipped ${type} ${objectName} (files already exist: ${skippedOut.join(', ')})`,
     };
   }
 
@@ -366,20 +376,25 @@ async function writePullDdicTabl(
     await fs.writeFile(settingsAbs, pieces.settingsJson.endsWith('\n') ? pieces.settingsJson : pieces.settingsJson + '\n', 'utf-8');
   }
 
+  const mainOut = toOutputPath(mainRel);
+  const ddicOut = toOutputPath(ddicRel);
+  const settingsOut = settingsRel ? toOutputPath(settingsRel) : undefined;
+  const writtenOut = settingsOut ? [mainOut, ddicOut, settingsOut] : [mainOut, ddicOut];
+
   return {
-    data: {
+    data: normalizePullData({
       object: objectName,
       type,
-      entries: allFiles.map((file) => ({ file, status: 'written' })),
-      written: allFiles,
+      entries: writtenOut.map((file) => ({ file, status: 'written' })),
+      written: writtenOut,
       skipped: [],
       failed: [],
       layout: settingsRel ? 'tabl-aff-three-piece' : 'tabl-aff-two-piece',
       warnings: Array.isArray(wire.warnings) ? wire.warnings : undefined,
-    },
+    }),
     human: settingsRel
-      ? `Pulled ${type} ${objectName} to ${mainRel}, ${ddicRel}, ${settingsRel}`
-      : `Pulled ${type} ${objectName} to ${mainRel}, ${ddicRel}`,
+      ? `Pulled ${type} ${objectName} to ${mainOut}, ${ddicOut}, ${settingsOut}`
+      : `Pulled ${type} ${objectName} to ${mainOut}, ${ddicOut}`,
   };
 }
 
@@ -408,31 +423,34 @@ async function runPullHttp(objectName: string, opts: PullOptions): Promise<PullR
   const targetPath = path.resolve(process.cwd(), relPath);
 
   if (await fileExists(targetPath) && !opts.overwrite && !opts.skipExisting) {
-    throw new CliError('OVERWRITE_REQUIRED', `${relPath} already exists; use --overwrite to replace it`, {
-      file: relPath,
+    const outPath = toOutputPath(relPath);
+    throw new CliError('OVERWRITE_REQUIRED', `${outPath} already exists; use --overwrite to replace it`, {
+      file: outPath,
       nextSteps: ['Re-run with --overwrite to replace the existing file.'],
       example: `abap pull ${objectName} --type HTTP --overwrite`,
     });
   }
   if (await fileExists(targetPath) && opts.skipExisting) {
+    const outPath = toOutputPath(relPath);
     return {
-      data: { object: objectName, type: 'HTTP', entries: [{ file: relPath, status: 'skipped' }], written: [], skipped: [relPath], failed: [] },
-      human: `Skipped HTTP ${objectName} (file already exists: ${relPath})`,
+      data: normalizePullData({ object: objectName, type: 'HTTP', entries: [{ file: outPath, status: 'skipped' }], written: [], skipped: [outPath], failed: [] }),
+      human: `Skipped HTTP ${objectName} (file already exists: ${outPath})`,
     };
   }
 
   await writeHttpJson(targetPath, local);
+  const outPath = toOutputPath(relPath);
 
   return {
-    data: {
+    data: normalizePullData({
       object: objectName,
       type: 'HTTP',
-      entries: [{ file: relPath, status: 'written' }],
-      written: [relPath],
+      entries: [{ file: outPath, status: 'written' }],
+      written: [outPath],
       skipped: [],
       failed: [],
-    },
-    human: `Pulled HTTP ${objectName} to ${relPath}`,
+    }),
+    human: `Pulled HTTP ${objectName} to ${outPath}`,
   };
 }
 
@@ -497,42 +515,45 @@ async function runPullRemote(objectName: string, type: string | undefined, remot
   const targetPath = path.resolve(process.cwd(), relPath);
 
   if (await fileExists(targetPath) && !opts.overwrite && !opts.skipExisting) {
-    throw new CliError('OVERWRITE_REQUIRED', `${relPath} already exists; use --overwrite to replace it`, {
-      file: relPath,
+    const outPath = toOutputPath(relPath);
+    throw new CliError('OVERWRITE_REQUIRED', `${outPath} already exists; use --overwrite to replace it`, {
+      file: outPath,
       nextSteps: ['Re-run with --overwrite to replace the existing file.'],
       example: `abap pull ${objectName} --remote ${remoteUpper} --overwrite`,
     });
   }
   if (await fileExists(targetPath) && opts.skipExisting) {
+    const outPath = toOutputPath(relPath);
     return {
-      data: {
+      data: normalizePullData({
         object: objectName,
         type: objType,
         remote: remoteUpper,
         version,
-        entries: [{ file: relPath, status: 'skipped' }],
+        entries: [{ file: outPath, status: 'skipped' }],
         written: [],
-        skipped: [relPath],
+        skipped: [outPath],
         failed: [],
-      },
-      human: `Skipped ${objType} ${objectName} (file already exists: ${relPath})`,
+      }),
+      human: `Skipped ${objType} ${objectName} (file already exists: ${outPath})`,
     };
   }
 
   await writeAbapFile(targetPath, source);
+  const outPath = toOutputPath(relPath);
 
   return {
-    data: {
+    data: normalizePullData({
       object: objectName,
       type: objType,
       remote: remoteUpper,
       version,
-      entries: [{ file: relPath, status: 'written' }],
-      written: [relPath],
+      entries: [{ file: outPath, status: 'written' }],
+      written: [outPath],
       skipped: [],
       failed: [],
-    },
-    human: `Pulled ${objType} ${objectName} from ${remoteUpper} (version ${version}) to ${relPath}`,
+    }),
+    human: `Pulled ${objType} ${objectName} from ${remoteUpper} (version ${version}) to ${outPath}`,
   };
 }
 
@@ -573,7 +594,7 @@ async function runPackagePull(client: AdtClientWrapper, opts: PullOptions): Prom
   }
 
   return {
-    data: {
+    data: normalizePullData({
       package: pkg,
       entries,
       written,
@@ -583,7 +604,7 @@ async function runPackagePull(client: AdtClientWrapper, opts: PullOptions): Prom
       limit,
       truncated,
       ...(truncated ? { hint: `Result truncated. Use --page ${page + 1} to fetch more.` } : {}),
-    },
+    }),
     human: `Pulled ${written.length} object(s) from ${pkg}${truncated ? ' (truncated)' : ''}.`,
   };
 }
@@ -627,11 +648,12 @@ async function pullObject(
         return;
       }
       if (!opts.overwrite) {
+        const outPath = toOutputPath(filePath);
         throw new CliError(
           'OVERWRITE_REQUIRED',
-          `Local file ${filePath} differs from SAP; refusing to overwrite.`,
+          `Local file ${outPath} differs from SAP; refusing to overwrite.`,
           {
-            details: { file: filePath, object: object.name },
+            details: { file: outPath, object: object.name },
             nextSteps: [
               'Re-run with --overwrite to replace the local file.',
               'Or re-run with --skip-existing to keep the local file unchanged.',
@@ -642,8 +664,9 @@ async function pullObject(
       }
     }
     await writeAbapFile(absPath, content);
-    entries.push({ object: object.name, type: object.type, status: 'written', files: [filePath] });
-    written.push(filePath);
+    const outPath = toOutputPath(filePath);
+    entries.push({ object: object.name, type: object.type, status: 'written', files: [outPath] });
+    written.push(outPath);
   }
 }
 
@@ -746,7 +769,7 @@ async function runTransportPull(client: AdtClientWrapper, requestNumber: string,
     }
   }
 
-  const data: Record<string, unknown> = {
+  const data: Record<string, unknown> = normalizePullData({
     transport: requestNumber,
     requested: ordered.length,
     pulled,
@@ -755,7 +778,7 @@ async function runTransportPull(client: AdtClientWrapper, requestNumber: string,
     entries,
     written,
     skipped,
-  };
+  });
   if (failed > 0) {
     data.partial = true;
   }

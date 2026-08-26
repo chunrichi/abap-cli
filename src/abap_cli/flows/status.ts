@@ -6,6 +6,7 @@ import { readAbapFile } from '../formats/abap-source.js';
 import { resolveLocalTargets } from '../core/local-targets.js';
 import { resolveObject, getObjectParts } from '../core/resolve.js';
 import { SEARCH_RESULT_LIMIT } from '../core/limits.js';
+import { toRelativeOutputPath } from '../core/path-output.js';
 
 export type ChangeDirection = 'local-only' | 'remote-only' | 'divergent' | 'unchanged';
 
@@ -47,6 +48,8 @@ export async function computeChangedParts(client: AdtClientWrapper, opts: Status
       const stat = await fs.stat(file);
       if (stat.mtimeMs < new Date(opts.since).getTime()) continue;
     }
+    // detail carries a cwd-relative POSIX path relative to the flow's own cwd.
+    const detail = `local file: ${toRelativeOutputPath(file, cwd)}`;
     const resolved = resolveFile(file);
     try {
       const object = await resolveObject(client, resolved.objectName, resolved.objectType);
@@ -58,14 +61,14 @@ export async function computeChangedParts(client: AdtClientWrapper, opts: Status
       checked++;
       if (remoteContent === localContent) {
         if (opts.all) {
-          parts.push({ object: object.name, part: resolved.subtype, direction: 'unchanged', detail: `local file: ${file}` });
+          parts.push({ object: object.name, part: resolved.subtype, direction: 'unchanged', detail });
         }
       } else {
-        parts.push({ object: object.name, part: resolved.subtype, direction: 'divergent', detail: `local file: ${file}` });
+        parts.push({ object: object.name, part: resolved.subtype, direction: 'divergent', detail });
       }
     } catch (error: unknown) {
       if (error instanceof CliError && (error.code === 'OBJECT_NOT_FOUND' || error.code === 'AMBIGUOUS_OBJECT')) {
-        parts.push({ object: resolved.objectName, part: resolved.subtype, direction: 'local-only', detail: `local file: ${file}` });
+        parts.push({ object: resolved.objectName, part: resolved.subtype, direction: 'local-only', detail });
       } else {
         throw error;
       }

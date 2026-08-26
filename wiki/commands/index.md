@@ -43,4 +43,8 @@ changed at: 2026-08-19 23:00:00
 
 - [extension](extension.md) — 管理内置 ICF ABAP 扩展（deploy 部署 / status 只读探测版本匹配）
 
+## 跨命令契约
+
+- [path-output](path-output.md) — `--json` 输出路径统一 POSIX（`/`），Windows / Linux / macOS Agent 消费到同一结构；边界 helper `toOutputPath` / `toOutputJoin` / `normalizePullData`
+
 # references

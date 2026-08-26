@@ -8,6 +8,7 @@ import { exportProfiles, importProfiles, type ProfileBundle } from '../config/pr
 import { runList, runShow, runTest, runDelete } from '../flows/profile-flow.js';
 import { runAdd, runSet } from '../flows/profile-flow.js';
 import { runLogin } from '../flows/sso-flow.js';
+import { toOutputPath } from '../core/path-output.js';
 
 export function registerProfileCommand(program: Command): void {
   const profile = program
@@ -144,7 +145,8 @@ export function registerProfileCommand(program: Command): void {
         const human = `Exported ${bundle.systems.length} profile(s)${opts.withPasswords ? ' (with passwords)' : ''}.`;
         if (opts.file) {
           fs.writeFileSync(path.resolve(opts.file), JSON.stringify(bundle, null, 2) + '\n', 'utf-8');
-          printResult(mode, { file: opts.file, count: bundle.systems.length }, `${human} → ${opts.file}`);
+          const outFile = toOutputPath(opts.file);
+          printResult(mode, { file: outFile, count: bundle.systems.length }, `${human} → ${outFile}`);
         } else {
           printResult(mode, bundle, human);
         }

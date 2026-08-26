@@ -16,6 +16,7 @@ import { pushObject, type PushStage } from './push-object.js';
 import { pushFugrOne } from './push-fugr.js';
 import { pushTextpoolFile } from './push-textpool.js';
 import { getExtensionRegistry } from '../extensions/registry.js';
+import { toRelativeOutputPath } from '../core/path-output.js';
 
 /** Options for the file-level `abap push` orchestration (distinct from pushObject's PushOptions). */
 export interface PushFileOptions {
@@ -109,7 +110,7 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
         }
       } catch (error: unknown) {
         const err = toErrorShape(error);
-        validationFailures.push({ file, code: err.code as string, message: err.message as string });
+        validationFailures.push({ file: toRelativeOutputPath(file), code: err.code as string, message: err.message as string });
       }
     }
     if (validationFailures.length > 0) {
@@ -178,7 +179,7 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
     const message = single && firstFailed?.message ? firstFailed.message : `${failed} of ${target.files.length} file(s) failed`;
     const nextSteps = single && firstFailed?.nextSteps ? firstFailed.nextSteps : undefined;
     throw new CliError(aggregateCode, message, {
-      details: { results, failed },
+      details: { results: results.map(normalizePushResult), failed },
       nextSteps: nextSteps ?? [
         "Inspect the failing file's `code` and `stage` fields.",
         'Fix the issue and re-run with --keep-going (default) or --fail-fast to stop earlier.',
@@ -188,9 +189,19 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
   }
 
   return {
-    data: opts.dryRun ? { dryRun: true, results } : { results, failed },
+    data: opts.dryRun
+      ? { dryRun: true, results: results.map(normalizePushResult) }
+      : { results: results.map(normalizePushResult), failed },
     human: humanSummary(results),
   };
+}
+
+/** Normalize a PushFileResult path to a cwd-relative POSIX form (P0).
+ *  `r.file` is an absolute host-native path from resolveLocalTargets; the
+ *  agent contract wants a stable relative path that reads the same on every
+ *  platform. */
+function normalizePushResult(r: PushFileResult): PushFileResult {
+  return { ...r, file: toRelativeOutputPath(r.file) };
 }
 
 /**
@@ -274,13 +285,15 @@ async function pushDdicFile(
     local = await readDdicJson(path.resolve(process.cwd(), file));
   } catch (error: unknown) {
     const m = error instanceof Error ? error.message : String(error);
-    throw new CliError('INVALID_ARGUMENT', `Cannot read DDIC file ${file}: ${m}`, { file });
+    const outFile = toRelativeOutputPath(file);
+    throw new CliError('INVALID_ARGUMENT', `Cannot read DDIC file ${outFile}: ${m}`, { file: outFile });
   }
   const type = resolved.objectType as DdicSupportedType;
   const errors = validateDdicObject(local, type);
   if (errors.length > 0) {
-    throw new CliError('VALIDATION_ERROR', `Invalid ${type} definition in ${file}: ${errors.join('; ')}`, {
-      file,
+    const outFile = toRelativeOutputPath(file);
+    throw new CliError('VALIDATION_ERROR', `Invalid ${type} definition in ${outFile}: ${errors.join('; ')}`, {
+      file: outFile,
       type,
       object: resolved.objectName,
       details: errors,
@@ -328,12 +341,14 @@ async function pushHttpFile(
     local = await readHttpJson(path.resolve(process.cwd(), file));
   } catch (error: unknown) {
     const m = error instanceof Error ? error.message : String(error);
-    throw new CliError('INVALID_ARGUMENT', `Cannot read HTTP service file ${file}: ${m}`, { file });
+    const outFile = toRelativeOutputPath(file);
+    throw new CliError('INVALID_ARGUMENT', `Cannot read HTTP service file ${outFile}: ${m}`, { file: outFile });
   }
   const errors = validateHttpObject(local);
   if (errors.length > 0) {
-    throw new CliError('VALIDATION_ERROR', `Invalid HTTP service definition in ${file}: ${errors.join('; ')}`, {
-      file,
+    const outFile = toRelativeOutputPath(file);
+    throw new CliError('VALIDATION_ERROR', `Invalid HTTP service definition in ${outFile}: ${errors.join('; ')}`, {
+      file: outFile,
       type: 'HTTP',
       object: resolved.objectName,
       details: errors,
@@ -377,7 +392,8 @@ async function pushOne(
   try {
     resolved = resolveFile(file);
   } catch (error: unknown) {
-    throw new CliError('FILE_PARSE_ERROR', `Cannot parse ${file}: ${message(error)}`, { details: { file } });
+    const outFile = toRelativeOutputPath(file);
+    throw new CliError('FILE_PARSE_ERROR', `Cannot parse ${outFile}: ${message(error)}`, { details: { file: outFile } });
   }
   validateLocalFile(resolved);
 
@@ -396,7 +412,8 @@ async function pushOne(
   try {
     content = await readAbapFile(file);
   } catch (error: unknown) {
-    throw new CliError('FILE_PARSE_ERROR', `Cannot read ${file}: ${message(error)}`, { details: { file } });
+    const outFile = toRelativeOutputPath(file);
+    throw new CliError('FILE_PARSE_ERROR', `Cannot read ${outFile}: ${message(error)}`, { details: { file: outFile } });
   }
 
   const object = await resolveObject(client, resolved.objectName, resolved.objectType);
@@ -439,7 +456,7 @@ function humanSummary(results: PushFileResult[]): string {
   for (const r of results) {
     const tr = r.transport ? ` (${r.transport})` : '';
     const plan = r.plan ? ` [${r.plan.join(' → ')}]` : '';
-    lines.push(`  ${r.file} → ${r.status}${tr}${plan}`);
+    lines.push(`  ${toRelativeOutputPath(r.file)} → ${r.status}${tr}${plan}`);
   }
   return lines.join('\n');
 }
