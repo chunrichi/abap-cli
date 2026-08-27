@@ -5,7 +5,19 @@
 
 ## [Unreleased]
 
+### Changed
+- **025 — Skill 重组：4 领域 + 1 meta（替换旧 2-skill 设计）**：顶层 `skills/` 从 `abap-setup` + `abap-object`（021 合并版）拆为 `abap-cli`（meta 路由）+ `abap-cli-setup`（环境就绪）+ `abap-cli-search`（只读探查）+ `abap-cli-edit`（写路径，含 DDIC）+ `abap-cli-data`（运行时消费）。每个领域 skill 决策树短、行数 ≤ 阈值、错误码严格不重叠；`references/errors.md` 内联各自错误码，**不**做跨 skill cross-reference。`agents/abap-developer.agent.md` 扩为 9 步工作流 + 5 handoffs（含 `Route → abap-cli` 入口），可选串联 `.github/skills/abap-code-writing`（Step 0）与 `.github/skills/clean-abap`（Step 5.5）；用户 workspace 无 `.github/skills/` 时两 Step 是 no-op。spec 在 `specs/025-skill-restructure/spec.md`，plan 在同目录 `plan.md`，tasks 在同目录 `tasks.md`。设计动机与对比详见 `specs/025-skill-restructure/spec.md`（Overview + Naming & Boundaries）。
+
 ### Removed
+- **025 — 旧 skill 目录删除（不留 compat 别名）**：
+  - `skills/abap-setup/` → 内容迁移到 `skills/abap-cli-setup/`（commands-quick.md / errors.md 措辞更新为指向 `abap-cli-search` / `abap-cli-edit`）
+  - `skills/abap-object/` → 内容拆分到 `skills/abap-cli-search/`（6 命令）+ `skills/abap-cli-edit/`（6 命令 + workflow.md）+ `skills/abap-cli-data/`（2 命令）
+  - `agents/abap-developer.agent.md` 旧 7 步 / 2 handoffs 版本删除
+  - **Migration**（agent 用户必读）：
+    - 路由层：`abap-setup` → `abap-cli-setup`；`abap-object` → `abap-cli-search` / `abap-cli-edit` / `abap-cli-data`（按意图选）
+    - 跨 skill 引用：旧措辞"（abap-object skill 内）"改为"（[abap-cli-edit]）"或"（[abap-cli-search]）"
+    - 重新加载 agent（Claude Code / Copilot）使新 5 skill 路由生效
+    - AGENTS.md "Refactor Fearlessly" 明确允许 breaking change，本特性不留 compat alias
 - **P1 — `--help` 不再嵌入 `Common errors / Exit codes` 块**：之前每个命令的 `--help` 末尾都贴同一份"Common errors and how to fix them" + "Exit codes" 段落（17 处 `addHelpText('after', commonErrorsAfter())`），内容大量重复且无法随 scope 区分。删除 `src/abap_cli/output/help-text.ts` 与全部调用点；改为在错误抛出时通过新增的 `CliError.references` 字段（human 输出 `See: <path>` 一行；JSON envelope 新增 `references` 字段）指向 `skills/abap-object/references/errors.md` / `skills/abap-setup/references/errors.md`。已挂 references 的 4 个核心错误源：`http-error.ts`（TLS_ERROR / AUTH_ERROR / SAP_ERROR → abap-setup）、`core/transport.ts`（NO_TRANSPORT → abap-setup）、`flows/push-object.ts`（LOCK_FAILED → abap-object）、`flows/run-flow.ts`（classrun error → 按 code 区分 abap-object vs abap-setup，WRAPPER_NOT_DEPLOYED 指向 abap-setup）。`cli-output.schema.json` 加 `references` 字段。**Migration**：用户在 `--help` 里看不到错误恢复提示，错误现场 stderr / JSON envelope 直接给一行 `See: skills/.../errors.md#anchor`；Agent 拿 `error.code` + `error.references` 即可跳转。
 
 ### Added
