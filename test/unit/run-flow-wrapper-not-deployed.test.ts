@@ -21,9 +21,8 @@ describe('run-flow WRAPPER_NOT_DEPLOYED', () => {
       const err = e as CliError;
       expect(err.code).toBe('WRAPPER_NOT_DEPLOYED');
       expect(err.nextSteps?.some((s) => s.includes('abap extension deploy'))).toBe(true);
-      // The recovery reference points at abap-setup because the fix is
-      // `abap extension deploy`, not anything in the run/select surface.
-      expect(err.references).toBe('skills/abap-setup/references/errors.md');
+      // 025 重构：WRAPPER_NOT_DEPLOYED 修复动作在 abap-cli-setup（extension deploy）
+      expect(err.references).toBe('skills/abap-cli-setup/references/errors.md');
     }
   });
 
@@ -37,7 +36,8 @@ describe('run-flow WRAPPER_NOT_DEPLOYED', () => {
     } catch (e) {
       const err = e as CliError;
       expect(err.code).toBe('METHOD_FAILED');
-      expect(err.references).toBe('skills/abap-object/references/errors.md');
+      // 025 重构：其他 run 错误归 abap-cli-data（运行时消费域）
+      expect(err.references).toBe('skills/abap-cli-data/references/errors.md');
     }
   });
 });

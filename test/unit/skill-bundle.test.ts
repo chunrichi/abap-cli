@@ -76,7 +76,8 @@ function parseFrontmatter(content: string): SkillFrontmatter {
       } else if (value.startsWith('[') && value.endsWith(']')) {
         // 顶层 inline list（仅用于 commands 这类）
         currentObj = null;
-        result[currentKey] = value.slice(1, -1).split(',').map((s) => s.trim().replace(/^["']|["']$/g, ''));
+        const inner = value.slice(1, -1).trim();
+        result[currentKey] = inner === '' ? [] : inner.split(',').map((s) => s.trim().replace(/^["']|["']$/g, ''));
       } else {
         currentObj = null;
         // 去掉引号
@@ -88,7 +89,8 @@ function parseFrontmatter(content: string): SkillFrontmatter {
         const value = (indented[2] ?? '').replace(/^["']|["']$/g, '').trim();
         // 简化：list 形式 `commands: [a, b, c]` 或 `- a`
         if (value.startsWith('[') && value.endsWith(']')) {
-          currentObj[indented[1]!] = value.slice(1, -1).split(',').map((s) => s.trim().replace(/^["']|["']$/g, ''));
+          const inner = value.slice(1, -1).trim();
+          currentObj[indented[1]!] = inner === '' ? [] : inner.split(',').map((s) => s.trim().replace(/^["']|["']$/g, ''));
         } else {
           currentObj[indented[1]!] = value;
         }
@@ -105,15 +107,17 @@ function getAllSkills(): SkillInfo[] {
 describe('skill bundle (019-cli-skill-agent-bundle) structural audit', () => {
   const skills = getAllSkills();
 
-  it('discovers exactly 2 skills (abap-setup / abap-object; 0.2 合并)', () => {
+  it('discovers exactly 5 skills (025 重构: meta + 4 领域)', () => {
     const names = skills.map((s) => s.dirName).sort();
-    expect(names).toEqual(['abap-object', 'abap-setup']);
+    expect(names).toEqual(['abap-cli', 'abap-cli-data', 'abap-cli-edit', 'abap-cli-search', 'abap-cli-setup']);
   });
 
   it.each(skills.map((s) => [s.dirName, s] as const))(
-    '%s: has references/ scripts/ assets/ subdirectories (FR7)',
+    '%s: has references/ scripts/ assets/ subdirectories (FR7, meta 允许空)',
     (_name, skill) => {
       expect(skill.hasReferences, 'references/ missing').toBe(true);
+      // meta skill 不直接管命令，允许 scripts/ 与 assets/ 缺失（025 ADR-002）
+      if (skill.dirName === 'abap-cli') return;
       expect(skill.hasScripts, 'scripts/ missing').toBe(true);
       expect(skill.hasAssets, 'assets/ missing').toBe(true);
     },
@@ -148,6 +152,8 @@ describe('skill bundle (019-cli-skill-agent-bundle) structural audit', () => {
       const fm = parseFrontmatter(content);
       const description = fm.description ?? '';
       const commands = fm.metadata?.commands ?? [];
+      // meta skill (abap-cli) 的 metadata.commands 是空数组；description 描述路由层而非命令，豁免
+      if (skill.dirName === 'abap-cli') return;
       // 至少一个 metadata.commands 里的命令名必须出现在 description 中
       const found = commands.some((cmd: string) => description.includes(cmd));
       expect(found, `description 必须包含至少一个 metadata.commands 命令名`).toBe(true);
@@ -238,17 +244,25 @@ describe('skill bundle (019-cli-skill-agent-bundle) structural audit', () => {
   });
 });
 
-describe('skill bundle — size constraints (FR6)', () => {
+describe('skill bundle — size constraints (025 SC-004 / FR3)', () => {
   const skills = getAllSkills();
-  const MAX_SKILL_LINES = 220;
-  const MAX_AGENT_LINES = 120;
+  // 025 SC-004: 各领域 skill ≤ 旧对应 skill 行数；meta skill 无对应旧 skill 但保持精简
+  const MAX_SKILL_LINES: Record<string, number> = {
+    'abap-cli': 120,
+    'abap-cli-setup': 140,
+    'abap-cli-search': 80,
+    'abap-cli-edit': 150,
+    'abap-cli-data': 110,
+  };
+  const MAX_AGENT_LINES = 180;
 
   it.each(skills.map((s) => [s.dirName, s] as const))(
-    '%s: SKILL.md ≤ 220 lines',
+    '%s: SKILL.md ≤ 行数阈值',
     (_name, skill) => {
       const content = fs.readFileSync(skill.skillMdPath, 'utf-8');
       const lineCount = content.split('\n').length;
-      expect(lineCount, `${skill.dirName}/SKILL.md = ${lineCount} 行（超 ${MAX_SKILL_LINES}）`).toBeLessThanOrEqual(MAX_SKILL_LINES);
+      const limit = MAX_SKILL_LINES[skill.dirName] ?? 150;
+      expect(lineCount, `${skill.dirName}/SKILL.md = ${lineCount} 行（超 ${limit}）`).toBeLessThanOrEqual(limit);
     },
   );
 

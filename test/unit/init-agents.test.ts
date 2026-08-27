@@ -36,9 +36,11 @@ describe('init --agent (scaffoldAgents)', () => {
       const result = await scaffoldAgents(target, false);
       expect(result.skipped).toEqual([]);
 
-      // Two skills copied to vendor skills dir.
-      expectFile(path.join(cwd, vendorDir, 'skills', 'abap-setup', 'SKILL.md'));
-      expectFile(path.join(cwd, vendorDir, 'skills', 'abap-object', 'SKILL.md'));
+      // 025 重构: 5 个 skill 全拷（meta + 4 领域）
+      const expectedSkills = ['abap-cli', 'abap-cli-setup', 'abap-cli-search', 'abap-cli-edit', 'abap-cli-data'];
+      for (const s of expectedSkills) {
+        expectFile(path.join(cwd, vendorDir, 'skills', s, 'SKILL.md'));
+      }
 
       // Agent copied to vendor agents dir.
       expectFile(path.join(cwd, vendorDir, 'agents', 'abap-developer.agent.md'));
@@ -131,7 +133,7 @@ describe('init --agent (scaffoldAgents)', () => {
     it('--force overwrites existing files', async () => {
       await scaffoldAgents('copilot', false);
       // Tamper with a skill file to prove --force really overwrites.
-      const skillPath = path.join(cwd, '.github', 'skills', 'abap-setup', 'SKILL.md');
+      const skillPath = path.join(cwd, '.github', 'skills', 'abap-cli-setup', 'SKILL.md');
       fs.writeFileSync(skillPath, 'tampered');
       const result = await scaffoldAgents('copilot', true);
       expect(result.written.some((p) => p.endsWith('SKILL.md'))).toBe(true);
