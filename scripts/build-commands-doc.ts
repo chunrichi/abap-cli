@@ -3,9 +3,9 @@
  * Build docs/commands.md from the canonical sources:
  *  - src/abap_cli/output/cli-output.schema.json        (envelope)
  *  - src/abap_cli/output/error-codes.ts / exit-codes.ts (error table)
- *  - src/abap_cli/flows/command-schemas.ts              (12 commands)
+ *  - src/abap_cli/flows/command-schemas.ts              (13 commands)
  *  - src/abap_cli/commands/{create,run,select,search,tcode,where-used}.ts
- *    (per-command SCHEMA constants)
+ *    (6 per-command SCHEMA constants)
  *
  * Usage:
  *   node scripts/build-commands-doc.ts > docs/commands.md
@@ -124,8 +124,8 @@ interface CommandSchemaDoc {
   notes?: string[];
 }
 
-// Collect all 19 command schemas in a stable display order. The 12 commands
-// in `commandSchemas` are the centralised ones; the remaining 7 keep their
+// Collect all 19 command schemas in a stable display order. The 13 commands
+// in `commandSchemas` are the centralised ones; the remaining 6 keep their
 // SCHEMA const inline (create, run, select, search, tcode, where-used).
 const schemas: CommandSchemaDoc[] = [
   commandSchemas['init']!,
