@@ -8,7 +8,7 @@ abap-cli 用户的 AI agent 上下文集合。**自包含**——分发时每个
 
 | 路径 | 用途 | 谁用 | 随 npm 包分发？ |
 |---|---|---|---|
-| `.github/skills/` `abap-style/` `okf/` | 本仓库 AI 贡献者的元方法 | vibe_with_abap 开发者 | ❌ |
+| `.github/skills/` `abap-style/` `okf` | 本仓库 AI 贡献者的元方法 | vibe_with_abap 开发者 | ❌ |
 | `.github/agents/`（spec-kit、test-driver 等） | 本仓库工作流 | vibe_with_abap 开发者 | ❌ |
 | **顶层 `skills/`（本目录）** | **abap-cli 用户的 agent 路由层** | **abap-cli 用户** | **❌（v1）** |
 | **顶层 `agents/abap-developer.agent.md`** | **abap-cli 用户的端到端开发代理** | **abap-cli 用户** | **❌（v1）** |
@@ -57,12 +57,15 @@ cp agents/abap-developer.agent.md <your-project>/.github/agents/abap-developer.a
 
 ## 索引
 
-### Skill（按用户动作切，2 个）
+### Skill（5 个 — 1 meta + 4 领域）
 
-| skill | 覆盖命令 | 触发场景 | 入口 |
+| skill | scope | 覆盖命令 | 一句话职责 |
 |---|---|---|---|
-| **`abap-setup`** | `init` `profile` `doctor` `transport` `extension`（deploy / status） | 接入 / 诊断 / 传输请求 / 基础设施就绪 | [SKILL.md](./abap-setup/SKILL.md) |
-| **`abap-object`** | `search` `where-used` `pull` `push` `check` `create` `activate` `inspect` `diff` `status` `create local` + DDIC 子集 + `select` `run` `tcode` | 对象全生命周期（含 DDIC）+ 对对象的只读消费 | [SKILL.md](./abap-object/SKILL.md) |
+| **`abap-cli`** | meta | （无命令，纯路由） | 入口路由层：根据用户意图分发到 4 个领域 skill；串联 `.github/skills/` 两层方法论 |
+| **`abap-cli-setup`** | workspace-and-sap | `init` `profile` `doctor` `transport` `extension`（deploy/status） | 环境就绪：workspace 配置、profile 凭证、本地诊断、SAP 传输请求、ICF 服务部署 |
+| **`abap-cli-search`** | sap（只读） | `search` `where-used` `inspect` `tcode` `diff` `status` | 元数据探查：纯只读命令集合；不改对象、不加锁、不写 transport |
+| **`abap-cli-edit`** | sap（写） | `pull` `push` `check` `create` `activate` `create local` + DDIC 子集 | 写路径：所有会改 SAP 对象的命令；DDIC CRUD 与源码 CRUD 同源 |
+| **`abap-cli-data`** | sap（只读消费） | `select` `run` | 对象运行时消费：对一个已存在对象做不修改数据的查询/执行 |
 
 每个 skill 的内部结构：
 
@@ -70,35 +73,50 @@ cp agents/abap-developer.agent.md <your-project>/.github/agents/abap-developer.a
 skills/<name>/
 ├── SKILL.md                  # 入口（决策树 + 错误恢复）
 ├── references/
-│   ├── commands-quick.md     # 完整命令速查
-│   ├── errors.md             # 错误码全表
-│   └── workflow.md           # 详细工作流（变体）
-├── scripts/                  # 可执行 bash 脚本（包装 abap-cli）
+│   ├── commands-quick.md     # 本 skill 覆盖命令的完整速查
+│   └── errors.md             # 本 skill 错误码全表（不含其他 skill 专属错误码）
+├── scripts/                  # 可执行 .mjs 脚本（包装 abap-cli）
 └── assets/                   # 模板文件
 ```
 
-### Agent（编排 2 个 skill）
+### Agent（编排 5 个 skill）
 
 | agent | 角色 | 详细 |
 |---|---|---|
-| **`abap-developer`** | 端到端开发代理（handoffs 跳转 2 skill） | [abap-developer.agent.md](../agents/abap-developer.agent.md) |
+| **`abap-developer`** | 端到端开发代理（9 步工作流 + 5 handoffs） | [abap-developer.agent.md](../agents/abap-developer.agent.md) |
 
-### 为什么从 3 个 skill 收敛到 2 个
+### 路由表（`abap-cli` meta-skill 权威持有）
 
-原 `abap-edit` 涵盖的 10 个命令里绝大多数是只读（`search` / `pull` / `inspect` / `check` / `diff` / `status` / `where-used`）；原 `abap-data` 涵盖的 `select` / `run` / `tcode` 本质都是**对一个对象**的只读消费。两条 skill 的真实意图维度都是"对一个对象做什么"，与 `abap-setup` 的"环境就绪"维度正交——合到一个 `abap-object` skill 一次决策。
+| 用户意图 | 唯一目标 skill | 触发命令 |
+|---|---|---|
+| 配置 / 接 SAP / 加 profile / 诊断 / 传输请求 / 部署 ICF | `abap-cli-setup` | `init` `profile` `doctor` `transport` `extension` |
+| 查对象元数据 / where-used / 业务码 / 拉取对账 / 状态只读 | `abap-cli-search` | `search` `where-used` `inspect` `tcode` `diff` `status` |
+| 拉对象 / 改 / 推 / 语法检查 / 激活 / 创建 | `abap-cli-edit` | `pull` `push` `check` `create` `activate` `create local` + DDIC 子集 |
+| 跑类 / 查表 / 翻页 select | `abap-cli-data` | `select` `run` |
+| 意图模糊 / 不确定归哪类 | `abap-cli`（meta） | （路由查询本身） |
 
-`extension deploy` 是基础设施安装动作（部署 `/sap/zabap_vibe` ICF 服务、`ZCL_ABAP_VIBE_RUNNER` wrapper 类），与 `init` / `doctor` / `profile` / `transport` 同脉络，归 `abap-setup`。
+> ⚠️ **`pull` 归 `abap-cli-edit`**（写路径的中间步骤），**`inspect` 归 `abap-cli-search`**（只读元数据，修复动作归 edit）。
 
-## 命令覆盖核对（v0.2 — 合并后）
+### 错误码不重叠（硬性约束）
 
-- ✅ `abap-setup` 覆盖：`init` `profile` `doctor` `transport` `extension`（deploy/status）
-- ✅ `abap-object` 覆盖：`search` `where-used` `pull` `push` `check` `create` `activate` `inspect` `diff` `status` `create local` `select` `run` `tcode`
-- ❌ 不纳入（021 决策）：`abap atc` / `abap sync` / `abap report-stuck` 已移除（`atc` → `abap check atc`）
+- `WRAPPER_NOT_DEPLOYED` / `TABLE_NOT_FOUND` / `LIMIT_EXCEEDED` / `TIMEOUT` — **仅** `abap-cli-data`
+- `LOCK_FAILED` / `SYNTAX_ERROR` / `DDIC_NOT_SUPPORTED` / `INACTIVE_PARTS` — **仅** `abap-cli-edit`
+- `OBJECT_NOT_FOUND` / `TCODE_NOT_FOUND` / `NOT_AUTHORIZED` — **仅** `abap-cli-search`
+- `CONFIG_ERROR` / `TLS_ERROR` / `NO_TRANSPORT` / `ICF_CHECK_DEGRADED` — **仅** `abap-cli-setup`
+- 公共错误（`INVALID_ARGUMENT` / `USAGE` 等）在涉及它的每个 skill 中各自内联完整描述，不做 cross-reference
+
+## 命令覆盖核对（v0.3 — 5-skill）
+
+- ✅ `abap-cli-setup`：`init` `profile` `doctor` `transport` `extension`（deploy/status）
+- ✅ `abap-cli-search`：`search` `where-used` `inspect` `tcode` `diff` `status`
+- ✅ `abap-cli-edit`：`pull` `push` `check` `create` `activate` `create local` + DDIC 子集
+- ✅ `abap-cli-data`：`select` `run`
+- ✅ `abap-cli`（meta）：路由层，**不**直接管命令
 
 ## 版本
 
-- **CLI 版本**：`0.2.0`
-- **本特性 spec**：`specs/019-cli-skill-agent-bundle/spec.md`
+- **CLI 版本**：`0.3.0`
+- **本特性 spec**：`specs/025-skill-restructure/spec.md`
 - **agentskills.io 标准**：<https://agentskills.io/>
 
 ## references

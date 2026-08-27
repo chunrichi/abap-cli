@@ -1,4 +1,4 @@
-# abap-setup — 错误码全表
+# abap-cli-setup — 错误码全表
 
 > 按需加载。本文件只在 SKILL.md 提及 references 时被 agent 读取。
 
@@ -64,7 +64,7 @@
 | code | cat/exit | 触发 | 修复 |
 |---|---|---|---|
 | `OBJECT_EXISTS` | USAGE/2 | `--atomic` 推送已存在对象 | 加 `--overwrite`（如支持） |
-| `ACTIVATION_FAILED` | VALIDATION_ERROR/7 | ICF handler 激活失败 | 复检：`inspect <obj> --activation` → `activate --yes`（abap-object skill 内） |
+| `ACTIVATION_FAILED` | VALIDATION_ERROR/7 | ICF handler 激活失败 | 复检：`inspect <obj> --activation`（[abap-cli-search]）→ `activate --yes`（[abap-cli-edit]） |
 | `SAP_ERROR` | SAP_ERROR/6 | SAP 端 deploy 失败 | 看 `data.objects[]` 哪个失败 |
 | `ICF_CHECK_DEGRADED` | warning（meta.warnings） | ICF 部署健康探测不可达 | 不阻断；查 SAP 端 `/sap/zabap_vibe/` 是否可达 |
 

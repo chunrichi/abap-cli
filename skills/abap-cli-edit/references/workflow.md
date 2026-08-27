@@ -1,6 +1,6 @@
-# abap-object — 详细工作流
+# abap-cli-edit — 详细工作流
 
-> 按需加载。本文件展开 SKILL.md 决策树，处理各种变体（FUGR / DDIC / 包批量 / 远程 / stale 激活修复 / where-used / select 翻页）。
+> 按需加载。本文件展开 SKILL.md 决策树，处理各种变体（FUGR / DDIC / 包批量 / 远程 / stale 激活修复 / where-used）。select 翻页走 [abap-cli-data] 的 `scripts/pages-select.mjs`。
 
 ## 变体 1 — FUGR（Function Group）
 
