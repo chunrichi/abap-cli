@@ -52,7 +52,7 @@ export interface CliErrorOptions {
   /** FR-009 — a single canonical invocation that would succeed. */
   example?: string;
   /** Repo-relative path to a skill reference doc that lists this error's
-   *  meaning, category and recovery steps (e.g. 'skills/abap-object/references/errors.md#lock_failed'). */
+*   meaning, category and recovery steps (e.g. 'skills/abap-cli-edit/references/errors.md#lock_failed'). */
   references?: string;
 }
 

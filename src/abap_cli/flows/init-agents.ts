@@ -107,7 +107,7 @@ function copyTree(
 }
 
 /** Rewrite every recorded path in `out` so it carries the vendor dir prefix
- * (e.g. `skills/abap-object/SKILL.md` → `.github/skills/abap-object/SKILL.md`).
+ * (e.g. `skills/abap-cli-setup/SKILL.md` → `.github/skills/abap-cli-setup/SKILL.md`).
  * Token-efficient: agents see the actual final location, not an ambiguous
  * repo-rooted path that would only be true for the `generic` vendor. */
 function rewritePaths(out: ScaffoldingResult, vendorDir: string): void {
@@ -223,8 +223,8 @@ const CLAUDE_MD_TEMPLATE = `# abap-cli — Claude Code integration
 This workspace uses abap-cli. Run \`abap --help\` to see all commands. Claude should
 prefer \`abap <command> --json\` for machine-readable output.
 
-Skills live under \`.claude/skills/\` (abap-setup, abap-object). The
-abap-developer agent (\`.claude/agents/abap-developer.agent.md\`) orchestrates them.
+Skills live under \`.claude/skills/\` (5 skills: abap-cli meta + abap-cli-setup / -search / -edit / -data).
+The abap-developer agent (\`.claude/agents/abap-developer.agent.md\`) orchestrates them.
 `;
 
 const CURSOR_MDC_TEMPLATE = `---
@@ -235,5 +235,5 @@ alwaysApply: true
 
 This workspace uses abap-cli. Run \`abap --help\` for the full command tree. Always prefer \`abap <command> --json\`.
 
-Skills live under \`.cursor/skills/\` (abap-setup, abap-object).
+Skills live under \`.cursor/skills/\` (5 skills: abap-cli meta + abap-cli-setup / -search / -edit / -data).
 `;

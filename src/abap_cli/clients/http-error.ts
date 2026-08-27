@@ -25,9 +25,11 @@ const TLS_NEXT_STEPS = [
   "For self-signed dev systems only: 'abap profile set <name> --insecure'.",
 ];
 const TLS_EXAMPLE = 'abap profile set <name> --ca ./sap-dev-ca.pem';
-const TLS_REFERENCE = 'skills/abap-setup/references/errors.md#tls_error';
-const AUTH_REFERENCE = 'skills/abap-setup/references/errors.md#auth_error';
-const SAP_ERROR_REFERENCE = 'skills/abap-setup/references/errors.md#sap_error';
+// 025 重构：error.references 指向新 4 领域 skill 的 errors.md
+// TLS / AUTH / SAP_ERROR 由 abap-cli-setup 文档（环境就绪 + 凭证 + ICF 部署）
+const TLS_REFERENCE = 'skills/abap-cli-setup/references/errors.md#tls_error';
+const AUTH_REFERENCE = 'skills/abap-cli-setup/references/errors.md#auth_error';
+const SAP_ERROR_REFERENCE = 'skills/abap-cli-setup/references/errors.md#sap_error';
 
 /**
  * Choose the "what now?" hint for a 401/403 based on the auth method actually

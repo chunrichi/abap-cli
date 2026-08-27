@@ -70,7 +70,7 @@
         "details": { "type": "object" },
         "nextSteps": { "type": "array", "items": { "type": "string" }, "description": "Concrete actions the agent should try next." },
         "example": { "type": "string", "description": "A single canonical invocation that would succeed." },
-        "references": { "type": "string", "description": "Repo-relative path to a skill reference doc that documents this error (e.g. 'skills/abap-object/references/errors.md')." },
+        "references": { "type": "string", "description": "Repo-relative path to a skill reference doc that documents this error (e.g. 'skills/abap-cli-edit/references/errors.md')." },
         "httpStatus": { "type": "number", "description": "Present only for SAP_ERROR with an HTTP status." },
         "httpStatusText": { "type": "string" }
       },

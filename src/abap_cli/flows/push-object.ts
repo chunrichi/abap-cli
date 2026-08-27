@@ -78,7 +78,7 @@ export async function pushObject(
         'Wait for the lock to be released, or release it manually in SE03.',
       ],
       example: `abap inspect ${object.name} --locks`,
-      references: 'skills/abap-object/references/errors.md#lock_failed',
+      references: 'skills/abap-cli-edit/references/errors.md#lock_failed',
     });
   }
 

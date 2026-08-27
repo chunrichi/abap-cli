@@ -453,15 +453,17 @@ function nextStepsFor(code: ErrorCode, className: string, method: string | null)
 }
 
 /** Map a run-flow error code to the skill reference anchor that documents it.
- *  abap-object covers the read/write/inspect surface; abap-setup covers the
- *  deployment / credential layer that WRAPPER_NOT_DEPLOYED points at. */
+ *  025 重构后：
+ *  - WRAPPER_NOT_DEPLOYED / AUTH_ERROR 由 abap-cli-setup 文档
+ *    （extension deploy / profile test 修复路径）
+ *  - 其他 run 错误（METHOD_FAILED / TIMEOUT / OBJECT_NOT_ACTIVE / WRAPPER_INPUT_UNAVAILABLE ...）
+ *    由 abap-cli-data 文档（运行时消费域） */
 function referenceFor(code: ErrorCode): string {
   switch (code) {
     case 'WRAPPER_NOT_DEPLOYED':
-    case 'WRAPPER_INPUT_UNAVAILABLE':
     case 'AUTH_ERROR':
-      return 'skills/abap-setup/references/errors.md';
+      return 'skills/abap-cli-setup/references/errors.md';
     default:
-      return 'skills/abap-object/references/errors.md';
+      return 'skills/abap-cli-data/references/errors.md';
   }
 }
