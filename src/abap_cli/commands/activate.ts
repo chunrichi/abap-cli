@@ -1,7 +1,6 @@
 import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError, printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
-import { commonErrorsAfter } from '../output/help-text.js';
 import { resolveObject } from '../core/resolve.js';
 import { commandSchemas } from '../flows/command-schemas.js';
 
@@ -18,7 +17,6 @@ export function registerActivateCommand(program: Command): void {
   program
     .command('activate [object]')
     .description('Activate inactive ABAP objects')
-    .addHelpText('after', commonErrorsAfter())
     .option('--type <type>', 'Object type (CLAS, PROG, INTF, etc.)')
     .option('--yes', 'Confirm in non-interactive environments')
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')

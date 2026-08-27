@@ -55,7 +55,7 @@ metadata:
 | `ACTIVATION_FAILED` (exit 7) | ICF handler 激活失败；`inspect <obj> --activation` 复检 → `activate --yes` |
 | `SAP_ERROR` (exit 6) | `data.objects[]` 看哪个失败 |
 | `ICF_CHECK_DEGRADED` | warning（meta.warnings），不阻断 |
-| `USAGE` / `INVALID_ARGUMENT` | 看 `error.nextSteps` 或 `abap <cmd> --help` |
+| `USAGE` / `INVALID_ARGUMENT` | 看 `error.nextSteps` 或 `error.references`（help 已不再含错误恢复表） |
 
 ## 错误恢复
 
@@ -66,7 +66,7 @@ metadata:
 | `AUTH_ERROR` (exit 5) | `profile test <name>` 诊断；重写 keychain 密码（`profile set <name> --password '***'`） |
 | `NO_TRANSPORT` (exit 7) | `transport list --open` 查 → 没有则 `transport create "..." --package $PKG` |
 | `TRANSPORT_CREATE_FAILED` | 描述非空；用户须有 developer 权限 |
-| `USAGE` / `INVALID_ARGUMENT` | 看 `error.nextSteps` 或 `abap <cmd> --help` |
+| `USAGE` / `INVALID_ARGUMENT` | 看 `error.nextSteps` 或 `error.references`（help 已不再含错误恢复表） |
 
 ## 通用规则
 

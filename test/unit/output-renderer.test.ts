@@ -144,4 +144,39 @@ describe('output renderer (FR-001, FR-002, FR-016, SC-008)', () => {
     expect(parsed.error.httpStatus).toBe(500);
     expect(out.exitCode).toBe(6);
   });
+
+  it('toErrorShape surfaces references on CliError instances', () => {
+    const err = new CliError('TLS_ERROR', 'self-signed cert', {
+      references: 'skills/abap-setup/references/errors.md#tls_error',
+    });
+    expect(toErrorShape(err).references).toBe('skills/abap-setup/references/errors.md#tls_error');
+  });
+
+  it('renderError("human", ...) appends a See: line for error.references', () => {
+    const err = new CliError('LOCK_FAILED', 'Cannot lock ZCL_FOO', {
+      nextSteps: ['abap inspect ZCL_FOO --locks'],
+      references: 'skills/abap-object/references/errors.md#lock_failed',
+    });
+    const out = renderError('human', err, meta);
+    expect(out.stdout).toEqual([]);
+    expect(out.stderr).toContain('Error: Cannot lock ZCL_FOO');
+    expect(out.stderr).toContain('  Try: abap inspect ZCL_FOO --locks');
+    expect(out.stderr).toContain('  See:  skills/abap-object/references/errors.md#lock_failed');
+  });
+
+  it('renderError("json", ...) includes references in the error envelope', () => {
+    const err = new CliError('WRAPPER_NOT_DEPLOYED', 'wrapper missing', {
+      nextSteps: ['abap extension deploy'],
+      references: 'skills/abap-setup/references/errors.md',
+    });
+    const out = renderError('json', err, meta);
+    const parsed = JSON.parse(out.stderr[0]!);
+    expect(parsed.error.references).toBe('skills/abap-setup/references/errors.md');
+  });
+
+  it('renderError("human", ...) omits See: when references is absent', () => {
+    const err = new CliError('SAP_ERROR', 'plain failure');
+    const out = renderError('human', err, meta);
+    expect(out.stderr.some((l) => l.startsWith('  See:'))).toBe(false);
+  });
 });

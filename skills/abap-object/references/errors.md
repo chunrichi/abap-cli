@@ -20,7 +20,7 @@
 | `REMOTE_VERSION_NOT_FOUND` | NOT_FOUND/8 | pull --remote | 对象未传到远程系统；改用普通 `pull` 拉本地 |
 | `VERSION_DESTINATION_INVALID` | USAGE/2 | pull --remote | 系统 ID 非法；看 `--remote` 参数 |
 | `OBJECT_NOT_INDEXED` | SAP_ERROR/6 | where-used | 暂时无索引；改用 `search <obj>` + `pull` 看代码 |
-| `USAGE` / `INVALID_ARGUMENT` | USAGE/2 | 任意 | 看 `error.nextSteps` 或 `abap <cmd> --help` |
+| `USAGE` / `INVALID_ARGUMENT` | USAGE/2 | 任意 | 看 `error.nextSteps` / `error.references`（See: 行）；help 已不再含错误恢复表 |
 
 ## push 失败环节（`data.stage`）
 

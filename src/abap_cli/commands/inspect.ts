@@ -2,7 +2,6 @@ import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { inspectObject, type InspectFlags } from '../flows/inspect-ops.js';
 import { CliError, printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
-import { commonErrorsAfter } from '../output/help-text.js';
 import { commandSchemas } from '../flows/command-schemas.js';
 
 interface InspectOptions extends InspectFlags {}
@@ -11,7 +10,6 @@ export function registerInspectCommand(program: Command): void {
   program
     .command('inspect [object]')
     .description('View ABAP object metadata')
-    .addHelpText('after', commonErrorsAfter())
     .option('--structure', 'Include object structure elements')
     .option('--includes', 'Include class include parts')
     .option('--locks', 'Include transport ownership (not ADT editor-session state)')

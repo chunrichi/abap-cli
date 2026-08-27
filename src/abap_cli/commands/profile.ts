@@ -3,7 +3,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { printError, printResult, printSchema, jsonFromCommand, CliError, type OutputMode } from '../output/json.js';
 import { collectWarning } from '../output/meta.js';
-import { commonErrorsAfter } from '../output/help-text.js';
 import { exportProfiles, importProfiles, type ProfileBundle } from '../config/profiles.js';
 import { runList, runShow, runTest, runDelete } from '../flows/profile-flow.js';
 import { runAdd, runSet } from '../flows/profile-flow.js';
@@ -15,7 +14,6 @@ export function registerProfileCommand(program: Command): void {
   const profile = program
     .command('profile')
     .description('Manage global connection profiles')
-    .addHelpText('after', commonErrorsAfter())
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action((_opts, cmd) => {
       if (cmd.optsWithGlobals().schema) {

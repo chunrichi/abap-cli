@@ -1,6 +1,5 @@
 import { Command } from 'commander';
 import { CliError, printError, printResult, printSchema, jsonFromCommand, type OutputMode } from '../output/json.js';
-import { commonErrorsAfter } from '../output/help-text.js';
 import { runDoctorChecks, applySafeFixes } from '../flows/doctor-checks.js';
 import { commandSchemas } from '../flows/command-schemas.js';
 
@@ -15,7 +14,6 @@ export function registerDoctorCommand(program: Command): void {
   program
     .command('doctor')
     .description('Diagnose CLI environment and configuration')
-    .addHelpText('after', commonErrorsAfter())
     .option('--verbose', 'Include detail (versions, paths, messages)')
     .option('--fix', 'Apply safe, reversible fixes (requires --yes)')
     .option('--yes', 'Confirm --fix without prompting')

@@ -1,7 +1,6 @@
 import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError, printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
-import { commonErrorsAfter } from '../output/help-text.js';
 import { computeChangedParts, type ChangedPart } from '../flows/status.js';
 import { SEARCH_RESULT_LIMIT } from '../core/limits.js';
 import { commandSchemas } from '../flows/command-schemas.js';
@@ -18,7 +17,6 @@ export function registerStatusCommand(program: Command): void {
   program
     .command('status')
     .description('Show local vs SAP sync status')
-    .addHelpText('after', commonErrorsAfter())
     .option('--remote-only', 'Objects on SAP but not locally')
     .option('--local-only', 'Objects locally but not on SAP')
     .option('--limit <n>', `Max result count (default ${SEARCH_RESULT_LIMIT})`)

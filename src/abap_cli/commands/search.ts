@@ -2,7 +2,6 @@ import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError, printError, printResult, jsonFromCommand, printSchema, type CommandSchema, type OutputMode } from '../output/json.js';
 import { collectWarning } from '../output/meta.js';
-import { commonErrorsAfter } from '../output/help-text.js';
 import { SEARCH_RESULT_LIMIT, PAGE_ALL_DEFAULT_MAX } from '../core/limits.js';
 import type { SearchResult } from 'abap-adt-api';
 
@@ -33,7 +32,6 @@ export function registerSearchCommand(program: Command): void {
   program
     .command('search')
     .description('Search for ABAP objects in SAP system')
-    .addHelpText('after', commonErrorsAfter())
     // [query]（可选）是因为 --schema 模式下不需要查询词；真实搜索仍需 query。
     .argument('[query]', 'Search query (supports * wildcard)')
     .option('--type <type>', 'Filter by object type')

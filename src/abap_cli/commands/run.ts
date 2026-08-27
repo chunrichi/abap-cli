@@ -1,6 +1,5 @@
 import { Command } from 'commander';
 import { printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
-import { commonErrorsAfter } from '../output/help-text.js';
 import {
   buildDryRun,
   runRun,
@@ -109,7 +108,6 @@ export function registerRunCommand(program: Command): void {
     .description(
       'Execute ABAP class (classrun) or PUBLIC STATIC method; returns stdout + exit code',
     )
-    .addHelpText('after', commonErrorsAfter())
     .argument('[class-name]', 'Class name (e.g. ZCL_MY_THING)')
     .option('--method <name>', 'PUBLIC STATIC method to invoke via ZCL_ABAP_VIBE_RUNNER')
     .option('--args <json>', 'Method arguments JSON', '{}')

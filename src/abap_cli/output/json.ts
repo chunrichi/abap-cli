@@ -51,6 +51,9 @@ export interface CliErrorOptions {
   nextSteps?: string[];
   /** FR-009 — a single canonical invocation that would succeed. */
   example?: string;
+  /** Repo-relative path to a skill reference doc that lists this error's
+   *  meaning, category and recovery steps (e.g. 'skills/abap-object/references/errors.md#lock_failed'). */
+  references?: string;
 }
 
 export class CliError extends Error {
@@ -58,6 +61,7 @@ export class CliError extends Error {
   readonly details?: Record<string, unknown>;
   readonly nextSteps?: string[];
   readonly example?: string;
+  readonly references?: string;
 
   constructor(code: ErrorCode, message: string, options?: CliErrorOptions | Record<string, unknown>) {
     super(message);
@@ -68,12 +72,13 @@ export class CliError extends Error {
     }
     // Detect legacy `details` object: it has no recognised options-bag keys.
     const looksLikeOptionsBag =
-      'details' in options || 'nextSteps' in options || 'example' in options;
+      'details' in options || 'nextSteps' in options || 'example' in options || 'references' in options;
     if (looksLikeOptionsBag) {
       const opts = options as CliErrorOptions;
       this.details = opts.details;
       this.nextSteps = opts.nextSteps;
       this.example = opts.example;
+      this.references = opts.references;
     } else {
       // Legacy callers passed a raw details object as the third argument.
       this.details = options as Record<string, unknown>;
@@ -96,6 +101,7 @@ export function toErrorShape(error: unknown): { code: ErrorCode; category: Error
     if (error.details) out.details = error.details;
     if (error.nextSteps) out.nextSteps = error.nextSteps;
     if (error.example) out.example = error.example;
+    if (error.references) out.references = error.references;
     return out as { code: ErrorCode; category: ErrorCategory; message: string; [key: string]: unknown };
   }
   const err = error as { statusCode?: number; statusMessage?: string; message?: string };
@@ -169,6 +175,9 @@ export function renderError(mode: OutputMode, error: unknown, meta: OutputMeta):
   const lines = [...meta.warnings.map((w) => `Warning: ${w.message}`), `Error: ${err.message}`];
   if (Array.isArray(err.nextSteps) && err.nextSteps.length > 0) {
     lines.push(`  Try: ${err.nextSteps.join(' / ')}`);
+  if (typeof err.references === 'string' && err.references.length > 0) {
+    lines.push(`  See:  ${err.references}`);
+  }
   }
   return { stdout: [], stderr: lines, exitCode };
 }

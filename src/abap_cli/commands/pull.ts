@@ -1,7 +1,6 @@
 import { Command } from 'commander';
 import { runPull, type PullOptions } from '../flows/pull-flow.js';
 import { printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
-import { commonErrorsAfter } from '../output/help-text.js';
 import { SEARCH_RESULT_LIMIT } from '../core/limits.js';
 import { commandSchemas } from '../flows/command-schemas.js';
 
@@ -9,7 +8,6 @@ export function registerPullCommand(program: Command): void {
   program
     .command('pull')
     .description('Download ABAP objects from SAP to local files')
-    .addHelpText('after', commonErrorsAfter())
     .argument('[object-name]', 'Object name (e.g., ZCL_MY_CLASS)')
     .option('--type <type>', 'Object type (CLAS, PROG, INTF, etc.)')
     .option('--package <package>', 'Download all objects in a package')

@@ -1,7 +1,6 @@
 import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError, printError, printResult, printSchema, jsonFromCommand, type OutputMode } from '../output/json.js';
-import { commonErrorsAfter } from '../output/help-text.js';
 import { showTransport, resolveObjectTransport, assignObjectToTransport } from '../flows/transport-ops.js';
 import { commandSchemas } from '../flows/command-schemas.js';
 
@@ -21,7 +20,6 @@ export function registerTransportCommand(program: Command): void {
   const transportCmd = program
     .command('transport')
     .description('Manage transport requests')
-    .addHelpText('after', commonErrorsAfter())
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action((_opts, cmd) => {
       if (cmd.optsWithGlobals().schema) {

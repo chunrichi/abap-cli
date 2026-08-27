@@ -28,7 +28,7 @@
 | `CONFIG_ERROR` | CONFIG_ERROR/3 | `.abap.json` / `systems.json` 损坏、字段缺失 | 检查 JSON 语法；重新 `abap init` |
 | `TLS_ERROR` | TLS_ERROR/4 | TLS 握手失败 | `--insecure` 或 `--ca <pem>` |
 | `AUTH_ERROR` | AUTH_ERROR/5 | 用户名/密码错 / 会话过期 | `profile test <name>`；确认 keychain 密码 |
-| `USAGE` | USAGE/2 | 缺必填参数 | `abap <cmd> --help` |
+| `USAGE` | USAGE/2 | 缺必填参数 | `error.nextSteps` / `error.references`（help 已不再含错误恢复表） |
 | `INVALID_ARGUMENT` | USAGE/2 | 参数不合法（如 `profile add` 缺 url） | 看 `error.nextSteps` |
 | `NOT_FOUND` | NOT_FOUND/8 | profile 不存在 | `profile list` 查名字 |
 
@@ -49,7 +49,7 @@
 | `NO_TRANSPORT` | VALIDATION_ERROR/7 | 推送对象无可用请求 | `transport create "..."` 后 `--tr` 重试 |
 | `TRANSPORT_CREATE_FAILED` | VALIDATION_ERROR/7 | `transport create` 失败（描述空、用户无权限） | 描述非空；用户须有 developer 权限 |
 | `INVALID_ARGUMENT` | USAGE/2 | `transport create` 描述为空等 | 看 `error.nextSteps` |
-| `USAGE` | USAGE/2 | 缺必填参数 | `abap transport --help` |
+| `USAGE` | USAGE/2 | 缺必填参数 | `error.nextSteps` / `error.references`（help 已不再含错误恢复表） |
 
 ### 写操作保护（P0.3）
 

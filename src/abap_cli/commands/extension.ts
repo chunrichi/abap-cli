@@ -2,7 +2,6 @@ import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError, printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
 import { collectWarning } from '../output/meta.js';
-import { commonErrorsAfter } from '../output/help-text.js';
 import { resolveTransport } from '../core/transport.js';
 import { deployBundled, type DeploymentSummary } from '../flows/deploy-flow.js';
 import { checkIcfDeployment, ICF_SERVICE_VERSION } from '../icf/service-version.js';
@@ -22,7 +21,6 @@ export function registerExtensionCommand(program: Command): void {
   const extension = program
     .command('extension')
     .description('Manage the bundled ICF ABAP extension (deploy / status)')
-    .addHelpText('after', commonErrorsAfter())
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action((_opts, cmd) => {
       if (cmd.optsWithGlobals().schema) {

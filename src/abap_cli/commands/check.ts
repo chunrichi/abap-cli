@@ -5,7 +5,6 @@ import { AdtClientWrapper } from '../clients/adt-client.js';
 import { resolveFile } from '../formats/file-resolver.js';
 import { listAbapFiles, readAbapFile } from '../formats/abap-source.js';
 import { CliError, printError, printResult, printSchema, jsonFromCommand, type OutputMode } from '../output/json.js';
-import { commonErrorsAfter } from '../output/help-text.js';
 import { resolveObject, getObjectParts, validateLocalFile } from '../core/resolve.js';
 import { runAtcCheck } from '../flows/atc.js';
 import type { AtcWorkList } from 'abap-adt-api';
@@ -38,7 +37,6 @@ export function registerCheckCommand(program: Command): void {
   const check = program
     .command('check')
     .description('Validate ABAP source code (syntax / content / atc)')
-    .addHelpText('after', commonErrorsAfter())
     .option('--files <files...>', 'Shortcut: run syntax mode on the given files (equivalent to `abap check syntax <files...>`)')
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action(async (opts: CheckOptions, cmd) => {

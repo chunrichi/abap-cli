@@ -1,6 +1,5 @@
 import { Command } from 'commander';
 import { printError, printSchema, jsonFromCommand, type OutputMode } from '../output/json.js';
-import { commonErrorsAfter } from '../output/help-text.js';
 import { runCreate, runCreateLocal, type CreateOptions, type CreateLocalOptions } from '../flows/create-flow.js';
 import { createSchema } from '../flows/create-schema.js';
 
@@ -8,7 +7,6 @@ export function registerCreateCommand(program: Command): void {
   const createCmd = program
     .command('create')
     .description('Create and activate a new ABAP object (CLAS, INTF, PROG, FUGR)')
-    .addHelpText('after', commonErrorsAfter())
     // [type]/[name]（可选）是因为 --schema 模式下不需要 name；真实创建仍需两者。
     .argument('[type]', 'Object type (CLAS, INTF, PROG, FUGR)')
     .argument('[name]', 'Object name')
@@ -49,7 +47,6 @@ function registerCreateLocalCommand(createCmd: Command): void {
   createCmd
     .command('local')
     .description('Experimental: create a local draft skeleton file (no SAP connection)')
-    .addHelpText('after', commonErrorsAfter())
     .addHelpText('after', [
       '',
       'This command is experimental and creates a local draft only — nothing is sent to SAP.',

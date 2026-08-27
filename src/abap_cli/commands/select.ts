@@ -1,6 +1,5 @@
 import { Command } from 'commander';
 import { printError, printResult, printSchema, jsonFromCommand, CliError } from '../output/json.js';
-import { commonErrorsAfter } from '../output/help-text.js';
 import {
   buildDryRun,
   runSelect,
@@ -146,7 +145,6 @@ export function registerSelectCommand(program: Command): void {
     .description(
       'Query table data read-only (SE16N equivalent) via the bundled ICF /data endpoint',
     )
-    .addHelpText('after', commonErrorsAfter())
     .option('--table <name>', 'Table or view name (e.g. ZTAB_FIXTURE)')
     .option('--fields <csv>', 'Comma-separated field names')
     .option('--where <clause>', 'Filter clause (FIELD OP VALUE joined by AND)')

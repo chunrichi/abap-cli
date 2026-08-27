@@ -1,6 +1,5 @@
 import { Command } from 'commander';
 import { CliError, printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
-import { commonErrorsAfter } from '../output/help-text.js';
 import { runInitFromOpts, runInitWizard, runInitShowConfig, runInitUnset } from '../flows/init-flow.js';
 import { scaffoldAgents, type AgentTarget } from '../flows/init-agents.js';
 import { commandSchemas } from '../flows/command-schemas.js';
@@ -61,7 +60,6 @@ export function registerInitCommand(program: Command): void {
   const init = program
     .command('init')
     .description('Initialize the workspace (bind a profile, write .abap.json) and/or scaffold AI agent context')
-    .addHelpText('after', commonErrorsAfter())
     .addHelpText('after', initParamHelp())
     .option('--profile <name>', 'Use an existing global profile (created with `abap profile add`)')
     // Legacy alias (021 deprecation): --system still accepted, prints a hint to migrate.
