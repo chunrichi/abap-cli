@@ -191,16 +191,26 @@ export function printError(mode: OutputMode, error: unknown, meta?: OutputMeta):
 // Machine-readable description of a command's arguments/options so an agent
 // can discover the exact invocation contract before calling it.
 
+/** A schema field can be string-typed (covers int/number/json as well).
+ *  The type union stays narrow for readability; richer shapes (--args as
+ *  JSON, --timeout as number) surface through dedicated fields below. */
 export interface CommandSchemaArgument {
   name: string;
+  /** Argument value type. Defaults to 'string' when omitted. */
+  type?: 'string' | 'int' | 'number' | 'json';
   required: boolean;
   description: string;
+  /** Restrict to a fixed enum, e.g. object type (CLAS/INTF/PROG/FUGR). */
   allowedValues?: string[];
+  /** Regex pattern for string values; rejected by Agent before calling. */
+  pattern?: string;
+  /** Maximum string length (chars). */
+  maxLength?: number;
 }
 
 export interface CommandSchemaOption {
   name: string;
-  type: 'string' | 'int' | 'boolean';
+  type: 'string' | 'int' | 'number' | 'boolean' | 'json';
   /** Placeholder text shown in usage, e.g. `<n>` for --limit <n>. */
   valuePlaceholder?: string;
   description: string;
@@ -208,19 +218,47 @@ export interface CommandSchemaOption {
   default?: string | number | boolean;
   deprecated?: boolean;
   allowedValues?: string[];
+  /** Regex pattern for string values. */
+  pattern?: string;
+  /** Numeric lower bound (int/number only). */
+  minimum?: number;
+  /** Numeric upper bound (int/number only). */
+  maximum?: number;
+  /** True if the option is a global flag inherited from the root program. */
+  global?: boolean;
+}
+
+/** Per-example block for richer command docs (run/select/tcode/where-used). */
+export interface CommandSchemaExample {
+  description?: string;
+  command: string;
+}
+
+export interface CommandSchemaError {
+  code: string;
+  category: string;
+  exitCode: number;
 }
 
 export interface CommandSchema {
   schemaVersion: 1;
   command: string;
   description: string;
-  usage: string;
+  usage?: string;
+  /** Optional command scope tag (sap / local) used for grouping in docs. */
+  scope?: 'sap' | 'local' | string;
   arguments: CommandSchemaArgument[];
   options: CommandSchemaOption[];
-  /** Option sets that must not be combined, e.g. [['--exact', '--fuzzy']]. */
+  /** Option sets that must not be combined, e.g. [['--exact', '--fuzzy']].
+   *  An empty array `[]` means "no explicit mutex groups" — render nothing. */
   exclusiveGroups?: string[][];
-  globalOptions: string[];
-  examples?: string[];
+  /** Global options inherited from the root program (always `--json`). */
+  globalOptions?: string[];
+  examples?: (string | CommandSchemaExample)[];
+  /** Command-scoped error codes (subset of the global ErrorCode enum). */
+  errors?: CommandSchemaError[];
+  /** Free-form notes (design, contract, runtime hints) for the docs page. */
+  notes?: string[];
 }
 
 /** Print a command schema. Always a JSON envelope — it is a machine-readable

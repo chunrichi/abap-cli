@@ -1,7 +1,8 @@
 import { Command } from 'commander';
-import { printError, jsonFromCommand, type OutputMode } from '../output/json.js';
+import { printError, printSchema, jsonFromCommand, type OutputMode } from '../output/json.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import { runCreate, runCreateLocal, type CreateOptions, type CreateLocalOptions } from '../flows/create-flow.js';
+import { createSchema } from '../flows/create-schema.js';
 
 export function registerCreateCommand(program: Command): void {
   const createCmd = program
@@ -27,6 +28,13 @@ export function registerCreateCommand(program: Command): void {
     .action(async (type, name, opts, cmd) => {
       const mode = jsonFromCommand(cmd);
       try {
+        // --schema branch — emit machine-readable parameter schema (no SAP call).
+        // `abap create --schema` returns the general contract; `abap create --schema <type>`
+        // adds the type dimension (templates / supported flag).
+        if (cmd.optsWithGlobals().schema) {
+          printSchema(createSchema(type), mode);
+          return;
+        }
         await runCreate(type, name, opts, mode);
       } catch (error: unknown) {
         printError(mode, error);

@@ -35,7 +35,7 @@ describe('abap search --schema (P0.1 introspection)', () => {
     expect(status).toBe('success');
     expect(data.command).toBe('search');
     expect(data.schemaVersion).toBe(1);
-    expect(data.arguments).toEqual([{ name: 'query', required: true, description: 'Search query (supports * wildcard)' }]);
+    expect(data.arguments).toEqual([{ name: 'query', type: 'string', required: true, description: 'Search query (supports * wildcard)' }]);
     expect(data.options.map((o: { name: string }) => o.name)).toEqual(
       expect.arrayContaining(['--type', '--limit', '--page', '--exact', '--fuzzy', '--package', '--max', '--page-all', '--page-all-max']),
     );

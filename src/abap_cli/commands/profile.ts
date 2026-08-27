@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
-import { printError, printResult, jsonFromCommand, CliError, type OutputMode } from '../output/json.js';
+import { printError, printResult, printSchema, jsonFromCommand, CliError, type OutputMode } from '../output/json.js';
 import { collectWarning } from '../output/meta.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import { exportProfiles, importProfiles, type ProfileBundle } from '../config/profiles.js';
@@ -9,13 +9,19 @@ import { runList, runShow, runTest, runDelete } from '../flows/profile-flow.js';
 import { runAdd, runSet } from '../flows/profile-flow.js';
 import { runLogin } from '../flows/sso-flow.js';
 import { toOutputPath } from '../core/path-output.js';
+import { commandSchemas } from '../flows/command-schemas.js';
 
 export function registerProfileCommand(program: Command): void {
   const profile = program
     .command('profile')
     .description('Manage global connection profiles')
     .addHelpText('after', commonErrorsAfter())
+    .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action((_opts, cmd) => {
+      if (cmd.optsWithGlobals().schema) {
+        printSchema(commandSchemas['profile']!, jsonFromCommand(cmd));
+        return;
+      }
       // Bare `abap profile` prints the subcommand help (exit 0), like bare `abap`.
       console.log(cmd.helpInformation());
     });

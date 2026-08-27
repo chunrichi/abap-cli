@@ -12,11 +12,14 @@ import {
   type SelectResult,
 } from '../flows/select-flow.js';
 
-const SCHEMA = {
+export const SCHEMA = {
+  schemaVersion: 1,
   command: 'select',
   description:
     'Query table data read-only via the bundled ICF /data endpoint (SE16N equivalent): --table ZTAB [--fields ...] [--where ...] [--limit N] [--offset N] [--order-by ...] [--count-only]',
+  usage: 'abap select --table <name> [options]',
   scope: 'sap',
+  arguments: [],
   options: [
     {
       name: '--table',
@@ -91,17 +94,17 @@ const SCHEMA = {
       required: false,
       default: false,
       global: true,
-      description: 'Emit the unified JSON envelope on stdout (012 output contract).',
+      description: 'Emit the unified JSON envelope on stdout (012 output contract); --pretty-json indents.',
     },
     {
       name: '--schema',
       type: 'boolean',
       required: false,
       default: false,
-      description: 'Print this schema as JSON and exit 0 without any SAP call.',
+      description: 'Print the command parameter schema as JSON and exit (no SAP call).',
     },
   ],
-  exclusiveGroups: [['<no_exclusive_groups>']],
+  exclusiveGroups: [],
   globalOptions: ['--json'],
   examples: [
     {
@@ -152,7 +155,7 @@ export function registerSelectCommand(program: Command): void {
     .option('--order-by <csv>', 'Comma-separated FIELD:ASC|DESC pairs')
     .option('--count-only', 'Return only the matching row count')
     .option('--dry-run', 'Print request envelope without invoking ICF endpoint')
-    .option('--schema', 'Print the command parameter schema as JSON and exit 0')
+    .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action(
       async (
         opts: {

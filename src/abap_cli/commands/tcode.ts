@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import { jsonFromCommand, printError, printResult, printSchema } from '../output/json.js';
 import { runTcode, type TcodeResult } from '../flows/tcode-flow.js';
 
-const SCHEMA = {
+export const SCHEMA = {
   schemaVersion: 1,
   command: 'tcode',
   description: 'Resolve a transaction code to its configured ABAP entry program (read-only).',
@@ -24,7 +24,7 @@ const SCHEMA = {
       type: 'boolean',
       required: false,
       default: false,
-      description: 'Print this schema as JSON and exit 0 without any SAP call.',
+      description: 'Print the command parameter schema as JSON and exit (no SAP call).',
     },
   ],
   exclusiveGroups: [['--schema', '<tcode>']],
@@ -45,7 +45,7 @@ export function registerTcodeCommand(program: Command): void {
     .command('tcode')
     .description('Resolve transaction code to its ABAP entry program (read-only)')
     .argument('[tcode]', 'Transaction code (e.g. SE38)')
-    .option('--schema', 'Print the command parameter schema as JSON and exit 0')
+    .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action(async (tcode: string | undefined, _opts: unknown, cmd: Command) => {
       const mode = jsonFromCommand(cmd);
 

@@ -4,13 +4,14 @@ import * as path from 'path';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { resolveFile } from '../formats/file-resolver.js';
 import { listAbapFiles, readAbapFile } from '../formats/abap-source.js';
-import { CliError, printError, printResult, jsonFromCommand, type OutputMode } from '../output/json.js';
+import { CliError, printError, printResult, printSchema, jsonFromCommand, type OutputMode } from '../output/json.js';
 import { commonErrorsAfter } from '../output/help-text.js';
 import { resolveObject, getObjectParts, validateLocalFile } from '../core/resolve.js';
 import { runAtcCheck } from '../flows/atc.js';
 import type { AtcWorkList } from 'abap-adt-api';
 import type { CheckIssue } from '../output/issues.js';
 import { toOutputPath, toRelativeOutputPath } from '../core/path-output.js';
+import { commandSchemas } from '../flows/command-schemas.js';
 
 type CheckMode = 'syntax' | 'content' | 'atc';
 
@@ -39,7 +40,13 @@ export function registerCheckCommand(program: Command): void {
     .description('Validate ABAP source code (syntax / content / atc)')
     .addHelpText('after', commonErrorsAfter())
     .option('--files <files...>', 'Shortcut: run syntax mode on the given files (equivalent to `abap check syntax <files...>`)')
+    .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action(async (opts: CheckOptions, cmd) => {
+      // --schema branch — emit machine-readable parameter schema (no SAP call).
+      if (cmd.optsWithGlobals().schema) {
+        printSchema(commandSchemas['check']!, jsonFromCommand(cmd));
+        return;
+      }
       // Bare `abap check` (no subcommand, no --files) prints subcommand help.
       const hasShortcut = Array.isArray(opts.files) && opts.files.length > 0;
       if (!hasShortcut) {

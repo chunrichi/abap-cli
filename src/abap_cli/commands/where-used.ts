@@ -116,12 +116,12 @@ function whereUsedSchema(): CommandSchema {
       { name: '--ref-type', type: 'string', valuePlaceholder: '<type>', description: 'Filter references by object type.', allowedValues: [...SUPPORTED_WHERE_USED_TYPES] },
       { name: '--package', type: 'string', valuePlaceholder: '<package>', description: 'Case-insensitive reference package filter.' },
       { name: '--limit', type: 'int', valuePlaceholder: '<n>', description: 'Maximum returned references.', default: DEFAULT_WHERE_USED_LIMIT },
-      { name: '--schema', type: 'boolean', description: 'Print this schema without making a SAP call.', default: false },
+      { name: '--schema', type: 'boolean', description: 'Print the command parameter schema as JSON and exit (no SAP call).', default: false },
     ],
     globalOptions: ['--json'],
     examples: [
-      'abap where-used ZCL_TARGET --type CLAS',
-      'abap references ZTAB_TARGET --type TABL --ref-type TABL --json',
+      { description: 'Find references to a class', command: 'abap where-used ZCL_TARGET --type CLAS' },
+      { description: 'JSON envelope via the references alias', command: 'abap references ZTAB_TARGET --type TABL --ref-type TABL --json' },
     ],
   };
 }

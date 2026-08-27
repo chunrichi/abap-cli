@@ -313,15 +313,13 @@ describe('P1 per-command contract validation', () => {
     expect(res.exitCode).toBe(2);
   });
 
-  it('--schema commands are exactly create/run/search/select/tcode/where-used', () => {
-    expect(entries.filter((e) => e.hasSchema).map((e) => e.name).sort()).toEqual([
-      'create',
-      'run',
-      'search',
-      'select',
-      'tcode',
-      'where-used',
-    ]);
+  it('--schema is exposed by every registered command', () => {
+    const withSchema = entries.filter((e) => e.hasSchema).map((e) => e.name).sort();
+    // All 19 commands must now expose `--schema` so agents can introspect
+    // every command's parameter contract. Subcommands (e.g. `check syntax`,
+    // `transport create`) inherit from the parent.
+    const all = entries.map((e) => e.name).sort();
+    expect(withSchema).toEqual(all);
   });
 
   it.each(entries.filter((e) => e.hasSchema))(

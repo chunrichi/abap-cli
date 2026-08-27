@@ -1,8 +1,9 @@
 import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { inspectObject, type InspectFlags } from '../flows/inspect-ops.js';
-import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
+import { CliError, printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
 import { commonErrorsAfter } from '../output/help-text.js';
+import { commandSchemas } from '../flows/command-schemas.js';
 
 interface InspectOptions extends InspectFlags {}
 
@@ -16,8 +17,13 @@ export function registerInspectCommand(program: Command): void {
     .option('--locks', 'Include transport ownership (not ADT editor-session state)')
     .option('--package', 'Include the object package name')
     .option('--activation', 'Verify active vs latest source (detect stale activation)')
+    .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action(async (object: string | undefined, opts: InspectOptions, cmd) => {
       const mode = jsonFromCommand(cmd);
+      if (cmd.optsWithGlobals().schema) {
+        printSchema(commandSchemas['inspect']!, mode);
+        return;
+      }
       try {
         if (!object) {
           throw new CliError('USAGE', 'inspect requires an object name.', {
