@@ -359,28 +359,60 @@ function resolveAuthFromOpts(opts: CommandOpts): AuthConfig {
   return resolveAuthFromOptions({ method, bag }, defaultAuth());
 }
 
-/** Prompt for a brand-new system profile. */
+/**
+ * Prompt for a brand-new system profile.
+ *
+ * Order rationale (FR-022 + UX): identity first (URL → Client → Username →
+ * Language), credentials last (insecure / ca → password). Asking for a
+ * password before the user has named the system feels backwards and forces
+ * them to juggle password-manager + paste + URL simultaneously.
+ */
 async function collectNewSystem(opts: CommandOpts): Promise<CollectedConfig> {
   const auth = resolveAuthFromOpts(opts);
   const wantPassword = auth.method === 'basic' || auth.method === 'oauth_password';
-  const pwd = wantPassword
-    ? str(opts.password) || orCancel(await password({ message: 'Password (stored in OS keychain)' }))
-    : '';
+
+  const url = str(opts.url) || orCancel(await text({
+    message: 'SAP URL',
+    placeholder: 'https://sap.example.com',
+    validate: (value) => ((value ?? '').trim() ? undefined : 'URL is required'),
+  }));
+  const client = str(opts.client) || orCancel(await text({ message: 'Client', initialValue: '100' }));
+  const username = str(opts.username) || orCancel(await text({
+    message: 'Username',
+    validate: (value) => ((value ?? '').trim() ? undefined : 'Username is required'),
+  }));
+  const language = str(opts.language) || orCancel(await text({ message: 'Language', initialValue: 'EN' }));
+
+  const insecure = opts.insecure === true
+    ? true
+    : orCancel(await confirm({
+        message: 'Skip SSL certificate verification? (development only)',
+        initialValue: false,
+      }));
+  const ca = insecure
+    ? undefined
+    : str(opts.ca) || undefined;
+
+  // Local name shadows the imported `@clack/prompts` `password` — rename so the
+  // ESM/TypeScript output doesn't trip on the inner `await password(...)` below.
+  let resolvedPassword = '';
+  if (wantPassword) {
+    const fromFlag = str(opts.password);
+    if (fromFlag) {
+      resolvedPassword = fromFlag;
+    } else {
+      resolvedPassword = orCancel(await password({ message: 'Password (stored in OS keychain)' }));
+    }
+  }
+
   return {
-    url: str(opts.url) || orCancel(await text({
-      message: 'SAP URL',
-      placeholder: 'https://sap.example.com',
-      validate: (value) => ((value ?? '').trim() ? undefined : 'URL is required'),
-    })),
-    client: str(opts.client) || orCancel(await text({ message: 'Client', initialValue: '100' })),
-    username: str(opts.username) || orCancel(await text({
-      message: 'Username',
-      validate: (value) => ((value ?? '').trim() ? undefined : 'Username is required'),
-    })),
-    password: pwd,
-    language: str(opts.language) || orCancel(await text({ message: 'Language', initialValue: 'EN' })),
-    insecure: opts.insecure === true ? true : undefined,
-    ca: str(opts.ca) || undefined,
+    url,
+    client,
+    username,
+    password: resolvedPassword,
+    language,
+    insecure: insecure ? true : undefined,
+    ca,
     auth,
     transport: '',
     pkg: '',
