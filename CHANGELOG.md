@@ -5,6 +5,8 @@
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-08-28
+
 ### Security
 - **027 — 扩展加载信任硬化（Lazy Load + Lockfile Pinning + 严格包名校验）**：`src/abap_cli/index.ts` 启动期不再 `import()` 任何 npm 扩展；改为 argv 首词嗅探（仅 `extensions list` / `extensions lock` 与非 builtin 首词触发预加载）+ commander `preAction` 钩内异步加载剩余扩展。`abap --help` / `--version` / `doctor` / 空 argv **不再** 执行任何扩展模块顶层代码，关闭了"打开 CLI 就被恶意 `.abap.json` RCE"路径。新增 `extensions.lock.json` 文件格式（`schemaVersion: 1`，含 `{packageName, resolved, integrity: 'sha512-<base64>'}` 条目），CLI 在 `import()` 之前用 `node:crypto` 校验每个 `sourceType:'npm'` 扩展的 sha512 与 lockfile 是否一致；缺失 / 篡改 / 不可解析分别归一化为 `LOCKFILE_MISSING_ENTRY` / `LOCKFILE_INTEGRITY_MISMATCH` / `INTEGRITY_UNRESOLVABLE` reason（属于 `EXTENSION_LOAD_FAILED`，exit 3）。`sourceType:'path'` 扩展继续走既有 `path_contains_parent_ref` / `path_escapes_allowlist` 检查（FR-006 豁免）。新增 `abap extensions lock [--allow-unsigned]` 子命令重新生成 lockfile；首次创建必须显式 `--allow-unsigned`。`loadExtensionModule(spec, ctx?)` 接受可选 lockfile 上下文（向后兼容）。`meta.extensions.lockfile?: { status, lastResolved? }` 字段新增（无 npm 扩展时省略，token-efficient），`extensions list --json` 每条 npm 条目带 `lockfile` 子字段（路径源省略）。新增 npm 包名校验（FR-010）覆盖 `..` / `\` / 空 scope / URL scheme / 绝对路径 / 非 npm 名字符集；`INVALID_PACKAGE_NAME` 拒绝在任何 `import()` / `createRequire().resolve()` 之前触发。spec 在 `specs/027-extension-trust/spec.md`，plan/tasks/contracts 同目录。**零新 npm 依赖**（仅 `node:crypto` / `node:fs/promises` / `node:module` / `node:path`）；CHANGELOG / AGENTS.md / docs/commands.md 既有契约未破坏；022/023 envelope 形状不变（仅在 `meta.extensions` 下加可选字段）。**Migration**：现存用户首次升级后，对含 npm 扩展的项目跑 `abap extensions lock --allow-unsigned` 一次，提交 `extensions.lock.json` 到 git（与 `package-lock.json` 同处置）；之后所有 npm 扩展加载会校验 sha512。strict mode（`ABAP_CLI_EXTENSIONS_STRICT=1`）行为不变：任一扩展加载失败即以 JSON envelope + exit 3 中止。
 
