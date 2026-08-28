@@ -37,6 +37,7 @@ export type WarningCode =
   | 'PROFILE_MISMATCH'      // stored profile differs from current config
   | 'PAGINATION_LIMITED'    // search --page-all hit the page cap; result truncated
   | 'ICF_CHECK_DEGRADED'    // init ICF deployment check degraded (non-blocking)
+  | 'ICF_OUTDATED_DEADLOCK' // extension status reports outdated gc_version (likely user transport holds the new source)
   | 'OAUTH_CLIENT_SECRET_ON_DISK' // oauth_password profile: client_secret stored in systems.json
   // 023-extension-mechanism
   | 'EXTENSION_DEGRADED'    // extension failed to load but CLI continues (lenient mode)

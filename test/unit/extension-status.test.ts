@@ -24,6 +24,14 @@ import { registerExtensionCommand } from '../../src/abap_cli/commands/extension.
 import { CliError } from '../../src/abap_cli/output/json.js';
 
 async function run(args: string[]): Promise<{ data: unknown; exitCode: number | undefined }> {
+  const { data, meta, exitCode } = await runWithMeta(args);
+  return { data, exitCode };
+}
+
+/** Full envelope access — used by tests that need to inspect meta.warnings
+ *  (e.g. ICF_OUTDATED_DEADLOCK surfaced when remote gc_version is older
+ *  than the bundled one). */
+async function runWithMeta(args: string[]): Promise<{ data: unknown; meta: unknown; exitCode: number | undefined }> {
   const program = new Command().option('--json', 'json').exitOverride();
   registerExtensionCommand(program);
   const stdoutLines: string[] = [];
@@ -50,8 +58,8 @@ async function run(args: string[]): Promise<{ data: unknown; exitCode: number | 
     // eslint-disable-next-line no-console
     envelope = null;
   }
-  const data = (envelope as { data?: unknown } | null)?.data;
-  return { data, exitCode };
+  const env = envelope as { data?: unknown; meta?: unknown } | null;
+  return { data: env?.data, meta: env?.meta, exitCode };
 }
 
 describe('abap extension status (021: new subcommand)', () => {
@@ -91,11 +99,21 @@ describe('abap extension status (021: new subcommand)', () => {
     mockGet.mockReset();
     probeAdtRuntime.mockResolvedValueOnce({ runtime: 'netweaver740', source: 'discovery', icfSetupBlocked: false });
     mockGet.mockResolvedValueOnce({ status: 'success', data: { version: '0.3.0' } });
-    const { data } = await run(['extension', 'status', '--json']);
+    const { data, meta } = await runWithMeta(['extension', 'status', '--json']);
     const d = data as { installed: boolean; match: boolean; remoteVersion: string };
     expect(d.installed).toBe(true);
     expect(d.match).toBe(false);
     expect(d.remoteVersion).toBe('0.3.0');
+    // Outdated status must surface ICF_OUTDATED_DEADLOCK warning with the
+    // three-step recovery path (transport list → release → re-deploy) so users
+    // stuck in the deadlock get a concrete escape hatch.
+    const warnings = (meta as { warnings?: { code: string; nextSteps?: string[]; details?: unknown }[] } | undefined)?.warnings ?? [];
+    const deadlock = warnings.find((w) => w.code === 'ICF_OUTDATED_DEADLOCK');
+    expect(deadlock).toBeTruthy();
+    const details = deadlock?.details as { nextSteps?: string[] } | undefined;
+    const steps = details?.nextSteps ?? [];
+    expect(steps.some((s) => s.includes('transport list --open'))).toBe(true);
+    expect(steps.some((s) => s.includes('extension deploy --yes'))).toBe(true);
   });
 
   it('returns installed=false on unreachable (non-blocking)', async () => {

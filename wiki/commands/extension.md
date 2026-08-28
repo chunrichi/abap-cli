@@ -35,7 +35,9 @@ abap extension status [options]   # 只读探测：已安装？版本匹配？
 ### 行为规则
 
 - `--package` 非 `$TMP` 且无 `--tr` → `NO_TRANSPORT`（exit 7 类）
-- transport 解析链：`--tr` > 项目配置 > 用户可改请求
+- **`$TMP` 与 `--tr` 互斥**：deploy 在 `$TMP` 路径下显式拒绝 `--tr`。**禁止**自动选 user 的 modifiable transport：当 user 拥有任意可改 transport 时，原 `resolveTransport({transportOptional: true})` 会把新 `gc_version` 写进 transport，`$TMP` 里的 active class 仍是旧版 → `extension status` 永远 outdated、`deploy` 看似 success 实际 no-op。`$TMP` 必须走空 transport（local object 直接激活）。
+- `targetPackage === '$TMP'`：`transport = ''`（走 local object 直接激活）
+- `targetPackage !== '$TMP'`：`resolveTransport` 解析链：`--tr` > 项目配置 > 用户可改请求
 - 自动创建 SAP 上不存在的捆绑对象（`objects` 数组：`created | updated | unchanged | failed`）
 - 设置失败 → 结构化 `SAP_ERROR`（exit 6）
 - `--dry-run` 报 `icfNode.status: "planned"` 而不触发设置
@@ -49,6 +51,7 @@ abap extension status [options]   # 只读探测：已安装？版本匹配？
 - 结果 `{ installed, status, remoteVersion, expectedVersion, match }`
 - `status` ∈ `not_deployed`（404）| `current` | `outdated` | `unreachable`（非 404 异常）
 - `not_deployed` / `outdated` → hint `abap extension deploy`
+- `outdated` 还会**额外**触发 `meta.warnings[]` `ICF_OUTDATED_DEADLOCK`，给出三步恢复路径（`abap transport list --open` 查遗留 transport → release/import 历史 transport → `abap extension deploy --yes` 重 deploy → `abap extension status` 验证）——专门应对死锁模式：用户用旧版 CLI 部署后 SAP 端 transport 里有新 source 但 $TMP 仍是旧 version。
 - `unreachable` → 降级为 `meta.warnings` 条目，不崩溃
 - **边界**：`extension status` 查 SAP 侧；`abap doctor` 查本地（环境 / 配置 / profile 可达性）
 

@@ -59,14 +59,31 @@ export function registerExtensionCommand(program: Command): void {
         }
         const client = await AdtClientWrapper.create();
         const projectConfig = client.getConfig();
+        // When --package $TMP (local objects), NEVER use a transport. The
+        // previous `transportOptional: true` flag was a footgun — `resolveTransport`
+        // still preferred the user's first modifiable request before falling back
+        // to '', so the new gc_version / source landed in a user transport instead
+        // of $TMP. The transport's release/import gate then made `extension status`
+        // read back the old `gc_version` forever ("outdated" deadlock even after
+        // re-deploying). $TMP is local — push source straight to the active object.
+        if (targetPackage === '$TMP' && opts.tr) {
+          throw new CliError(
+            'NO_TRANSPORT',
+            '--tr cannot be combined with --package $TMP (local objects do not need a transport)',
+            {
+              nextSteps: [
+                'Re-run without --tr (the ICF sources are local in $TMP).',
+                'Or use --package <custom> --tr <request> for a transportable deploy.',
+              ],
+              example: 'abap extension deploy --package $TMP --yes',
+            },
+          );
+        }
         const transport = opts.dryRun
           ? (opts.tr ?? projectConfig.transport ?? 'DRY_RUN')
-          : await resolveTransport(
-              client,
-              opts.tr,
-              projectConfig.transport,
-              { transportOptional: targetPackage === '$TMP' },
-            );
+          : targetPackage === '$TMP'
+            ? ''
+            : await resolveTransport(client, opts.tr, projectConfig.transport);
         const summary = await deployBundled(client, {
           transport,
           dryRun: opts.dryRun,
@@ -109,6 +126,24 @@ export function registerExtensionCommand(program: Command): void {
         const runtimeHint = info.runtime === 'steampunk'
           ? ' (Steampunk: SICF service cannot be auto-registered, expose via Cloud Foundry destination — see wiki/commands/extension.md#steampunk)'
           : '';
+        // When the remote gc_version is older than the bundled one and a
+        // normal `extension deploy` was already attempted, the most likely
+        // cause is that the new source landed in a user-owned transport (so
+        // $TMP's active object is still the old version). Surface that as an
+        // actionable nextStep alongside the "run deploy" hint.
+        if (info.status === 'outdated') {
+          collectWarning(
+            'ICF_OUTDATED_DEADLOCK',
+            `ICF service reports gc_version ${info.remoteVersion} but expected ${info.expectedVersion}.`,
+            {
+              nextSteps: [
+                'Run: abap transport list --open — if a transport contains ZCL_ABAP_VIBE_*, release it and re-import to $TMP.',
+                'Then run: abap extension deploy --yes (it now forces --package $TMP to bypass user transports).',
+                'Verify with: abap extension status',
+              ],
+            },
+          );
+        }
         const hint = info.status === 'not_deployed'
           ? `ICF service not deployed${runtimeHint}. Run \`abap extension deploy\` to install it.`
           : info.status === 'outdated'
