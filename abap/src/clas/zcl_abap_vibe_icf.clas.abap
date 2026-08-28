@@ -15,7 +15,7 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
       BEGIN OF ty_error_body,
         code    TYPE string,
         message TYPE string,
-        details TYPE REF TO data,
+        details TYPE string_table,
       END OF ty_error_body,
       BEGIN OF ty_error,
         status TYPE string,
@@ -68,11 +68,12 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
                 iv_reason  TYPE string
                 is_payload TYPE any.
     METHODS respond_error
-      IMPORTING io_server TYPE REF TO if_http_server
-                iv_status TYPE i
-                iv_reason TYPE string
-                iv_code   TYPE string
-                iv_msg    TYPE string.
+      IMPORTING io_server  TYPE REF TO if_http_server
+                iv_status  TYPE i
+                iv_reason  TYPE string
+                iv_code    TYPE string
+                iv_msg     TYPE string
+                iv_details TYPE any OPTIONAL.
     " 017: single JSON generation entries (US1/US2 build responses via these).
     METHODS serialize_response
       IMPORTING is_payload TYPE any
@@ -1213,6 +1214,8 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
                              IMPORTING es_payload  = DATA(ls_payload_get)
                                        ev_error    = DATA(ls_error_get) ).
       IF ls_error_get IS NOT INITIAL.
+        " get_textpool_elements failures are single-message (not a BAPI table);
+        " no details to surface, so iv_details is omitted on purpose.
         respond_error( io_server = io_server
                        iv_status = 404
                        iv_reason = 'Not Found'
@@ -1360,11 +1363,12 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
                                           ev_error   = ls_create_err ).
       ENDCASE.
       IF ls_create_err IS NOT INITIAL.
-        respond_error( io_server = io_server
-                       iv_status = 200
-                       iv_reason = 'OK'
-                       iv_code   = ls_create_err-error-code
-                       iv_msg    = ls_create_err-error-message ).
+        respond_error( io_server  = io_server
+                       iv_status  = 200
+                       iv_reason  = 'OK'
+                       iv_code    = ls_create_err-error-code
+                       iv_msg     = ls_create_err-error-message
+                       iv_details = ls_create_err-error-details ).
       ELSE.
         respond_json( io_server = io_server iv_status = 200 iv_reason = 'OK' is_payload = ls_create ).
       ENDIF.
@@ -1374,6 +1378,8 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
                        IMPORTING es_payload = DATA(lr_get)
                                  ev_error   = DATA(ls_get_err) ).
       IF ls_get_err IS NOT INITIAL.
+        " get_ddic_object failures are single-message (not a BAPI table); no
+        " details to surface, so iv_details is omitted on purpose.
         respond_error( io_server = io_server
                        iv_status = 200
                        iv_reason = 'OK'
@@ -1536,18 +1542,25 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
 
     DATA lv_ok TYPE abap_bool VALUE abap_true.
     DATA lv_msg TYPE string.
+    DATA lt_details TYPE string_table.
+    DATA lv_error TYPE string.
     LOOP AT lt_bapireturn INTO DATA(ls_err) WHERE type CA 'EAX'.
       lv_ok = abap_false.
-      IF lv_msg IS INITIAL.
-        lv_msg = ls_err-message.
+      IF ls_err-message IS INITIAL.
+        MESSAGE ID ls_err-id TYPE 'S' NUMBER ls_err-number
+          WITH ls_err-message_v1 ls_err-message_v2 ls_err-message_v3 ls_err-message_v4
+          INTO lv_error.
       ELSE.
-        lv_msg = lv_msg && |; { ls_err-message }|.
+        lv_error = ls_err-message.
       ENDIF.
+      APPEND lv_error TO lt_details.
+      IF lv_msg IS INITIAL. lv_msg = lv_error. ELSE. lv_msg = lv_msg && |; { lv_error }|. ENDIF.
     ENDLOOP.
     IF lv_ok = abap_false.
       ev_error = VALUE ty_error( status = 'error'
                                  error = VALUE ty_error_body( code = 'DDIC_CREATE_FAILED'
-                                                              message = lv_msg ) ).
+                                                              message = lv_msg
+                                                              details = lt_details ) ).
       RETURN.
     ENDIF.
 
@@ -1602,36 +1615,26 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
         et_transport   = lt_transport.
 
     DATA lv_ok TYPE abap_bool VALUE abap_true.
+    DATA lt_details TYPE string_table.
     DATA lv_msg TYPE string.
     DATA lv_error TYPE string.
     LOOP AT lt_bapireturn INTO DATA(ls_err) WHERE type CA 'EAX'.
       lv_ok = abap_false.
       IF ls_err-message IS INITIAL.
-        CLEAR lv_error.
-        CALL FUNCTION 'MESSAGE_TEXT_BUILD'
-          EXPORTING
-            msgid               = ls_err-id
-            msgnr               = ls_err-number
-            msgv1               = ls_err-message_v1
-            msgv2               = ls_err-message_v2
-            msgv3               = ls_err-message_v3
-            msgv4               = ls_err-message_v4
-          IMPORTING
-            message_text_output = lv_error
-          EXCEPTIONS
-            OTHERS              = 1.
-        IF lv_error IS INITIAL.
-          lv_error = |{ ls_err-type } { ls_err-id } { ls_err-number } { ls_err-message_v1 } { ls_err-message_v2 } { ls_err-message_v3 } { ls_err-message_v4 }|.
-        ENDIF.
+        MESSAGE ID ls_err-id TYPE 'S' NUMBER ls_err-number
+          WITH ls_err-message_v1 ls_err-message_v2 ls_err-message_v3 ls_err-message_v4
+          INTO lv_error.
       ELSE.
         lv_error = ls_err-message.
       ENDIF.
+      APPEND lv_error TO lt_details.
       IF lv_msg IS INITIAL. lv_msg = lv_error. ELSE. lv_msg = lv_msg && |; { lv_error }|. ENDIF.
     ENDLOOP.
     IF lv_ok = abap_false.
       ev_error = VALUE ty_error( status = 'error'
                                  error = VALUE ty_error_body( code = 'DDIC_CREATE_FAILED'
-                                                              message = lv_msg ) ).
+                                                              message = lv_msg
+                                                              details = lt_details ) ).
       RETURN.
     ENDIF.
     es_payload = VALUE ty_ddic_create( status = 'success'
@@ -1727,14 +1730,25 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
 
     DATA lv_ok TYPE abap_bool VALUE abap_true.
     DATA lv_msg TYPE string.
+    DATA lt_details TYPE string_table.
+    DATA lv_error TYPE string.
     LOOP AT lt_bapireturn INTO DATA(ls_err) WHERE type CA 'EAX'.
       lv_ok = abap_false.
-      IF lv_msg IS INITIAL. lv_msg = ls_err-message. ELSE. lv_msg = lv_msg && |; { ls_err-message }|. ENDIF.
+      IF ls_err-message IS INITIAL.
+        MESSAGE ID ls_err-id TYPE 'S' NUMBER ls_err-number
+          WITH ls_err-message_v1 ls_err-message_v2 ls_err-message_v3 ls_err-message_v4
+          INTO lv_error.
+      ELSE.
+        lv_error = ls_err-message.
+      ENDIF.
+      APPEND lv_error TO lt_details.
+      IF lv_msg IS INITIAL. lv_msg = lv_error. ELSE. lv_msg = lv_msg && |; { lv_error }|. ENDIF.
     ENDLOOP.
     IF lv_ok = abap_false.
       ev_error = VALUE ty_error( status = 'error'
                                  error = VALUE ty_error_body( code = 'DDIC_CREATE_FAILED'
-                                                              message = lv_msg ) ).
+                                                              message = lv_msg
+                                                              details = lt_details ) ).
       RETURN.
     ENDIF.
     es_payload = VALUE ty_ddic_create( status = 'success'
@@ -1803,14 +1817,25 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
 
     DATA lv_ok TYPE abap_bool VALUE abap_true.
     DATA lv_msg TYPE string.
+    DATA lt_details TYPE string_table.
+    DATA lv_error TYPE string.
     LOOP AT lt_bapireturn INTO DATA(ls_err) WHERE type CA 'EAX'.
       lv_ok = abap_false.
-      IF lv_msg IS INITIAL. lv_msg = ls_err-message. ELSE. lv_msg = lv_msg && |; { ls_err-message }|. ENDIF.
+      IF ls_err-message IS INITIAL.
+        MESSAGE ID ls_err-id TYPE 'S' NUMBER ls_err-number
+          WITH ls_err-message_v1 ls_err-message_v2 ls_err-message_v3 ls_err-message_v4
+          INTO lv_error.
+      ELSE.
+        lv_error = ls_err-message.
+      ENDIF.
+      APPEND lv_error TO lt_details.
+      IF lv_msg IS INITIAL. lv_msg = lv_error. ELSE. lv_msg = lv_msg && |; { lv_error }|. ENDIF.
     ENDLOOP.
     IF lv_ok = abap_false.
       ev_error = VALUE ty_error( status = 'error'
                                  error = VALUE ty_error_body( code = 'DDIC_CREATE_FAILED'
-                                                              message = lv_msg ) ).
+                                                              message = lv_msg
+                                                              details = lt_details ) ).
       RETURN.
     ENDIF.
     es_payload = VALUE ty_ddic_create( status = 'success'
@@ -1930,7 +1955,18 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD respond_error.
-    DATA(lv_json) = serialize_error( iv_code = iv_code iv_message = iv_msg ).
+    DATA lv_json TYPE string.
+    " forward iv_details to serialize_error only when the caller actually
+    " supplied it (most call sites pass no details; their initial data ref
+    " would otherwise leak as an empty `details: null` in the response).
+    IF iv_details IS SUPPLIED.
+      lv_json = serialize_error( iv_code    = iv_code
+                                iv_message = iv_msg
+                                iv_details = iv_details ).
+    ELSE.
+      lv_json = serialize_error( iv_code    = iv_code
+                                iv_message = iv_msg ).
+    ENDIF.
     io_server->response->set_status( code = iv_status reason = iv_reason ).
     io_server->response->set_content_type( content_type = 'application/json' ).
     io_server->response->set_cdata( data = lv_json ).
@@ -1963,10 +1999,10 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
       lv_msg = escape_json_string( iv_message ).
     ENDIF.
     DATA(ls_error) = VALUE ty_error( status = 'error'
-                                     error = VALUE ty_error_body( code = iv_code
+                                     error = VALUE ty_error_body( code    = iv_code
                                                                   message = lv_msg ) ).
     IF iv_details IS SUPPLIED.
-      GET REFERENCE OF iv_details INTO ls_error-error-details.
+      ls_error-error-details = iv_details.
     ENDIF.
     TRY.
         rv_json = /ui2/cl_json=>serialize( data        = ls_error
@@ -2242,6 +2278,8 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
                      IMPORTING es_payload = ls_count
                                ev_error   = ls_count_err ).
       IF ls_count_err IS NOT INITIAL.
+        " execute_count failures are single-message (cx_root text, not a BAPI
+        " table); no details to surface, so iv_details is omitted on purpose.
         respond_error( io_server = io_server
                        iv_status = 200
                        iv_reason = 'OK'
@@ -2274,6 +2312,8 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
         RETURN.
     ENDTRY.
     IF ls_sel_err IS NOT INITIAL.
+      " execute_select failures are single-message (cx_root text, not a BAPI
+      " table); no details to surface, so iv_details is omitted on purpose.
       respond_error( io_server = io_server
                      iv_status = 200
                      iv_reason = 'OK'
