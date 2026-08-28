@@ -161,6 +161,35 @@ describe('022 create HTTP service', () => {
     const out = JSON.parse(res.stderr);
     expect(out.error.code).toBe('HTTP_CREATE_FAILED');
   });
+
+  it('surfaces SICF subrc/sy-msgid/sy-msgno in HTTP_SERVICE_WRITE_FAILED message (#5)', async () => {
+    // Simulates the wrapper's `insert_node` failure: ABAP returns subrc=6
+    // (node_already_existing) with sy-msgid=SU53 sy-msgno=819. The CLI must
+    // surface this in `error.message` so users can diagnose the SICF failure.
+    writeHttpJsonFile('ZHTTP_NODE_FAIL');
+    icfPostHttp.mockResolvedValueOnce({
+      status: 'error',
+      data: null,
+      error: {
+        code: 'HTTP_SERVICE_WRITE_FAILED',
+        message: 'SICF service creation failed (subrc=6, SU53 819): Node already exists',
+      },
+    });
+    const program = makeProgram();
+    registerCreateCommand(program);
+    const res = await runCommand(program, [
+      'create', 'HTTP', 'ZHTTP_NODE_FAIL',
+      '--file', 'src/zhttp_test.http.json',
+      '--package', '$TMP',
+      '--yes', '--json',
+    ], { cwd });
+    // HTTP_SERVICE_WRITE_FAILED maps to SAP_ERROR (not in error-codes table) → exit 1.
+    expect(res.exitCode).toBe(1);
+    const out = JSON.parse(res.stderr);
+    expect(out.error.code).toBe('HTTP_SERVICE_WRITE_FAILED');
+    expect(out.error.message).toMatch(/subrc=6/);
+    expect(out.error.message).toMatch(/SU53/);
+  });
 });
 
 describe('022 create --schema HTTP', () => {

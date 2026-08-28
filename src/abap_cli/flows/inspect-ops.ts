@@ -46,9 +46,17 @@ export interface ActivationPart {
 }
 
 export interface ActivationInfo {
-  /** true when every source part is fully activated (active == latest). */
+  /**
+   * true when the implementation parts (`implementations` / `definitions` /
+   * `testclasses` / `macros`) are all active. The ADT `main` part is the
+   * class's standalone include — its `active` flag carries SAP GUI's
+   * "INCLUDE program not separately activated" semantics, which doesn't
+   * mean the class is inactive. See #4 in feedback/ISSUES.md.
+   */
   ok: boolean;
   parts: ActivationPart[];
+  /** Per-part reasons when `ok === false` (debug aid; not part of the ok contract). */
+  inactive?: { includeType: string; reason: 'stale_active' }[];
 }
 
 export interface InspectResult {
@@ -162,5 +170,16 @@ async function checkActivation(
     }
     parts.push({ includeType: inc['class:includeType'] ?? 'main', sourceUri, active });
   }
-  return { ok: parts.every((p) => p.active), parts };
+  // #4: ADT `includeType:main` reports active=false for the INCLUDE program even
+  // when the class itself is fully active. Treat only the implementation parts
+  // (`implementations` / `definitions` / `testclasses` / `macros`) as the source
+  // of truth — `main` is reported for visibility but excluded from the ok flag.
+  const IMPLEMENTATION_PARTS = new Set(['implementations', 'definitions', 'testclasses', 'macros']);
+  const implementationParts = parts.filter((p) => IMPLEMENTATION_PARTS.has(p.includeType));
+  const inactiveImplementation = implementationParts.filter((p) => !p.active);
+  const ok = inactiveImplementation.length === 0;
+  const inactive = inactiveImplementation.length > 0
+    ? inactiveImplementation.map((p) => ({ includeType: p.includeType, reason: 'stale_active' as const }))
+    : undefined;
+  return inactive ? { ok, parts, inactive } : { ok, parts };
 }
