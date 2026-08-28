@@ -119,6 +119,10 @@ abap push src/clas/a.clas.abap src/clas/b.clas.abap --tr NDK123456 --atomic
 # 推送 DDIC 对象（$TMP 无需 --tr）
 abap push src/tabl/ztest_e2e.tabl.json
 
+# 推送 TABL 三件套：main 即可；同目录 .tabl.ddic / .tabl.settings.json 自动一起推
+abap push src/tabl/zthree.tabl.json --tr NDK900001 --yes
+# 等价于：abap push src/tabl/zthree.tabl.json src/tabl/zthree.tabl.ddic src/tabl/zthree.tabl.settings.json --tr NDK900001 --yes
+
 # 推送 textpool
 abap push src/prog/zprog/zprog.prog.texts.en.properties
 ```

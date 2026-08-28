@@ -98,6 +98,21 @@ TABL three-piece：
 }
 ```
 
+DDIC `abap create TABL/STRU` 走 ICF POST `/ddic/<type>`，data envelope 不展开三件套（ICF 端点是单字段 wire schema），仅返回 `{ object, type, action, file: <main> }`：
+
+```json
+{
+  "data": {
+    "object": "ZTODO",
+    "type": "TABL",
+    "action": "created",
+    "file": "src/tabl/ztodo.tabl.json"
+  }
+}
+```
+
+如果 agent 需要明确三件套全部路径，自己用 `tablArtifactPaths(file)`（[`src/abap_cli/dictionary/tabl-artifact.ts`](https://github.com/chunrichi/abap-cli/blob/main/src/abap_cli/dictionary/tabl-artifact.ts)）算即可。CLI 内部创建路径已探测同目录 `.tabl.ddic` / `.tabl.settings.json`（`readDdicObjectForCreate`），所以三件套"在源端一致"是先决条件，不需要在 output 里重复。
+
 ## Examples
 
 ### Agent: parse the local file path on any host

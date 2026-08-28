@@ -31,7 +31,7 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 - `--no-pull`: 跳过 create-then-pull 本地副本（默认拉取）
 - `--check-only`: 只校验对象可行性（`validateNewObject`），不创建
 - `--audit`: 额外一次 SAP 往返记录 before-checksum（默认关）
-- `--file <path>`: 014 — abap-file-format DDIC JSON 输入（`DOMA`/`DTEL`/`TABL`/`STRU` 必填）
+- `--file <path>`: 014 — abap-file-format DDIC 输入（`DOMA`/`DTEL`/`TABL`/`STRU` 必填）。TABL/STRU 是三件套：`--file` 指向 main `.tabl.json`，CLI 自动读同目录 `.tabl.ddic`（DDL 源）与 `.tabl.settings.json`；只有 main JSON 时回落 legacy wire-flat 单文件（顶层 `name` / `fields[]`）。DDL 解析失败 → `TABL_DDL_INVALID`（exit 7）
 - `--schema`: 打印参数 schema 为 JSON 并退出（无 SAP 调用；`<type>`/`<name>` 可不传）
 - `--yes`: 非交互确认写操作；非 TTY 且无 `--yes` → `VALIDATION_ERROR`（exit 7）。`create` 本身暂无 `--dry-run` flag（014 走的是 `--check-only`），但 `requireWriteConfirmation` 仍识别 `dryRun` 字段作为 future flag 占位
 
@@ -48,6 +48,7 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 - **创建即激活**：复用 push 流程（lock → 写 skeleton → activate → unlock）；`--no-activate` 跳过激活
 - **FUGR 与源对象的差异**：新 FUGR 用 `objectStructure` 取 parts（立即可读）；CLAS/INTF/PROG 对新建对象 objectStructure 有就绪延迟（真机 "wrong input data"），回退到稳定 `<objectUrl>/source/main`
 - **DDIC 客户端校验**（快失败，零 SAP 往返）：命名空间（Z/Y/slash）与必需字段 → `VALIDATION_ERROR`；非 `$TMP` 包必须 `--tr`
+- **DDIC TABL/STRU 三件套解析**：`readDdicObjectForCreate(filePath, type)` 探测同目录 `.tabl.ddic`（或 `.stru.ddic`）与 `.tabl.settings.json`；三件齐全走 `readTablArtifact`，否则回落 `readDdicJson`（legacy wire-flat）。DDL 解析失败 → `TABL_DDL_INVALID`（exit 7）；main JSON 缺 `header.description` 等必填 → `VALIDATION_ERROR`，`error.example` 字段附 wire-flat 最小模板
 - **CLI flag 覆盖文件值**：`--description` / `--package` / `--tr` 优先于 `--file` JSON 内字段；`--description` 覆盖 `header.description`
 - **`--check-only` 仅源对象**：DDIC 路由不接受（走 `--file` 校验）
 - **create-then-pull**：成功后把激活后的源码写回 `src/<obj>/<obj>.<type>.abap`（`--no-pull` 关闭）
@@ -72,9 +73,26 @@ abap create DTEL ZDTEL_NAME --file src/dtel/zdtel_name.dtel.json --package $TMP
 # DDIC：非 $TMP 包必须给 transport
 abap create DOMA ZDOMA_CODE --file src/doma/zdoma_code.doma.json --package ZPKG --tr A4HK900116
 
-# agent 自省：通用 schema 与类型维度
+# DDIC TABL/STRU：abap-file-format 三件套（happy path；--file 指向 main，自动读取 .tabl.ddic + .tabl.settings.json）
+abap create TABL ZTODO --file src/tabl/ztodo.tabl.json --package $TMP --yes
+# src/tabl/ztodo.tabl.json    — { formatVersion, header.description }
+# src/tabl/ztodo.tabl.ddic    — define table ztodo { ... }（DDL 源真值）
+# src/tabl/ztodo.tabl.settings.json — generalInformation.{dataClassCategory,sizeCategory}（可选）
+
+# DDIC TABL/STRU：legacy wire-flat 单文件（只有 main JSON，无 .tabl.ddic sidecar）仍可工作
+# 顶层 name / description / fields[]；与 014 旧行为一致
+abap create TABL ZFLAT --file src/tabl/zflat.tabl.json --package $TMP --yes
+
+# agent 写新表：直接 cp DDL 骨架（5 个场景：透明表 / include / 货币金额 / 数量单位 / STRU）
+# 比凭空写 @AbapCatalog.* / @Semantics.* 少踩 90% 坑
+cp <skill-dir>/skills/abap-cli-edit/assets/tabl-templates/transparent-key/* src/tabl/ztodo.tabl.{json,ddic,settings.json}
+sed -i '' 's/zsample/ztodo/g' src/tabl/ztodo.tabl.{json,ddic,settings.json}
+$EDITOR src/tabl/ztodo.tabl.ddic   # 改字段定义
+abap create TABL ZTODO --file src/tabl/ztodo.tabl.json --package $TMP --yes
+
+# agent 自省：通用 schema 与类型维度（DDIC 类型带 exampleJson 字段，三件套形态）
 abap create --schema
-abap create --schema CLAS
+abap create --schema TABL   # schema.exampleJson 含 main / .tabl.ddic / .tabl.settings.json 模板
 
 # 本地草稿（不连 SAP）
 abap create local CLAS ZCL_DRAFT --template public-method --dir src/

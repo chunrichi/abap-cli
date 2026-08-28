@@ -1,5 +1,5 @@
 import type { CommandSchema } from '../output/json.js';
-import { DDIC_SUPPORTED_TYPES } from '../dictionary/ddic-json.js';
+import { DDIC_SUPPORTED_TYPES, getDdicJsonExample, type DdicSupportedType } from '../dictionary/ddic-json.js';
 import { HTTP_SUPPORTED_TYPES } from '../dictionary/http-json.js';
 import { listTemplates } from '../formats/templates.js';
 import { TYPE_MAP, DDIC_TYPES, HTTP_TYPES } from './create-types.js';
@@ -13,6 +13,8 @@ export type CreateCommandSchema = CommandSchema & {
   reason?: 'DDIC_NOT_SUPPORTED' | 'TYPE_NOT_SUPPORTED';
   message?: string;
   templates?: { name: string; description: string }[];
+  /** BUG-1: minimal abap-file-format JSON example for the requested type. */
+  exampleJson?: string;
 };
 
 /**
@@ -57,10 +59,11 @@ export function createSchema(type?: string): CreateCommandSchema {
       type: t,
       supported: true,
       route: 'icf',
-      message: `DDIC type ${t} created via the self-built ICF service (014). Requires --file <abap-file-format JSON>.`,
+      message: `DDIC type ${t} created via the self-built ICF service (014). Requires --file <abap-file-format JSON> with top-level fields: name, description, fields[].`,
+      exampleJson: getDdicJsonExample(t as DdicSupportedType),
       options: [
         ...base.options,
-        { name: '--file', type: 'string', valuePlaceholder: '<path>', required: true, description: 'abap-file-format DDIC JSON input' },
+        { name: '--file', type: 'string', valuePlaceholder: '<path>', required: true, description: 'abap-file-format DDIC JSON input (top-level fields; see exampleJson)' },
       ],
     };
   }

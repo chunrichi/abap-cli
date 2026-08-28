@@ -129,6 +129,34 @@ describe('abap create --schema (P0.1 introspection)', () => {
     expect(data).toMatchObject({ type: 'DOMA', supported: true, route: 'icf' });
   });
 
+  it('BUG-1: --schema for DDIC types embeds an abap-file-format exampleJson (so agents discover the layout)', async () => {
+    const program = makeProgram();
+    registerCreateCommand(program);
+    for (const t of ['DOMA', 'DTEL', 'TABL', 'STRU']) {
+      const res = await runCommand(program, ['create', '--schema', t]);
+      const { data } = parseStdout(res);
+      expect(data.exampleJson, `expected exampleJson for ${t}`).toBeTypeOf('string');
+      // For TABL/STRU the example shows the three-piece abap-file-format layout
+      // (main JSON + .tabl.ddic + optional .tabl.settings.json), so we look
+      // for the `.tabl.ddic` / `.stru.ddic` token rather than wire-flat `name`.
+      if (t === 'TABL' || t === 'STRU') {
+        expect(data.exampleJson, `TABL/STRU exampleJson must mention .${t.toLowerCase()}.ddic`)
+          .toMatch(new RegExp(`\\.${t.toLowerCase()}\\.ddic`));
+        expect(data.exampleJson, 'TABL/STRU exampleJson must include a DDL `define` snippet')
+          .toMatch(/define\s+(table|structure)\s+\w+\s*\{/);
+      } else {
+        // DOMA/DTEL are single-file; the example is a wire-flat JSON object
+        // possibly prefixed with a `# <path>` comment line.
+        const jsonPart = data.exampleJson
+          .split('\n')
+          .filter((l: string) => !l.trim().startsWith('#'))
+          .join('\n');
+        const parsed = JSON.parse(jsonPart);
+        expect(parsed.name, `exampleJson for ${t} must have top-level name`).toBeTypeOf('string');
+      }
+    }
+  });
+
   it('reports TTYP as unsupported (DDIC_NOT_SUPPORTED, deferred per Q2)', async () => {
     const program = makeProgram();
     registerCreateCommand(program);

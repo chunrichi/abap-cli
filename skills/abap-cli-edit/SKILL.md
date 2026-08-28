@@ -26,7 +26,7 @@ metadata:
 - 比较本地与 SAP 差异（`diff` / `status`）后再决定 pull 或 push——`diff` / `status` 在 `abap-cli-search`，本 skill 关注"差异确定后的拉/推动作"
 - 显式编排 status → pull → push——CI 友好
 - 离线起一份草稿（`create local`）再 push
-- DDIC 定义 CRUD：`pull <name> --type DOMA|DTEL|TABL|STRU`、`create <type> <name> --file <json>`、`push <name>.<type>.json`
+- DDIC 定义 CRUD：`pull <name> --type DOMA|DTEL|TABL|STRU`、`create <type> <name> --file <json>`、`push <name>.<type>.json`。TABL/STRU 现在遵循 abap-file-format 三件套（`--file` 指向 main `.tabl.json` + 同目录 `.tabl.ddic` + 可选 `.tabl.settings.json`）；只有 main JSON 时回落 014 legacy wire-flat（详见 workflow.md 变体 2）。**写新 TABL/STRU 时直接 `cp` [assets/tabl-templates/](../assets/tabl-templates/) 里的 DDL 骨架**（5 个场景：透明表 / include / 货币金额 / 数量单位 / STRU），别凭空写 `@AbapCatalog.*` 注释
 
 ## 决策树
 
@@ -41,10 +41,32 @@ metadata:
     └── 链式？→ status → pull → push
 
 DDIC 定义？
-├── 拉 → pull <name> --type TABL|DOMA|DTEL|STRU
-├── 改 → 编辑 <name>.<type>.json
-└── 推 → push <name>.<type>.json --tr <tr>
+├── TABL/STRU 拉 → pull <name> --type TABL|STRU                # 落三件套 (.tabl.json + .tabl.ddic [+ .tabl.settings.json])
+├── TABL/STRU 改 → 编辑 .tabl.ddic（DDL 源真值）；设置编辑 .tabl.settings.json
+├── TABL/STRU 建 → write 三件套 → create <type> <name> --file <name>.tabl.json --package ... --tr ...
+├── TABL/STRU 推 → push <name>.tabl.json --tr <tr>             # main 文件即可；同目录三件套一起推
+├── DOMA/DTEL 拉 → pull <name> --type DOMA|DTEL                # 落单文件 wire-flat
+├── DOMA/DTEL 改 → 编辑 <name>.<type>.json（顶层 name / dataType / length / description / domain）
+└── DOMA/DTEL 推 → push <name>.<type>.json --tr <tr>
 ```
+
+## TABL vs STRU（DDL 注解差异）
+
+`@AbapCatalog.*` 注释里**只有 TABL 适用**——给 STRU 写会过 DDL 解析但语义无意义，AGENTS / 测试不会拦。下列差异在 DDL 写错时常撞上：
+
+| 注解 / 字段 | TABL | STRU |
+|---|---|---|
+| `define` 关键字 | `define table <name>` | `define structure <name>` |
+| `@AbapCatalog.deliveryClass : #A/C/L/...` | ✅ 必填 | ❌ 写了无意义 |
+| `@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE` | ✅ 通常写 | ❌ |
+| `@AbapCatalog.tableCategory : #TRANSPARENT` | ✅ 必填 | ❌ |
+| `@AbapCatalog.dataMaintenance : #RESTRICTED` | ✅ 通常写 | ❌ |
+| `.tabl.settings.json` | 可选 | ❌ 不要写（SAP 不为 STRU 产生 settings） |
+| `key client : abap.clnt not null;` | ✅ 业务主键 | ❌ 不需要 key |
+| `key <business_field>` | 主键 | 不需要 |
+| `@Semantics.*` | 适用 | 适用（语义注解同样有效） |
+
+CLI 解析器（[tabl-artifact.ts:parseTablDdic](https://github.com/chunrichi/abap-cli/blob/main/src/abap_cli/dictionary/tabl-artifact.ts)）按 `define table|structure` 自动分流；不会强制检查上述「TABL-only 注解出现在 STRU」的反模式，所以**写错是 silent 的**。直接 cp [assets/tabl-templates/structure-basic/](../assets/tabl-templates/structure-basic/) 骨架最稳。
 
 ## 推送前 checklist
 

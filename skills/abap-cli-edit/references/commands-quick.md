@@ -97,7 +97,10 @@ abap create CLAS ZCL_NEW --package ZDEV --description "..." --tr DEVK900001 --ye
 abap create CLAS ZCL_NEW --no-activate --yes         # 不激活
 abap create CLAS ZCL_NEW --template empty --yes      # 自定义模板
 abap create local CLAS ZCL_NEW --dir ./src           # 离线草稿（不连 SAP，零 --yes）
-abap create TABL ZT_X --file ./zt_x.tabl.json --tr DEVK900001 --yes  # DDIC
+abap create TABL ZT_X --file ./src/tabl/zt_x.tabl.json --tr DEVK900001 --yes  # DDIC（abap-file-format 三件套；详见 workflow.md 变体 2）
+
+# TABL/STRU 的 --file 指向 main JSON，CLI 自动读取同目录的同名 .tabl.ddic（DDL 源）与 .tabl.settings.json
+# 三件齐全时走 abap-file-format 规范；只有 main JSON 时回落 wire-flat 单文件（向后兼容 014）
 abap create <type> --schema                          # 自省（无 SAP 调用）
 abap create <type> <name> --json
 ```

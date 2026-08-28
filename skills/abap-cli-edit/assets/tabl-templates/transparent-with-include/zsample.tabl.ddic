@@ -1,0 +1,11 @@
+@EndUserText.label : 'Sample table with .INCLUDE'
+@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+@AbapCatalog.tableCategory : #TRANSPARENT
+@AbapCatalog.deliveryClass : #A
+@AbapCatalog.dataMaintenance : #RESTRICTED
+define table zsample {
+  key client : abap.clnt not null;
+  key doc_id : abap.char(10) not null;
+  include zsample_reuse;
+  status      : abap.char(1);
+}

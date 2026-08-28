@@ -158,7 +158,7 @@ abap pull --tr NDK123456
 ## fixme
 
 - [ ] **B** — `<name>.fugr.json` 的 `fixPointArithmetic` 是条件写入（fugr-v1.json required）。真实 SAP 返回该字段，但 mock 等缺少该元数据的来源下 pull 出的 fugr.json 缺字段、过不了 schema 校验。建议缺失时默认 `false` 兜底。
-- [ ] **C** — DDIC JSON（`.doma.json`/`.dtel.json`/`.tabl.json`/`.stru.json`）是扁平自定义结构（`{name, description, dataType, …}`），不是规范嵌套结构（`{formatVersion, header, format:{dataType,length}, …}`），且 TABL 缺规范要求的 `.tabl.ddic` 技术设置文件。这是 014 配合自建 ICF round-trip 的设计决策，严格讲不符合规范。
+- [x] **C** — TABL/STRU 现已遵循 abap-file-format 三件套（pull 路径原已就绪；create 路径 0.5.0 起通过 `readDdicObjectForCreate` 自动解析 `.tabl.ddic` + `.tabl.settings.json`）。DDIC JSON 仍为扁平自定义结构（DOMA/DTEL：`{name, description, dataType, …}`；TABL/STRU 走三件套，main JSON 仅含 `formatVersion` + `header.description`），与规范嵌套结构 `{formatVersion, header, format:{dataType,length}}` 不一致 — 这是 014 配合自建 ICF round-trip 的设计决策，CLI 在 `dictionary/ddic-json.ts` 内部做 wire ↔ local 双向映射。
 - [ ] **D** — `abap create FUGR` 的 create-then-pull 骨架会留一个 `<name>.fugr.abap`（规范无此文件，主程序应为 `sapl<name>.reps.abap`）。属于 create 的既有行为，非 pull 产出。
 
 ## todo

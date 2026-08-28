@@ -27,26 +27,73 @@ UXX include 由系统生成，**不**在 pull 范围内——`abap pull` 自动�
 
 走 ICF 服务 `/ddic/<type>`，与 ADT 链路完全独立。
 
-```bash
-# 拉
-abap pull ZT_X --type TABL                  # 落 src/z_x.tabl.json
-abap pull ZD_X --type DOMA                  # 落 src/z_d_x.doma.json
+### TABL / STRU：abap-file-format 三件套（happy path）
 
-# 建（基于 JSON）
-abap create TABL ZT_X --file ./zt_x.tabl.json --tr DEVK900001
+**LM Agent 写新表时**：直接 `cp` 一份 [assets/tabl-templates/](../assets/tabl-templates/) 里的骨架到 `src/<typeFolder>/`，sed 重命名 + 编辑字段即可。5 个场景覆盖 90% 需求（透明表 / include / 货币金额 / 数量单位 / STRU）。
+
+`--file` 指向 main JSON（`<name>.tabl.json`），CLI 自动读取同目录的同名 `<name>.tabl.ddic`（DDL 源）与 `<name>.tabl.settings.json`：
+
+| 文件 | 必填 | 内容 |
+|---|---|---|
+| `<name>.tabl.json` | ✅ | `formatVersion` + `header.{description, originalLanguage, abapLanguageVersion}`（**无** `name` / `fields`） |
+| `<name>.tabl.ddic` | ✅ | DDL 源（`@AbapCatalog.*` 注释 + `define table|structure <name> { ... }`） |
+| `<name>.tabl.settings.json` | ❌ | `generalInformation.{dataClassCategory, sizeCategory, ...}` |
+
+```bash
+# 拉 — SAP 端 zcl_abap_vibe_tabl_format 产生三件套，CLI 落盘
+abap pull ZT_X --type TABL --overwrite     # 落 src/tabl/zt_x.tabl.json + .tabl.ddic (+ .tabl.settings.json)
+
+# 建 — CLI 解析三件套，wire payload 推 /ddic/tabl
+cat > src/tabl/zt_x.tabl.json <<'EOF'
+{
+  "formatVersion": "1",
+  "header": { "description": "Example", "originalLanguage": "en" }
+}
+EOF
+cat > src/tabl/zt_x.tabl.ddic <<'EOF'
+@EndUserText.label : 'Example'
+@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+@AbapCatalog.tableCategory : #TRANSPARENT
+@AbapCatalog.deliveryClass : #A
+@AbapCatalog.dataMaintenance : #RESTRICTED
+define table zt_x {
+  key client : abap.clnt not null;
+  key id     : abap.char(10) not null;
+}
+EOF
+# 可选
+cat > src/tabl/zt_x.tabl.settings.json <<'EOF'
+{
+  "formatVersion": "1",
+  "generalInformation": { "dataClassCategory": "APPL0", "sizeCategory": "0" }
+}
+EOF
+abap create TABL ZT_X --file src/tabl/zt_x.tabl.json --package $TMP --yes
 
 # 推
-abap push src/z_x.tabl.json --tr DEVK900001
-abap push src/z_d_x.doma.json               # $TMP 无需 --tr
+abap push src/tabl/zt_x.tabl.json --tr DEVK900001 --yes   # 也可 --all 推整个 src/
 ```
 
-客户端校验（`validateDdicObject`）：
+### TABL/STRU 兼容：legacy wire-flat 单文件
 
-- 命名空间必须 `Z`/`Y` 开头（客户命名空间）
-- 必填字段（依 type 而异）
-- `transportRequest` 字段（推送时回退）
+只有 main `<name>.tabl.json`（无 `.tabl.ddic` sidecar）时，CLI 回落 014 既有的 wire-flat 解析（顶层 `name` / `description` / `fields[]`）。**新文件应统一用三件套**（DDL 是字段源真值、`dataClassCategory` / `sizeCategory` 在 settings.json 里）。
 
-错误码：`DDIC_NOT_SUPPORTED` / `INVALID_FIELD` / `MISSING_FIELD` / `INVALID_NAMESPACE`。
+### DOMA / DTEL：单文件 wire-flat
+
+```bash
+abap pull ZD_X --type DOMA                  # 落 src/doma/z_d_x.doma.json
+abap create DOMA ZD_X --file src/doma/z_d_x.doma.json --tr DEVK900001 --yes
+abap push src/doma/z_d_x.doma.json --tr DEVK900001 --yes
+abap push src/doma/z_d_x.doma.json               # $TMP 无需 --tr
+```
+
+### 客户端校验（`validateDdicObject`）
+
+- 命名空间必须 `Z`/`Y`/`/` 开头（客户命名空间）
+- 必填字段（依 type 而异）：TABL/STRU 至少 `fields[]` 非空；DOMA 至少 `dataType` + `length`；DTEL 至少 `description` + (`domain` 或 `dataType`)
+- 非 `$TMP` 包必须 `--tr`
+
+错误码：`DDIC_NOT_SUPPORTED` / `TABL_DDL_INVALID`（三件套 DDL 解析错）/ `INVALID_FIELD` / `MISSING_FIELD` / `INVALID_NAMESPACE` / `VALIDATION_ERROR`。schema 与 example：见 `abap create <type> --schema` 的 `exampleJson` 字段（三件套形态）与 `error.example`（legacy wire-flat fallback 提示）。
 
 ## 变体 3 — 包批量
 

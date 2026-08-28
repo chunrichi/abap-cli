@@ -1,0 +1,11 @@
+@EndUserText.label : 'Sample customer table'
+@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+@AbapCatalog.tableCategory : #TRANSPARENT
+@AbapCatalog.deliveryClass : #A
+@AbapCatalog.dataMaintenance : #RESTRICTED
+define table zsample {
+  key client : abap.clnt not null;
+  key customer_id : abap.char(10) not null;
+  name           : abap.char(80);
+  created_at     : abap.tims;
+}

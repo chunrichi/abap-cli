@@ -13,7 +13,7 @@ import { buildFilename, objectDirName } from '../formats/file-resolver.js';
 import { folderFor } from '../formats/type-folder.js';
 import { writeAbapFile, fileExists } from '../formats/abap-source.js';
 import { defaultSkeleton, getTemplate, listTemplates } from '../formats/templates.js';
-import { readDdicJson, localToWire, validateDdicObject, type DdicSupportedType } from '../dictionary/ddic-json.js';
+import { readDdicJson, readDdicObjectForCreate, localToWire, validateDdicObject, getDdicFlatJsonExample, type DdicSupportedType, type DdicObject } from '../dictionary/ddic-json.js';
 import { readHttpJson, localToWire as httpLocalToWire, validateHttpObject } from '../dictionary/http-json.js';
 import { TYPE_MAP, DDIC_TYPES, HTTP_TYPES, isDdicSupportedType, isHttpSupportedType, type CreateTypeSpec } from './create-types.js';
 import { createSchema } from './create-schema.js';
@@ -79,21 +79,45 @@ export async function runCreateLocal(type: string, name: string, opts: CreateLoc
  * schema, and POSTs /ddic/<type>. Command-line --description overrides the file's
  * description. Other required fields (package, transport for non-$TMP) are validated
  * client-side before the round-trip.
+ *
+ * For TABL/STRU, the file `--file` is the *abap-file-format* main JSON
+ * (`<name>.tabl.json` / `<name>.stru.json`). When the same directory also has
+ * the sibling `<name>.tabl.ddic` (DDL source of truth) and optionally
+ * `<name>.tabl.settings.json`, those sidecars are read together and merged
+ * into the wire payload — i.e. we honor the full abap-file-format three-piece
+ * layout. When only the main JSON is present we fall back to the legacy
+ * wire-flat single-file shape (top-level name/description/fields) for
+ * backwards compatibility.
  */
 async function runCreateDdic(type: DdicSupportedType, objectName: string, opts: CreateOptions,mode: OutputMode): Promise<void> {
   const filePath = path.resolve(process.cwd(), opts.file ?? '');
-  let local: Awaited<ReturnType<typeof readDdicJson>>;
+  let local: DdicObject;
   try {
-    local = await readDdicJson(filePath);
+    local = await readDdicObjectForCreate(filePath, type);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     const outFile = toOutputPath(opts.file);
-    throw new CliError('INVALID_ARGUMENT', `Cannot read DDIC file ${outFile}: ${message}`, {
-      file: outFile,
-      nextSteps: [
+    // CliError already carries its own code/nextSteps; do not wrap.
+    if (error instanceof CliError) throw error;
+    // readTablArtifact throws on malformed DDL (e.g. missing `define table ... {`)
+    // or when the three-piece layout is incomplete (main without ddic).
+    const isTablDdlError = (type === 'TABL' || type === 'STRU')
+      && (message.includes('Table and Structure DDL') || message.includes('Incomplete Table and Structure'));
+    const code: ErrorCode = isTablDdlError ? 'TABL_DDL_INVALID' : 'INVALID_ARGUMENT';
+    const nextSteps = isTablDdlError
+      ? [
+        'Inspect the .tabl.ddic / .stru.ddic sidecar: it must start with `define table|structure <name> {` and end with `}`.',
+        'See specs/024-tabl-aff-pull/data-model.md for the supported DDL syntax.',
+      ]
+      : [
         'Verify the file exists and is valid JSON.',
-        'See quickstart.md scenario 1 for the expected layout.',
-      ],
+        'For TABL/STRU, see specs/024-tabl-aff-pull/data-model.md for the three-piece abap-file-format layout.',
+      ];
+    throw new CliError(code, `Cannot read DDIC file ${outFile}: ${message}`, {
+      file: outFile,
+      type,
+      object: objectName,
+      nextSteps,
     });
   }
 
@@ -101,6 +125,9 @@ async function runCreateDdic(type: DdicSupportedType, objectName: string, opts: 
   const errors = validateDdicObject(local, type);
   if (errors.length > 0) {
     const outFile = toOutputPath(opts.file);
+    // BUG-1: the example makes the wire-flat layout unambiguous so first-time
+    // users don't write the nested abap-file-format header/body layout.
+    const example = getDdicFlatJsonExample(type);
     throw new CliError('VALIDATION_ERROR', `Invalid ${type} definition in ${outFile}: ${errors.join('; ')}`, {
       file: outFile,
       type,
@@ -108,8 +135,10 @@ async function runCreateDdic(type: DdicSupportedType, objectName: string, opts: 
       details: errors,
       nextSteps: [
         'Fix the errors above and re-run.',
-        'See data-model.md §1-4 for the per-type required fields.',
+        `See data-model.md §1-4 for the per-type required fields, or run \`abap create ${type} --schema\` for the contract.`,
       ],
+      example: `${example}\n# expected top-level fields: name, description, fields[]; description may also live under header.description`,
+      references: `specs/014-ddic-crud-textpool/quickstart.md#scenario-1`,
     });
   }
 
