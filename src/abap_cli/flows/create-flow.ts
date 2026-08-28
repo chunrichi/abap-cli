@@ -143,7 +143,10 @@ async function runCreateDdic(type: DdicSupportedType, objectName: string, opts: 
   }
 
   // FR-004: non-$TMP package requires a transport request.
-  if (opts.package !== '$TMP' && !opts.tr) {
+  // $TMP is case-insensitive — shells sometimes expand $TMP to "" and users retype it,
+  // so accept $TMP / $tmp / $Tmp the same way extension.ts does.
+  const targetPackage = (opts.package ?? '$TMP').trim().toUpperCase();
+  if (targetPackage !== '$TMP' && !opts.tr) {
     throw new CliError('VALIDATION_ERROR', 'transportRequest is required when package is not $TMP', {
       nextSteps: ['Re-run with --tr <REQUEST>', 'Or use --package $TMP for local objects.'],
       example: `abap create ${type} ${objectName} --file ${toOutputPath(opts.file)} --package ${opts.package} --tr <REQUEST> --description "..."`,
@@ -223,7 +226,9 @@ async function runCreateHttp(type: 'HTTP', objectName: string, opts: CreateOptio
   }
 
   // FR-004: non-$TMP package requires a transport request.
-  if (opts.package !== '$TMP' && !opts.tr) {
+  // Case-insensitive $TMP matching: extension.ts uses the same convention.
+  const targetPackage = (opts.package ?? '$TMP').trim().toUpperCase();
+  if (targetPackage !== '$TMP' && !opts.tr) {
     throw new CliError('VALIDATION_ERROR', 'transportRequest is required when package is not $TMP', {
       nextSteps: ['Re-run with --tr <REQUEST>', 'Or use --package $TMP for local objects.'],
       example: `abap create ${type} ${objectName} --file ${toOutputPath(opts.file)} --package ${opts.package} --tr <REQUEST> --description "..."`,
@@ -342,7 +347,8 @@ export async function runCreate(type: string | undefined, name: string | undefin
     client,
     opts.tr,
     client.getConfig().transport,
-    { transportOptional: opts.package === '$TMP' },
+    // $TMP is case-insensitive: shell expansion to "" + user-typed variants should all skip transport.
+    { transportOptional: (opts.package ?? '$TMP').trim().toUpperCase() === '$TMP' },
   );
 
   // Refuse to overwrite: create is a "new object" operation.
