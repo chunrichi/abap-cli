@@ -42,6 +42,7 @@ changed at: 2026-08-19 23:00:00
 ## 扩展
 
 - [extension](extension.md) — 管理内置 ICF ABAP 扩展（deploy 部署 / status 只读探测版本匹配）
+- [extensions-lock](extensions-lock.md) — 027扩展加载信任硬化：算 / 刷新 `extensions.lock.json`（npm 扩展 sha512 钉死；`--allow-unsigned` 首次必填）
 
 ## 跨命令契约
 

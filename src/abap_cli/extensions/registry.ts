@@ -32,6 +32,15 @@ import { loadExtensionModule } from './loader.js';
 import { extensionValidationFailed, extensionLoadFailed, extensionCommandBlocked } from './errors.js';
 import type { ExtensionMeta } from '../output/meta.js';
 import { collectWarning } from '../output/meta.js';
+import { readLockfile, findLockEntry, type ExtensionsLock, type LockfileStatus } from './lockfile.js';
+
+/** Per-call lockfile context for trust verification (027 US2). */
+export interface LoadContext {
+  lock?: ExtensionsLock | null;
+  lockfilePath?: string;
+  /** cwd-derived directory used by createRequire().resolve(packageName). */
+  projectRoot?: string;
+}
 
 function isValidationRule(ext: Extension): ext is ValidationRule {
   return ext.type === 'validation';
@@ -75,118 +84,265 @@ export class ExtensionRegistry {
   };
   /** Map of extension name → command spec for conflict detection. */
   private _commandNames = new Set<string>();
+  // 027 US4 — lockfile health snapshot, derived from the most recent load
+  private _lockfileStatus: LockfileStatus = 'present';
+  private _lockfileLastResolved: string | undefined;
+  private _hasNpmExtensions = false;
 
-  /** Load and register all extensions from the project config. */
+  /**
+   * Load ONLY `type:'command'` extensions. Used by the pre-parse argv sniff
+   * (027 US1) so extension-contributed command names are reachable by
+   * commander.parseAsync. Validation + lifecycle extensions are deferred.
+   */
+  async loadCommandExtensions(
+    program: Command,
+    extensions: ExtensionManifest[] | undefined,
+    ctx?: LoadContext,
+  ): Promise<void> {
+    return this._loadByType(program, extensions, ['command'], ctx);
+  }
+
+  /**
+   * Load `type:'validation'` and `type:'lifecycle'` extensions. Called from
+   * commander's preAction hook (027 US1) so trivial invocations
+   * (--help / --version / doctor) never import extension modules.
+   */
+  async loadRemainingExtensions(
+    program: Command,
+    extensions: ExtensionManifest[] | undefined,
+    ctx?: LoadContext,
+  ): Promise<void> {
+    return this._loadByType(program, extensions, ['validation', 'lifecycle'], ctx);
+  }
+
+  /**
+   * 023-compatible eager-load: load every extension at once. Kept for tests
+   * and as a fallback for callers that still want the old behaviour.
+   */
   async loadAndRegisterExtensions(
     program: Command,
     extensions: ExtensionManifest[] | undefined,
+    ctx?: LoadContext,
   ): Promise<ExtensionRegistry> {
-    if (!extensions || extensions.length === 0) return this;
+    await this.loadCommandExtensions(program, extensions, ctx);
+    await this.loadRemainingExtensions(program, extensions, ctx);
+    return this;
+  }
+
+  /** Shared core for the three load entrypoints. */
+  private async _loadByType(
+    program: Command,
+    extensions: ExtensionManifest[] | undefined,
+    types: ReadonlyArray<Extension['type']>,
+    ctx?: LoadContext,
+  ): Promise<void> {
+    if (!extensions || extensions.length === 0) return;
+
+    // 027 US2 — track lockfile health across all extensions of interest.
+    if (types.includes('command') || types.includes('validation') || types.includes('lifecycle')) {
+      this._refreshLockfileState(extensions, ctx);
+    }
 
     for (const manifest of extensions) {
-      const name = manifest.name;
-
-      // Validate manifest structure (type, name, source) — not the loaded module
-      if (!manifest.type || typeof manifest.type !== 'string') {
-        this._failed.push({ name, type: manifest.type ?? '(missing)', source: manifest.source, status: 'failed', error: 'MISSING_TYPE: Extension manifest missing type field' });
-        continue;
-      }
-      if (!manifest.name || typeof manifest.name !== 'string') {
-        this._failed.push({ name, type: manifest.type, source: manifest.source, status: 'failed', error: 'MISSING_NAME: Extension manifest missing name field' });
-        continue;
-      }
-      if (!/^[a-z][a-z0-9-]*$/.test(manifest.name)) {
-        this._failed.push({ name, type: manifest.type, source: manifest.source, status: 'failed', error: `INVALID_NAME: Extension name '${manifest.name}' must be lowercase alphanumeric, start with a letter, and use hyphens only` });
-        continue;
-      }
-      if (!manifest.source || typeof manifest.source !== 'object') {
-        this._failed.push({ name, type: manifest.type, source: manifest.source, status: 'failed', error: 'MISSING_SOURCE: Extension manifest missing source field' });
-        continue;
-      }
-      const src = manifest.source as Record<string, unknown>;
-      const validSource =
-        (src.sourceType === 'path' && typeof src.path === 'string') ||
-        (src.sourceType === 'npm' && typeof src.packageName === 'string');
-      if (!validSource) {
-        this._failed.push({ name, type: manifest.type, source: manifest.source, status: 'failed', error: 'INVALID_SOURCE: Extension source must be {sourceType:"path", path:string} or {sourceType:"npm", packageName:string}' });
-        continue;
-      }
-
-      // Load the module
-      let extModule: unknown;
-      try {
-        const result = await loadExtensionModule(manifest.source);
-        extModule = result.default;
-      } catch (err) {
-        const reason = err instanceof Error ? err.message : String(err);
-        this._failed.push({
-          name,
-          type: manifest.type,
-          source: manifest.source,
-          status: 'failed',
-          error: reason,
-        });
-        continue;
-      }
-
-      // Validate the exported extension shape
-      const shapeOk = validateExtension(extModule as Record<string, unknown>);
-      if (!shapeOk.ok) {
-        this._failed.push({
-          name,
-          type: manifest.type,
-          source: manifest.source,
-          status: 'failed',
-          error: `${shapeOk.code}: ${shapeOk.message}`,
-        });
-        continue;
-      }
-      const ext = shapeOk.value;
-
-      // Override appliesTo from manifest if present
-      if (manifest.appliesTo && isValidationRule(ext)) {
-        ext.appliesTo = manifest.appliesTo;
-      }
-
-      // Register by type
-      if (isCommandExtension(ext)) {
-        const builtIn = program.commands.some((c) => c.name() === ext.name);
-        if (this._commandNames.has(ext.name) || builtIn) {
-          this._failed.push({
-            name: ext.name,
-            type: 'command',
-            source: manifest.source,
-            status: 'failed',
-            error: `Command name '${ext.name}' is already registered`,
-          });
-          continue;
-        }
-        this._commandNames.add(ext.name);
-        // Register via Commander's lazy command API
-        this._registerCommandExtension(program, ext);
-        this._loaded.push({ name: ext.name, type: 'command', source: manifest.source, status: 'loaded' });
-      } else if (isValidationRule(ext)) {
-        const cmds = ext.appliesTo === '*' ? ['*'] : ext.appliesTo;
-        for (const cmd of cmds) {
-          const existing = this._rulesByCommand.get(cmd) ?? [];
-          existing.push(ext);
-          this._rulesByCommand.set(cmd, existing);
-        }
-        this._loaded.push({ name: ext.name, type: 'validation', source: manifest.source, status: 'loaded' });
-      } else if (isLifecycleHook(ext)) {
-        const bucket = this._hooks[ext.event];
-        if (bucket) bucket.push(ext);
-        this._loaded.push({ name: ext.name, type: 'lifecycle', source: manifest.source, status: 'loaded' });
-      }
+      if (!types.includes(manifest.type as Extension['type'])) continue;
+      await this._loadOne(program, manifest, ctx);
     }
 
-    // Strict mode: fail fast if any extension failed to load
+    // Strict mode: fail fast if any extension failed to load.  027 — emit the
+    // JSON envelope directly (matches the baseline's eager-load path) so the
+    // error code is visible to scripts / agents regardless of --json.
     if (this._failed.length > 0 && process.env['ABAP_CLI_EXTENSIONS_STRICT'] === '1') {
       const first = this._failed[0]!;
-      throw extensionLoadFailed(first.name, first.error ?? 'unknown error');
+      const reason = typeof first.error === 'string' && first.error.length > 0
+        ? first.error
+        : 'unknown error';
+      const cliErr = extensionLoadFailed(first.name, reason);
+      // Lazy import avoids circular dependency between registry.ts and json.ts.
+      const { printError } = await import('../output/json.js');
+      printError('json', cliErr);
+    }
+  }
+
+  /**
+   * Compute the lockfile health from declared npm extensions + (optional) ctx.
+   * `present` is the default when no npm extensions are declared.
+   */
+  private _refreshLockfileState(
+    extensions: ExtensionManifest[] | undefined,
+    ctx?: LoadContext,
+  ): void {
+    const npmManifests = (extensions ?? []).filter(
+      (m) => (m.source as { sourceType?: string })?.sourceType === 'npm',
+    );
+    if (npmManifests.length === 0) {
+      this._hasNpmExtensions = false;
+      this._lockfileStatus = 'present';
+      this._lockfileLastResolved = undefined;
+      return;
+    }
+    this._hasNpmExtensions = true;
+
+    const lock = ctx?.lock ?? null;
+    const lastResolved = lock?.lastResolved;
+    let status: LockfileStatus;
+
+    if (lock === null) {
+      status = 'absent';
+    } else {
+      const declaredNames = npmManifests.map((m) => {
+        const src = m.source as { packageName?: string };
+        return typeof src?.packageName === 'string' ? src.packageName : '';
+      }).filter((s) => s.length > 0);
+      const allPresent = declaredNames.every((n) => findLockEntry(lock, n) !== undefined);
+      status = allPresent ? 'present' : 'outdated';
+      if (status === 'present') {
+        // Detect any recorded integrity mismatch (set by loader extensionLoadFailed).
+        const anyMismatch = this._failed.some(
+          (f) => typeof f.error === 'string' && f.error.includes('LOCKFILE_INTEGRITY_MISMATCH'),
+        );
+        if (anyMismatch) status = 'mismatch';
+      }
     }
 
-    return this;
+    this._lockfileStatus = status;
+    this._lockfileLastResolved = status === 'absent' ? undefined : lastResolved;
+  }
+
+  /** Read-only view of lockfile health (used by `extensions list`). */
+  lockfileStatus(): LockfileStatus {
+    return this._lockfileStatus;
+  }
+
+  lockfileLastResolved(): string | undefined {
+    return this._lockfileLastResolved;
+  }
+
+  /** Per-entry lockfile status (undefined for path-source entries). */
+  entryLockfileStatus(packageName: string): LockfileStatus | undefined {
+    if (!this._hasNpmExtensions) return undefined;
+    // If the entry appears in failed[], derive its per-entry reason.
+    const failed = this._failed.find((f) => {
+      const src = f.source as { packageName?: string } | undefined;
+      return src?.packageName === packageName;
+    });
+    if (failed && typeof failed.error === 'string') {
+      if (failed.error.includes('LOCKFILE_INTEGRITY_MISMATCH')) return 'mismatch';
+      if (failed.error.includes('LOCKFILE_MISSING_ENTRY')) return 'outdated';
+      if (failed.error.includes('INVALID_PACKAGE_NAME')) return 'absent';
+    }
+    return this._lockfileStatus === 'present' ? 'present' : this._lockfileStatus;
+  }
+
+  /** Per-manifest loading + validation + registration. */
+  private async _loadOne(
+    program: Command,
+    manifest: ExtensionManifest,
+    ctx?: LoadContext,
+  ): Promise<void> {
+    // 027 — dedupe: an extension already loaded (by name) is a no-op so
+    // meta-commands (which eager-load all types) and the preAction hook
+    // (which loads validation + lifecycle) don't double-count.
+    if (
+      this._loaded.some((r) => r.name === manifest.name && r.type === manifest.type) ||
+      this._failed.some((f) => f.name === manifest.name && f.type === manifest.type)
+    ) {
+      return;
+    }
+    const name = manifest.name;
+
+    if (!manifest.type || typeof manifest.type !== 'string') {
+      this._failed.push({ name, type: manifest.type ?? '(missing)', source: manifest.source, status: 'failed', error: 'MISSING_TYPE: Extension manifest missing type field' });
+      return;
+    }
+    if (!manifest.name || typeof manifest.name !== 'string') {
+      this._failed.push({ name, type: manifest.type, source: manifest.source, status: 'failed', error: 'MISSING_NAME: Extension manifest missing name field' });
+      return;
+    }
+    if (!/^[a-z][a-z0-9-]*$/.test(manifest.name)) {
+      this._failed.push({ name, type: manifest.type, source: manifest.source, status: 'failed', error: `INVALID_NAME: Extension name '${manifest.name}' must be lowercase alphanumeric, start with a letter, and use hyphens only` });
+      return;
+    }
+    if (!manifest.source || typeof manifest.source !== 'object') {
+      this._failed.push({ name, type: manifest.type, source: manifest.source, status: 'failed', error: 'MISSING_SOURCE: Extension manifest missing source field' });
+      return;
+    }
+    const src = manifest.source as Record<string, unknown>;
+    const validSource =
+      (src.sourceType === 'path' && typeof src.path === 'string') ||
+      (src.sourceType === 'npm' && typeof src.packageName === 'string');
+    if (!validSource) {
+      this._failed.push({ name, type: manifest.type, source: manifest.source, status: 'failed', error: 'INVALID_SOURCE: Extension source must be {sourceType:"path", path:string} or {sourceType:"npm", packageName:string}' });
+      return;
+    }
+
+    let extModule: unknown;
+    try {
+      const result = await loadExtensionModule(manifest.source, ctx);
+      extModule = result.default;
+    } catch (err) {
+      // 027 — keep the canonical reason string in `failed[].error` so strict
+      // mode and per-entry diagnostics don't nest "Extension X failed to load"
+      // prefixes. Loader errors are CliError instances with a `reason` field in
+      // their details; everything else is treated as a generic 'import_failed'.
+      const reason =
+        err instanceof Error && err.name === 'CliError'
+          ? ((err as unknown as { details?: { reason?: string } }).details?.reason ?? 'import_failed')
+          : 'import_failed';
+      this._failed.push({
+        name,
+        type: manifest.type,
+        source: manifest.source,
+        status: 'failed',
+        error: reason,
+      });
+      return;
+    }
+
+    const shapeOk = validateExtension(extModule as Record<string, unknown>);
+    if (!shapeOk.ok) {
+      this._failed.push({
+        name,
+        type: manifest.type,
+        source: manifest.source,
+        status: 'failed',
+        error: `${shapeOk.code}: ${shapeOk.message}`,
+      });
+      return;
+    }
+    const ext = shapeOk.value;
+
+    if (manifest.appliesTo && isValidationRule(ext)) {
+      ext.appliesTo = manifest.appliesTo;
+    }
+
+    if (isCommandExtension(ext)) {
+      const builtIn = program.commands.some((c) => c.name() === ext.name);
+      if (this._commandNames.has(ext.name) || builtIn) {
+        this._failed.push({
+          name: ext.name,
+          type: 'command',
+          source: manifest.source,
+          status: 'failed',
+          error: `Command name '${ext.name}' is already registered`,
+        });
+        return;
+      }
+      this._commandNames.add(ext.name);
+      this._registerCommandExtension(program, ext);
+      this._loaded.push({ name: ext.name, type: 'command', source: manifest.source, status: 'loaded' });
+    } else if (isValidationRule(ext)) {
+      const cmds = ext.appliesTo === '*' ? ['*'] : ext.appliesTo;
+      for (const cmd of cmds) {
+        const existing = this._rulesByCommand.get(cmd) ?? [];
+        existing.push(ext);
+        this._rulesByCommand.set(cmd, existing);
+      }
+      this._loaded.push({ name: ext.name, type: 'validation', source: manifest.source, status: 'loaded' });
+    } else if (isLifecycleHook(ext)) {
+      const bucket = this._hooks[ext.event];
+      if (bucket) bucket.push(ext);
+      this._loaded.push({ name: ext.name, type: 'lifecycle', source: manifest.source, status: 'loaded' });
+    }
   }
 
   /** Register a CommandExtension as a real commander sub-command. */
@@ -349,6 +505,15 @@ export class ExtensionRegistry {
     if (lifeCount > 0) meta.byType.lifecycle = lifeCount;
     if (relevantRules.length > 0) {
       meta.validationRules = relevantRules.map((r) => ({ name: r.name, appliesTo: r.appliesTo }));
+    }
+
+    // 027 US4 — surface lockfile health when not 'present'
+    const lockStatus = this._lockfileStatus;
+    if (lockStatus !== 'present' && this._hasNpmExtensions) {
+      meta.lockfile = { status: lockStatus };
+      if (this._lockfileLastResolved && lockStatus !== 'absent') {
+        meta.lockfile.lastResolved = this._lockfileLastResolved;
+      }
     }
 
     return meta;

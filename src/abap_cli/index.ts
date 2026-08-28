@@ -146,34 +146,59 @@ registerLazyCommands(program, COMMAND_SPECS);
 
 setProgram(program);
 
-// Load project config and extensions before parsing commands
-let registry: ExtensionRegistry;
+// 027 US1 — load extensions lazily. The argv sniff registers only
+// `type:'command'` extensions whose name matches argv[2]; validation and
+// lifecycle extensions defer to the preAction hook so that
+// `--help` / `--version` / `doctor` / empty-argv invocations never
+// import any extension module.
+const config = await loadConfig();
+const registry = new ExtensionRegistry();
+let extensionsLockfile: Awaited<ReturnType<typeof import('./extensions/lockfile.js').readLockfile>> = null;
+let extensionsLockfilePath: string | undefined;
 try {
-  const config = await loadConfig();
-  registry = new ExtensionRegistry();
-  await registry.loadAndRegisterExtensions(program, config.extensions ?? []);
+  const { readLockfile, extensionsLockPath } = await import('./extensions/lockfile.js');
+  const configDir = await import('./config/project-config.js').then((m) => m.findWorkspaceConfig());
+  if (configDir) {
+    extensionsLockfilePath = extensionsLockPath(require('node:path').dirname(configDir));
+    extensionsLockfile = await readLockfile(require('node:path').dirname(configDir));
+  }
+} catch {
+  // Lockfile unreadable — treat as absent; loader will surface per-entry failures.
+}
+const loadCtx = { lock: extensionsLockfile, lockfilePath: extensionsLockfilePath };
+
+try {
+  const { tryLoadCommandExtensionsForArgv, isMetaExtensionsCommand } = await import('./extensions/lazy.js');
+  if (isMetaExtensionsCommand(process.argv)) {
+    // Meta-commands need the full extension picture (per-entry conflicts,
+    // per-entry lockfile status, etc.).
+    await registry.loadAndRegisterExtensions(program, config.extensions ?? [], loadCtx);
+  } else {
+    await tryLoadCommandExtensionsForArgv(program, config.extensions ?? [], process.argv);
+  }
 } catch (err) {
-  // Extension loading failures are non-fatal in lenient mode.
-  // Strict mode errors (EXTENSION_LOAD_FAILED) are fatal — exit with proper code + error envelope.
   if (err instanceof CliError && err.code === 'EXTENSION_LOAD_FAILED') {
-    // Fatal: exit with the JSON error envelope even in human mode, so the
-    // error code is visible to the caller (test / script).  This runs before
-    // parseAsync so Commander's own error handling is not yet active.
     const out = renderError('json', err, buildMeta());
     for (const line of out.stderr) console.error(line);
     process.exit(out.exitCode ?? EXIT_GENERIC_FALLBACK);
   }
-  registry = new ExtensionRegistry();
+  // Surface non-fatal load failures into registry.failed via loadRemainingExtensions.
+  await registry.loadRemainingExtensions(program, config.extensions ?? [], loadCtx);
 }
 
 // Set singletons for json.ts and list-command.ts
 setExtensionRegistry(registry);
 setExtRegJson(registry);
 
-// Install lifecycle hooks globally once (FR-007)
+// Install lifecycle hooks globally once (FR-007).  027 US1 — load the
+// remaining (non-command) extensions on each dispatch so the user's real
+// command always sees a fully-loaded validation + lifecycle set.
 program.hook('preAction', async (_thisCmd, actionCmd) => {
   const argv = process.argv.slice(2);
   const cmdName = actionCmd.name();
+  // Strict-mode failures exit with a hardcoded JSON envelope (matches the
+  // baseline behavior for `EXTENSION_LOAD_FAILED`); nothing further runs.
+  await registry.loadRemainingExtensions(program, config.extensions ?? [], loadCtx);
   await registry.dispatchBeforeCommand({
     command: cmdName,
     argv,

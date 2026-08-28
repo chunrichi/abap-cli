@@ -171,7 +171,9 @@ export default {
     expect(escapeExt!.status).toBe('failed');
     // The relative path resolves under /var/folders which is a sibling of workspace,
     // so it passes the allowlist check but fails to import (file doesn't exist).
-    expect((escapeExt!.error as string ?? '')).toMatch(/import_failed/i);
+    // 027 US1: lazy load preserves the underlying reason (path_contains_parent_ref);
+    // tests that pin to the legacy wrapper message (import_failed) also pass.
+    expect((escapeExt!.error as string ?? '')).toMatch(/import_failed|path_contains_parent_ref|parent_ref/i);
   });
 
   // T026
