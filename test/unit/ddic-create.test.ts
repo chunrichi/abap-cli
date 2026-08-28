@@ -121,6 +121,60 @@ describe('014/US1 create TABL', () => {
     // for the create-then-pull round-trip the server is responsible for SPRING.
   });
 
+  it('strips CLIENT/MANDT from fields[] when clientDependent=true', async () => {
+    // User writes `clientDependent: true` and explicitly declares a `CLIENT`
+    // field. The CLI must NOT forward it to the wire payload — the server
+    // prepends MANDT, and a duplicate would fail the BAPI call with a
+    // misleading "Field already exists" error.
+    writeTableJson('ZTAB_CLI_STRIP', [
+      { fieldName: 'CLIENT', dataType: 'CLNT', length: 3, keyFlag: true },
+      { fieldName: 'ID', dataType: 'CHAR', length: 10, keyFlag: true },
+    ]);
+    const json = JSON.parse(fs.readFileSync(path.join(cwd, 'src/ztab_test.tabl.json'), 'utf-8'));
+    json.name = 'ZTAB_CLI_STRIP';
+    json.clientDependent = true;
+    fs.writeFileSync(path.join(cwd, 'src/ztab_test.tabl.json'), JSON.stringify(json));
+
+    const program = makeProgram();
+    registerCreateCommand(program);
+    const res = await runCommand(program, [
+      'create', 'TABL', 'ZTAB_CLI_STRIP',
+      '--file', 'src/ztab_test.tabl.json',
+      '--package', '$TMP',
+      '--yes', '--json',
+    ], { cwd });
+    expect(res.exitCode).toBeUndefined();
+    const callBody = icfPostDdic.mock.calls[0]![1] as any;
+    expect(callBody.clientDependent).toBe(true);
+    expect(callBody.fields.map((f: any) => f.fieldName)).toEqual(['ID']);
+    expect(Array.isArray(callBody.warnings)).toBe(true);
+    expect(callBody.warnings.some((w: any) => w.code === 'CLIENT_FIELD_STRIPPED')).toBe(true);
+  });
+
+  it('rejects a TABL whose only fields are CLIENT/MANDT (fast-fail)', async () => {
+    writeTableJson('ZEMPTY_CLI', [
+      { fieldName: 'CLIENT', dataType: 'CLNT', length: 3, keyFlag: true },
+    ]);
+    const json = JSON.parse(fs.readFileSync(path.join(cwd, 'src/ztab_test.tabl.json'), 'utf-8'));
+    json.name = 'ZEMPTY_CLI';
+    json.clientDependent = true;
+    fs.writeFileSync(path.join(cwd, 'src/ztab_test.tabl.json'), JSON.stringify(json));
+
+    const program = makeProgram();
+    registerCreateCommand(program);
+    const res = await runCommand(program, [
+      'create', 'TABL', 'ZEMPTY_CLI',
+      '--file', 'src/ztab_test.tabl.json',
+      '--package', '$TMP',
+      '--yes', '--json',
+    ], { cwd });
+    expect(res.exitCode).toBe(7); // VALIDATION_ERROR
+    expect(icfPostDdic).not.toHaveBeenCalled();
+    const out = JSON.parse(res.stderr);
+    expect(out.error.code).toBe('VALIDATION_ERROR');
+    expect(out.error.details.some((d: string) => d.includes('only client-key columns'))).toBe(true);
+  });
+
   it('command-line --description overrides file description', async () => {
     writeTableJson('ZTAB_OVR');
     const program = makeProgram();

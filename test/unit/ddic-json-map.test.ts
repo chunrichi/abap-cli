@@ -411,4 +411,61 @@ describe('014/ddic-json-map', () => {
       }
     });
   });
+
+  describe('client-key fields (CLIENT/MANDT) on the wire-flat path', () => {
+    it('localToWire drops CLIENT/MANDT from fields[] (server prepends MANDT)', () => {
+      const wire = localToWire('TABL', {
+        name: 'ztab',
+        clientDependent: true,
+        fields: [
+          { fieldName: 'CLIENT', dataType: 'CLNT', length: 3, keyFlag: true },
+          { fieldName: 'MANDT', dataType: 'CLNT', length: 3, keyFlag: true },
+          { fieldName: 'ID', dataType: 'CHAR', length: 10, keyFlag: true },
+        ],
+      });
+      expect(wire.fields!.map((f) => f.fieldName)).toEqual(['ID']);
+      expect(wire.warnings).toEqual([
+        expect.objectContaining({
+          code: 'CLIENT_FIELD_STRIPPED',
+          message: expect.stringContaining('CLIENT'),
+        }),
+      ]);
+    });
+
+    it('localToWire does not strip non-client fields that happen to look like one', () => {
+      const wire = localToWire('TABL', {
+        name: 'ztab',
+        clientDependent: false,
+        fields: [
+          { fieldName: 'CLIENT_ID', dataType: 'CHAR', length: 10 },
+          { fieldName: 'MANDANT_TXT', dataType: 'CHAR', length: 20 },
+        ],
+      });
+      expect(wire.fields!.map((f) => f.fieldName)).toEqual(['CLIENT_ID', 'MANDANT_TXT']);
+      expect(wire.warnings).toBeUndefined();
+    });
+
+    it('validateDdicObject rejects a TABL whose only fields are client-key columns', () => {
+      const errors = validateDdicObject({
+        name: 'ZEMPTY',
+        clientDependent: true,
+        fields: [
+          { fieldName: 'CLIENT', dataType: 'CLNT', length: 3, keyFlag: true },
+        ],
+      }, 'TABL');
+      expect(errors.some((e) => e.includes('only client-key columns'))).toBe(true);
+    });
+
+    it('validateDdicObject flags duplicate fieldName', () => {
+      const errors = validateDdicObject({
+        name: 'ZDUP',
+        clientDependent: false,
+        fields: [
+          { fieldName: 'A', dataType: 'CHAR', length: 1 },
+          { fieldName: 'a', dataType: 'CHAR', length: 2 }, // case-insensitive duplicate
+        ],
+      }, 'TABL');
+      expect(errors.some((e) => e.includes('declared more than once'))).toBe(true);
+    });
+  });
 });

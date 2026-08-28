@@ -1503,11 +1503,20 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
     lt_fields = ls_attr-fields.
 
     IF ls_attr-clientDependent = abap_true.
-      ls_mandt-fieldName = 'MANDT'.
-      ls_mandt-rollname   = 'MANDT'.
-      ls_mandt-keyFlag    = abap_true.
-      ls_mandt-notNull    = abap_true.
-      INSERT ls_mandt INTO lt_fields INDEX 1.
+      " The CLI strips any CLIENT/MANDT entry from the wire before posting
+      " (see src/abap_cli/dictionary/ddic-json.ts:stripClientFields), so under
+      " normal operation `lt_fields` does not contain MANDT here. We still
+      " guard against a duplicate-MANDT insert so older clients (or hand-
+      " crafted payloads) don't fail with a misleading "Field already exists"
+      " error from the BAPI layer.
+      READ TABLE lt_fields TRANSPORTING NO FIELDS WITH KEY fieldName = 'MANDT'.
+      IF sy-subrc <> 0.
+        ls_mandt-fieldName = 'MANDT'.
+        ls_mandt-rollname   = 'MANDT'.
+        ls_mandt-keyFlag    = abap_true.
+        ls_mandt-notNull    = abap_true.
+        INSERT ls_mandt INTO lt_fields INDEX 1.
+      ENDIF.
     ENDIF.
 
     build_table_header( EXPORTING iv_table_name    = CONV tabname( ls_attr-name )
