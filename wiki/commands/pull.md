@@ -35,6 +35,7 @@ abap pull
 - `--textpool`: 同时拉取 textpool `.properties` 文件（`.texts`/`.selections`/`.headings.<lang>.properties`）
 - `--remote <remoteid>`: 拉取对象在远程系统的 active 版本源码（Version Management，`/version-source` 端点）
 - `--tr <request>`: T4.2 — 拉取 transport 请求内全部对象（直接对象 + 嵌套 task 对象，去重），与对象名/`--package` **互斥**；空字符串 → `INVALID_ARGUMENT`
+- `--schema`: 打印本命令参数 schema（unified envelope，无 SAP 调用）
 
 ## 路由与布局
 

@@ -30,6 +30,7 @@ abap inspect ZCL_FOO --locks --json         # 谁锁着 / 绑定到哪个请求
 | `--package` | 含对象包名 |
 | `--activation` | 校验 active vs latest source per part（只读；检测 stale 激活） |
 | `--type <type>` | 对象类型消歧（CLAS / PROG / INTF 等） |
+| `--schema` | 打印本命令参数 schema（unified envelope，无 SAP 调用） |
 
 无 flag 时返回对象基础元数据；`--activation` 是最常用的诊断 flag。
 

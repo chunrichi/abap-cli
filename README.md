@@ -92,6 +92,7 @@ abap select --table SFLIGHT --fields CARRID CONNID --limit 5 --json
 | `abap create local <type> <name>` | Generate a draft skeleton offline (no SAP connection) |
 | `abap transport list\|create\|show\|resolve\|assign` | Manage transports (write actions require `--yes`) |
 | `abap extension deploy\|status` | Deploy / probe the SAP-side ICF service (backend for DDIC / HTTP / tcode resolution) |
+| `abap extensions list\|lock` | Manage installed third-party extensions (023) + 027 trust hardening (npm sha512 pinned in `extensions.lock.json`) |
 | `abap doctor` | Diagnose the CLI environment (`--fix` applies safe fixes) |
 | `abap inspect <object>` | Read-only object metadata (`--structure` / `--includes` / `--locks` / `--activation`) |
 | `abap activate <object>` | Activate the object (repairs stale activation) |

@@ -80,6 +80,8 @@ abap transport list --json
 - `--cert-passphrase <pwd>`: .p12 / 加密私钥口令；写入 OS keychain（独立 account）
 - `--sso-cookie-file <path>`: SSO cookie jar 路径（`auth-method=browser_sso` 时可选，默认 `~/.abap-cli/<profile>.sso.cookies.json`，mode 0o600）
 - `--auth-option <key=value>`: 通用认证字段（可重复）。新认证方法的字段从 bag 读，无需新增 Commander option。示例：`--auth-option certPath=/abs/cert.pem --auth-option keyPath=/abs/key.pem`。legacy flag（`--cert-path` / `--cert-key` / `--cert-ca` / `--sso-cookie-file` / `--service-key`）会自动映射进 bag（`--auth-option` 同名 key 优先）。
+- `--service-key <path>`: BTP / CF service key JSON（`auth-method=oauth_password` 时）；写 `~/.abap-cli/systems.json` 的 `authMethod=oauth_password` + `serviceKeyPath`
+- `--schema`: 打印本命令参数 schema（unified envelope，本地调用）
 
 `set` 额外支持：`--remove-password`（删 keychain 凭证）、`--clear-ca`（移除 CA 设置）、`--remove-cert-passphrase`（删 keychain 中证书口令）、`--clear-cert-auth`（同时移除 `authMethod` 与 `certAuth`，回到 basic）、`--clear-sso-cookie-file`（重置 cookie 文件路径到默认）。
 

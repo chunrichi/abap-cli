@@ -67,6 +67,48 @@ Endpoints exposed under `/sap/zabap_vibe/` (current service version `0.5.0`):
 
 `abap extension deploy` pushes the bundled sources then triggers the setup class; `abap extension status` / `abap init` check deployment state/version. JSON generation on the SAP side is unified on `/ui2/cl_json=>serialize` (017) — about 74 handcrafted JSON concatenations across the ICF handler / runner / setup classes were replaced. Development of this layer follows the **Dogfooding** principle — it is itself developed via the CLI's create → pull → edit → push loop.
 
+## Extension Layer (023 + 027)
+
+A opt-in extension mechanism lets teams ship internal/downstream capabilities (custom deploy flows, command policies, report-stuck hooks) without modifying core. Two source types, both registered in `.abap.json`:
+
+```jsonc
+{
+  "extensions": [
+    { "sourceType": "npm", "packageName": "@myorg/abap-ext" },   // distributed
+    { "sourceType": "path", "path": "./extensions/zlocal.js" }   // in-repo
+  ]
+}
+```
+
+### Lifecycle (023)
+
+- **Lazy load** — `src/abap_cli/index.ts` does NOT `import()` any extension at startup. It sniffs `argv[2]` (matching `extensions list` / `extensions lock` / unknown commands) and uses a commander `preAction` hook to async-load the rest. `abap --help` / `--version` / `doctor` / empty argv never touch extension module top-level code.
+- **Hook surface** — `beforeParse` (argv inspection), `beforeCommand` (can **veto** by returning `{block: true, reason}` → `EXTENSION_COMMAND_BLOCKED` / exit 7), and per-command extensions registered as commander subcommands. Built-in commands always win — extensions may NOT override them.
+- **Path allowlist** — `sourceType: 'path'` entries must resolve under cwd or `~/.abap-cli/extensions/`. `path_contains_parent_ref` / `path_escapes_allowlist` checked at load.
+
+### Trust hardening (027 — Security)
+
+- **Lockfile pinning** — `extensions.lock.json` records `{packageName, resolved, integrity: 'sha512-<base64>'}` for every npm entry. CLI computes sha512 with `node:crypto` and refuses to `import()` on mismatch.
+- **First-run guard** — `abap extensions lock` requires `--allow-unsigned` to create a fresh lockfile, blocking "drop a hostile `.abap.json` and self-pin on first run" attacks.
+- **Package-name regex (FR-010)** — `INVALID_PACKAGE_NAME` rejects `..` / `\` / empty scope / URL scheme / absolute paths / non-npm chars before any `createRequire(...).resolve()`.
+- **Strict mode** — `ABAP_CLI_EXTENSIONS_STRICT=1` aborts on any `EXTENSION_LOAD_FAILED` (exit 3) with JSON envelope; otherwise warnings are surfaced via `meta.warnings` and the command proceeds.
+
+### Where it lives in code
+
+```
+src/abap_cli/
+├── extensions/
+│   ├── registry.ts          # ExtensionRegistry — owns loaded extensions
+│   ├── lockfile.ts          # readLockfile / writeLockfile / regenerateLock
+│   ├── lazy.ts              # argv sniff + preAction loader
+│   ├── list-command.ts      # `abap extensions list` action body
+│   ├── validation.ts        # path allowlist + package-name regex
+│   └── spec.ts              # CommandExtension / LifecycleExtension types
+└── commands/extensions.ts   # commander registration (list + lock subcommands)
+```
+
+See [Agent Integration → Extension Trust](agent-integration.md#extension-trust-027) for the agent-facing contract.
+
 ## Agent Layer (`skills/` + `agents/`)
 
 Markdown prompts that orchestrate the CLI for AI agents:

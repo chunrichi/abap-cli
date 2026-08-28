@@ -30,6 +30,7 @@ abap extension status [options]   # 只读探测：已安装？版本匹配？
 - `--diff`: 逐文件差异摘要
 - `--force`: 绕过安全检查（结果 `forced: true`）
 - `--yes`: 非交互确认
+- `--schema`: 打印本命令参数 schema（unified envelope，无 SAP 调用）
 
 ### 行为规则
 

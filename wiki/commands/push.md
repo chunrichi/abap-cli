@@ -26,6 +26,7 @@ abap push [options] [files...]
 - `--no-activate`: lock + write + 跳过 check + 跳过 activate + unlock
 - `--dry-run`: 只记录计划，零变更 ADT 调用
 - `--fail-fast`: 第一个失败文件即停（默认 keep-going）
+- `--schema`: 打印本命令参数 schema（unified envelope，无 SAP 调用；`data` 即 schema 对象）
 - `--atomic`: 先结构校验所有文件，任一失败则零写入（`VALIDATION_ERROR`）
 - `--yes`: 非交互确认写操作；非 TTY 且无 `--yes`/`--dry-run` → `VALIDATION_ERROR`（exit 7）
 

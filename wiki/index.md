@@ -19,6 +19,7 @@ changed at: 2026-08-19 23:00:00
 - [profile](commands/profile.md) — 管理全局连接 profiles
 - [doctor](commands/doctor.md) — 诊断 CLI 环境
 - [extension](commands/extension.md) — 管理内置 ICF ABAP 扩展（deploy / status）
+- [extensions](commands/extensions.md) — 管理第三方扩展（list 探测 / lock 钉 hash；027 信任硬化）
 
 ### 创建 / 拉取 / 推送
 
