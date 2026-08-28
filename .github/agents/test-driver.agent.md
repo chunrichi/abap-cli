@@ -35,7 +35,7 @@ If the target is ambiguous, ask at most 3 clarifying questions (vscode_askQuesti
 - Implementation: `src/abap_cli/commands/`, `src/abap_cli/flows/`, `src/abap_cli/core/`, `abap/src/`
 - Existing tests and tooling: `test/unit/`, `test/mock-adt/server.js`
 - Run commands: `package.json` scripts (`npm test`, `npm run build`), `vitest.config.ts`
-- Connection: `.abap.json` / `.env`; real-SAP environment per AGENTS.md (vhcala4hci:50000, developer, client 001)
+- Connection: `.abap.json`; real-SAP environment per `.github/copilot-instructions.md` (vhcala4hci:50000, developer, client 001)
 
 ### 3. Plan test cases -> <RUN_DIR>/test-cases.md
 
@@ -64,7 +64,7 @@ Then write `<RUN_DIR>/test-cases.md` with the strict checklist format:
   1. `setup` — environment, config files, CLI version, doctor/connection-test
   2. `unit` — vitest cases in `test/unit/`
   3. `mock-cli` — `node dist/src/abap_cli/index.js …` against `test/mock-adt/server.js`
-  4. `real-sap` — against real SAP per AGENTS.md (uses `$TMP` + `ZCLI_TC_*` prefix + cleanup)
+  4. `real-sap` — against real SAP per `.github/copilot-instructions.md` (uses `$TMP` + `ZCLI_TC_*` prefix + cleanup)
   5. `roundtrip` — full create→pull→edit→push→re-pull cycle (uses real-sap or mock-cli as appropriate)
   6. `cleanup` — explicit teardown of any test-side artifacts (local files, mock state)
 - `[P]` = parallelizable (different files, no dependencies)

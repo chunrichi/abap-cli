@@ -13,7 +13,6 @@
     "abap/src",
     "skills",
     "agents",
-    "AGENTS.md",
     ".github"
   ],
   "repository": {

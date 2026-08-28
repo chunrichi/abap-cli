@@ -47,5 +47,3 @@ cp ../../../../tmp/abap-file-formats/file-formats/tabl/tabl-v1.json .
 cp ../../../../tmp/abap-file-formats/file-formats/tabl/tabt-v1.json .
 git diff  # 看 schema 字段增减
 ```
-
-如果官方有 breaking 变更（如 `header` 加 `abapLanguageVersion` 必填），CLI 解析器、create 流程、5 个骨架都要跟着改。**AGENTS.md** "Refactor Fearlessly" 允许 breaking，但要在 CHANGELOG 记录 schema 版本。
