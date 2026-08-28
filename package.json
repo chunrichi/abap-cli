@@ -1,6 +1,6 @@
 {
   "name": "abap-cli",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "CLI tool for ABAP vibe coding — agent-driven ABAP development in any agent",
   "type": "module",
   "main": "dist/src/abap_cli/index.js",
@@ -9,6 +9,7 @@
   },
   "files": [
     "dist",
+    "src/abap_cli/output/cli-output.schema.json",
     "abap/src",
     "skills",
     "agents",
@@ -34,6 +35,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "build-docs": "node scripts/build-commands-doc.mjs",
     "verify": "npm run build && npm test"
   },
   "keywords": [

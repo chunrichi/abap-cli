@@ -1,0 +1,118 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "abap-cli unified --json output envelope",
+  "description": "Machine-readable contract for every `abap <cmd> --json` response (spec 012, contracts/cli-output.md). Success envelopes go to stdout only; failure envelopes go to stderr only; stdout stays empty on any failure path. exit code maps to error.category (output/exit-codes.ts). Enforced by test/unit/envelope-schema.test.ts for every registered command.",
+  "oneOf": [
+    {
+      "type": "object",
+      "title": "success",
+      "properties": {
+        "status": { "const": "success" },
+        "data": {
+          "type": "object",
+          "description": "Command-specific payload. Paths are POSIX-relative (core/path-output.ts); empty arrays/objects are stripped (token-efficient)."
+        },
+        "meta": { "$ref": "#/definitions/meta" }
+      },
+      "required": ["status", "data", "meta"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "title": "error",
+      "properties": {
+        "status": { "const": "error" },
+        "error": { "$ref": "#/definitions/error" },
+        "meta": { "$ref": "#/definitions/meta" }
+      },
+      "required": ["status", "error", "meta"],
+      "additionalProperties": false
+    }
+  ],
+  "definitions": {
+    "meta": {
+      "type": "object",
+      "description": "Envelope metadata. `--schema` mode uses the reduced form (command/version/durationMs only, no timestamp/warnings).",
+      "properties": {
+        "command": { "type": "string", "description": "Canonical command name, e.g. 'abap pull'." },
+        "version": { "type": "string", "description": "CLI version from package.json." },
+        "timestamp": { "type": "string", "description": "ISO 8601 (UTC) timestamp; absent in --schema mode." },
+        "durationMs": { "type": "number", "description": "Milliseconds since CLI start (non-negative)." },
+        "warnings": {
+          "type": "array",
+          "description": "Non-fatal warnings; absent in --schema mode, never enters the error object.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+              "message": { "type": "string" },
+              "details": { "type": "object" }
+            },
+            "required": ["code", "message"],
+            "additionalProperties": false
+          }
+        },
+        "extensions": { "$ref": "#/definitions/extensionMeta" }
+      },
+      "required": ["command", "version", "durationMs"],
+      "additionalProperties": false
+    },
+    "error": {
+      "type": "object",
+      "description": "Structured failure. `code` is the literal ErrorCode; `category` drives the exit code. Extension failures always use dedicated EXTENSION_* codes and never override built-in codes.",
+      "properties": {
+        "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$", "description": "Literal ErrorCode (output/error-codes.ts)." },
+        "category": {
+          "enum": ["UNKNOWN", "USAGE", "CONFIG_ERROR", "TLS_ERROR", "AUTH_ERROR", "SAP_ERROR", "VALIDATION_ERROR", "NOT_FOUND", "LOCKED"],
+          "description": "ErrorCategory; maps 1:1 to the exit code (output/exit-codes.ts)."
+        },
+        "message": { "type": "string" },
+        "details": { "type": "object" },
+        "nextSteps": { "type": "array", "items": { "type": "string" }, "description": "Concrete actions the agent should try next." },
+        "example": { "type": "string", "description": "A single canonical invocation that would succeed." },
+        "references": { "type": "string", "description": "Repo-relative path to a skill reference doc that documents this error (e.g. 'skills/abap-cli-edit/references/errors.md')." },
+        "httpStatus": { "type": "number", "description": "Present only for SAP_ERROR with an HTTP status." },
+        "httpStatusText": { "type": "string" }
+      },
+      "required": ["code", "category", "message"],
+      "additionalProperties": false
+    },
+    "extensionMeta": {
+      "type": "object",
+      "description": "Loaded-extension summary merged into meta.extensions (023). Keys with zero counts are omitted.",
+      "properties": {
+        "loaded": { "type": "number" },
+        "failed": { "type": "number" },
+        "byType": {
+          "type": "object",
+          "properties": {
+            "command": { "type": "number" },
+            "validation": { "type": "number" },
+            "lifecycle": { "type": "number" }
+          },
+          "additionalProperties": false
+        },
+        "names": { "type": "array", "items": { "type": "string" } },
+        "validationRules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "appliesTo": {
+                "oneOf": [
+                  { "type": "string", "const": "*" },
+                  { "type": "array", "items": { "type": "string" } }
+                ]
+              }
+            },
+            "required": ["name", "appliesTo"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["loaded", "byType", "names"],
+      "additionalProperties": false
+    }
+  }
+}

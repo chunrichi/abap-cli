@@ -88,6 +88,8 @@ describe('abap push per-object transport resolution', () => {
     const out = JSON.parse(res.stderr);
     expect(out.error.code).toBe('VALIDATION_ERROR');
     expect(out.error.details.results[0].code).toBe('VALIDATION_ERROR');
+    // P0: the failure branch reports the same cwd-relative POSIX file as success.
+    expect(out.error.details.results[0].file).toBe('src/zcl_tr.clas.abap');
     expect(lock).not.toHaveBeenCalled();
     expect(setObjectSource).not.toHaveBeenCalled();
   });

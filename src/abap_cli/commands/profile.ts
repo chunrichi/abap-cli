@@ -1,20 +1,25 @@
 import { Command } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
-import { printError, printResult, jsonFromCommand, CliError, type OutputMode } from '../output/json.js';
+import { printError, printResult, printSchema, jsonFromCommand, CliError, type OutputMode } from '../output/json.js';
 import { collectWarning } from '../output/meta.js';
-import { commonErrorsAfter } from '../output/help-text.js';
 import { exportProfiles, importProfiles, type ProfileBundle } from '../config/profiles.js';
 import { runList, runShow, runTest, runDelete } from '../flows/profile-flow.js';
 import { runAdd, runSet } from '../flows/profile-flow.js';
 import { runLogin } from '../flows/sso-flow.js';
+import { toOutputPath } from '../core/path-output.js';
+import { commandSchemas } from '../flows/command-schemas.js';
 
 export function registerProfileCommand(program: Command): void {
   const profile = program
     .command('profile')
     .description('Manage global connection profiles')
-    .addHelpText('after', commonErrorsAfter())
+    .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action((_opts, cmd) => {
+      if (cmd.optsWithGlobals().schema) {
+        printSchema(commandSchemas['profile']!, jsonFromCommand(cmd));
+        return;
+      }
       // Bare `abap profile` prints the subcommand help (exit 0), like bare `abap`.
       console.log(cmd.helpInformation());
     });
@@ -144,7 +149,8 @@ export function registerProfileCommand(program: Command): void {
         const human = `Exported ${bundle.systems.length} profile(s)${opts.withPasswords ? ' (with passwords)' : ''}.`;
         if (opts.file) {
           fs.writeFileSync(path.resolve(opts.file), JSON.stringify(bundle, null, 2) + '\n', 'utf-8');
-          printResult(mode, { file: opts.file, count: bundle.systems.length }, `${human} → ${opts.file}`);
+          const outFile = toOutputPath(opts.file);
+          printResult(mode, { file: outFile, count: bundle.systems.length }, `${human} → ${outFile}`);
         } else {
           printResult(mode, bundle, human);
         }

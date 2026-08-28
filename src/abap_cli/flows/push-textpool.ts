@@ -6,6 +6,7 @@ import { readAbapFile } from '../formats/abap-source.js';
 import { parseTextpoolProperties, textpoolCategoryFromExtension } from '../formats/textpool.js';
 import { routeTextpool } from '../textpool/textpool-router.js';
 import type { PushStage } from './push-object.js';
+import { toRelativeOutputPath } from '../core/path-output.js';
 
 interface TextpoolResolved {
   objectName: string;
@@ -37,7 +38,8 @@ export async function pushTextpoolFile(
     content = await readAbapFile(file);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new CliError('FILE_PARSE_ERROR', `Cannot read ${file}: ${message}`, { details: { file } });
+    const outFile = toRelativeOutputPath(file);
+    throw new CliError('FILE_PARSE_ERROR', `Cannot read ${outFile}: ${message}`, { details: { file: outFile } });
   }
 
   // subtype looks like "texts.en" → file category = first segment.

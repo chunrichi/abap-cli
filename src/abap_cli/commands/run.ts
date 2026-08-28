@@ -1,6 +1,5 @@
 import { Command } from 'commander';
-import { printError, printResult, jsonFromCommand } from '../output/json.js';
-import { commonErrorsAfter } from '../output/help-text.js';
+import { printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
 import {
   buildDryRun,
   runRun,
@@ -9,10 +8,12 @@ import {
   validateTimeout,
 } from '../flows/run-flow.js';
 
-const SCHEMA = {
+export const SCHEMA = {
+  schemaVersion: 1,
   command: 'run',
   description:
     'Execute an ABAP class (classrun) or a static method via the bundled runner wrapper; returns stdout + exit code (read-only).',
+  usage: 'abap run [options] <class-name>',
   scope: 'sap',
   arguments: [
     {
@@ -64,19 +65,18 @@ const SCHEMA = {
       required: false,
       default: false,
       global: true,
-      description: 'Emit the unified JSON envelope on stdout (012 output contract).',
+      description: 'Emit the unified JSON envelope on stdout (012 output contract); --pretty-json indents.',
     },
     {
       name: '--schema',
       type: 'boolean',
       required: false,
       default: false,
-      description: 'Print this schema as JSON and exit 0 without any SAP call.',
+      description: 'Print the command parameter schema as JSON and exit (no SAP call).',
     },
   ],
-  exclusive: [
-    '--schema runs alone (rejected with INVALID_ARGUMENT if combined with class-name or --method)',
-  ],
+  exclusiveGroups: [['--schema', '<class-name>']],
+  globalOptions: ['--json'],
   examples: [
     { description: 'Trigger classrun (no --method)', command: 'abap run ZCL_MY_THING' },
     {
@@ -108,13 +108,12 @@ export function registerRunCommand(program: Command): void {
     .description(
       'Execute ABAP class (classrun) or PUBLIC STATIC method; returns stdout + exit code',
     )
-    .addHelpText('after', commonErrorsAfter())
     .argument('[class-name]', 'Class name (e.g. ZCL_MY_THING)')
     .option('--method <name>', 'PUBLIC STATIC method to invoke via ZCL_ABAP_VIBE_RUNNER')
     .option('--args <json>', 'Method arguments JSON', '{}')
     .option('--timeout <ms>', 'Execution timeout in ms (100–600000)', '30000')
     .option('--dry-run', 'Print the request envelope without invoking ADT classrun')
-    .option('--schema', 'Print the command parameter schema as JSON and exit 0')
+    .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action(
       async (
         className: string | undefined,
@@ -130,7 +129,7 @@ export function registerRunCommand(program: Command): void {
 
         // --schema branch — emit machine-readable parameter schema, no SAP call.
         if (cmd.optsWithGlobals().schema) {
-          console.log(JSON.stringify(SCHEMA, null, mode === 'pretty-json' ? 2 : 0));
+          printSchema(SCHEMA, mode);
           return;
         }
 

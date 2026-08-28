@@ -75,8 +75,8 @@ describe('abap pull (abap-file-format layout)', () => {
     expect(meta.header.description).toBe('Demo class');
     expect(meta.header.originalLanguage).toBe('en');
 
-    expect(data.written).toContain(path.join('src', 'clas', 'zcl_demo', 'zcl_demo.clas.json'));
-    expect(data.written).toContain(path.join('src', 'clas', 'zcl_demo', 'zcl_demo.clas.abap'));
+    expect(data.written).toContain('src/clas/zcl_demo/zcl_demo.clas.json');
+    expect(data.written).toContain('src/clas/zcl_demo/zcl_demo.clas.abap');
   });
 
   it('--include-tests also writes the testclasses part', async () => {
@@ -165,8 +165,8 @@ describe('abap pull (abap-file-format layout)', () => {
     const res = await runCommand(program, ['pull', 'ZCL_DEMO', '--type', 'CLAS', '--json'], { cwd });
     const data = read(res).data;
     // identical .abap skipped, .json still written (did not exist)
-    expect(data.skipped).toContain(path.join('src', 'clas', 'zcl_demo', 'zcl_demo.clas.abap'));
-    expect(data.written).toContain(path.join('src', 'clas', 'zcl_demo', 'zcl_demo.clas.json'));
+    expect(data.skipped).toContain('src/clas/zcl_demo/zcl_demo.clas.abap');
+    expect(data.written).toContain('src/clas/zcl_demo/zcl_demo.clas.json');
 
     // differing file without --overwrite → OVERWRITE_REQUIRED
     fs.writeFileSync(path.join(dir, 'zcl_demo.clas.abap'), 'DIFFERENT');

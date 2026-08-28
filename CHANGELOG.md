@@ -5,6 +5,53 @@
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-08-28
+
+### Security
+- **027 — 扩展加载信任硬化（Lazy Load + Lockfile Pinning + 严格包名校验）**：`src/abap_cli/index.ts` 启动期不再 `import()` 任何 npm 扩展；改为 argv 首词嗅探（仅 `extensions list` / `extensions lock` 与非 builtin 首词触发预加载）+ commander `preAction` 钩内异步加载剩余扩展。`abap --help` / `--version` / `doctor` / 空 argv **不再** 执行任何扩展模块顶层代码，关闭了"打开 CLI 就被恶意 `.abap.json` RCE"路径。新增 `extensions.lock.json` 文件格式（`schemaVersion: 1`，含 `{packageName, resolved, integrity: 'sha512-<base64>'}` 条目），CLI 在 `import()` 之前用 `node:crypto` 校验每个 `sourceType:'npm'` 扩展的 sha512 与 lockfile 是否一致；缺失 / 篡改 / 不可解析分别归一化为 `LOCKFILE_MISSING_ENTRY` / `LOCKFILE_INTEGRITY_MISMATCH` / `INTEGRITY_UNRESOLVABLE` reason（属于 `EXTENSION_LOAD_FAILED`，exit 3）。`sourceType:'path'` 扩展继续走既有 `path_contains_parent_ref` / `path_escapes_allowlist` 检查（FR-006 豁免）。新增 `abap extensions lock [--allow-unsigned]` 子命令重新生成 lockfile；首次创建必须显式 `--allow-unsigned`。`loadExtensionModule(spec, ctx?)` 接受可选 lockfile 上下文（向后兼容）。`meta.extensions.lockfile?: { status, lastResolved? }` 字段新增（无 npm 扩展时省略，token-efficient），`extensions list --json` 每条 npm 条目带 `lockfile` 子字段（路径源省略）。新增 npm 包名校验（FR-010）覆盖 `..` / `\` / 空 scope / URL scheme / 绝对路径 / 非 npm 名字符集；`INVALID_PACKAGE_NAME` 拒绝在任何 `import()` / `createRequire().resolve()` 之前触发。spec 在 `specs/027-extension-trust/spec.md`，plan/tasks/contracts 同目录。**零新 npm 依赖**（仅 `node:crypto` / `node:fs/promises` / `node:module` / `node:path`）；CHANGELOG / AGENTS.md / docs/commands.md 既有契约未破坏；022/023 envelope 形状不变（仅在 `meta.extensions` 下加可选字段）。**Migration**：现存用户首次升级后，对含 npm 扩展的项目跑 `abap extensions lock --allow-unsigned` 一次，提交 `extensions.lock.json` 到 git（与 `package-lock.json` 同处置）；之后所有 npm 扩展加载会校验 sha512。strict mode（`ABAP_CLI_EXTENSIONS_STRICT=1`）行为不变：任一扩展加载失败即以 JSON envelope + exit 3 中止。
+
+### Changed
+- **025 — Skill 重组：4 领域 + 1 meta（替换旧 2-skill 设计）**：顶层 `skills/` 从 `abap-setup` + `abap-object`（021 合并版）拆为 `abap-cli`（meta 路由）+ `abap-cli-setup`（环境就绪）+ `abap-cli-search`（只读探查）+ `abap-cli-edit`（写路径，含 DDIC）+ `abap-cli-data`（运行时消费）。每个领域 skill 决策树短、行数 ≤ 阈值、错误码严格不重叠；`references/errors.md` 内联各自错误码，**不**做跨 skill cross-reference。`agents/abap-developer.agent.md` 扩为 9 步工作流 + 5 handoffs（含 `Route → abap-cli` 入口），可选串联 `.github/skills/abap-code-writing`（Step 0）与 `.github/skills/clean-abap`（Step 5.5）；用户 workspace 无 `.github/skills/` 时两 Step 是 no-op。spec 在 `specs/025-skill-restructure/spec.md`，plan 在同目录 `plan.md`，tasks 在同目录 `tasks.md`。设计动机与对比详见 `specs/025-skill-restructure/spec.md`（Overview + Naming & Boundaries）。
+
+### Removed
+- **025 — 旧 skill 目录删除（不留 compat 别名）**：
+  - `skills/abap-setup/` → 内容迁移到 `skills/abap-cli-setup/`（commands-quick.md / errors.md 措辞更新为指向 `abap-cli-search` / `abap-cli-edit`）
+  - `skills/abap-object/` → 内容拆分到 `skills/abap-cli-search/`（6 命令）+ `skills/abap-cli-edit/`（6 命令 + workflow.md）+ `skills/abap-cli-data/`（2 命令）
+  - `agents/abap-developer.agent.md` 旧 7 步 / 2 handoffs 版本删除
+  - **Migration**（agent 用户必读）：
+    - 路由层：`abap-setup` → `abap-cli-setup`；`abap-object` → `abap-cli-search` / `abap-cli-edit` / `abap-cli-data`（按意图选）
+    - 跨 skill 引用：旧措辞"（abap-object skill 内）"改为"（[abap-cli-edit]）"或"（[abap-cli-search]）"
+    - 重新加载 agent（Claude Code / Copilot）使新 5 skill 路由生效
+    - AGENTS.md "Refactor Fearlessly" 明确允许 breaking change，本特性不留 compat alias
+- **P1 — `--help` 不再嵌入 `Common errors / Exit codes` 块**：之前每个命令的 `--help` 末尾都贴同一份"Common errors and how to fix them" + "Exit codes" 段落（17 处 `addHelpText('after', commonErrorsAfter())`），内容大量重复且无法随 scope 区分。删除 `src/abap_cli/output/help-text.ts` 与全部调用点；改为在错误抛出时通过新增的 `CliError.references` 字段（human 输出 `See: <path>` 一行；JSON envelope 新增 `references` 字段）指向 `skills/abap-object/references/errors.md` / `skills/abap-setup/references/errors.md`。已挂 references 的 4 个核心错误源：`http-error.ts`（TLS_ERROR / AUTH_ERROR / SAP_ERROR → abap-setup）、`core/transport.ts`（NO_TRANSPORT → abap-setup）、`flows/push-object.ts`（LOCK_FAILED → abap-object）、`flows/run-flow.ts`（classrun error → 按 code 区分 abap-object vs abap-setup，WRAPPER_NOT_DEPLOYED 指向 abap-setup）。`cli-output.schema.json` 加 `references` 字段。**Migration**：用户在 `--help` 里看不到错误恢复提示，错误现场 stderr / JSON envelope 直接给一行 `See: skills/.../errors.md#anchor`；Agent 拿 `error.code` + `error.references` 即可跳转。
+
+### Added
+- **P1 — 全 19 命令 `--schema` introspection**：之前仅 6 个命令（`create` / `run` / `search` / `select` / `tcode` / `where-used`）支持 `--schema`，其余 13 个（`init` / `pull` / `push` / `check` / `transport` / `extension` / `profile` / `status` / `doctor` / `inspect` / `activate` / `diff` / `extensions`）没有机器可读契约。新增 `src/abap_cli/flows/command-schemas.ts` 集中存放 SCHEMA 常量（单个 import 表面 `commandSchemas`），各命令路由 `--schema` 到 `printSchema(...)`。Agent 现在可以对**所有**注册命令做参数自省（之前 docs/commands.md 承诺覆盖19 命令但实际只覆盖6 个 — gap 已填补）。
+- **P1 — docs/commands.md 自动生成**（`scripts/build-commands-doc.{ts,mjs}`）：所有19 个命令的 Argument / Option / Exclusive groups / Global options / Examples / Error codes 段均由 `commandSchemas` + `EXIT_CODES` 单一事实源生成。`docs/commands.md` 顶部加 "auto-generated — v{version}" 横幅与 "do not edit by hand" 提示；末尾加 Per-command error code index（按 code 聚合每个 code 被哪些命令使用）。`npm run build-docs` 调用脚本（自动 `npm run build` if dist/ 缺失）。**Migration**：之前手工写的 prose 段（init 的 "四种模式 + agent scaffold matrix"、push 的 "transport resolution algorithm"、select 的 "Read-only & injection-safety contract" 等）暂未迁入 schema 的 `notes` 字段 — 下一轮增量补齐；当前生成器已具备 `notes: string[]` 渲染通道，加内容只需在 schema 常量里追加。
+- **P1 — `CommandSchemaOption` / `CommandSchemaArgument` 接口扩展**：`type` 联合扩展（`'string' \| 'int' \| 'number' \| 'boolean' \| 'json'`）；`pattern` / `minimum` / `maximum` / `maxLength` / `global` / `valuePlaceholder` 字段新增。`CommandSchema` 加 `scope?` / `notes?` / `errors?: CommandSchemaError[]` 字段；`CommandSchema.usage` 由必填改为可选。`searchSchema()` 的 query argument 补 `type: 'string'` 与 run/select/tcode 一致。
+
+### Changed
+- **`abap init` 向导新增系统的提问顺序调整为"身份先、凭证后"**：原顺序先问 `Password` 再问 URL/Client/Username，认知负担重（用户得同时在密码管理器与终端间切换）。现顺序：URL → Client → Username → Language → `Skip SSL certificate verification?` → Password；向导在 TTY 下显式询问 insecure（之前仅在传 `--insecure` 时生效；TTY 用户无法在向导内决定）。`auth method` 仍默认 `basic`（该行为与既有契约一致；wizard 内切换 cert/sso/oauth 不在本次范围）。新增 `test/unit/init-new-system-order.test.ts` 锁住顺序。非 TTY 路径未受影响。
+- **P1 — `--schema` 统一为 unified envelope**：`run` / `select` / `tcode` / `where-used` 的 `--schema` 此前直接在 stdout 输出裸 schema 对象（`{command, arguments, ...}`），与 `search` / `create` 的 unified envelope 不一致。现全部改为输出 `{ status: 'success', meta, data }`（`data` 为原 schema，`meta` 为精简版 `command` / `version` / `durationMs`，支持 `--pretty-json` 缩进）。**Migration**：Agent 消费 `abap run|select|tcode|where-used --schema` 时，从 `JSON.parse(stdout)` 改为 `JSON.parse(stdout).data`；未使用 `--schema` 的输出不受影响。
+- **P1 — envelope JSON Schema + 全命令契约测试**：新增 `src/abap_cli/output/cli-output.schema.json`（draft-07，success/error 两种 envelope 的单一事实源，覆盖 meta / error / extensionMeta 结构、error.category 枚举、error.code 命名模式）与 `test/unit/envelope-schema.test.ts`。测试扫描 `src/abap_cli/commands/*.ts` 的全部注册命令：① 每个命令的失败路径（未知选项）必须在 stderr 输出 schema-valid 的错误 envelope、stdout 严格为空、exit 2；② 每个带 `--schema` 的命令（create/run/search/select/tcode/where-used）成功路径输出 schema-valid 的 envelope 且 meta 仅含 `command`/`version`/`durationMs`；③ 扩展错误必须使用专用 `EXTENSION_*` code（不伪装内建错误）。
+- **P1 — `run.ts` / `select.ts` 的 SCHEMA 补齐一致性**：之前缺 `schemaVersion: 1` / `usage` / `globalOptions` / `exclusiveGroups` 字段，`exclusive: [...]` 命名也与其他命令不一致。现统一为 `exclusiveGroups: [['--schema', '<class-name>']]`（与 `tcode` / `where-used` / `search` 同形）。`select.ts` 的 `exclusiveGroups: [['<no_exclusive_groups>']]` 占位符改为 `[]`。
+
+### Fixed
+- **P0 — Windows / cross-platform path contract**：所有 `--json` 输出的路径字段统一为 POSIX 相对路径（`/`），Agent 在 Windows / Linux / macOS 下消费到同一种结构。新增 `src/abap_cli/core/path-output.ts` 提供 `toOutputPath` / `toRelativeOutputPath` / `normalizePullData` 三个边界 helper（`isPathLike` 为内部判别）。Node 的 `path.join` / `path.relative` 仍用于 fs I/O（host-native 必需），但所有进入 `data` envelope / human 文本的路径都先经过规范化。受影响字段：
+  - `create`：`data.file`（local 创建草稿 + DDIC/HTTP `--file`）、`data.localFile`（create-then-pull）、`error.details.file`、`human` 中的 `relPath`。
+  - `pull`：`data.file` / `data.entries[].file` / `data.entries[].files` / `data.written` / `data.skipped` / `data.failed`（单对象、textpool、DDIC 单文件、TABL/STRU three-piece、HTTP、remote、package 批量、transport 批量六条路径全覆盖）；human 消息和 `OVERWRITE_REQUIRED` 错误文本中的 `file` 字段同步。
+  - `push`：`data.results[].file` + human 文本；`--atomic` 失败的 `details.failures[].file`、DDIC/HTTP 校验与 `FILE_PARSE_ERROR` 的 `details.file` / message。
+  - `deploy`：`data.files[].file`。
+  - `init --agent`：`data.written` / `data.skipped`。
+  - `init`：`data.configPath`（`--show-config` / `--unset-*`）与 `CONFIG_ERROR` 的 `details.file`。
+  - `profile`：`profile export --file` 的 `data.file` + human；`PROFILE_MISMATCH` warning 文本中的 workspace 相对路径。
+  - `doctor`：`config.active` verbose 文本中的 workspace 相对路径。
+  - `check`：`data.issues[].file`、`data.out`（仅 `--atc --out` 时报告；显式路径回显用户输入、默认值输出相对 POSIX `.abap/atc/<variant>-<ts>.json`，且与真实落盘文件一致）、persisted ATC JSON 的 `files[].file`。
+  - `status` / `diff`：`data.parts[].detail`（`local file: <path>` 改为相对 cwd 的 POSIX 路径）。
+- **绝对路径字段统一转为 cwd-relative POSIX**：`push` 的 `data.results[].file`、`check` 的 `data.issues[].file` 与 persisted worklists、`status`/`diff` 的 detail 原本是 `path.resolve` 的绝对路径，跨平台前缀不一致（`C:/...` vs `/...`）。现全部输出 cwd 相对 POSIX 路径（新增 `toRelativeOutputPath` helper），Agent 在任意平台看到同一形状。`diff` 内部读取 detail 路径时用 `path.resolve(cwd, ...)` 转回绝对路径供 fs 使用。
+- `path: "src/clas/..."` 形式的字面量（用户 `--file` 参数 / `out` 配置等）若包含 `\` 也自动转为 `/`，避免 Agent 在 Windows 上解析失败。
+- **测试基线**：上游 Windows 报告的 54/756 失败是 `path.join` 输出 `\` 与测试期望 `/` 的冲突，本次新增 19 条 `path-output.test.ts`（含 `toRelativeOutputPath` 5 条，覆盖显式 `cwd` 参数）+ 修正 `pull-layout.test.ts` 用 `path.join` 写死 `/` 的两处断言 + `check-modes.test.ts` 的 `out` 断言改为跨平台正确（并补 `--out` 未传时不报告 `out` 的回归断言）+ `push-transport.test.ts` 补失败分支 `details.results[].file` 归一化断言。本机 macOS / Linux 上 787/787 全绿，Windows CI 同代码也将看到同样结构化结果。
+
 ## [0.2.1] - 2026-08-25
 
 ### Added

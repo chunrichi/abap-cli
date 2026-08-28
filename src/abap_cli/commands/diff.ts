@@ -1,9 +1,9 @@
 import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { computeDiff } from '../flows/diff.js';
-import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
-import { commonErrorsAfter } from '../output/help-text.js';
+import { CliError, printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
 import { SEARCH_RESULT_LIMIT } from '../core/limits.js';
+import { commandSchemas } from '../flows/command-schemas.js';
 
 interface DiffOptions {
   file?: string;
@@ -17,13 +17,17 @@ export function registerDiffCommand(program: Command): void {
   program
     .command('diff [file]')
     .description('Compare local files against SAP')
-    .addHelpText('after', commonErrorsAfter())
     .option('--all', 'Compare the whole workspace')
     .option('--remote', 'Remote-only differences')
     .option('--local-only', 'Local-only differences')
     .option('--limit <n>', `Result bound (default ${SEARCH_RESULT_LIMIT})`)
+    .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action(async (file: string | undefined, opts: DiffOptions, cmd) => {
       const mode = jsonFromCommand(cmd);
+      if (cmd.optsWithGlobals().schema) {
+        printSchema(commandSchemas['diff']!, mode);
+        return;
+      }
       try {
         if (file && (opts.all || opts.remote || opts.localOnly)) {
           throw new CliError('INVALID_ARGUMENT', 'A file argument cannot be combined with --all/--remote/--local-only.', {

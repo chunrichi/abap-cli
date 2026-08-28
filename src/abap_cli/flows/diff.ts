@@ -145,7 +145,9 @@ export async function computeDiff(client: AdtClientWrapper, opts: DiffOptions = 
       const summary = await divergentSummary(client, cp, cwd);
       parts.push({ object: cp.object, part: cp.part, direction: cp.direction, summary });
     } else if (cp.direction === 'local-only') {
-      const local = await readAbapFile(cp.detail ? cp.detail.replace(/^local file: /, '') : `${cwd}/src/${cp.object.toLowerCase()}.abap`);
+      // detail carries a cwd-relative POSIX path (P0); resolve for fs reads.
+      const localPath = cp.detail ? cp.detail.replace(/^local file: /, '') : `${cwd}/src/${cp.object.toLowerCase()}.abap`;
+      const local = await readAbapFile(path.resolve(cwd, localPath));
       const lines = local.split('\n').length - 1;
       parts.push({ object: cp.object, part: cp.part, direction: cp.direction, summary: { added: lines, removed: 0, changedLines: [] } });
     } else {
@@ -162,11 +164,13 @@ async function divergentSummary(client: AdtClientWrapper, cp: ChangedPart, cwd: 
   if (!localFile) {
     throw new CliError('OBJECT_NOT_FOUND', `Cannot locate local file for ${cp.object}`);
   }
-  const resolved = resolveFile(localFile);
+  // detail carries a cwd-relative POSIX path (P0); resolve for fs reads.
+  const absLocal = path.resolve(cwd, localFile);
+  const resolved = resolveFile(absLocal);
   const object = await resolveObject(client, resolved.objectName, resolved.objectType);
   const partsList = await getObjectParts(client, object);
   const part = partsList.find((p) => p.subtype === cp.part) ?? partsList.find((p) => p.subtype === 'main');
   const remote = part ? await client.getObjectSource(part.sourceUrl) : '';
-  const local = await readAbapFile(localFile);
+  const local = await readAbapFile(absLocal);
   return lineDiffSummary(local, remote);
 }

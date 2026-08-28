@@ -51,6 +51,9 @@ export interface CliErrorOptions {
   nextSteps?: string[];
   /** FR-009 — a single canonical invocation that would succeed. */
   example?: string;
+  /** Repo-relative path to a skill reference doc that lists this error's
+*   meaning, category and recovery steps (e.g. 'skills/abap-cli-edit/references/errors.md#lock_failed'). */
+  references?: string;
 }
 
 export class CliError extends Error {
@@ -58,6 +61,7 @@ export class CliError extends Error {
   readonly details?: Record<string, unknown>;
   readonly nextSteps?: string[];
   readonly example?: string;
+  readonly references?: string;
 
   constructor(code: ErrorCode, message: string, options?: CliErrorOptions | Record<string, unknown>) {
     super(message);
@@ -68,12 +72,13 @@ export class CliError extends Error {
     }
     // Detect legacy `details` object: it has no recognised options-bag keys.
     const looksLikeOptionsBag =
-      'details' in options || 'nextSteps' in options || 'example' in options;
+      'details' in options || 'nextSteps' in options || 'example' in options || 'references' in options;
     if (looksLikeOptionsBag) {
       const opts = options as CliErrorOptions;
       this.details = opts.details;
       this.nextSteps = opts.nextSteps;
       this.example = opts.example;
+      this.references = opts.references;
     } else {
       // Legacy callers passed a raw details object as the third argument.
       this.details = options as Record<string, unknown>;
@@ -96,6 +101,7 @@ export function toErrorShape(error: unknown): { code: ErrorCode; category: Error
     if (error.details) out.details = error.details;
     if (error.nextSteps) out.nextSteps = error.nextSteps;
     if (error.example) out.example = error.example;
+    if (error.references) out.references = error.references;
     return out as { code: ErrorCode; category: ErrorCategory; message: string; [key: string]: unknown };
   }
   const err = error as { statusCode?: number; statusMessage?: string; message?: string };
@@ -169,6 +175,9 @@ export function renderError(mode: OutputMode, error: unknown, meta: OutputMeta):
   const lines = [...meta.warnings.map((w) => `Warning: ${w.message}`), `Error: ${err.message}`];
   if (Array.isArray(err.nextSteps) && err.nextSteps.length > 0) {
     lines.push(`  Try: ${err.nextSteps.join(' / ')}`);
+  if (typeof err.references === 'string' && err.references.length > 0) {
+    lines.push(`  See:  ${err.references}`);
+  }
   }
   return { stdout: [], stderr: lines, exitCode };
 }
@@ -191,16 +200,26 @@ export function printError(mode: OutputMode, error: unknown, meta?: OutputMeta):
 // Machine-readable description of a command's arguments/options so an agent
 // can discover the exact invocation contract before calling it.
 
+/** A schema field can be string-typed (covers int/number/json as well).
+ *  The type union stays narrow for readability; richer shapes (--args as
+ *  JSON, --timeout as number) surface through dedicated fields below. */
 export interface CommandSchemaArgument {
   name: string;
+  /** Argument value type. Defaults to 'string' when omitted. */
+  type?: 'string' | 'int' | 'number' | 'json';
   required: boolean;
   description: string;
+  /** Restrict to a fixed enum, e.g. object type (CLAS/INTF/PROG/FUGR). */
   allowedValues?: string[];
+  /** Regex pattern for string values; rejected by Agent before calling. */
+  pattern?: string;
+  /** Maximum string length (chars). */
+  maxLength?: number;
 }
 
 export interface CommandSchemaOption {
   name: string;
-  type: 'string' | 'int' | 'boolean';
+  type: 'string' | 'int' | 'number' | 'boolean' | 'json';
   /** Placeholder text shown in usage, e.g. `<n>` for --limit <n>. */
   valuePlaceholder?: string;
   description: string;
@@ -208,26 +227,58 @@ export interface CommandSchemaOption {
   default?: string | number | boolean;
   deprecated?: boolean;
   allowedValues?: string[];
+  /** Regex pattern for string values. */
+  pattern?: string;
+  /** Numeric lower bound (int/number only). */
+  minimum?: number;
+  /** Numeric upper bound (int/number only). */
+  maximum?: number;
+  /** True if the option is a global flag inherited from the root program. */
+  global?: boolean;
+}
+
+/** Per-example block for richer command docs (run/select/tcode/where-used). */
+export interface CommandSchemaExample {
+  description?: string;
+  command: string;
+}
+
+export interface CommandSchemaError {
+  code: string;
+  category: string;
+  exitCode: number;
 }
 
 export interface CommandSchema {
   schemaVersion: 1;
   command: string;
   description: string;
-  usage: string;
+  usage?: string;
+  /** Optional command scope tag (sap / local) used for grouping in docs. */
+  scope?: 'sap' | 'local' | string;
   arguments: CommandSchemaArgument[];
   options: CommandSchemaOption[];
-  /** Option sets that must not be combined, e.g. [['--exact', '--fuzzy']]. */
+  /** Option sets that must not be combined, e.g. [['--exact', '--fuzzy']].
+   *  An empty array `[]` means "no explicit mutex groups" — render nothing. */
   exclusiveGroups?: string[][];
-  globalOptions: string[];
-  examples?: string[];
+  /** Global options inherited from the root program (always `--json`). */
+  globalOptions?: string[];
+  examples?: (string | CommandSchemaExample)[];
+  /** Command-scoped error codes (subset of the global ErrorCode enum). */
+  errors?: CommandSchemaError[];
+  /** Free-form notes (design, contract, runtime hints) for the docs page. */
+  notes?: string[];
 }
 
-/** Print a command schema. Always JSON — it is a machine-readable contract.
- *  Uses the reduced `buildSchemaMeta()` envelope (no timestamp/warnings) so
- *  schema introspection stays deterministic across runs. */
-export function printSchema(schema: CommandSchema): void {
-  printResult('json', schema, '', buildSchemaMeta() as OutputMeta);
+/** Print a command schema. Always a JSON envelope — it is a machine-readable
+ *  contract. Uses the reduced `buildSchemaMeta()` (no timestamp/warnings) so
+ *  schema introspection stays deterministic across runs. `--pretty-json`
+ *  indents; human mode still emits compact JSON (a schema is JSON by nature).
+ *  The payload may be the base `CommandSchema` or a richer command-specific
+ *  shape (scope/errors/examples) — it is never read, only wrapped. */
+export function printSchema(schema: object, mode: OutputMode = 'json'): void {
+  const jsonMode = mode === 'pretty-json' ? 'pretty-json' : 'json';
+  printResult(jsonMode, schema, '', buildSchemaMeta() as OutputMeta);
 }
 
 // --- Token-efficient output helpers (025 US2) ---

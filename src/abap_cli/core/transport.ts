@@ -27,5 +27,6 @@ export async function resolveTransport(
   throw new CliError('NO_TRANSPORT', 'No transport request available; specify one with --tr', {
     nextSteps: ['Re-run with --tr <request> (e.g. --tr NDK123456).', "Create one with 'abap transport create'."],
     example: 'abap push src/foo.abap --tr NDK123456',
+    references: 'skills/abap-cli-setup/references/errors.md#no_transport',
   });
 }

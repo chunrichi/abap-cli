@@ -9,6 +9,7 @@ import { collectWarning } from '../output/meta.js';
 import { parseBtpServiceKey } from '../auth/types.js';
 import { findWorkspaceConfig } from '../config/project-config.js';
 import { probeSystem } from '../clients/probe.js';
+import { toOutputPath } from '../core/path-output.js';
 import { probeTextpoolCapability, recordCapability } from '../textpool/textpool-capability.js';
 import { getOrProbeRuntime } from '../config/runtime-cache.js';
 import { assertValidProfile } from '../config/validation.js';
@@ -325,7 +326,7 @@ export async function runDelete(name: string, yes: boolean, mode: OutputMode): P
     try {
       const workspace = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
       if (workspace.system === name) {
-        warning = `workspace .abap.json (${path.relative(process.cwd(), configPath) || '.abap.json'}) references '${name}'`;
+        warning = `workspace .abap.json (${toOutputPath(path.relative(process.cwd(), configPath)) || '.abap.json'}) references '${name}'`;
       }
     } catch {
       // ignore parse errors

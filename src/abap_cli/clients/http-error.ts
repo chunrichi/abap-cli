@@ -25,6 +25,11 @@ const TLS_NEXT_STEPS = [
   "For self-signed dev systems only: 'abap profile set <name> --insecure'.",
 ];
 const TLS_EXAMPLE = 'abap profile set <name> --ca ./sap-dev-ca.pem';
+// 025 重构：error.references 指向新 4 领域 skill 的 errors.md
+// TLS / AUTH / SAP_ERROR 由 abap-cli-setup 文档（环境就绪 + 凭证 + ICF 部署）
+const TLS_REFERENCE = 'skills/abap-cli-setup/references/errors.md#tls_error';
+const AUTH_REFERENCE = 'skills/abap-cli-setup/references/errors.md#auth_error';
+const SAP_ERROR_REFERENCE = 'skills/abap-cli-setup/references/errors.md#sap_error';
 
 /**
  * Choose the "what now?" hint for a 401/403 based on the auth method actually
@@ -70,6 +75,7 @@ export function classifyHttpError(
         details: { cause: httpEx.code, ...(context?.name ? { system: context.name } : {}) },
         nextSteps: TLS_NEXT_STEPS,
         example: TLS_EXAMPLE,
+        references: TLS_REFERENCE,
       });
     }
     if (status === 401 || status === 403) {
@@ -78,10 +84,12 @@ export function classifyHttpError(
         details: { httpStatus: status, ...(context?.name ? { system: context.name, authMethod: context.authMethod } : { authMethod: context?.authMethod }) },
         nextSteps: hints.nextSteps,
         example: hints.example,
+        references: AUTH_REFERENCE,
       });
     }
     const opts: CliErrorOptions = {
       details: { httpStatus: status, ...(context?.name ? { system: context.name } : {}) },
+      references: SAP_ERROR_REFERENCE,
     };
     return new CliError('SAP_ERROR', httpEx.message || `HTTP ${status}`, opts);
   }
@@ -92,9 +100,7 @@ export function classifyHttpError(
     const code = (error as NodeJS.ErrnoException).code;
     if (code && TLS_ERROR_CODES.has(code)) {
       return new CliError('TLS_ERROR', error.message, {
-        details: { cause: code, ...(context?.name ? { system: context.name } : {}) },
-        nextSteps: TLS_NEXT_STEPS,
-        example: TLS_EXAMPLE,
+        references: TLS_REFERENCE,
       });
     }
   }
@@ -107,6 +113,7 @@ export function classifyHttpError(
         details: { cause: cause.code, ...(context?.name ? { system: context.name } : {}) },
         nextSteps: TLS_NEXT_STEPS,
         example: TLS_EXAMPLE,
+        references: TLS_REFERENCE,
       });
     }
     const status = error.response?.status;
@@ -117,12 +124,14 @@ export function classifyHttpError(
         details: { httpStatus: status, ...(context?.name ? { system: context.name, authMethod: context.authMethod } : { authMethod: context?.authMethod }) },
         nextSteps: hints.nextSteps,
         example: hints.example,
+        references: AUTH_REFERENCE,
       });
     }
     if (typeof status === 'number') {
       const body = error.response?.data as { message?: string } | undefined;
       const opts: CliErrorOptions = {
         details: { httpStatus: status, ...(context?.name ? { system: context.name } : {}) },
+        references: SAP_ERROR_REFERENCE,
       };
       if (error.response?.statusText) opts.details = { ...opts.details, httpStatusText: error.response.statusText };
       return new CliError('SAP_ERROR', body?.message || error.message, opts);
@@ -131,7 +140,7 @@ export function classifyHttpError(
 
   // Fallback — re-throw the original error as SAP_ERROR.
   const msg = error instanceof Error ? error.message : String(error);
-  return new CliError('SAP_ERROR', msg, context?.name ? { details: { system: context.name } } : undefined);
+  return new CliError('SAP_ERROR', msg, context?.name ? { details: { system: context.name }, references: SAP_ERROR_REFERENCE } : { references: SAP_ERROR_REFERENCE });
 }
 
 /** Convenience: does this error originate from a TLS handshake? */

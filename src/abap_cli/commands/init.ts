@@ -1,8 +1,8 @@
 import { Command } from 'commander';
-import { CliError, printError, printResult, jsonFromCommand } from '../output/json.js';
-import { commonErrorsAfter } from '../output/help-text.js';
+import { CliError, printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
 import { runInitFromOpts, runInitWizard, runInitShowConfig, runInitUnset } from '../flows/init-flow.js';
 import { scaffoldAgents, type AgentTarget } from '../flows/init-agents.js';
+import { commandSchemas } from '../flows/command-schemas.js';
 
 /** `abap init` (parent) help: option groups, examples, profile references. */
 function initParamHelp(): string {
@@ -60,7 +60,6 @@ export function registerInitCommand(program: Command): void {
   const init = program
     .command('init')
     .description('Initialize the workspace (bind a profile, write .abap.json) and/or scaffold AI agent context')
-    .addHelpText('after', commonErrorsAfter())
     .addHelpText('after', initParamHelp())
     .option('--profile <name>', 'Use an existing global profile (created with `abap profile add`)')
     // Legacy alias (021 deprecation): --system still accepted, prints a hint to migrate.
@@ -94,8 +93,15 @@ export function registerInitCommand(program: Command): void {
     .option('--force', 'Overwrite existing files when scaffolding --agent (default: skip)')
     .option('--yes', 'Skip all prompts; fail if required input is missing (alias: --non-interactive)')
     .option('--non-interactive', 'Alias of --yes')
+    .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action(async (opts, cmd) => {
       const mode = jsonFromCommand(cmd);
+
+      // --schema branch — emit machine-readable parameter schema (no SAP call).
+      if (cmd.optsWithGlobals().schema) {
+        printSchema(commandSchemas['init']!, mode);
+        return;
+      }
 
       // --agent can run independently of any profile/workspace fields.
       if (typeof opts.agent === 'string') {

@@ -37,18 +37,13 @@ describe('abap run --help', () => {
     }
   });
 
-  it('lists the 7 new 015 error codes in the common-errors block', async () => {
+  it('does not embed the old common-errors / exit-codes block', async () => {
+    // US-recent: the inline `Common errors and how to fix them` block was
+    // removed from --help; error recovery lives in skills/*/references/errors.md
+    // and is surfaced at run time via `error.references` / `See:` lines.
     const out = await runHelp();
-    for (const code of [
-      'METHOD_NOT_SUPPORTED',
-      'METHOD_FAILED',
-      'OBJECT_NOT_ACTIVE',
-      'WRAPPER_NOT_DEPLOYED',
-      'LOCAL_CLASS_NOT_RUNNABLE',
-      'CLASS_NOT_RUNNABLE',
-      'TIMEOUT',
-    ]) {
-      expect(out).toContain(code);
-    }
+    expect(out).not.toContain('Common errors and how to fix them');
+    expect(out).not.toContain('Exit codes:');
+    expect(out).not.toContain('WRAPPER_NOT_DEPLOYED');
   });
 });

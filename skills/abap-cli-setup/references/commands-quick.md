@@ -1,4 +1,4 @@
-# abap-setup — 4 + 2 命令完整速查
+# abap-cli-setup — 5 命令完整速查
 
 > 按需加载。本文件只在 SKILL.md 提及 references 时被 agent 读取。
 
@@ -116,7 +116,7 @@ abap transport release DEVK900001 --tr <target> --yes
 
 ## `abap extension`（基础设施就绪）
 
-部署和探测 bundled ICF 服务（`/sap/zabap_vibe`）。安装 `ZCL_ABAP_VIBE_ICF` + `ZCL_ABAP_VIBE_ICF_SETUP` + `ZCL_ABAP_VIBE_RUNNER`，是 `abap-object` 的 `run` / `select` / `tcode` 的硬性依赖。
+部署和探测 bundled ICF 服务（`/sap/zabap_vibe`）。安装 `ZCL_ABAP_VIBE_ICF` + `ZCL_ABAP_VIBE_ICF_SETUP` + `ZCL_ABAP_VIBE_RUNNER`，是 [abap-cli-data] 的 `run` / `select` 的硬性依赖。
 
 ### `abap extension deploy`
 

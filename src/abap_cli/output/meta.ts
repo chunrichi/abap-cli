@@ -50,13 +50,18 @@ export interface Warning {
   details?: Record<string, unknown>;
 }
 
-/** Snapshot of loaded extensions for meta.extensions (023-extension-mechanism). */
+/** Snapshot of loaded extensions for meta.extensions (023-extension-mechanism).
+ *  027-extension-trust — adds optional `lockfile` sub-object.
+ *  Purely additive: consumers that ignore unknown keys are unaffected. */
 export interface ExtensionMeta {
   loaded: number;
   failed?: number;
   byType: { command?: number; validation?: number; lifecycle?: number };
   names: string[];
   validationRules?: Array<{ name: string; appliesTo: string[] | '*' }>;
+  /** 027 US4 — lockfile health. Omitted when no npm extensions declared
+   *  or when status is `present` (token-efficient). */
+  lockfile?: { status: 'present' | 'absent' | 'outdated' | 'mismatch'; lastResolved?: string };
 }
 
 export interface OutputMeta {

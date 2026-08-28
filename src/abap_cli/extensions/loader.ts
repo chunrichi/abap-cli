@@ -2,6 +2,10 @@
  * Extension module loader (FR-005 / FR-006).
  * Handles bare npm packages, local paths, path security (realpath + dual allowlist),
  * recursion guard, and timeout.
+ *
+ * 027: also enforces strict npm package-name validation (FR-010) and
+ * lockfile-pinned integrity (FR-005) for `sourceType: 'npm'` sources.
+ * `sourceType: 'path'` sources skip lockfile verification (FR-006).
  */
 
 import { pathToFileURL } from 'url';
@@ -9,6 +13,23 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { realpath } from 'fs/promises';
 import { extensionLoadFailed } from './errors.js';
+import {
+  validateNpmPackageName,
+  findLockEntry,
+  hashFile,
+  resolvePackageEntry,
+  type ExtensionsLock,
+} from './lockfile.js';
+
+/**
+ * Optional 2nd argument to `loadExtensionModule` (027 US2).
+ * When provided for npm sources, the loader verifies the on-disk file's
+ * sha512 against `lockfile` before calling `import()`.
+ */
+export interface LoadContext {
+  lock?: ExtensionsLock | null;
+  lockfilePath?: string;
+}
 
 /** Maximum symlink-following depth before declaring a cycle. */
 const MAX_DEPTH = 5;
@@ -38,7 +59,7 @@ export async function resolveLocalPath(raw: string): Promise<string> {
 
   if (normalized.includes('..')) {
     throw extensionLoadFailed(raw, 'path_contains_parent_ref', {
-      reason: 'path contains .. segment',
+      parentRef: 'path contains .. segment',
     });
   }
 
@@ -59,7 +80,7 @@ export async function resolveLocalPath(raw: string): Promise<string> {
   const isAllowed = allowlist.some((base) => realNormalized.startsWith(base + path.sep));
   if (!isAllowed) {
     throw extensionLoadFailed(raw, 'path_escapes_allowlist', {
-      reason: `resolved path '${real}' is not under allowed directories`,
+      resolvedPath: `resolved path '${real}' is not under allowed directories`,
       allowlist,
     });
   }
@@ -74,11 +95,27 @@ export async function resolveLocalPath(raw: string): Promise<string> {
  * path sourceType: resolves the path, converts to file:// URL, imports it
  *
  * Timeout (30s) and recursion guard (MAX_DEPTH) prevent runaway loading.
+ *
+ * 027 US2/US3: when `ctx` is provided for npm sources, the loader first runs
+ * strict package-name validation and then verifies the on-disk file's
+ * sha512 against `ctx.lock`. `path:` sources skip both checks (FR-006).
  */
 export async function loadExtensionModule(
   spec: { sourceType: 'npm'; packageName: string; path?: string } | { sourceType: 'path'; path: string },
-  loadingStack: Set<string> = new Set(),
+  ctxOrStack?: LoadContext | Set<string>,
+  legacyStack?: Set<string>,
 ): Promise<{ default: unknown }> {
+  // Backward-compat: 023 callers passed a Set<string> as the 2nd arg.
+  // 027 callers pass a LoadContext. Discriminate by shape.
+  let ctx: LoadContext | undefined;
+  let loadingStack: Set<string>;
+  if (ctxOrStack instanceof Set) {
+    loadingStack = ctxOrStack;
+  } else {
+    ctx = ctxOrStack;
+    loadingStack = legacyStack ?? new Set();
+  }
+
   if (loadingStack.size >= MAX_DEPTH) {
     throw extensionLoadFailed(
       spec.sourceType === 'npm' ? spec.packageName : spec.path,
@@ -91,6 +128,48 @@ export async function loadExtensionModule(
   loadingStack.add(key);
 
   try {
+    // 027 US3 — strict package name validation runs BEFORE any module resolution.
+    if (spec.sourceType === 'npm') {
+      const nameCheck = validateNpmPackageName(spec.packageName);
+      if (!nameCheck.ok) {
+        throw extensionLoadFailed(spec.packageName, 'INVALID_PACKAGE_NAME', {
+          packageName: spec.packageName,
+          validationReason: nameCheck.reason,
+        });
+      }
+
+      // 027 US2 — lockfile verification before import() for npm sources.
+      if (ctx?.lock !== undefined) {
+        const entry = findLockEntry(ctx.lock, spec.packageName);
+        if (!entry) {
+          throw extensionLoadFailed(spec.packageName, 'LOCKFILE_MISSING_ENTRY', {
+            lockfilePath: ctx.lockfilePath,
+          });
+        }
+        const resolved = resolvePackageEntry(spec.packageName);
+        if (!resolved) {
+          throw extensionLoadFailed(spec.packageName, 'INTEGRITY_UNRESOLVABLE', {
+            packageName: spec.packageName,
+          });
+        }
+        let actual: string;
+        try {
+          actual = await hashFile(resolved);
+        } catch {
+          throw extensionLoadFailed(spec.packageName, 'INTEGRITY_UNRESOLVABLE', {
+            packageName: spec.packageName,
+          });
+        }
+        if (actual !== entry.integrity) {
+          throw extensionLoadFailed(spec.packageName, 'LOCKFILE_INTEGRITY_MISMATCH', {
+            expected: entry.integrity.slice(7, 15),
+            actual: actual.slice(7, 15),
+            resolved,
+          });
+        }
+      }
+    }
+
     let href: string;
 
     if (spec.sourceType === 'npm') {
@@ -101,17 +180,23 @@ export async function loadExtensionModule(
       href = pathToFileURL(realPath).href;
     }
 
-    const timer = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Extension load timed out')), LOAD_TIMEOUT_MS),
-    );
+    let timerHandle: ReturnType<typeof setTimeout> | undefined;
+    const timer = new Promise<never>((_, reject) => {
+      timerHandle = setTimeout(() => reject(new Error('Extension load timed out')), LOAD_TIMEOUT_MS);
+    });
 
     const load = import(href);
     const { default: ext } = await Promise.race([load, timer]);
+    // Clear the timeout so its handle doesn't keep the event loop alive
+    // (the original 023 loader had this leak; tests hung for ~30s after success).
+    if (timerHandle) clearTimeout(timerHandle);
     return { default: ext };
   } catch (err) {
+    // Already a CliError from validation/lockfile step — pass through unchanged.
+    if (err instanceof Error && err.name === 'CliError') throw err;
     const reason =
       err instanceof Error ? err.message : String(err);
-    if (err instanceof Error && err.message === 'Extension load timed out') {
+    if (reason === 'Extension load timed out') {
       throw extensionLoadFailed(
         spec.sourceType === 'npm' ? spec.packageName : spec.path,
         'load_timeout',
@@ -121,7 +206,7 @@ export async function loadExtensionModule(
     throw extensionLoadFailed(
       spec.sourceType === 'npm' ? spec.packageName : spec.path,
       'import_failed',
-      { reason },
+      { importError: reason },
     );
   } finally {
     loadingStack.delete(key);

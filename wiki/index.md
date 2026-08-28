@@ -49,6 +49,10 @@ changed at: 2026-08-19 23:00:00
 
 - [transport](commands/transport.md) — 管理 SAP 传输请求（list / create / show / resolve / assign）
 
+### 跨命令契约
+
+- [output path contract](commands/path-output.md) — `--json` 路径字段统一 POSIX，跨平台 Agent 消费稳定
+
 ## Notes
 
 - [SAP 层统一 JSON 生成（/ui2/cl_json）](json-generation.md) — 全 SAP 层唯一 JSON 生成方式（017）

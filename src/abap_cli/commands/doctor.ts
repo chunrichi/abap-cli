@@ -1,7 +1,7 @@
 import { Command } from 'commander';
-import { CliError, printError, printResult, jsonFromCommand, type OutputMode } from '../output/json.js';
-import { commonErrorsAfter } from '../output/help-text.js';
+import { CliError, printError, printResult, printSchema, jsonFromCommand, type OutputMode } from '../output/json.js';
 import { runDoctorChecks, applySafeFixes } from '../flows/doctor-checks.js';
+import { commandSchemas } from '../flows/command-schemas.js';
 
 interface DoctorOptions {
   verbose?: boolean;
@@ -14,13 +14,17 @@ export function registerDoctorCommand(program: Command): void {
   program
     .command('doctor')
     .description('Diagnose CLI environment and configuration')
-    .addHelpText('after', commonErrorsAfter())
     .option('--verbose', 'Include detail (versions, paths, messages)')
     .option('--fix', 'Apply safe, reversible fixes (requires --yes)')
     .option('--yes', 'Confirm --fix without prompting')
     .option('--system <name>', 'Scope to a named profile')
+    .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action(async (opts: DoctorOptions, cmd) => {
       const mode = jsonFromCommand(cmd);
+      if (cmd.optsWithGlobals().schema) {
+        printSchema(commandSchemas['doctor']!, mode);
+        return;
+      }
       try {
         await runDoctor(opts, mode);
       } catch (error: unknown) {

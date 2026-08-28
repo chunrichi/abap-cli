@@ -4,6 +4,7 @@ import * as os from 'os';
 import { probeSystem } from '../clients/probe.js';
 import { assertValidProfile } from '../config/validation.js';
 import { findWorkspaceConfig } from '../config/project-config.js';
+import { toOutputPath } from '../core/path-output.js';
 
 export type DoctorStatus = 'ok' | 'err';
 
@@ -194,7 +195,7 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
           config,
           okItem(
             'config.active',
-            verbose ? `active system: ${activeSystem} (${path.relative(cwd, workspacePath) || '.abap.json'})` : undefined,
+            verbose ? `active system: ${activeSystem} (${toOutputPath(path.relative(cwd, workspacePath)) || '.abap.json'})` : undefined,
           ),
         );
       }

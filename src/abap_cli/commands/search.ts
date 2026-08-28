@@ -2,8 +2,7 @@ import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError, printError, printResult, jsonFromCommand, printSchema, type CommandSchema, type OutputMode } from '../output/json.js';
 import { collectWarning } from '../output/meta.js';
-import { commonErrorsAfter } from '../output/help-text.js';
-import { SEARCH_RESULT_LIMIT } from '../core/limits.js';
+import { SEARCH_RESULT_LIMIT, PAGE_ALL_DEFAULT_MAX } from '../core/limits.js';
 import type { SearchResult } from 'abap-adt-api';
 
 interface SearchResultItem {
@@ -29,14 +28,10 @@ interface SearchOptions {
   pageAllMax?: string;
 }
 
-/** Default hard cap for `--page-all` (50 × 20 = 1000 items). */
-const PAGE_ALL_DEFAULT_MAX = 50;
-
 export function registerSearchCommand(program: Command): void {
   program
     .command('search')
     .description('Search for ABAP objects in SAP system')
-    .addHelpText('after', commonErrorsAfter())
     // [query]（可选）是因为 --schema 模式下不需要查询词；真实搜索仍需 query。
     .argument('[query]', 'Search query (supports * wildcard)')
     .option('--type <type>', 'Filter by object type')
@@ -230,7 +225,7 @@ function searchSchema(): CommandSchema {
     command: 'search',
     description: 'Search for ABAP objects in SAP system',
     usage: 'abap search [options] <query>',
-    arguments: [{ name: 'query', required: true, description: 'Search query (supports * wildcard)' }],
+    arguments: [{ name: 'query', type: 'string', required: true, description: 'Search query (supports * wildcard)' }],
     options: [
       { name: '--type', type: 'string', valuePlaceholder: '<type>', description: 'Filter by object type' },
       { name: '--limit', type: 'int', valuePlaceholder: '<n>', default: SEARCH_RESULT_LIMIT, description: 'Maximum results per page' },
@@ -244,6 +239,10 @@ function searchSchema(): CommandSchema {
     ],
     exclusiveGroups: [['--exact', '--fuzzy'], ['--page', '--page-all']],
     globalOptions: ['--json'],
-    examples: ['abap search ZCL_* --type CLAS --limit 50', 'abap search ZCL_DEMO --exact', 'abap search ZCL_* --page-all'],
+    examples: [
+      { description: 'Filter by type', command: 'abap search ZCL_* --type CLAS --limit 50' },
+      { description: 'Exact name match', command: 'abap search ZCL_DEMO --exact' },
+      { description: 'Fetch all results in one request', command: 'abap search ZCL_* --page-all' },
+    ],
   };
 }

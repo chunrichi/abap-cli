@@ -4,12 +4,13 @@ import * as path from 'path';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { resolveFile } from '../formats/file-resolver.js';
 import { listAbapFiles, readAbapFile } from '../formats/abap-source.js';
-import { CliError, printError, printResult, jsonFromCommand, type OutputMode } from '../output/json.js';
-import { commonErrorsAfter } from '../output/help-text.js';
+import { CliError, printError, printResult, printSchema, jsonFromCommand, type OutputMode } from '../output/json.js';
 import { resolveObject, getObjectParts, validateLocalFile } from '../core/resolve.js';
 import { runAtcCheck } from '../flows/atc.js';
 import type { AtcWorkList } from 'abap-adt-api';
 import type { CheckIssue } from '../output/issues.js';
+import { toOutputPath, toRelativeOutputPath } from '../core/path-output.js';
+import { commandSchemas } from '../flows/command-schemas.js';
 
 type CheckMode = 'syntax' | 'content' | 'atc';
 
@@ -36,9 +37,14 @@ export function registerCheckCommand(program: Command): void {
   const check = program
     .command('check')
     .description('Validate ABAP source code (syntax / content / atc)')
-    .addHelpText('after', commonErrorsAfter())
     .option('--files <files...>', 'Shortcut: run syntax mode on the given files (equivalent to `abap check syntax <files...>`)')
+    .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action(async (opts: CheckOptions, cmd) => {
+      // --schema branch — emit machine-readable parameter schema (no SAP call).
+      if (cmd.optsWithGlobals().schema) {
+        printSchema(commandSchemas['check']!, jsonFromCommand(cmd));
+        return;
+      }
       // Bare `abap check` (no subcommand, no --files) prints subcommand help.
       const hasShortcut = Array.isArray(opts.files) && opts.files.length > 0;
       if (!hasShortcut) {
@@ -138,41 +144,57 @@ async function runCheck(files: string[], opts: CheckOptions, checkMode: CheckMod
     if (result.worklist) worklists.push(result.worklist);
   }
 
-  if (checkMode === 'atc' && opts.out !== undefined) {
-    await persistWorklists(opts, worklists);
+  // --atc --out persists the raw worklists; resolve the output file ONCE so the
+  // persisted path and the reported `out` field can never disagree (P0).
+  const atcOut = checkMode === 'atc' && opts.out !== undefined ? outPath(opts) : undefined;
+  if (atcOut) {
+    await persistWorklists(opts, worklists, atcOut);
   }
 
-  const failed = issues.some((i) => i.severity === 'error' || (opts.strict && i.severity === 'warning'));
+  // P0: normalize path fields to cwd-relative POSIX in the JSON envelope so
+  // agents see the same shape on every platform.
+  const outIssues: CheckIssue[] = issues.map((i) => ({ ...i, file: toRelativeOutputPath(i.file) }));
+  // `out` is only reported when --atc --out was given (i.e. something was
+  // actually persisted). Explicit paths echo the user's input (separators only);
+  // the default is the cwd-relative POSIX form of the very file just written.
+  const outValue = atcOut !== undefined
+    ? (typeof opts.out === 'string' && opts.out.trim() !== '' ? toOutputPath(opts.out) : toRelativeOutputPath(atcOut))
+    : undefined;
+
+  const failed = outIssues.some((i) => i.severity === 'error' || (opts.strict && i.severity === 'warning'));
   if (failed) {
     const code = checkMode === 'syntax' ? 'SYNTAX_ERROR' : 'VALIDATION_ERROR';
-    throw new CliError(code, `${issues.length} issue(s) found across ${fileList.length} file(s)`, {
-      details: { issues, files: fileList.length, ...(opts.out !== undefined ? { out: outPath(opts) } : {}) },
+    throw new CliError(code, `${outIssues.length} issue(s) found across ${fileList.length} file(s)`, {
+      details: { issues: outIssues, files: fileList.length, ...(outValue !== undefined ? { out: outValue } : {}) },
     });
   }
-  printResult(outMode, { issues, failure: false, ...(opts.out !== undefined ? { out: outPath(opts) } : {}) }, humanSummary(issues));
+  printResult(outMode, { issues: outIssues, failure: false, ...(outValue !== undefined ? { out: outValue } : {}) }, humanSummary(outIssues));
 }
 
-/** Persist raw ATC worklists to the requested file (or the default path). */
-async function persistWorklists(opts: CheckOptions, worklists: { file: string; worklist: AtcWorkList }[]): Promise<void> {
-  const file = outPath(opts);
+/** Persist raw ATC worklists to `file` (resolved once by the caller). */
+async function persistWorklists(opts: CheckOptions, worklists: { file: string; worklist: AtcWorkList }[], file: string): Promise<void> {
+  // P0: persist the cwd-relative POSIX `file` field; the on-disk `file` is the
+  // host-native path for fs.writeFile. Two values because each is consumed by
+  // a different reader (agents vs the OS).
   const payload = {
     variant: opts.variant,
     timestamp: new Date().toISOString(),
-    files: worklists.map((w) => ({ file: w.file, worklist: w.worklist })),
+    files: worklists.map((w) => ({ file: toRelativeOutputPath(w.file), worklist: w.worklist })),
   };
   try {
     await fs.mkdir(path.dirname(file), { recursive: true });
     await fs.writeFile(file, JSON.stringify(payload, null, 2) + '\n', 'utf-8');
   } catch (error: unknown) {
-    throw new CliError('FILE_PARSE_ERROR', `Cannot write ATC output to ${file}: ${message(error)}`, {
-      file,
+    throw new CliError('FILE_PARSE_ERROR', `Cannot write ATC output to ${toOutputPath(file)}: ${message(error)}`, {
+      file: toOutputPath(file),
       nextSteps: ['Pick a writable path: abap check atc <file> --variant Z_VARIANT --out /tmp/atc.json'],
       example: 'abap check atc src/zcl_ok.clas.abap --variant Z_ATC_VAR --out /tmp/atc.json',
     });
   }
 }
 
-/** Resolve the output file: explicit path, or .abap/atc/<variant>-<timestamp>.json. */
+/** Resolve the output file: explicit path, or .abap/atc/<variant>-<timestamp>.json.
+ *  Returns the host-native absolute path for fs.writeFile (P0 boundary). */
 function outPath(opts: CheckOptions): string {
   // commander resolves `--out` without a value to `true`.
   if (typeof opts.out === 'string' && opts.out.trim() !== '') return path.resolve(opts.out);
