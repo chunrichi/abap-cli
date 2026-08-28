@@ -234,3 +234,47 @@ abap select --table ZT_FOO --where "AMOUNT > 100" --count-only
 ```
 
 `data.truncated: true` 表示还有后续页。`--count-only` 走 `COUNT(*)` SQL，不取明细。
+
+## 变体 12 — HTTP 服务（ICF / SICF 节点）
+
+**类型码是 `HTTP`，不是 `SICF`。** 写 `--type SICF` 不会被识别为"类型不支持"，而是被当成 ADT 类型下传，最终报 `OBJECT_NOT_FOUND`（对象不存在）—— 这是最容易被误导的错误。
+
+先区分两个同名概念：
+
+| | 含义 | 对应 |
+|---|---|---|
+| ICF 作为**通道** | 自建服务 `/sap/zabap_vibe` 旁路 ADT，承载 DDIC CRUD / textpool / `select` / `tcode` / `run` | `abap extension deploy` / `extension status` |
+| ICF 作为**对象** | 被管理的 SICF 服务节点本身（handler class / URL / 父节点） | `--type HTTP` |
+
+即"用 ICF 通道管理 ICF 节点"——前者是后者的前提。
+
+```bash
+# 拉 — 落 src/http/zmy_service.http.json
+abap pull ZMY_SERVICE --type HTTP --json
+
+# 建 — 必须 --file，无 create local 骨架（漏了报 USAGE）
+abap create HTTP ZMY_SERVICE --file src/http/zmy_service.http.json \
+  --package $TMP --description "My service"
+
+# 推
+abap push src/http/zmy_service.http.json --tr <TR>
+```
+
+`.http.json` 遵循 abap-file-format（`http-v1.json`）嵌套结构；CLI 同时接受扁平写法（`description` / `handlerClass` / `url` 提到顶层）：
+
+```json
+{
+  "formatVersion": "1",
+  "header": {
+    "description": "My service",
+    "originalLanguage": "EN"
+  },
+  "generalInformation": {
+    "handlerClass": "ZCL_MY_HANDLER",
+    "url": "/sap/zmy_service"
+  }
+}
+```
+
+写失败报 `HTTP_CREATE_FAILED`（exit 6，SAP_ERROR 类）——看 `error.details`，校对 handlerClass 是否存在、url 是否冲突、父节点是否已建。
+

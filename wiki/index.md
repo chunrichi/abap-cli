@@ -11,6 +11,8 @@ changed at: 2026-08-19 23:00:00
 
 面向 Agent 与开发者的 abap CLI 知识库。命令参考按 okf 格式维护。
 
+**不确定 CLI 能处理什么对象？先看 [支持的对象类型](object-types.md)** — 类型码 × 命令 × 路由矩阵。
+
 ## Commands
 
 ### Setup & 环境
@@ -52,6 +54,7 @@ changed at: 2026-08-19 23:00:00
 
 ### 跨命令契约
 
+- [支持的对象类型](object-types.md) — 9 个类型 × 命令 × 路由（ADT / ICF）总览；SICF 节点对应类型码 `HTTP`
 - [output path contract](commands/path-output.md) — `--json` 路径字段统一 POSIX，跨平台 Agent 消费稳定
 
 ## Notes

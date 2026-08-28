@@ -1,11 +1,11 @@
 ---
 name: abap-cli-edit
-description: abap-cli 写路径 — 拉（`pull`）/ 推（`push`）/ 语法检查（`check`）/ 创建（`create` / `create local`）/ 激活（`activate`），含 DDIC CRUD（DOMA / DTEL / TABL / STRU 经 `pull --type` / `create --file` / `push *.json`）。use when asking how to change a SAP object / download an ABAP class / push a local file / run syntax check / create a new object / activate inactive parts / edit a DDIC definition.
+description: abap-cli 写路径 — 拉（`pull`）/ 推（`push`）/ 语法检查（`check`）/ 创建（`create` / `create local`）/ 激活（`activate`），含 DDIC CRUD（DOMA / DTEL / TABL / STRU）与 ICF/SICF 服务节点（类型码 `HTTP`），经 `pull --type` / `create --file` / `push *.json`。use when asking how to change a SAP object / download an ABAP class / push a local file / run syntax check / create a new object / activate inactive parts / edit a DDIC definition / create or edit an ICF SICF HTTP service node / which object types the CLI supports.
 metadata:
-  version: "0.3.0"
+  version: "0.4.0"
   scope: sap
   commands: [pull, push, check, create, activate, "create local"]
-  tags: [write, lock, transport, ddic]
+  tags: [write, lock, transport, ddic, http, sicf]
 ---
 
 # abap-cli-edit — 写路径（含 DDIC）
@@ -48,7 +48,27 @@ DDIC 定义？
 ├── DOMA/DTEL 拉 → pull <name> --type DOMA|DTEL                # 落单文件 wire-flat
 ├── DOMA/DTEL 改 → 编辑 <name>.<type>.json（顶层 name / dataType / length / description / domain）
 └── DOMA/DTEL 推 → push <name>.<type>.json --tr <tr>
+
+ICF / SICF 服务节点？→ 类型码是 HTTP，不是 SICF
+├── 拉 → pull <name> --type HTTP                               # 落 http/<name>.http.json
+├── 建 → 写 .http.json → create HTTP <name> --file <path> --package ... --tr ...
+└── 推 → push <name>.http.json --tr <tr>
 ```
+
+## 支持的对象类型（权威列表）
+
+写命令只认这 9 个类型码。传别的（`SICF` / `TTYP` / `DDLS` / `TRAN`）**不会**报"类型不支持"，而是被当成 ADT 类型下传，最终报 `OBJECT_NOT_FOUND` —— 语义误导，别被带偏。
+
+| 类型码 | 对象 | 路由 | `create` | `pull` | `push` | `create local` |
+|---|---|---|---|---|---|---|
+| `CLAS` / `INTF` / `PROG` / `FUGR` | 源对象 | ADT | ✅ | ✅ | ✅ | ✅ |
+| `TABL` / `STRU` | 表 / 结构 | ICF | ✅ | ✅ | ✅ | ❌ |
+| `DOMA` / `DTEL` | 域 / 数据元素 | ICF | ✅ | ✅ | ✅ | ❌ |
+| `HTTP` | **ICF / SICF 节点** | ICF | ✅（须 `--file`） | ✅ | ✅ | ❌ |
+
+ICF 路由类型依赖内置扩展已部署——失败先跳 `abap-cli-setup` 跑 `extension status`。**不支持**：`TTYP`、`DDLS`/CDS（`.asddls` 虽被解析器识别但无实现）、`TRAN`（只读）、`ENHO`。
+
+HTTP 服务（SICF 节点）的文件契约与完整示例见 [references/workflow.md](references/workflow.md) 变体 12。
 
 ## TABL vs STRU（DDL 注解差异）
 
@@ -82,16 +102,17 @@ CLI 解析器（[tabl-artifact.ts:parseTablDdic](https://github.com/chunrichi/ab
 
 | 错误 | 动作 |
 |---|---|
-| `OBJECT_NOT_FOUND` (exit 8) | `search <name>` 校对；`push` 不自动创建（创建走 `create`） |
+| `OBJECT_NOT_FOUND` (exit 8) | `search <name>` 校对；`push` 不自动创建（创建走 `create`）。**也可能是类型码写错**（如 `--type SICF` 应为 `HTTP`）——未知类型会被静默降级成这个错 |
 | `OBJECT_EXISTS` (exit 2) | 改用 `pull` + `push`；不要重复 `create` |
 | `LOCK_FAILED` (exit 9) | `inspect <obj> --locks`（[abap-cli-search]）查持有者；SE03 手动释放 |
 | `ACTIVATION_FAILED` (exit 7) | `data.errors` 含行号；修复后重推 |
 | `SYNTAX_ERROR` (exit 7) | `data.errors[]` 含 `{line, offset, severity, text}` |
 | `NO_TRANSPORT` (exit 7) | 跳 `abap-cli-setup`：`transport list` / `transport create` → `--tr` 重试 |
-| `DDIC_NOT_SUPPORTED` (exit 7) | 类型不在白名单（DOMA/DTEL/TABL/STRU 之外）；看 `abap create --schema` |
+| `DDIC_NOT_SUPPORTED` (exit 7) | 类型不在白名单（DOMA/DTEL/TABL/STRU 之外）；看上方类型表 |
 | `FILE_EXISTS` (exit 2) | `pull --overwrite` 或 `--skip-existing` |
-| `TYPE_NOT_SUPPORTED` (exit 7) | `abap <cmd> --schema` 看支持列表 |
+| `TYPE_NOT_SUPPORTED` (exit 7) | 以上方类型表为准。**`create` 的报错文案只列 CLAS/INTF/PROG/FUGR，是不完整的**，遗漏了 DDIC 四类与 `HTTP` |
 | `PUSH_FAILED` (exit 7) | `data.stage` 指示失败环节（lock/write/activate/unlock） |
+| `HTTP_CREATE_FAILED` (exit 6) | HTTP 服务（SICF 节点）写失败；看 `error.details`，校对 handlerClass / url / 父节点是否存在 |
 | `INACTIVE_PARTS` (exit 6) | `inspect --activation`（[abap-cli-search]）诊断 → `activate --yes` 修复 |
 | `INVALID_ARGUMENT` (exit 2) | 看 `error.nextSteps` / `error.references` |
 
