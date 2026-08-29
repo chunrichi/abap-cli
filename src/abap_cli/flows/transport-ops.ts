@@ -107,7 +107,7 @@ export async function showTransport(client: AdtClientWrapper, number: string): P
   }
 }
 
-/** Which request(s) an object currently belongs to — read-only (FR-016). */
+/** Which request(s) an object currently belongs to — read-only. */
 export async function resolveObjectTransport(
   client: AdtClientWrapper,
   objectName: string,

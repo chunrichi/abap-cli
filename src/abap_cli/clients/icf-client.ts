@@ -67,12 +67,12 @@ export class IcfClient {
     return this.request('put', path, body);
   }
 
-  /** 014: POST /ddic/<type> — create/overwrite a DDIC object (FR-001). */
+  /** POST /ddic/<type> — create/overwrite a DDIC object. */
   async postDdic<T>(type: string, body: unknown): Promise<IcfResponse<T>> {
     return this.post(`/ddic/${type}`, body);
   }
 
-  /** 014: GET /ddic/<type>/<name> — pull a DDIC object as wire JSON (FR-011). */
+  /** GET /ddic/<type>/<name> — pull a DDIC object as wire JSON. */
   async getDdic<T>(type: string, name: string): Promise<IcfResponse<T>> {
     return this.get(`/ddic/${type}/${encodeURIComponent(name)}`);
   }
@@ -92,13 +92,13 @@ export class IcfClient {
     return this.get(`/tcode/${encodeURIComponent(tcode)}`);
   }
 
-  /** 014: GET /textpool/<category>?object=...&type=... — read text elements (US4). */
+  /** GET /textpool/<category>?object=...&type=... — read text elements. */
   async getTextpool<T>(category: string, object: string, type: string): Promise<IcfResponse<T>> {
     const qs = new URLSearchParams({ object, type });
     return this.get(`/textpool/${category}?${qs.toString()}`);
   }
 
-  /** 014: POST /textpool/<category>?object=...&type=... — write text elements (US4). */
+  /** POST /textpool/<category>?object=...&type=... — write text elements. */
   async postTextpool<T>(category: string, object: string, type: string, body: unknown): Promise<IcfResponse<T>> {
     const qs = new URLSearchParams({ object, type });
     return this.post(`/textpool/${category}?${qs.toString()}`, body);

@@ -66,7 +66,7 @@ export function parseTextpoolProperties(category: TextpoolCategoryArg, content: 
   return elements;
 }
 
-/** Validate text elements against the category constraints (FR-021). */
+/** Validate text elements against the category constraints. */
 export function validateTextElements(elements: TextElement[], category: TextpoolCategoryArg): void {
   const adt = toAdtCategory(category);
   for (const el of elements) {

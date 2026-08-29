@@ -83,7 +83,7 @@ count-only 信封不含 `rows` / `fields` / `truncated`；dry-run 信封含 `wou
 
 人类模式（默认）：ASCII 表格（列宽自适应）+ 行数 + 截断提示 + 排除字段提示 + 耗时。
 
-## 注入安全与只读契约（spec FR-007 / SC-004 / SC-005）
+## 注入安全与只读契约
 
 三层独立防线，全部落在 SAP handler：
 

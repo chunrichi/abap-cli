@@ -8,7 +8,7 @@ import { TYPE_MAP, DDIC_TYPES, HTTP_TYPES } from './create-types.js';
 export type CreateCommandSchema = CommandSchema & {
   type?: string;
   supported?: boolean;
-  /** 014: 'icf' for DDIC types created via the self-built ICF service. */
+  /** 'icf' for DDIC types created via the self-built ICF service. */
   route?: 'icf';
   reason?: 'DDIC_NOT_SUPPORTED' | 'TYPE_NOT_SUPPORTED';
   message?: string;
@@ -41,7 +41,7 @@ export function createSchema(type?: string): CreateCommandSchema {
       { name: '--no-pull', type: 'boolean', description: 'Skip the create-then-pull local copy (default: pull after create)' },
       { name: '--check-only', type: 'boolean', description: 'Validate the proposed object without creating it' },
       { name: '--audit', type: 'boolean', description: 'Include the before-checksum (extra SAP round-trip, off by default)' },
-      { name: '--file', type: 'string', valuePlaceholder: '<path>', description: '014: abap-file-format DDIC JSON input (required for DOMA/DTEL/TABL/STRU)' },
+      { name: '--file', type: 'string', valuePlaceholder: '<path>', description: 'abap-file-format DDIC JSON input (required for DOMA/DTEL/TABL/STRU)' },
       { name: '--schema', type: 'boolean', default: false, description: 'Print the command parameter schema as JSON and exit (no SAP call).' },
       { name: '--yes', type: 'boolean', default: false, description: 'Confirm in non-interactive environments.' },
       { name: '--non-interactive', type: 'boolean', default: false, description: 'Alias of --yes.' },
@@ -51,7 +51,7 @@ export function createSchema(type?: string): CreateCommandSchema {
   };
 
   if (!t) return base;
-  // 014: supported DDIC types now report supported:true with the ICF route
+  // Supported DDIC types now report supported:true with the ICF route
   // (TTYP and unknown types stay rejected).
   if (DDIC_TYPES.has(t)) {
     return {
@@ -59,7 +59,7 @@ export function createSchema(type?: string): CreateCommandSchema {
       type: t,
       supported: true,
       route: 'icf',
-      message: `DDIC type ${t} created via the self-built ICF service (014). Requires --file <abap-file-format JSON> with top-level fields: name, description, fields[].`,
+      message: `DDIC type ${t} created via the self-built ICF service. Requires --file <abap-file-format JSON> with top-level fields: name, description, fields[].`,
       exampleJson: getDdicJsonExample(t as DdicSupportedType),
       options: [
         ...base.options,
@@ -67,14 +67,14 @@ export function createSchema(type?: string): CreateCommandSchema {
       ],
     };
   }
-  // 022: HTTP service routed via the self-built ICF service.
+  // HTTP service routed via the self-built ICF service.
   if (HTTP_TYPES.has(t)) {
     return {
       ...base,
       type: t,
       supported: true,
       route: 'icf',
-      message: `HTTP service created via the self-built ICF service (022). Requires --file <abap-file-format JSON>.`,
+      message: `HTTP service created via the self-built ICF service. Requires --file <abap-file-format JSON>.`,
       options: [
         ...base.options,
         { name: '--file', type: 'string', valuePlaceholder: '<path>', required: true, description: 'abap-file-format HTTP service JSON input' },

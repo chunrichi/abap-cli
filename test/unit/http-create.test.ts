@@ -1,7 +1,7 @@
 /**
- * 022: create HTTP service end-to-end tests. Drives the full CLI pipeline
+  create HTTP service end-to-end tests. Drives the full CLI pipeline
  * (create → file → wire → POST /http/<name>) against a mock ICF client.
- * Mirrors ddic-create.test.ts (014) but for the HTTP service object type.
+ * Mirrors ddic-create.test.ts but for the HTTP service object type.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import * as fs from 'fs';

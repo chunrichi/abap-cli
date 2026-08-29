@@ -13,7 +13,7 @@ import { buildAuth } from '../auth/adapter.js';
  * Thin wrapper around abap-adt-api ADTClient.
  * Initializes from project config and exposes the most common operations.
  *
- * Login strategy is selected by `config.sap.authMethod` (025): `basic` keeps
+ * Login strategy is selected by `config.sap.authMethod`: `basic` keeps
  * the original username/password behavior, `cert` injects an X.509
  * `https.Agent` via `buildAuth`. The chosen strategy is recorded on
  * `this.authLabel` so downstream code can surface it in doctor / probe output.
@@ -176,7 +176,7 @@ export class AdtClientWrapper {
     return this._call(() => this.client.objectStructure(objectUrl));
   }
 
-  /** Structure elements for `inspect --structure` (FR-012). */
+  /** Structure elements for `inspect --structure`. */
   objectStructureElements(objectUrl: string, version?: Parameters<ADTClient['objectStructureElements']>[1]) {
     return this._call(() => this.client.objectStructureElements(objectUrl, version));
   }
@@ -273,7 +273,7 @@ export class AdtClientWrapper {
     return this._call(() => this.client.userTransports(user, targets));
   }
 
-  /** Structured transport metadata for `transport show <req>` (FR-015). */
+  /** Structured transport metadata for `transport show <req>`. */
   transportDetails(transportNumber: string) {
     return this._call(() => this.client.transportDetails(transportNumber));
   }

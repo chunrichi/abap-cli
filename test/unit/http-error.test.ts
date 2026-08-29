@@ -4,7 +4,7 @@ import { AxiosError } from 'axios';
 import { classifyHttpError, isTlsErrorCode, TLS_ERROR_CODE_LIST } from '../../src/abap_cli/clients/http-error.js';
 import { toErrorShape } from '../../src/abap_cli/output/json.js';
 
-describe('http-error classifier (FR-010)', () => {
+describe('http-error classifier ()', () => {
   it('TLS_ERROR_CODE_LIST contains the documented Node codes', () => {
     expect(TLS_ERROR_CODE_LIST).toContain('UNABLE_TO_VERIFY_LEAF_SIGNATURE');
     expect(TLS_ERROR_CODE_LIST).toContain('SELF_SIGNED_CERT_IN_CHAIN');

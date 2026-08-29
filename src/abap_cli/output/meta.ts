@@ -6,7 +6,7 @@
  *    buildMeta can derive the canonical command name from argv + command tree.
  *  - collectWarning / getWarnings / resetWarnings: structured non-fatal
  *    warnings that only ever appear in meta.warnings, never in the error
- *    envelope (FR-009).
+ *    envelope.
  *  - buildMeta: snapshot of command, version, timestamp, durationMs, warnings.
  *  - buildSchemaMeta: reduced metadata for deterministic schema introspection.
  *  - getOriginalArgv: lazy snapshot of process.argv.slice(2) captured on first
@@ -138,7 +138,7 @@ function readVersion(): string {
   }
 }
 
-/** Build the envelope meta block (FR-003). */
+/** Build the envelope meta block. */
 export function buildMeta(): OutputMeta {
   return {
     command: deriveCommand(process.argv),

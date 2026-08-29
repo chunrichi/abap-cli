@@ -1,5 +1,5 @@
 /**
- * 015: pull an object's active version source from a remote system via the
+  pull an object's active version source from a remote system via the
  * Version Management endpoint (/version-source). Drives `abap pull <name> --remote <id>`.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';

@@ -120,7 +120,7 @@ describe('abap create --schema (P0.1 introspection)', () => {
     expect(createObject).not.toHaveBeenCalled();
   });
 
-  it('reports supported DDIC types (DOMA) as supported via ICF (014)', async () => {
+  it('reports supported DDIC types (DOMA) as supported via ICF ', async () => {
     const program = makeProgram();
     registerCreateCommand(program);
     const res = await runCommand(program, ['create', '--schema', 'DOMA']);

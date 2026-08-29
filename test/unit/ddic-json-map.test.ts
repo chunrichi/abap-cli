@@ -1,5 +1,5 @@
 /**
- * 014: ddic-json.ts mapping round-trip tests. Written TDD-style — these tests
+  ddic-json.ts mapping round-trip tests. Written TDD-style — these tests
  * targeted the abap-file-format ↔ wire schema conversion before the SAP-side
  * ZCL_ABAP_VIBE_DDIC class was completed (Validates T005).
  */

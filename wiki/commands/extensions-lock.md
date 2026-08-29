@@ -2,7 +2,7 @@
 type: command
 title: abap extensions lock
 description: Compute or refresh extensions.lock.json (npm extensions only). Required for first-run bootstrap with --allow-unsigned.
-tags: [abap-cli, command, extensions, lockfile, security, 027-extension-trust]
+tags: [abap-cli, command, extensions, lockfile, security]
 created at: 2026-08-28 00:00:00
 changed at: 2026-08-28 00:00:00
 ---
@@ -12,7 +12,7 @@ changed at: 2026-08-28 00:00:00
 Recompute `extensions.lock.json` from `.abap.json`'s `extensions[]` array.
 Each `sourceType: 'npm'` extension is resolved via `createRequire(import.meta.url).resolve(...)` and pinned by `sha512-<base64>` of the resolved entry file's bytes.
 
-`sourceType: 'path'` extensions are lockfile-exempt (FR-006); they only re-validate the existing `path_escapes_allowlist` / `path_contains_parent_ref` checks at load time.
+`sourceType: 'path'` extensions are lockfile-exempt; they only re-validate the existing `path_escapes_allowlist` / `path_contains_parent_ref` checks at load time.
 
 ## Usage
 
@@ -22,7 +22,7 @@ abap extensions lock [--allow-unsigned] [--json|--pretty-json]
 
 ## Options
 
-- `--allow-unsigned`: Required to create a brand-new `extensions.lock.json`. Without it the command exits with `CONFIG_ERROR` (exit 3) on a fresh repo so a hostile `.abap.json` cannot quietly pin itself into the lockfile on first run (FR-007).
+- `--allow-unsigned`: Required to create a brand-new `extensions.lock.json`. Without it the command exits with `CONFIG_ERROR` (exit 3) on a fresh repo so a hostile `.abap.json` cannot quietly pin itself into the lockfile on first run.
 - `--json`: Emit the standard envelope (`{status, meta, data}`) with `data.{lockfile, lastResolved, added, updated, removed, unresolved}`.
 - `--pretty-json`: Pretty-printed JSON envelope (overrides `--json`).
 

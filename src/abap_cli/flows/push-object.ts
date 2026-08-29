@@ -33,9 +33,9 @@ export interface PushOptions {
   checkOnly: boolean;
   /** Write source but skip activation (used by `abap create --no-activate`). Defaults to true. */
   activate?: boolean;
-  /** Plan only — record stages without making mutating ADT calls (FR-012). */
+  /** Plan only — record stages without making mutating ADT calls. */
   dryRun?: boolean;
-  /** Per-stage callback for --json result reporting (FR-016). */
+  /** Per-stage callback for --json result reporting. */
   onStage?: (stage: PushStage) => void;
   /** Non-fatal warning (e.g. unlock failed after a successful push) — US-5. */
   onWarning?: (warning: Warning) => void;
@@ -52,7 +52,7 @@ export async function pushObject(
   parts: PushPart[],
   opts: PushOptions,
 ): Promise<void> {
-  // Dry-run: record every stage, perform no mutating calls (FR-012).
+  // Dry-run: record every stage, perform no mutating calls.
   if (opts.dryRun) {
     opts.onStage?.('lock');
     for (const part of parts) opts.onStage?.('write');

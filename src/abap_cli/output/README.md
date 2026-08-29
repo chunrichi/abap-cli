@@ -1,7 +1,7 @@
 # CLI Output Layer (`src/abap_cli/output/`)
 
 Unified output + error contract. Every command renders through this layer so
-`--json` envelopes, exit codes, and human text stay consistent (012).
+`--json` envelopes, exit codes, and human text stay consistent.
 
 ## 渲染链路（一个错误从抛出到退出码）
 

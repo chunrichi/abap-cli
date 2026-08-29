@@ -22,7 +22,7 @@ vi.mock('../../src/abap_cli/config/user-config.js', () => ({
   saveUserConfig: vi.fn(),
 }));
 
-describe('abap init non-interactive (FR-006, FR-022, SC-007)', () => {
+describe('abap init non-interactive ', () => {
   let cwd: string;
 
   beforeEach(() => {
@@ -31,7 +31,7 @@ describe('abap init non-interactive (FR-006, FR-022, SC-007)', () => {
   });
 
   it('flagless abap init in non-TTY returns a USAGE error and does not mutate profiles', async () => {
-    // 021: bare `abap init` in non-TTY is an error (Agent-First: no blocking
+    // bare `abap init` in non-TTY is an error (Agent-First: no blocking
     // prompt). The legacy "print help" behavior was removed.
     const program = makeProgram();
     registerInitCommand(program);
@@ -43,7 +43,7 @@ describe('abap init non-interactive (FR-006, FR-022, SC-007)', () => {
     expect(upsertSystem).not.toHaveBeenCalled();
   });
 
-  it('non-TTY abap init with full params rejects profile creation (FR-022) and never mutates profiles', async () => {
+  it('non-TTY abap init with full params rejects profile creation () and never mutates profiles', async () => {
     const program = makeProgram();
     registerInitCommand(program);
     const res = await runCommand(

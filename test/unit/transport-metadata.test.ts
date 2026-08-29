@@ -48,7 +48,7 @@ function parseData(res: { stdout: string }) {
   return JSON.parse(res.stdout).data;
 }
 
-describe('abap transport metadata (US5, FR-015..017, SC-006)', () => {
+describe('abap transport metadata (US5..017)', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('show returns structured metadata with objects', async () => {

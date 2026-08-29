@@ -109,7 +109,7 @@ abap push src/zcl_demo/zcl_demo.clas.abap --tr "$transport" --json
 - **Prefer explicit `--tr`** when a specific transport is required; automatic resolution only finds requests in the user's modifiable list.
 - **Loop safely** — each step is idempotent at the boundary (create reports `OBJECT_EXISTS` rather than overwriting; push reports per-file results).
 
-## Extension Trust (027)
+## Extension Trust
 
 Third-party extensions declared in `.abap.json`'s `extensions[]` are subject to strict trust checks before any code runs. Agents must understand this contract before triggering commands that would load extensions.
 
@@ -135,9 +135,9 @@ The CLI computes sha512 of every npm entry file at startup (via `node:crypto`) a
 - `LOCKFILE_MISSING_ENTRY` — package declared in `.abap.json` but absent from `extensions.lock.json`. Recovery: `abap extensions lock --allow-unsigned` (after verifying the new package is intentional).
 - `LOCKFILE_INTEGRITY_MISMATCH` — sha512 of the resolved entry file no longer matches the pinned value. Recovery: `abap extensions lock` (after confirming the upstream package update is intentional).
 - `INTEGRITY_UNRESOLVABLE` — `createRequire(...).resolve()` failed (e.g. `npm install` was skipped). Recovery: `npm install` then retry.
-- `INVALID_PACKAGE_NAME` — the package name in `.abap.json` failed FR-010 validation (`..` / `\` / empty scope / URL scheme / absolute path / non-npm chars). Recovery: fix `.abap.json`.
+- `INVALID_PACKAGE_NAME` — the package name in `.abap.json` failed validation (`..` / `\` / empty scope / URL scheme / absolute path / non-npm chars). Recovery: fix `.abap.json`.
 
-`sourceType: 'path'` extensions are **lockfile-exempt** (FR-006); only `path_escapes_allowlist` / `path_contains_parent_ref` are re-checked at load time.
+`sourceType: 'path'` extensions are **lockfile-exempt**; only `path_escapes_allowlist` / `path_contains_parent_ref` are re-checked at load time.
 
 ### What `extensions list --json` reports
 

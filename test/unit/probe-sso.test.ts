@@ -7,7 +7,7 @@ vi.mock('../../src/abap_cli/config/user-config.js', () => ({
 
 const { probeSystem } = await import('../../src/abap_cli/clients/probe.js');
 
-describe('probeSystem — browser_sso (026)', () => {
+describe('probeSystem — browser_sso ', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

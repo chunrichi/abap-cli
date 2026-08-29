@@ -78,7 +78,7 @@ Prompts guide you through selecting an existing system profile or entering a new
 }
 ```
 
-The same `abap init` command is also the entry point for **modifying** an existing `.abap.json` (026):
+The same `abap init` command is also the entry point for **modifying** an existing `.abap.json`:
 
 ```bash
 # Switch default transport or package (merge, not replace — other fields stay)
@@ -141,8 +141,8 @@ abap push src/zcl_my_new_class/zcl_my_new_class.clas.abap --tr DEVK900001
 ## What's Supported (v0.2)
 
 - **Source objects** — Class (CLAS), Interface (INTF), Program (PROG), Function Group (FUGR) for pull / push / check / create via the ADT REST API
-- **DDIC objects** (Domain, DataElement, Table, Structure as `.doma.json` / `.dtel.json` / `.tabl.json` / `.stru.json`) — create / overwrite / pull via the self-built ICF service (`/sap/zabap_vibe/ddic/*`). TABL/STRU pull writes abap-file-format three-piece layouts (024). `abap create <DOMA|DTEL|TABL|STRU> <name> --file <json>` creates; `abap pull <name> --type <T>` downloads; `abap push <name>.<type>.json --tr <tr>` updates. TTYP is deferred.
-- **HTTP service** (022) — `abap pull <name> --type HTTP` / `abap push <file>.http.json` / `abap create HTTP <name> --file <file>.http.json` via ICF `/http/<name>`. Compatible with abap-file-format `zif_aff_http_v1`.
+- **DDIC objects** (Domain, DataElement, Table, Structure as `.doma.json` / `.dtel.json` / `.tabl.json` / `.stru.json`) — create / overwrite / pull via the self-built ICF service (`/sap/zabap_vibe/ddic/*`). TABL/STRU pull writes abap-file-format three-piece layouts. `abap create <DOMA|DTEL|TABL|STRU> <name> --file <json>` creates; `abap pull <name> --type <T>` downloads; `abap push <name>.<type>.json --tr <tr>` updates. TTYP is deferred.
+- **HTTP service** — `abap pull <name> --type HTTP` / `abap push <file>.http.json` / `abap create HTTP <name> --file <file>.http.json` via ICF `/http/<name>`. Compatible with abap-file-format `zif_aff_http_v1`.
 - **Read-only execution & data access** — `abap run` (classrun / static method, push → run → verify), `abap select` (SE16N equivalent), `abap where-used` (impact assessment before refactor / delete), `abap tcode` (TSTC → TSTCT)
 - **Transport management** — `abap transport list` / `create` / `show` / `resolve` / `assign`
 - **Diagnosis & workflows** — `abap doctor`, `abap inspect`, `abap diff`, `abap status`, `abap activate`

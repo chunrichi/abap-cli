@@ -33,7 +33,7 @@ export interface DeployObjectResult {
   code?: string;
 }
 
-/** ICF node state reported after the setup step (FR-010). */
+/** ICF node state reported after the setup step. */
 export interface DeployIcfNode {
   status: 'success' | 'error' | 'planned';
   action?: 'created' | 'updated' | 'already_active';
@@ -111,7 +111,7 @@ export async function deployBundled(client: AdtClientWrapper, opts: DeployOption
   const sourceDir = opts.sourceDir ?? bundledDir;
   const files = await enumerateSources(sourceDir);
 
-  // Non-interactive confirmation gate (FR-020): actual deploys mutate SAP.
+  // Non-interactive confirmation gate: actual deploys mutate SAP.
   if (!opts.dryRun && !opts.yes && !process.stdin.isTTY) {
     throw new CliError('VALIDATION_ERROR', 'abap extension deploy modifies SAP; confirm with --yes in non-interactive mode', {
       nextSteps: ['Re-run with --yes to confirm the deployment.', 'Or use --dry-run to preview without changes.'],
@@ -123,9 +123,9 @@ export async function deployBundled(client: AdtClientWrapper, opts: DeployOption
   const objectResults: DeployObjectResult[] = [];
   const fileResults: DeployFileResult[] = [];
 
-  // 030: detect ADT runtime tier to branch deploy behaviour (Steampunk blocks
+  // Detect ADT runtime tier to branch deploy behaviour (Steampunk blocks
   // cl_icf_tree). Probe failure is non-blocking and falls back to on-prem.
-  // 034: prefer the cached runtime written by `profile test` / `init`; only
+  // Prefer the cached runtime written by `profile test` / `init`; only
     // re-probe the network when the cache is absent or empty.
   const cachedRuntime = opts.profileName
     ? await getOrProbeRuntime(opts.profileName).catch(() => undefined)
@@ -143,12 +143,12 @@ export async function deployBundled(client: AdtClientWrapper, opts: DeployOption
     objectResults.push(objectResult);
   }
 
-  // ICF setup: create/bind/activate the SICF node after source deploy (FR-008).
-  // --dry-run only plans the step; it never triggers a mutating call (FR-009).
-  // 030: on Steampunk the setup step is source-only — cl_icf_tree is blocked
+  // ICF setup: create/bind/activate the SICF node after source deploy.
+  // --dry-run only plans the step; it never triggers a mutating call.
+  // On Steampunk the setup step is source-only — cl_icf_tree is blocked
   // by the Released APIs whitelist. We surface this as a structured warning
   // and emit a Cloud Foundry destination hint via steampunkDeployHint().
-  // 034: dispatch through the ICF register registry — the chosen strategy
+  // Dispatch through the ICF register registry — the chosen strategy
   // decides whether to mutate, plan, or hint. Dry-run always short-circuits
   // to 'planned' regardless of strategy; the registry call still runs so the
   // summary reports which strategy would have been selected.
@@ -180,7 +180,7 @@ export async function deployBundled(client: AdtClientWrapper, opts: DeployOption
   if (outcome.status === 'planned') {
     icfNode = { status: 'planned' };
     if (!opts.dryRun && outcome.hint && outcome.hint.length > 0) {
-      // 034: only Steampunk emits the user-facing "configure Cockpit"
+      // Only Steampunk emits the user-facing "configure Cockpit"
       // warning. On-prem / unknown plans stay silent — they are normal
       // pre-deploy outputs, not failures.
       if (outcome.strategyId === 'steampunk-cockpit-fallback') {
@@ -343,7 +343,7 @@ async function deployOneObject(
       { transport: opts.transport, checkOnly: false, dryRun: opts.dryRun },
     );
     // Root-URI activation inside pushObject can silently no-op on real SAP for
-    // method/OSI items (013 dogfooding lesson); re-activate every inactive
+    // method/OSI items; re-activate every inactive
     // part of this object via activateAll so the next runClass finds the
     // expected methods (e.g. if_oo_adt_classrun~main on the setup class).
     await activateAllParts(client, resolved);

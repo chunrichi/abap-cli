@@ -21,7 +21,7 @@ function makeTree(): Command {
   return program;
 }
 
-describe('output meta (FR-003, FR-004, US-1)', () => {
+describe('output meta (FR-003, US-1)', () => {
   afterEach(() => {
     resetWarnings();
     vi.restoreAllMocks();
@@ -96,7 +96,7 @@ describe('output meta (FR-003, FR-004, US-1)', () => {
     expect(Object.keys(JSON.parse(failOut.stderr[0]!)).sort()).toEqual(['error', 'meta', 'status']);
   });
 
-  it('warnings live only in meta.warnings and never affect exit codes (US-2, FR-009)', () => {
+  it('warnings live only in meta.warnings and never affect exit codes (US-2)', () => {
     collectWarning('DEPRECATED_OPTION', '--max is deprecated');
     const success = renderResult('json', { ok: 1 }, '', buildMeta());
     const successJson = JSON.parse(success.stdout[0]!);

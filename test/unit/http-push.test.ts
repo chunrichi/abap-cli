@@ -1,8 +1,8 @@
 /**
- * 022: abap push of HTTP service .json files routes through the ICF /http/<name>
+  abap push of HTTP service .json files routes through the ICF /http/<name>
  * endpoint (pushHttpFile). Covers: wire conversion + transportRequest, $TMP
  * transport-free path, --check-only rejection, validation, dry-run.
- * Mirrors push-ddic.test.ts (014).
+ * Mirrors push-ddic.test.ts .
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import * as fs from 'fs';

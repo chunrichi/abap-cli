@@ -119,7 +119,7 @@ export function registerExtensionCommand(program: Command): void {
           remoteVersion: info.remoteVersion ?? null,
           expectedVersion: info.expectedVersion,
           match: info.status === 'current',
-          // 030: runtime tier + whether cl_icf_tree is blocked (Steampunk).
+          // Runtime tier + whether cl_icf_tree is blocked (Steampunk).
           runtime: info.runtime ?? 'unknown',
           icfSetupBlocked: info.icfSetupBlocked === true,
         };

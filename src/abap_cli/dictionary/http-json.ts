@@ -9,7 +9,7 @@ export const HTTP_SUPPORTED_TYPES = ['HTTP'] as const;
 export type HttpSupportedType = (typeof HTTP_SUPPORTED_TYPES)[number];
 
 /**
- * 022: local abap-file-format HTTP representation (snake_case / nested).
+ * Local abap-file-format HTTP representation (snake_case / nested).
  * Mirrors `zif_aff_http_v1.intf.abap`:
  *   ty_main  → { formatVersion, header, generalInformation }
  *   header   → { description, originalLanguage, abapLanguageVersion? }
@@ -26,7 +26,7 @@ export interface HttpObjectLocal {
 }
 
 /**
- * 022: ICF wire representation (camelCase, transport envelope).
+ * ICF wire representation (camelCase, transport envelope).
  * Mirrors the JSON the SAP-side handler will deserialize.
  */
 export interface HttpWirePayload {

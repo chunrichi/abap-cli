@@ -24,7 +24,7 @@ import {
   regenerateLock,
 } from '../../src/abap_cli/extensions/lockfile.js';
 
-// --- 027 lazy-load argv sniff (US1) --------------------------------------
+// --- 027 lazy-load argv sniff () --------------------------------------
 
 import {
   classifySkipReason,
@@ -36,7 +36,7 @@ import {
 
 import { loadExtensionModule } from '../../src/abap_cli/extensions/loader.js';
 
-describe('027 — lazy-load argv sniff (US1)', () => {
+describe('027 — lazy-load argv sniff ()', () => {
   it('classifySkipReason: empty / help / version / doctor / builtin → skip', () => {
     expect(classifySkipReason(undefined)).toBe('empty-argv');
     expect(classifySkipReason('--help')).toBe('help');
@@ -54,7 +54,7 @@ describe('027 — lazy-load argv sniff (US1)', () => {
   });
 
   it('BUILTIN_COMMANDS has all 19 top-level commands', () => {
-    // 023 spec FR-001 mandates 19 names; sanity check.
+    // Extension trust spec mandates 19 names; sanity check.
     expect(BUILTIN_COMMANDS.size).toBe(19);
     expect(BUILTIN_COMMANDS.has('extensions')).toBe(true);
     expect(BUILTIN_COMMANDS.has('init')).toBe(true);
@@ -183,21 +183,21 @@ describe('027 — lockfile read/write (US2 / FR-004..FR-008)', () => {
     const result = await regenerateLock(dir, [
       { type: 'validation', name: 'path-only', source: { sourceType: 'path', path: './ext.mjs' } },
     ]);
-    // path sources are lockfile-exempt (FR-006) — no entries written.
+    // path sources are lockfile-exempt () — no entries written.
     expect(result.lock.entries).toEqual([]);
     expect(result.added).toEqual([]);
     expect(result.unresolved).toEqual([]);
   });
 
   it('loader throws LOCKFILE_MISSING_ENTRY when lockfile context is empty', async () => {
-    // Path source — never reaches lockfile check (FR-006).
+    // Path source — never reaches lockfile check ().
     const f = join(dir, 'ext.mjs');
     writeFileSync(f, 'export default {type:"validation",name:"x",validate:()=>({ok:true})};');
     await expect(
       loadExtensionModule({ sourceType: 'path', path: f }, { lock: null }),
     ).resolves.toBeDefined();
 
-    // NPM source with empty lock — npm name check would fire first (US3);
+    // NPM source with empty lock — npm name check would fire first ();
     // bypass it via a valid name and confirm LOCKFILE_MISSING_ENTRY is the
     // *expected* failure once name check passes.
     // We can't easily exercise npm lockfile from a unit test without a real

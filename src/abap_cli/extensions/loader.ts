@@ -1,11 +1,11 @@
 /**
- * Extension module loader (FR-005 / FR-006).
+ * Extension module loader.
  * Handles bare npm packages, local paths, path security (realpath + dual allowlist),
  * recursion guard, and timeout.
  *
- * 027: also enforces strict npm package-name validation (FR-010) and
- * lockfile-pinned integrity (FR-005) for `sourceType: 'npm'` sources.
- * `sourceType: 'path'` sources skip lockfile verification (FR-006).
+ * Also enforces strict npm package-name validation and
+ * lockfile-pinned integrity for `sourceType: 'npm'` sources.
+ * `sourceType: 'path'` sources skip lockfile verification.
  */
 
 import { pathToFileURL } from 'url';
@@ -96,9 +96,9 @@ export async function resolveLocalPath(raw: string): Promise<string> {
  *
  * Timeout (30s) and recursion guard (MAX_DEPTH) prevent runaway loading.
  *
- * 027 US2/US3: when `ctx` is provided for npm sources, the loader first runs
+ * When `ctx` is provided for npm sources, the loader first runs
  * strict package-name validation and then verifies the on-disk file's
- * sha512 against `ctx.lock`. `path:` sources skip both checks (FR-006).
+ * sha512 against `ctx.lock`. `path:` sources skip both checks.
  */
 export async function loadExtensionModule(
   spec: { sourceType: 'npm'; packageName: string; path?: string } | { sourceType: 'path'; path: string },

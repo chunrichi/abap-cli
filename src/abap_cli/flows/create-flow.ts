@@ -74,7 +74,7 @@ export async function runCreateLocal(type: string, name: string, opts: CreateLoc
 }
 
 /**
- * 014: create a DDIC object via the self-built ICF service.
+ * Create a DDIC object via the self-built ICF service.
  * Reads the abap-file-format JSON from `--file`, validates it, converts to wire
  * schema, and POSTs /ddic/<type>. Command-line --description overrides the file's
  * description. Other required fields (package, transport for non-$TMP) are validated
@@ -186,7 +186,7 @@ async function runCreateDdic(type: DdicSupportedType, objectName: string, opts: 
 }
 
 /**
- * 022: create an HTTP service via the self-built ICF service.
+ * Create an HTTP service via the self-built ICF service.
  * Reads the abap-file-format JSON from `--file`, validates it, converts to wire
  * schema, and POSTs /http/<name>. Command-line --description overrides the file's
  * description. Other required fields (package, transport for non-$TMP) are validated
@@ -287,7 +287,7 @@ export async function runCreate(type: string | undefined, name: string | undefin
       example: 'abap create CLAS ZCL_MY_CLASS --package ZPKG --description "desc"',
     });
   }
-  // 014: when --file is provided the description is supplied via the JSON file
+  // When --file is provided the description is supplied via the JSON file
   // (works for any DDIC type, including deferred ones like TTYP).
   if (!opts.description && !opts.file) {
     throw new CliError('USAGE', "Missing required option '--description <desc>'", {
@@ -303,7 +303,7 @@ export async function runCreate(type: string | undefined, name: string | undefin
   const typeUpper = type.toUpperCase();
   const objectName = normalizeName(name);
 
-  // 014: DDIC types route to the self-built ICF service (US1/2).
+  // DDIC types route to the self-built ICF service.
   if (isDdicSupportedType(typeUpper)) {
     if (!opts.file) {
       throw new CliError('USAGE', `DDIC type ${typeUpper} requires --file <path> with an abap-file-format JSON`, {
@@ -314,7 +314,7 @@ export async function runCreate(type: string | undefined, name: string | undefin
     return;
   }
 
-  // 022: HTTP service routes to the self-built ICF service.
+  // HTTP service routes to the self-built ICF service.
   if (isHttpSupportedType(typeUpper)) {
     if (!opts.file) {
       throw new CliError('USAGE', `HTTP service requires --file <path> with an abap-file-format JSON`, {
@@ -328,7 +328,7 @@ export async function runCreate(type: string | undefined, name: string | undefin
   const spec = resolveType(type);
   const client = await AdtClientWrapper.create();
 
-  // --check-only: validate the proposed object without creating it (FR-021).
+  // --check-only: validate the proposed object without creating it.
   if (opts.checkOnly) {
     const result = await client.validateNewObject({
       objtype: spec.objtype,
@@ -402,7 +402,7 @@ export async function runCreate(type: string | undefined, name: string | undefin
     { transport, checkOnly: false, activate: skipActivate ? false : true },
   );
 
-  // Create-then-pull default: write the local file so the agent has it (FR-021).
+  // Create-then-pull default: write the local file so the agent has it.
   let localFile: string | undefined;
   if (opts.pull !== false) {
     const content = await client.getObjectSource(mainPart.sourceUrl);
@@ -438,7 +438,7 @@ export function resolveType(type: string): CreateTypeSpec {
       { type: t },
     );
   }
-  // 022: HTTP service is supported via ICF (handled upstream by runCreate → runCreateHttp).
+  // HTTP service is supported via ICF (handled upstream by runCreate → runCreateHttp).
   // resolveType is only consulted by runCreateLocal; HTTP local draft skeletons are not
   // generated here — keep the rejection semantics aligned with DDIC for `create local`.
   if (HTTP_TYPES.has(t)) {

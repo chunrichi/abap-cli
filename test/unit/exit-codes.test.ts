@@ -13,7 +13,7 @@ import {
 } from '../../src/abap_cli/output/exit-codes.js';
 import { categoryOf, type ErrorCode } from '../../src/abap_cli/output/error-codes.js';
 
-describe('exit codes (FR-003, FR-007, FR-008, SC-002, SC-004)', () => {
+describe('exit codes ', () => {
   it('every ErrorCategory has a unique exit code (UNKNOWN=1, categories 2..9)', () => {
     const codes = Object.values(EXIT_CODES);
     expect(codes).toHaveLength(9);
@@ -72,13 +72,13 @@ describe('exit codes (FR-003, FR-007, FR-008, SC-002, SC-004)', () => {
   });
 });
 
-// --- Process-level exit-code contract (US-3, FR-015) ---
+// --- Process-level exit-code contract (US-3) ---
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const cliEntry = path.join(repoRoot, 'dist/src/abap_cli/index.js');
 const run = promisify(execFile);
 const hasBuiltCli = fs.existsSync(cliEntry);
 
-describe('process-level help/version (US-3, FR-015)', () => {
+describe('process-level help/version (US-3)', () => {
   it.skipIf(!hasBuiltCli)('--help exits 0 with text output and no envelope JSON', async () => {
     const { stdout, stderr } = await run(process.execPath, [cliEntry, '--help']);
     expect(stdout).toContain('Usage');

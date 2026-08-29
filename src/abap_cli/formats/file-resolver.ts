@@ -40,7 +40,7 @@ export function resolveFile(filePath: string): ResolvedFile {
   const basename = path.basename(filePath);
   const ext = getOuterExtension(basename);
 
-  // 014: textpool .properties — <name>.<type>.<category>.<lang>.properties
+  // Textpool .properties — <name>.<type>.<category>.<lang>.properties
   if (ext === '.properties') {
     const stem = basename.slice(0, basename.length - '.properties'.length);
     const parts = stem.split('.');

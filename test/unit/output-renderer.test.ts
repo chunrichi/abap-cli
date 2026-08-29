@@ -10,7 +10,7 @@ const meta: OutputMeta = {
   warnings: [],
 };
 
-describe('output renderer (FR-001, FR-002, FR-016, SC-008)', () => {
+describe('output renderer ', () => {
   it('renderResult("json", data, human, meta) emits compact JSON with meta on stdout', () => {
     const out = renderResult('json', { hello: 'world' }, 'human text', meta);
     expect(out.stdout).toHaveLength(1);
@@ -90,7 +90,7 @@ describe('output renderer (FR-001, FR-002, FR-016, SC-008)', () => {
     expect(out.exitCode).toBe(4); // TLS_ERROR → 4
   });
 
-  it('stripEmpty() recurses into nested data (US2)', () => {
+  it('stripEmpty() recurses into nested data ()', () => {
     const out = renderResult('json', {
       ok: 1,
       skipped: [],

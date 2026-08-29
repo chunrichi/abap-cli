@@ -68,7 +68,7 @@ describe('IcfRegisterStrategy registry — 034 strategy dispatch', () => {
     const outcome = await executeIcfRegister(client as never, SPEC, probe({ runtime: 'netweaver750' }));
     expect(outcome.status).toBe('error');
     expect(outcome.error?.code).toBe('ICF_SETUP_OUTPUT');
-    // 034: preserve the raw classrun text in the message for debugging —
+    // preserve the raw classrun text in the message for debugging —
     // the previous behaviour (just `"not json"`) made it impossible to tell
     // whether the JSON parse failure came from a real message or noise.
     expect(outcome.error?.message).toContain('Unparseable classrun output');

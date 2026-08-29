@@ -9,7 +9,7 @@ const contractPath010 = path.join(repoRoot, 'specs/010-new-cli-commands/contract
 const commandsDir = path.join(repoRoot, 'src/abap_cli/commands');
 
 // Flags introduced or changed by THIS feature (spec FRs / contract delta).
-// 021: `--syntax` / `--content` / `--atc` were converted into check subcommands
+// `--syntax` / `--content` / `--atc` were converted into check subcommands
 // (syntax/content/atc) — the subcommand names cover the contract now.
 const FEATURE_FLAGS = [
   '--limit', '--page', '--exact', '--fuzzy', '--package', '--max', // search + pull batch
@@ -21,7 +21,7 @@ const FEATURE_FLAGS = [
   '--file', '--with-passwords', '--overwrite', // profile export/import
 ];
 
-describe('contract coverage (T035, SC-009)', () => {
+describe('contract coverage (T035)', () => {
   it('every feature-introduced flag is documented in the delta contract', () => {
     const contract = fs.readFileSync(contractPath, 'utf-8');
     const missing = FEATURE_FLAGS.filter((f) => !contract.includes(f));
@@ -55,7 +55,7 @@ const FLAGS_010 = [
   '--all', '--remote', '--local-only', '--limit', // diff
 ];
 
-describe('contract coverage 010 (T021, SC-009)', () => {
+describe('contract coverage 010 (T021)', () => {
   it('every 010 flag is documented in the 010 delta contract', () => {
     const contract = fs.readFileSync(contractPath010, 'utf-8');
     const missing = FLAGS_010.filter((f) => !contract.includes(f));
@@ -81,7 +81,7 @@ describe('contract coverage 010 (T021, SC-009)', () => {
   });
 });
 
-// --- 012-unify-cli-output-contract: unified output contract (SC-003, FR-017) ---
+// --- 012-unify-cli-output-contract: unified output contract (SC-003) ---
 const contract012Path = path.join(repoRoot, 'specs/012-unify-cli-output-contract/contracts/cli-output.md');
 const CONTRACT012_TOKENS = [
   'meta', 'category', 'UNKNOWN', 'WarningCode', 'warnings', 'durationMs',
@@ -89,7 +89,7 @@ const CONTRACT012_TOKENS = [
   'OBJECT_EXISTS', 'FILE_EXISTS', 'schema version',
 ];
 
-describe('contract coverage 012 (T018, SC-003)', () => {
+describe('contract coverage 012 (T018)', () => {
   it('the unified contract documents every key token', () => {
     const contract = fs.readFileSync(contract012Path, 'utf-8').toLowerCase();
     const missing = CONTRACT012_TOKENS.filter((t) => !contract.includes(t.toLowerCase()));

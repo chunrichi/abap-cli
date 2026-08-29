@@ -14,7 +14,7 @@ export class SteampunkSwbStrategy implements IcfRegisterStrategy {
   readonly id = 'steampunk-swb' as const;
 
   supports(probe: RuntimeProbeResult): boolean {
-    // 034: gated on capability evidence. We require an explicit
+    // Gated on capability evidence. We require an explicit
     //  `httpService.available === true` AND a verified POST mime; neither
     //  is currently produced by the discovery probe (the API exists but
     //  POST fails SY530 on every documented body). When the probe gains a

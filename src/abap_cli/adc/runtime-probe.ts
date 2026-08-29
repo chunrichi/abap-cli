@@ -4,7 +4,7 @@ import { readCaCertificate, type SapConfig } from '../config/project-config.js';
 import { CliError } from '../output/json.js';
 import { buildAuth } from '../auth/adapter.js';
 
-/** ADT runtime tier detected from public discovery endpoints (030).
+/** ADT runtime tier detected from public discovery endpoints.
  *  Drives deploy-flow branching and surfaces the runtime on `profile test`
  *  JSON so agents can adapt without trial-and-error. */
 export type AdtRuntime = 'netweaver740' | 'netweaver750' | 'steampunk' | 'unknown';
@@ -19,14 +19,14 @@ export interface RuntimeProbeResult {
   sapComponent?: string;
   /** Optional release string (`sap:rel`) when the Atom XML exposes it. */
   release?: string;
-  /** IcfApi + HttpServiceApi detected from the discovery endpoint (034).
+  /** IcfApi + HttpServiceApi detected from the discovery endpoint.
    *  Used by `extension deploy` to pick the right register strategy without
    *  re-probing the network. Absent on 'none' source. */
   apiCapabilities?: IcfApiCapabilities;
   error?: { code: string; message: string };
 }
 
-/** Capability flags reported alongside the runtime tier (034).
+/** Capability flags reported alongside the runtime tier.
  *  - `icf`: classic `/sap/bc/adt/icf` collection (on-prem SICF admin).
  *           absent → cl_icf_tree is the wrong tool (Steampunk).
  *  - `httpService`: `/sap/bc/adt/ucon/httpservices` collection (Steampunk
@@ -182,7 +182,7 @@ function classifyInformationsystem(xml: string): RuntimeProbeResult {
       icfSetupBlocked: false,
       sapComponent,
       release,
-      // 034: on-prem S/4HANA always exposes /sap/bc/adt/icf. Mark it here so
+      // On-prem S/4HANA always exposes /sap/bc/adt/icf. Mark it here so
       // deploy-flow can skip the ICF collection availability check.
       apiCapabilities: { icf: { available: true }, httpService: { available: false } },
     };
@@ -240,7 +240,7 @@ async function probeFromDiscovery(client: unknown): Promise<RuntimeProbeResult> 
     /steampunk/i.test(discXml) ||
     /hana\.ondemand\.com/i.test(discXml) ||
     /sapbtp|abap[\s_-]?env/i.test(discXml);
-  // 034: extract ICF / HTTP service collection hrefs so deploy-flow can pick
+  // Extract ICF / HTTP service collection hrefs so deploy-flow can pick
   // a register strategy without re-probing the network.
   const icfHrefMatch = /href\s*=\s*"([^"]*\/sap\/bc\/adt\/icf\/[^"]+)"/i.exec(discXml);
   const icfPrimaryPath = icfHrefMatch ? icfHrefMatch[1] : undefined;
@@ -299,7 +299,7 @@ function extractBody(resp: unknown): string {
 
 /**
  * Build the structured `nextSteps` for Steampunk users who just ran
- * `extension deploy` (030). The hint walks through the BTP Cockpit
+ * `extension deploy`. The hint walks through the BTP Cockpit
  * destination + route setup so the ICF handler is reachable end-to-end.
  */
 export function steampunkDeployHint(systemUrl: string): string[] {

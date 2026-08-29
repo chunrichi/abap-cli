@@ -39,7 +39,7 @@ export function registerCreateCommand(program: Command): void {
     .option('--no-pull', 'Skip the create-then-pull local copy (default: pull after create)')
     .option('--check-only', 'Validate without creating')
     .option('--audit', 'Include the before-checksum (extra SAP round-trip, off by default)')
-    .option('--file <path>', '014: abap-file-format JSON input (required for DOMA/DTEL/TABL/STRU/HTTP)')
+    .option('--file <path>', 'abap-file-format JSON input (required for DOMA/DTEL/TABL/STRU/HTTP)')
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .option('--yes', 'Confirm in non-interactive mode')
     .action(async (type, name, opts, cmd) => {

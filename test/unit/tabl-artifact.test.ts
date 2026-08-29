@@ -1,5 +1,5 @@
 /**
- * 024: abap-file-format TABL/STRU three-piece parser unit coverage.
+  abap-file-format TABL/STRU three-piece parser unit coverage.
  *
  * Targets `parseTablDdic` (DDL → fields) and `extractTablArtifactWire`
  * (wire → canonical strings). Round-trip with zcl_abap_vibe_tabl_format is

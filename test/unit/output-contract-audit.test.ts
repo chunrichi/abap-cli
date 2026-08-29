@@ -24,7 +24,7 @@ function listTsFiles(dir: string): string[] {
   return out;
 }
 
-describe('output contract audit (FR-012, US-4, SC-001/002/005)', () => {
+describe('output contract audit (FR-012, US-4/002/005)', () => {
   it('§4 exit-code table in the contract matches EXIT_CODES', () => {
     // Rows like `| 1 | \`UNKNOWN\` |` — category name is the backticked token.
     const parsed = new Map<number, string>();

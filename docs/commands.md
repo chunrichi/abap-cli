@@ -15,7 +15,7 @@ Every command supports the global `--json` option for structured output (Agent-F
 
 ## JSON Output Contract
 
-Machine-readable contract for every `abap <cmd> --json` response (spec 012, contracts/cli-output.md). Success envelopes go to stdout only; failure envelopes go to stderr only; stdout stays empty on any failure path. exit code maps to error.category (output/exit-codes.ts). Enforced by test/unit/envelope-schema.test.ts for every registered command.
+Machine-readable contract for every `abap <cmd> --json` response. Success envelopes go to stdout only; failure envelopes go to stderr only; stdout stays empty on any failure path. exit code maps to error.category (output/exit-codes.ts). Enforced by test/unit/envelope-schema.test.ts for every registered command.
 
 Structured failure. `code` is the literal ErrorCode; `category` drives the exit code. Extension failures always use dedicated EXTENSION_* codes and never override built-in codes.
 
@@ -139,9 +139,9 @@ abap pull [options] [object-name]
 | `--skip-existing` | Skip files that already exist. |
 | `--include-tests` | Include testclasses source part. |
 | `--include-all-parts` | Include every source-code part. |
-| `--textpool` | 014: also pull textpool files (.texts/.selections/.headings.<lang>.properties). |
-| `--remote=<remoteid>` | 015: pull the object's active version source from a remote system (Version Management). |
-| `--tr=<request>` | T4.2: pull all objects bound to a transport request (mutually exclusive with object name and --package). |
+| `--textpool` | Also pull textpool files (.texts/.selections/.headings.<lang>.properties). |
+| `--remote=<remoteid>` | Pull the object's active version source from a remote system (Version Management). |
+| `--tr=<request>` | Pull all objects bound to a transport request (mutually exclusive with object name and --package). |
 | `--schema` | Print the command parameter schema as JSON and exit (no SAP call). (default `false`) |
 
 ### Exclusive groups
@@ -733,7 +733,7 @@ abap run [options] <class-name>
 | `--args` | JSON object of method arguments, mapped to IMPORTING parameters (case-insensitive). Must be a JSON object, not array/null. (default `"{}"`) |
 | `--timeout` | Maximum execution time in ms. Wrapper path enforces server-side via cl_abap_runtime; classrun path uses ADT endpoint timeout (~5min) plus CLI-side AbortController fallback. (default `30000`) — min: `100` · max: `600000` |
 | `--dry-run` | Plan only — print the request envelope without invoking ADT classrun. (default `false`) |
-| `--json` | Emit the unified JSON envelope on stdout (012 output contract); --pretty-json indents. (default `false`) — global |
+| `--json` | Emit the unified JSON envelope on stdout; --pretty-json indents. (default `false`) — global |
 | `--schema` | Print the command parameter schema as JSON and exit (no SAP call). (default `false`) |
 
 ### Exclusive groups
@@ -792,7 +792,7 @@ abap select --table <name> [options]
 | `--order-by=<csv>` | Comma-separated FIELD:ASC|DESC pairs, e.g. "ID:ASC,AMOUNT:DESC". |
 | `--count-only` | Return only the matching row count (data.count); rows/fields omitted. (default `false`) |
 | `--dry-run` | Plan only — print the query envelope without invoking the ICF endpoint. (default `false`) |
-| `--json` | Emit the unified JSON envelope on stdout (012 output contract); --pretty-json indents. (default `false`) — global |
+| `--json` | Emit the unified JSON envelope on stdout; --pretty-json indents. (default `false`) — global |
 | `--schema` | Print the command parameter schema as JSON and exit (no SAP call). (default `false`) |
 
 ### Global options
@@ -981,7 +981,7 @@ abap create <type> <name> [options]
 | `--no-pull` | Skip the create-then-pull local copy (default: pull after create) |
 | `--check-only` | Validate the proposed object without creating it |
 | `--audit` | Include the before-checksum (extra SAP round-trip, off by default) |
-| `--file=<path>` | 014: abap-file-format DDIC JSON input (required for DOMA/DTEL/TABL/STRU) |
+| `--file=<path>` | abap-file-format DDIC JSON input (required for DOMA/DTEL/TABL/STRU) |
 | `--schema` | Print the command parameter schema as JSON and exit (no SAP call). (default `false`) |
 | `--yes` | Confirm in non-interactive environments. (default `false`) |
 | `--non-interactive` | Alias of --yes. (default `false`) |

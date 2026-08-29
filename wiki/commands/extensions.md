@@ -2,7 +2,7 @@
 type: command
 title: abap extensions
 description: 管理已安装的第三方扩展 — list（只读列出注册项 + 加载状态 + lockfile 状态）/ lock（重新生成 extensions.lock.json，027 信任硬化）
-tags: [abap-cli, command, extensions, lockfile, security, 027-extension-trust]
+tags: [abap-cli, command, extensions, lockfile, security]
 created at: 2026-08-28 00:00:00
 changed at: 2026-08-28 00:00:00
 ---
@@ -12,7 +12,7 @@ changed at: 2026-08-28 00:00:00
 管理从 `.abap.json` 的 `extensions[]` 数组中声明的第三方扩展。包含两个子命令：
 
 - `extensions list` — 只读列出所有已注册扩展，附带**加载状态**与（npm 扩展的）`extensions.lock.json` 状态。
-- `extensions lock` — 重新生成 `extensions.lock.json`（027 US2 / FR-007）。
+- `extensions lock` — 重新生成 `extensions.lock.json`。
 
 > **注意**：本命令与 [`abap extension`](extension.md) 是**不同命令**——后者管理内置的 SAP-side ICF ABAP 扩展（`/sap/zabap_vibe`）。本命令面向**第三方扩展加载机制**（023 + 027）。
 
@@ -102,7 +102,7 @@ abap extensions list --json
 
 | sourceType | lockfile | path allowlist | package-name regex | Hash pinned |
 |------------|----------|----------------|--------------------|-------------|
-| `npm`      | required | n/a            | yes (FR-010)       | yes (sha512) |
+| `npm`      | required | n/a            | yes       | yes (sha512) |
 | `path`     | exempt   | required (cwd 或 `~/.abap-cli/extensions/`) | n/a | no |
 
 `INVALID_PACKAGE_NAME` 在任何 `import()` / `createRequire().resolve()` 之前拒绝（覆盖 `..` / `\` / 空 scope / URL scheme / 绝对路径 / 非 npm 名字符集）。

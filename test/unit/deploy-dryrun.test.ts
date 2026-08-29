@@ -36,7 +36,7 @@ beforeEach(() => {
   fs.writeFileSync(path.join(sourceDir, 'zcl_deploy.clas.abap'), 'CLASS zcl_deploy DEFINITION PUBLIC.\nENDCLASS.\n');
 });
 
-describe('abap extension deploy (US6, FR-018..020, SC-005)', () => {
+describe('abap extension deploy (US6..020)', () => {
   it('--dry-run makes zero mutating calls and returns a per-file plan', async () => {
     const summary = await deployBundled(client, { transport: 'TRN001', yes: true, dryRun: true, sourceDir });
     expect(lock).not.toHaveBeenCalled();

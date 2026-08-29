@@ -2,7 +2,7 @@ import type { AdtClientWrapper } from '../clients/adt-client.js';
 import { resolveObject } from '../core/resolve.js';
 import { SEARCH_RESULT_LIMIT } from '../core/limits.js';
 
-/** Base object metadata — always returned (FR-011). */
+/** Base object metadata — always returned. */
 export interface ObjectMetadata {
   object: string;
   type: string;
@@ -14,7 +14,7 @@ export interface ObjectMetadata {
   responsible?: string;
 }
 
-/** Structure element from `--structure` (FR-012). */
+/** Structure element from `--structure`. */
 export interface ObjectStructureElement {
   name: string;
   type: string;
@@ -22,14 +22,14 @@ export interface ObjectStructureElement {
   children: ObjectStructureElement[];
 }
 
-/** Class include part from `--includes` (FR-012). */
+/** Class include part from `--includes`. */
 export interface ObjectInclude {
   includeType: string;
   name: string;
   sourceUri: string;
 }
 
-/** Lock/transport ownership from `--locks` (FR-012). */
+/** Lock/transport ownership from `--locks`. */
 export interface ObjectLock {
   transport: string;
   status: string;
@@ -51,7 +51,7 @@ export interface ActivationInfo {
    * `testclasses` / `macros`) are all active. The ADT `main` part is the
    * class's standalone include — its `active` flag carries SAP GUI's
    * "INCLUDE program not separately activated" semantics, which doesn't
-   * mean the class is inactive. See #4 in feedback/ISSUES.md.
+   * mean the class is inactive.
    */
   ok: boolean;
   parts: ActivationPart[];

@@ -1,4 +1,4 @@
-/** One finding, unified across syntax / content / ATC modes (FR-008). */
+/** One finding, unified across syntax / content / ATC modes. */
 export interface CheckIssue {
   file: string;
   line: number;

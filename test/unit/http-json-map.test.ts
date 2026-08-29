@@ -1,6 +1,6 @@
 /**
- * 022: HTTP service JSON helpers — local↔wire conversion, validation, namespace.
- * Mirrors ddic-json-map.test.ts (014) but for the HTTP service object type.
+  HTTP service JSON helpers — local↔wire conversion, validation, namespace.
+ * Mirrors ddic-json-map.test.ts but for the HTTP service object type.
  */
 import { describe, expect, it } from 'vitest';
 import {

@@ -1,5 +1,5 @@
 /**
- * Shape validation for untrusted extension payloads (FR-004).
+ * Shape validation for untrusted extension payloads.
  * Hand-rolled discriminator — no Zod/Valibot (research decision #3).
  */
 

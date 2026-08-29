@@ -22,12 +22,12 @@ const TYPE_FOLDER: Record<string, string> = {
   INTF: 'intf',
   PROG: 'prog',
   FUGR: 'fugr',
-  // DDIC objects (014)
+  // DDIC objects
   TABL: 'tabl',
   DOMA: 'doma',
   STRU: 'stru',
   DTEL: 'dtel',
-  // 022: HTTP service (SICF node) — also routed via the self-built ICF service.
+  // HTTP service (SICF node) — also routed via the self-built ICF service.
   HTTP: 'http',
 };
 

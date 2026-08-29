@@ -5,7 +5,7 @@ import * as path from 'path';
 import { resolveLocalTargets } from '../../src/abap_cli/core/local-targets.js';
 import { loadIgnorePatterns } from '../../src/abap_cli/core/ignore.js';
 
-describe('local-targets + ignore (FR-017, FR-025)', () => {
+describe('local-targets + ignore ', () => {
   it('loadIgnorePatterns always includes the defaults', () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'abapignore-'));
     try {

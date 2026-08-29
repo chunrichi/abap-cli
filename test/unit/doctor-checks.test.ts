@@ -38,7 +38,7 @@ describe('doctor-checks (FR-001..005)', () => {
     cwd = tmpDir();
   });
 
-  it('healthy environment → all items ok and empty nextSteps (FR-001/FR-002, SC-001)', async () => {
+  it('healthy environment → all items ok and empty nextSteps (FR-001/FR-002)', async () => {
     writeSystems(home, {
       mock: { url: 'http://localhost:8080', client: '100', username: 'MOCKUSER', language: 'EN' },
     });
@@ -61,7 +61,7 @@ describe('doctor-checks (FR-001..005)', () => {
     expect(report.nextSteps).toContain(item?.suggestion);
   });
 
-  it('corrupt systems.json → config item err + suggestion in nextSteps, no throw (FR-002, SC-001)', async () => {
+  it('corrupt systems.json → config item err + suggestion in nextSteps, no throw ', async () => {
     const cliDir = path.join(home, '.abap-cli');
     fs.mkdirSync(cliDir, { recursive: true });
     const configPath = path.join(cliDir, 'systems.json');
@@ -73,14 +73,14 @@ describe('doctor-checks (FR-001..005)', () => {
     expect(report.nextSteps.length).toBeGreaterThan(0);
   });
 
-  it('invalid profile → config item err (FR-002)', async () => {
+  it('invalid profile → config item err ()', async () => {
     writeSystems(home, { bad: { url: 'not-a-url', username: 'x' } });
     const report = await runDoctorChecks({ home, cwd });
     const item = report.config.find((i) => i.key.startsWith('config.profile'));
     expect(item?.status).toBe('err');
   });
 
-  it('unknown --system → connection item err, not a hard failure (FR-005)', async () => {
+  it('unknown --system → connection item err, not a hard failure ()', async () => {
     writeSystems(home, {
       mock: { url: 'http://localhost:8080', client: '100', username: 'MOCKUSER', language: 'EN' },
     });
@@ -90,7 +90,7 @@ describe('doctor-checks (FR-001..005)', () => {
     expect(conn?.suggestion).toBeTruthy();
   });
 
-  it('--verbose adds per-item detail (FR-003)', async () => {
+  it('--verbose adds per-item detail ()', async () => {
     writeSystems(home, {
       mock: { url: 'http://localhost:8080', client: '100', username: 'MOCKUSER', language: 'EN' },
     });
@@ -131,7 +131,7 @@ describe('doctor-checks (FR-001..005)', () => {
   });
 });
 
-describe('abap doctor command (FR-004)', () => {
+describe('abap doctor command ()', () => {
   // Command layer: use doMock so --fix never touches the real home dir, while
   // the unit describe above keeps the real runDoctorChecks implementation.
   const runDoctorChecksMock = vi.fn();
@@ -153,7 +153,7 @@ describe('abap doctor command (FR-004)', () => {
     registerCmd = cmd.registerDoctorCommand;
   });
 
-  it('--fix without --yes in non-TTY → VALIDATION_ERROR exit 7, zero changes (FR-004, SC-002)', async () => {
+  it('--fix without --yes in non-TTY → VALIDATION_ERROR exit 7, zero changes ', async () => {
     const program = makeProgram();
     registerCmd(program);
     const res = await runCommand(program, ['doctor', '--fix', '--json'], {});
@@ -164,7 +164,7 @@ describe('abap doctor command (FR-004)', () => {
     expect(applySafeFixesMock).not.toHaveBeenCalled();
   });
 
-  it('--fix --yes applies only safe fixes and reports fixesApplied (FR-004, SC-002)', async () => {
+  it('--fix --yes applies only safe fixes and reports fixesApplied ', async () => {
     const program = makeProgram();
     registerCmd(program);
     const res = await runCommand(program, ['doctor', '--fix', '--yes', '--json'], {});

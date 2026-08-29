@@ -105,8 +105,8 @@ export function parseClassrunOutput(raw: string): ClassrunOutput {
   }
   if (parsed && parsed.status === 'error') {
     // Two envelope shapes exist:
-    //   A. wrapper (015):  { status: 'error', code, message, class?, method? }
-    //   B. ICF/setup (013): { status: 'error', error: { code, message } }
+    //   A. wrapper:  { status: 'error', code, message, class?, method? }
+    //   B. ICF/setup: { status: 'error', error: { code, message } }
     const err = (parsed.error ?? {}) as { code?: string; message?: string };
     return {
       kind: 'error',

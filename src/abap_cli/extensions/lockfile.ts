@@ -53,7 +53,7 @@ export function extensionsLockPath(projectRoot: string): string {
 }
 
 /**
- * Strict npm package-name validation (FR-010). Runs before any module
+ * Strict npm package-name validation. Runs before any module
  * resolution so a hostile string never reaches Node's resolver.
  */
 export function validateNpmPackageName(
@@ -196,7 +196,7 @@ export function declaredNpmPackages(extensions: ExtensionManifest[] | undefined)
 
 /**
  * Verify one npm extension against the lockfile before `import()`.
- * `path:` sources never reach here (FR-006).
+ * `path:` sources never reach here.
  */
 export async function verifyNpmPackage(
   packageName: string,

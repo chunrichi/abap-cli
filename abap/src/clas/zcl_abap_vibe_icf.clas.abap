@@ -74,7 +74,7 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
                 iv_code    TYPE string
                 iv_msg     TYPE string
                 iv_details TYPE any OPTIONAL.
-    " 017: single JSON generation entries (US1/US2 build responses via these).
+    " Single JSON generation entries (build success/error responses via these).
     METHODS serialize_response
       IMPORTING is_payload TYPE any
       RETURNING VALUE(rv_json) TYPE string.
@@ -83,7 +83,7 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
                 iv_message TYPE string
                 iv_details TYPE any OPTIONAL
       RETURNING VALUE(rv_json) TYPE string.
-    " 017: vhcala4hci deploys an old /UI2/CL_JSON that does NOT escape JSON
+    " vhcala4hci deploys an old /UI2/CL_JSON that does NOT escape JSON
     " string values — probe once and escape ourselves when needed.
     CLASS-DATA gv_escape_needed TYPE abap_bool.
     METHODS escape_probe_needed
@@ -202,7 +202,7 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
       END OF ty_field,
       tt_field TYPE STANDARD TABLE OF ty_field WITH EMPTY KEY.
 
-    " ----- 016: read-only table data query (SE16N equivalent) -----
+    " ----- read-only table data query (SE16N equivalent) -----
     " Wire payload type (camelCase — matches /ui2/cl_json pretty_mode-camel_case).
     TYPES:
       BEGIN OF ty_query_request,
@@ -249,7 +249,7 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
       gc_query_limit_def  TYPE i VALUE 100.
 
     " Large-object datatype set — STRG/RSTR/LCHR/LRAW are excluded from output when
-    " --fields is not specified, and rejected explicitly when it is (spec FR-016).
+    " --fields is not specified, and rejected explicitly when it is.
     CONSTANTS:
       gc_large_object_types TYPE string VALUE 'STRG|RSTR|LCHR|LRAW'.
 
@@ -285,7 +285,7 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
                 VALUE(ev_err_msg)  TYPE string
                 VALUE(ev_err_offset) TYPE i.
 
-    " select wire payloads (017): rows is a partial-JSON piece (native values,
+    " select wire payloads: rows is a partial-JSON piece (native values,
     " uppercase field names via pretty_mode-none); envelope is camelCase.
     TYPES:
       BEGIN OF ty_select_result_data,
@@ -496,7 +496,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
     ELSEIF lv_path CP '/tcode/*'.
       dispatch_tcode( io_server = server iv_path = lv_path iv_method = lv_method ).
     ELSEIF lv_path CP '/data/*'.
-      " 016: read-only table data query (SE16N equivalent).
+      " Read-only table data query (SE16N equivalent).
       TRY.
           dispatch_data( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
         CATCH cx_root INTO DATA(lx_top_dispatch).
@@ -1166,7 +1166,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD dispatch_textpool.
-    " 014 US4: read textpool via RS_TEXTPOOL_READ; write support is target-specific.
+    " Read textpool via RS_TEXTPOOL_READ; write support is target-specific.
     " Routes /textpool/<category>?object=<name>&type=<type>.
     " category: texts|selections|headings; object = program/class name; type = PROG|CLAS|FUGR.
     DATA lv_path        TYPE string.
@@ -1854,7 +1854,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_ddic_object.
-    " US3: pull a DDIC object definition and return the wire JSON (mirrors the
+    " Pull a DDIC object definition and return the wire JSON (mirrors the
     " create payload so round-trip is consistent). Object missing → DDIC_OBJECT_NOT_FOUND.
     CASE iv_type.
       WHEN 'DOMA'.
@@ -1982,7 +1982,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD serialize_response.
-    " 017: single success-envelope generation entry (camelCase wire).
+    " Single success-envelope generation entry (camelCase wire).
     " Copy to a modifiable heap object so old /UI2/CL_JSON escaping can apply.
     DATA lr_payload TYPE REF TO data.
     CREATE DATA lr_payload LIKE is_payload.
@@ -2001,7 +2001,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD serialize_error.
-    " 017: single error-envelope generation entry (compress skips unbound details).
+    " Single error-envelope generation entry (compress skips unbound details).
     DATA lv_msg TYPE string.
     lv_msg = iv_message.
     IF escape_probe_needed( ) = abap_true.
@@ -2088,7 +2088,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD dispatch_data.
-    " 016: route /data/<sub> → sub-handlers. Only /data/query is supported in v1.
+    " Route /data/<sub> → sub-handlers. Only /data/query is supported in v1.
     IF iv_path <> '/data/query'.
       respond_error( io_server = io_server
                      iv_status = 404
@@ -2154,7 +2154,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
         LOOP AT ls_meta-fields INTO DATA(ls_field) WHERE name = lv_fname.
           lv_match = abap_true.
           IF ls_field-dataType CP gc_large_object_types.
-            " 016: explicit projection of a large-object field is rejected.
+            " Explicit projection of a large-object field is rejected.
             respond_error( io_server = io_server
                            iv_status = 400
                            iv_reason = 'Bad Request'
@@ -2278,7 +2278,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
       ENDIF.
     ENDIF.
 
-    " 8. Count-only path (US4).
+    " 8. Count-only path.
     IF ls_req-countonly = abap_true.
       DATA ls_count     TYPE ty_select_count.
       DATA ls_count_err TYPE ty_error.
@@ -2334,7 +2334,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD parse_data_query.
-    " 016: deserialize the wire payload (camelCase). Generate default values for
+    " Deserialize the wire payload (camelCase). Generate default values for
     " missing fields so the consumer always sees a valid request.
     CLEAR: es_req, ev_ok, ev_err_code, ev_err_msg, ev_err_details.
     ev_ok = abap_false.
@@ -2380,7 +2380,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD read_table_metadata.
-    " 016: read DD02L (table header) + DD03L (field list) for the requested table.
+    " Read DD02L (table header) + DD03L (field list) for the requested table.
     CLEAR: es_meta, ev_ok, ev_err_code, ev_err_msg, ev_err_details, ev_err_http.
     ev_ok = abap_false.
     DATA(lv_name) = to_upper( condense( val = iv_name del = ` ` ) ).
@@ -2440,7 +2440,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD parse_where_clause.
-    " 016: AND-only where grammar per research R8.
+    " AND-only where grammar per research R8.
     "   where := condition { "AND" condition }
     "   condition := field op value
     "   op := "=" | "<>" | ">" | ">=" | "<" | "<=" | "LIKE"
@@ -2682,7 +2682,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD execute_select.
-    " 016: dynamic Open SQL with host-variable binding (research R1).
+    " Dynamic Open SQL with host-variable binding (research R1).
     " Build the dynamic row type from DD03L metadata, then SELECT with a
     " generated WHERE clause whose values are bound as host variables.
     " Take limit+1 to detect truncation.
@@ -2933,7 +2933,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD execute_count.
-    " 016: SELECT COUNT(*) FROM (table) WHERE (cond) — same parameter binding.
+    " SELECT COUNT(*) FROM (table) WHERE (cond) — same parameter binding.
     DATA(lv_meta) = is_meta.
 
     " Pre-declare host vars (ABAP forbids re-`DATA` inside CASE branches).

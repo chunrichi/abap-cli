@@ -211,7 +211,7 @@ interface CheckFileResult {
 
 /** `resolveMode` removed in 021: mode is now an explicit subcommand argument. */
 
-/** Resolve the file set from explicit files, --all, or --changed (FR-007). */
+/** Resolve the file set from explicit files, --all, or --changed. */
 async function collectFiles(files: string[], opts: CheckOptions): Promise<string[]> {
   const scopeCount = Number(Boolean(opts.all)) + Number(Boolean(opts.changed)) + Number(files.length > 0);
   if (scopeCount > 1) {

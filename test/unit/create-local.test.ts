@@ -18,7 +18,7 @@ function parseError(res: { stderr: string }) {
   return JSON.parse(res.stderr).error;
 }
 
-describe('abap create local (US1, US2, SC-001..003)', () => {
+describe('abap create local (US1, US2..003)', () => {
   it('CLAS default skeleton: file path, content and --json contract', async () => {
     const program = makeProgram();
     registerCreateCommand(program);

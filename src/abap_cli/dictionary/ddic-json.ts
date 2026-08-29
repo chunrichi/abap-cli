@@ -74,7 +74,7 @@ export interface DdicWirePayload {
   clientDependent?: boolean;
   allowMaintenance?: boolean;
   fields?: DdicFieldWire[];
-  // 024: TABL/STRU abap-file-format three-piece pull wire
+  // TABL/STRU abap-file-format three-piece pull wire
   // (populated by zcl_abap_vibe_tabl_format). main_json / ddic_source /
   // settings_json are canonical strings; type/has_settings/warnings/error_*
   // supplement for diagnostics.
@@ -453,7 +453,7 @@ export function wireToLocal(type: DdicSupportedType, wire: DdicWirePayload): Ddi
 }
 
 /**
- * 014: validate a local DDIC object against the per-type contract
+ * Validate a local DDIC object against the per-type contract
  * (data-model.md §1-4). Returns an array of human-readable errors
  * (empty when valid). Namespace / package / transport rules enforced here.
  */

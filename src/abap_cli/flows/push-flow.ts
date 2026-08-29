@@ -94,7 +94,7 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
         const resolved = resolveFile(file);
         validateLocalFile(resolved);
         if (resolved.route === 'icf') {
-          // 022: HTTP service uses its own JSON shape; route via the dedicated helper.
+          // HTTP service uses its own JSON shape; route via the dedicated helper.
           if (resolved.objectType === 'HTTP') {
             const local = await readHttpJson(path.resolve(process.cwd(), file));
             const errors = validateHttpObject(local);
@@ -169,13 +169,13 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
   if (failed > 0) {
     // Aggregate exit code follows the category of the first failed file
     // (or PUSH_FAILED fallback); thrown so the unified renderer in the action
-    // handles envelope + exit code (FR-011).
+    // handles envelope + exit code.
     const single = target.files.length === 1;
     const code = (single ? (results[0]?.code ?? 'PUSH_FAILED') : 'PUSH_FAILED') as ErrorCode;
     const firstFailed = results.find((r) => r.status === 'failed');
     const aggregateCode = (firstFailed?.code ?? code) as ErrorCode;
     // Single-file runs surface the original failure (message + nextSteps) so the
-    // cause is visible without unwrapping `details.results` (FR-011).
+    // cause is visible without unwrapping `details.results`.
     const message = single && firstFailed?.message ? firstFailed.message : `${failed} of ${target.files.length} file(s) failed`;
     const nextSteps = single && firstFailed?.nextSteps ? firstFailed.nextSteps : undefined;
     throw new CliError(aggregateCode, message, {
@@ -254,9 +254,9 @@ async function resolveObjectTransport(
   return resolveTransport(client, opts.tr, client.getConfig().transport);
 }
 
-/** 014/022: push a .json file via the self-built ICF service.
+/** Push a .json file via the self-built ICF service.
  *  DDIC types (DOMA/DTEL/TABL/STRU) → POST /ddic/<type>.
- *  HTTP service (022)              → POST /http/<name>.
+ *  HTTP service                     → POST /http/<name>.
  */
 async function pushDdicFile(
   client: AdtClientWrapper,
@@ -275,7 +275,7 @@ async function pushDdicFile(
     return { transport: opts.tr ?? client.getConfig().transport ?? 'DRY_RUN', status: 'dry-run' };
   }
 
-  // 022: HTTP service has its own wire format; route via the dedicated helper.
+  // HTTP service has its own wire format; route via the dedicated helper.
   if (resolved.objectType === 'HTTP') {
     return pushHttpFile(client, resolved, file, opts);
   }
@@ -327,7 +327,7 @@ async function pushDdicFile(
 }
 
 /**
- * 022: push a HTTP service .json file via ICF POST /http/<name>.
+ * Push a HTTP service .json file via ICF POST /http/<name>.
  * The SAP-side handler creates/updates a SICF node with the given handler class + URL.
  */
 async function pushHttpFile(
@@ -397,13 +397,13 @@ async function pushOne(
   }
   validateLocalFile(resolved);
 
-  // 014: textpool .properties files route via ADT/ICF (mixed mode, cache-decided).
+  // Textpool .properties files route via ADT/ICF (mixed mode, cache-decided).
   if (resolved.route === 'textpool') {
     await pushTextpoolFile(client, resolved, file, opts, onStage);
     return { transport: opts.tr ?? client.getConfig().transport ?? '' };
   }
 
-  // 014: DDIC .json files (DOMA/DTEL/TABL/STRU) push via ICF /ddic/<type>.
+  // DDIC .json files (DOMA/DTEL/TABL/STRU) push via ICF /ddic/<type>.
   if (resolved.route === 'icf') {
     return pushDdicFile(client, resolved, file, opts, onStage);
   }
