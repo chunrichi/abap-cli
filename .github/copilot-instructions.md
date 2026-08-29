@@ -11,6 +11,7 @@
 - 每个 command 都使用 skill okf 编写 wiki 知识库。
 - spec 是设计文档,**不进** git 仓库；`wiki/commands/` 下的 okf 文档才是命令的最终参考。
 - 不要将 bug / spec 等编号写入 changlog/commit/PR 描述/代码注释,也不要在 wiki 中写 "fix #123" 或 "see #456"。
+- 编写文档的时候，不要编写解释性标注（如 `（内部代号，已脱敏）`、`（已删除）`、`（已弃用）`）。
 
 ## Token-efficient
 
