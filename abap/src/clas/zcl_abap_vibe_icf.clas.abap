@@ -117,6 +117,12 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
       IMPORTING iv_query TYPE string
                 iv_name  TYPE string
       RETURNING VALUE(rv_value) TYPE string.
+    " Reflect the ABAP language version of a handler class. Returns 'cloudDevelopment'
+    " or 'standard'; falls back to 'standard' when the class cannot be introspected
+    " (e.g. not yet activated, no RTTI access, or handler is empty).
+    METHODS resolve_handler_language_version
+      IMPORTING iv_class_name TYPE string
+      RETURNING VALUE(rv_version) TYPE string.
 
     " ----- transaction-code lookup (configured entry program only) -----
     TYPES:
@@ -645,7 +651,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
                                                                  THEN CONV string( lv_service_name )
                                                                  ELSE CONV string( ls_docu-icf_docu ) )
                                                                  original_language = lv_original_language
-                                                                 abap_language_version = 'standard' )
+                                                                 abap_language_version = resolve_handler_language_version( ls_handler-icfhandler ) )
                          general_information = VALUE #( handler_class = COND #( WHEN sy-subrc = 0
                                                                                  THEN CONV string( ls_handler-icfhandler )
                                                                                  ELSE `` )
@@ -920,6 +926,24 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
                   is_payload = VALUE ty_http_write(
                     status = 'success'
                     data = VALUE #( name = lv_node_name type = 'HTTP' action = 'created' ) ) ).
+  ENDMETHOD.
+
+  METHOD resolve_handler_language_version.
+    " Default to 'standard' on any failure: missing handler, not loaded,
+    " no RTTI access, etc. abap-file-format only allows these two enum values.
+    rv_version = 'standard'.
+    IF iv_class_name IS INITIAL.
+      RETURN.
+    ENDIF.
+    TRY.
+        DATA(lo_descr) = cl_abap_classdescr=>describe_by_name( iv_class_name ).
+        IF lo_descr IS BOUND AND lo_descr->get_language_version( ) = cl_abap_language_version=>co_cloud_development.
+          rv_version = 'cloudDevelopment'.
+        ENDIF.
+      CATCH cx_root.
+        " Silent fallback: introspection failures (class missing, no authority, etc.)
+        " must not break the GET response — we still return a usable HTTP service payload.
+    ENDTRY.
   ENDMETHOD.
 
   METHOD dispatch_version_management.

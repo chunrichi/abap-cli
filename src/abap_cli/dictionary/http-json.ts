@@ -138,6 +138,9 @@ export function validateHttpObject(data: HttpObjectLocal): string[] {
   const originalLanguage = (l.originalLanguage as string | undefined) ?? (headerObj?.originalLanguage as string | undefined);
 
   if (!description) errors.push('HTTP service missing: description (header.description)');
+  if (typeof description === 'string' && description.length > 60) {
+    errors.push(`HTTP service description too long: maxLength 60 (got ${description.length})`);
+  }
   if (!originalLanguage) errors.push('HTTP service missing: originalLanguage (header.originalLanguage)');
 
   // abapLanguageVersion is optional but if present must be one of the enum values.
