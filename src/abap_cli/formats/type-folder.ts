@@ -1,20 +1,21 @@
 /**
  * Local-convention type → subdirectory mapping.
  *
- * Decided (Q5=B): local convention over abapGit compatibility. Files are
- * written under `<rootDir>/<typeFolder>/...` so source and DDIC objects no
- * longer collide in a single `src/` directory.
+ * Decided (Q5=B): a single uniform layout for source and DDIC objects.
+ * Files are written under `<rootDir>/<typeFolder>/...` so source and DDIC
+ * objects no longer collide in a single `src/` directory.
  *
  * Notes:
- *   - Folder names follow the abapGit style (lowercase type code) so that
- *     downstream tooling that already understands `src/clas/` etc. keeps
- *     working with minimal adjustment. This is a *local* convention and is
- *     NOT guaranteed to round-trip with a vanilla `abapGit` import.
+ *   - Folder names are the lowercase type code (`clas` / `intf` / `prog` /
+ *     `fugr` / `tabl` / `doma` / `stru` / `dtel` / `http` / `tran`). This
+ *     is a *local* convention only.
  *   - DDIC types are bucketed here too, even though `abap-file-format`
  *     traditionally lays DDIC files flat. We deliberately diverge from
  *     that to keep all object types under one classification scheme.
  *   - Unknown types fall through to `unknown/` so we never silently write
  *     outside the documented layout.
+ *   - No abapGit round-trip is guaranteed or intended. See constitution
+ *     Principle III.
  */
 const TYPE_FOLDER: Record<string, string> = {
   // Source objects
@@ -29,6 +30,8 @@ const TYPE_FOLDER: Record<string, string> = {
   DTEL: 'dtel',
   // HTTP service (SICF node) — also routed via the self-built ICF service.
   HTTP: 'http',
+  // Transaction code (SE93) — routed via the self-built ICF service.
+  TRAN: 'tran',
 };
 
 const DEFAULT_FOLDER = 'unknown';

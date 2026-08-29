@@ -30,17 +30,13 @@ Going further: **every command supports `--json`**, so an AI agent can run the l
 
 | You want to … | Other tools | abap-cli |
 |---|---|---|
-| Edit ABAP in your local editor | No official tooling; abapGit is repo-level sync | Single-file `pull` / `push`, with lock + activate |
+| Edit ABAP in your local editor | No official tooling | Single-file `pull` / `push`, with lock + activate |
 | Query SAP without opening the GUI | SE16N / SE16H only | `abap select` is the SE16N equivalent, with `--where` / `--limit` / `--json` |
 | Have an AI agent edit ABAP | adt-cli targets scripts, not agents | Every command emits compact `--json` + structured error envelope + exit codes |
 | Create or find transport requests | SAP GUI required | `abap transport list / create / assign` closes the loop in the CLI |
 | Validate syntax without activating | No direct path | `abap check syntax` is read-only — zero side effects |
 | Run an ABAP class and see the result | SE80 / SE24 + debugger | `abap run <class>` returns the outcome in one command |
 | Handle function groups, includes, DDIC objects | Manual in GUI | `pull` / `push` / `create` cover CLAS / INTF / PROG / FUGR / DOMA / DTEL / TABL |
-
-**vs abapGit**: `abap-cli` is a **development-loop** tool (frequent, single-file, agent-friendly). abapGit is a **release** tool (one-shot, whole-package, git workflow). They complement each other.
-
-**vs `abap-adt-api`** (the Node SDK): `abap-cli` is its **productized wrapper** — you get every ADT capability without writing Node code, plus agent-friendly layers: `--json` contracts, error-code mapping, automatic transport resolution, DDIC over a self-hosted ICF service.
 
 ---
 

@@ -47,7 +47,7 @@ src/abap_cli/
 
 ## SAP Layer (`abap/`)
 
-The bundled ICF service lives under `abap/src/clas/` (abapGit layout):
+The bundled ICF service lives under `abap/src/clas/` (the same lowercase-type layout used by the CLI pull destination):
 - **`ZCL_ABAP_VIBE_ICF`** — HTTP handler (`IF_HTTP_EXTENSION`) for `/sap/zabap_vibe/`: root path returns a unified JSON envelope with service id + version; unknown paths / methods return unified error JSON.
 - **`ZCL_ABAP_VIBE_ICF_SETUP`** — `IF_OO_ADT_CLASSRUN` runner that idempotently creates/binds/activates the SICF node via the standard `CL_ICF_TREE` API (ADR gap: SICF config is not covered by ADT REST).
 - **`ZCL_ABAP_VIBE_RUNNER`** — reflection-based wrapper invoked by `abap run --method <name>` to call PUBLIC STATIC methods on arbitrary classes and serialise the `RETURNING` value.

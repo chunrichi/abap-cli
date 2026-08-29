@@ -51,7 +51,7 @@ abap pull
 
 ### 顶层分类子目录
 
-所有 pull 产物按对象类型落到 `src/<typeFolder>/` 下，`typeFolder` 由 `src/abap_cli/formats/type-folder.ts#folderFor(type)` 决定（小写 abapGit 风格：`clas` / `intf` / `prog` / `fugr` / `tabl` / `doma` / `stru` / `dtel`；未识别类型 → `unknown/`）。这是本地约定（Q5=B），DDIC 原本在 abap-file-format 规范里要求扁平，本仓库统一改为带子目录以保持 8 类对象工作目录整洁，**不保证与严格 abapGit round-trip 兼容**。
+所有 pull 产物按对象类型落到 `src/<typeFolder>/` 下，`typeFolder` 由 `src/abap_cli/formats/type-folder.ts#folderFor(type)` 决定（小写：`clas` / `intf` / `prog` / `fugr` / `tabl` / `doma` / `stru` / `dtel` / `http` / `tran`；未识别类型 → `unknown/`）。这是本地约定（Q5=B），DDIC 原本在 abap-file-format 规范里要求扁平，本仓库统一改为带子目录以保持多类型对象工作目录整洁。**本仓库不实现 abapGit 序列化/反序列化，目录布局不保证与 abapGit 兼容**（见 constitution Principle III）。
 
 写文件前的冲突处理采用**保守拒绝**策略 —— `--overwrite` 与 `--skip-existing` **都不是默认**，默认遇到本地文件与 SAP 内容不同时报错，绝不静默覆盖或丢弃本地未推送的改动：
 

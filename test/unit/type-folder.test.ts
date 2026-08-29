@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { folderFor } from '../../src/abap_cli/formats/type-folder.js';
 
 describe('folderFor (local type→subdirectory mapping, Q5=B)', () => {
-  it('maps every supported type code to its abapGit-style folder', () => {
+  it('maps every supported type code to its lowercase folder', () => {
     expect(folderFor('CLAS')).toBe('clas');
     expect(folderFor('INTF')).toBe('intf');
     expect(folderFor('PROG')).toBe('prog');

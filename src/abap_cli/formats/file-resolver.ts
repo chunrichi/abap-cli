@@ -105,7 +105,8 @@ function getOuterExtension(filename: string): string {
 
 /**
  * Namespaced names (e.g. /UI2/CL_JSON) must not create directory levels: / → #.
- * abapGit-style: `#ui2#cl_json` is both the object directory and the file prefix.
+ * The hashed form (`#ui2#cl_json`) is both the object directory and the file
+ * prefix. This is a local convention, not a guaranteed abapGit contract.
  */
 export function objectDirName(objectName: string): string {
   return objectName.toLowerCase().replace(/\//g, '#');
