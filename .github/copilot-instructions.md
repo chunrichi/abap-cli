@@ -28,7 +28,7 @@
 
 - 源对象（Class、Interface、Program、CDS）：通过 `abap-adt-api` 走 ADT REST API。
 - DDIC 对象（Domain、DataElement、Table）：自建 ICF 服务,RESTful JSON 通信。
-- 文件格式遵循 abap-file-format / abapGit 约定。
+- 文件格式遵循 abap-file-format 约定。
 - 配置放在 `.abap.json`（gitignored）。
 - 环境变量优先级高于 `.abap.json`。
 
@@ -63,4 +63,4 @@
 - 永不提交 `.env` 或 `.abap.json`（两者都在 `.gitignore` 中；密钥早在 secrets 迁到 OS keychain 后就不再依赖 `.env`,详见 `CHANGELOG` 0.2.1 "Removed — env 密码读取"）。
 - 所有新增的 CLI 命令必须注册到 `src/abap_cli/index.ts`。
 - 沿用既有命令模式：`export function register<Name>Command(program: Command)`。
-- `abap/src/` 下的 ABAP 代码遵循 abapGit 文件命名约定。
+- `abap/src/` 下的 ABAP 代码遵循 abap-file-format 文件命名约定。
