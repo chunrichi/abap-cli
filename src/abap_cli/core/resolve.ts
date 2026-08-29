@@ -67,13 +67,14 @@ export async function getObjectParts(
 const DDIC_ICF_SUPPORTED = new Set(['DOMA', 'DTEL', 'TABL', 'STRU']);
 
 /** 022: object types the CLI can create/pull/push via the self-built ICF service. */
-const ICF_ROUTED_TYPES = new Set<string>([...DDIC_ICF_SUPPORTED, 'HTTP']);
+const ICF_ROUTED_TYPES = new Set<string>([...DDIC_ICF_SUPPORTED, 'HTTP', 'TRAN']);
 
 /**
  * 014/022: validate a local file before push. Source files are passed through;
- * DDIC files for the four supported types (DOMA/DTEL/TABL/STRU) and HTTP service
- * (.http.json) are allowed through to the matching ICF endpoint. Unknown
- * DDIC-looking types (notably TTYP) still raise DDIC_NOT_SUPPORTED.
+ * DDIC files for the four supported types (DOMA/DTEL/TABL/STRU), HTTP service
+ * (.http.json), and Transaction code (.tran.json) are allowed through to the
+ * matching ICF endpoint. Unknown DDIC-looking types (notably TTYP) still raise
+ * DDIC_NOT_SUPPORTED.
  */
 export function validateLocalFile(resolved: { objectName: string; objectType: string; route: string }): void {
   if (resolved.route === 'icf') {

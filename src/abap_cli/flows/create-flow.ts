@@ -15,7 +15,8 @@ import { writeAbapFile, fileExists } from '../formats/abap-source.js';
 import { defaultSkeleton, getTemplate, listTemplates } from '../formats/templates.js';
 import { readDdicJson, readDdicObjectForCreate, localToWire, validateDdicObject, getDdicFlatJsonExample, type DdicSupportedType, type DdicObject } from '../dictionary/ddic-json.js';
 import { readHttpJson, localToWire as httpLocalToWire, validateHttpObject } from '../dictionary/http-json.js';
-import { TYPE_MAP, DDIC_TYPES, HTTP_TYPES, isDdicSupportedType, isHttpSupportedType, type CreateTypeSpec } from './create-types.js';
+import { readTranJson, localToWire as tranLocalToWire, validateTranObject } from '../dictionary/tran-json.js';
+import { TYPE_MAP, DDIC_TYPES, HTTP_TYPES, TRAN_TYPES, isDdicSupportedType, isHttpSupportedType, isTranSupportedType, type CreateTypeSpec } from './create-types.js';
 import { createSchema } from './create-schema.js';
 import { toOutputPath } from '../core/path-output.js';
 
@@ -267,6 +268,83 @@ async function runCreateHttp(type: 'HTTP', objectName: string, opts: CreateOptio
   );
 }
 
+/**
+ * Create a transaction code (SE93) via the self-built ICF service.
+ * Reads the abap-file-format JSON from `--file`, validates it, converts to wire
+ * schema, and POSTs /tran/<code>. Command-line --description overrides the file's
+ * description. Non-$TMP package requires --tr.
+ */
+async function runCreateTran(type: 'TRAN', objectName: string, opts: CreateOptions,mode: OutputMode): Promise<void> {
+  const filePath = path.resolve(process.cwd(), opts.file ?? '');
+  let local: Awaited<ReturnType<typeof readTranJson>>;
+  try {
+    local = await readTranJson(filePath);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    const outFile = toOutputPath(opts.file);
+    throw new CliError('INVALID_ARGUMENT', `Cannot read Transaction file ${outFile}: ${message}`, {
+      file: outFile,
+      nextSteps: [
+        'Verify the file exists and is valid JSON.',
+        'See the abap-file-format Transaction schema (tran-v1.json) for the expected layout.',
+      ],
+    });
+  }
+
+  const errors = validateTranObject(local);
+  if (errors.length > 0) {
+    const outFile = toOutputPath(opts.file);
+    throw new CliError('VALIDATION_ERROR', `Invalid ${type} definition in ${outFile}: ${errors.join('; ')}`, {
+      file: outFile,
+      type,
+      object: objectName,
+      details: errors,
+      nextSteps: [
+        'Fix the errors above and re-run.',
+        'See the abap-file-format Transaction schema (tran-v1.json) for the per-field contract.',
+      ],
+    });
+  }
+
+  const targetPackage = (opts.package ?? '$TMP').trim().toUpperCase();
+  if (targetPackage !== '$TMP' && !opts.tr) {
+    throw new CliError('VALIDATION_ERROR', 'transportRequest is required when package is not $TMP', {
+      nextSteps: ['Re-run with --tr <REQUEST>', 'Or use --package $TMP for local objects.'],
+      example: `abap create ${type} ${objectName} --file ${toOutputPath(opts.file)} --package ${opts.package} --tr <REQUEST> --description "..."`,
+    });
+  }
+
+  const wire = tranLocalToWire(local);
+  if (opts.description) wire.description = opts.description;
+  if (opts.package) wire.package = opts.package;
+  if (opts.tr) wire.transportRequest = opts.tr;
+
+  const icf = await IcfClient.create();
+  const resp = await icf.postTran<{ name: string; type: string; action: 'created' | 'updated' }>(objectName, wire);
+  if (resp.status !== 'success' || !resp.data) {
+    const code = (resp.error?.code ?? 'TRAN_CREATE_FAILED') as ErrorCode;
+    throw new CliError(code, resp.error?.message ?? `Failed to create ${type} ${objectName}`, {
+      object: objectName,
+      type,
+      details: resp.error?.details,
+      nextSteps: [
+        'Verify the file conforms to the abap-file-format Transaction JSON schema.',
+        'Re-run after fixing the cause above.',
+      ],
+    });
+  }
+
+  printResult(mode,
+    {
+      object: resp.data.name,
+      type,
+      action: resp.data.action,
+      file: toOutputPath(opts.file),
+    },
+    `Created ${type} ${resp.data.name} via ICF ${resp.data.action === 'created' ? '(new)' : '(overwritten)'}`,
+  );
+}
+
 export async function runCreate(type: string | undefined, name: string | undefined, opts: CreateOptions,mode: OutputMode): Promise<void> {
   if (opts.schema) {
     printSchema(createSchema(type));
@@ -322,6 +400,17 @@ export async function runCreate(type: string | undefined, name: string | undefin
       });
     }
     await runCreateHttp(typeUpper, objectName, opts, mode);
+    return;
+  }
+
+  // Transaction code (SE93) routes to the self-built ICF service.
+  if (isTranSupportedType(typeUpper)) {
+    if (!opts.file) {
+      throw new CliError('USAGE', `Transaction code requires --file <path> with an abap-file-format JSON`, {
+        example: `abap create TRAN ${objectName} --file src/${objectName.toLowerCase()}.tran.json --package $TMP --description "..."`,
+      });
+    }
+    await runCreateTran(typeUpper, objectName, opts, mode);
     return;
   }
 
@@ -445,7 +534,16 @@ export function resolveType(type: string): CreateTypeSpec {
     throw new CliError(
       'TYPE_NOT_SUPPORTED',
       `Object type ${t} is an HTTP service; only \`abap create ${t} <name> --file <path>\` is supported (ICF route, not \`create local\`).`,
-      { type: t, supported: [...Object.keys(TYPE_MAP), ...DDIC_TYPES, ...HTTP_TYPES] },
+      { type: t, supported: [...Object.keys(TYPE_MAP), ...DDIC_TYPES, ...HTTP_TYPES, ...TRAN_TYPES] },
+    );
+  }
+  // Transaction code is supported via ICF (handled upstream by runCreate → runCreateTran).
+  // resolveType is only consulted by runCreateLocal — keep the same rejection semantics.
+  if (TRAN_TYPES.has(t)) {
+    throw new CliError(
+      'TYPE_NOT_SUPPORTED',
+      `Object type ${t} is a transaction code; only \`abap create ${t} <name> --file <path>\` is supported (ICF route, not \`create local\`).`,
+      { type: t, supported: [...Object.keys(TYPE_MAP), ...DDIC_TYPES, ...HTTP_TYPES, ...TRAN_TYPES] },
     );
   }
   const spec = TYPE_MAP[t];

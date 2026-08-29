@@ -87,6 +87,16 @@ export class IcfClient {
     return this.get(`/http/${encodeURIComponent(name)}`);
   }
 
+  /** POST /tran/<tcode> — create/overwrite a transaction code (SE93). */
+  async postTran<T>(tcode: string, body: unknown): Promise<IcfResponse<T>> {
+    return this.post(`/tran/${encodeURIComponent(tcode)}`, body);
+  }
+
+  /** GET /tran/<tcode> — pull a transaction code as wire JSON. */
+  async getTran<T>(tcode: string): Promise<IcfResponse<T>> {
+    return this.get(`/tran/${encodeURIComponent(tcode)}`);
+  }
+
   /** GET /tcode/<tcode> — resolve a transaction code to its entry program (read-only). */
   async getTcode<T>(tcode: string): Promise<IcfResponse<T>> {
     return this.get(`/tcode/${encodeURIComponent(tcode)}`);

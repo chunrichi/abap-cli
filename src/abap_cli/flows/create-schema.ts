@@ -1,8 +1,9 @@
 import type { CommandSchema } from '../output/json.js';
 import { DDIC_SUPPORTED_TYPES, getDdicJsonExample, type DdicSupportedType } from '../dictionary/ddic-json.js';
 import { HTTP_SUPPORTED_TYPES } from '../dictionary/http-json.js';
+import { TRAN_SUPPORTED_TYPES } from '../dictionary/tran-json.js';
 import { listTemplates } from '../formats/templates.js';
-import { TYPE_MAP, DDIC_TYPES, HTTP_TYPES } from './create-types.js';
+import { TYPE_MAP, DDIC_TYPES, HTTP_TYPES, TRAN_TYPES } from './create-types.js';
 
 /** `create --schema` 的返回类型：在通用 schema 上补充类型维度。 */
 export type CreateCommandSchema = CommandSchema & {
@@ -81,6 +82,19 @@ export function createSchema(type?: string): CreateCommandSchema {
       ],
     };
   }
+  if (TRAN_TYPES.has(t)) {
+    return {
+      ...base,
+      type: t,
+      supported: true,
+      route: 'icf',
+      message: `Transaction code created via the self-built ICF service. Requires --file <abap-file-format JSON>.`,
+      options: [
+        ...base.options,
+        { name: '--file', type: 'string', valuePlaceholder: '<path>', required: true, description: 'abap-file-format Transaction JSON input' },
+      ],
+    };
+  }
   if (t === 'TTYP') {
     return {
       ...base,
@@ -96,7 +110,7 @@ export function createSchema(type?: string): CreateCommandSchema {
       type: t,
       supported: false,
       reason: 'TYPE_NOT_SUPPORTED',
-      message: `Object type ${t} is not supported. Supported types: ${[...Object.keys(TYPE_MAP), ...DDIC_SUPPORTED_TYPES, ...HTTP_SUPPORTED_TYPES].join(', ')}`,
+      message: `Object type ${t} is not supported. Supported types: ${[...Object.keys(TYPE_MAP), ...DDIC_SUPPORTED_TYPES, ...HTTP_SUPPORTED_TYPES, ...TRAN_SUPPORTED_TYPES].join(', ')}`,
     };
   }
 
