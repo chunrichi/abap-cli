@@ -48,4 +48,5 @@ wiki/*
 !wiki/index.md
 !wiki/object-types.md
 !wiki/roadmap.md
+!wiki/adt-front-controller-s4h-2023.md
 .claude-memory/
