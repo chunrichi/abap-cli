@@ -30,15 +30,13 @@ abap push src/zcl_my_class/ --tr DEVK900001   # 锁 → 写 → 激活 → 解�
 
 | 你想要的 | 别的工具 | abap-cli |
 |---|---|---|
-| 在本地编辑器写 ABAP | 没有官方工具；abapGit 是 git 仓库级同步 | 单文件级 pull/push，带 lock + activate |
+| 在本地编辑器写 ABAP | 没有官方工具 | 单文件级 pull/push，带 lock + activate |
 | 不开 SAP GUI 跑查询 | 只能 SE16N / SE16H | `abap select` 是 SE16N 等价，支持 `--where` / `--limit` / `--json` |
 | AI agent 帮我改 ABAP | adt-cli 是给脚本的，不是给 agent 的 | 命令都带 `--json` 紧凑输出 + 结构化错误信封 + 退出码 |
 | 创建 transport / 找 transport | 必须 SAP GUI | `abap transport list/create/assign` 在 CLI 里闭环 |
 | 验证语法但不激活 | 没直接路径 | `abap check syntax` 只查不写，零副作用 |
 | 跑一个 ABAP 类看结果 | SE80 / SE24 + 调试器 | `abap run <class>` 一条命令得到结果 |
 | 函数组、include、DDIC 对象 | GUI 里手动处理 | `pull` / `push` / `create` 统一覆盖 CLAS/INTF/PROG/FUGR/DOMA/DTEL/TABL |
-
-跟 abapGit 比：`abap-cli` 是**开发循环**工具（频繁、单文件、agent 友好）；abapGit 是**发布**工具（一次性、整包、git 工作流）。两者互补不冲突。
 
 跟 `abap-adt-api`（Node SDK）比：`abap-cli` 是它的**产品化封装**——你不用写 Node 代码就能享受所有 ADT 能力，并且加了 `--json` 契约、错误码映射、transport 自动解析、DDIC via 自建 ICF 等 agent 友好的层。
 

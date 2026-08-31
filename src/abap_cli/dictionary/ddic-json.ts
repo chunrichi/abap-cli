@@ -74,7 +74,7 @@ export interface DdicWirePayload {
   clientDependent?: boolean;
   allowMaintenance?: boolean;
   fields?: DdicFieldWire[];
-  // 024: TABL/STRU abap-file-format three-piece pull wire
+  // TABL/STRU abap-file-format three-piece pull wire
   // (populated by zcl_abap_vibe_tabl_format). main_json / ddic_source /
   // settings_json are canonical strings; type/has_settings/warnings/error_*
   // supplement for diagnostics.
@@ -113,6 +113,32 @@ export async function readDdicJson(filePath: string): Promise<DdicObject> {
 }
 
 /**
+ * abap-file-format compliant reader for the `create` flow.
+ *
+ * For TABL/STRU, look for a three-piece layout next to the main JSON:
+ * `<name>.tabl.json` + `<name>.tabl.ddic` (+ optional `<name>.tabl.settings.json`).
+ * If the sidecars exist, parse them via `readTablArtifact` so the wire payload
+ * honors abap-file-format (DDL is the source of truth for fields, settings
+ * holds dataClassCategory / sizeCategory). If only the main JSON is present
+ * (legacy wire-flat shape), fall back to `readDdicJson` for backwards
+ * compatibility. For DOMA/DTEL the legacy wire-flat shape is the only one.
+ */
+export async function readDdicObjectForCreate(filePath: string, type: DdicSupportedType): Promise<DdicObject> {
+  if (type === 'TABL' || type === 'STRU') {
+    // Lazy import to avoid pulling tabl-artifact code for non-TABL flows.
+    const { readTablArtifact } = await import('./tabl-artifact.js');
+    const artifact = await readTablArtifact(filePath).catch((error: unknown) => {
+      // readTablArtifact throws on malformed DDL / missing main+ddic pair.
+      // Surface the message verbatim — the create-flow wrapper turns it into
+      // a structured CliError.
+      throw error instanceof Error ? error : new Error(String(error));
+    });
+    if (artifact) return artifact.local;
+  }
+  return readDdicJson(filePath);
+}
+
+/**
  * Write a DDIC JSON file to disk, creating parent directories as needed.
  */
 export async function writeDdicJson(filePath: string, data: DdicObject): Promise<void> {
@@ -139,6 +165,25 @@ export async function listDdicFiles(dirPath: string): Promise<string[]> {
     // directory may not exist
   }
   return results;
+}
+
+/** Names that mean "the client (MANDT) key column" in TABL field lists.
+ * The wire format never carries MANDT — the server prepends it when
+ * `clientDependent: true` (see zcl_abap_vibe_icf.create_ddic_table). We strip
+ * both `CLIENT` (abap-file-format DDL alias) and `MANDT` (legacy name) from
+ * the wire payload to keep the two create paths in lockstep.
+ *
+ * Kept in sync with `tabl-artifact.ts:57` which applies the same filter on
+ * the abap-file-format three-piece path.
+ */
+export const CLIENT_FIELD_NAMES = new Set(['CLIENT', 'MANDT']);
+export function isClientFieldName(name: unknown): boolean {
+  return typeof name === 'string' && CLIENT_FIELD_NAMES.has(name.toUpperCase());
+}
+/** Filter out client field entries from a local field list. Pure function. */
+export function stripClientFields(fields: DdicFieldLocal[] | undefined): DdicFieldLocal[] {
+  if (!Array.isArray(fields)) return [];
+  return fields.filter((f) => !isClientFieldName(f.fieldName));
 }
 
 /** 014: map abap-file-format field (snake_case, mixed numeric) to wire (camelCase, number). */
@@ -173,6 +218,134 @@ export function wireFieldToLocal(wire: DdicFieldWire): DdicFieldLocal {
   if (wire.checkTable !== undefined) local.checkTable = wire.checkTable;
   if (wire.precField !== undefined) local.precField = wire.precField;
   return local;
+}
+
+/**
+ * 014 + BUG-1: return a minimal **abap-file-format** example for a given DDIC
+ * type. For TABL/STRU this is the canonical three-piece layout
+ * (`<name>.tabl.json` + `<name>.tabl.ddic` + optional `<name>.tabl.settings.json`).
+ * For DOMA/DTEL the legacy single-file wire-flat shape is the only one.
+ *
+ * Used in three places: (1) `create --schema` for agent discovery,
+ * (2) quickstart docs, (3) validation error next-steps.
+ */
+export function getDdicJsonExample(type: DdicSupportedType): string {
+  switch (type) {
+    case 'DOMA':
+      return `# src/zdoma_example.doma.json (single file)
+{
+  "name": "ZDOMA_EXAMPLE",
+  "description": "Example domain",
+  "dataType": "CHAR",
+  "length": 10
+}`;
+    case 'DTEL':
+      return `# src/zdtel_example.dtel.json (single file)
+{
+  "name": "ZDTEL_EXAMPLE",
+  "description": "Example data element",
+  "domain": "ZDOMA_EXAMPLE",
+  "shortText": "Short",
+  "mediumText": "Medium",
+  "longText": "Long field text",
+  "headerText": "Header"
+}`;
+    case 'TABL':
+      return `# abap-file-format three-piece layout (preferred).
+# Place all three files in the same directory and pass --file the main JSON.
+# src/ztab_example.tabl.json
+{
+  "formatVersion": "1",
+  "header": {
+    "description": "Example table",
+    "originalLanguage": "en"
+  }
+}
+
+# src/ztab_example.tabl.ddic
+@EndUserText.label : 'Example table'
+@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+@AbapCatalog.tableCategory : #TRANSPARENT
+@AbapCatalog.deliveryClass : #A
+@AbapCatalog.dataMaintenance : #RESTRICTED
+define table ztab_example {
+  key client : abap.clnt not null;
+  key id     : abap.char(10) not null;
+}
+
+# src/ztab_example.tabl.settings.json (optional — buffering / data class / size)
+{
+  "formatVersion": "1",
+  "generalInformation": {
+    "dataClassCategory": "APPL0",
+    "sizeCategory": "0"
+  }
+}`;
+    case 'STRU':
+      return `# abap-file-format three-piece layout (preferred).
+# src/zstru_example.stru.json
+{
+  "formatVersion": "1",
+  "header": {
+    "description": "Example structure",
+    "originalLanguage": "en"
+  }
+}
+
+# src/zstru_example.stru.ddic
+@EndUserText.label : 'Example structure'
+define structure zstru_example {
+  field1 : abap.char(20);
+}`;
+  }
+}
+
+/**
+ * BUG-1 / legacy fallback: the **wire-flat** single-file shape accepted by
+ * `localToWire` when only the main JSON is present (no `.tabl.ddic` sidecar).
+ * Used in validation errors to remind first-time users that the legacy
+ * single-file layout still has `name` / `fields[]` at the top level.
+ */
+export function getDdicFlatJsonExample(type: DdicSupportedType): string {
+  switch (type) {
+    case 'DOMA':
+      return `{
+  "name": "ZDOMA_EXAMPLE",
+  "description": "Example domain",
+  "dataType": "CHAR",
+  "length": 10
+}`;
+    case 'DTEL':
+      return `{
+  "name": "ZDTEL_EXAMPLE",
+  "description": "Example data element",
+  "domain": "ZDOMA_EXAMPLE",
+  "shortText": "Short",
+  "mediumText": "Medium",
+  "longText": "Long field text",
+  "headerText": "Header"
+}`;
+    case 'TABL':
+      return `{
+  "name": "ZTAB_EXAMPLE",
+  "description": "Example table",
+  "deliveryClass": "A",
+  "dataClass": "APPL0",
+  "sizeCategory": "0",
+  "clientDependent": true,
+  "fields": [
+    { "fieldName": "FIELD1", "dataType": "CHAR", "length": 20, "keyFlag": true }
+  ]
+}`;
+    case 'STRU':
+      return `{
+  "name": "ZSTRU_EXAMPLE",
+  "description": "Example structure",
+  "fields": [
+    { "fieldName": "FIELD1", "dataType": "CHAR", "length": 20 }
+  ]
+}`;
+  }
 }
 
 /** 014: convert a local DDIC object (read from .doma.json etc.) to wire payload. */
@@ -215,7 +388,26 @@ export function localToWire(type: DdicSupportedType, local: DdicObject): DdicWir
       wire.clientDependent = l.clientDependent as boolean | undefined;
       wire.allowMaintenance = l.allowMaintenance as boolean | undefined;
       if (Array.isArray(l.fields)) {
-        wire.fields = (l.fields as DdicFieldLocal[]).map(localFieldToWire);
+        // Drop any client-key field the user wrote in `fields[]`. The server
+        // prepends MANDT when `clientDependent: true`, so sending one here
+        // would collide with the auto-injected column and fail the create
+        // with a misleading "Field already exists" error. The three-piece
+        // path does the same in tabl-artifact.ts. Stripped entries are
+        // recorded as a `warning` so agents and humans can see the
+        // auto-correction.
+        const original = l.fields as DdicFieldLocal[];
+        const stripped = stripClientFields(original);
+        const dropped = original
+          .filter((f) => isClientFieldName(f.fieldName))
+          .map((f) => String(f.fieldName).toUpperCase());
+        if (dropped.length > 0) {
+          const ws = (wire.warnings ?? (wire.warnings = []));
+          ws.push({
+            code: 'CLIENT_FIELD_STRIPPED',
+            message: `dropped ${dropped.join(', ')} from fields[] — the server prepends MANDT when clientDependent: true`,
+          });
+        }
+        wire.fields = stripped.map(localFieldToWire);
       }
       break;
   }
@@ -261,13 +453,20 @@ export function wireToLocal(type: DdicSupportedType, wire: DdicWirePayload): Ddi
 }
 
 /**
- * 014: validate a local DDIC object against the per-type contract
+ * Validate a local DDIC object against the per-type contract
  * (data-model.md §1-4). Returns an array of human-readable errors
  * (empty when valid). Namespace / package / transport rules enforced here.
  */
 export function validateDdicObject(data: DdicObject, objectType: string): string[] {
   const errors: string[] = [];
-  if (!data.name) errors.push('Missing required field: name');
+  if (!data.name) {
+    // BUG-1: the file's `name` must be a top-level JSON field, not nested under
+    // `header` or anywhere else. Spell that out so first-time users stop
+    // writing abap-file-format's nested header layout.
+    errors.push(
+      `Missing required field: name (must be a top-level field, e.g. { "name": "ZTAB_EXAMPLE", ... })`,
+    );
+  }
 
   // FR-004: namespace enforcement (Z/Y/slash only).
   const name = data.name ?? '';
@@ -289,12 +488,35 @@ export function validateDdicObject(data: DdicObject, objectType: string): string
     case 'TABL':
     case 'STRU':
       if (!Array.isArray((data as Record<string, unknown>).fields)) {
-        errors.push(`${objectType} missing: fields`);
+        // BUG-1: spell out that `fields` is a top-level array, not nested.
+        errors.push(
+          `${objectType} missing: fields (must be a top-level array, e.g. { "fields": [{ "fieldName": "...", "dataType": "...", "length": N }] })`,
+        );
       } else {
         const fields = (data as Record<string, unknown>).fields as Array<Record<string, unknown>>;
         if (fields.length === 0) errors.push(`${objectType} fields list is empty`);
+        // Enforce the same strip the wire serializer applies, so a user who
+        // writes *only* `CLIENT`/`MANDT` in fields[] gets a clear error
+        // instead of a silent empty payload.
+        const afterStrip = stripClientFields(fields as unknown as DdicFieldLocal[]);
+        if (afterStrip.length === 0 && fields.length > 0) {
+          errors.push(
+            `${objectType} fields list contains only client-key columns (CLIENT/MANDT); these are auto-prepended by the server when clientDependent: true, so the table has no user-defined fields. Add at least one non-client field, or set clientDependent: false.`,
+          );
+        }
+        // Duplicate fieldName is always wrong — the server would reject it
+        // anyway, so we surface it before the round-trip.
+        const seen = new Set<string>();
         for (const f of fields) {
           if (!f.fieldName) errors.push(`${objectType} field missing: fieldName`);
+          else {
+            const key = String(f.fieldName).toUpperCase();
+            if (seen.has(key)) {
+              errors.push(`${objectType} field "${f.fieldName}" is declared more than once`);
+            } else {
+              seen.add(key);
+            }
+          }
         }
       }
       break;

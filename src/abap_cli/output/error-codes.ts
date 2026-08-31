@@ -1,7 +1,7 @@
 /**
- * Error code constants — single source of truth (FR-008).
+ * Error code constants — single source of truth.
  * Categorisation drives the exit-code mapper; the literal `code` value
- * stays backward-compatible with existing call sites (FR-011).
+ * stays backward-compatible with existing call sites.
  */
 
 export type ErrorCategory =
@@ -25,8 +25,8 @@ export type ErrorCode =
   | 'UNKNOWN'             // NEW — unmapped exception fallback (exit 1)
   | 'CONFIG_ERROR'
   | 'SAP_ERROR'
-  | 'TLS_ERROR'           // NEW (FR-010)
-  | 'AUTH_ERROR'          // NEW (FR-010)
+  | 'TLS_ERROR'           // NEW
+  | 'AUTH_ERROR'          // NEW
   // Legacy categories
   | 'USAGE'
   | 'INVALID_ARGUMENT'
@@ -43,45 +43,45 @@ export type ErrorCode =
   | 'SYNTAX_ERROR'
   | 'NO_TRANSPORT'
   | 'TRANSPORT_CREATE_FAILED'
-  | 'TRANSPORT_NOT_FOUND'  // NEW (US-7 scenario 4)
+  | 'TRANSPORT_NOT_FOUND'  // NEW
   | 'CREATE_FAILED'
   | 'DDIC_NOT_SUPPORTED'
-  | 'DDIC_CREATE_FAILED'    // 014: ICF /ddic/<type> POST failure (SAP_ERROR)
-  | 'DDIC_OBJECT_NOT_FOUND' // 014: ICF /ddic/<type>/<name> GET 404 (NOT_FOUND)
-  | 'DDIC_TABL_FORMAT_UNSUPPORTED' // 025: canonical TABL projection cannot represent the object (VALIDATION_ERROR)
+  | 'DDIC_CREATE_FAILED'    // ICF /ddic/<type> POST failure (SAP_ERROR)
+  | 'DDIC_OBJECT_NOT_FOUND' // ICF /ddic/<type>/<name> GET 404 (NOT_FOUND)
+  | 'DDIC_TABL_FORMAT_UNSUPPORTED' // canonical TABL projection cannot represent the object (VALIDATION_ERROR)
   | 'TYPE_NOT_SUPPORTED'
-  | 'OVERWRITE_REQUIRED'   // NEW (FR-018)
+  | 'OVERWRITE_REQUIRED'   // NEW
   | 'PUSH_FAILED'
-  | 'PULL_PARTIAL_FAILURE'  // 025: some objects in a pull succeeded, others failed (VALIDATION_ERROR)
+  | 'PULL_PARTIAL_FAILURE'  // some objects in a pull succeeded, others failed (VALIDATION_ERROR)
   | 'VALIDATION_ERROR'     // semantic rejection (exit 7); see contracts §3
   | 'OBJECT_EXISTS'        // normalized legacy code (USAGE/2), used by create.ts
   | 'FILE_EXISTS'          // normalized legacy code (USAGE/2), used by init.ts
   | 'COMMAND_MOVED'        // normalized legacy code (VALIDATION_ERROR/7); command retired (e.g. atc → check atc)
-  // 015-abap-run: classrun runner error codes
-  | 'METHOD_FAILED'           // 015: target method raised cx_root (VALIDATION_ERROR)
-  | 'METHOD_NOT_SUPPORTED'    // 015: method signature not adapter-compatible (VALIDATION_ERROR)
-  | 'CLASS_NOT_RUNNABLE'      // 015: target class lacks if_oo_adt_classrun~main (VALIDATION_ERROR)
-  | 'LOCAL_CLASS_NOT_RUNNABLE'// 015: class name contains `~` (local class) (SAP_ERROR)
-  | 'OBJECT_NOT_ACTIVE'       // 015: target class is inactive (SAP_ERROR)
-  | 'WRAPPER_NOT_DEPLOYED'    // 015: ZCL_ABAP_VIBE_RUNNER missing on target system (NOT_FOUND)
-  | 'TIMEOUT'                 // 015: classrun exceeded --timeout (SAP_ERROR)
-  | 'WRAPPER_INPUT_UNAVAILABLE' // 015: SAP classrun endpoint does not inject method args (SAP_ERROR)
-  // 016-abap-select: read-only table data query error codes
-  | 'TABLE_NOT_FOUND'          // 016: ICF /data/query — table/view does not exist (NOT_FOUND)
-  | 'TABLE_TYPE_NOT_SUPPORTED' // 016: ICF /data/query — pool/cluster/structure not queryable (VALIDATION_ERROR)
-  | 'INVALID_FIELD'            // 016: ICF /data/query — field not in table / explicit large-object projection (VALIDATION_ERROR)
-  | 'INVALID_WHERE'            // 016: ICF /data/query — where syntax/op/field/type/MANDT violation (VALIDATION_ERROR)
-  | 'LIMIT_EXCEEDED'           // 016: ICF /data/query — limit > 10000 or non-integer (VALIDATION_ERROR)
-  | 'OFFSET_EXCEEDED'          // 016: ICF /data/query — offset > 100000 or non-integer (VALIDATION_ERROR)
-  | 'QUERY_FAILED'             // 016: ICF /data/query — runtime dynamic SQL error (SAP_ERROR)
-    // 022-http: HTTP service (SICF node) error codes
-    | 'HTTP_CREATE_FAILED'       // 022: ICF /http/<name> POST failure (SAP_ERROR)
-    | 'HTTP_OBJECT_NOT_FOUND'    // 022: ICF /http/<name> GET 404 (NOT_FOUND)
-  // 023-extension-mechanism: extension loading and validation
+  // classrun runner error codes
+  | 'METHOD_FAILED'           // target method raised cx_root (VALIDATION_ERROR)
+  | 'METHOD_NOT_SUPPORTED'    // method signature not adapter-compatible (VALIDATION_ERROR)
+  | 'CLASS_NOT_RUNNABLE'      // target class lacks if_oo_adt_classrun~main (VALIDATION_ERROR)
+  | 'LOCAL_CLASS_NOT_RUNNABLE'// class name contains `~` (local class) (SAP_ERROR)
+  | 'OBJECT_NOT_ACTIVE'       // target class is inactive (SAP_ERROR)
+  | 'WRAPPER_NOT_DEPLOYED'    // ZCL_ABAP_VIBE_RUNNER missing on target system (NOT_FOUND)
+  | 'TIMEOUT'                 // classrun exceeded --timeout (SAP_ERROR)
+  | 'WRAPPER_INPUT_UNAVAILABLE' // SAP classrun endpoint does not inject method args (SAP_ERROR)
+  // read-only table data query error codes
+  | 'TABLE_NOT_FOUND'          // ICF /data/query — table/view does not exist (NOT_FOUND)
+  | 'TABLE_TYPE_NOT_SUPPORTED' // ICF /data/query — pool/cluster/structure not queryable (VALIDATION_ERROR)
+  | 'INVALID_FIELD'            // ICF /data/query — field not in table / explicit large-object projection (VALIDATION_ERROR)
+  | 'INVALID_WHERE'            // ICF /data/query — where syntax/op/field/type/MANDT violation (VALIDATION_ERROR)
+  | 'LIMIT_EXCEEDED'           // ICF /data/query — limit > 10000 or non-integer (VALIDATION_ERROR)
+  | 'OFFSET_EXCEEDED'          // ICF /data/query — offset > 100000 or non-integer (VALIDATION_ERROR)
+  | 'QUERY_FAILED'             // ICF /data/query — runtime dynamic SQL error (SAP_ERROR)
+    // HTTP service (SICF node) error codes
+    | 'HTTP_CREATE_FAILED'       // ICF /http/<name> POST failure (SAP_ERROR)
+    | 'HTTP_OBJECT_NOT_FOUND'    // ICF /http/<name> GET 404 (NOT_FOUND)
+  // extension loading and validation
   | 'EXTENSION_LOAD_FAILED'       // extension module failed to load (CONFIG_ERROR/exit 3)
   | 'EXTENSION_VALIDATION_FAILED' // extension shape check failed (VALIDATION_ERROR/exit 7)
   | 'EXTENSION_COMMAND_BLOCKED'  // a beforeCommand hook vetoed the command (VALIDATION_ERROR/exit 7)
-  // 024-tabl-aff-pull: abap-file-format three-piece TABL/STRU pull diagnostics
+  // abap-file-format three-piece TABL/STRU pull diagnostics
   | 'TABL_DDL_INVALID'          // DDL parse failure (VALIDATION_ERROR/exit 7)
   | 'TABL_ARTIFACT_INCOMPLETE'  // wire missing mainJson or ddicSource (VALIDATION_ERROR/exit 7)
   // tcode: ICF /tcode/<code> transaction lookup

@@ -153,7 +153,7 @@ abap run --schema --json
 
 - [ ] **P2 — PROG（report）执行** — 通过 ADT SUBMIT 或独立入口支持 `abap run <prog> --type PROG`（roadmap 差异能力）；report 输出回 SP01 的捕获方式需先验证。
 - [ ] **`--method` 参数注入的跨版本探测** — 在 `profile add/set` 或 `abap init` 时一次性探测 SAP classrun 是否支持参数注入并持久化到 profile（类似 014 的 `adtTextpool` 能力探测），`--method` 在支持的系统上正常走 wrapper、不支持的直接提示，避免每次运行 `WRAPPER_INPUT_UNAVAILABLE`。
-- [ ] **`--no-wait` 异步执行** — spec FR-002 曾规划"只入队不等待返回"，v1 未实现（`--method` 参数注入可用后再评估）。
+- [ ] **`--no-wait` 异步执行** — 曾规划"只入队不等待返回"，v1 未实现（`--method` 参数注入可用后再评估）。
 - [ ] **真实 SAP 端到端 fixture** — `ZCL_ABAP_VIBE_RUNNER_FIXTURE_OK/BAD/FAIL` 测试类目前仅在 mock 覆盖；如需在真实 SAP 上回归 `--method` 反射，需先确认目标系统支持参数注入。
 
 # references

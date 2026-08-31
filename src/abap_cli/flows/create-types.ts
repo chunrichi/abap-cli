@@ -1,6 +1,7 @@
 import type { CreatableTypeIds } from 'abap-adt-api';
 import { DDIC_SUPPORTED_TYPES } from '../dictionary/ddic-json.js';
 import { HTTP_SUPPORTED_TYPES } from '../dictionary/http-json.js';
+import { TRAN_SUPPORTED_TYPES } from '../dictionary/tran-json.js';
 
 export interface CreateTypeSpec {
   objtype: CreatableTypeIds;
@@ -14,13 +15,16 @@ export const TYPE_MAP: Record<string, CreateTypeSpec> = {
   FUGR: { objtype: 'FUGR/F' },
 };
 
-// 014: DDIC types created via the self-built ICF service. TTYP is deferred (Q2).
+// DDIC types created via the self-built ICF service. TTYP is deferred (Q2).
 export const DDIC_TYPES = new Set<string>(DDIC_SUPPORTED_TYPES);
 
-// 022: HTTP service (SICF node) created via the self-built ICF service.
+// HTTP service (SICF node) created via the self-built ICF service.
 export const HTTP_TYPES = new Set<string>(HTTP_SUPPORTED_TYPES);
 
-/** 014: narrow an arbitrary type string to the supported DDIC types. */
+// Transaction code (SE93) created via the self-built ICF service.
+export const TRAN_TYPES = new Set<string>(TRAN_SUPPORTED_TYPES);
+
+/** Narrow an arbitrary type string to the supported DDIC types. */
 export function isDdicSupportedType(t: string): t is (typeof DDIC_SUPPORTED_TYPES)[number] {
   return (DDIC_SUPPORTED_TYPES as readonly string[]).includes(t);
 }
@@ -28,4 +32,9 @@ export function isDdicSupportedType(t: string): t is (typeof DDIC_SUPPORTED_TYPE
 /** 022: narrow an arbitrary type string to the supported HTTP types. */
 export function isHttpSupportedType(t: string): t is (typeof HTTP_SUPPORTED_TYPES)[number] {
   return (HTTP_SUPPORTED_TYPES as readonly string[]).includes(t);
+}
+
+/** Narrow an arbitrary type string to the supported Transaction types. */
+export function isTranSupportedType(t: string): t is (typeof TRAN_SUPPORTED_TYPES)[number] {
+  return (TRAN_SUPPORTED_TYPES as readonly string[]).includes(t);
 }

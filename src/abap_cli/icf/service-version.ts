@@ -2,13 +2,13 @@ import { IcfClient } from '../clients/icf-client.js';
 import { CliError } from '../output/json.js';
 import { probeAdtRuntime, type AdtRuntime } from '../adc/runtime-probe.js';
 
-/** Bundled expected version of the zabap_vibe ICF service (FR-013).
- *  Bumped 0.1.0 → 0.2.0 in 014 (DDIC CRUD + textpool support);
- *  bumped 0.2.0 → 0.3.0 in 016 (read-only table data query support);
- *  bumped 0.3.0 → 0.4.0 in 017 (select rows native-typed values — Q1 B);
- *  bumped 0.4.0 → 0.5.0 in 024 (TABL/STRU pull via zcl_abap_vibe_tabl_format,
- *  abap-file-format three-piece layout: main + ddic + settings.json);
- *  FR-027: root version check stays backward compatible. */
+/** Bundled expected version of the zabap_vibe ICF service.
+ *  Bumped 0.1.0 → 0.2.0 for DDIC CRUD + textpool support;
+ *  bumped 0.2.0 → 0.3.0 for read-only table data query support;
+ *  bumped 0.3.0 → 0.4.0 for select rows native-typed values;
+ *  bumped 0.4.0 → 0.5.0 for TABL/STRU pull via zcl_abap_vibe_tabl_format,
+ *  abap-file-format three-piece layout (main + ddic + settings.json).
+ *  Root version check stays backward compatible. */
 export const ICF_SERVICE_VERSION = '0.5.0';
 
 export type IcfDeploymentStatus = 'not_deployed' | 'current' | 'outdated' | 'unreachable';
@@ -44,7 +44,7 @@ export function compareVersions(remote: string, expected: string): 'current' | '
  * Probe ICF deployment state (FR-012..FR-015, four states).
  * Never throws: not_deployed / unreachable are reported, not raised.
  *
- * 030: when `profileName` is provided, also detects ADT runtime tier
+// When `profileName` is provided, also detects ADT runtime tier
  * (steampunk → icfSetupBlocked=true). The runtime probe runs in parallel
  * with the version probe so latency stays at ~1 round-trip.
  */

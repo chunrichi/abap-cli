@@ -8,18 +8,18 @@ import { toOutputPath } from '../core/path-output.js';
 
 export type DoctorStatus = 'ok' | 'err';
 
-/** One checked item across environment / config / connection sections (FR-002). */
+/** One checked item across environment / config / connection sections. */
 export interface DoctorItem {
   key: string;
   status: DoctorStatus;
   message: string;
-  /** Concrete action when err — aggregated into nextSteps (FR-002). */
+  /** Concrete action when err — aggregated into nextSteps. */
   suggestion?: string;
-  /** Verbose-only detail (exact versions/paths/messages, FR-003). */
+  /** Verbose-only detail (exact versions/paths/messages). */
   detail?: string;
 }
 
-/** The full doctor report. Sections never throw — connection issues are items (FR-005). */
+/** The full doctor report. Sections never throw — connection issues are items. */
 export interface DoctorReport {
   environment: DoctorItem[];
   config: DoctorItem[];
@@ -89,8 +89,8 @@ function readSystems(configPath: string): { systems: Record<string, unknown>; er
 }
 
 /**
- * Run the three-section doctor check (FR-001..003). Never throws for probe or
- * config failures — findings are items in the report (FR-005).
+ * Run the three-section doctor check. Never throws for probe or
+ * config failures — findings are items in the report.
  */
 export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorReport> {
   const verbose = opts.verbose ?? false;
@@ -268,7 +268,7 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
   return { environment, config, connection, nextSteps: suggestions };
 }
 
-/** Safe, reversible fixes for `doctor --fix` (FR-004). Returns what was applied. */
+/** Safe, reversible fixes for `doctor --fix`. Returns what was applied. */
 export function applySafeFixes(home: string = os.homedir()): string[] {
   const applied: string[] = [];
   const dir = path.join(home, '.abap-cli');

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { runRun } from '../../src/abap_cli/flows/run-flow.js';
 import { AdtClientWrapper } from '../../src/abap_cli/clients/adt-client.js';
 
-// US1 — classrun JSON OK path (T010). Spec acceptance 1-2, SC-001.
+// US1 — classrun JSON OK path (T010). Spec acceptance 1-2.
 
 function makeFakeClient(stdout: string, paramsCheck?: (params?: unknown) => void) {
   const fake = {

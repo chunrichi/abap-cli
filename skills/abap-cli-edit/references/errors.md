@@ -13,6 +13,7 @@
 | `SYNTAX_ERROR` | VALIDATION_ERROR/7 | check / push --check-only | `data.errors[]` 含 `{line, offset, severity, text}` |
 | `NO_TRANSPORT` | VALIDATION_ERROR/7 | push / create | 跳 `abap-cli-setup`：`transport list` / `transport create` → `--tr` 重试 |
 | `DDIC_NOT_SUPPORTED` | VALIDATION_ERROR/7 | pull / create / push | 类型不在白名单（DOMA/DTEL/TABL/STRU 之外）；看 `abap create --schema` |
+| `TABL_DDL_INVALID` | VALIDATION_ERROR/7 | create TABL/STRU | 三件套的 `.tabl.ddic` / `.stru.ddic` 解析失败（缺 `define table|structure ... {` 或 `}`）；`error.message` 含 DDL 解析行；详见 [workflow.md 变体 2](workflow.md) |
 | `FILE_EXISTS` | USAGE/2 | pull | `pull --overwrite` 或 `--skip-existing` |
 | `TYPE_NOT_SUPPORTED` | VALIDATION_ERROR/7 | 任意 | `abap <cmd> --schema` 看支持列表 |
 | `PUSH_FAILED` | VALIDATION_ERROR/7 | push | `data.stage` 指示失败环节（lock/write/activate/unlock） |

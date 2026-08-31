@@ -1,6 +1,6 @@
 /**
- * 022: HTTP service JSON helpers — local↔wire conversion, validation, namespace.
- * Mirrors ddic-json-map.test.ts (014) but for the HTTP service object type.
+  HTTP service JSON helpers — local↔wire conversion, validation, namespace.
+ * Mirrors ddic-json-map.test.ts but for the HTTP service object type.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -120,6 +120,24 @@ describe('022 HTTP JSON helpers', () => {
         generalInformation: { handlerClass: longName, url: '/x' },
       };
       expect(validateHttpObject(local).some((e) => e.includes('handlerClass too long'))).toBe(true);
+    });
+
+    it('rejects description over 60 chars', () => {
+      const local: HttpObjectLocal = {
+        name: 'ZHTTP_TEST',
+        header: { description: 'd'.repeat(61), originalLanguage: 'EN' },
+        generalInformation: { handlerClass: 'ZCL_X', url: '/x' },
+      };
+      expect(validateHttpObject(local).some((e) => e.includes('description too long'))).toBe(true);
+    });
+
+    it('accepts description at exactly 60 chars', () => {
+      const local: HttpObjectLocal = {
+        name: 'ZHTTP_TEST',
+        header: { description: 'd'.repeat(60), originalLanguage: 'EN' },
+        generalInformation: { handlerClass: 'ZCL_X', url: '/x' },
+      };
+      expect(validateHttpObject(local)).toEqual([]);
     });
   });
 });

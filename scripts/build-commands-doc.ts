@@ -403,10 +403,10 @@ sections.push('');
 
 sections.push('## See also');
 sections.push('');
-sections.push('- [`specs/012-unify-cli-output-contract/contracts/cli-output.md`](specs/012-unify-cli-output-contract/contracts/cli-output.md) — unified envelope contract');
-sections.push('- [`src/abap_cli/output/cli-output.schema.json`](src/abap_cli/output/cli-output.schema.json) — machine-readable envelope schema (JSON Schema draft-07)');
-sections.push('- [`src/abap_cli/output/error-codes.ts`](src/abap_cli/output/error-codes.ts) — error-code → category → exit-code mapper');
-sections.push('- [`src/abap_cli/output/json.ts`](src/abap_cli/output/json.ts) — `CliError.references` field; rendered as `See: <path>` on human error output');
+sections.push('- Unified envelope contract: see the repo design history under specs/012-unify-cli-output-contract/contracts/cli-output.md');
+sections.push('- [`cli-output.schema.json`](../src/abap_cli/output/cli-output.schema.json) — machine-readable envelope schema (JSON Schema draft-07)');
+sections.push('- [`error-codes.ts`](../src/abap_cli/output/error-codes.ts) — error-code → category → exit-code mapper');
+sections.push('- [`json.ts`](../src/abap_cli/output/json.ts) — `CliError.references` field; rendered as `See: <path>` on human error output');
 sections.push('');
 
 const out = sections.join('\n');

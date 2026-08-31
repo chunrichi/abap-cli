@@ -15,7 +15,7 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
       BEGIN OF ty_error_body,
         code    TYPE string,
         message TYPE string,
-        details TYPE REF TO data,
+        details TYPE string_table,
       END OF ty_error_body,
       BEGIN OF ty_error,
         status TYPE string,
@@ -68,12 +68,13 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
                 iv_reason  TYPE string
                 is_payload TYPE any.
     METHODS respond_error
-      IMPORTING io_server TYPE REF TO if_http_server
-                iv_status TYPE i
-                iv_reason TYPE string
-                iv_code   TYPE string
-                iv_msg    TYPE string.
-    " 017: single JSON generation entries (US1/US2 build responses via these).
+      IMPORTING io_server  TYPE REF TO if_http_server
+                iv_status  TYPE i
+                iv_reason  TYPE string
+                iv_code    TYPE string
+                iv_msg     TYPE string
+                iv_details TYPE any OPTIONAL.
+    " Single JSON generation entries (build success/error responses via these).
     METHODS serialize_response
       IMPORTING is_payload TYPE any
       RETURNING VALUE(rv_json) TYPE string.
@@ -82,7 +83,7 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
                 iv_message TYPE string
                 iv_details TYPE any OPTIONAL
       RETURNING VALUE(rv_json) TYPE string.
-    " 017: vhcala4hci deploys an old /UI2/CL_JSON that does NOT escape JSON
+    " vhcala4hci deploys an old /UI2/CL_JSON that does NOT escape JSON
     " string values — probe once and escape ourselves when needed.
     CLASS-DATA gv_escape_needed TYPE abap_bool.
     METHODS escape_probe_needed
@@ -116,6 +117,12 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
       IMPORTING iv_query TYPE string
                 iv_name  TYPE string
       RETURNING VALUE(rv_value) TYPE string.
+    " Reflect the ABAP language version of a handler class. Returns 'cloudDevelopment'
+    " or 'standard'; falls back to 'standard' when the class cannot be introspected
+    " (e.g. not yet activated, no RTTI access, or handler is empty).
+    METHODS resolve_handler_language_version
+      IMPORTING iv_class_name TYPE string
+      RETURNING VALUE(rv_version) TYPE string.
 
     " ----- transaction-code lookup (configured entry program only) -----
     TYPES:
@@ -201,7 +208,7 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
       END OF ty_field,
       tt_field TYPE STANDARD TABLE OF ty_field WITH EMPTY KEY.
 
-    " ----- 016: read-only table data query (SE16N equivalent) -----
+    " ----- read-only table data query (SE16N equivalent) -----
     " Wire payload type (camelCase — matches /ui2/cl_json pretty_mode-camel_case).
     TYPES:
       BEGIN OF ty_query_request,
@@ -248,7 +255,7 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
       gc_query_limit_def  TYPE i VALUE 100.
 
     " Large-object datatype set — STRG/RSTR/LCHR/LRAW are excluded from output when
-    " --fields is not specified, and rejected explicitly when it is (spec FR-016).
+    " --fields is not specified, and rejected explicitly when it is.
     CONSTANTS:
       gc_large_object_types TYPE string VALUE 'STRG|RSTR|LCHR|LRAW'.
 
@@ -284,7 +291,7 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
                 VALUE(ev_err_msg)  TYPE string
                 VALUE(ev_err_offset) TYPE i.
 
-    " select wire payloads (017): rows is a partial-JSON piece (native values,
+    " select wire payloads: rows is a partial-JSON piece (native values,
     " uppercase field names via pretty_mode-none); envelope is camelCase.
     TYPES:
       BEGIN OF ty_select_result_data,
@@ -463,6 +470,163 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
                 iv_name    TYPE string
       EXPORTING es_payload TYPE REF TO data
                 ev_error   TYPE ty_error.
+
+    " ----- Transaction Code (SE93) CRUD over abap-file-format tran-v1 -----
+    TYPES:
+      BEGIN OF ty_tran_dialog,
+        program_name          TYPE string,
+        program_dynnr         TYPE string,
+        stv_maintenance_mode  TYPE string,
+      END OF ty_tran_dialog,
+      BEGIN OF ty_tran_pv,
+        parameter_name  TYPE string,
+        parameter_value TYPE string,
+      END OF ty_tran_pv,
+      tt_tran_pv TYPE STANDARD TABLE OF ty_tran_pv WITH EMPTY KEY,
+      BEGIN OF ty_tran_param,
+        par_parent_transaction_code TYPE string,
+        skip_initial_screen_mode    TYPE string,
+        parameter_values            TYPE tt_tran_pv,
+      END OF ty_tran_param,
+      BEGIN OF ty_tran_report,
+        report_name         TYPE string,
+        report_dynnr        TYPE string,
+        report_variant_name TYPE string,
+      END OF ty_tran_report,
+      BEGIN OF ty_tran_oo,
+        local_in_program_indi     TYPE abap_bool,
+        class_program_name        TYPE string,
+        class_name                TYPE string,
+        method_name               TYPE string,
+        oo_transaction_model_indi TYPE abap_bool,
+        update_mode               TYPE string,
+      END OF ty_tran_oo,
+      BEGIN OF ty_tran_variant,
+        var_parent_transaction_code  TYPE string,
+        transaction_variant_ci_indi  TYPE abap_bool,
+        transaction_ci_variant_name  TYPE string,
+        transaction_variant_name     TYPE string,
+      END OF ty_tran_variant,
+      BEGIN OF ty_tran_general,
+        transaction_type      TYPE string,
+        lock_status           TYPE string,
+        dialog_transaction    TYPE ty_tran_dialog,
+        parameter_transaction TYPE ty_tran_param,
+        report_transaction    TYPE ty_tran_report,
+        oo_transaction        TYPE ty_tran_oo,
+        variant_transaction   TYPE ty_tran_variant,
+      END OF ty_tran_general,
+      BEGIN OF ty_tran_service,
+        application_name TYPE string,
+        application_type TYPE string,
+        program_id       TYPE string,
+        object_type      TYPE string,
+        object_name      TYPE string,
+        service_type     TYPE string,
+        service          TYPE string,
+      END OF ty_tran_service,
+      tt_tran_service TYPE STANDARD TABLE OF ty_tran_service WITH EMPTY KEY,
+      BEGIN OF ty_tran_rel,
+        relationship_type TYPE string,
+        related_tcode     TYPE string,
+      END OF ty_tran_rel,
+      tt_tran_rel TYPE STANDARD TABLE OF ty_tran_rel WITH EMPTY KEY,
+      BEGIN OF ty_tran_srv_rel,
+        relationship_type        TYPE string,
+        related_application_type TYPE string,
+        related_application_name TYPE string,
+        program_id               TYPE string,
+        object_type              TYPE string,
+        object_name              TYPE string,
+        service_type             TYPE string,
+        service                  TYPE string,
+      END OF ty_tran_srv_rel,
+      tt_tran_srv_rel TYPE STANDARD TABLE OF ty_tran_srv_rel WITH EMPTY KEY,
+      BEGIN OF ty_tran_ui,
+        inheritance_mode  TYPE string,
+        ui_classification TYPE string,
+        iac_service_name  TYPE string,
+        pervasive_mode    TYPE string,
+        webgui_mode       TYPE string,
+        platin_mode       TYPE string,
+        win32_mode        TYPE string,
+      END OF ty_tran_ui,
+      BEGIN OF ty_tran_user_interface,
+        ui_attributes TYPE ty_tran_ui,
+      END OF ty_tran_user_interface,
+      BEGIN OF ty_tran_sao_fv,
+        auth_field_name  TYPE string,
+        auth_field_value TYPE string,
+      END OF ty_tran_sao_fv,
+      tt_tran_sao_fv TYPE STANDARD TABLE OF ty_tran_sao_fv WITH EMPTY KEY,
+      BEGIN OF ty_tran_sao,
+        auth_object_name         TYPE string,
+        auth_object_field_values TYPE tt_tran_sao_fv,
+      END OF ty_tran_sao,
+      BEGIN OF ty_tran_ad_fv,
+        auth_field_name       TYPE string,
+        auth_field_low_value  TYPE string,
+        auth_field_high_value TYPE string,
+      END OF ty_tran_ad_fv,
+      tt_tran_ad_fv TYPE STANDARD TABLE OF ty_tran_ad_fv WITH EMPTY KEY,
+      BEGIN OF ty_tran_ad_ao,
+        auth_object_name         TYPE string,
+        maintenance_status       TYPE string,
+        documentation            TYPE string,
+        auth_object_field_values TYPE tt_tran_ad_fv,
+      END OF ty_tran_ad_ao,
+      tt_tran_ad_ao TYPE STANDARD TABLE OF ty_tran_ad_ao WITH EMPTY KEY,
+      BEGIN OF ty_tran_ad,
+        maintenance_mode        TYPE string,
+        default_values_required TYPE string,
+        inheritance_mode        TYPE string,
+        documentation           TYPE string,
+        auth_objects            TYPE tt_tran_ad_ao,
+      END OF ty_tran_ad,
+      BEGIN OF ty_tran_auth,
+        start_authorization_object TYPE ty_tran_sao,
+        authorization_defaults     TYPE ty_tran_ad,
+      END OF ty_tran_auth,
+      BEGIN OF ty_tran_header,
+        description           TYPE string,
+        original_language     TYPE string,
+        abap_language_version TYPE string,
+      END OF ty_tran_header,
+      BEGIN OF ty_tran_data,
+        format_version            TYPE string,
+        header                    TYPE ty_tran_header,
+        general_information       TYPE ty_tran_general,
+        transaction_services      TYPE tt_tran_service,
+        transaction_relationships TYPE tt_tran_rel,
+        service_relationships     TYPE tt_tran_srv_rel,
+        user_interface            TYPE ty_tran_user_interface,
+        authorizations            TYPE ty_tran_auth,
+      END OF ty_tran_data,
+      BEGIN OF ty_tran_write,
+        name   TYPE string,
+        type   TYPE string,
+        action TYPE string,
+      END OF ty_tran_write,
+      BEGIN OF ty_tran_service_response,
+        status TYPE string,
+        data   TYPE ty_tran_data,
+      END OF ty_tran_service_response,
+      BEGIN OF ty_tran_write_response,
+        status TYPE string,
+        data   TYPE ty_tran_write,
+      END OF ty_tran_write_response.
+
+    METHODS dispatch_tran
+      IMPORTING io_server TYPE REF TO if_http_server
+                iv_path   TYPE string
+                iv_method TYPE string
+                iv_body   TYPE string.
+    METHODS read_tran_tstc
+      IMPORTING iv_tcode TYPE tstc-tcode
+      EXPORTING es_tstc  TYPE tstc.
+    METHODS build_tran_payload
+      IMPORTING iv_tcode    TYPE tstc-tcode
+      EXPORTING es_payload  TYPE ty_tran_data.
 ENDCLASS.
 
 CLASS zcl_abap_vibe_icf IMPLEMENTATION.
@@ -494,8 +658,10 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
       dispatch_http( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
     ELSEIF lv_path CP '/tcode/*'.
       dispatch_tcode( io_server = server iv_path = lv_path iv_method = lv_method ).
+    ELSEIF lv_path CP '/tran/*'.
+      dispatch_tran( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
     ELSEIF lv_path CP '/data/*'.
-      " 016: read-only table data query (SE16N equivalent).
+      " Read-only table data query (SE16N equivalent).
       TRY.
           dispatch_data( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
         CATCH cx_root INTO DATA(lx_top_dispatch).
@@ -644,7 +810,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
                                                                  THEN CONV string( lv_service_name )
                                                                  ELSE CONV string( ls_docu-icf_docu ) )
                                                                  original_language = lv_original_language
-                                                                 abap_language_version = 'standard' )
+                                                                 abap_language_version = resolve_handler_language_version( ls_handler-icfhandler ) )
                          general_information = VALUE #( handler_class = COND #( WHEN sy-subrc = 0
                                                                                  THEN CONV string( ls_handler-icfhandler )
                                                                                  ELSE `` )
@@ -921,6 +1087,24 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
                     data = VALUE #( name = lv_node_name type = 'HTTP' action = 'created' ) ) ).
   ENDMETHOD.
 
+  METHOD resolve_handler_language_version.
+    " Default to 'standard' on any failure: missing handler, not loaded,
+    " no RTTI access, etc. abap-file-format only allows these two enum values.
+    rv_version = 'standard'.
+    IF iv_class_name IS INITIAL.
+      RETURN.
+    ENDIF.
+    TRY.
+        DATA(lo_descr) = cl_abap_classdescr=>describe_by_name( iv_class_name ).
+        IF lo_descr IS BOUND AND lo_descr->get_language_version( ) = cl_abap_language_version=>co_cloud_development.
+          rv_version = 'cloudDevelopment'.
+        ENDIF.
+      CATCH cx_root.
+        " Silent fallback: introspection failures (class missing, no authority, etc.)
+        " must not break the GET response — we still return a usable HTTP service payload.
+    ENDTRY.
+  ENDMETHOD.
+
   METHOD dispatch_version_management.
     IF iv_method <> 'GET'.
       respond_error( io_server = io_server
@@ -1165,7 +1349,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD dispatch_textpool.
-    " 014 US4: read textpool via RS_TEXTPOOL_READ; write support is target-specific.
+    " Read textpool via RS_TEXTPOOL_READ; write support is target-specific.
     " Routes /textpool/<category>?object=<name>&type=<type>.
     " category: texts|selections|headings; object = program/class name; type = PROG|CLAS|FUGR.
     DATA lv_path        TYPE string.
@@ -1213,6 +1397,8 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
                              IMPORTING es_payload  = DATA(ls_payload_get)
                                        ev_error    = DATA(ls_error_get) ).
       IF ls_error_get IS NOT INITIAL.
+        " get_textpool_elements failures are single-message (not a BAPI table);
+        " no details to surface, so iv_details is omitted on purpose.
         respond_error( io_server = io_server
                        iv_status = 404
                        iv_reason = 'Not Found'
@@ -1360,11 +1546,12 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
                                           ev_error   = ls_create_err ).
       ENDCASE.
       IF ls_create_err IS NOT INITIAL.
-        respond_error( io_server = io_server
-                       iv_status = 200
-                       iv_reason = 'OK'
-                       iv_code   = ls_create_err-error-code
-                       iv_msg    = ls_create_err-error-message ).
+        respond_error( io_server  = io_server
+                       iv_status  = 200
+                       iv_reason  = 'OK'
+                       iv_code    = ls_create_err-error-code
+                       iv_msg     = ls_create_err-error-message
+                       iv_details = ls_create_err-error-details ).
       ELSE.
         respond_json( io_server = io_server iv_status = 200 iv_reason = 'OK' is_payload = ls_create ).
       ENDIF.
@@ -1374,6 +1561,8 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
                        IMPORTING es_payload = DATA(lr_get)
                                  ev_error   = DATA(ls_get_err) ).
       IF ls_get_err IS NOT INITIAL.
+        " get_ddic_object failures are single-message (not a BAPI table); no
+        " details to surface, so iv_details is omitted on purpose.
         respond_error( io_server = io_server
                        iv_status = 200
                        iv_reason = 'OK'
@@ -1497,11 +1686,20 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
     lt_fields = ls_attr-fields.
 
     IF ls_attr-clientDependent = abap_true.
-      ls_mandt-fieldName = 'MANDT'.
-      ls_mandt-rollname   = 'MANDT'.
-      ls_mandt-keyFlag    = abap_true.
-      ls_mandt-notNull    = abap_true.
-      INSERT ls_mandt INTO lt_fields INDEX 1.
+      " The CLI strips any CLIENT/MANDT entry from the wire before posting
+      " (see src/abap_cli/dictionary/ddic-json.ts:stripClientFields), so under
+      " normal operation `lt_fields` does not contain MANDT here. We still
+      " guard against a duplicate-MANDT insert so older clients (or hand-
+      " crafted payloads) don't fail with a misleading "Field already exists"
+      " error from the BAPI layer.
+      READ TABLE lt_fields TRANSPORTING NO FIELDS WITH KEY fieldName = 'MANDT'.
+      IF sy-subrc <> 0.
+        ls_mandt-fieldName = 'MANDT'.
+        ls_mandt-rollname   = 'MANDT'.
+        ls_mandt-keyFlag    = abap_true.
+        ls_mandt-notNull    = abap_true.
+        INSERT ls_mandt INTO lt_fields INDEX 1.
+      ENDIF.
     ENDIF.
 
     build_table_header( EXPORTING iv_table_name    = CONV tabname( ls_attr-name )
@@ -1536,18 +1734,25 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
 
     DATA lv_ok TYPE abap_bool VALUE abap_true.
     DATA lv_msg TYPE string.
+    DATA lt_details TYPE string_table.
+    DATA lv_error TYPE string.
     LOOP AT lt_bapireturn INTO DATA(ls_err) WHERE type CA 'EAX'.
       lv_ok = abap_false.
-      IF lv_msg IS INITIAL.
-        lv_msg = ls_err-message.
+      IF ls_err-message IS INITIAL.
+        MESSAGE ID ls_err-id TYPE 'S' NUMBER ls_err-number
+          WITH ls_err-message_v1 ls_err-message_v2 ls_err-message_v3 ls_err-message_v4
+          INTO lv_error.
       ELSE.
-        lv_msg = lv_msg && |; { ls_err-message }|.
+        lv_error = ls_err-message.
       ENDIF.
+      APPEND lv_error TO lt_details.
+      IF lv_msg IS INITIAL. lv_msg = lv_error. ELSE. lv_msg = lv_msg && |; { lv_error }|. ENDIF.
     ENDLOOP.
     IF lv_ok = abap_false.
       ev_error = VALUE ty_error( status = 'error'
                                  error = VALUE ty_error_body( code = 'DDIC_CREATE_FAILED'
-                                                              message = lv_msg ) ).
+                                                              message = lv_msg
+                                                              details = lt_details ) ).
       RETURN.
     ENDIF.
 
@@ -1602,36 +1807,26 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
         et_transport   = lt_transport.
 
     DATA lv_ok TYPE abap_bool VALUE abap_true.
+    DATA lt_details TYPE string_table.
     DATA lv_msg TYPE string.
     DATA lv_error TYPE string.
     LOOP AT lt_bapireturn INTO DATA(ls_err) WHERE type CA 'EAX'.
       lv_ok = abap_false.
       IF ls_err-message IS INITIAL.
-        CLEAR lv_error.
-        CALL FUNCTION 'MESSAGE_TEXT_BUILD'
-          EXPORTING
-            msgid               = ls_err-id
-            msgnr               = ls_err-number
-            msgv1               = ls_err-message_v1
-            msgv2               = ls_err-message_v2
-            msgv3               = ls_err-message_v3
-            msgv4               = ls_err-message_v4
-          IMPORTING
-            message_text_output = lv_error
-          EXCEPTIONS
-            OTHERS              = 1.
-        IF lv_error IS INITIAL.
-          lv_error = |{ ls_err-type } { ls_err-id } { ls_err-number } { ls_err-message_v1 } { ls_err-message_v2 } { ls_err-message_v3 } { ls_err-message_v4 }|.
-        ENDIF.
+        MESSAGE ID ls_err-id TYPE 'S' NUMBER ls_err-number
+          WITH ls_err-message_v1 ls_err-message_v2 ls_err-message_v3 ls_err-message_v4
+          INTO lv_error.
       ELSE.
         lv_error = ls_err-message.
       ENDIF.
+      APPEND lv_error TO lt_details.
       IF lv_msg IS INITIAL. lv_msg = lv_error. ELSE. lv_msg = lv_msg && |; { lv_error }|. ENDIF.
     ENDLOOP.
     IF lv_ok = abap_false.
       ev_error = VALUE ty_error( status = 'error'
                                  error = VALUE ty_error_body( code = 'DDIC_CREATE_FAILED'
-                                                              message = lv_msg ) ).
+                                                              message = lv_msg
+                                                              details = lt_details ) ).
       RETURN.
     ENDIF.
     es_payload = VALUE ty_ddic_create( status = 'success'
@@ -1727,14 +1922,25 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
 
     DATA lv_ok TYPE abap_bool VALUE abap_true.
     DATA lv_msg TYPE string.
+    DATA lt_details TYPE string_table.
+    DATA lv_error TYPE string.
     LOOP AT lt_bapireturn INTO DATA(ls_err) WHERE type CA 'EAX'.
       lv_ok = abap_false.
-      IF lv_msg IS INITIAL. lv_msg = ls_err-message. ELSE. lv_msg = lv_msg && |; { ls_err-message }|. ENDIF.
+      IF ls_err-message IS INITIAL.
+        MESSAGE ID ls_err-id TYPE 'S' NUMBER ls_err-number
+          WITH ls_err-message_v1 ls_err-message_v2 ls_err-message_v3 ls_err-message_v4
+          INTO lv_error.
+      ELSE.
+        lv_error = ls_err-message.
+      ENDIF.
+      APPEND lv_error TO lt_details.
+      IF lv_msg IS INITIAL. lv_msg = lv_error. ELSE. lv_msg = lv_msg && |; { lv_error }|. ENDIF.
     ENDLOOP.
     IF lv_ok = abap_false.
       ev_error = VALUE ty_error( status = 'error'
                                  error = VALUE ty_error_body( code = 'DDIC_CREATE_FAILED'
-                                                              message = lv_msg ) ).
+                                                              message = lv_msg
+                                                              details = lt_details ) ).
       RETURN.
     ENDIF.
     es_payload = VALUE ty_ddic_create( status = 'success'
@@ -1803,14 +2009,25 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
 
     DATA lv_ok TYPE abap_bool VALUE abap_true.
     DATA lv_msg TYPE string.
+    DATA lt_details TYPE string_table.
+    DATA lv_error TYPE string.
     LOOP AT lt_bapireturn INTO DATA(ls_err) WHERE type CA 'EAX'.
       lv_ok = abap_false.
-      IF lv_msg IS INITIAL. lv_msg = ls_err-message. ELSE. lv_msg = lv_msg && |; { ls_err-message }|. ENDIF.
+      IF ls_err-message IS INITIAL.
+        MESSAGE ID ls_err-id TYPE 'S' NUMBER ls_err-number
+          WITH ls_err-message_v1 ls_err-message_v2 ls_err-message_v3 ls_err-message_v4
+          INTO lv_error.
+      ELSE.
+        lv_error = ls_err-message.
+      ENDIF.
+      APPEND lv_error TO lt_details.
+      IF lv_msg IS INITIAL. lv_msg = lv_error. ELSE. lv_msg = lv_msg && |; { lv_error }|. ENDIF.
     ENDLOOP.
     IF lv_ok = abap_false.
       ev_error = VALUE ty_error( status = 'error'
                                  error = VALUE ty_error_body( code = 'DDIC_CREATE_FAILED'
-                                                              message = lv_msg ) ).
+                                                              message = lv_msg
+                                                              details = lt_details ) ).
       RETURN.
     ENDIF.
     es_payload = VALUE ty_ddic_create( status = 'success'
@@ -1820,7 +2037,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_ddic_object.
-    " US3: pull a DDIC object definition and return the wire JSON (mirrors the
+    " Pull a DDIC object definition and return the wire JSON (mirrors the
     " create payload so round-trip is consistent). Object missing → DDIC_OBJECT_NOT_FOUND.
     CASE iv_type.
       WHEN 'DOMA'.
@@ -1930,14 +2147,25 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD respond_error.
-    DATA(lv_json) = serialize_error( iv_code = iv_code iv_message = iv_msg ).
+    DATA lv_json TYPE string.
+    " forward iv_details to serialize_error only when the caller actually
+    " supplied it (most call sites pass no details; their initial data ref
+    " would otherwise leak as an empty `details: null` in the response).
+    IF iv_details IS SUPPLIED.
+      lv_json = serialize_error( iv_code    = iv_code
+                                iv_message = iv_msg
+                                iv_details = iv_details ).
+    ELSE.
+      lv_json = serialize_error( iv_code    = iv_code
+                                iv_message = iv_msg ).
+    ENDIF.
     io_server->response->set_status( code = iv_status reason = iv_reason ).
     io_server->response->set_content_type( content_type = 'application/json' ).
     io_server->response->set_cdata( data = lv_json ).
   ENDMETHOD.
 
   METHOD serialize_response.
-    " 017: single success-envelope generation entry (camelCase wire).
+    " Single success-envelope generation entry (camelCase wire).
     " Copy to a modifiable heap object so old /UI2/CL_JSON escaping can apply.
     DATA lr_payload TYPE REF TO data.
     CREATE DATA lr_payload LIKE is_payload.
@@ -1956,17 +2184,17 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD serialize_error.
-    " 017: single error-envelope generation entry (compress skips unbound details).
+    " Single error-envelope generation entry (compress skips unbound details).
     DATA lv_msg TYPE string.
     lv_msg = iv_message.
     IF escape_probe_needed( ) = abap_true.
       lv_msg = escape_json_string( iv_message ).
     ENDIF.
     DATA(ls_error) = VALUE ty_error( status = 'error'
-                                     error = VALUE ty_error_body( code = iv_code
+                                     error = VALUE ty_error_body( code    = iv_code
                                                                   message = lv_msg ) ).
     IF iv_details IS SUPPLIED.
-      GET REFERENCE OF iv_details INTO ls_error-error-details.
+      ls_error-error-details = iv_details.
     ENDIF.
     TRY.
         rv_json = /ui2/cl_json=>serialize( data        = ls_error
@@ -2043,7 +2271,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD dispatch_data.
-    " 016: route /data/<sub> → sub-handlers. Only /data/query is supported in v1.
+    " Route /data/<sub> → sub-handlers. Only /data/query is supported in v1.
     IF iv_path <> '/data/query'.
       respond_error( io_server = io_server
                      iv_status = 404
@@ -2109,7 +2337,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
         LOOP AT ls_meta-fields INTO DATA(ls_field) WHERE name = lv_fname.
           lv_match = abap_true.
           IF ls_field-dataType CP gc_large_object_types.
-            " 016: explicit projection of a large-object field is rejected.
+            " Explicit projection of a large-object field is rejected.
             respond_error( io_server = io_server
                            iv_status = 400
                            iv_reason = 'Bad Request'
@@ -2233,7 +2461,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
       ENDIF.
     ENDIF.
 
-    " 8. Count-only path (US4).
+    " 8. Count-only path.
     IF ls_req-countonly = abap_true.
       DATA ls_count     TYPE ty_select_count.
       DATA ls_count_err TYPE ty_error.
@@ -2242,6 +2470,8 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
                      IMPORTING es_payload = ls_count
                                ev_error   = ls_count_err ).
       IF ls_count_err IS NOT INITIAL.
+        " execute_count failures are single-message (cx_root text, not a BAPI
+        " table); no details to surface, so iv_details is omitted on purpose.
         respond_error( io_server = io_server
                        iv_status = 200
                        iv_reason = 'OK'
@@ -2274,6 +2504,8 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
         RETURN.
     ENDTRY.
     IF ls_sel_err IS NOT INITIAL.
+      " execute_select failures are single-message (cx_root text, not a BAPI
+      " table); no details to surface, so iv_details is omitted on purpose.
       respond_error( io_server = io_server
                      iv_status = 200
                      iv_reason = 'OK'
@@ -2285,7 +2517,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD parse_data_query.
-    " 016: deserialize the wire payload (camelCase). Generate default values for
+    " Deserialize the wire payload (camelCase). Generate default values for
     " missing fields so the consumer always sees a valid request.
     CLEAR: es_req, ev_ok, ev_err_code, ev_err_msg, ev_err_details.
     ev_ok = abap_false.
@@ -2331,7 +2563,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD read_table_metadata.
-    " 016: read DD02L (table header) + DD03L (field list) for the requested table.
+    " Read DD02L (table header) + DD03L (field list) for the requested table.
     CLEAR: es_meta, ev_ok, ev_err_code, ev_err_msg, ev_err_details, ev_err_http.
     ev_ok = abap_false.
     DATA(lv_name) = to_upper( condense( val = iv_name del = ` ` ) ).
@@ -2391,7 +2623,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD parse_where_clause.
-    " 016: AND-only where grammar per research R8.
+    " AND-only where grammar per research R8.
     "   where := condition { "AND" condition }
     "   condition := field op value
     "   op := "=" | "<>" | ">" | ">=" | "<" | "<=" | "LIKE"
@@ -2633,7 +2865,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD execute_select.
-    " 016: dynamic Open SQL with host-variable binding (research R1).
+    " Dynamic Open SQL with host-variable binding (research R1).
     " Build the dynamic row type from DD03L metadata, then SELECT with a
     " generated WHERE clause whose values are bound as host variables.
     " Take limit+1 to detect truncation.
@@ -2884,7 +3116,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD execute_count.
-    " 016: SELECT COUNT(*) FROM (table) WHERE (cond) — same parameter binding.
+    " SELECT COUNT(*) FROM (table) WHERE (cond) — same parameter binding.
     DATA(lv_meta) = is_meta.
 
     " Pre-declare host vars (ABAP forbids re-`DATA` inside CASE branches).
@@ -2942,6 +3174,259 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
         table       = lv_meta-name
         count       = lv_count
         duration_ms = 1 ) ).
+  ENDMETHOD.
+
+  METHOD dispatch_tran.
+    " /tran/<tcode>  —  Read SE93 transaction metadata as abap-file-format tran-v1.
+    "
+    "   GET  → read TSTC + TSTCT + TSTCC + TSTCP + TSTCA, map to tran-v1 schema
+    "   POST → not implemented in this iteration (501). Write path needs the
+    "          RPY_TRANSACTION_INSERT + RS_CORR_INSERT chain (or BDC for OO) and
+    "          will land in a follow-up PR after S/4H validation on s4h.
+    "
+    " Wire payload uses /ui2/cl_json pretty_mode-camel_case so field names on the
+    " wire (generalInformation, transactionServices, ...) match the ABAP struct
+    " names (general_information, transaction_services, ...) one-to-one.
+    DATA lv_match_name TYPE string.
+
+    FIND REGEX '^/tran/(.+)$' IN iv_path IGNORING CASE SUBMATCHES lv_match_name.
+    IF sy-subrc <> 0 OR lv_match_name IS INITIAL.
+      respond_error( io_server = io_server
+                     iv_status = 400
+                     iv_reason = 'Bad Request'
+                     iv_code = 'TRAN_SERVICE_INVALID'
+                     iv_msg = 'Transaction code is required' ).
+      RETURN.
+    ENDIF.
+
+    IF iv_method = 'GET'.
+      DATA(ls_tstc) = read_tran_tstc( lv_match_name ).
+      IF ls_tstc IS INITIAL.
+        respond_error( io_server = io_server
+                       iv_status = 404
+                       iv_reason = 'Not Found'
+                       iv_code = 'TRAN_OBJECT_NOT_FOUND'
+                       iv_msg = |Transaction { lv_match_name } not found| ).
+        RETURN.
+      ENDIF.
+      DATA(ls_payload) = build_tran_payload( lv_match_name ).
+      respond_json( io_server = io_server
+                    iv_status = 200
+                    iv_reason = 'OK'
+                    is_payload = VALUE ty_tran_service_response( status = 'success' data = ls_payload ) ).
+      RETURN.
+    ENDIF.
+
+    IF iv_method = 'POST' OR iv_method = 'PUT'.
+      respond_error( io_server = io_server
+                     iv_status = 501
+                     iv_reason = 'Not Implemented'
+                     iv_code = 'TRAN_WRITE_NOT_IMPLEMENTED'
+                     iv_msg = |Transaction write is not yet implemented for { lv_match_name } on this handler| ).
+      RETURN.
+    ENDIF.
+
+    respond_error( io_server = io_server
+                   iv_status = 405
+                   iv_reason = 'Method Not Allowed'
+                   iv_code = 'METHOD_NOT_ALLOWED'
+                   iv_msg = |GET only on /tran/{ lv_match_name }| ).
+  ENDMETHOD.
+
+  METHOD read_tran_tstc.
+    " Read the TSTC row for iv_tcode. Clear when not found so callers can
+    " use IS INITIAL to detect a 404 case.
+    CLEAR es_tstc.
+    SELECT SINGLE * FROM tstc WHERE tcode = @iv_tcode INTO @es_tstc.
+  ENDMETHOD.
+
+  METHOD build_tran_payload.
+    " Map TSTC + auxiliary tables to the abap-file-format tran-v1 schema.
+    " Returns an empty struct when the transaction does not exist.
+    CLEAR es_payload.
+
+    DATA(ls_tstc) = read_tran_tstc( iv_tcode ).
+    IF ls_tstc IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    " Primary-language short text. Prefer the current login language; fall back
+    " to whatever entry exists.
+    DATA ls_tstct TYPE tstct.
+    SELECT SINGLE * FROM tstct
+      WHERE tcode = @iv_tcode AND sprsl = @sy-langu
+      INTO @ls_tstct.
+    IF sy-subrc <> 0.
+      SELECT SINGLE * FROM tstct
+        WHERE tcode = @iv_tcode
+        INTO @ls_tstct.
+    ENDIF.
+    DATA(lv_description)   = ls_tstct-ttext.
+    DATA(lv_original_lang) = ls_tstct-sprsl.
+
+    " Derive transaction type from TSTC-CINFO bit pattern (abapGit
+    " zcl_abapgit_object_tran constants: lc_hex_par = x'02', lc_hex_rep = x'80',
+    " lc_hex_var = x'90' = rep + x'10' for variants, lc_hex_oo = x'08').
+    DATA(lv_cinfo) = ls_tstc-cinfo.
+    DATA(lv_transaction_type) = COND #(
+      WHEN lv_cinfo O 0x90 = 0x90 THEN 'variantTransaction'
+      WHEN lv_cinfo O 0x08 = 0x08 THEN 'ooTransaction'
+      WHEN lv_cinfo O 0x80 = 0x80 THEN 'reportTransaction'
+      WHEN lv_cinfo O 0x02 = 0x02 THEN 'parameterTransaction'
+      ELSE 'dialogTransaction' ).
+
+    es_payload = VALUE ty_tran_data(
+      format_version = '1'
+      header = VALUE ty_tran_header(
+        description       = lv_description
+        original_language = lv_original_lang ) ).
+
+    " TSTCP rows (parameter transaction SPA/GPA values + OO transaction
+    " class/method encoded as '\CLASS=...\METHOD=...' in PARAM).
+    DATA lt_tstcp TYPE TABLE OF tstcp.
+    SELECT * FROM tstcp WHERE tcode = @iv_tcode INTO TABLE @lt_tstcp.
+
+    CASE lv_transaction_type.
+      WHEN 'dialogTransaction'.
+        es_payload-general_information = VALUE ty_tran_general(
+          transaction_type   = lv_transaction_type
+          dialog_transaction = VALUE ty_tran_dialog(
+            program_name         = ls_tstc-pgmna
+            program_dynnr        = ls_tstc-dypno
+            stv_maintenance_mode = 'notAllowed' ) ).
+      WHEN 'parameterTransaction'.
+        " Parameter transaction: first TSTCP-PARAM holds the called tcode and
+        " the SPA/GPA defaults as 'NAME VALUE' pairs separated by spaces.
+        DATA(lv_param_string) = VALUE string( ).
+        READ TABLE lt_tstcp INTO DATA(ls_param_row) INDEX 1.
+        IF sy-subrc = 0.
+          lv_param_string = ls_param_row-param.
+        ENDIF.
+        DATA(lv_called_tcode) = lv_param_string.
+        " Trim to first whitespace — the called tcode lives in the leading segment.
+        IF lv_called_tcode CA ' '.
+          lv_called_tcode = lv_called_tcode( sy-fdpos ).
+        ENDIF.
+        " Subsequent rows carry individual 'NAME VALUE' pairs.
+        DATA lt_pv TYPE tt_tran_pv.
+        LOOP AT lt_tstcp INTO ls_param_row FROM 2.
+          SPLIT ls_param_row-param AT space INTO DATA(lv_pv_name) DATA(lv_pv_value).
+          IF lv_pv_name IS NOT INITIAL.
+            APPEND VALUE ty_tran_pv(
+              parameter_name  = lv_pv_name
+              parameter_value = lv_pv_value ) TO lt_pv.
+          ENDIF.
+        ENDLOOP.
+        es_payload-general_information = VALUE ty_tran_general(
+          transaction_type      = lv_transaction_type
+          parameter_transaction = VALUE ty_tran_param(
+            par_parent_transaction_code = lv_called_tcode
+            skip_initial_screen_mode    = 'skip'
+            parameter_values            = lt_pv ) ).
+      WHEN 'reportTransaction'.
+        es_payload-general_information = VALUE ty_tran_general(
+          transaction_type   = lv_transaction_type
+          report_transaction = VALUE ty_tran_report(
+            report_name  = ls_tstc-pgmna
+            report_dynnr = ls_tstc-dypno ) ).
+      WHEN 'ooTransaction'.
+        " OO transaction: TSTCP-PARAM carries '\CLASS=...\METHOD=...' segments.
+        " abapGit's split_parameters pattern: walk the string, picking out the
+        " \CLASS= and \METHOD= tokens; default values for the method also live
+        " in TSTCP as additional NAME VALUE pairs.
+        DATA(lv_oo_param) = VALUE string( ).
+        READ TABLE lt_tstcp INTO ls_param_row INDEX 1.
+        IF sy-subrc = 0.
+          lv_oo_param = ls_param_row-param.
+        ENDIF.
+        DATA(lv_oo_class)  = VALUE string( ).
+        DATA(lv_oo_method) = VALUE string( ).
+        DATA(lv_class_offset) = find( val = lv_oo_param sub = '\CLASS=' ).
+        IF sy-class_ok = abap_true AND lv_class_offset >= 0.
+          DATA(lv_class_rest) = lv_oo_param+lv_class_offset.
+          " \CLASS= ends at the next '\' or end of string.
+          FIND FIRST OCCURRENCE OF REGEX '\\CLASS=([^\\]+)' IN lv_oo_param
+            SUBMATCHES lv_oo_class.
+        ENDIF.
+        FIND FIRST OCCURRENCE OF REGEX '\\METHOD=([^\\]+)' IN lv_oo_param
+          SUBMATCHES lv_oo_method.
+        es_payload-general_information = VALUE ty_tran_general(
+          transaction_type = lv_transaction_type
+          oo_transaction   = VALUE ty_tran_oo(
+            class_name  = lv_oo_class
+            method_name = lv_oo_method ) ).
+      WHEN 'variantTransaction'.
+        " Variant: first TSTCP-PARAM holds '@' + core tcode (abapGit split).
+        DATA(lv_variant_param) = VALUE string( ).
+        READ TABLE lt_tstcp INTO ls_param_row INDEX 1.
+        IF sy-subrc = 0.
+          lv_variant_param = ls_param_row-param.
+        ENDIF.
+        DATA(lv_var_parent) = lv_variant_param.
+        IF lv_var_parent CA '@'.
+          lv_var_parent = lv_var_parent+sy-fdpos+1.
+          IF lv_var_parent CA ' '.
+            lv_var_parent = lv_var_parent(sy-fdpos).
+          ENDIF.
+        ENDIF.
+        es_payload-general_information = VALUE ty_tran_general(
+          transaction_type    = lv_transaction_type
+          variant_transaction = VALUE ty_tran_variant(
+            var_parent_transaction_code = lv_var_parent ) ).
+    ENDCASE.
+
+    " TSTCC → userInterface.uiAttributes. The official field names are
+    " S_WEBGUI / S_WIN32 / S_PLATIN for GUI modes, S_SERVICE for the IAC
+    " service name, S_PERVAS for pervasive mode. UI classification is derived
+    " from which GUI flags are set: webgui + win32/platin ⇒ professional,
+    " webgui only ⇒ easy web.
+    DATA ls_tstcc TYPE tstcc.
+    SELECT SINGLE * FROM tstcc WHERE tcode = @iv_tcode INTO @ls_tstcc.
+    IF sy-subrc = 0.
+      DATA(lv_webgui_on) = boolc( ls_tstcc-s_webgui <> ' ' ).
+      DATA(lv_win32_on)  = boolc( ls_tstcc-s_win32  <> ' ' ).
+      DATA(lv_platin_on) = boolc( ls_tstcc-s_platin <> ' ' ).
+      es_payload-user_interface = VALUE ty_tran_user_interface(
+        ui_attributes = VALUE ty_tran_ui(
+          ui_classification = COND #(
+            WHEN lv_webgui_on = abap_true
+              AND ( lv_win32_on = abap_true OR lv_platin_on = abap_true )
+              THEN 'professionalUserTransaction'
+            WHEN lv_webgui_on = abap_true
+              THEN 'easyWebTransaction'
+            ELSE 'professionalUserTransaction' )
+          iac_service_name  = ls_tstcc-s_service
+          pervasive_mode    = COND #( WHEN ls_tstcc-s_pervas = 'D' THEN 'disabled' ELSE 'enabled' )
+          webgui_mode       = COND #( WHEN lv_webgui_on = abap_true THEN 'supported' ELSE 'notSupported' )
+          platin_mode       = COND #( WHEN lv_platin_on = abap_true THEN 'supported' ELSE 'notSupported' )
+          win32_mode        = COND #( WHEN lv_win32_on = abap_true THEN 'supported' ELSE 'notSupported' ) ) ).
+    ENDIF.
+
+    " TSTCA → authorizations.startAuthorizationObject + authorizationDefaults.
+    " TSTCA stores one row per (tcode, objct, field, low, high). The first
+    " row's OBJCT is the start authorization object name; subsequent rows for
+    " the same OBJCT are its field values. Multiple OBJCT groups indicate
+    " multiple authorization objects — only the first group is surfaced here;
+    " extending this requires TSTCA → USOBX/USOBT cross-references.
+    DATA lt_tstca TYPE TABLE OF tstca.
+    SELECT * FROM tstca WHERE tcode = @iv_tcode ORDER BY PRIMARY KEY INTO TABLE @lt_tstca.
+    IF sy-subrc = 0 AND lines( lt_tstca ) > 0.
+      DATA ls_first_tstca TYPE tstca.
+      READ TABLE lt_tstca INTO ls_first_tstca INDEX 1.
+      DATA lt_sao_fv TYPE tt_tran_sao_fv.
+      LOOP AT lt_tstca INTO DATA(ls_tstca) WHERE objct = ls_first_tstca-objct.
+        APPEND VALUE ty_tran_sao_fv(
+          auth_field_name  = ls_tstca-field
+          auth_field_value = ls_tstca-low ) TO lt_sao_fv.
+      ENDLOOP.
+      es_payload-authorizations = VALUE ty_tran_auth(
+        start_authorization_object = VALUE ty_tran_sao(
+          auth_object_name         = ls_first_tstca-objct
+          auth_object_field_values = lt_sao_fv )
+        authorization_defaults     = VALUE ty_tran_ad(
+          maintenance_mode        = 'manual'
+          default_values_required = 'yes' ) ).
+    ENDIF.
   ENDMETHOD.
 
 ENDCLASS.

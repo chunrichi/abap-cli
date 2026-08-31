@@ -10,7 +10,7 @@ CLASS zcl_abap_vibe_icf_setup DEFINITION PUBLIC CREATE PUBLIC.
       gc_handler TYPE icf_hand VALUE 'ZCL_ABAP_VIBE_ICF',
       gc_vhost   TYPE icfhostnum VALUE 0. " default_host
 
-    " 017: message types serialized via /ui2/cl_json (camelCase wire).
+    " Message types serialized via /ui2/cl_json (camelCase wire).
     TYPES:
       BEGIN OF ty_setup_error_body,
         code    TYPE string,

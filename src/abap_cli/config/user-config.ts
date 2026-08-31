@@ -32,7 +32,7 @@ export interface SystemProfile {
   runtime?: CachedRuntime;
 }
 
-/** Subset of RuntimeProbeResult that is safe to serialise on disk (034).
+/** Subset of RuntimeProbeResult that is safe to serialise on disk.
  *  Mirrors runtime-probe.ts fields but lives here to avoid a circular import. */
 export interface CachedRuntime {
   tier: 'netweaver740' | 'netweaver750' | 'steampunk' | 'unknown';

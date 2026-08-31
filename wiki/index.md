@@ -11,6 +11,8 @@ changed at: 2026-08-19 23:00:00
 
 面向 Agent 与开发者的 abap CLI 知识库。命令参考按 okf 格式维护。
 
+**不确定 CLI 能处理什么对象？先看 [支持的对象类型](object-types.md)** — 类型码 × 命令 × 路由矩阵。
+
 ## Commands
 
 ### Setup & 环境
@@ -19,6 +21,7 @@ changed at: 2026-08-19 23:00:00
 - [profile](commands/profile.md) — 管理全局连接 profiles
 - [doctor](commands/doctor.md) — 诊断 CLI 环境
 - [extension](commands/extension.md) — 管理内置 ICF ABAP 扩展（deploy / status）
+- [extensions](commands/extensions.md) — 管理第三方扩展（list 探测 / lock 钉 hash；027 信任硬化）
 
 ### 创建 / 拉取 / 推送
 
@@ -51,6 +54,7 @@ changed at: 2026-08-19 23:00:00
 
 ### 跨命令契约
 
+- [支持的对象类型](object-types.md) — 9 个类型 × 命令 × 路由（ADT / ICF）总览；SICF 节点对应类型码 `HTTP`
 - [output path contract](commands/path-output.md) — `--json` 路径字段统一 POSIX，跨平台 Agent 消费稳定
 
 ## Notes
@@ -59,5 +63,27 @@ changed at: 2026-08-19 23:00:00
 - [外部 CLI 项目学习点](cli-benchmark-learning.md)
 - [abap CLI 建议汇总](roadmap.md)
 - [abap-file-format 导出与兼容](abap-file-format-export.md)
+- [ADT 前台控制器与发现矩阵 — SAP S/4HANA 2023 SP02](adt-front-controller-s4h-2023.md) — `CL_ADT_WB_RES_APP` 职责、本系统 `/sap/bc/adt/discovery` 暴露的 80 个 workspace / 763 个 collection 矩阵与 CLI 覆盖度映射；姊妹页（ECC 等）按版本后缀追加
+
+### ADT 发现矩阵的姊妹页（待补）
+
+按版本族后缀追加，命名规则 `adt-front-controller-<version>.md`：
+
+| 占位文件名 | 目标版本族 | 触发条件 |
+|---|---|---|
+| `adt-front-controller-s4h-2023.md` | S/4HANA 2023 SP02（kernel 793 / NW 7.58） | ✅ 已落版 |
+| `adt-front-controller-ecc-ehp7.md` | ECC 6.0 EHP7（NW 7.40） | 当有 on-prem ECC 沙盒（URL ≠ 当前 s4h）时拉一次 discovery 即落 |
+| `adt-front-controller-ecc-ehp8.md` | ECC 6.0 EHP8（NW 7.50） | 同上 |
+
+ECC 版落版时预期差异（参考，待实际核对）：
+- 缺 CDS 整族（`ABAP DDL Sources` / `ABAP DCL Sources` / `CDS Annotation*` / `Service Definitions / Bindings`）
+- 缺 HANA-only 集（`HDI Namespace` / `HANA-Integration` / `DB Procedure Proxies`）
+- CTS 路径走 `/sap/bc/adt/wb/transport/...`，与 S/4HANA 的 `/sap/bc/adt/cts/...` 不同
+- Debugger / Profiler collection 数略少（无 AMDP 调试、无 CDS 测试代码生成）
+
+新增时需同步：
+1. 在本节 Notes 上方添加新链接
+2. 在仓库根 `.gitignore` 的 `wiki/*` 白名单下补一行 `!wiki/adt-front-controller-<version>.md`
+3. 在新页 frontmatter `title` 字段补版本号；正文 § 适用 SAP 版本 表格填实际探测值
 
 # references

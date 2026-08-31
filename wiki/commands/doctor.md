@@ -23,6 +23,7 @@ abap doctor [--verbose] [--fix] [--yes] [--system <name>]
 - `--fix`: 应用安全可逆的修复（非交互环境需 `--yes`）
 - `--yes`: 无需提示确认 `--fix`
 - `--system <name>`: 连接段只检查指定 profile
+- `--schema`: 打印本命令参数 schema（unified envelope，本地调用）
 
 ## 检查项
 

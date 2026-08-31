@@ -45,7 +45,7 @@ The file is written with mode `0600` (`0700` for the directory) and is not commi
 | `package` | Default package used by commands that create objects |
 | `sourceDir` | Base directory for `push --all` / `check --all` (falls back to cwd) |
 
-The same `abap init` command is also the entry point for **inspecting and clearing** these fields (026):
+The same `abap init` command is also the entry point for **inspecting and clearing** these fields:
 
 ```bash
 abap init --show-config               # print the current .abap.json (read-only)

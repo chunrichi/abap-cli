@@ -80,7 +80,7 @@ export function registerProfileCommand(program: Command): void {
     .option('--insecure', 'Skip SSL certificate verification (self-signed certs, development only)')
     .option('--ca <path>', 'Path to a CA certificate (PEM) for SSL verification')
     .option('--clear-ca', 'Remove the CA certificate setting')
-    .option('--auth-method <method>', 'Login strategy: basic | cert | browser_sso (026) | oauth_password (027)')
+    .option('--auth-method <method>', 'Login strategy: basic | cert | browser_sso | oauth_password')
     .option('--auth-option <kv>', 'Generic auth option, repeatable as key=value (e.g. --auth-option certPath=/abs/cert.pem). New auth methods add no Commander options — they read from this bag.')
     .option('--cert-path <path>', 'X.509 client cert file (PEM)')
     .option('--cert-key <path>', 'X.509 private key file (PEM)')

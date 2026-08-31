@@ -6,7 +6,7 @@
  *    buildMeta can derive the canonical command name from argv + command tree.
  *  - collectWarning / getWarnings / resetWarnings: structured non-fatal
  *    warnings that only ever appear in meta.warnings, never in the error
- *    envelope (FR-009).
+ *    envelope.
  *  - buildMeta: snapshot of command, version, timestamp, durationMs, warnings.
  *  - buildSchemaMeta: reduced metadata for deterministic schema introspection.
  *  - getOriginalArgv: lazy snapshot of process.argv.slice(2) captured on first
@@ -37,6 +37,7 @@ export type WarningCode =
   | 'PROFILE_MISMATCH'      // stored profile differs from current config
   | 'PAGINATION_LIMITED'    // search --page-all hit the page cap; result truncated
   | 'ICF_CHECK_DEGRADED'    // init ICF deployment check degraded (non-blocking)
+  | 'ICF_OUTDATED_DEADLOCK' // extension status reports outdated gc_version (likely user transport holds the new source)
   | 'OAUTH_CLIENT_SECRET_ON_DISK' // oauth_password profile: client_secret stored in systems.json
   // 023-extension-mechanism
   | 'EXTENSION_DEGRADED'    // extension failed to load but CLI continues (lenient mode)
@@ -137,7 +138,7 @@ function readVersion(): string {
   }
 }
 
-/** Build the envelope meta block (FR-003). */
+/** Build the envelope meta block. */
 export function buildMeta(): OutputMeta {
   return {
     command: deriveCommand(process.argv),

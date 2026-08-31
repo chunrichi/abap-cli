@@ -1,5 +1,5 @@
 /**
- * `abap run` flow — execute ABAP classrun or static method via wrapper (015).
+ * `abap run` flow — execute ABAP classrun or static method via wrapper.
  *
  * Two routes:
  *   1. **classrun** (`opts.method` absent) — direct ADT classrun via
@@ -14,7 +14,7 @@
  * (src/abap_cli/core/classrun-output.ts). The flow here:
  *   - chooses the route based on `opts.method`
  *   - times the classrun via `performance.now()` deltas
- *   - maps JSON `code` to `ErrorCode` per data-model §5 / spec FR-008
+ *   - maps JSON `code` to `ErrorCode` per data-model §5
  *   - constructs a `RunResult` that `printResult` / `printError` consume
  */
 

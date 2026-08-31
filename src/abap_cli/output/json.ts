@@ -36,7 +36,7 @@ export function isJsonMode(mode: OutputMode): boolean {
   return mode !== 'human';
 }
 
-/** Resolve the top-level output flags from any nested subcommand (FR-027).
+/** Resolve the top-level output flags from any nested subcommand.
  *  `--pretty-json` wins over `--json` when both are set. */
 export function jsonFromCommand(cmd: Command): OutputMode {
   const opts = cmd.optsWithGlobals<{ json?: boolean; prettyJson?: boolean }>();
@@ -47,7 +47,7 @@ export function jsonFromCommand(cmd: Command): OutputMode {
 
 export interface CliErrorOptions {
   details?: Record<string, unknown>;
-  /** FR-009 — concrete actions the agent should try next. */
+  /** Concrete actions the agent should try next. */
   nextSteps?: string[];
   /** FR-009 — a single canonical invocation that would succeed. */
   example?: string;
@@ -129,9 +129,9 @@ export interface RenderedOutput {
 }
 
 /** Render a success payload. JSON (with meta) goes to stdout; human text goes
- *  to stdout with any warnings as `Warning:` lines on stderr (FR-016).
+ *  to stdout with any warnings as `Warning:` lines on stderr.
  *
- *  Token-efficient design (025 US1/US2):
+ *  Token-efficient design:
  *   - Compact JSON (`null`) by default for `json` mode; indent 2 only for `pretty-json`.
  *   - Recursively strip empty `{}`/`[]` from `data` to save LM agent tokens.
  *   - Top-level `data` object is always preserved, even if it becomes `{}`. */
@@ -153,7 +153,7 @@ export function renderResult(mode: OutputMode, data: unknown, human: string, met
 }
 
 /** Render a failure payload. JSON (with meta) goes to stderr; human text goes
- *  to stderr with `Warning:` lines first, then `Error:` + `Try:` (FR-016). */
+ *  to stderr with `Warning:` lines first, then `Error:` + `Try:`. */
 export function renderError(mode: OutputMode, error: unknown, meta: OutputMeta): RenderedOutput {
   // Merge extension meta if registry is present
   const extMeta = _registry?.metaFragment(deriveCommand(process.argv));

@@ -227,7 +227,7 @@ export async function runShow(name: string, mode: OutputMode): Promise<void> {
   printResult(mode, { system: detail }, human);
 }
 
-/** Exit code for the worst failing layer (FR-008): TLS→4, AUTH→5, SAP→6. */
+/** Exit code for the worst failing layer: TLS→4, AUTH→5, SAP→6. */
 function worstExitCode(probe: { tls: { ok: boolean }; auth: { ok: boolean }; adt: { ok: boolean }; icf: { ok: boolean } }): number | undefined {
   const codes: Record<string, number> = { tls: 4, auth: 5, adt: 6, icf: 6 };
   let worst: number | undefined;
@@ -243,7 +243,7 @@ function worstExitCode(probe: { tls: { ok: boolean }; auth: { ok: boolean }; adt
 /** Probe a profile across tls → auth → adt → icf and report per-layer results. */
 export async function runTest(name: string, mode: OutputMode): Promise<void> {
   const probe = await probeSystem(name);
-  // 034: when the adt layer succeeded, refresh the runtime cache so subsequent
+  // When the adt layer succeeded, refresh the runtime cache so subsequent
   // deploy / init calls can read it without a network round-trip.
   if (probe.adt.ok) {
     try {

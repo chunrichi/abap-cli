@@ -566,7 +566,7 @@ async function createSystemFromParams(opts: CommandOpts, mode: OutputMode): Prom
 
   const systemName = str(opts.profile) || str(opts.system) || deriveSystemName(profile);
   await saveProfile(systemName, profile, password, mode);
-  // 025: if the user supplied a cert passphrase, persist it in keychain too.
+  // If the user supplied a cert passphrase, persist it in keychain too.
   if (str(opts.certPassphrase)) await storeCertPassphrase(systemName, str(opts.certPassphrase)!);
   await handleFileOverwrite(opts.yes === true || opts.nonInteractive === true ? 'overwrite' : 'refuse');
   await writeConfig(systemName, config, mode);

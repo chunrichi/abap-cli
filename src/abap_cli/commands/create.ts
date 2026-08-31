@@ -6,13 +6,32 @@ import { createSchema } from '../flows/create-schema.js';
 export function registerCreateCommand(program: Command): void {
   const createCmd = program
     .command('create')
-    .description('Create and activate a new ABAP object (CLAS, INTF, PROG, FUGR)')
+    .description('Create and activate a new ABAP object (CLAS, INTF, PROG, FUGR, TABL, STRU, DOMA, DTEL, HTTP)')
     // [type]/[name]（可选）是因为 --schema 模式下不需要 name；真实创建仍需两者。
-    .argument('[type]', 'Object type (CLAS, INTF, PROG, FUGR)')
+    .argument('[type]', 'Object type (CLAS, INTF, PROG, FUGR, TABL, STRU, DOMA, DTEL, HTTP)')
     .argument('[name]', 'Object name')
+    .addHelpText('after', [
+      '',
+      'Supported types:',
+      '  CLAS  Class              (ADT route)',
+      '  INTF  Interface          (ADT route)',
+      '  PROG  Program            (ADT route)',
+      '  FUGR  Function group     (ADT route)',
+      '  DOMA  Domain             (ICF /ddic/doma — requires --file)',
+      '  DTEL  Data element       (ICF /ddic/dtel — requires --file)',
+      '  TABL  Database table     (ICF /ddic/tabl — requires --file)',
+      '  STRU  Structure          (ICF /ddic/stru — requires --file)',
+      '  HTTP  SICF service node  (ICF /http/<name> — requires --file)',
+      '',
+      'Run `abap create <type> --schema` for the machine-readable contract of a specific type.',
+      '',
+      'Tip: --package $TMP must be quoted as \'$TMP\' in shells that expand $-variables',
+      '(zsh/bash will silently expand to empty string otherwise).',
+      '',
+    ].join('\n'))
     // 不用 requiredOption：父命令的 mandatory 选项会被 commander 在子命令
     // local 的解析中一并校验（walk ancestors），故改为 .option + 手动校验。
-    .option('--package <package>', 'Target SAP package (required)')
+    .option('--package <package>', 'Target SAP package (required, quote $TMP as \'$TMP\')')
     .option('--description <desc>', 'Object description (required)')
     .option('--tr <transport>', 'Transport number')
     .option('--no-activate', 'Create without activating')
@@ -20,7 +39,7 @@ export function registerCreateCommand(program: Command): void {
     .option('--no-pull', 'Skip the create-then-pull local copy (default: pull after create)')
     .option('--check-only', 'Validate without creating')
     .option('--audit', 'Include the before-checksum (extra SAP round-trip, off by default)')
-    .option('--file <path>', '014: abap-file-format DDIC JSON input (required for DOMA/DTEL/TABL/STRU)')
+    .option('--file <path>', 'abap-file-format JSON input (required for DOMA/DTEL/TABL/STRU/HTTP)')
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .option('--yes', 'Confirm in non-interactive mode')
     .action(async (type, name, opts, cmd) => {

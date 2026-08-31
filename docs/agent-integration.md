@@ -108,3 +108,65 @@ abap push src/zcl_demo/zcl_demo.clas.abap --tr "$transport" --json
 - **Never echo credentials** — passwords come from the OS keychain (or `--password` / a TTY prompt); never pass them on command lines that are logged.
 - **Prefer explicit `--tr`** when a specific transport is required; automatic resolution only finds requests in the user's modifiable list.
 - **Loop safely** — each step is idempotent at the boundary (create reports `OBJECT_EXISTS` rather than overwriting; push reports per-file results).
+
+## Extension Trust
+
+Third-party extensions declared in `.abap.json`'s `extensions[]` are subject to strict trust checks before any code runs. Agents must understand this contract before triggering commands that would load extensions.
+
+### Files involved
+
+- `.abap.json` — declares `extensions: [{ sourceType, packageName | path, ... }]`. **Untrusted input** if shared across teammates; never auto-pin without explicit user action.
+- `extensions.lock.json` — generated artifact pinning every `sourceType: 'npm'` entry to its resolved entry file's `sha512-<base64>` hash. Committed to git alongside `package-lock.json`.
+
+### First-run bootstrap (CI / fresh checkout)
+
+```bash
+# After `npm install` on a project with npm extensions, the lockfile is REQUIRED.
+abap extensions lock --allow-unsigned --json
+# → { status: "success", data: { lockfile, added: [...], updated: [...], ... } }
+```
+
+`--allow-unsigned` is mandatory on first creation. Without it, the command exits with `CONFIG_ERROR` (exit 3) and the lockfile is **not** written — preventing a hostile `.abap.json` from quietly self-pinning.
+
+### What happens on subsequent runs
+
+The CLI computes sha512 of every npm entry file at startup (via `node:crypto`) and compares against the lockfile. Mismatches abort with `EXTENSION_LOAD_FAILED` (category `EXTENSION_LOAD_FAILED` / exit 3) and one of:
+
+- `LOCKFILE_MISSING_ENTRY` — package declared in `.abap.json` but absent from `extensions.lock.json`. Recovery: `abap extensions lock --allow-unsigned` (after verifying the new package is intentional).
+- `LOCKFILE_INTEGRITY_MISMATCH` — sha512 of the resolved entry file no longer matches the pinned value. Recovery: `abap extensions lock` (after confirming the upstream package update is intentional).
+- `INTEGRITY_UNRESOLVABLE` — `createRequire(...).resolve()` failed (e.g. `npm install` was skipped). Recovery: `npm install` then retry.
+- `INVALID_PACKAGE_NAME` — the package name in `.abap.json` failed validation (`..` / `\` / empty scope / URL scheme / absolute path / non-npm chars). Recovery: fix `.abap.json`.
+
+`sourceType: 'path'` extensions are **lockfile-exempt**; only `path_escapes_allowlist` / `path_contains_parent_ref` are re-checked at load time.
+
+### What `extensions list --json` reports
+
+```jsonc
+{
+  "status": "success",
+  "meta": {
+    "command": "abap extensions list",
+    "version": "0.2.2",
+    "extensions": {                       // omitted if no npm extensions (token-efficient)
+      "lockfile": { "status": "ok", "lastResolved": "2026-08-28T11:00:00.000Z" }
+    }
+  },
+  "data": {
+    "extensions": [
+      { "sourceType": "npm", "packageName": "@myorg/abap-ext", "resolved": "/abs/path", "status": "loaded",
+        "lockfile": { "status": "match", "expected": "sha512-...", "actual": "sha512-..." } },
+      { "sourceType": "path", "path": "./extensions/zlocal.js", "status": "loaded", "lockfile": null }
+    ],
+    "summary": { "loaded": 2, "failed": 0 }
+  }
+}
+```
+
+### Agent playbook
+
+1. **Before installing an extension**, inspect: read `data.extensions` to confirm what's already declared; check `data.summary` for current load state.
+2. **After modifying `.abap.json`**, refresh the lockfile: `abap extensions lock --json` (no `--allow-unsigned` needed on update — only on first creation).
+3. **On `EXTENSION_LOAD_FAILED`**, do **not** auto-remediate. Surface `error.code` + `error.references` to the user; let them decide whether the mismatch is intentional.
+4. **Treat `extensions.lock.json` as a build artifact** — commit it; review diffs in PRs like `package-lock.json`.
+
+See the extension trust contract (lockfile semantics, trust scopes, lock-cmd behaviour) in the repo design history.

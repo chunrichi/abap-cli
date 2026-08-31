@@ -13,7 +13,7 @@ function mockClient(): AdtClientWrapper {
   } as unknown as AdtClientWrapper;
 }
 
-describe('push dry-run (FR-012, SC-005)', () => {
+describe('push dry-run ', () => {
   it('pushObject with dryRun makes zero mutating calls and records stages', async () => {
     const client = mockClient();
     const stages: string[] = [];

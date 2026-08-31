@@ -1,10 +1,10 @@
 /**
- * `extensions lock` subcommand body (027 US2 / FR-007 / FR-008).
+ * `extensions lock` subcommand body.
  *
  * Recomputes `extensions.lock.json` from `.abap.json`'s `extensions[]` array,
  * records sha512 of every npm-source entry, and writes the lockfile atomically.
  *
- * First-run guard (FR-007): refuses to create a fresh lockfile unless the
+ * First-run guard: refuses to create a fresh lockfile unless the
  * caller passes `--allow-unsigned`, so a hostile `.abap.json` cannot quietly
  * gain an un-pinned extension on the first run.
  *
@@ -43,7 +43,7 @@ export async function runExtensionsLock(
   const lockfilePath = extensionsLockPath(configDir);
   const lockfileExists = await readLockfile(configDir).then((l) => l !== null);
 
-  // First-run guard (FR-007).
+  // First-run guard.
   if (!lockfileExists && !flags.allowUnsigned) {
     throw new CliError(
       'CONFIG_ERROR',

@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+> 已 release 至 [0.2.2](../CHANGELOG.md#022---2026-08-28)。本段保留为历史归档，便于 review 025 → 028 期间累积变更的原始面貌。请勿在此追加新条目——新条目写 `CHANGELOG.md` 的 [Unreleased]。
+
 ### Added
 - **扩展机制补全（为内部/下游发行版铺路）** —— 让 `deploy` / `report-stuck` / command-policy 这类内部功能可以完全以扩展形式实现，无需修改核心：
   - `beforeCommand` 钩子支持**否决**：返回 `{block: true, reason}` 即中止命令，报 `EXTENSION_COMMAND_BLOCKED`（`VALIDATION_ERROR` / exit 7）。这是实现"按工作区禁用命令"的通道。

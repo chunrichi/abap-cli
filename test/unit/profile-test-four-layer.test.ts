@@ -34,7 +34,7 @@ const SKIPPED = (): { ok: boolean; skipped: true; error: { code: string; message
   error: { code: 'SKIPPED', message: 'Skipped because a prerequisite layer failed.' },
 });
 
-describe('abap profile test (FR-024, FR-008 exit codes)', () => {
+describe('abap profile test (FR-024 exit codes)', () => {
   let cwd: string;
 
   beforeEach(() => {
@@ -43,7 +43,7 @@ describe('abap profile test (FR-024, FR-008 exit codes)', () => {
     process.exitCode = undefined;
   });
 
-  /** Run and return the result plus the command-set process.exitCode (FR-008). */
+  /** Run and return the result plus the command-set process.exitCode (). */
   async function runTest(args: string[]) {
     const program = makeProgram();
     registerProfileCommand(program);
@@ -65,7 +65,7 @@ describe('abap profile test (FR-024, FR-008 exit codes)', () => {
     expect(probeSystemMock).toHaveBeenCalledWith('real');
   });
 
-  it('auth failure → auth err with nextSteps, adt/icf skipped, exit 5 (FR-008)', async () => {
+  it('auth failure → auth err with nextSteps, adt/icf skipped, exit 5 ()', async () => {
     probeSystemMock.mockResolvedValue({
       tls: { ok: true, skipped: true },
       auth: {
@@ -87,7 +87,7 @@ describe('abap profile test (FR-024, FR-008 exit codes)', () => {
     expect(parsed.data.icf.skipped).toBe(true);
   });
 
-  it('TLS failure → tls err, remaining layers still reported, exit 4 (FR-008)', async () => {
+  it('TLS failure → tls err, remaining layers still reported, exit 4 ()', async () => {
     probeSystemMock.mockResolvedValue({
       tls: {
         ok: false,
@@ -110,7 +110,7 @@ describe('abap profile test (FR-024, FR-008 exit codes)', () => {
     }
   });
 
-  it('icf failure → icf err reported, exit 6 (FR-008)', async () => {
+  it('icf failure → icf err reported, exit 6 ()', async () => {
     probeSystemMock.mockResolvedValue({
       tls: { ok: true, skipped: true },
       auth: { ok: true },

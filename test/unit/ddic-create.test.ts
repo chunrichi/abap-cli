@@ -121,6 +121,60 @@ describe('014/US1 create TABL', () => {
     // for the create-then-pull round-trip the server is responsible for SPRING.
   });
 
+  it('strips CLIENT/MANDT from fields[] when clientDependent=true', async () => {
+    // User writes `clientDependent: true` and explicitly declares a `CLIENT`
+    // field. The CLI must NOT forward it to the wire payload — the server
+    // prepends MANDT, and a duplicate would fail the BAPI call with a
+    // misleading "Field already exists" error.
+    writeTableJson('ZTAB_CLI_STRIP', [
+      { fieldName: 'CLIENT', dataType: 'CLNT', length: 3, keyFlag: true },
+      { fieldName: 'ID', dataType: 'CHAR', length: 10, keyFlag: true },
+    ]);
+    const json = JSON.parse(fs.readFileSync(path.join(cwd, 'src/ztab_test.tabl.json'), 'utf-8'));
+    json.name = 'ZTAB_CLI_STRIP';
+    json.clientDependent = true;
+    fs.writeFileSync(path.join(cwd, 'src/ztab_test.tabl.json'), JSON.stringify(json));
+
+    const program = makeProgram();
+    registerCreateCommand(program);
+    const res = await runCommand(program, [
+      'create', 'TABL', 'ZTAB_CLI_STRIP',
+      '--file', 'src/ztab_test.tabl.json',
+      '--package', '$TMP',
+      '--yes', '--json',
+    ], { cwd });
+    expect(res.exitCode).toBeUndefined();
+    const callBody = icfPostDdic.mock.calls[0]![1] as any;
+    expect(callBody.clientDependent).toBe(true);
+    expect(callBody.fields.map((f: any) => f.fieldName)).toEqual(['ID']);
+    expect(Array.isArray(callBody.warnings)).toBe(true);
+    expect(callBody.warnings.some((w: any) => w.code === 'CLIENT_FIELD_STRIPPED')).toBe(true);
+  });
+
+  it('rejects a TABL whose only fields are CLIENT/MANDT (fast-fail)', async () => {
+    writeTableJson('ZEMPTY_CLI', [
+      { fieldName: 'CLIENT', dataType: 'CLNT', length: 3, keyFlag: true },
+    ]);
+    const json = JSON.parse(fs.readFileSync(path.join(cwd, 'src/ztab_test.tabl.json'), 'utf-8'));
+    json.name = 'ZEMPTY_CLI';
+    json.clientDependent = true;
+    fs.writeFileSync(path.join(cwd, 'src/ztab_test.tabl.json'), JSON.stringify(json));
+
+    const program = makeProgram();
+    registerCreateCommand(program);
+    const res = await runCommand(program, [
+      'create', 'TABL', 'ZEMPTY_CLI',
+      '--file', 'src/ztab_test.tabl.json',
+      '--package', '$TMP',
+      '--yes', '--json',
+    ], { cwd });
+    expect(res.exitCode).toBe(7); // VALIDATION_ERROR
+    expect(icfPostDdic).not.toHaveBeenCalled();
+    const out = JSON.parse(res.stderr);
+    expect(out.error.code).toBe('VALIDATION_ERROR');
+    expect(out.error.details.some((d: string) => d.includes('only client-key columns'))).toBe(true);
+  });
+
   it('command-line --description overrides file description', async () => {
     writeTableJson('ZTAB_OVR');
     const program = makeProgram();
@@ -150,6 +204,133 @@ describe('014/US1 create TABL', () => {
     expect(icfPostDdic).not.toHaveBeenCalled();
     const out = JSON.parse(res.stderr);
     expect(out.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('BUG-1: VALIDATION_ERROR for a nested-header file embeds a wire example', async () => {
+    // First-time user pattern: abap-file-format nested header, no top-level name/fields.
+    fs.writeFileSync(path.join(cwd, 'src/ztodo.tabl.json'), JSON.stringify({
+      formatVersion: '1',
+      header: { description: 'Todo', originalLanguage: 'EN' },
+    }, null, 2));
+    const program = makeProgram();
+    registerCreateCommand(program);
+    const res = await runCommand(program, [
+      'create', 'TABL', 'ZTODO',
+      '--file', 'src/ztodo.tabl.json',
+      '--package', '$TMP',
+      '--yes', '--json',
+    ], { cwd });
+    expect(res.exitCode).toBe(7);
+    expect(icfPostDdic).not.toHaveBeenCalled();
+    const out = JSON.parse(res.stderr);
+    expect(out.error.code).toBe('VALIDATION_ERROR');
+    // details should mention both missing fields (and the top-level hint, see ddic-json-map).
+    expect(out.error.details).toEqual(expect.arrayContaining([
+      expect.stringContaining('name'),
+      expect.stringContaining('fields'),
+    ]));
+    // The example must be a parseable wire-flat JSON with top-level `name`.
+    expect(typeof out.error.example).toBe('string');
+    const exampleBlock = out.error.example.split('#')[0]; // strip trailing comment line
+    const parsed = JSON.parse(exampleBlock);
+    expect(parsed.name).toBeTypeOf('string');
+    expect(Array.isArray(parsed.fields)).toBe(true);
+  });
+
+  it('abap-file-format three-piece TABL: main + .tabl.ddic + .tabl.settings.json drive the wire payload', async () => {
+    // abap-file-format happy path: main JSON is just header, .tabl.ddic is the
+    // source of truth for fields, .tabl.settings.json holds dataClassCategory /
+    // sizeCategory. The CLI must stitch all three into the wire payload sent
+    // to the ICF service.
+    fs.writeFileSync(path.join(cwd, 'src/zthree.tabl.json'), JSON.stringify({
+      formatVersion: '1',
+      header: { description: 'three-piece TABL', originalLanguage: 'en' },
+    }, null, 2));
+    fs.writeFileSync(path.join(cwd, 'src/zthree.tabl.ddic'),
+      "@EndUserText.label : 'three-piece TABL'\n" +
+      "@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE\n" +
+      "@AbapCatalog.tableCategory : #TRANSPARENT\n" +
+      "@AbapCatalog.deliveryClass : #L\n" +
+      "@AbapCatalog.dataMaintenance : #RESTRICTED\n" +
+      "define table zthree {\n" +
+      "  key client : abap.clnt not null;\n" +
+      "  key id     : abap.char(10) not null;\n" +
+      "  payload   : abap.char(255);\n" +
+      "}\n");
+    fs.writeFileSync(path.join(cwd, 'src/zthree.tabl.settings.json'), JSON.stringify({
+      formatVersion: '1',
+      generalInformation: { dataClassCategory: 'APPL1', sizeCategory: '3' },
+    }, null, 2));
+
+    const program = makeProgram();
+    registerCreateCommand(program);
+    const res = await runCommand(program, [
+      'create', 'TABL', 'ZTHREE',
+      '--file', 'src/zthree.tabl.json',
+      '--package', '$TMP',
+      '--yes', '--json',
+    ], { cwd });
+    expect(res.exitCode).toBeUndefined();
+    expect(icfPostDdic).toHaveBeenCalledWith('tabl', expect.objectContaining({
+      name: 'ZTHREE',
+      description: 'three-piece TABL',
+      deliveryClass: 'L',
+      dataClass: 'APPL1',
+      sizeCategory: '3',
+      clientDependent: true,
+      package: '$TMP',
+    }));
+    const callBody = icfPostDdic.mock.calls[0]![1] as any;
+    // MANDT/CLIENT is dropped from the wire (server prepends it itself).
+    // Field order in `fields[]` mirrors the DDL order (key first).
+    expect(callBody.fields.map((f: any) => f.fieldName)).toEqual(['ID', 'PAYLOAD']);
+    expect(callBody.fields[0]).toMatchObject({ fieldName: 'ID', dataType: 'CHAR', length: 10, keyFlag: true, notNull: true });
+    expect(callBody.fields[1]).toMatchObject({ fieldName: 'PAYLOAD', dataType: 'CHAR', length: 255, keyFlag: false });
+  });
+
+  it('abap-file-format TABL with malformed .tabl.ddic surfaces TABL_DDL_INVALID (not INVALID_ARGUMENT)', async () => {
+    fs.writeFileSync(path.join(cwd, 'src/zbad.tabl.json'), JSON.stringify({
+      formatVersion: '1',
+      header: { description: 'bad' },
+    }, null, 2));
+    fs.writeFileSync(path.join(cwd, 'src/zbad.tabl.ddic'), '@AbapCatalog.deliveryClass : #L\n');
+    const program = makeProgram();
+    registerCreateCommand(program);
+    const res = await runCommand(program, [
+      'create', 'TABL', 'ZBAD',
+      '--file', 'src/zbad.tabl.json',
+      '--package', '$TMP',
+      '--yes', '--json',
+    ], { cwd });
+    expect(res.exitCode).toBe(7);
+    expect(icfPostDdic).not.toHaveBeenCalled();
+    const out = JSON.parse(res.stderr);
+    expect(out.error.code).toBe('TABL_DDL_INVALID');
+  });
+
+  it('abap-file-format TABL: only main JSON present → falls back to legacy wire-flat shape (backwards compat)', async () => {
+    // No .tabl.ddic sidecar: CLI should NOT crash, and should treat the main
+    // JSON as the legacy wire-flat single-file shape.
+    fs.writeFileSync(path.join(cwd, 'src/zlegacy.tabl.json'), JSON.stringify({
+      name: 'ZLEGACY',
+      description: 'legacy flat',
+      deliveryClass: 'A',
+      fields: [{ fieldName: 'F1', dataType: 'CHAR', length: 5 }],
+    }, null, 2));
+    const program = makeProgram();
+    registerCreateCommand(program);
+    const res = await runCommand(program, [
+      'create', 'TABL', 'ZLEGACY',
+      '--file', 'src/zlegacy.tabl.json',
+      '--package', '$TMP',
+      '--yes', '--json',
+    ], { cwd });
+    expect(res.exitCode).toBeUndefined();
+    expect(icfPostDdic).toHaveBeenCalledWith('tabl', expect.objectContaining({
+      name: 'ZLEGACY',
+      deliveryClass: 'A',
+      fields: [expect.objectContaining({ fieldName: 'F1', dataType: 'CHAR', length: 5 })],
+    }));
   });
 
   it('reports VALIDATION_ERROR for empty fields list', async () => {

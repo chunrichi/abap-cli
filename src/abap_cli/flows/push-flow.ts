@@ -12,6 +12,7 @@ import { resolveLocalTargets } from '../core/local-targets.js';
 import { requireWriteConfirmation } from '../core/confirmation.js';
 import { readDdicJson, localToWire, validateDdicObject, type DdicSupportedType } from '../dictionary/ddic-json.js';
 import { readHttpJson, localToWire as httpLocalToWire, validateHttpObject } from '../dictionary/http-json.js';
+import { readTranJson, localToWire as tranLocalToWire, validateTranObject } from '../dictionary/tran-json.js';
 import { pushObject, type PushStage } from './push-object.js';
 import { pushFugrOne } from './push-fugr.js';
 import { pushTextpoolFile } from './push-textpool.js';
@@ -94,10 +95,14 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
         const resolved = resolveFile(file);
         validateLocalFile(resolved);
         if (resolved.route === 'icf') {
-          // 022: HTTP service uses its own JSON shape; route via the dedicated helper.
+          // HTTP service uses its own JSON shape; route via the dedicated helper.
           if (resolved.objectType === 'HTTP') {
             const local = await readHttpJson(path.resolve(process.cwd(), file));
             const errors = validateHttpObject(local);
+            if (errors.length > 0) throw new CliError('VALIDATION_ERROR', errors.join('; '));
+          } else if (resolved.objectType === 'TRAN') {
+            const local = await readTranJson(path.resolve(process.cwd(), file));
+            const errors = validateTranObject(local);
             if (errors.length > 0) throw new CliError('VALIDATION_ERROR', errors.join('; '));
           } else {
             // DDIC: structurally validate the JSON (readAbapFile only reads text).
@@ -135,8 +140,7 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
         command: 'push',
         argv: process.argv.slice(2),
         files: [file],
-      });
-      const { transport, status } = await pushOne(client, file, opts, onStage, onWarning);
+      });      const { transport, status } = await pushOne(client, file, opts, onStage, onWarning);
       if (opts.dryRun) {
         results.push({ file, status: 'dry-run', plan: stages });
       } else {
@@ -169,13 +173,13 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
   if (failed > 0) {
     // Aggregate exit code follows the category of the first failed file
     // (or PUSH_FAILED fallback); thrown so the unified renderer in the action
-    // handles envelope + exit code (FR-011).
+    // handles envelope + exit code.
     const single = target.files.length === 1;
     const code = (single ? (results[0]?.code ?? 'PUSH_FAILED') : 'PUSH_FAILED') as ErrorCode;
     const firstFailed = results.find((r) => r.status === 'failed');
     const aggregateCode = (firstFailed?.code ?? code) as ErrorCode;
     // Single-file runs surface the original failure (message + nextSteps) so the
-    // cause is visible without unwrapping `details.results` (FR-011).
+    // cause is visible without unwrapping `details.results`.
     const message = single && firstFailed?.message ? firstFailed.message : `${failed} of ${target.files.length} file(s) failed`;
     const nextSteps = single && firstFailed?.nextSteps ? firstFailed.nextSteps : undefined;
     throw new CliError(aggregateCode, message, {
@@ -254,9 +258,9 @@ async function resolveObjectTransport(
   return resolveTransport(client, opts.tr, client.getConfig().transport);
 }
 
-/** 014/022: push a .json file via the self-built ICF service.
+/** Push a .json file via the self-built ICF service.
  *  DDIC types (DOMA/DTEL/TABL/STRU) → POST /ddic/<type>.
- *  HTTP service (022)              → POST /http/<name>.
+ *  HTTP service                     → POST /http/<name>.
  */
 async function pushDdicFile(
   client: AdtClientWrapper,
@@ -275,9 +279,13 @@ async function pushDdicFile(
     return { transport: opts.tr ?? client.getConfig().transport ?? 'DRY_RUN', status: 'dry-run' };
   }
 
-  // 022: HTTP service has its own wire format; route via the dedicated helper.
+  // HTTP service has its own wire format; route via the dedicated helper.
   if (resolved.objectType === 'HTTP') {
     return pushHttpFile(client, resolved, file, opts);
+  }
+  // Transaction code has its own wire format; route via the dedicated helper.
+  if (resolved.objectType === 'TRAN') {
+    return pushTranFile(client, resolved, file, opts);
   }
 
   let local: { name: string; package?: string; transportRequest?: string; [key: string]: unknown };
@@ -327,7 +335,7 @@ async function pushDdicFile(
 }
 
 /**
- * 022: push a HTTP service .json file via ICF POST /http/<name>.
+ * Push a HTTP service .json file via ICF POST /http/<name>.
  * The SAP-side handler creates/updates a SICF node with the given handler class + URL.
  */
 async function pushHttpFile(
@@ -381,6 +389,61 @@ async function pushHttpFile(
   return { transport, status: 'written' };
 }
 
+/**
+ * Push a Transaction (.tran.json) file via ICF POST /tran/<code>.
+ * The SAP-side handler routes to RPY_TRANSACTION_INSERT (or BDC for OO) and
+ * runs corr_insert + TADIR when a transport is given.
+ */
+async function pushTranFile(
+  client: AdtClientWrapper,
+  resolved: { objectName: string; objectType: string },
+  file: string,
+  opts: PushFileOptions,
+): Promise<PushOneResult> {
+  let local: { name: string; package?: string; transportRequest?: string; [key: string]: unknown };
+  try {
+    local = await readTranJson(path.resolve(process.cwd(), file));
+  } catch (error: unknown) {
+    const m = error instanceof Error ? error.message : String(error);
+    const outFile = toRelativeOutputPath(file);
+    throw new CliError('INVALID_ARGUMENT', `Cannot read Transaction file ${outFile}: ${m}`, { file: outFile });
+  }
+  const errors = validateTranObject(local as Parameters<typeof validateTranObject>[0]);
+  if (errors.length > 0) {
+    const outFile = toRelativeOutputPath(file);
+    throw new CliError('VALIDATION_ERROR', `Invalid TRAN definition in ${outFile}: ${errors.join('; ')}`, {
+      file: outFile,
+      type: 'TRAN',
+      object: resolved.objectName,
+      details: errors,
+    });
+  }
+
+  const wire = tranLocalToWire(local as Parameters<typeof tranLocalToWire>[0]);
+  const packageName = (wire.package ?? '').toUpperCase();
+  let transport = opts.tr ?? client.getConfig().transport ?? local.transportRequest ?? '';
+  if (!transport && packageName !== '$TMP') {
+    transport = await resolveTransport(client, opts.tr, client.getConfig().transport);
+  }
+  wire.transportRequest = transport || undefined;
+
+  const icf = await IcfClient.create();
+  const resp = await icf.postTran<{ name: string; type: string; action: 'created' | 'updated' }>(resolved.objectName, wire);
+  if (resp.status !== 'success' || !resp.data) {
+    const code = (resp.error?.code ?? 'TRAN_CREATE_FAILED') as ErrorCode;
+    throw new CliError(code, resp.error?.message ?? `Failed to push TRAN ${resolved.objectName}`, {
+      object: resolved.objectName,
+      type: 'TRAN',
+      details: resp.error?.details,
+      nextSteps: [
+        'Verify the file conforms to the abap-file-format Transaction JSON schema.',
+        'Re-run after fixing the cause above.',
+      ],
+    });
+  }
+  return { transport, status: 'written' };
+}
+
 async function pushOne(
   client: AdtClientWrapper,
   file: string,
@@ -397,13 +460,13 @@ async function pushOne(
   }
   validateLocalFile(resolved);
 
-  // 014: textpool .properties files route via ADT/ICF (mixed mode, cache-decided).
+  // Textpool .properties files route via ADT/ICF (mixed mode, cache-decided).
   if (resolved.route === 'textpool') {
     await pushTextpoolFile(client, resolved, file, opts, onStage);
     return { transport: opts.tr ?? client.getConfig().transport ?? '' };
   }
 
-  // 014: DDIC .json files (DOMA/DTEL/TABL/STRU) push via ICF /ddic/<type>.
+  // DDIC .json files (DOMA/DTEL/TABL/STRU) push via ICF /ddic/<type>.
   if (resolved.route === 'icf') {
     return pushDdicFile(client, resolved, file, opts, onStage);
   }

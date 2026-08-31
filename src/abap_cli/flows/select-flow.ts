@@ -1,5 +1,5 @@
 /**
- * `abap select` flow — read-only table data query (016).
+ * `abap select` flow — read-only table data query.
  *
  * Consumes the `IcfClient.postDataQuery` HTTP method (which targets the
  * `/sap/zabap_vibe/data/query` endpoint on the deployed ICF service) and
@@ -389,7 +389,7 @@ export function interpret(
   }
   const data = wire.data;
   if (req.countOnly) {
-    // Per spec FR-015 / US4: count-only responses carry only the count (plus
+    // Count-only responses carry only the count (plus
     // table echo) — no rows / fields / truncated.
     return {
       table,

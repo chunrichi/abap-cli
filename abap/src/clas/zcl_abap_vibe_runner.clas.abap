@@ -16,7 +16,7 @@ CLASS zcl_abap_vibe_runner DEFINITION PUBLIC CREATE PUBLIC.
   PRIVATE SECTION.
     CONSTANTS gc_version TYPE string VALUE '0.7.0'.
 
-    " 017: message types serialized via /ui2/cl_json (camelCase wire).
+    " Message types serialized via /ui2/cl_json (camelCase wire).
     TYPES:
       BEGIN OF ty_heartbeat,
         status    TYPE string,

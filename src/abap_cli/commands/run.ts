@@ -65,7 +65,7 @@ export const SCHEMA = {
       required: false,
       default: false,
       global: true,
-      description: 'Emit the unified JSON envelope on stdout (012 output contract); --pretty-json indents.',
+      description: 'Emit the unified JSON envelope on stdout; --pretty-json indents.',
     },
     {
       name: '--schema',

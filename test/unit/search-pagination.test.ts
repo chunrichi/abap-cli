@@ -31,7 +31,7 @@ function parseJsonOutput(res: { stdout: string; stderr: string; exitCode?: numbe
   return { json, exitCode: res.exitCode };
 }
 
-describe('abap search pagination (US1, SC-001/SC-002)', () => {
+describe('abap search pagination (US1/SC-002)', () => {
   beforeEach(() => searchObject.mockClear());
 
   it('default --limit 20 returns 20 items with truncated:true and a hint', async () => {

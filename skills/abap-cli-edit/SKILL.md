@@ -1,11 +1,11 @@
 ---
 name: abap-cli-edit
-description: abap-cli 写路径 — 拉（`pull`）/ 推（`push`）/ 语法检查（`check`）/ 创建（`create` / `create local`）/ 激活（`activate`），含 DDIC CRUD（DOMA / DTEL / TABL / STRU 经 `pull --type` / `create --file` / `push *.json`）。use when asking how to change a SAP object / download an ABAP class / push a local file / run syntax check / create a new object / activate inactive parts / edit a DDIC definition.
+description: abap-cli 写路径 — 拉（`pull`）/ 推（`push`）/ 语法检查（`check`）/ 创建（`create` / `create local`）/ 激活（`activate`），含 DDIC CRUD（DOMA / DTEL / TABL / STRU）与 ICF/SICF 服务节点（类型码 `HTTP`），经 `pull --type` / `create --file` / `push *.json`。use when asking how to change a SAP object / download an ABAP class / push a local file / run syntax check / create a new object / activate inactive parts / edit a DDIC definition / create or edit an ICF SICF HTTP service node / which object types the CLI supports.
 metadata:
-  version: "0.3.0"
+  version: "0.4.0"
   scope: sap
   commands: [pull, push, check, create, activate, "create local"]
-  tags: [write, lock, transport, ddic]
+  tags: [write, lock, transport, ddic, http, sicf]
 ---
 
 # abap-cli-edit — 写路径（含 DDIC）
@@ -26,7 +26,7 @@ metadata:
 - 比较本地与 SAP 差异（`diff` / `status`）后再决定 pull 或 push——`diff` / `status` 在 `abap-cli-search`，本 skill 关注"差异确定后的拉/推动作"
 - 显式编排 status → pull → push——CI 友好
 - 离线起一份草稿（`create local`）再 push
-- DDIC 定义 CRUD：`pull <name> --type DOMA|DTEL|TABL|STRU`、`create <type> <name> --file <json>`、`push <name>.<type>.json`
+- DDIC 定义 CRUD：`pull <name> --type DOMA|DTEL|TABL|STRU`、`create <type> <name> --file <json>`、`push <name>.<type>.json`。TABL/STRU 现在遵循 abap-file-format 三件套（`--file` 指向 main `.tabl.json` + 同目录 `.tabl.ddic` + 可选 `.tabl.settings.json`）；只有 main JSON 时回落 014 legacy wire-flat（详见 workflow.md 变体 2）。**写新 TABL/STRU 时直接 `cp` [assets/tabl-templates](./assets/tabl-templates/README.md) 里的 DDL 骨架**（5 个场景：透明表 / include / 货币金额 / 数量单位 / STRU），别凭空写 `@AbapCatalog.*` 注释
 
 ## 决策树
 
@@ -41,10 +41,52 @@ metadata:
     └── 链式？→ status → pull → push
 
 DDIC 定义？
-├── 拉 → pull <name> --type TABL|DOMA|DTEL|STRU
-├── 改 → 编辑 <name>.<type>.json
-└── 推 → push <name>.<type>.json --tr <tr>
+├── TABL/STRU 拉 → pull <name> --type TABL|STRU                # 落三件套 (.tabl.json + .tabl.ddic [+ .tabl.settings.json])
+├── TABL/STRU 改 → 编辑 .tabl.ddic（DDL 源真值）；设置编辑 .tabl.settings.json
+├── TABL/STRU 建 → write 三件套 → create <type> <name> --file <name>.tabl.json --package ... --tr ...
+├── TABL/STRU 推 → push <name>.tabl.json --tr <tr>             # main 文件即可；同目录三件套一起推
+├── DOMA/DTEL 拉 → pull <name> --type DOMA|DTEL                # 落单文件 wire-flat
+├── DOMA/DTEL 改 → 编辑 <name>.<type>.json（顶层 name / dataType / length / description / domain）
+└── DOMA/DTEL 推 → push <name>.<type>.json --tr <tr>
+
+ICF / SICF 服务节点？→ 类型码是 HTTP，不是 SICF
+├── 拉 → pull <name> --type HTTP                               # 落 http/<name>.http.json
+├── 建 → 写 .http.json → create HTTP <name> --file <path> --package ... --tr ...
+└── 推 → push <name>.http.json --tr <tr>
 ```
+
+## 支持的对象类型（权威列表）
+
+写命令只认这 9 个类型码。传别的（`SICF` / `TTYP` / `DDLS` / `TRAN`）**不会**报"类型不支持"，而是被当成 ADT 类型下传，最终报 `OBJECT_NOT_FOUND` —— 语义误导，别被带偏。
+
+| 类型码 | 对象 | 路由 | `create` | `pull` | `push` | `create local` |
+|---|---|---|---|---|---|---|
+| `CLAS` / `INTF` / `PROG` / `FUGR` | 源对象 | ADT | ✅ | ✅ | ✅ | ✅ |
+| `TABL` / `STRU` | 表 / 结构 | ICF | ✅ | ✅ | ✅ | ❌ |
+| `DOMA` / `DTEL` | 域 / 数据元素 | ICF | ✅ | ✅ | ✅ | ❌ |
+| `HTTP` | **ICF / SICF 节点** | ICF | ✅（须 `--file`） | ✅ | ✅ | ❌ |
+
+ICF 路由类型依赖内置扩展已部署——失败先跳 `abap-cli-setup` 跑 `extension status`。**不支持**：`TTYP`、`DDLS`/CDS（`.asddls` 虽被解析器识别但无实现）、`TRAN`（只读）、`ENHO`。
+
+HTTP 服务（SICF 节点）的文件契约与完整示例见 [references/workflow.md](references/workflow.md) 变体 12。
+
+## TABL vs STRU（DDL 注解差异）
+
+`@AbapCatalog.*` 注释里**只有 TABL 适用**——给 STRU 写会过 DDL 解析但语义无意义，AGENTS / 测试不会拦。下列差异在 DDL 写错时常撞上：
+
+| 注解 / 字段 | TABL | STRU |
+|---|---|---|
+| `define` 关键字 | `define table <name>` | `define structure <name>` |
+| `@AbapCatalog.deliveryClass : #A/C/L/...` | ✅ 必填 | ❌ 写了无意义 |
+| `@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE` | ✅ 通常写 | ❌ |
+| `@AbapCatalog.tableCategory : #TRANSPARENT` | ✅ 必填 | ❌ |
+| `@AbapCatalog.dataMaintenance : #RESTRICTED` | ✅ 通常写 | ❌ |
+| `.tabl.settings.json` | 可选 | ❌ 不要写（SAP 不为 STRU 产生 settings） |
+| `key client : abap.clnt not null;` | ✅ 业务主键 | ❌ 不需要 key |
+| `key <business_field>` | 主键 | 不需要 |
+| `@Semantics.*` | 适用 | 适用（语义注解同样有效） |
+
+CLI 解析器（[tabl-artifact.ts:parseTablDdic](https://github.com/chunrichi/abap-cli/blob/main/src/abap_cli/dictionary/tabl-artifact.ts)）按 `define table|structure` 自动分流；不会强制检查上述「TABL-only 注解出现在 STRU」的反模式，所以**写错是 silent 的**。直接 cp [assets/tabl-templates/structure-basic](./assets/tabl-templates/structure-basic/README.md) 骨架最稳。
 
 ## 推送前 checklist
 
@@ -60,16 +102,17 @@ DDIC 定义？
 
 | 错误 | 动作 |
 |---|---|
-| `OBJECT_NOT_FOUND` (exit 8) | `search <name>` 校对；`push` 不自动创建（创建走 `create`） |
+| `OBJECT_NOT_FOUND` (exit 8) | `search <name>` 校对；`push` 不自动创建（创建走 `create`）。**也可能是类型码写错**（如 `--type SICF` 应为 `HTTP`）——未知类型会被静默降级成这个错 |
 | `OBJECT_EXISTS` (exit 2) | 改用 `pull` + `push`；不要重复 `create` |
 | `LOCK_FAILED` (exit 9) | `inspect <obj> --locks`（[abap-cli-search]）查持有者；SE03 手动释放 |
 | `ACTIVATION_FAILED` (exit 7) | `data.errors` 含行号；修复后重推 |
 | `SYNTAX_ERROR` (exit 7) | `data.errors[]` 含 `{line, offset, severity, text}` |
 | `NO_TRANSPORT` (exit 7) | 跳 `abap-cli-setup`：`transport list` / `transport create` → `--tr` 重试 |
-| `DDIC_NOT_SUPPORTED` (exit 7) | 类型不在白名单（DOMA/DTEL/TABL/STRU 之外）；看 `abap create --schema` |
+| `DDIC_NOT_SUPPORTED` (exit 7) | 类型不在白名单（DOMA/DTEL/TABL/STRU 之外）；看上方类型表 |
 | `FILE_EXISTS` (exit 2) | `pull --overwrite` 或 `--skip-existing` |
-| `TYPE_NOT_SUPPORTED` (exit 7) | `abap <cmd> --schema` 看支持列表 |
+| `TYPE_NOT_SUPPORTED` (exit 7) | 以上方类型表为准。**`create` 的报错文案只列 CLAS/INTF/PROG/FUGR，是不完整的**，遗漏了 DDIC 四类与 `HTTP` |
 | `PUSH_FAILED` (exit 7) | `data.stage` 指示失败环节（lock/write/activate/unlock） |
+| `HTTP_CREATE_FAILED` (exit 6) | HTTP 服务（SICF 节点）写失败；看 `error.details`，校对 handlerClass / url / 父节点是否存在 |
 | `INACTIVE_PARTS` (exit 6) | `inspect --activation`（[abap-cli-search]）诊断 → `activate --yes` 修复 |
 | `INVALID_ARGUMENT` (exit 2) | 看 `error.nextSteps` / `error.references` |
 

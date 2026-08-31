@@ -26,6 +26,7 @@ abap push [options] [files...]
 - `--no-activate`: lock + write + 跳过 check + 跳过 activate + unlock
 - `--dry-run`: 只记录计划，零变更 ADT 调用
 - `--fail-fast`: 第一个失败文件即停（默认 keep-going）
+- `--schema`: 打印本命令参数 schema（unified envelope，无 SAP 调用；`data` 即 schema 对象）
 - `--atomic`: 先结构校验所有文件，任一失败则零写入（`VALIDATION_ERROR`）
 - `--yes`: 非交互确认写操作；非 TTY 且无 `--yes`/`--dry-run` → `VALIDATION_ERROR`（exit 7）
 
@@ -56,7 +57,7 @@ DDIC 推送时 `--atomic` 也会结构校验 JSON（`readDdicJson` + `validateDd
 
 ### 支持的文件类型
 
-按 [file-resolver.ts](../src/abap_cli/formats/file-resolver.ts) 的文件名解析规则，push 可处理的文件：
+按 [file-resolver.ts](../../src/abap_cli/formats/file-resolver.ts) 的文件名解析规则，push 可处理的文件：
 
 | 文件 | 路由 | 说明 |
 |------|------|------|
@@ -117,6 +118,10 @@ abap push src/clas/a.clas.abap src/clas/b.clas.abap --tr NDK123456 --atomic
 
 # 推送 DDIC 对象（$TMP 无需 --tr）
 abap push src/tabl/ztest_e2e.tabl.json
+
+# 推送 TABL 三件套：main 即可；同目录 .tabl.ddic / .tabl.settings.json 自动一起推
+abap push src/tabl/zthree.tabl.json --tr NDK900001 --yes
+# 等价于：abap push src/tabl/zthree.tabl.json src/tabl/zthree.tabl.ddic src/tabl/zthree.tabl.settings.json --tr NDK900001 --yes
 
 # 推送 textpool
 abap push src/prog/zprog/zprog.prog.texts.en.properties

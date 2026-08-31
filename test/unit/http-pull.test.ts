@@ -1,7 +1,7 @@
 /**
- * 022: pull HTTP service via the ICF route.
+  pull HTTP service via the ICF route.
  * Drives `abap pull <name> --type HTTP` → GET /http/<name> → local abap-file-format JSON.
- * Mirrors ddic-pull.test.ts (014) but for the HTTP service object type.
+ * Mirrors ddic-pull.test.ts but for the HTTP service object type.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import * as fs from 'fs';

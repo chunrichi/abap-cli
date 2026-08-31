@@ -26,6 +26,7 @@ abap activate <object> [options]
 - `<object>`: **SAP 对象名**（如 `ZCL_MY_CLASS`），不是本地文件名；经 `resolveObject`（ADT searchObject）解析为 objectUrl
 - `--type <type>`: 对象类型（CLAS / PROG / INTF 等），用于同名多类型对象消歧（否则抛 `AMBIGUOUS_OBJECT`）
 - `--yes`: 非交互环境确认（无 TTY 时必须提供）
+- `--schema`: 打印本命令参数 schema（unified envelope，无 SAP 调用）
 
 ## 执行流程
 

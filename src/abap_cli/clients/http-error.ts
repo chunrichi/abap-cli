@@ -46,7 +46,7 @@ const authHints = lookupAuthHints;
  * Detection happens on `error.code` (Node system errors propagated through
  * axios's `error.cause` chain) and `error.response.status` — never by
  * string-matching the response body. The optional `context.authMethod` lets
- * the classifier pick cert-specific guidance on 401/403 (025).
+ * the classifier pick cert-specific guidance on 401/403.
  */
 export function classifyHttpError(
   error: unknown,

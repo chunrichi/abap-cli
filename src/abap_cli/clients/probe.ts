@@ -10,14 +10,14 @@ import { buildAuth } from '../auth/adapter.js';
 import type { AuthConfig, AuthMethodV2 } from '../auth/v2-types.js';
 import { defaultCookieFile as defaultCookieFileFor, readCookieStore } from '../auth/sso-cookie.js';
 
-/** Per-layer result of `profile test <name>` (FR-024). */
+/** Per-layer result of `profile test <name>`. */
 export interface ProbeLayerResult {
   ok: boolean;
   /** True when the layer was not run because a prerequisite failed. */
   skipped?: boolean;
   error?: { code: string; message: string };
   nextSteps?: string[];
-  /** Auth strategy that was actually attempted (025). */
+  /** Auth strategy that was actually attempted. */
   authMethod?: AuthMethodV2;
 }
 
@@ -98,9 +98,9 @@ export async function probeSystem(name: string): Promise<SystemProbe> {
 /** TLS layer — raw handshake for https URLs; http is trivially ok.
  *  For cert profiles we fail-fast when the cert / key files are missing —
  *  the runtime would just throw the same error later, but we surface it
- *  during probe so `profile test` is informative (025).
+ *  during probe so `profile test` is informative.
  *  For browser_sso profiles we fail-fast when the cookie jar is missing
- *  or expired — same reason (026).
+ *  or expired — same reason.
  */
 function probeTls(name: string, config: ProbeConfig): Promise<ProbeLayerResult> {
   if (config.auth.method === 'browser_sso') {

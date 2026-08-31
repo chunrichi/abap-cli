@@ -111,7 +111,7 @@ describe('014/US3 pull DDIC', () => {
   });
 });
 
-// 024: abap-file-format three-piece pull wire for TABL/STRU.
+// abap-file-format three-piece pull wire for TABL/STRU.
 // zcl_abap_vibe_tabl_format returns { mainJson, ddicSource, settingsJson,
 // hasSettings, type, warnings? } in response.data; the CLI must write three
 // files under src/tabl/<name>.tabl.{json,ddic,settings.json} (TABL) or

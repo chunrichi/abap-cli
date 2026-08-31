@@ -1,0 +1,12 @@
+@EndUserText.label : 'Sample order item with quantity'
+@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+@AbapCatalog.tableCategory : #TRANSPARENT
+@AbapCatalog.deliveryClass : #A
+@AbapCatalog.dataMaintenance : #RESTRICTED
+define table zsample {
+  key client      : abap.clnt not null;
+  key item_id     : abap.char(10) not null;
+  @Semantics.quantity.unitOfMeasure : 'zsample.unit'
+  quantity       : abap.quan(13, 3);
+  unit           : abap.unit;
+}

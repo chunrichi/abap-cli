@@ -1,4 +1,4 @@
-/** Named skeleton registry for `abap create --template` (FR-021). */
+/** Named skeleton registry for `abap create --template`. */
 export interface CreateTemplate {
   name: string;
   description: string;

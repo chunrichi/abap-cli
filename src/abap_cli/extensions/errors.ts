@@ -1,5 +1,5 @@
 /**
- * Extension-specific error factories (FR-008).
+ * Extension-specific error factories.
  * Wraps CliError with extension-contextual details.
  */
 

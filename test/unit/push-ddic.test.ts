@@ -1,5 +1,5 @@
 /**
- * 014: abap push of DDIC .json files routes through the ICF /ddic/<type>
+  abap push of DDIC .json files routes through the ICF /ddic/<type>
  * endpoint (pushDdicFile). Covers: wire conversion + transportRequest,
  * $TMP transport-free path, --check-only rejection, validation, dry-run.
  */

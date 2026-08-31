@@ -8,7 +8,7 @@ vi.mock('../../src/abap_cli/adc/runtime-probe.js', () => ({
 }));
 
 vi.mock('../../src/abap_cli/config/runtime-cache.js', () => ({
-  // 034: cache is empty in tests — every deploy probe forces a network call,
+  // cache is empty in tests — every deploy probe forces a network call,
   // which is what the original 030 assertions targeted.
   getOrProbeRuntime: (...a: unknown[]) => getOrProbeRuntime(...a),
   clearRuntimeCache: () => undefined,
@@ -56,7 +56,7 @@ describe('deploy-flow — 030 Steampunk runtime branching', () => {
   beforeEach(() => {
     probeAdtRuntime.mockReset();
     getOrProbeRuntime.mockReset();
-    // 034: cache miss by default — deploy must probe the network.
+    // cache miss by default — deploy must probe the network.
     getOrProbeRuntime.mockResolvedValue(undefined);
     pushObject.mockReset();
     pushObject.mockResolvedValue({

@@ -49,7 +49,7 @@ function parseData(res: { stdout: string }) {
   return JSON.parse(res.stdout).data;
 }
 
-describe('abap create options (US7, FR-021..023, SC-008)', () => {
+describe('abap create options (US7..023)', () => {
   it('--check-only validates without creating (zero create calls)', async () => {
     const program = makeProgram();
     registerCreateCommand(program);

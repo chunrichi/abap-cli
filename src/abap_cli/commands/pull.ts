@@ -18,9 +18,9 @@ export function registerPullCommand(program: Command): void {
     .option('--skip-existing', 'Skip files that already exist')
     .option('--include-tests', 'Include testclasses source part')
     .option('--include-all-parts', 'Include every source-code part')
-    .option('--textpool', '014: also pull textpool files (.texts/.selections/.headings.<lang>.properties)')
-    .option('--remote <remoteid>', '015: pull the object\'s active version source from a remote system (Version Management)')
-    .option('--tr <request>', 'T4.2: pull all objects bound to a transport request (mutually exclusive with object name and --package)')
+    .option('--textpool', 'Also pull textpool files (.texts/.selections/.headings.<lang>.properties)')
+    .option('--remote <remoteid>', 'Pull the object\'s active version source from a remote system (Version Management)')
+    .option('--tr <request>', 'Pull all objects bound to a transport request (mutually exclusive with object name and --package)')
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action(async (objectName: string, opts: PullOptions, cmd) => {
       // --schema branch — emit machine-readable parameter schema (no SAP call).

@@ -29,7 +29,7 @@ vi.mock('../../src/abap_cli/icf/service-version.js', () => ({
   ICF_SERVICE_VERSION: '0.1.0',
 }));
 
-describe('abap init ICF deployment check (US4, FR-012..FR-015, SC-004/005)', () => {
+describe('abap init ICF deployment check (US4..FR-015/005)', () => {
   let cwd: string;
 
   beforeEach(() => {
@@ -46,14 +46,14 @@ describe('abap init ICF deployment check (US4, FR-012..FR-015, SC-004/005)', () 
     return { exitCode: res.exitCode, stdout: res.stdout };
   }
 
-  it('not_deployed → data.icf.status="not_deployed", init succeeds (FR-014)', async () => {
+  it('not_deployed → data.icf.status="not_deployed", init succeeds ()', async () => {
     const { stdout } = await runInitWithIcf({ status: 'not_deployed', expectedVersion: '0.1.0' });
     const parsed = JSON.parse(stdout);
     expect(parsed.status).toBe('success');
     expect(parsed.data.icf.status).toBe('not_deployed');
   });
 
-  it('current → data.icf.status="current" with remote/expected versions (FR-013)', async () => {
+  it('current → data.icf.status="current" with remote/expected versions ()', async () => {
     const { stdout } = await runInitWithIcf({ status: 'current', remoteVersion: '0.1.0', expectedVersion: '0.1.0' });
     const parsed = JSON.parse(stdout);
     expect(parsed.status).toBe('success');
@@ -62,7 +62,7 @@ describe('abap init ICF deployment check (US4, FR-012..FR-015, SC-004/005)', () 
     expect(parsed.data.icf.expectedVersion).toBe('0.1.0');
   });
 
-  it('outdated → data.icf.status="outdated" with remote/expected, init still succeeds (FR-013)', async () => {
+  it('outdated → data.icf.status="outdated" with remote/expected, init still succeeds ()', async () => {
     const { stdout } = await runInitWithIcf({ status: 'outdated', remoteVersion: '0.0.9', expectedVersion: '0.1.0' });
     const parsed = JSON.parse(stdout);
     expect(parsed.status).toBe('success');
@@ -70,7 +70,7 @@ describe('abap init ICF deployment check (US4, FR-012..FR-015, SC-004/005)', () 
     expect(parsed.data.icf.remoteVersion).toBe('0.0.9');
   });
 
-  it('unreachable → degraded warning in meta.warnings, init still succeeds (FR-015, SC-005)', async () => {
+  it('unreachable → degraded warning in meta.warnings, init still succeeds ', async () => {
     const { stdout } = await runInitWithIcf({
       status: 'unreachable',
       expectedVersion: '0.1.0',

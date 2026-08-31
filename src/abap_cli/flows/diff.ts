@@ -29,7 +29,7 @@ export interface DiffResult {
 }
 
 export interface DiffOptions {
-  /** Single local file to compare (FR-015); when omitted, whole workspace. */
+  /** Single local file to compare; when omitted, whole workspace. */
   file?: string;
   all?: boolean;
   remote?: boolean;
@@ -70,7 +70,7 @@ export function lineDiffSummary(local: string, remote: string): DiffSummary {
 }
 
 /**
- * Compare one local file against SAP (FR-015) — resolve the file's object, fetch
+ * Compare one local file against SAP — resolve the file's object, fetch
  * the matching part source, and report direction + line summary. A file whose
  * object does not exist on SAP is reported as local-only (not an error).
  */

@@ -48,7 +48,7 @@ function parseSuccess(res: { stdout: string }) {
   return JSON.parse(res.stdout).data;
 }
 
-describe('abap status changedParts (US4, FR-012..014, SC-004)', () => {
+describe('abap status changedParts (US4..014)', () => {
   it('reports local-only, divergent, and remote-only parts; omits unchanged', async () => {
     const program = makeProgram();
     registerStatusCommand(program);

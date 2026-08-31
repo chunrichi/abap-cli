@@ -29,7 +29,7 @@ function fakeClient(
   } as unknown as IcfClient;
 }
 
-describe('select-flow-basic-success (US1)', () => {
+describe('select-flow-basic-success ()', () => {
   it('returns success envelope with rows + rowCount + truncated', async () => {
     const client = fakeClient(
       {
@@ -77,7 +77,7 @@ describe('select-flow-basic-success (US1)', () => {
   });
 });
 
-describe('select-flow-empty-result (US1)', () => {
+describe('select-flow-empty-result ()', () => {
   it('returns empty rows + rowCount=0 + truncated=false', async () => {
     const client = fakeClient(
       {
@@ -93,7 +93,7 @@ describe('select-flow-empty-result (US1)', () => {
   });
 });
 
-describe('select-flow-default-limit (US1)', () => {
+describe('select-flow-default-limit ()', () => {
   it('defaults limit to 100 when not specified', async () => {
     let capturedBody: unknown;
     const client = fakeClient(
@@ -109,7 +109,7 @@ describe('select-flow-default-limit (US1)', () => {
   });
 });
 
-describe('select-flow-truncation (US1)', () => {
+describe('select-flow-truncation ()', () => {
   it('returns truncated=true when rowCount equals limit (probe fetched limit+1)', async () => {
     const client = fakeClient(
       {
@@ -132,7 +132,7 @@ describe('select-flow-truncation (US1)', () => {
   });
 });
 
-describe('select-flow-dry-run (US1)', () => {
+describe('select-flow-dry-run ()', () => {
   it('returns a dry-run envelope without invoking the ICF client', () => {
     const dry: SelectResult = buildDryRun('ZTAB_FIXTURE', { limit: 10, where: "STATUS = 'X'" });
     expect(dry.dryRun).toBe(true);
@@ -144,7 +144,7 @@ describe('select-flow-dry-run (US1)', () => {
   });
 });
 
-describe('select validateLimit / validateOffset (US1)', () => {
+describe('select validateLimit / validateOffset ()', () => {
   it('accepts integer in [1, 10000]', () => {
     expect(validateLimit('100')).toBe(100);
     expect(validateLimit(1)).toBe(1);
@@ -184,7 +184,7 @@ describe('select validateLimit / validateOffset (US1)', () => {
   });
 });
 
-describe('select error mapping (US1)', () => {
+describe('select error mapping ()', () => {
   it('maps TABLE_NOT_FOUND to CliError with NOT_FOUND category', async () => {
     const client = fakeClient(
       {

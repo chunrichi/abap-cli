@@ -205,7 +205,7 @@ describe('probeAdtRuntime — 030 ADT runtime tier detection', () => {
     expect(r.icfSetupBlocked).toBe(false);
   });
 
-  // 034: apiCapabilities surface for the strategy registry. On Steampunk the
+  // apiCapabilities surface for the strategy registry. On Steampunk the
   // httpService collection is present, on on-prem the ICF collection is
   // present; both flags are reported together so deploy-flow can branch
   // without re-probing.

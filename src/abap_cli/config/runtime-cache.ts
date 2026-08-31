@@ -11,7 +11,7 @@ import { probeAdtRuntime } from '../adc/runtime-probe.js';
  *
  *  Never throws — runtime probe failures are returned as `tier: 'unknown'`
  *  with `icfSetupBlocked: false`. The caller (deploy-flow) treats 'unknown'
- *  as conservative on-prem fallback (030).
+ *  as conservative on-prem fallback.
  */
 export async function getOrProbeRuntime(name: string, opts: { force?: boolean } = {}): Promise<CachedRuntime | undefined> {
   if (!opts.force) {

@@ -15,7 +15,7 @@ interface TextpoolResolved {
 }
 
 /**
- * 014: push a single textpool .properties file via the mixed-mode route
+ * Push a single textpool .properties file via the mixed-mode route
  * (ADT text-elements API when the cached capability allows, otherwise the
  * self-built ICF /textpool endpoint). Route is decided from the recorded
  * profile — no runtime fallback (Q1).

@@ -8,6 +8,10 @@ import type { SearchResult } from 'abap-adt-api';
 interface SearchResultItem {
   name: string;
   type: string;
+  /** Top-level ADT category, e.g. "TABL" split out of "TABL/DT". */
+  category: string;
+  /** DDIC sub-kind when `type` is "category/subtype" (TABL/DT, TABL/DB, …). */
+  ddicSubtype?: string;
   uri: string;
   description: string;
   packageName: string;
@@ -149,13 +153,23 @@ async function runSearch(query: string | undefined, opts: SearchOptions,mode: Ou
 }
 
 function toResultItem(r: SearchResult): SearchResultItem {
-  return {
+  const rawType = r['adtcore:type'] ?? '';
+  // Split ADT "category/subtype" (e.g. "TABL/DT") into a separate `ddicSubtype`
+  // so agents can distinguish transparent tables (DT) from pooled (DB),
+  // append structures (DY), etc. without parsing the slash on their own.
+  const slash = rawType.indexOf('/');
+  const category = slash >= 0 ? rawType.slice(0, slash) : rawType;
+  const ddicSubtype = slash >= 0 ? rawType.slice(slash + 1) : undefined;
+  const item: SearchResultItem = {
     name: r['adtcore:name'] ?? '',
-    type: r['adtcore:type'] ?? '',
+    type: rawType,
+    category,
     uri: r['adtcore:uri'] ?? '',
     description: r['adtcore:description'] ?? '',
     packageName: r['adtcore:packageName'] ?? '',
   };
+  if (ddicSubtype !== undefined) item.ddicSubtype = ddicSubtype;
+  return item;
 }
 
 function applyFilters(items: SearchResultItem[], opts: SearchOptions, query: string): SearchResultItem[] {
@@ -227,7 +241,7 @@ function searchSchema(): CommandSchema {
     usage: 'abap search [options] <query>',
     arguments: [{ name: 'query', type: 'string', required: true, description: 'Search query (supports * wildcard)' }],
     options: [
-      { name: '--type', type: 'string', valuePlaceholder: '<type>', description: 'Filter by object type' },
+      { name: '--type', type: 'string', valuePlaceholder: '<type>', description: 'Filter by SAP ADT object type. Common values: CLAS, INTF, PROG, FUGR, TABL, TABL/DT (transparent table), TABL/DB (pooled), TABL/DY (append structure), DOMA, DTEL, STRU, MSAG, TYPE, TTYP.' },
       { name: '--limit', type: 'int', valuePlaceholder: '<n>', default: SEARCH_RESULT_LIMIT, description: 'Maximum results per page' },
       { name: '--page', type: 'int', valuePlaceholder: '<n>', default: 1, description: 'Page number (1-based)' },
       { name: '--exact', type: 'boolean', description: 'Exact name match (mutually exclusive with --fuzzy)' },

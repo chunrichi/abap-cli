@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "abap-cli unified --json output envelope",
-  "description": "Machine-readable contract for every `abap <cmd> --json` response (spec 012, contracts/cli-output.md). Success envelopes go to stdout only; failure envelopes go to stderr only; stdout stays empty on any failure path. exit code maps to error.category (output/exit-codes.ts). Enforced by test/unit/envelope-schema.test.ts for every registered command.",
+  "description": "Machine-readable contract for every `abap <cmd> --json` response. Success envelopes go to stdout only; failure envelopes go to stderr only; stdout stays empty on any failure path. exit code maps to error.category (output/exit-codes.ts). Enforced by test/unit/envelope-schema.test.ts for every registered command.",
   "oneOf": [
     {
       "type": "object",
@@ -79,7 +79,7 @@
     },
     "extensionMeta": {
       "type": "object",
-      "description": "Loaded-extension summary merged into meta.extensions (023). Keys with zero counts are omitted.",
+      "description": "Loaded-extension summary merged into meta.extensions. Keys with zero counts are omitted.",
       "properties": {
         "loaded": { "type": "number" },
         "failed": { "type": "number" },

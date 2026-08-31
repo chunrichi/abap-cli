@@ -7,6 +7,7 @@ import { folderFor } from '../formats/type-folder.js';
 import { fileExists, writeAbapFile } from '../formats/abap-source.js';
 import { writeDdicJson, DDIC_SUPPORTED_TYPES, wireToLocal, type DdicSupportedType } from '../dictionary/ddic-json.js';
 import { writeHttpJson, wireToLocal as httpWireToLocal, type HttpWirePayload } from '../dictionary/http-json.js';
+import { writeTranJson, wireToLocal as tranWireToLocal, type TranWirePayload } from '../dictionary/tran-json.js';
 import { parseTextpoolProperties, serializeTextpoolProperties, type TextElementCategory } from '../formats/textpool.js';
 import { routeTextpool } from '../textpool/textpool-router.js';
 import { strategyFor } from '../formats/pull-strategy.js';
@@ -20,7 +21,7 @@ import { SEARCH_RESULT_LIMIT } from '../core/limits.js';
 export interface PullOptions {
   type?: string;
   package?: string;
-  /** T4.2: pull all objects bound to a transport request (mutually exclusive with object name and --package). */
+  /** Pull all objects bound to a transport request (mutually exclusive with object name and --package). */
   tr?: string;
   dir: string;
   overwrite?: boolean;
@@ -29,9 +30,9 @@ export interface PullOptions {
   includeAllParts?: boolean;
   limit?: string;
   page?: string;
-  /** 014: also pull textpool .properties files (texts/selections/headings). */
+  /** Also pull textpool .properties files (texts/selections/headings). */
   textpool?: boolean;
-  /** 015: pull the object's active version source from a remote system (Version Management). */
+  /** Pull the object's active version source from a remote system (Version Management). */
   remote?: string;
 }
 
@@ -51,7 +52,7 @@ export interface PullResult {
 }
 
 export async function runPull(objectName: string, opts: PullOptions): Promise<PullResult> {
-  // T4.2: --tr selector — mutually exclusive with object name and --package.
+  // --tr selector — mutually exclusive with object name and --package.
   if (opts.tr !== undefined) {
     const selectorCount = Number(Boolean(objectName)) + Number(Boolean(opts.package)) + Number(opts.tr !== undefined);
     if (selectorCount > 1) {
@@ -84,22 +85,26 @@ export async function runPull(objectName: string, opts: PullOptions): Promise<Pu
     });
   }
 
-  // 015: --remote pulls the active (00000) source of an object as transported to
+  // --remote pulls the active (00000) source of an object as transported to
   // another system via the Version Management endpoint (/version-source).
   if (opts.remote) {
     return runPullRemote(objectName, opts.type, opts.remote, opts);
   }
 
-  // 014: --textpool pulls the three .properties files (mixed-mode route).
+  // --textpool pulls the three .properties files (mixed-mode route).
   if (opts.textpool) {
     return runPullTextpool(objectName, opts.type, opts);
   }
 
-  // 014: DDIC objects route to the self-built ICF service (FR-015).
-  // 022: HTTP service also routes to the self-built ICF service.
+  // DDIC objects route to the self-built ICF service.
+  // HTTP service also routes to the self-built ICF service.
+  // Transaction code also routes to the self-built ICF service.
   const typeUpper = opts.type?.toUpperCase();
   if (typeUpper === 'HTTP') {
     return runPullHttp(objectName, opts);
+  }
+  if (typeUpper === 'TRAN') {
+    return runPullTran(objectName, opts);
   }
   if (typeUpper && isDdicSupportedType(typeUpper)) {
     return runPullDdic(objectName, typeUpper, opts);
@@ -123,7 +128,7 @@ export async function runPull(objectName: string, opts: PullOptions): Promise<Pu
 }
 
 /**
- * 014: pull textpool .properties files for an object via the mixed-mode route
+ * Pull textpool .properties files for an object via the mixed-mode route
  * (ADT when the cached capability allows reads, otherwise ICF fallback — Q1:
  * route is decided from the recorded profile, no runtime fallback).
  */
@@ -175,7 +180,7 @@ async function runPullTextpool(objectName: string, type: string | undefined, opt
         failed.push(outPath);
         continue;
       }
-      // Reuse the shared properties serializer so ADT/ICF output is identical (FR-023).
+      // Reuse the shared properties serializer so ADT/ICF output is identical.
       content = serializeTextpoolProperties(
         fileCat,
         (resp.data.elements ?? []).map((e) => ({ id: e.id, text: e.text })),
@@ -194,15 +199,15 @@ async function runPullTextpool(objectName: string, type: string | undefined, opt
   };
 }
 
-/** 014: load the active system name for route decisions. */
+/** Load the active system name for route decisions. */
 async function loadProjectConfig(): Promise<{ systemName: string }> {
   const { loadConfig } = await import('../config/project-config.js');
   const cfg = await loadConfig();
   return { systemName: cfg.systemName };
 }
 
-/** 014: pull a DDIC object via ICF GET /ddic/<type>/<name> and write the local JSON.
- *  024: TABL/STRU switch to the abap-file-format three-piece layout
+/** Pull a DDIC object via ICF GET /ddic/<type>/<name> and write the local JSON.
+ *  TABL/STRU switch to the abap-file-format three-piece layout
  *  (main + ddic + settings.json) when the wire carries canonical strings from
  *  zcl_abap_vibe_tabl_format. DOMA/DTEL stay on the flat single-file layout. */
 async function runPullDdic(objectName: string, type: DdicSupportedType, opts: PullOptions): Promise<PullResult> {
@@ -222,7 +227,7 @@ async function runPullDdic(objectName: string, type: DdicSupportedType, opts: Pu
     });
   }
 
-  // 024: TABL/STRU three-piece layout when wire carries canonical strings.
+  // TABL/STRU three-piece layout when wire carries canonical strings.
 // When the wire has ddicSource but is missing mainJson, fall through to the
 // flat wire path (legacy data) — writePullDdicTabl will detect the partial
 // state and reject with TABL_ARTIFACT_INCOMPLETE.
@@ -454,6 +459,60 @@ async function runPullHttp(objectName: string, opts: PullOptions): Promise<PullR
   };
 }
 
+/** Pull a transaction code (SE93) via ICF GET /tran/<code> and write the local JSON. */
+async function runPullTran(objectName: string, opts: PullOptions): Promise<PullResult> {
+  const icf = await IcfClient.create();
+  const resp = await icf.getTran<TranWirePayload>(objectName);
+  if (resp.status !== 'success' || !resp.data) {
+    const rawCode = resp.error?.code ?? 'SAP_ERROR';
+    const code: ErrorCode = rawCode === 'TRAN_OBJECT_NOT_FOUND' ? 'OBJECT_NOT_FOUND' : (rawCode as ErrorCode);
+    throw new CliError(code, resp.error?.message ?? `Failed to pull TRAN ${objectName}`, {
+      object: objectName,
+      type: 'TRAN',
+      nextSteps: [
+        'Verify the transaction code exists in the target system.',
+        'Run `abap tcode <code>` to confirm the code resolves.',
+      ],
+    });
+  }
+
+  const local = tranWireToLocal(resp.data);
+  const filename = buildFilename(objectName, 'TRAN', 'main', '.json');
+  const relPath = path.join(opts.dir, folderFor('TRAN'), filename);
+  const targetPath = path.resolve(process.cwd(), relPath);
+
+  if (await fileExists(targetPath) && !opts.overwrite && !opts.skipExisting) {
+    const outPath = toOutputPath(relPath);
+    throw new CliError('OVERWRITE_REQUIRED', `${outPath} already exists; use --overwrite to replace it`, {
+      file: outPath,
+      nextSteps: ['Re-run with --overwrite to replace the existing file.'],
+      example: `abap pull ${objectName} --type TRAN --overwrite`,
+    });
+  }
+  if (await fileExists(targetPath) && opts.skipExisting) {
+    const outPath = toOutputPath(relPath);
+    return {
+      data: normalizePullData({ object: objectName, type: 'TRAN', entries: [{ file: outPath, status: 'skipped' }], written: [], skipped: [outPath], failed: [] }),
+      human: `Skipped TRAN ${objectName} (file already exists: ${outPath})`,
+    };
+  }
+
+  await writeTranJson(targetPath, local);
+  const outPath = toOutputPath(relPath);
+
+  return {
+    data: normalizePullData({
+      object: objectName,
+      type: 'TRAN',
+      entries: [{ file: outPath, status: 'written' }],
+      written: [outPath],
+      skipped: [],
+      failed: [],
+    }),
+    human: `Pulled TRAN ${objectName} to ${outPath}`,
+  };
+}
+
 
 /** 014: narrow an arbitrary type string to the supported DDIC types. */
 function isDdicSupportedType(t: string): t is DdicSupportedType {
@@ -557,7 +616,7 @@ async function runPullRemote(objectName: string, type: string | undefined, remot
   };
 }
 
-/** Enumerate a package (search + packageName filter) and pull each object (FR-024). */
+/** Enumerate a package (search + packageName filter) and pull each object. */
 async function runPackagePull(client: AdtClientWrapper, opts: PullOptions): Promise<PullResult> {
   const limit = parsePositiveInt(opts.limit, '--limit', SEARCH_RESULT_LIMIT);
   const page = parsePositiveInt(opts.page, '--page', 1);
@@ -695,7 +754,7 @@ function humanSummary(
 }
 
 /**
- * T4.2: pull every object bound to a transport request.
+ * Pull every object bound to a transport request.
  * Iterates direct objects + nested task objects, deduplicates,
  * routes each through the standard pull pipeline.
  */
@@ -732,6 +791,15 @@ async function runTransportPull(client: AdtClientWrapper, requestNumber: string,
       // HTTP service — ICF route.
       if (item.type === 'HTTP') {
         const res = await runPullHttp(item.name, opts);
+        const entry: PullEntry = { object: item.name, type: item.type, status: 'written' };
+        entries.push(entry);
+        written.push(item.name);
+        pulled++;
+        continue;
+      }
+      // Transaction code — ICF route.
+      if (item.type === 'TRAN') {
+        const res = await runPullTran(item.name, opts);
         const entry: PullEntry = { object: item.name, type: item.type, status: 'written' };
         entries.push(entry);
         written.push(item.name);

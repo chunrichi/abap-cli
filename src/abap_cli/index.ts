@@ -55,7 +55,7 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
   },
   {
     name: 'create',
-    description: 'Create and activate a new ABAP object (CLAS, INTF, PROG, FUGR)',
+    description: 'Create and activate a new ABAP object (CLAS, INTF, PROG, FUGR, TABL, STRU, DOMA, DTEL, HTTP)',
     load: () => import('./commands/create.js').then((m) => ({ register: m.registerCreateCommand })),
   },
   {
@@ -146,7 +146,7 @@ registerLazyCommands(program, COMMAND_SPECS);
 
 setProgram(program);
 
-// 027 US1 — load extensions lazily. The argv sniff registers only
+// Load extensions lazily. The argv sniff registers only
 // `type:'command'` extensions whose name matches argv[2]; validation and
 // lifecycle extensions defer to the preAction hook so that
 // `--help` / `--version` / `doctor` / empty-argv invocations never
@@ -190,9 +190,9 @@ try {
 setExtensionRegistry(registry);
 setExtRegJson(registry);
 
-// Install lifecycle hooks globally once (FR-007).  027 US1 — load the
-// remaining (non-command) extensions on each dispatch so the user's real
-// command always sees a fully-loaded validation + lifecycle set.
+// Install lifecycle hooks globally once. Load the remaining (non-command)
+// extensions on each dispatch so the user's real command always sees a
+// fully-loaded validation + lifecycle set.
 program.hook('preAction', async (_thisCmd, actionCmd) => {
   const argv = process.argv.slice(2);
   const cmdName = actionCmd.name();

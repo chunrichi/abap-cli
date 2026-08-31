@@ -19,6 +19,7 @@ abap transport create <description> [--package <pkg>] [--dry-run] [--yes] [--jso
 abap transport show <req> [--json]
 abap transport resolve <object> [--json]
 abap transport assign <object> --tr <transport> [--dry-run] [--yes] [--json]
+abap transport --schema                              # 参数自省（unified envelope，无 SAP 调用）
 ```
 
 ## Options

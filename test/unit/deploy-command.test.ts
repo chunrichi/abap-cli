@@ -68,6 +68,18 @@ describe('abap extension deploy command — --package default and --tr rules', (
     expect(opts.transport).toBe('NDK123456');
     expect(stdoutHasError(res.stdout)).toBe(false);
   });
+
+  // Regression: combining --package $TMP with --tr used to silently use the
+  // user-supplied transport, which is exactly how the ICF source update got
+  // parked in a transport and the local $TMP object stayed at the old
+  // gc_version forever (an "outdated" dead-lock even after re-deploying).
+  // Force NO_TRANSPORT instead so the user picks one path.
+  it('rejects --package $TMP combined with --tr (ICF dead-lock guard)', async () => {
+    const res = await runCommand(program(), ['extension', 'deploy', '--dry-run', '--package', '$TMP', '--tr', 'NDK123456', '--json']);
+    expect(deployBundled).not.toHaveBeenCalled();
+    expect(res.stderr).toMatch(/"code"\s*:\s*"NO_TRANSPORT"/);
+    expect(res.exitCode).toBe(7);
+  });
 });
 
 function stdoutHasError(stdout: string): boolean {

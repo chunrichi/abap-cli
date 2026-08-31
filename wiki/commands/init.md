@@ -51,6 +51,7 @@ abap init --agent copilot|claude|cursor|generic [--force]
 - `--agent <target>`: 脚手架 agent 上下文（见下表；幂等，已存在文件跳过）
 - `--force`: `--agent` 时覆盖已存在文件
 - `--yes` / `--non-interactive`: 非交互确认（aliases）
+- `--schema`: 打印本命令参数 schema（unified envelope，meta 仅含 `command` / `version` / `durationMs`，无 SAP 调用）
 
 ## 行为规则
 
@@ -152,8 +153,10 @@ abap init --agent copilot --force
   "meta": { "command": "abap init --agent", "version": "0.2.1", "timestamp": "2026-08-26T00:00:00.000Z", "durationMs": 86, "warnings": [] },
   "data": {
     "written": [
-      ".claude/skills/abap-setup/SKILL.md",
-      ".claude/skills/abap-object/SKILL.md",
+      ".claude/skills/abap-cli-setup/SKILL.md",
+      ".claude/skills/abap-cli-search/SKILL.md",
+      ".claude/skills/abap-cli-edit/SKILL.md",
+      ".claude/skills/abap-cli-data/SKILL.md",
       ".claude/agents/abap-developer.agent.md",
       "CLAUDE.md"
     ],

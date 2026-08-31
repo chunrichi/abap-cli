@@ -23,7 +23,7 @@
 - **Agent 层**（Skill/Prompt）：AI Agent 的行为编排，定义工作流和约束
 
 ### III. 文件格式遵循 SAP abap-file-format 规范
-本地文件格式以 SAP abap-file-format（https://github.com/SAP/abap-file-formats）为基准。源码对象的文件扩展名和目录结构与 abapGit 惯例保持一致。DDIC 对象的 JSON schema 由 ICF 服务端定义并保持向后兼容。
+本地文件格式以 SAP abap-file-format（https://github.com/SAP/abap-file-formats）为基准。DDIC 对象的 JSON schema 由 ICF 服务端定义并保持向后兼容。**不承诺**与 abapGit 兼容——本仓库不实现 abapGit 序列化/反序列化,也不参与 abapGit 仓库的 round-trip 同步;目录布局与文件扩展名可能与 abapGit 习惯重合,但偏离时不视为缺陷。
 
 ### IV. 最小可用范围优先
 第一版只覆盖核心对象类型，不追求全面覆盖。每新增一种对象类型需要明确的使用场景驱动，并同步更新 CLI 命令、ICF 接口和 Skill 文档。

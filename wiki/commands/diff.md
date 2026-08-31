@@ -160,4 +160,4 @@ abap diff src/clas/zcl_foo/zcl_foo.clas.abap --remote PRD --json
 
 - 用户文档：[docs/commands.md#abap-diff](../../docs/commands.md#abap-diff)
 - 设计决策：[specs/004-pull-push-check-loop/spec.md](../../specs/004-pull-push-check-loop/spec.md)
-- 同步工作流：[skills/abap-object/SKILL.md](../../skills/abap-object/SKILL.md)（决策树）
+- 同步工作流：[skills/abap-cli-edit/SKILL.md](../../skills/abap-cli-edit/SKILL.md)（决策树）

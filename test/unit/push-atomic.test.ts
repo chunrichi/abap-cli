@@ -37,7 +37,7 @@ beforeEach(() => {
   fs.writeFileSync(path.join(cwd, 'src/zcl_ok.clas.abap'), 'CLASS zcl_ok DEFINITION PUBLIC.\nENDCLASS.\n');
 });
 
-describe('abap push --atomic (US8, FR-025, SC-007)', () => {
+describe('abap push --atomic ()', () => {
   it('a file that fails validation writes nothing (zero mutating calls)', async () => {
     // A DDIC-route file with a type outside the 014 supported scope (TTYP)
     // fails structural validation (validateLocalFile → DDIC_NOT_SUPPORTED).

@@ -28,6 +28,8 @@ abap check --files <f...>                 # 父命令快捷方式 = check syntax
 - `--changed`: 仅检查本地 mtime 比 SAP 对象 `changedAt` 新（允许 1s 时钟偏差）的文件；变更集为空则快速失败
 - `--strict`: 把 warning 也视为失败
 - `--out [file]`: 把原始 ATC worklist 持久化到本地文件（仅 `check atc`）；无值默认写 `.abap/atc/<variant>-<timestamp>.json`，有值写指定路径
+- `--files <files...>`: 父命令快捷方式 = `check syntax <files...>`
+- `--schema`: 打印本命令参数 schema（unified envelope，无 SAP 调用）
 
 ## 行为规则
 
