@@ -26,7 +26,7 @@ metadata:
 - 比较本地与 SAP 差异（`diff` / `status`）后再决定 pull 或 push——`diff` / `status` 在 `abap-cli-search`，本 skill 关注"差异确定后的拉/推动作"
 - 显式编排 status → pull → push——CI 友好
 - 离线起一份草稿（`create local`）再 push
-- DDIC 定义 CRUD：`pull <name> --type DOMA|DTEL|TABL|STRU`、`create <type> <name> --file <json>`、`push <name>.<type>.json`。TABL/STRU 现在遵循 abap-file-format 三件套（`--file` 指向 main `.tabl.json` + 同目录 `.tabl.ddic` + 可选 `.tabl.settings.json`）；只有 main JSON 时回落 014 legacy wire-flat（详见 workflow.md 变体 2）。**写新 TABL/STRU 时直接 `cp` [assets/tabl-templates/](../assets/tabl-templates/) 里的 DDL 骨架**（5 个场景：透明表 / include / 货币金额 / 数量单位 / STRU），别凭空写 `@AbapCatalog.*` 注释
+- DDIC 定义 CRUD：`pull <name> --type DOMA|DTEL|TABL|STRU`、`create <type> <name> --file <json>`、`push <name>.<type>.json`。TABL/STRU 现在遵循 abap-file-format 三件套（`--file` 指向 main `.tabl.json` + 同目录 `.tabl.ddic` + 可选 `.tabl.settings.json`）；只有 main JSON 时回落 014 legacy wire-flat（详见 workflow.md 变体 2）。**写新 TABL/STRU 时直接 `cp` [assets/tabl-templates](./assets/tabl-templates/README.md) 里的 DDL 骨架**（5 个场景：透明表 / include / 货币金额 / 数量单位 / STRU），别凭空写 `@AbapCatalog.*` 注释
 
 ## 决策树
 
@@ -86,7 +86,7 @@ HTTP 服务（SICF 节点）的文件契约与完整示例见 [references/workfl
 | `key <business_field>` | 主键 | 不需要 |
 | `@Semantics.*` | 适用 | 适用（语义注解同样有效） |
 
-CLI 解析器（[tabl-artifact.ts:parseTablDdic](https://github.com/chunrichi/abap-cli/blob/main/src/abap_cli/dictionary/tabl-artifact.ts)）按 `define table|structure` 自动分流；不会强制检查上述「TABL-only 注解出现在 STRU」的反模式，所以**写错是 silent 的**。直接 cp [assets/tabl-templates/structure-basic/](../assets/tabl-templates/structure-basic/) 骨架最稳。
+CLI 解析器（[tabl-artifact.ts:parseTablDdic](https://github.com/chunrichi/abap-cli/blob/main/src/abap_cli/dictionary/tabl-artifact.ts)）按 `define table|structure` 自动分流；不会强制检查上述「TABL-only 注解出现在 STRU」的反模式，所以**写错是 silent 的**。直接 cp [assets/tabl-templates/structure-basic](./assets/tabl-templates/structure-basic/README.md) 骨架最稳。
 
 ## 推送前 checklist
 

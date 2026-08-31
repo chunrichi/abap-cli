@@ -113,13 +113,21 @@ describe('skill bundle (019-cli-skill-agent-bundle) structural audit', () => {
   });
 
   it.each(skills.map((s) => [s.dirName, s] as const))(
-    '%s: has references/ scripts/ assets/ subdirectories (FR7, meta 允许空)',
+    '%s: subdirs match SKILL.md references (meta 全免，领域按需)',
     (_name, skill) => {
-      expect(skill.hasReferences, 'references/ missing').toBe(true);
-      // meta skill 不直接管命令，允许 scripts/ 与 assets/ 缺失（025 ADR-002）
+      // meta skill 不直接管命令，子目录按需
       if (skill.dirName === 'abap-cli') return;
-      expect(skill.hasScripts, 'scripts/ missing').toBe(true);
-      expect(skill.hasAssets, 'assets/ missing').toBe(true);
+      // 子目录仅在 SKILL.md 实际引用时才要求存在；空目录无意义
+      const content = fs.readFileSync(skill.skillMdPath, 'utf-8');
+      if (/scripts\//.test(content)) {
+        expect(skill.hasScripts, 'scripts/ referenced in SKILL.md but missing').toBe(true);
+      }
+      if (/assets\//.test(content)) {
+        expect(skill.hasAssets, 'assets/ referenced in SKILL.md but missing').toBe(true);
+      }
+      if (/references\//.test(content)) {
+        expect(skill.hasReferences, 'references/ referenced in SKILL.md but missing').toBe(true);
+      }
     },
   );
 

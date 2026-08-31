@@ -2,8 +2,8 @@
 
 ## Getting Help
 
-- **Issues**: [GitHub Issues](../../issues)
-- **Discussions**: [GitHub Discussions](../../discussions)
+- **Issues**: [GitHub Issues](https://github.com/chunrichi/abap-cli/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/chunrichi/abap-cli/discussions)
 - **Documentation**: [docs/README.md](docs/README.md)
 
 ## Reporting Bugs

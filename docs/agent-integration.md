@@ -169,4 +169,4 @@ The CLI computes sha512 of every npm entry file at startup (via `node:crypto`) a
 3. **On `EXTENSION_LOAD_FAILED`**, do **not** auto-remediate. Surface `error.code` + `error.references` to the user; let them decide whether the mismatch is intentional.
 4. **Treat `extensions.lock.json` as a build artifact** — commit it; review diffs in PRs like `package-lock.json`.
 
-See [`specs/027-extension-trust/spec.md`](specs/027-extension-trust/spec.md) for the full contract.
+See the extension trust contract (lockfile semantics, trust scopes, lock-cmd behaviour) in the repo design history.

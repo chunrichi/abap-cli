@@ -83,7 +83,7 @@ ECC 版落版时预期差异（参考，待实际核对）：
 
 新增时需同步：
 1. 在本节 Notes 上方添加新链接
-2. 在 [`.gitignore`](../../.gitignore) `wiki/*` 白名单补一行 `!wiki/adt-front-controller-<version>.md`
+2. 在仓库根 `.gitignore` 的 `wiki/*` 白名单下补一行 `!wiki/adt-front-controller-<version>.md`
 3. 在新页 frontmatter `title` 字段补版本号；正文 § 适用 SAP 版本 表格填实际探测值
 
 # references

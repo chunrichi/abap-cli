@@ -106,7 +106,7 @@ curl -s -u "$USR:$PW" \
 | **服务组发现** | `FIND_SADT_SERVICE_GROUP` —— URI 前缀 → 表 `SADT_SRVC_GRP_U` 反查所属服务组 |
 | **异常归一** | 任何 `CX_ADT_REST` → `LCL_EXCEPTION_RESPONSE~CREATE` 输出统一 ADT 异常 XML envelope |
 
-更详细内容阅读 [tmp/s4h/cls/zcl_adt_wb_res_app.prog.abap](../../tmp/s4h/cls/zcl_adt_wb_res_app.prog.abap)（641 行，仓库临时目录，非 git 资产）。
+更详细内容阅读 `CL_ADT_WB_RES_APP` 源码（641 行，仓库临时目录 `tmp/s4h/cls/`，非 git 资产——需本地按上文 curl 拉取）。
 
 ## 二、它"挂"了什么 — 本系统 ADT discovery 全清单
 
@@ -253,7 +253,7 @@ curl -s -u "$USR:$PW" \
 | Business Logic Extensions | 2 | `/sap/bc/adt/businesslogicext/...` |
 | Others（兜底） | 45 | 跨学科/产品特定 |
 
-`grep '^===' tmp/s4h/discovery-summary.txt` 可得到全部 80 个 workspace 行；完整明细见 [tmp/s4h/discovery-summary.txt](../../tmp/s4h/discovery-summary.txt)。
+`grep '^===' tmp/s4h/discovery-summary.txt` 可得到全部 80 个 workspace 行；完整明细见 `tmp/s4h/discovery-summary.txt`（仓库临时目录，非 git 资产——按上文脚本生成）。
 
 ## 三、对本仓库 CLI 的可用 / 不可用关系
 
@@ -273,12 +273,12 @@ curl -s -u "$USR:$PW" \
 ### 3.3 ADT 已暴露但 CLI 暂未覆盖（按主题列出潜在扩展）
 
 - **DDIC 高级**：DDLS（CDS 视图源）、DCLS（CDS 访问控制）、SrvD / SrvB / Type Groups / Lock Objects / External View
-- **CTS 自动化**：Workbench/运输请求完整 7 个 collection（[transport 命令已部分覆盖](../commands/transport.md)）
+- **CTS 自动化**：Workbench/运输请求完整 7 个 collection（[transport 命令已部分覆盖](commands/transport.md)）
 - **质量**：ATC（25 collection），可走 ADT 直接开 run；`check atc` 也能用
 - **调试**：Debugger 15 个 collection，`run` 之外可以加 `debugger` 子命令
 - **搜索/Inspect 高级**：Repository Information 33 个 collection（当前只用到 `search`、`whereused`、`executableObjects` 一类）
 
-完整 ADT 容量矩阵（CLI ↔ 系统暴露度）见 [tmp/s4h/discovery-summary.txt](../../tmp/s4h/discovery-summary.txt)。CLI 当前实际覆盖度参见 [object-types.md](object-types.md)。
+完整 ADT 容量矩阵（CLI ↔ 系统暴露度）见 `tmp/s4h/discovery-summary.txt`（仓库临时目录，非 git 资产）。CLI 当前实际覆盖度参见 [object-types.md](object-types.md)。
 
 # More
 
@@ -292,8 +292,8 @@ curl -s -u "$USR:$PW" \
 
 - 服务文档 `/sap/bc/adt/discovery` —— w3c App service (`application/atomsvc+xml`)
 - ICF 节点 `/sap/bc/adt`，TADIR `R3TR IWSG ADT_0001`，handler `CL_ADT_WB_RES_APP`
-- `CL_ADT_WB_RES_APP` 源码：[tmp/s4h/cls/zcl_adt_wb_res_app.prog.abap](../../tmp/s4h/cls/zcl_adt_wb_res_app.prog.abap)
-- ADT 服务清单：[tmp/s4h/discovery-summary.txt](../../tmp/s4h/discovery-summary.txt)
-- 系统信息：[tmp/s4h/system-info.xml](../../tmp/s4h/system-info.xml)
-- 组件发布：[tmp/s4h/components.xml](../../tmp/s4h/components.xml)
-- 原始 service document：[tmp/s4h/adt-discovery.xml](../../tmp/s4h/adt-discovery.xml)
+- `CL_ADT_WB_RES_APP` 源码：见 `tmp/s4h/cls/zcl_adt_wb_res_app.prog.abap`（仓库临时目录，非 git 资产——按上文 curl 脚本生成）
+- ADT 服务清单：见 `tmp/s4h/discovery-summary.txt`（同上）
+- 系统信息：见 `tmp/s4h/system-info.xml`（同上）
+- 组件发布：见 `tmp/s4h/components.xml`（同上）
+- 原始 service document：见 `tmp/s4h/adt-discovery.xml`（同上）

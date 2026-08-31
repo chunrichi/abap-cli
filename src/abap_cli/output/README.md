@@ -28,7 +28,6 @@ Top-level commander 错误（unknown command / missing arg / unknown option）�
 | [exit-codes.ts](exit-codes.ts) | 分类 → 退出码映射（0–9，稳定契约，改码需扩展合同文档） |
 | [json.ts](json.ts) | `OutputMode` / `isJsonMode`、`CliError` 类、`printResult` / `printError` / `renderError`、`printSchema`、`jsonFromCommand`、`CommandSchema` 类型 + `stripEmpty` token-efficient helper |
 | [meta.ts](meta.ts) | 普通信封 `meta` 块（command/version/timestamp/durationMs/warnings）与 schema 精简 meta（command/version/durationMs）+ `collectWarning` / `getOriginalArgv` |
-| [help-text.ts](help-text.ts) | `commonErrorsAfter()`：挂在每个命令 `--help` 尾部的错误码/退出码表 |
 | [issues.ts](issues.ts) | `CheckIssue` 输出数据模型（check 命令的 finding，不涉及错误信封） |
 
 ## 关键约定
@@ -37,7 +36,7 @@ Top-level commander 错误（unknown command / missing arg / unknown option）�
   `config/`、`formats/`、`clients/`、`core/`、`textpool/`、`dictionary/`、
   `icf/`）抛出的必须构造 `CliError`，由 `test/unit/cli-error-boundary.test.ts` 强制。
 - **退出码稳定性**：`EXIT_CODES` 的值跨版本不变；新增分类只能占用保留区间
-  （≥10）或走合同扩展。`help-text.ts` 的表与 `EXIT_CODES` 必须同步。
+  （≥10）或走合同扩展。`EXIT_CODES` 的表与分类枚举保持同步。
 - **warning ≠ error**：非致命问题（如解锁失败、ICF 探测降级）走
   `meta.warnings`（`collectWarning`），永不出现在错误信封里。
 - **stdout/stderr 分离**：`--json` 失败时 stdout 必须为空，信封 + 帮助体走
@@ -55,4 +54,4 @@ Top-level commander 错误（unknown command / missing arg / unknown option）�
 - **`getOriginalArgv()` 懒加载**（025）：取代 module-top 的 `originalArgv`
   常量；首次调用时再读 `process.argv.slice(2)`。
 - **变更提示**：改错误码表时同时更新 `error-codes.ts`、`exit-codes.ts`、
-  `help-text.ts` 和 `specs/012-unify-cli-output-contract/contracts/cli-output.md`。
+  以及 `specs/012-unify-cli-output-contract/contracts/cli-output.md`。

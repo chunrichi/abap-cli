@@ -57,7 +57,7 @@ DDIC 推送时 `--atomic` 也会结构校验 JSON（`readDdicJson` + `validateDd
 
 ### 支持的文件类型
 
-按 [file-resolver.ts](../src/abap_cli/formats/file-resolver.ts) 的文件名解析规则，push 可处理的文件：
+按 [file-resolver.ts](../../src/abap_cli/formats/file-resolver.ts) 的文件名解析规则，push 可处理的文件：
 
 | 文件 | 路由 | 说明 |
 |------|------|------|
