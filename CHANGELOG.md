@@ -6,6 +6,8 @@
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-08-31
+
 ### Added
 - **对象类型可发现性文档**：新增 `wiki/object-types.md`（9 类对象 × 4 个写命令路由矩阵；澄清"ICF"通道 vs 对象两种含义；列出 `TTYP` / DDLS-CDS / `TRAN` / `ENHO` 暂不支持）。`skills/abap-cli-edit` 决策树加 HTTP 分支 + 类型矩阵表；workflow.md 新增变体 12（HTTP 服务 pull/create/push）。`.gitignore` 增列 `!wiki/object-types.md`。
 - **DDIC TABL/STRU DDL 骨架资产**：`skills/abap-cli-edit/assets/tabl-templates/` 5 个场景（transparent-key / transparent-with-include / transparent-currency-amount / transparent-quantity-unit / structure-basic），每个含 README + cp/sed 流程。SKILL.md 决策树与 workflow.md 变体 2 引用 assets。
@@ -44,6 +46,8 @@
 ### Known limitations
 - **BTP trial `extension deploy` 仅 source-only**：on-prem 走 `cl_icf_tree`，Steampunk 仅 deploy sources + 自动 hint CF destination。
 - **BTP trial `reentranceticket` 当前不接受裸调**：trial 上唯一自动化 SSO 是 `oauth_password`。
+
+## [0.2.3] - 2026-08-31
 
 ## [0.2.2] - 2026-08-28
 
