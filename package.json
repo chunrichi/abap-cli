@@ -12,8 +12,7 @@
     "src/abap_cli/output/cli-output.schema.json",
     "abap/src",
     "skills",
-    "agents",
-    ".github"
+    "agents"
   ],
   "repository": {
     "type": "git",
