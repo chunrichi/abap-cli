@@ -1,15 +1,15 @@
 ---
 type: reference
 title: ADT 前台控制器与发现矩阵 — SAP S/4HANA 2023 SP02
-description: /sap/bc/adt 的前台控制器 CL_ADT_WB_RES_APP 职责，以及本系统（SAP S/4HANA 2023 SP02）ADT discovery 暴露的全部 workspace × collection 矩阵
+description: /sap/bc/adt 的前台控制器 CL_ADT_WB_RES_APP 职责，以及 SAP S/4HANA 2023 SP02（kernel 793 / NW 7.58 / HDB 2.0）discovery 暴露的 workspace × collection 矩阵
 tags: [abap, adt, sadt, discovery, rest, reference, s4h, s-4hana, 2023]
 created at: 2026-08-29 12:30:00
-changed at: 2026-08-29 12:30:00
+changed at: 2026-08-31 21:56:00
 ---
 
 # ADT 前台控制器与发现矩阵 — SAP S/4HANA 2023 SP02
 
-> 同名姊妹页（计划）：`-ecc-*` 适用 ECC 6.0 EHP7/EHP8 / NW 7.40 / 7.50；`-s4h-2023` 为本页（S/4HANA 2023 SP02）。两份矩阵对 ADT 路由模型同样适用，区别主要在 § 二 的 workspace 数与 collection 详情。
+> 姊妹页：[ECC 6.0 EHP7](adt-front-controller-ecc-ehp7.md)（Oracle, kernel 753 / NW 7.40）、[S/4HANA 2022 SP01](adt-front-controller-s4h-2022.md)（kernel 789 / NW 7.57 / HDB 2.0）。ADT 路由模型一致，区别集中在 § 二 的 workspace 数与 collection 详情。
 
 ## 适用 SAP 版本
 
@@ -297,3 +297,4 @@ curl -s -u "$USR:$PW" \
 - 系统信息：见 `tmp/s4h/system-info.xml`（同上）
 - 组件发布：见 `tmp/s4h/components.xml`（同上）
 - 原始 service document：见 `tmp/s4h/adt-discovery.xml`（同上）
+- 姊妹页 [ECC 6.0 EHP7](adt-front-controller-ecc-ehp7.md)、[S/4HANA 2022 SP01](adt-front-controller-s4h-2022.md)

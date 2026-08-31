@@ -59,11 +59,13 @@ changed at: 2026-08-19 23:00:00
 
 ## Notes
 
-- [SAP 层统一 JSON 生成（/ui2/cl_json）](json-generation.md) — 全 SAP 层唯一 JSON 生成方式（017）
+- [SAP 层统一 JSON 生成（/ui2/cl_json）](json-generation.md) — 全 SAP 层唯一 JSON 生成方式
 - [外部 CLI 项目学习点](cli-benchmark-learning.md)
 - [abap CLI 建议汇总](roadmap.md)
 - [abap-file-format 导出与兼容](abap-file-format-export.md)
 - [ADT 前台控制器与发现矩阵 — SAP S/4HANA 2023 SP02](adt-front-controller-s4h-2023.md) — `CL_ADT_WB_RES_APP` 职责、本系统 `/sap/bc/adt/discovery` 暴露的 80 个 workspace / 763 个 collection 矩阵与 CLI 覆盖度映射；姊妹页（ECC 等）按版本后缀追加
+- [ADT 前台控制器与发现矩阵 — S/4HANA 2022 SP01](adt-front-controller-s4h-2022.md) — S/4HANA 2022（kernel 789 / NW 7.57 / HDB 2.0）探测：106 workspace / 541 collection，与 2023 版的差异集中在 DDIC / CDS 服务模型与扩展性
+- [ADT 前台控制器与发现矩阵 — ECC 6.0 EHP7](adt-front-controller-ecc-ehp7.md) — Oracle 上的 ECC 沙盒（kernel 753 / NW 7.40）：44 workspace / 176 collection；含 DDL/DCL/AMDP 宣告（功能可用性须按 collection 核实）
 
 ### ADT 发现矩阵的姊妹页（待补）
 
@@ -72,14 +74,16 @@ changed at: 2026-08-19 23:00:00
 | 占位文件名 | 目标版本族 | 触发条件 |
 |---|---|---|
 | `adt-front-controller-s4h-2023.md` | S/4HANA 2023 SP02（kernel 793 / NW 7.58） | ✅ 已落版 |
-| `adt-front-controller-ecc-ehp7.md` | ECC 6.0 EHP7（NW 7.40） | 当有 on-prem ECC 沙盒（URL ≠ 当前 s4h）时拉一次 discovery 即落 |
-| `adt-front-controller-ecc-ehp8.md` | ECC 6.0 EHP8（NW 7.50） | 同上 |
+| `adt-front-controller-s4h-2022.md` | S/4HANA 2022 SP01（kernel 789 / NW 7.57） | ✅ 已落版 |
+| `adt-front-controller-ecc-ehp7.md` | ECC 6.0 EHP7（kernel 753 / NW 7.40） | ✅ 已落版 |
+| `adt-front-controller-ecc-ehp8.md` | ECC 6.0 EHP8（NW 7.50） | 待 ECC EHP8 沙盒接入 |
 
-ECC 版落版时预期差异（参考，待实际核对）：
-- 缺 CDS 整族（`ABAP DDL Sources` / `ABAP DCL Sources` / `CDS Annotation*` / `Service Definitions / Bindings`）
-- 缺 HANA-only 集（`HDI Namespace` / `HANA-Integration` / `DB Procedure Proxies`）
-- CTS 路径走 `/sap/bc/adt/wb/transport/...`，与 S/4HANA 的 `/sap/bc/adt/cts/...` 不同
+ECC 版落版时预期差异（参考，待实际核对；EHP7 已证伪部分假设）：
+- ~~缺 CDS 整族（`ABAP DDL Sources` / `ABAP DCL Sources` / `CDS Annotation*` / `Service Definitions / Bindings`）~~ — EHP7 实测**仍宣告** DDL/DCL/AMDP proxy/HANA 集成 collection（是否可用须按 collection 与授权核实）
+- ~~缺 HANA-only 集（`HDI Namespace` / `HANA-Integration` / `DB Procedure Proxies`）~~ — HANA-Integration 在 EHP7 宣告存在，HDI Namespace 与 DB Procedure Proxies 在 EHP7 也宣告
+- CTS 路径走 `/sap/bc/adt/wb/transport/...`，与 S/4HANA 的 `/sap/bc/adt/cts/...` 不同（EHP7 CTS endpoint 是 `/sap/bc/adt/cts`，命名相近；真实差异需逐接口核）
 - Debugger / Profiler collection 数略少（无 AMDP 调试、无 CDS 测试代码生成）
+- EHP7 多了两个 S/4HANA 没有的 workspace：`Generic WB repository object types` 与 `ABAP Documentation`
 
 新增时需同步：
 1. 在本节 Notes 上方添加新链接
