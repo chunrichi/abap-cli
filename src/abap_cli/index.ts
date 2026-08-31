@@ -113,6 +113,12 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
     load: () => import('./commands/diff.js').then((m) => ({ register: m.registerDiffCommand })),
   },
   {
+    name: 'dumps',
+    scope: 'sap',
+    description: 'List recent ST22 ABAP runtime dumps (read-only)',
+    load: () => import('./commands/dumps.js').then((m) => ({ register: m.registerDumpsCommand })),
+  },
+  {
     name: 'extensions',
     scope: 'local',
     description: 'Manage installed extensions',

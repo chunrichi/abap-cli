@@ -47,12 +47,13 @@ changed at: 2026-08-19 23:00:00
 
 ## 搜索与探查（增量）
 
-> 详见 [wiki/index.md#搜索与探查](../index.md) — 本索引只列命令；`diff` / `status` / `inspect` / `select` 在该分组：
+> 详见 [wiki/index.md#搜索与探查](../index.md) — 本索引只列命令；`diff` / `status` / `inspect` / `select` / `dumps` 在该分组：
 
 - [inspect](inspect.md) — 只读对象元数据（structure / includes / locks / activation / package）
 - [status](status.md) — 本地 vs SAP 差异（changed parts）
 - [diff](diff.md) — 本地 ↔ SAP 按 part 对比（只读）
 - [select](select.md) — 表数据只读查询（SE16N 等价）
+- [dumps](dumps.md) — 近期 ST22 ABAP runtime dump 摘要（只读，走 ADT Atom feed）
 
 ## 跨命令契约
 

@@ -1,5 +1,6 @@
-import { ADTClient, session_types, type ClientOptions, type TextElement, type TextElementCategory } from 'abap-adt-api';
+import { ADTClient, session_types, type ClientOptions, type TextElement, type TextElementCategory, type DumpsFeed } from 'abap-adt-api';
 import type { BearerFetcher } from 'abap-adt-api/build/AdtHTTP.js';
+import { dumps as adtDumps } from 'abap-adt-api/build/api/feeds.js';
 import {
   getTextElements as adtGetTextElements,
   setTextElements as adtSetTextElements,
@@ -341,5 +342,27 @@ export class AdtClientWrapper {
         ? this.client.atcWorklists(runResultId)
         : this.client.atcWorklists(runResultId, timestamp, usedObjectSet ?? '', includeExemptedFindings),
     );
+  }
+
+  // --- Runtime dumps (read-only) ---
+
+  /**
+   * List recent ST22 ABAP runtime dumps via the ADT Atom feed
+   * `/sap/bc/adt/runtime/dumps`. Read-only — never creates locks, transports, or
+   * SAP data. The `$top` query is sent to SAP so the server trims the result set
+   * before it reaches the CLI; `--user` adds an OData `$filter` when given.
+   *
+   * Bypasses `this.client.dumps(query?)` because the library wraps the query in
+   * `$query=<value>`, while SAP ADT expects OData `$top` / `$filter`. Calling
+   * the internal `dumps(h, query)` parser keeps us aligned with `DumpsFeed`
+   * type while we own the wire request.
+   */
+  dumps(limit?: number, user?: string): Promise<DumpsFeed> {
+    return this._call(() => {
+      const parts: string[] = [];
+      if (typeof limit === 'number') parts.push(`$top=${limit}`);
+      if (user) parts.push(`$filter=author eq '${user.replace(/'/g, "''")}'`);
+      return adtDumps(this.client.httpClient, parts.join(';'));
+    });
   }
 }
