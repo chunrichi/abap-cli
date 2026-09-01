@@ -453,14 +453,14 @@ export function wireToLocal(type: DdicSupportedType, wire: DdicWirePayload): Ddi
 }
 
 /**
- * Validate a local DDIC object against the per-type contract
- * (data-model.md §1-4). Returns an array of human-readable errors
- * (empty when valid). Namespace / package / transport rules enforced here.
+ * Validate a local DDIC object against the per-type contract.
+ * Returns an array of human-readable errors (empty when valid).
+ * Namespace / package / transport rules enforced here.
  */
 export function validateDdicObject(data: DdicObject, objectType: string): string[] {
   const errors: string[] = [];
   if (!data.name) {
-    // BUG-1: the file's `name` must be a top-level JSON field, not nested under
+    // The file's `name` must be a top-level JSON field, not nested under
     // `header` or anywhere else. Spell that out so first-time users stop
     // writing abap-file-format's nested header layout.
     errors.push(
@@ -468,7 +468,7 @@ export function validateDdicObject(data: DdicObject, objectType: string): string
     );
   }
 
-  // FR-004: namespace enforcement (Z/Y/slash only).
+  // Namespace enforcement: Z/Y/slash only.
   const name = data.name ?? '';
   if (name && name[0] !== 'Z' && name[0] !== 'Y' && name[0] !== '/') {
     errors.push(`Invalid namespace: name must start with Z, Y, or / (got "${name}")`);

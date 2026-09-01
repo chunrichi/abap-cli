@@ -1,5 +1,5 @@
 /**
- * Lazy command registration (P1.6).
+ * Lazy command registration.
  *
  * index.ts declares every command by name + description only; the heavy module
  * import is deferred until that command is actually dispatched or its help is

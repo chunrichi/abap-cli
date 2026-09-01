@@ -108,11 +108,11 @@ async function runCreateDdic(type: DdicSupportedType, objectName: string, opts: 
     const nextSteps = isTablDdlError
       ? [
         'Inspect the .tabl.ddic / .stru.ddic sidecar: it must start with `define table|structure <name> {` and end with `}`.',
-        'See specs/024-tabl-aff-pull/data-model.md for the supported DDL syntax.',
+        'See the abap-file-format schema (tabl-v1.json / tabt-v1.json) for the supported DDL syntax.',
       ]
       : [
         'Verify the file exists and is valid JSON.',
-        'For TABL/STRU, see specs/024-tabl-aff-pull/data-model.md for the three-piece abap-file-format layout.',
+        'For TABL/STRU, see the abap-file-format three-piece layout (`.tabl.json` + `.tabl.ddic` + `.tabl.settings.json`).',
       ];
     throw new CliError(code, `Cannot read DDIC file ${outFile}: ${message}`, {
       file: outFile,
@@ -122,12 +122,12 @@ async function runCreateDdic(type: DdicSupportedType, objectName: string, opts: 
     });
   }
 
-  // FR-004: client-side validation (fast-fail, no SAP round-trip for invalid input).
+  // Client-side validation (fast-fail, no SAP round-trip for invalid input).
   const errors = validateDdicObject(local, type);
   if (errors.length > 0) {
     const outFile = toOutputPath(opts.file);
-    // BUG-1: the example makes the wire-flat layout unambiguous so first-time
-    // users don't write the nested abap-file-format header/body layout.
+    // The example makes the wire-flat layout unambiguous so first-time users
+    // don't write the nested abap-file-format header/body layout.
     const example = getDdicFlatJsonExample(type);
     throw new CliError('VALIDATION_ERROR', `Invalid ${type} definition in ${outFile}: ${errors.join('; ')}`, {
       file: outFile,
@@ -136,14 +136,13 @@ async function runCreateDdic(type: DdicSupportedType, objectName: string, opts: 
       details: errors,
       nextSteps: [
         'Fix the errors above and re-run.',
-        `See data-model.md §1-4 for the per-type required fields, or run \`abap create ${type} --schema\` for the contract.`,
+        `Run \`abap create ${type} --schema\` for the per-type contract, or check the assets/tabl-templates/schemas/ JSON Schemas in the repo.`,
       ],
       example: `${example}\n# expected top-level fields: name, description, fields[]; description may also live under header.description`,
-      references: `specs/014-ddic-crud-textpool/quickstart.md#scenario-1`,
     });
   }
 
-  // FR-004: non-$TMP package requires a transport request.
+  // Non-$TMP package requires a transport request.
   // $TMP is case-insensitive — shells sometimes expand $TMP to "" and users retype it,
   // so accept $TMP / $tmp / $Tmp the same way extension.ts does.
   const targetPackage = (opts.package ?? '$TMP').trim().toUpperCase();
@@ -210,7 +209,7 @@ async function runCreateHttp(type: 'HTTP', objectName: string, opts: CreateOptio
     });
   }
 
-  // FR-004: client-side validation (fast-fail, no SAP round-trip for invalid input).
+  // Client-side validation (fast-fail, no SAP round-trip for invalid input).
   const errors = validateHttpObject(local);
   if (errors.length > 0) {
     const outFile = toOutputPath(opts.file);
@@ -226,8 +225,7 @@ async function runCreateHttp(type: 'HTTP', objectName: string, opts: CreateOptio
     });
   }
 
-  // FR-004: non-$TMP package requires a transport request.
-  // Case-insensitive $TMP matching: extension.ts uses the same convention.
+  // Nnsitive $TMP matching: extension.ts uses the same convention.
   const targetPackage = (opts.package ?? '$TMP').trim().toUpperCase();
   if (targetPackage !== '$TMP' && !opts.tr) {
     throw new CliError('VALIDATION_ERROR', 'transportRequest is required when package is not $TMP', {
@@ -477,7 +475,7 @@ export async function runCreate(type: string | undefined, name: string | undefin
   }
   const skeleton = template ? template.skeleton(objectName) : defaultSkeleton(type, objectName);
 
-  // --audit: capture the before-checksum (roadmap §1.2, off by default).
+  // --audit: capture the before-checksum (off by default).
   let checksum: string | undefined;
   if (opts.audit) {
     const before = await client.getObjectSource(mainPart.sourceUrl);

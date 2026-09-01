@@ -1,6 +1,6 @@
 /**
- * `extensions` command group (T013).
- * Subcommands: list (registered extensions with status), lock (027 US2).
+ * `extensions` command group.
+ * Subcommands: list (registered extensions with status), lock.
  */
 
 import { Command } from 'commander';
@@ -31,7 +31,7 @@ export function registerExtensionsCommand(program: Command): void {
     });
 
   // Lazy-load the lock subcommand so its dependencies (file I/O, lockfile)
-  // don't tax `extensions list --json` startup (P1.6 parity).
+  // don't tax `extensions list --json` startup.
   extensions
     .command('lock')
     .description('Compute or refresh extensions.lock.json (npm extensions only)')

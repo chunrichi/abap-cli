@@ -115,13 +115,13 @@ export function wireToLocal(wire: HttpWirePayload): HttpObjectLocal {
 /**
  * Validate a local HTTP object against the abap-file-format contract.
  * Returns an array of human-readable errors (empty when valid).
- * Namespace rule: Z/Y/slash only (matches FR-004 and DDIC convention).
+ * Namespace rule: Z/Y/slash only (matches DDIC convention).
  */
 export function validateHttpObject(data: HttpObjectLocal): string[] {
   const errors: string[] = [];
   if (!data.name) errors.push('Missing required field: name');
 
-  // Namespace enforcement: Z/Y/slash (matches DDIC FR-004).
+  // Namespace enforcement: Z/Y/slash (DDIC convention).
   const name = data.name ?? '';
   if (name && name[0] !== 'Z' && name[0] !== 'Y' && name[0] !== '/') {
     errors.push(`Invalid namespace: name must start with Z, Y, or / (got "${name}")`);

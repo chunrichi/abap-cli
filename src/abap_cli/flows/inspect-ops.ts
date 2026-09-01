@@ -77,8 +77,8 @@ export interface InspectFlags {
 }
 
 /**
- * Inspect an object's metadata read-only (FR-011..014). Never calls lock() —
- * lock/transport ownership is read via transportInfo (research §2).
+ * Inspect an object's metadata read-only. Never calls lock() —
+ * lock/transport ownership is read via transportInfo.
  */
 export async function inspectObject(client: AdtClientWrapper, name: string, flags: InspectFlags = {}): Promise<InspectResult> {
   // resolveObject gives exact-name resolution + OBJECT_NOT_FOUND/AMBIGUOUS_OBJECT.
@@ -170,7 +170,7 @@ async function checkActivation(
     }
     parts.push({ includeType: inc['class:includeType'] ?? 'main', sourceUri, active });
   }
-  // #4: ADT `includeType:main` reports active=false for the INCLUDE program even
+  // ADT `includeType:main` reports active=false for the INCLUDE program even
   // when the class itself is fully active. Treat only the implementation parts
   // (`implementations` / `definitions` / `testclasses` / `macros`) as the source
   // of truth — `main` is reported for visibility but excluded from the ok flag.

@@ -12,7 +12,7 @@ import { setExtensionRegistry as setExtRegJson, CliError, renderError } from './
 import { EXIT_GENERIC_FALLBACK } from './output/exit-codes.js';
 import { loadConfig } from './config/project-config.js';
 
-// 声明式惰性注册（P1.6）：只有 name + description 在启动时加载，模块体在
+// 声明式惰性注册：只有 name + description 在启动时加载，模块体在
 // 命令真正被调用（或请求其 --help）时才 import。
 const COMMAND_SPECS: LazyCommandSpec[] = [
   {
@@ -141,13 +141,13 @@ program
   .option('--json', 'Output in JSON format (compact, default for agents)')
   .option('--pretty-json', 'Output in pretty JSON format (overrides --json)');
 
-// 顶层错误处理（FR-005/FR-007）：commander 抛错（缺参/未知选项）由这里归一化为
+// 顶层错误处理：commander 抛错（缺参/未知选项）由这里归一化为
 // 结构化错误；--help/--version 让 commander 自己写 stdout（包含 addHelpText
 // 后置 section），我们在 catch 里只补 USAGE/JSON 信封和退出码，避免重复。
 program.exitOverride();
 program.configureOutput({ writeErr: () => {} });
 
-// Register all commands lazily (P1.6): stubs up front, modules on demand.
+// Register all commands lazily: stubs up front, modules on demand.
 registerLazyCommands(program, COMMAND_SPECS);
 
 setProgram(program);
@@ -223,7 +223,7 @@ program.hook('postAction', async (_thisCmd, actionCmd) => {
 });
 
 try {
-  // parseAsync: lazy commands (P1.6) dispatch through an async _parseCommand,
+  // parseAsync: lazy commands dispatch through an async _parseCommand,
   // so commander's sync help/error throws surface as rejections that only
   // parseAsync (which awaits the chain) re-throws into this catch block.
   await registry.dispatch('beforeParse', {

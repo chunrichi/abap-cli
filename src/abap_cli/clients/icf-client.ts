@@ -125,8 +125,8 @@ export class IcfClient {
    *
    * The SAP-side handler validates the request against DD02L/DD03L metadata,
    * parses the `where` clause, and executes a dynamic Open SQL statement with
-   * value parameters bound separately (see research.md R1/R2 for the
-   * injection-safety contract).
+   * value parameters bound separately (injection-safety contract: never string-
+   * concatenate user input into the SQL).
    *
    * Caller responsibility:
    *   - `table` must be a non-empty string (DDIC lookup is downstream)

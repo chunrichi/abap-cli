@@ -159,5 +159,5 @@ abap diff src/clas/zcl_foo/zcl_foo.clas.abap --remote PRD --json
 ## references
 
 - 用户文档：[docs/commands.md#abap-diff](../../docs/commands.md#abap-diff)
-- 设计决策：[specs/004-pull-push-check-loop/spec.md](../../specs/004-pull-push-check-loop/spec.md)
+- 设计决策：见 wiki 顶层 `pull-push-check-loop` 历史回顾（设计文档不入 git，详见仓库 wiki）
 - 同步工作流：[skills/abap-cli-edit/SKILL.md](../../skills/abap-cli-edit/SKILL.md)（决策树）

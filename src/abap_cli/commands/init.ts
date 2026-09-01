@@ -16,7 +16,7 @@ function initParamHelp(): string {
     '  Clear fields:     --unset-package | --unset-tr | --unset-source-dir',
     '                    (remove a single key from .abap.json; --yes to skip prompt)',
     '  Direct fields:    --url, --client, --username, --password, --language, --insecure, --ca',
-    '                    (TTY mode only — non-interactive refuses per FR-022)',
+    '                    (TTY mode only — non-interactive refuses)',
     '  Test/verify:      --test-connection, --test-tls, --test-auth',
     '  Agent scaffold:   --agent copilot|claude|cursor|generic [--force]',
     '  Non-interactive:  --yes / --non-interactive',

@@ -136,5 +136,5 @@ abap inspect ZCL_FOO --includes --locks --package --json
 ## references
 
 - 用户文档：[docs/commands.md#abap-inspect](../../docs/commands.md#abap-inspect)
-- 设计决策：[specs/013-icf-interface-implementation/spec.md](../../specs/013-icf-interface-implementation/spec.md)
-- 修复脚本：直接走 `abap inspect <obj> --activation --json` + `abap activate <obj> --yes --json`（`inspect-activation.sh` 已并入 abap-object 时删除，agent 可按 SKILL.md 错误恢复表按需现写）
+- 设计决策：见 wiki 顶层 `icf-interface-implementation` 历史回顾（设计文档不入 git）
+- 修复脚本：直接走 `abap inspect <obj> --activation --json` + `abap activate <obj> --yes --json`（agent 可按 SKILL.md 错误恢复表按需现写）

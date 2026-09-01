@@ -87,7 +87,7 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
 
   // --atomic phase 1: structural validation of every file (NO content syntax
   // check — it establishes an SAP edit session that breaks the later activate,
-  // per 008 real-SAP findings and research §11). Any failure → zero writes.
+  // per real-SAP findings). Any failure → zero writes.
   if (opts.atomic) {
     const validationFailures: { file: string; code?: string; message: string }[] = [];
     for (const file of target.files) {
@@ -135,7 +135,7 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
     const stages: PushStage[] = [];
     const onStage = (s: PushStage) => stages.push(s);
     try {
-      // ValidationRule hook: FR-002
+      // ValidationRule hook
       await getExtensionRegistry().runValidation('push', {
         command: 'push',
         argv: process.argv.slice(2),

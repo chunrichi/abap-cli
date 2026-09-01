@@ -133,7 +133,7 @@ export async function handleFileOverwrite(mode: 'prompt' | 'overwrite' | 'refuse
   // mode === 'overwrite': fall through and overwrite.
 }
 
-/** T012: Input validation. */
+/** Input validation. */
 export function validateInputs(config: CollectedConfig): void {
   // Only `basic` requires a stored password — cert / browser_sso / oauth_password
   // supply credentials via different storage (cert files, cookie jar, env).
@@ -158,7 +158,7 @@ export async function writeConfig(systemName: string, config: CollectedConfig, m
   if (!mode) console.log('Workspace initialized.');
 }
 
-/** T013: JSON output */
+/** JSON output */
 export function outputJson(
   systemName: string,
   config: CollectedConfig,
@@ -184,7 +184,7 @@ export function outputJson(
 }
 
 /**
- * Informational ICF deployment check (FR-012..FR-015).
+ * Informational ICF deployment check.
  * Never throws or blocks init: unreachable degrades to a warning.
  */
 export async function icfDeploymentCheck(mode: OutputMode, profileName?: string): Promise<IcfDeploymentInfo | undefined> {
@@ -220,10 +220,9 @@ export async function icfDeploymentCheck(mode: OutputMode, profileName?: string)
 }
 
 /**
- * Core parameterized write for `abap init`. Replaces the legacy
- * `runConfigFromOpts`. `--profile <name>` references an existing global
- * profile (formerly `--system`). Full connection params still create a
- * new profile in TTY mode (FR-022 unchanged).
+ * Core parameterized write for `abap init`. `--profile <name>` references an
+ * existing global profile. Full connection params still create a new profile
+ * in TTY mode.
  */
 export async function runInitFromOpts(opts: CommandOpts, mode: OutputMode): Promise<void> {
   const isNonTty = !process.stdin.isTTY;
@@ -232,7 +231,7 @@ export async function runInitFromOpts(opts: CommandOpts, mode: OutputMode): Prom
     (opts.username || process.env.SAP_USER) &&
     !!opts.password;
 
-  // FR-022: in non-interactive mode init never creates or mutates profiles.
+  // Non-interactive mode: init never creates or mutates profiles.
   if (isNonTty && hasFullParams) {
     throw new CliError(
       'VALIDATION_ERROR',
@@ -362,10 +361,10 @@ function resolveAuthFromOpts(opts: CommandOpts): AuthConfig {
 /**
  * Prompt for a brand-new system profile.
  *
- * Order rationale (FR-022 + UX): identity first (URL → Client → Username →
- * Language), credentials last (insecure / ca → password). Asking for a
- * password before the user has named the system feels backwards and forces
- * them to juggle password-manager + paste + URL simultaneously.
+ * Order rationale (UX): identity first (URL → Client → Username → Language),
+ * credentials last (insecure / ca → password). Asking for a password before
+ * the user has named the system feels backwards and forces them to juggle
+ * password-manager + paste + URL simultaneously.
  */
 async function collectNewSystem(opts: CommandOpts): Promise<CollectedConfig> {
   const auth = resolveAuthFromOpts(opts);

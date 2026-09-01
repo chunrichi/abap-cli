@@ -1,5 +1,5 @@
 /**
- * Envelope meta + structured warnings (FR-003/FR-004).
+ * Envelope meta + structured warnings.
  *
  * Public API:
  *  - setProgram: register the commander program once (from index.ts) so

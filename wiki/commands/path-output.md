@@ -172,5 +172,4 @@ printResult(mode, { file: toOutputPath(path.join('src', name)) });
 
 - [abap-file-format-export.md](../abap-file-format-export.md) — 路径布局的规范来源
 - `src/abap_cli/core/path-output.ts` — 边界 helper 实现
-- `specs/022-unify-json-generation/` — JSON 输出契约（POSIX 路径是该契约的一部分）
-- [GitHub issue: Windows 路径 54/756 测试失败] (内部反馈，未公开 issue)
+- JSON 输出契约：见 wiki 顶层 `unify-json-generation` 历史回顾（POSIX 路径是该契约的一部分）

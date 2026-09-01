@@ -232,7 +232,7 @@ async function collectFiles(files: string[], opts: CheckOptions): Promise<string
 
 /**
  * The change set: local files whose mtime is newer than the SAP object's
- * changedAt (research §7). Empty set fails fast with guidance.
+ * changedAt. Empty set fails fast with guidance.
  */
 async function collectChangedFiles(): Promise<string[]> {
   const client = await AdtClientWrapper.create();
@@ -330,7 +330,7 @@ async function syntaxIssues(
   }));
 }
 
-/** Local-only validation for --content (research §6): no SAP calls. */
+/** Local-only validation for --content: no SAP calls. */
 async function contentIssues(
   file: string,
   resolved: { objectName: string; objectType: string; subtype: string; route: string },

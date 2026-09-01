@@ -14,7 +14,7 @@
  * (src/abap_cli/core/classrun-output.ts). The flow here:
  *   - chooses the route based on `opts.method`
  *   - times the classrun via `performance.now()` deltas
- *   - maps JSON `code` to `ErrorCode` per data-model §5
+ *   - maps JSON `code` to `ErrorCode`
  *   - constructs a `RunResult` that `printResult` / `printError` consume
  */
 
@@ -67,7 +67,7 @@ const CLASS_NAME_REGEX = /^[A-Za-z][A-Za-z0-9_~]{0,29}$/;
 /** Method name regex (stricter — must start with letter/underscore). */
 const METHOD_NAME_REGEX = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-/** Timeout bounds (per FR-002). */
+/** Timeout bounds. */
 const TIMEOUT_MIN = 100;
 const TIMEOUT_MAX = 600_000;
 const TIMEOUT_DEFAULT = 30_000;
@@ -165,7 +165,7 @@ function isLocalClass(name: string): boolean {
 }
 
 /**
- * Map a classrun JSON `code` (data-model §5) to an `ErrorCode`.
+ * Map a classrun JSON `code` to an `ErrorCode`.
  * Unknown codes fall back to `SAP_ERROR` per spec.
  */
 function mapClassrunCode(code: string | undefined): ErrorCode {
@@ -253,7 +253,7 @@ export async function runRun(
 
   const adt = client ?? (await AdtClientWrapper.create());
 
-  // ValidationRule hook: FR-002 — before SAP invocation
+  // ValidationRule hook: before SAP invocation
   await getExtensionRegistry().runValidation('run', {
     command: 'run',
     argv: process.argv.slice(2),
@@ -285,7 +285,7 @@ export async function runRun(
 /**
  * CLI-side timeout fallback. SAP-side (wrapper route) already enforces
  * `--timeout` via cl_abap_runtime; this guards against the wrapper not
- * returning at all. Exported for tests (T038 spies on abort()).
+ * returning at all. Exported for tests so abort() can be spied on.
  */
 export async function withTimeout<T>(
   promise: Promise<T>,

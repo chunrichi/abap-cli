@@ -53,7 +53,7 @@ export type ErrorCode =
   | 'OVERWRITE_REQUIRED'   // NEW
   | 'PUSH_FAILED'
   | 'PULL_PARTIAL_FAILURE'  // some objects in a pull succeeded, others failed (VALIDATION_ERROR)
-  | 'VALIDATION_ERROR'     // semantic rejection (exit 7); see contracts §3
+  | 'VALIDATION_ERROR'     // semantic rejection (exit 7)
   | 'OBJECT_EXISTS'        // normalized legacy code (USAGE/2), used by create.ts
   | 'FILE_EXISTS'          // normalized legacy code (USAGE/2), used by init.ts
   | 'COMMAND_MOVED'        // normalized legacy code (VALIDATION_ERROR/7); command retired (e.g. atc → check atc)

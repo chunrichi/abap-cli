@@ -85,7 +85,7 @@ function collectAllReferences(details: RawTransportDetails): TransportObjectInfo
   return [...direct, ...fromTasks];
 }
 
-/** Structured metadata for `transport show <req>` (FR-015, research §8). */
+/** Structured metadata for `transport show <req>`. */
 export async function showTransport(client: AdtClientWrapper, number: string): Promise<TransportRequestInfo> {
   try {
     const details = (await client.transportDetails(number)) as RawTransportDetails;
@@ -127,7 +127,7 @@ export async function resolveObjectTransport(
 
 /**
  * Attach an object to a transport by writing its current source back with the
- * target transport as corrNr (research §8). Already-assigned → no-op.
+ * target transport as corrNr. Already-assigned → no-op.
  */
 export async function assignObjectToTransport(
   client: AdtClientWrapper,

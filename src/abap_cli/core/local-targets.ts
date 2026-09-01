@@ -19,7 +19,7 @@ export interface ResolveLocalTargetsOptions {
 /**
  * Resolve the list of files a command should operate on. Behaviour:
  *  - When `files` is set: return them resolved against `cwd` (no ignore applied
- *    — explicit files always win, per FR-017 acceptance scenario).
+ *    — explicit files always win).
  *  - When `all` is set: walk `sourceDir` (`.abap.json::sourceDir`, else cwd)
  *    recursively, honouring `.abapignore` + defaults.
  *

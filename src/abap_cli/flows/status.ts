@@ -34,7 +34,7 @@ export interface StatusOptions {
 
 /**
  * Compare the local file set against SAP and produce a standardized
- * changedParts list (FR-012/FR-013, research §7).
+ * changedParts list.
  */
 export async function computeChangedParts(client: AdtClientWrapper, opts: StatusOptions = {}): Promise<StatusResult> {
   const cwd = opts.cwd ?? process.cwd();
@@ -75,7 +75,7 @@ export async function computeChangedParts(client: AdtClientWrapper, opts: Status
     }
   }
 
-  // Remote-only enumeration, bounded by --limit (research §7).
+  // Remote-only enumeration, bounded by --limit.
   const limit = opts.limit ?? SEARCH_RESULT_LIMIT;
   const remoteAll = await client.searchObject('', undefined, limit);
   const localNames = new Set(targets.files.map((f) => resolveFile(f).objectName));
@@ -88,8 +88,8 @@ export async function computeChangedParts(client: AdtClientWrapper, opts: Status
   let filtered = parts;
   if (opts.remoteOnly) filtered = filtered.filter((p) => p.direction === 'remote-only');
   if (opts.localOnly) filtered = filtered.filter((p) => p.direction === 'local-only');
-  // The default limit always bounds the result (roadmap §1.1); truncation is
-  // signalled when the remote enumeration or the combined list is capped.
+  // The default limit always bounds the result; truncation is signalled when
+  // the remote enumeration or the combined list is capped.
   const truncated = remoteAll.length >= limit || filtered.length > limit;
   filtered = filtered.slice(0, limit);
 

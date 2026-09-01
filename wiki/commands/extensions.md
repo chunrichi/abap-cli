@@ -76,11 +76,11 @@ abap extensions --schema                                # 参数自省
 
 ## `abap extensions lock`
 
-从 `.abap.json` 的 `extensions[]` 重新计算 `extensions.lock.json`。每个 `sourceType: 'npm'` 扩展通过 `createRequire(import.meta.url).resolve(...)` 解析后，按解析入口文件的字节计算 `sha512-<base64>` 并钉到 lockfile。`sourceType: 'path'` 扩展**lockfile 豁免**（FR-006），仅在 load 时校验 `path_escapes_allowlist` / `path_contains_parent_ref`。
+从 `.abap.json` 的 `extensions[]` 重新计算 `extensions.lock.json`。每个 `sourceType: 'npm'` 扩展通过 `createRequire(import.meta.url).resolve(...)` 解析后，按解析入口文件的字节计算 `sha512-<base64>` 并钉到 lockfile。`sourceType: 'path'` 扩展**lockfile 豁免**，仅在 load 时校验 `path_escapes_allowlist` / `path_contains_parent_ref`。
 
 ### Options
 
-- `--allow-unsigned`: 首次创建 `extensions.lock.json` 必须显式传。无 flag 时若 lockfile 不存在 → `CONFIG_ERROR`（exit 3），避免敌意 `.abap.json` 在首次运行时静默自我钉入 lockfile（FR-007）。
+- `--allow-unsigned`: 首次创建 `extensions.lock.json` 必须显式传。无 flag 时若 lockfile 不存在 → `CONFIG_ERROR`（exit 3），避免敌意 `.abap.json` 在首次运行时静默自我钉入 lockfile。
 - `--json`: 标准 envelope `{status, meta, data}`，`data = { lockfile, lastResolved, added, updated, removed, unresolved }`。
 - `--pretty-json`: 同上，缩进。
 
@@ -129,9 +129,7 @@ abap extensions list --json
 
 ## references
 
-- spec: [`specs/027-extension-trust/spec.md`](../../specs/027-extension-trust/spec.md) §FR-007 / §FR-008 / §FR-010
-- contract: [`specs/027-extension-trust/contracts/extensions-lock-v1.md`](../../specs/027-extension-trust/contracts/extensions-lock-v1.md)
-- data model: [`specs/027-extension-trust/data-model.md`](../../specs/027-extension-trust/data-model.md) §1 / §3
+- 信任硬化设计：见 wiki 顶层 `extension-trust` 历史回顾（设计文档不入 git，详见仓库 wiki）
 - subcommand detail: [`wiki/commands/extensions-lock.md`](extensions-lock.md)
 - sibling: [`wiki/commands/extension.md`](extension.md) — 内置 ICF ABAP 扩展管理器（不相关）
 - architecture: [`docs/architecture.md#extension-layer`](../../docs/architecture.md)

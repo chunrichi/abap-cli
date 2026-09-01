@@ -41,10 +41,10 @@ export function compareVersions(remote: string, expected: string): 'current' | '
 }
 
 /**
- * Probe ICF deployment state (FR-012..FR-015, four states).
+ * Probe ICF deployment state (four states).
  * Never throws: not_deployed / unreachable are reported, not raised.
  *
-// When `profileName` is provided, also detects ADT runtime tier
+ * When `profileName` is provided, also detects ADT runtime tier
  * (steampunk → icfSetupBlocked=true). The runtime probe runs in parallel
  * with the version probe so latency stays at ~1 round-trip.
  */

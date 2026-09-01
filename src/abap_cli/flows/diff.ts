@@ -7,7 +7,7 @@ import { readAbapFile } from '../formats/abap-source.js';
 import { resolveObject, getObjectParts } from '../core/resolve.js';
 import { computeChangedParts, type ChangedPart, type ChangeDirection } from './status.js';
 
-/** Bounded line-change summary for one part (no full unified diff, FR-015). */
+/** Bounded line-change summary for one part (no full unified diff). */
 export interface DiffSummary {
   added: number;
   removed: number;
@@ -115,8 +115,8 @@ async function diffSingleFile(client: AdtClientWrapper, file: string): Promise<D
 }
 
 /**
- * Compare local files against SAP (FR-015..017). With a `file`, only that file is
- * compared; otherwise the whole workspace is covered (via computeChangedParts).
+ * Compare local files against SAP. With a `file`, only that file is compared;
+ * otherwise the whole workspace is covered (via computeChangedParts).
  * `--remote`/`--local-only` scope the result; `--limit` bounds it. Read-only.
  */
 export async function computeDiff(client: AdtClientWrapper, opts: DiffOptions = {}): Promise<DiffResult> {

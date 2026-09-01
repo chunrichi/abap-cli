@@ -2,12 +2,9 @@ import type { ErrorCategory } from './error-codes.js';
 
 /**
  * Sequential exit codes (0–9). 0 = success, 1 = unknown fallback, 2–9 = categories.
- * Stability contract (FR-007/FR-008): existing values NEVER change across
- * versions; new categories only occupy the reserved range (≥10) or are added
- * via an explicit contract-document extension. Source of truth:
- * specs/012-unify-cli-output-contract/contracts/cli-output.md §4.
- * Per [research §2](../../../../specs/008-cli-foundation/research.md#2-categorised-exit-codes-fr-003)
- * the mapping lives here so changes do not touch call sites.
+ * Stability contract: existing values NEVER change across versions; new categories
+ * only occupy the reserved range (≥10) or are added via an explicit extension.
+ * The mapping lives here so changes do not touch call sites.
  */
 export const EXIT_CODES: Record<ErrorCategory, number> = {
   UNKNOWN: 1,

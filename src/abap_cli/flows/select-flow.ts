@@ -11,7 +11,7 @@
  * Design conventions follow the established 015 `run-flow.ts` pattern:
  *   - `parseArgs`-style normalisers for option strings (with `CliError` on bad input)
  *   - `runSelect` is the main entry; pure `interpret` is exported for tests
- *   - Errors are mapped via a single table (data-model §6) to `ErrorCode`
+ *   - Errors are mapped via a single table to `ErrorCode`
  *   - All side-effect-free paths (dry-run, build) are exported for the command layer
  */
 
@@ -296,11 +296,11 @@ export function buildDryRun(table: string, opts: SelectOptions): SelectResult {
 
 /**
  * Map a wire error code to the CLI `ErrorCode` category. Unknown codes fall
- * back to `SAP_ERROR` per the spec (data-model §6).
+ * back to `SAP_ERROR` per the spec.
  *
- * The endpoint's codes are the canonical 016 codes (TABLE_NOT_FOUND, etc.).
- * Earlier `US3` introduces additional codes (INVALID_WHERE, LIMIT_EXCEEDED,
- * OFFSET_EXCEEDED, QUERY_FAILED) and the same mapping applies.
+ * The endpoint's codes are the canonical ones (TABLE_NOT_FOUND, etc.).
+ * Additional codes (INVALID_WHERE, LIMIT_EXCEEDED, OFFSET_EXCEEDED,
+ * QUERY_FAILED) use the same mapping.
  */
 function mapDataQueryCode(code: string | undefined): ErrorCode {
   switch (code) {
@@ -437,7 +437,7 @@ export async function runSelect(
   const wire = buildDataQueryRequest(req);
   const icf = client ?? (await IcfClient.create());
 
-  // ValidationRule hook: FR-002
+  // ValidationRule hook
   await getExtensionRegistry().runValidation('select', {
     command: 'select',
     argv: process.argv.slice(2),

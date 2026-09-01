@@ -101,6 +101,6 @@ abap dumps --schema
 
 # references
 
-- spec: `specs/031-abap-dumps/spec.md`
+- 设计：见 wiki 顶层 `abap-dumps` 历史回顾
 - ABAP 侧无需改动
 - ADT 端点：`GET /sap/bc/adt/runtime/dumps`（接受 `application/atom+xml;type=feed`）

@@ -1,19 +1,17 @@
 /**
  * Profile auth-shape normalizer.
  *
- * Two shapes exist on disk:
- *
- *   **v1 (legacy)** — flat discriminator + optional blocks:
+ * Two shapes exist on disk — flat fields with optional blocks:
  *     ```
  *     {
- *       "authMethod": "cert",                  // optional, defaults to "basic"
+ *       "authMethod": "cert",
  *       "certAuth": { "certPath": "...", "keyPath": "..." },
  *       "ssoCookieFile": "/path/to/cookies.json",
  *       "oauthPassword": { "uaaUrl": "...", ... }
  *     }
  *     ```
  *
- *   **v2 (canonical)** — discriminated union under `auth`:
+ * and the canonical discriminated union under `auth`:
  *     ```
  *     {
  *       "auth": { "method": "cert", "cert": { "certPath": "...", ... } }
@@ -21,11 +19,10 @@
  *     ```
  *
  * `normalizeAuth` accepts either shape and returns the canonical `AuthConfig`.
- * The inverse (`serializeAuth`) writes v2 only — new profiles must use v2.
+ * The inverse (`serializeAuth`) writes the canonical shape only.
  *
- * Why two shapes exist on disk: 025/026/027 shipped before the canonical type.
- * Future reads always go through `normalizeAuth` so the rest of the code base
- * can assume v2 only.
+ * `normalizeAuth` is the only path that touches the flat shape on disk; the
+ * rest of the code base can assume the canonical shape.
  */
 import type { AuthConfig, AuthMethodV2, CertAuthBlock, OAuthPasswordBlock, SsoAuthBlock } from './v2-types.js';
 import { DEFAULT_AUTH_CONFIG } from './v2-types.js';

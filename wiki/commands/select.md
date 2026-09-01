@@ -11,9 +11,9 @@ changed at: 2026-08-09 00:00:00
 
 为 Agent 提供 **SE16N 等价**的数据查询能力：在 CLI 端用一条命令完成"看这条记录"，无需打开 SAP GUI 或 SE16N。走 013 自建 ICF 服务的新增 `POST /sap/zabap_vibe/data/query` 端点（服务版本 0.4.0），继承 014 DDIC CRUD 已建立的统一 JSON 信封与认证。
 
-`abap select` 是**严格只读**命令——不获取锁、不触发 transport、不激活、不修改表数据。Agent 可放心地在 push → run → verify 闭环中反复调用：表数据、传输请求、对象激活状态查询前后零变化（spec SC-004）。
+`abap select` 是**严格只读**命令——不获取锁、不触发 transport、不激活、不修改表数据。Agent 可放心地在 push → run → verify 闭环中反复调用：表数据、传输请求、对象激活状态查询前后零变化。
 
-> ⚠️ **约束（roadmap P1）**: 014 落地 DDIC **定义** CRUD；016 是数据层首个能力。后续可叠加 `abap export`（快照批量导出）/ `abap impact`（影响分析）等数据相关能力。
+> ⚠️ **约束**: 当前 `abap select` 是数据层首个能力；DDIC 定义 CRUD 已由更早的能力覆盖。后续可叠加 `abap export`（快照批量导出）/ `abap impact`（影响分析）等数据相关能力。
 
 ## Usage
 
@@ -153,10 +153,4 @@ QUERY_FAILED              runtime SQL failure             →  abap activate <ta
 
 ## 引用
 
-- spec: `specs/016-abap-select/spec.md`
-- plan: `specs/016-abap-select/plan.md`
-- research（动态 SQL 注入安全 + DDIC 元数据 + 行类型构建）: `specs/016-abap-select/research.md`
-- data-model（实体 + 错误映射）: `specs/016-abap-select/data-model.md`
-- contracts（HTTP / CLI 契约）: `specs/016-abap-select/contracts/`
-- quickstart（mock + 真实 SAP 验证场景）: `specs/016-abap-select/quickstart.md`
-- tasks（54 个任务）: `specs/016-abap-select/tasks.md`
+- 设计回顾：见 wiki 顶层 `abap-select` 历史回顾（动态 SQL 注入安全 + DDIC 元数据 + 行类型构建）

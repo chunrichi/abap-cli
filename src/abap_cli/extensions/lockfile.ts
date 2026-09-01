@@ -1,8 +1,7 @@
 /**
- * `extensions.lock.json` — npm extension integrity pinning (027 US2 / US3).
+ * `extensions.lock.json` — npm extension integrity pinning.
  *
  * Hashing is local-only (`node:crypto`); no network, no new dependencies.
- * See data-model.md §1-§3 and contracts/extensions-lock-v1.md.
  */
 
 import { createHash } from 'node:crypto';
@@ -114,7 +113,7 @@ function isValidEntry(raw: unknown): raw is ExtensionLockEntry {
 
 /**
  * Read + validate the lockfile. Returns null when absent or corrupt —
- * a corrupt lockfile is treated as `absent` per data-model.md §2.
+ * a corrupt lockfile is treated as `absent`.
  */
 export async function readLockfile(projectRoot: string): Promise<ExtensionsLock | null> {
   let text: string;
@@ -290,7 +289,7 @@ export async function regenerateLock(
   };
 }
 
-/** Suggested remediation steps per failure reason (data-model.md §3). */
+/** Suggested remediation steps per failure reason. */
 export function lockNextSteps(reason: string): string[] {
   switch (reason) {
     case 'INVALID_PACKAGE_NAME':

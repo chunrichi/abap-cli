@@ -366,7 +366,7 @@ async function deployOneObject(
 
 /**
  * Collect every inactive item belonging to the given object and activate them
- * via the per-item ADT endpoint. Mirrors `abap activate <object>` (FR-013.1).
+ * via the per-item ADT endpoint. Mirrors `abap activate <object>`.
  * Errors here are surfaced as ACTIVATION_FAILED so a stale-activation state
  * never silently propagates into the subsequent ICF setup step.
  */

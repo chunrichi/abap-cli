@@ -241,4 +241,4 @@ abap transport assign ZCL_DEMO --tr NDK123456 --dry-run
 - 实现：`src/abap_cli/commands/transport.ts`、`src/abap_cli/flows/transport-ops.ts`（`TransportRequestInfo` / `TransportTaskInfo` / `TransportObjectInfo` 类型 + `showTransport` 嵌套任务展开）、`src/abap_cli/core/transport.ts`（`resolveTransport`，push/create/extension deploy 共用）、`src/abap_cli/core/confirmation.ts`
 - 文档：`docs/commands.md`（`## abap transport` 章节）
 - 测试：`test/unit/transport-metadata.test.ts`（show/resolve/assign 元数据 + 写保护 6 分支）、`test/unit/pull-tr.test.ts`（`--tr` 拉取 + 去重）
-- 设计：`specs/006-transport-request-management/`
+- 设计：见 wiki 顶层 `transport-request-management` 历史回顾

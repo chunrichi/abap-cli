@@ -11,7 +11,7 @@ import type { ErrorCode } from '../output/error-codes.js';
  * Used when: module not found, syntax error, timeout, recursion guard, path escape.
  * 027 US2/US3 — adds INVALID_PACKAGE_NAME / LOCKFILE_MISSING_ENTRY /
  * LOCKFILE_INTEGRITY_MISMATCH / INTEGRITY_UNRESOLVABLE reasons with
- * nextSteps hint to recover (data-model.md §3 / contracts §3).
+ * nextSteps hint to recover.
  */
 export function extensionLoadFailed(
   nameOrPath: string,

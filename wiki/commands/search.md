@@ -119,4 +119,4 @@ abap search 'ZCL_*' --json
 - 底层：`abap-adt-api` `api/search.js`（quickSearch 无 offset，maxResults 实测支持至 5000）
 - 测试：`test/unit/search-pagination.test.ts`、`test/unit/search-page-all.test.ts`
 - 相关：`src/abap_cli/core/resolve.ts`（对象解析的裸名 `*NAME*` 重试逻辑）
-- 文档：`specs/007-abap-search/spec.md`
+- 文档：见 wiki 顶层 `abap-search` 历史回顾（设计文档不入 git，详见仓库 wiki）

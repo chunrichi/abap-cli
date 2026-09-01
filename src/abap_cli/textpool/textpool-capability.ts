@@ -1,7 +1,7 @@
 import { getSystem, upsertSystem } from '../config/user-config.js';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 
-/** Capability record persisted on SystemProfile (014 data-model §6a). */
+/** Capability record persisted on SystemProfile. */
 export interface TextpoolCapability {
   read: boolean;
   write: boolean;

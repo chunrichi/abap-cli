@@ -32,7 +32,6 @@
 | `AUTH_ERROR` | AUTH_ERROR/5 | select | 跳 `abap-cli-setup`：`profile test`；检查 `S_TABU_DIS` |
 | `ICF_CHECK_DEGRADED` | warning（`meta.warnings`） | select | 不阻断；跳 `abap-cli-setup` 跑 `extension status` |
 
-## 完整 012 契约参考
+## JSON 输出契约参考
 
-- <https://github.com/SAP/abap-cli/blob/main/docs/commands.md#json-output-contract>
-- <https://github.com/SAP/abap-cli/blob/main/specs/012-unify-cli-output-contract/contracts/cli-output.md>
+- 契约规范：见本仓库 `wiki/json-generation.md`（POSIX 路径是该契约的一部分）

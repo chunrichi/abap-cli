@@ -3,7 +3,7 @@ import { CliError } from '../output/json.js';
 
 /**
  * Resolve the transport request: --tr > project config > user's first modifiable request.
- * Throws NO_TRANSPORT when nothing is available (contracts/cli-commands.md FR-006).
+ * Throws NO_TRANSPORT when nothing is available.
  *
  * When `transportOptional` is true (caller is targeting $TMP), an empty string is
  * returned instead of throwing — $TMP objects are local and don't need a transport.

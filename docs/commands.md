@@ -1067,7 +1067,7 @@ Generated from the `errors` array of every command schema (single source of trut
 
 ## See also
 
-- Unified envelope contract: see the repo design history under specs/012-unify-cli-output-contract/contracts/cli-output.md
+- Unified envelope contract: see the repo design history under `wiki/json-generation.md`
 - [`cli-output.schema.json`](../src/abap_cli/output/cli-output.schema.json) — machine-readable envelope schema (JSON Schema draft-07)
 - [`error-codes.ts`](../src/abap_cli/output/error-codes.ts) — error-code → category → exit-code mapper
 - [`json.ts`](../src/abap_cli/output/json.ts) — `CliError.references` field; rendered as `See: <path>` on human error output

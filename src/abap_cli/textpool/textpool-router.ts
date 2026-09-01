@@ -6,7 +6,7 @@ export type TextpoolOperation = 'read' | 'write';
 /**
  * Mixed-mode routing: reads the cached SystemProfile capability (recorded once at
  * connect/init time) and picks the route DIRECTLY — no runtime probe, no fallback
- * on the fly (Q1: one-shot probe, reuse; research §3).
+ * on the fly.
  *
  * Conservative defaults when the profile has no adtTextpool record (not probed):
  *   - read  → ADT (getTextElements works on all systems)

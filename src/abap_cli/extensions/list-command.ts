@@ -1,5 +1,5 @@
 /**
- * Action body for `extensions list` (T012 / 027 US4).
+ * Action body for `extensions list`.
  * Reads the singleton registry snapshot and renders the extension list with
  * per-entry lockfile status for npm sources.
  */

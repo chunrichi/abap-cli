@@ -5,20 +5,20 @@ import type { CheckIssue } from '../output/issues.js';
 export interface AtcRunOptions {
   variant: string;
   mainUrl: string;
-  /** Local file path attached to every issue (FR-008 `file` field). */
+  /** Local file path attached to every issue (`file` field). */
   file: string;
 }
 
 export interface AtcCheckResult {
   issues: CheckIssue[];
-  /** Raw SAP worklist, persisted verbatim by `check --out` (FR-0xx). */
+  /** Raw SAP worklist, persisted verbatim by `check --out`. */
   worklist: AtcWorkList;
 }
 
 /**
  * Run an ATC check for one object and map findings to the unified CheckIssue
- * shape (FR-011, research §5). The raw worklist is returned alongside so the
- * caller can persist the full findings when the volume is large.
+ * shape. The raw worklist is returned alongside so the caller can persist the
+ * full findings when the volume is large.
  */
 export async function runAtcCheck(
   client: AdtClientWrapper,

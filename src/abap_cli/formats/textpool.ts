@@ -1,6 +1,6 @@
 /**
- * 014 US4: abap-file-format .properties textpool files.
- * Wire format matches the ADT text-elements API line format (research §3):
+ * abap-file-format .properties textpool files.
+ * Wire format matches the ADT text-elements API line format:
  *   - `@MaxLength:<n>` directive applies to the following symbol entries
  *   - `@DDICReference:<name>` directive applies to the following selection entry
  *   - `ID=text` entries; blank lines separate entries (except headings)

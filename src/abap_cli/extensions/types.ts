@@ -1,5 +1,5 @@
 /**
- * Extension type system (FR-001 / FR-002 / FR-003).
+ * Extension type system.
  * All types are frozen — no index signatures, no `any`.
  */
 

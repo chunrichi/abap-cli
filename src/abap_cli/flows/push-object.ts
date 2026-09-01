@@ -44,7 +44,7 @@ export interface PushOptions {
 /**
  * Execute lock → set source → syntax check → (activate) → unlock for one object.
  * The lock is always released in a finally block; a failed unlock surfaces as
- * UNLOCK_WARNING on the success path (contracts/cli-commands.md FR-007).
+ * UNLOCK_WARNING on the success path.
  */
 export async function pushObject(
   client: AdtClientWrapper,

@@ -32,7 +32,6 @@
 
 `error.category` 在 `--json` 信封中 1:1 对应退出码。≥10 保留。
 
-## 完整 012 契约参考
+## JSON 输出契约参考
 
-- <https://github.com/SAP/abap-cli/blob/main/docs/commands.md#json-output-contract>
-- <https://github.com/SAP/abap-cli/blob/main/specs/012-unify-cli-output-contract/contracts/cli-output.md>
+- 契约规范：见本仓库 `wiki/json-generation.md`（POSIX 路径是该契约的一部分）

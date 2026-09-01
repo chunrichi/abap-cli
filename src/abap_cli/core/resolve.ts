@@ -14,7 +14,7 @@ export interface ResolvedObject {
 
 /**
  * Locate an object by name (optionally filtered by type) and normalize its name.
- * Throws OBJECT_NOT_FOUND / AMBIGUOUS_OBJECT per contracts/cli-commands.md.
+ * Throws OBJECT_NOT_FOUND / AMBIGUOUS_OBJECT.
  *
  * Real-ADT quirk: the quickSearch endpoint requires `*` wildcards — a bare
  * exact name returns zero hits (verified against vhcala4hci 2026-08-04). We

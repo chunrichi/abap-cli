@@ -315,7 +315,7 @@ export class AdtClientWrapper {
     });
   }
 
-  /** Validate a proposed object without creating it (FR-021, `create --check-only`). */
+  /** Validate a proposed object without creating it (`create --check-only`). */
   validateNewObject(options: Parameters<ADTClient['validateNewObject']>[0]) {
     return this._call(() => this.client.validateNewObject(options));
   }
@@ -326,7 +326,7 @@ export class AdtClientWrapper {
     return this._call(() => this.client.deleteObject(objectUrl, lockHandle, transport));
   }
 
-  // --- ATC (check atc, FR-011) ---
+  // --- ATC (check atc) ---
 
   atcCheckVariant(variant: string) {
     return this._call(() => this.client.atcCheckVariant(variant));

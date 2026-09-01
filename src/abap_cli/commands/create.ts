@@ -62,7 +62,7 @@ export function registerCreateCommand(program: Command): void {
 }
 
 function registerCreateLocalCommand(createCmd: Command): void {
-  // 实验性：本地生成草稿骨架，不连接 SAP（FR-021-local）。
+  // 实验性：本地生成草稿骨架，不连接 SAP。
   createCmd
     .command('local')
     .description('Experimental: create a local draft skeleton file (no SAP connection)')
