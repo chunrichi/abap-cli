@@ -6,6 +6,14 @@
 
 ## [Unreleased]
 
+### Added
+- **wiki/design-decisions/**：5 篇设计决策录（001 三层架构 / 002 ICF bypass DDIC / 003 类型子目录布局 / 004 npm 扩展 trust hardening / 005 BTP vs on-prem），每篇遵循「决策 / 上下文 / 被否决方案 / 当前代价 / 后果」五段式；`.gitignore` 白名单加入 `wiki/design-decisions/` 与 `wiki/objects/`。
+- **wiki/objects/**：10 类对象（CLAS / INTF / PROG / FUGR / TABL / STRU / DOMA / DTEL / HTTP / TRAN）逐类一页：路由 / 本地文件形态 / 关键字段 / 命令示例 / abap-file-format 合规性 / 已知坑。
+- **wiki/agent-cookbook.md**：AI agent 端到端开发剧本库（修 bug / 加 DDIC / 跨系统同步 / 批量改 transport / 试运行 / 紧急回滚 / 新类 / 删除），每个剧本含完整命令序列 + 失败兜底。
+- **wiki/coverage-matrix.md**：SAP 开发任务覆盖率矩阵（10 大类对象 CRUD + 运行时 + transport + 元数据 + 跨系统 + 配置 + ICF + 扩展 + 文档 + 缺失能力优先级），诚实快照供未来 spec 选题与用户预期管理。
+- **wiki/architecture-diagrams.md**：8 张 Mermaid 图（三层架构 / pull 序列 / push 序列 / ICF 调用 / auth 路由 / error 与退出码 / 扩展信任链 / 命令全景）。
+- **`scripts/build-cli-schema.ts` + `npm run build-schema`**：从 `error-codes.ts` 的 `ErrorCode` / `ErrorCategory` 联合 + `exit-codes.ts` 的 `EXIT_CODES` 表派生 `cli-output.schema.json` 的 `error.code` enum（31 项）、`error.category` enum（9 项）、并附 `__exitCodesAnnex` 说明（category → exit code）。手写 schema → 自动生成 schema，错误码变更不再需要手改 JSON。
+
 ## [0.2.3] - 2026-08-31
 
 ### Added
