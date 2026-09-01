@@ -30,6 +30,7 @@
     "dev": "tsc --watch",
     "start": "node dist/src/abap_cli/index.js",
     "prepublishOnly": "npm run build",
+    "build-schema": "tsx scripts/build-cli-schema.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

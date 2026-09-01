@@ -175,9 +175,9 @@ export function renderError(mode: OutputMode, error: unknown, meta: OutputMeta):
   const lines = [...meta.warnings.map((w) => `Warning: ${w.message}`), `Error: ${err.message}`];
   if (Array.isArray(err.nextSteps) && err.nextSteps.length > 0) {
     lines.push(`  Try: ${err.nextSteps.join(' / ')}`);
-  if (typeof err.references === 'string' && err.references.length > 0) {
-    lines.push(`  See:  ${err.references}`);
-  }
+    if (typeof err.references === 'string' && err.references.length > 0) {
+      lines.push(`  See:  ${err.references}`);
+    }
   }
   return { stdout: [], stderr: lines, exitCode };
 }
