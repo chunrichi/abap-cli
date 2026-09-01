@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### Added
+- **`skills/abap-cli-performance/`**：ABAP 性能 review 方法论 skill（5→6 skill）;`metadata.commands` 列出触发的只读命令（`search / inspect / pull / check / select`），实际归属仍是 4 个领域 skill；本 skill 全程不写对象。同步更新：`skills/abap-cli/SKILL.md` 路由表 + 决策树、`skills/README.md` 索引表 + 路由表 + 命令覆盖核对、`agents/abap-developer.agent.md` `skills` / `handoffs` / references / 错误恢复表。路由关键词：`慢 / 性能 / 优化 / N² / FOR ALL ENTRIES / 内表 / HASHED / AMDP / CDS`。
 - **wiki/design-decisions/**：5 篇设计决策录（001 三层架构 / 002 ICF bypass DDIC / 003 类型子目录布局 / 004 npm 扩展 trust hardening / 005 BTP vs on-prem），每篇遵循「决策 / 上下文 / 被否决方案 / 当前代价 / 后果」五段式；`.gitignore` 白名单加入 `wiki/design-decisions/` 与 `wiki/objects/`。
 - **wiki/objects/**：10 类对象（CLAS / INTF / PROG / FUGR / TABL / STRU / DOMA / DTEL / HTTP / TRAN）逐类一页：路由 / 本地文件形态 / 关键字段 / 命令示例 / abap-file-format 合规性 / 已知坑。
 - **wiki/agent-cookbook.md**：AI agent 端到端开发剧本库（修 bug / 加 DDIC / 跨系统同步 / 批量改 transport / 试运行 / 紧急回滚 / 新类 / 删除），每个剧本含完整命令序列 + 失败兜底。

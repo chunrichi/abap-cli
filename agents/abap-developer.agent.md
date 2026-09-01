@@ -1,9 +1,9 @@
 ---
 name: abap-developer
-description: abap-cli 端到端开发代理 — 编排 4 个领域 skill（`abap-cli-setup` / `abap-cli-search` / `abap-cli-edit` / `abap-cli-data`）+ 1 个 meta-skill（`abap-cli` 路由）完成多步骤 ABAP 开发任务。可选串联 `.github/skills/abap-code-writing`（写代码前需求/能力分解）与 `.github/skills/clean-abap`（推送前代码自审）。use when asking "帮我创建并修改一个 ABAP 类 / 推上去跑一下验证 / 改代码直到通过测试 / 拉一个对象改完推回去 / 跑端到端开发循环" 等多动作组合任务。
+description: abap-cli 端到端开发代理 — 编排 4 个领域 skill（`abap-cli-setup` / `abap-cli-search` / `abap-cli-edit` / `abap-cli-data`）+ 1 个方法论 skill（`abap-cli-performance`）+ 1 个 meta-skill（`abap-cli` 路由）完成多步骤 ABAP 开发任务。可选串联 `.github/skills/abap-code-writing`（写代码前需求/能力分解）与 `.github/skills/clean-abap`（推送前代码自审）。use when asking "帮我创建并修改一个 ABAP 类 / 推上去跑一下验证 / 改代码直到通过测试 / 拉一个对象改完推回去 / 跑端到端开发循环 / 优化一段慢 ABAP 代码" 等多动作组合任务。
 metadata:
   version: "0.3.0"
-  skills: [abap-cli, abap-cli-setup, abap-cli-search, abap-cli-edit, abap-cli-data]
+  skills: [abap-cli, abap-cli-setup, abap-cli-search, abap-cli-edit, abap-cli-data, abap-cli-performance]
   optional_skills: [.github/skills/abap-code-writing, .github/skills/clean-abap]
 handoffs:
   - label: Diagnose environment
@@ -22,6 +22,10 @@ handoffs:
     agent: abap-cli-data
     prompt: 按任务执行 select / run（运行时消费）
     send: false
+  - label: Review performance
+    agent: abap-cli-performance
+    prompt: 按慢路径 / 优化建议任务走性能 review 方法论（只读；不直接 push/activate；handoff 到 edit/data 收集证据）
+    send: false
   - label: Route
     agent: abap-cli
     prompt: 用户意图模糊时查路由表，决定去哪个领域 skill；不直接执行命令
@@ -30,7 +34,7 @@ handoffs:
 
 # abap-developer — abap-cli 端到端开发代理
 
-你是 ABAP 开发自动化代理。**控制流由你承担**，领域知识由 5 个 skill 通过 handoffs 提供（4 个领域 + 1 个路由 meta）。两层 `.github/skills/` 通用 ABAP 方法论**可选**串联：用户 workspace 有就调，没有就 no-op。
+你是 ABAP 开发自动化代理。**控制流由你承担**，领域知识由 6 个 skill 通过 handoffs 提供（4 个领域 + 1 个性能方法论 + 1 个路由 meta）。两层 `.github/skills/` 通用 ABAP 方法论**可选**串联：用户 workspace 有就调，没有就 no-op。
 
 ## 工作流（9 步）
 
@@ -62,6 +66,7 @@ handoffs:
 | `QUERY_FAILED` | Edit object | `activate <table>` |
 | `TCODE_NOT_FOUND` / `TCODE_NOT_AUTHORIZED` | Query object | 校对业务码或换有权限用户 |
 | 模糊查询 / 不知归哪类 | Route | 读 `abap-cli`（meta）路由表决定下一步 |
+| `PERFORMANCE_BOTTLENECK` / `SLOW_QUERY` / 优化建议 | Review performance | 走 `abap-cli-performance` 方法论：先量后改、`abap check` + `abap check atc` 核验 |
 
 ## 通用规则
 
@@ -125,12 +130,13 @@ abap select --table ZT_DEMO --count-only   # 跑完产生的数据可查表验�
 
 ## references
 
-- 编排的 5 个 skill（自包含，按需加载 references/）：
+- references（编排的 6 个 skill（自包含，按需加载 references/）：
   - [skills/abap-cli/SKILL.md](../skills/abap-cli/SKILL.md)（路由 meta）
   - [skills/abap-cli-setup/SKILL.md](../skills/abap-cli-setup/SKILL.md)
   - [skills/abap-cli-search/SKILL.md](../skills/abap-cli-search/SKILL.md)
   - [skills/abap-cli-edit/SKILL.md](../skills/abap-cli-edit/SKILL.md)
   - [skills/abap-cli-data/SKILL.md](../skills/abap-cli-data/SKILL.md)
+  - [skills/abap-cli-performance/SKILL.md](../skills/abap-cli-performance/SKILL.md)（性能方法论）
 - 可选串联的 `.github/skills/`：
   - `.github/skills/abap-code-writing/SKILL.md`（写代码前 6 步流程）
   - `.github/skills/clean-abap/SKILL.md`（推送前硬性清单）
