@@ -1,8 +1,8 @@
 import { Command } from 'commander';
 import { CliError, printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
-import { runInitFromOpts, runInitWizard, runInitShowConfig, runInitUnset } from '../flows/init-flow.js';
-import { scaffoldAgents, type AgentTarget } from '../flows/init-agents.js';
-import { commandSchemas } from '../flows/command-schemas.js';
+import { runInitFromOpts, runInitWizard, runInitShowConfig, runInitUnset } from '../flows/setup/init.js';
+import { scaffoldAgents, type AgentTarget } from '../flows/setup/init-agents.js';
+import { commandSchemas } from '../flows/setup/command-schemas.js';
 
 /** `abap init` (parent) help: option groups, examples, profile references. */
 function initParamHelp(): string {

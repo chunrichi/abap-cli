@@ -1,9 +1,9 @@
 import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError, printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
-import { computeChangedParts, type ChangedPart } from '../flows/status.js';
+import { computeChangedParts, type ChangedPart } from '../flows/search/status.js';
 import { SEARCH_RESULT_LIMIT } from '../core/limits.js';
-import { commandSchemas } from '../flows/command-schemas.js';
+import { commandSchemas } from '../flows/setup/command-schemas.js';
 
 interface StatusOptions {
   remoteOnly?: boolean;

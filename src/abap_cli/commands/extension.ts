@@ -3,10 +3,10 @@ import { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError, printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
 import { collectWarning } from '../output/meta.js';
 import { resolveTransport } from '../core/transport.js';
-import { deployBundled, type DeploymentSummary } from '../flows/deploy-flow.js';
-import { checkIcfDeployment, ICF_SERVICE_VERSION } from '../icf/service-version.js';
+import { deployBundled, type DeploymentSummary } from '../flows/edit/deploy.js';
+import { checkIcfDeployment, ICF_SERVICE_VERSION } from '../clients/icf-version.js';
 import { loadConfig } from '../config/project-config.js';
-import { commandSchemas } from '../flows/command-schemas.js';
+import { commandSchemas } from '../flows/setup/command-schemas.js';
 
 interface DeployOptions {
   tr?: string;

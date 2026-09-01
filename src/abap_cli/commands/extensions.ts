@@ -6,7 +6,7 @@
 import { Command } from 'commander';
 import { printSchema, jsonFromCommand } from '../output/json.js';
 import { listExtensionsAction } from '../extensions/list-command.js';
-import { commandSchemas } from '../flows/command-schemas.js';
+import { commandSchemas } from '../flows/setup/command-schemas.js';
 
 export function registerExtensionsCommand(program: Command): void {
   const extensions = program

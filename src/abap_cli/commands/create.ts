@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import { printError, printSchema, jsonFromCommand, type OutputMode } from '../output/json.js';
-import { runCreate, runCreateLocal, type CreateOptions, type CreateLocalOptions } from '../flows/create-flow.js';
-import { createSchema } from '../flows/create-schema.js';
+import { runCreate, runCreateLocal, type CreateOptions, type CreateLocalOptions } from '../flows/edit/create.js';
+import { createSchema } from '../flows/edit/create-schema.js';
 
 export function registerCreateCommand(program: Command): void {
   const createCmd = program

@@ -1,7 +1,7 @@
 import { Command } from 'commander';
-import { runPush, type PushFileOptions } from '../flows/push-flow.js';
+import { runPush, type PushFileOptions } from '../flows/edit/push.js';
 import { printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
-import { commandSchemas } from '../flows/command-schemas.js';
+import { commandSchemas } from '../flows/setup/command-schemas.js';
 
 export function registerPushCommand(program: Command): void {
   program

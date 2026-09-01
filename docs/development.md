@@ -64,7 +64,7 @@ src/abap_cli/
 ├── core/                 # lazy registration, polyfill, object/transport resolution, limits
 ├── dictionary/           # DDIC + HTTP domain logic (ddic-json.ts, http-json.ts, tabl-artifact.ts)
 ├── extensions/           # 023 extension mechanism (types, loader, registry, list command)
-├── icf/                  # ICF service version + deployment check (service-version.ts)
+├── clients/icf-version.ts # ICF service version + deployment check
 ├── formats/              # file format + resolver + pull strategies + object-parts
 ├── output/               # unified JSON output, error codes, meta, check-issue types — see output/README.md
 └── flows/                # init (bind/modify/inspect/clear), profile, create (+ schema/types), pull, push (object/fugr/textpool), run, select, tcode, where-used, status, diff, inspect, doctor, atc

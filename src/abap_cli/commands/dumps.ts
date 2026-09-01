@@ -11,7 +11,7 @@ import {
   validateDumpLimit,
   validateDumpUser,
   type DumpsResult,
-} from '../flows/dumps-flow.js';
+} from '../flows/core/dumps.js';
 
 const SCHEMA: CommandSchema = {
   schemaVersion: 1,

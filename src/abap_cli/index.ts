@@ -124,6 +124,12 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
     description: 'Manage installed extensions',
     load: () => import('./commands/extensions.js').then((m) => ({ register: m.registerExtensionsCommand })),
   },
+  {
+    name: 'mime',
+    scope: 'sap',
+    description: 'Create, delete, or upload MIME Repository resources (create | delete | push)',
+    load: () => import('./commands/mime.js').then((m) => ({ register: m.registerMimeCommand })),
+  },
 ];
 
 const require = createRequire(import.meta.url);

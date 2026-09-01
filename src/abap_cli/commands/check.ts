@@ -6,11 +6,11 @@ import { resolveFile } from '../formats/file-resolver.js';
 import { listAbapFiles, readAbapFile } from '../formats/abap-source.js';
 import { CliError, printError, printResult, printSchema, jsonFromCommand, type OutputMode } from '../output/json.js';
 import { resolveObject, getObjectParts, validateLocalFile } from '../core/resolve.js';
-import { runAtcCheck } from '../flows/atc.js';
+import { runAtcCheck } from '../flows/core/atc.js';
 import type { AtcWorkList } from 'abap-adt-api';
 import type { CheckIssue } from '../output/issues.js';
 import { toOutputPath, toRelativeOutputPath } from '../core/path-output.js';
-import { commandSchemas } from '../flows/command-schemas.js';
+import { commandSchemas } from '../flows/setup/command-schemas.js';
 
 type CheckMode = 'syntax' | 'content' | 'atc';
 

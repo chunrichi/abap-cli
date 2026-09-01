@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import { CliError, printError, printResult, printSchema, jsonFromCommand, type OutputMode } from '../output/json.js';
-import { runDoctorChecks, applySafeFixes } from '../flows/doctor-checks.js';
-import { commandSchemas } from '../flows/command-schemas.js';
+import { runDoctorChecks, applySafeFixes } from '../flows/setup/doctor-checks.js';
+import { commandSchemas } from '../flows/setup/command-schemas.js';
 
 interface DoctorOptions {
   verbose?: boolean;

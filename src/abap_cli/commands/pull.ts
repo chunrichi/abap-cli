@@ -1,8 +1,8 @@
 import { Command } from 'commander';
-import { runPull, type PullOptions } from '../flows/pull-flow.js';
+import { runPull, type PullOptions } from '../flows/edit/pull.js';
 import { printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
 import { SEARCH_RESULT_LIMIT } from '../core/limits.js';
-import { commandSchemas } from '../flows/command-schemas.js';
+import { commandSchemas } from '../flows/setup/command-schemas.js';
 
 export function registerPullCommand(program: Command): void {
   program

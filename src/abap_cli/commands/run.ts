@@ -6,7 +6,7 @@ import {
   validateClassName,
   validateMethodName,
   validateTimeout,
-} from '../flows/run-flow.js';
+} from '../flows/data/run.js';
 
 export const SCHEMA = {
   schemaVersion: 1,

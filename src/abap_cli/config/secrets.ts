@@ -5,7 +5,7 @@
  * callers.
  *
  * Public API (the six exports below) is unchanged from pre-F refactor — all
- * callers (`flows/profile-flow.ts`, `flows/init-flow.ts`, `clients/probe.ts`,
+ * callers (`flows/setup/profile.ts`, `flows/setup/init.ts`, `clients/probe.ts`,
  * `adc/runtime-probe.ts`, `auth/strategies/cert.ts`, `auth/strategies/oauth-password.ts`)
  * keep their imports. Adding a new backend requires:
  *   1. Implement `SecretsBackend` in `secrets/backends/<name>.ts`.
