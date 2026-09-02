@@ -137,20 +137,36 @@ describe('014/ddic-json-map', () => {
   });
 
   describe('localToWire — DOMA', () => {
-    it('maps datatype, length, decimals, signFlag, lowercase, convExit', () => {
+    it('maps datatype, length, decimals, signFlag, lowercase, convExit (flat top-level fallback)', () => {
+      // 032 US9: legacy flat top-level still accepted (String() coerces).
       const wire = localToWire('DOMA', {
         name: 'ZD',
         description: 'Domain',
         dataType: 'CHAR',
         length: 3,
         decimals: 0,
-        signFlag: false,
-        lowercase: true,
+        signFlag: 'X',
+        lowercase: '',
         convExit: 'ALPHA',
       });
       expect(wire.dataType).toBe('CHAR');
       expect(wire.length).toBe(3);
-      expect(wire.lowercase).toBe(true);
+      expect(wire.signFlag).toBe('X');
+      expect(wire.lowercase).toBe('');
+      expect(wire.convExit).toBe('ALPHA');
+    });
+
+    it('maps nested format.{signFlag,lowercase,convExit} (abap-file-format)', () => {
+      const wire = localToWire('DOMA', {
+        name: 'ZD',
+        description: 'Domain',
+        dataType: 'QUAN',
+        length: 13,
+        decimals: 3,
+        format: { signFlag: 'X', lowercase: '', convExit: 'ALPHA' },
+      });
+      expect(wire.signFlag).toBe('X');
+      expect(wire.lowercase).toBe('');
       expect(wire.convExit).toBe('ALPHA');
     });
   });
@@ -193,16 +209,17 @@ describe('014/ddic-json-map', () => {
       });
     });
 
-    it('DOMA round-trip preserves signFlag, lowercase, convExit', () => {
+    it('DOMA round-trip preserves signFlag, lowercase, convExit (nested format.*)', () => {
+      // 032 US9: format flags now live under nested `format.*` (abap-file-format),
+      // and values are SAP-style strings ('X' / '' / 'ALPHA'). Empty string
+      // is preserved per AC2.
       const src = {
         name: 'ZD',
         description: 'Domain',
         dataType: 'QUAN',
         length: 13,
         decimals: 3,
-        signFlag: true,
-        lowercase: false,
-        convExit: 'ALPHA',
+        format: { signFlag: 'X', lowercase: '', convExit: 'ALPHA' },
       };
       expect(wireToLocal('DOMA', localToWire('DOMA', src))).toEqual({
         ...src,

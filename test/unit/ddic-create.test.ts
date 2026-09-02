@@ -477,9 +477,7 @@ describe('014/US2 create STRU/DTEL/DOMA', () => {
       dataType: 'QUAN',
       length: 13,
       decimals: 3,
-      signFlag: true,
-      lowercase: false,
-      convExit: 'ALPHA',
+      format: { signFlag: 'X', lowercase: '', convExit: 'ALPHA' },
     });
     const program = makeProgram();
     registerCreateCommand(program);
@@ -496,8 +494,8 @@ describe('014/US2 create STRU/DTEL/DOMA', () => {
       dataType: 'QUAN',
       length: 13,
       decimals: 3,
-      signFlag: true,
-      lowercase: false,
+      signFlag: 'X',
+      lowercase: '',
       convExit: 'ALPHA',
     }));
   });

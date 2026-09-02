@@ -63,8 +63,11 @@ export interface DdicWirePayload {
   dataType?: string;
   length?: number;
   decimals?: number;
-  signFlag?: boolean;
-  lowercase?: boolean;
+  /** 032 US9: SAP wire is string ('X' / ' '); abap-file-format local is also string under `format.signFlag`. */
+  signFlag?: string;
+  /** 032 US9: same — SAP wire is string ('X' / ''); empty string is preserved per AC2. */
+  lowercase?: string;
+  /** 032 US9: conversion exit (e.g. 'ALPHA'); string in both wire and local. */
   convExit?: string;
   /** DOMA fixed-value entry (multi-language). */
   fixedValues?: DdomaFixedValueWire[];
@@ -392,9 +395,17 @@ export function localToWire(type: DdicSupportedType, local: DdicObject): DdicWir
       wire.dataType = l.dataType as string;
       wire.length = l.length !== undefined ? Number(l.length) : undefined;
       wire.decimals = l.decimals !== undefined ? Number(l.decimals) : undefined;
-      wire.signFlag = l.signFlag as boolean | undefined;
-      wire.lowercase = l.lowercase as boolean | undefined;
-      wire.convExit = l.convExit as string | undefined;
+      // 032 US9: DOMA format flags live under `format.signFlag/lowercase/convExit`
+      // (abap-file-format nested) — accept both nested and top-level flat
+      // (legacy). Wire is the SAP-style string ('X' / ''); preserve empty
+      // string per AC2.
+      const domaFormat = l.format as Record<string, unknown> | undefined;
+      const signFlagRaw = domaFormat && typeof domaFormat === 'object' ? domaFormat.signFlag : l.signFlag;
+      const lowercaseRaw = domaFormat && typeof domaFormat === 'object' ? domaFormat.lowercase : l.lowercase;
+      const convExitRaw = domaFormat && typeof domaFormat === 'object' ? domaFormat.convExit : l.convExit;
+      if (signFlagRaw !== undefined) wire.signFlag = String(signFlagRaw);
+      if (lowercaseRaw !== undefined) wire.lowercase = String(lowercaseRaw);
+      if (convExitRaw !== undefined) wire.convExit = String(convExitRaw);
       // 032: DOMA fixedValues — accept either top-level `fixedValues` or
       // abap-file-format nested `format.fixedValues`. Empty array ⇒ omit wire.
       const domaFixedRaw =
@@ -502,9 +513,16 @@ export function wireToLocal(type: DdicSupportedType, wire: DdicWirePayload): Ddi
       if (wire.dataType !== undefined) local.dataType = wire.dataType;
       if (wire.length !== undefined) local.length = wire.length;
       if (wire.decimals !== undefined) local.decimals = wire.decimals;
-      if (wire.signFlag !== undefined) local.signFlag = wire.signFlag;
-      if (wire.lowercase !== undefined) local.lowercase = wire.lowercase;
-      if (wire.convExit !== undefined) local.convExit = wire.convExit;
+      // 032 US9: DOMA format flags → nested `format.{signFlag,lowercase,convExit}`.
+      // Empty string is preserved per AC2 (not omitted). Wire is SAP-style
+      // string ('X' / '' / 'ALPHA').
+      if (wire.signFlag !== undefined || wire.lowercase !== undefined || wire.convExit !== undefined) {
+        const localFormat: Record<string, unknown> = {};
+        if (wire.signFlag !== undefined) localFormat.signFlag = wire.signFlag;
+        if (wire.lowercase !== undefined) localFormat.lowercase = wire.lowercase;
+        if (wire.convExit !== undefined) localFormat.convExit = wire.convExit;
+        (local as Record<string, unknown>).format = localFormat;
+      }
       // 032: DOMA fixedValues — preserve on the local object as a top-level
       // array (round-trippable shape). abap-file-format places them under
       // `format.fixedValues`; we keep both for compatibility.

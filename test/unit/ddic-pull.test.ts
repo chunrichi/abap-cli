@@ -30,7 +30,8 @@ const icfGetDdic = vi.fn(async () => ({
     dataType: 'QUAN',
     length: 13,
     decimals: 3,
-    signFlag: true,
+    signFlag: 'X',
+    lowercase: '',
     convExit: 'ALPHA',
   },
   error: null,
@@ -73,7 +74,8 @@ describe('014/US3 pull DDIC', () => {
     expect(parsed.name).toBe('ZDOMA_TEST');
     expect(parsed.dataType).toBe('QUAN');
     expect(parsed.length).toBe(13);
-    expect(parsed.convExit).toBe('ALPHA');
+    // 032 US9: format flags now live under nested `format.*` (abap-file-format).
+    expect(parsed.format).toEqual({ signFlag: 'X', lowercase: '', convExit: 'ALPHA' });
   });
 
   it('uses --overwrite to replace an existing file', async () => {
