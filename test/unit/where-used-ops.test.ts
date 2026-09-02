@@ -14,7 +14,7 @@ import {
   runWhereUsed,
   validateWhereUsedType,
   MAX_WHERE_USED_LIMIT,
-} from '../../src/abap_cli/flows/where-used-ops.js';
+} from '../../src/abap_cli/flows/search/where-used-ops.js';
 
 function usageRef(overrides: Partial<UsageReference> & { uri: string }): UsageReference {
   return {

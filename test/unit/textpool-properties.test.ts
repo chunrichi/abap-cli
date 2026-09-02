@@ -1,6 +1,6 @@
 /**
  * 014 US4: .properties parsing / serialization / validation for textpool
- * (texts / selections / headings). TDD — written before the formats/textpool.ts
+ * (texts / selections / headings). TDD — written before the formats/textpool/properties.ts
  * implementation.
  */
 import { describe, it, expect } from 'vitest';
@@ -10,7 +10,7 @@ import {
   validateTextElements,
   TextElement,
   TextElementCategory,
-} from '../../src/abap_cli/formats/textpool.js';
+} from '../../src/abap_cli/formats/textpool/properties.js';
 
 describe('014/textpool-properties', () => {
   describe('parseTextpoolProperties', () => {

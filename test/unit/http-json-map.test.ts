@@ -9,7 +9,7 @@ import {
   validateHttpObject,
   type HttpObjectLocal,
   type HttpWirePayload,
-} from '../../src/abap_cli/dictionary/http-json.js';
+} from '../../src/abap_cli/formats/http/json.js';
 
 describe('022 HTTP JSON helpers', () => {
   describe('localToWire', () => {

@@ -6,7 +6,7 @@ import {
   validateDumpLimit,
   validateDumpUser,
   type DumpsClient,
-} from '../../src/abap_cli/flows/dumps-flow.js';
+} from '../../src/abap_cli/flows/core/dumps.js';
 import { CliError } from '../../src/abap_cli/output/json.js';
 
 function feedWith(dumps: DumpsFeed['dumps'], updated?: Date): DumpsFeed {

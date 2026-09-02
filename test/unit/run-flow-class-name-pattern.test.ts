@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateClassName } from '../../src/abap_cli/flows/run-flow.js';
+import { validateClassName } from '../../src/abap_cli/flows/data/run.js';
 import { CliError } from '../../src/abap_cli/output/json.js';
 
 // Spec edge case — class name regex.

@@ -9,7 +9,7 @@ import {
   validateTranObject,
   type TranObjectLocal,
   type TranWirePayload,
-} from '../../src/abap_cli/dictionary/tran-json.js';
+} from '../../src/abap_cli/formats/transport/json.js';
 
 describe('TRAN JSON helpers', () => {
   describe('localToWire', () => {

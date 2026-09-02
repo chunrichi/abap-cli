@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { runRun, validateTimeout } from '../../src/abap_cli/flows/run-flow.js';
+import { runRun, validateTimeout } from '../../src/abap_cli/flows/data/run.js';
 import { CliError } from '../../src/abap_cli/output/json.js';
 
 // US3 acceptance 3 / edge case — invalid --timeout values.

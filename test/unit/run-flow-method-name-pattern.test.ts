@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateMethodName } from '../../src/abap_cli/flows/run-flow.js';
+import { validateMethodName } from '../../src/abap_cli/flows/data/run.js';
 import { CliError } from '../../src/abap_cli/output/json.js';
 
 // Spec edge case — method name regex (stricter than class regex).

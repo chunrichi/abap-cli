@@ -26,7 +26,7 @@ vi.mock('../../src/abap_cli/config/project-config.js', () => ({
   readCaCertificate: () => undefined,
 }));
 
-vi.mock('../../src/abap_cli/flows/init-flow.js', () => ({
+vi.mock('../../src/abap_cli/flows/setup/init.js', () => ({
   // only the function we use is referenced; nothing else
 }));
 
@@ -41,7 +41,7 @@ vi.mock('abap-adt-api', () => ({
   })),
 }));
 
-import { deployBundled } from '../../src/abap_cli/flows/deploy-flow.js';
+import { deployBundled } from '../../src/abap_cli/flows/edit/deploy.js';
 
 function makeClient(): unknown {
   return {

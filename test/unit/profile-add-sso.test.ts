@@ -14,12 +14,12 @@ vi.mock('../../src/abap_cli/config/user-config.js', () => ({
   deleteSystem: () => false,
 }));
 
-vi.mock('../../src/abap_cli/textpool/textpool-capability.js', () => ({
+vi.mock('../../src/abap_cli/clients/textpool-capability.js', () => ({
   probeTextpoolCapability: () => Promise.reject(new Error('not used')),
   recordCapability: () => Promise.resolve(),
 }));
 
-import { runAdd } from '../../src/abap_cli/flows/profile-flow.js';
+import { runAdd } from '../../src/abap_cli/flows/setup/profile.js';
 
 describe('abap profile add — browser_sso', () => {
   it('creates a profile with v2 canonical browser_sso block and custom cookie file', async () => {

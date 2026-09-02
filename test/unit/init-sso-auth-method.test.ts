@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateInputs, type CollectedConfig } from '../../src/abap_cli/flows/init-flow.js';
+import { validateInputs, type CollectedConfig } from '../../src/abap_cli/flows/setup/init.js';
 
 describe('init-flow.validateInputs — auth method skip-password rules', () => {
   const baseProfile = {

@@ -10,11 +10,11 @@ import {
   isTablArtifactFile,
   parseTablDdic,
   tablArtifactPaths,
-} from '../../src/abap_cli/dictionary/tabl-artifact.js';
+} from '../../src/abap_cli/formats/ddic/tabl-artifact.js';
 import {
   extractTablArtifactWire,
   type DdicWirePayload,
-} from '../../src/abap_cli/dictionary/ddic-json.js';
+} from '../../src/abap_cli/formats/ddic/json.js';
 
 const ZAFF = `@EndUserText.label : 'Example Customer Data Table Structure'
 @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
