@@ -319,7 +319,7 @@ addObject('ZPROG_TOP', 'PROG/I', '/sap/bc/adt/programs/includes/zprog_top', 'Dem
     sourceUrl: '/sap/bc/adt/programs/includes/zprog_top/source/main',
     content: "TABLES: t001.\n",
   },
-]);
+], { programType: 'I' });
 
 // 015: remote (Version Management) sources served by /version-source — keyed TYPE:NAME.
 remoteSourceStore.set('REPS:ZPROG', "REPORT zprog.\nWRITE: / 'production version'.\n");
