@@ -4,7 +4,7 @@ title: abap inspect
 description: 只读探测 SAP 对象元数据 — structure / includes / locks / activation / package，不获取锁、不修改 SAP
 tags: [abap-cli, command, inspect, metadata, read-only, agent-loop]
 created at: 2026-08-09 22:40:00
-changed at: 2026-08-09 22:40:00
+changed at: 2026-09-02 23:10:19
 ---
 
 # abap inspect
@@ -37,6 +37,11 @@ abap inspect ZCL_FOO --locks --json         # 谁锁着 / 绑定到哪个请求
 ## --activation（核心诊断）
 
 逐 part 对比 active 源码 vs latest（inactive）源码，输出 `{ ok, parts: [...] }`：
+
+> **仅对 ADT structure 暴露 include parts 的对象生效**（CLAS / INTF / PROG 等）。
+> 对象没有 include parts（如 FUGR）时不输出 `activation` 键——`data` 只有
+> `metadata`，退出码仍为 0。Agent 必须把缺失的 `activation` 视为「该对象类型不
+> 适用」，而非错误；FUGR 这类对象的激活/收敛用 `abap status` / `abap diff` 验证。
 
 - `ok: true` — 每个 part 的 active = latest（没有 stale）
 - `ok: false` — 有 part 未激活或不一致
@@ -84,6 +89,10 @@ abap inspect ZCL_FOO --locks --json         # 谁锁着 / 绑定到哪个请求
 ```
 
 `--activation.ok: false` 时 `data.parts[]` 列出未激活 part；恢复路径在 `nextSteps` 里直接给 `abap activate <obj> --yes`。
+
+`activation` 键只在该对象 ADT structure 暴露 include parts 时出现（见上节）——
+对没有 include parts 的对象（如 FUGR），即使传了 `--activation`，`data` 也只有
+`metadata`、没有 `activation` 键。
 
 ## Examples
 
