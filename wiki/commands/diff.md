@@ -4,7 +4,7 @@ title: abap diff
 description: 本地↔SAP 对比 — per-part direction（same / local-only / remote-only / both-changed）+ bounded 行变化摘要，只读不锁
 tags: [abap-cli, command, diff, compare, read-only, agent-loop]
 created at: 2026-08-09 22:40:00
-changed at: 2026-08-09 22:40:00
+changed at: 2026-09-02 00:00:00
 ---
 
 # abap diff
@@ -21,7 +21,7 @@ abap diff --remote PRD
 abap diff --local-only --limit 50
 ```
 
-无文件参数时遍历当前目录下所有 `.abap` 文件（遵循 `.abapignore`）。
+无文件参数时遍历扫描根下所有 `.abap` 文件（遵循 `.abapignore`）——扫描根为 `.abap.json::sourceDir`（配置了时，相对配置文件所在目录解析），否则为当前工作目录。不遵循 `<name>.<type>.abap|xml` 布局的杂散文件会被跳过；显式 `diff <file>` 路径永不跳过。
 
 ## Options
 

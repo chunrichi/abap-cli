@@ -127,6 +127,19 @@ describe('abap diff (US4..017)', () => {
     expect(getObjectSource).toHaveBeenCalled();
   });
 
+  it('diff --all tolerates stray unparseable files (no FILE_PARSE_ERROR crash)', async () => {
+    // Stray files not following <name>.<type>.abap|xml used to crash whole-workspace scans.
+    fs.writeFileSync(path.join(cwd, 'discovery.xml'), '<xml/>');
+    fs.writeFileSync(path.join(cwd, 'source.abap'), 'REPORT zstray.');
+    const program = makeProgram();
+    registerDiffCommand(program);
+    const res = await runCommand(program, ['diff', '--all', '--json'], { cwd });
+    expect(res.exitCode).toBeUndefined();
+    const data = parseData(res);
+    const unchanged = data.parts.find((p: { object: string }) => p.object === 'ZCL_OK');
+    expect(unchanged.direction).toBe('unchanged');
+  });
+
   it('lineDiffSummary: CRLF remote vs LF local identical content → 0/0', () => {
     const local = 'LINE 1\nLINE 2\nLINE 3\n';
     const remote = 'LINE 1\r\nLINE 2\r\nLINE 3\r\n';

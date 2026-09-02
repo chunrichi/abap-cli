@@ -162,7 +162,7 @@ function pushSchema(): CommandSchema {
     ...base('push', 'Push local ABAP files to SAP: lock → set source → syntax check → activate → unlock.', 'abap push [options] [files...]', 'sap'),
     arguments: [{ name: 'files', type: 'string', required: false, description: 'Files to push (positional, variadic).' }],
     options: [
-      { name: '--all', type: 'boolean', description: 'Push all .abap files under the current directory (honours .abapignore).' },
+      { name: '--all', type: 'boolean', description: 'Push all .abap files under the scan root (sourceDir or current dir; honours .abapignore).' },
       { name: '--tr', type: 'string', valuePlaceholder: '<transport>', description: 'Transport number override for unbound objects.' },
       { name: '--check-only', type: 'boolean', description: 'Syntax check only; do not activate.' },
       { name: '--no-activate', type: 'boolean', description: 'Lock + write + skip check + skip activate + unlock.' },
@@ -197,7 +197,7 @@ function checkSchema(): CommandSchema {
     arguments: [],
     options: [
       { name: '--variant', type: 'string', valuePlaceholder: '<variant>', description: 'ATC check variant (required with `check atc`).' },
-      { name: '--all', type: 'boolean', description: 'Check all .abap files under the current directory.' },
+      { name: '--all', type: 'boolean', description: 'Check all .abap files under the scan root (sourceDir or current dir).' },
       { name: '--changed', type: 'boolean', description: 'Check only files changed since the SAP version.' },
       { name: '--strict', type: 'boolean', description: 'Treat warnings as failures.' },
       { name: '--out', type: 'string', valuePlaceholder: '[file]', description: 'Persist raw ATC worklist to a file (only with `check atc`); defaults to .abap/atc/<variant>-<timestamp>.json.' },

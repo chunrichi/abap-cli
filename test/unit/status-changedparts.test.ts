@@ -121,4 +121,37 @@ describe('abap status changedParts (US4..014)', () => {
     const byObj = Object.fromEntries(data.changedParts.map((p: { object: string; direction: string }) => [p.object, p.direction]));
     expect(byObj.ZCL_OK).toBe('unchanged');
   });
+
+  it('--all tolerates stray unparseable files (no FILE_PARSE_ERROR crash)', async () => {
+    // Stray files not following <name>.<type>.abap|xml used to crash whole-workspace scans.
+    fs.writeFileSync(path.join(cwd, 'discovery.xml'), '<xml/>');
+    fs.writeFileSync(path.join(cwd, 'source.abap'), 'REPORT zstray.');
+    const program = makeProgram();
+    registerStatusCommand(program);
+    const res = await runCommand(program, ['status', '--all', '--json'], { cwd });
+    expect(res.exitCode).toBeUndefined();
+    const data = parseSuccess(res);
+    const byObj = Object.fromEntries(data.changedParts.map((p: { object: string; direction: string }) => [p.object, p.direction]));
+    expect(byObj.ZCL_DEMO).toBe('divergent');
+    expect(byObj.ZLOCAL_ONLY).toBe('local-only');
+  });
+
+  it('--all scans .abap.json::sourceDir from a nested cwd instead of the cwd root', async () => {
+    searchObject.mockImplementation(defaultSearchObject);
+    const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'status-src-'));
+    fs.mkdirSync(path.join(ws, 'src'), { recursive: true });
+    fs.mkdirSync(path.join(ws, 'deep', 'work'), { recursive: true });
+    // Stray junk at workspace root + a sourceDir pointing at src/.
+    fs.writeFileSync(path.join(ws, '.abap.json'), JSON.stringify({ sourceDir: 'src' }));
+    fs.writeFileSync(path.join(ws, 'discovery.xml'), '<xml/>');
+    fs.writeFileSync(path.join(ws, 'source.abap'), 'REPORT zstray.');
+    fs.writeFileSync(path.join(ws, 'src', 'zcl_demo.clas.abap'), 'LOCAL\n');
+    const program = makeProgram();
+    registerStatusCommand(program);
+    const res = await runCommand(program, ['status', '--all', '--json'], { cwd: path.join(ws, 'deep', 'work') });
+    expect(res.exitCode).toBeUndefined();
+    const data = parseSuccess(res);
+    const byObj = Object.fromEntries(data.changedParts.map((p: { object: string; direction: string }) => [p.object, p.direction]));
+    expect(byObj.ZCL_DEMO).toBe('divergent');
+  });
 });

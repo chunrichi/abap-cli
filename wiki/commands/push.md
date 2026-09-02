@@ -4,7 +4,7 @@ title: abap push
 description: 推送本地 ABAP 文件到 SAP — lock → set source → syntax check → activate → unlock，支持源码对象、FUGR、textpool 与 DDIC JSON，按对象解析 transport
 tags: [abap-cli, command, push, upload, abap-file-format, ddic, textpool, transport]
 created at: 2026-08-07 00:11:03
-changed at: 2026-08-07 00:11:03
+changed at: 2026-09-02 00:00:00
 ---
 
 # abap push
@@ -20,7 +20,7 @@ abap push [options] [files...]
 ## Options
 
 - `[files...]`: 要推送的文件路径（一个或多个）
-- `--all`: 推送当前目录下所有 `.abap` 文件（遵循 `.abapignore`）
+- `--all`: 推送扫描根下所有 `.abap` 文件（遵循 `.abapignore`）——扫描根为 `.abap.json::sourceDir`（配置了时，相对配置文件所在目录解析），否则为当前工作目录；不遵循 `<name>.<type>.abap|xml` 布局的杂散文件会被跳过（显式 `[files...]` 路径永不跳过）
 - `--tr <transport>`: 传输请求号（按对象解析，见下文；多数场景不再必输）
 - `--check-only`: 只做语法检查不激活（与 `--no-activate` 互斥）
 - `--no-activate`: lock + write + 跳过 check + 跳过 activate + unlock

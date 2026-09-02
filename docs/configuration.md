@@ -43,7 +43,7 @@ The file is written with mode `0600` (`0700` for the directory) and is not commi
 | `system` | Name of the system profile to connect to (required) |
 | `transport` | Default transport number used when `--tr` is not given |
 | `package` | Default package used by commands that create objects |
-| `sourceDir` | Base directory for `push --all` / `check --all` (falls back to cwd) |
+| `sourceDir` | Scan root for whole-workspace scans (`push --all` / `check --all|--changed` / `status` / `diff`); falls back to cwd |
 
 The same `abap init` command is also the entry point for **inspecting and clearing** these fields:
 

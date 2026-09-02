@@ -19,7 +19,7 @@ export interface SapConfig {
   caPath: string;
   /** Canonical v2 auth config (discriminated union). */
   auth: AuthConfig;
-  /** Base directory for `push --all` / `check --all`; falls back to cwd. */
+  /** Base directory for whole-workspace scans (`push --all`, `check --all|--changed`, `status`, `diff`); falls back to cwd. */
   sourceDir: string;
 }
 

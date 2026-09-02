@@ -3,7 +3,8 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { resolveFile } from '../formats/file-resolver.js';
-import { listAbapFiles, readAbapFile } from '../formats/abap-source.js';
+import { readAbapFile } from '../formats/abap-source.js';
+import { resolveLocalTargets } from '../core/local-targets.js';
 import { CliError, printError, printResult, printSchema, jsonFromCommand, type OutputMode } from '../output/json.js';
 import { resolveObject, getObjectParts, validateLocalFile } from '../core/resolve.js';
 import { runAtcCheck } from '../flows/core/atc.js';
@@ -64,7 +65,7 @@ export function registerCheckCommand(program: Command): void {
     .command('syntax')
     .description('Syntax check against SAP')
     .argument('[files...]', 'Files to check')
-    .option('--all', 'Check all .abap files under the current directory')
+    .option('--all', 'Check all .abap files under the scan root (sourceDir or current dir)')
     .option('--changed', 'Check only files changed since the SAP version')
     .option('--strict', 'Treat warnings as failures')
     .action(async (files: string[], opts: CheckOptions, cmd) => {
@@ -80,7 +81,7 @@ export function registerCheckCommand(program: Command): void {
     .command('content')
     .description('Local-only validation, no SAP call')
     .argument('[files...]', 'Files to check')
-    .option('--all', 'Check all .abap files under the current directory')
+    .option('--all', 'Check all .abap files under the scan root (sourceDir or current dir)')
     .option('--changed', 'Check only files changed since the SAP version')
     .option('--strict', 'Treat warnings as failures')
     .action(async (files: string[], opts: CheckOptions, cmd) => {
@@ -97,7 +98,7 @@ export function registerCheckCommand(program: Command): void {
     .description('ATC check against SAP (requires --variant)')
     .argument('[files...]', 'Files to check')
     .requiredOption('--variant <variant>', 'ATC check variant')
-    .option('--all', 'Check all .abap files under the current directory')
+    .option('--all', 'Check all .abap files under the scan root (sourceDir or current dir)')
     .option('--changed', 'Check only files changed since the SAP version')
     .option('--strict', 'Treat warnings as failures')
     .option('--out [file]', 'Persist raw ATC worklist to a file (only with --atc); defaults to .abap/atc/<variant>-<timestamp>.json')
@@ -220,12 +221,13 @@ async function collectFiles(files: string[], opts: CheckOptions): Promise<string
       example: 'abap check --all',
     });
   }
-  if (opts.all) {
-    const found = await listAbapFiles(process.cwd());
-    return found.filter((f) => f.endsWith('.abap'));
-  }
-  if (opts.changed) {
-    return collectChangedFiles();
+  if (opts.all || opts.changed) {
+    // Whole-workspace scans share resolveLocalTargets scoping: .abap.json::sourceDir
+    // when configured (else cwd) + ignore defaults/.abapignore; strays are skipped.
+    const targets = await resolveLocalTargets({ all: true });
+    const all = targets.files.filter((f) => f.endsWith('.abap'));
+    if (opts.all) return all;
+    return collectChangedFiles(all);
   }
   return files.map((f) => path.resolve(f));
 }
@@ -234,9 +236,8 @@ async function collectFiles(files: string[], opts: CheckOptions): Promise<string
  * The change set: local files whose mtime is newer than the SAP object's
  * changedAt. Empty set fails fast with guidance.
  */
-async function collectChangedFiles(): Promise<string[]> {
+async function collectChangedFiles(all: string[]): Promise<string[]> {
   const client = await AdtClientWrapper.create();
-  const all = (await listAbapFiles(process.cwd())).filter((f) => f.endsWith('.abap'));
   const changed: string[] = [];
   for (const file of all) {
     try {

@@ -1,6 +1,10 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import { readFileSync } from 'fs';
 import { loadIgnorePatterns } from './ignore.js';
+import { findWorkspaceConfig } from '../config/project-config.js';
+import { resolveFile } from '../formats/file-resolver.js';
+import { CliError } from '../output/json.js';
 
 export interface LocalTargetResolution {
   /** Resolved base directory for `--all` scans. */
@@ -19,9 +23,11 @@ export interface ResolveLocalTargetsOptions {
 /**
  * Resolve the list of files a command should operate on. Behaviour:
  *  - When `files` is set: return them resolved against `cwd` (no ignore applied
- *    — explicit files always win).
- *  - When `all` is set: walk `sourceDir` (`.abap.json::sourceDir`, else cwd)
- *    recursively, honouring `.abapignore` + defaults.
+ *    — explicit files always win, unparseable ones included).
+ *  - When `all` is set: scan `.abap.json::sourceDir` (resolved against the
+ *    nearest config file) when configured, else `cwd`; honour `.abapignore` +
+ *    defaults; skip stray files that do not follow the `<name>.<type>.abap|xml`
+ *    layout (whole-workspace scans must not die on one junk file).
  *
  * The default `cwd` is `process.cwd()`. Pass `cwd` explicitly from tests.
  */
@@ -29,21 +35,60 @@ export async function resolveLocalTargets(
   opts: ResolveLocalTargetsOptions,
   cwd: string = process.cwd(),
 ): Promise<LocalTargetResolution> {
-  const sourceDir = cwd;
-  const patterns = loadIgnorePatterns(sourceDir);
-
   if (opts.all) {
-    const all = await walkDir(sourceDir, patterns);
-    return { sourceDir, files: all, ignorePatterns: patterns };
+    const sourceDir = resolveAllSourceDir(cwd);
+    const patterns = loadIgnorePatterns(sourceDir);
+    let walked: string[];
+    try {
+      walked = await walkDir(sourceDir, patterns);
+    } catch (error) {
+      // A configured sourceDir may not exist yet (pre-pull) — treat as empty.
+      if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+        walked = [];
+      } else {
+        throw error;
+      }
+    }
+    const files: string[] = [];
+    for (const file of walked) {
+      try {
+        resolveFile(file);
+        files.push(file);
+      } catch (error: unknown) {
+        if (!(error instanceof CliError && error.code === 'FILE_PARSE_ERROR')) throw error;
+      }
+    }
+    return { sourceDir, files, ignorePatterns: patterns };
   }
   if (opts.files && opts.files.length > 0) {
     return {
-      sourceDir,
+      sourceDir: cwd,
       files: opts.files.map((f) => path.resolve(f)),
-      ignorePatterns: patterns,
+      ignorePatterns: loadIgnorePatterns(cwd),
     };
   }
-  return { sourceDir, files: [], ignorePatterns: patterns };
+  return { sourceDir: cwd, files: [], ignorePatterns: loadIgnorePatterns(cwd) };
+}
+
+/**
+ * Effective scan root for `--all`: `.abap.json::sourceDir` when the nearest
+ * config declares it (resolved relative to the config file's directory), else
+ * `cwd`. The config file is read directly (JSON.parse tolerated) so commands
+ * stay usable in mock/dev workspaces that have no valid system profile.
+ */
+function resolveAllSourceDir(cwd: string): string {
+  const configPath = findWorkspaceConfig(cwd);
+  if (!configPath) return cwd;
+  try {
+    const raw: unknown = JSON.parse(readFileSync(configPath, 'utf-8'));
+    const sourceDir = (raw as { sourceDir?: unknown } | null)?.sourceDir;
+    if (typeof sourceDir === 'string' && sourceDir.trim() !== '') {
+      return path.resolve(path.dirname(configPath), sourceDir);
+    }
+  } catch {
+    // Unreadable / invalid .abap.json — fall back to cwd.
+  }
+  return cwd;
 }
 
 /** Recursively list `.abap` and `.xml` files under `dir`, skipping ignored paths. */

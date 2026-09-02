@@ -197,7 +197,7 @@ abap push [options] [files...]
 
 | Option | Description |
 |--------|-------------|
-| `--all` | Push all .abap files under the current directory (honours .abapignore). |
+| `--all` | Push all .abap files under the scan root (sourceDir or current dir; honours .abapignore). |
 | `--tr=<transport>` | Transport number override for unbound objects. |
 | `--check-only` | Syntax check only; do not activate. |
 | `--no-activate` | Lock + write + skip check + skip activate + unlock. |
@@ -252,7 +252,7 @@ abap check [syntax|content|atc] [options]
 | Option | Description |
 |--------|-------------|
 | `--variant=<variant>` | ATC check variant (required with `check atc`). |
-| `--all` | Check all .abap files under the current directory. |
+| `--all` | Check all .abap files under the scan root (sourceDir or current dir). |
 | `--changed` | Check only files changed since the SAP version. |
 | `--strict` | Treat warnings as failures. |
 | `--out=[file]` | Persist raw ATC worklist to a file (only with `check atc`); defaults to .abap/atc/<variant>-<timestamp>.json. |

@@ -229,4 +229,65 @@ describe('abap check modes (021: subcommands — syntax / content / atc)', () =>
     expect(res.stdout).toMatch(/syntax|content|atc/);
   });
 
+  it('check syntax --all skips stray unparseable files (no FILE_PARSE_ERROR issue)', async () => {
+    const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'chk-all-'));
+    fs.mkdirSync(path.join(ws, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(ws, 'src/zcl_ok.clas.abap'), 'CLASS zcl_ok DEFINITION PUBLIC.\nENDCLASS.\nCLASS zcl_ok IMPLEMENTATION.\nENDCLASS.\n');
+    // Stray unparseable file at the scan root used to produce a FILE_PARSE_ERROR issue.
+    fs.writeFileSync(path.join(ws, 'source.abap'), 'REPORT zstray.');
+    const program = makeProgram();
+    registerCheckCommand(program);
+    const res = await runCommand(program, ['check', 'syntax', '--all', '--json'], { cwd: ws });
+    expect(res.exitCode).toBeUndefined();
+    const json = JSON.parse(res.stdout);
+    expect(json.data.issues ?? []).toEqual([]);
+    expect(syntaxCheckContent).toHaveBeenCalledTimes(1);
+    expect(syntaxCheckContent.mock.calls[0]?.[2]).toContain('zcl_ok');
+  });
+
+  it('check syntax --all and --changed scope to .abap.json::sourceDir + ignore defaults', async () => {
+    const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'chk-scope-'));
+    fs.mkdirSync(path.join(ws, 'src'), { recursive: true });
+    fs.mkdirSync(path.join(ws, 'node_modules'), { recursive: true });
+    fs.writeFileSync(path.join(ws, '.abap.json'), JSON.stringify({ sourceDir: 'src' }));
+    fs.writeFileSync(path.join(ws, 'src/zcl_ok.clas.abap'), 'CLASS zcl_ok DEFINITION PUBLIC.\nENDCLASS.\nCLASS zcl_ok IMPLEMENTATION.\nENDCLASS.\n');
+    // Parseable but out-of-scope: outside sourceDir and under an ignored dir.
+    fs.writeFileSync(path.join(ws, 'source.abap'), 'REPORT zstray.');
+    fs.writeFileSync(path.join(ws, 'node_modules/zjunk.clas.abap'), 'REPORT zjunk.\n');
+    // --all: only the src/ file is collected.
+    const program = makeProgram();
+    registerCheckCommand(program);
+    const resAll = await runCommand(program, ['check', 'syntax', '--all', '--json'], { cwd: ws });
+    expect(resAll.exitCode).toBeUndefined();
+    expect(syntaxCheckContent).toHaveBeenCalledTimes(1);
+  });
+
+  it('check syntax --changed uses the same scoping as --all', async () => {
+    const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'chk-chg-'));
+    fs.mkdirSync(path.join(ws, 'src'), { recursive: true });
+    fs.mkdirSync(path.join(ws, 'node_modules'), { recursive: true });
+    fs.writeFileSync(path.join(ws, '.abap.json'), JSON.stringify({ sourceDir: 'src' }));
+    fs.writeFileSync(path.join(ws, 'src/zcl_ok.clas.abap'), 'CLASS zcl_ok DEFINITION PUBLIC.\nENDCLASS.\nCLASS zcl_ok IMPLEMENTATION.\nENDCLASS.\n');
+    // Out-of-scope strays with fresh mtimes must not join the change set.
+    fs.writeFileSync(path.join(ws, 'source.abap'), 'REPORT zstray.');
+    fs.writeFileSync(path.join(ws, 'node_modules/zjunk.clas.abap'), 'REPORT zjunk.\n');
+    // SAP object last changed in the past → local file counts as changed.
+    const originalStructure = objectStructure.getMockImplementation();
+    objectStructure.mockImplementation(async (objectUrl: string) => ({
+      objectUrl,
+      'adtcore:changedAt': '2000-01-01T00:00:00Z',
+      includes: [{ 'class:includeType': 'main', 'abapsource:sourceUri': `${objectUrl}/source/main` }],
+    }));
+    try {
+      const program = makeProgram();
+      registerCheckCommand(program);
+      const res = await runCommand(program, ['check', 'syntax', '--changed', '--json'], { cwd: ws });
+      expect(res.exitCode).toBeUndefined();
+      expect(syntaxCheckContent).toHaveBeenCalledTimes(1);
+      expect(syntaxCheckContent.mock.calls[0]?.[2]).toContain('zcl_ok');
+    } finally {
+      objectStructure.mockImplementation(originalStructure!);
+    }
+  });
+
 });

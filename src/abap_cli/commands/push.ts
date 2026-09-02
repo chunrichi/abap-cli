@@ -8,7 +8,7 @@ export function registerPushCommand(program: Command): void {
     .command('push')
     .description('Push local ABAP files to SAP')
     .argument('[files...]', 'Files to push')
-    .option('--all', 'Push all files under current directory (honours .abapignore)')
+    .option('--all', 'Push all files under the scan root (sourceDir or current dir; honours .abapignore)')
     .option('--tr <transport>', 'Transport number override for unbound objects')
     .option('--check-only', 'Syntax check only; do not activate')
     .option('--no-activate', 'Lock + write + skip check + skip activate + unlock')
