@@ -3,7 +3,7 @@
  * round-trip) instead of reporting a misleading OBJECT_NOT_FOUND after the
  * oversized name has been dialled into SAP. Validation mirrors the DDIC
  * client-side name validation (VALIDATION_ERROR / exit 7) and deliberately
- * does NOT enforce a Z/Y prefix ($TMP accepts e.g. A123 — O-1).
+ * does NOT enforce a Z/Y prefix ($TMP accepts e.g. A123).
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import * as fs from 'fs';
