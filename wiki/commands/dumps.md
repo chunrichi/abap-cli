@@ -4,7 +4,7 @@ title: abap dumps
 description: 通过只读 ADT Atom feed 列出近期 ST22 ABAP runtime dump 的紧凑摘要
 tags: [abap-cli, command, dumps, st22, adt, read-only]
 created at: 2026-08-31 22:00:00
-changed at: 2026-08-31 22:00:00
+changed at: 2026-09-02 23:40:00
 ---
 
 # abap dumps
@@ -76,6 +76,9 @@ abap dumps --schema
   20260831095801DEVELOPER003: DUMP_IN_ITAB | DEVELOPER - ...
 ```
 
+> 上面为归一化示例。真实 SAP 的 `dumps[].id` 是 feed entry id URI（含 URL 编码，如
+> `/sap/bc/adt/vit/runtime/dumps/<时间戳><主机>...`），`summary` 是截断后的 dump HTML 正文。
+
 ## 关键错误码
 
 | 错误 | 类别 / exit | 含义 | 恢复 |
@@ -94,10 +97,10 @@ abap dumps --schema
 ## 实现要点
 
 - 只读命令：不创建 lock、不触发 transport、不修改 SAP 数据
-- ABAP 侧零改动：复用 `/sap/bc/adt/runtime/dumps` 标准 ADT Atom feed
-- 走 `AdtClientWrapper.dumps(limit?, user?)` 包装层直接发 `$top` + `$filter` 查询参数（绕过 library 的 `$query=` 封装，让 SAP 端一次裁剪）
-- `DumpsFeed` / `Dump` 类型复用 `abap-adt-api@8.4.1`，XML 解析由 library 完成
-- 摘要字段空白合并 + 500 字符截断，避免 Agent 拿到大段无用 XML
+- ABAP 侧零改动：复用 `/sap/bc/adt/runtime/dumps` 标准 ADT Atom feed（on-prem S/4HANA 已验证启用）
+- 走 `AdtClientWrapper.dumps(limit?, user?)` → `clients/dumps-feed.ts`：以**直接 OData URL 参数**发送 `$top` + `$filter`，让 SAP 端一次裁剪；`abap-adt-api` 的 `dumps(h, query)` 把查询包成 `$query=...`，真实 SAP 以 HTTP 400（"Data is invalid and could not be converted"）拒绝该形态，故不走 library 的请求封装
+- `clients/dumps-feed.ts` 用 library 的 `fullParse`/`xmlArray` 镜像其 Atom 解析，`DumpsFeed` / `Dump` 类型仍复用 `abap-adt-api`
+- 真实 feed：`dumps[].id` 为 feed entry id URI（URL 编码，原样透传）；`summary` 为 dump 正文（HTML，空白合并 + 500 字符截断）
 
 # references
 

@@ -25,6 +25,7 @@
 - **跨类型注册表合一（US11 / T046-T052）**：`types/registry.ts` 成为 10 类对象（4 源 + 4 DDIC + HTTP + TRAN）的单一真源。`formats/type-folder.ts` 的 `TYPE_FOLDER`、`flows/edit/create-types.ts` 的 `TYPE_MAP`、`formats/{ddic,http,transport}/json.ts` 的 `*_SUPPORTED_TYPES` 常量全部迁移到 registry（保留同名 re-export 维持外部 import 兼容）。`create --schema` 的 `arguments[0].allowedValues` 从 4 个源对象升级为全 10 类。新增类型只需要编辑 `registry.ts` 一行，9 命令与 schema 自动识别。`isDdicSupportedType` / `isHttpSupportedType` / `isTranSupportedType` 收紧为 type guard（要求 uppercase 字符串）。
 
 ### Fixed
+- **dumps 查询形态对齐 ADT OData 契约**（真实 SAP 验证暴露）：`AdtClientWrapper.dumps` 原实现经 `abap-adt-api` 的 feeds.dumps 把查询整串包成 `$query=...`，而真实 SAP `/sap/bc/adt/runtime/dumps` 只接受直接 OData `$top`/`$filter` 参数，对该形态回 HTTP 400（"Data is invalid and could not be converted"）→ `abap dumps` 报 SAP_ERROR/exit 6。现新增 `clients/dumps-feed.ts` 自持 raw request（直发 `$top`/`$filter`）并用 library 的 `fullParse`/`xmlArray` 镜像其 Atom 解析，`DumpsFeed` 类型不变。真实 SAP（S/4HANA 2023 FPS02）`abap dumps --limit 5 --json` exit 0 返回 5 条摘要；`--user` 过滤与默认 `--limit 20` 均通过。测试：`test/unit/dumps-feed.test.ts` 9 cases（query 构造 / 请求形态 / Atom 解析）。
 - **HTTP create/push wire 形态对齐嵌套契约**（真实 SAP 验证暴露，T059）：`formats/http/json.ts#localToWire` 之前输出扁平 wire（`description`/`handlerClass`/`url` 在顶层），而自建 ICF handler `dispatch_http` 用 `/ui2/cl_json` 反序列化到嵌套 `ty_http_service_data`（`formatVersion` / `header` / `generalInformation`）→ 真实 SAP create 永远报 `HTTP_SERVICE_INVALID`（mock 无 `/http` 路由，掩盖了 wire 契约分歧）。现 wire 即嵌套 abap-file-format 形态（与 GET 响应、`http-v1.json` 一致），`package` / `transportRequest` 留在顶层信封；GET data 无 `name`（非 ABAP 结构成员），pull 由请求对象名注入。真实 SAP `create → pull → push → pull` 字节级零差异闭环通过。`serviceId` / `descriptionByLang[]`（US10）仍仅 CLI 透传 —— ABAP 0.5.0 结构不含这两字段，真实 SAP 不持久化 / 不回传（见 `wiki/objects/http.md` 已知坑）。
 - **HTTP `create` 骨架补 `name`**：`abap create HTTP <name>`（无 `--file`）骨架落盘含 `name`（与 pull 布局一致）；此前缺 `name`，骨架编辑后 push 校验报 `Missing required field: name`，无法"编辑即 push"。
 - **`abapLanguageVersion` namespace 读错**（真实 SAP 验证暴露，T059）：`formats/object-parts.ts` + `formats/pull-fugr.ts` 之前读 `meta['abapsource:abapLanguageVersion']`；真实 ADT 返回 `adtcore:abapLanguageVersion`（root attr，`xmlns:adtcore`），mock fixture 伪造 `abapsource:` → mock 全绿、真实 SAP 永远拿不到 → pull 落盘缺失。修复后真实 pull 落盘 `"abapLanguageVersion": "standard"`。
@@ -32,6 +33,7 @@
 - **TABL DDL 解析器扩展**：`formats/ddic/tabl-artifact.ts#parseTablDDic` 新增支持：① `.INCLUDE ... WITH SUFFIX <suffix>`（写入 `field.includeSuffix`）；② 多列复合 key（每列 `keyFlag: true, notNull: true`）；③ 行内 foreign key（`abap.char(3) with foreign key [dependent] check t005;` 一行式）；④ `@AbapCatalog.foreignKeys [ ... ]` 块（写入 `field.foreignKeys[]`）；⑤ `@ClientHandling.type`（驱动 `clientDependent` 显式覆盖默认启发式）。
 
 ### Tests
+- `test/unit/dumps-feed.test.ts` — 9 cases（`$top`/`$filter` query 构造、请求形态断言、Atom feed 解析、空 feed）。
 - `test/unit/abapLanguageVersion.test.ts` — 3 cases（cloud / on-prem / standard fallback）。
 - `test/unit/doma-fixedValues-roundtrip.test.ts` — 5 cases（empty / single / multi-lang / special chars / nested `format.fixedValues`）。
 - `test/unit/type-alias-sicf-http.test.ts` — 5 cases（uppercase / lowercase / subtype suffix / HTTP passthrough / unknown passthrough）。
