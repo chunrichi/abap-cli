@@ -36,25 +36,44 @@ export interface HttpObjectLocal {
 }
 
 /**
- * ICF wire representation (camelCase, transport envelope).
- * Mirrors the JSON the SAP-side handler will deserialize.
+ * ICF wire representation — the JSON body the self-built ICF handler
+ * (`zcl_abap_vibe_icf` → `dispatch_http`) deserializes on POST and
+ * serializes on GET.
  *
- * 032 US10: SICF extension fields (`serviceId` / `descriptionByLang`) are
- * SAP wire conventions that the CLI must round-trip even though they're
- * not in the abap-file-format http-v1.json schema. The CLI extends
- * `generalInformation` and `header` at runtime to carry them.
+ * The wire IS the nested abap-file-format HTTP shape (camelCase), matching
+ * `zif_aff_http_v1.intf.abap`:
+ *   { formatVersion: '1', header: {...}, generalInformation: {...} }
+ * A flat CLI envelope was the historical wire bug (T059): ABAP deserializes
+ * into `ty_http_service_data`, so flat fields never mapped and create always
+ * failed with `HTTP_SERVICE_INVALID`.
+ *
+ * GET data has no `name`/`package`/`transportRequest` (not structure
+ * members); POST adds the transport envelope at top level (`package` is
+ * ignored by the ABAP structure, `transportRequest` is regex-extracted by
+ * dispatch_http).
+ *
+ * 032 US10: SICF extensions the CLI round-trips but ABAP 0.5.0 does NOT
+ * persist / return (see known gaps in wiki/objects/http.md):
+ *   generalInformation.serviceId — SICF node path (e.g. '/sap/zfoo')
+ *   header.descriptionByLang[]   — multi-language descriptions
+ *                                  [{ language: 'EN', description: '...' }, ...]
  */
 export interface HttpWirePayload {
-  name: string;
-  description?: string;
-  originalLanguage?: string;
-  abapLanguageVersion?: string;
-  handlerClass?: string;
-  url?: string;
-  /** 032 US10: SICF service path on the wire (server-side node path). */
-  serviceId?: string;
-  /** 032 US10: multi-language descriptions on the wire. */
-  descriptionByLang?: Array<{ language: string; description: string }>;
+  /** SICF node name; uppercased from the local file on POST. */
+  name?: string;
+  formatVersion?: '1';
+  header?: {
+    description?: string;
+    originalLanguage?: string;
+    abapLanguageVersion?: 'standard' | 'cloudDevelopment';
+    descriptionByLang?: Array<{ language: string; description: string }>;
+  };
+  generalInformation?: {
+    handlerClass?: string;
+    url?: string;
+    serviceId?: string;
+  };
+  /** POST transport envelope — not part of the abap-file-format schema. */
   package?: string;
   transportRequest?: string;
 }
@@ -76,14 +95,13 @@ export async function writeHttpJson(filePath: string, data: HttpObjectLocal): Pr
 }
 
 /**
- * Convert a local HTTP object (read from .http.json) to wire payload.
- * Accepts both the abap-file-format nested shape ({ header, generalInformation })
- * and the flat CLI shape (description at top level) for ergonomics.
+ * Convert a local HTTP object (read from .http.json) to the nested wire
+ * payload the ICF handler deserializes. Accepts both the abap-file-format
+ * nested shape ({ header, generalInformation }) and the flat CLI shape
+ * (description / handlerClass at top level) for ergonomics.
  */
 export function localToWire(local: HttpObjectLocal): HttpWirePayload {
   const l = local as Record<string, unknown>;
-  // abap-file-format places the description under header.description; the flat CLI
-  // convention puts it at the top level. Accept both so the CLI accepts either shape.
   const headerObj = (l.header && typeof l.header === 'object') ? (l.header as Record<string, unknown>) : undefined;
   const generalObj = (l.generalInformation && typeof l.generalInformation === 'object')
     ? (l.generalInformation as Record<string, unknown>)
@@ -94,57 +112,66 @@ export function localToWire(local: HttpObjectLocal): HttpWirePayload {
   const abapLanguageVersion = (l.abapLanguageVersion as string | undefined) ?? (headerObj?.abapLanguageVersion as string | undefined);
   const handlerClass = (l.handlerClass as string | undefined) ?? (generalObj?.handlerClass as string | undefined);
   const url = (l.url as string | undefined) ?? (generalObj?.url as string | undefined);
-  // 032 US10: SICF extension fields — read from nested generalInformation/header
-  // (preferred, abap-file-format consistent) or top-level flat (legacy fallback).
+  // 032 US10: SICF extension fields — nested (preferred) or top-level flat (legacy fallback).
   const serviceId = (l.serviceId as string | undefined) ?? (generalObj?.serviceId as string | undefined);
   const descByLangRaw = (l.descriptionByLang as Array<{ language: string; description: string }> | undefined)
     ?? (headerObj?.descriptionByLang as Array<{ language: string; description: string }> | undefined);
 
-  return {
-    name: String(local.name).toUpperCase(),
-    description,
-    originalLanguage,
-    abapLanguageVersion,
-    handlerClass,
-    url,
-    serviceId,
-    descriptionByLang: descByLangRaw,
-    package: l.package as string | undefined,
-    transportRequest: l.transportRequest as string | undefined,
+  const header: Record<string, unknown> = {};
+  if (description !== undefined) header.description = description;
+  if (originalLanguage !== undefined) header.originalLanguage = originalLanguage;
+  if (abapLanguageVersion !== undefined) header.abapLanguageVersion = abapLanguageVersion;
+  if (descByLangRaw !== undefined && descByLangRaw.length > 0) header.descriptionByLang = descByLangRaw;
+
+  const generalInformation: Record<string, unknown> = {};
+  if (handlerClass !== undefined) generalInformation.handlerClass = handlerClass;
+  if (url !== undefined) generalInformation.url = url;
+  if (serviceId !== undefined) generalInformation.serviceId = serviceId;
+
+  const wire: HttpWirePayload = {
+    name: local.name !== undefined ? String(local.name).toUpperCase() : undefined,
+    formatVersion: '1',
+    header: header as HttpWirePayload['header'],
+    generalInformation: generalInformation as HttpWirePayload['generalInformation'],
   };
+  // Transport envelope: carried at the top level of the local file.
+  if (l.package !== undefined) wire.package = l.package as string;
+  if (l.transportRequest !== undefined) wire.transportRequest = l.transportRequest as string;
+  return wire;
 }
 
 /**
- * Convert a wire payload back to local abap-file-format shape.
- * Used to normalize the GET response so the file written to disk matches the
- * abap-file-format schema (header / generalInformation nesting).
+ * Convert a wire payload (GET /http/<name> data) back to the local
+ * abap-file-format shape (header / generalInformation nesting) so the file
+ * written to disk matches the schema. GET data carries no `name` — callers
+ * inject it from the requested object name.
  */
 export function wireToLocal(wire: HttpWirePayload): HttpObjectLocal {
+  const w = wire as Record<string, unknown>;
+  const headerObj = (w.header && typeof w.header === 'object') ? (w.header as Record<string, unknown>) : undefined;
+  const generalObj = (w.generalInformation && typeof w.generalInformation === 'object')
+    ? (w.generalInformation as Record<string, unknown>)
+    : undefined;
+
   const header: Record<string, unknown> = {};
-  if (wire.description !== undefined) header.description = wire.description;
-  if (wire.originalLanguage !== undefined) header.originalLanguage = wire.originalLanguage;
-  if (wire.abapLanguageVersion !== undefined) header.abapLanguageVersion = wire.abapLanguageVersion;
-
-  const generalInformation: Record<string, unknown> = {};
-  if (wire.handlerClass !== undefined) generalInformation.handlerClass = wire.handlerClass;
-  if (wire.url !== undefined) generalInformation.url = wire.url;
-  // 032 US10: SICF serviceId → nested generalInformation.serviceId
-  // (abap-file-format consistent location; not in schema but required by SAP wire).
-  if (wire.serviceId !== undefined) generalInformation.serviceId = wire.serviceId;
-
-  // 032 US10: multi-language descriptions → nested header.descriptionByLang[].
-  // Each entry is `{ language, description }` — both required per SAP wire.
-  if (wire.descriptionByLang !== undefined && wire.descriptionByLang.length > 0) {
-    header.descriptionByLang = wire.descriptionByLang;
+  if (headerObj?.description !== undefined) header.description = headerObj.description;
+  if (headerObj?.originalLanguage !== undefined) header.originalLanguage = headerObj.originalLanguage;
+  if (headerObj?.abapLanguageVersion !== undefined) header.abapLanguageVersion = headerObj.abapLanguageVersion;
+  if (Array.isArray(headerObj?.descriptionByLang) && (headerObj?.descriptionByLang as unknown[]).length > 0) {
+    header.descriptionByLang = headerObj.descriptionByLang;
   }
 
-  const local: HttpObjectLocal = {
-    name: wire.name,
+  const generalInformation: Record<string, unknown> = {};
+  if (generalObj?.handlerClass !== undefined) generalInformation.handlerClass = generalObj.handlerClass;
+  if (generalObj?.url !== undefined) generalInformation.url = generalObj.url;
+  if (generalObj?.serviceId !== undefined) generalInformation.serviceId = generalObj.serviceId;
+
+  return {
+    name: w.name as string,
     formatVersion: '1',
-    header,
-    generalInformation,
+    header: header as HttpObjectLocal['header'],
+    generalInformation: generalInformation as HttpObjectLocal['generalInformation'],
   };
-  return local;
 }
 
 /**

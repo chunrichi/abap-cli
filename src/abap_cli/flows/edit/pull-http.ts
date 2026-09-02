@@ -29,7 +29,10 @@ export async function runPullHttp(objectName: string, opts: PullOptions): Promis
     });
   }
 
+  // GET data is the nested abap-file-format payload but carries no `name`
+  // (not a member of the ABAP structure) — inject it from the request.
   const local = httpWireToLocal(resp.data);
+  local.name = objectName;
   const filename = buildFilename(objectName, 'HTTP', 'main', '.json');
   const relPath = path.join(opts.dir, folderFor('HTTP'), filename);
   const targetPath = path.resolve(process.cwd(), relPath);

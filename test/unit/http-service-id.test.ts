@@ -1,12 +1,12 @@
 /**
  * 032 US10 (T041/T042): HTTP `serviceId` + `descriptionByLang[]` round-trip.
  *
- * Wire shape (SAP ICF /http/<name>):
- *   `{ serviceId: '/sap/zfoo', descriptionByLang: [{ language: 'EN', description: 'My service' }] }`
+ * Wire shape (SAP ICF /http/<name> — nested abap-file-format payload):
+ *   `generalInformation.serviceId`   → '/sap/zfoo'
+ *   `header.descriptionByLang[]`     → [{ language: 'EN', description: 'My service' }]
  *
- * Local shape (abap-file-format http-v1.json + SICF extensions):
- *   `generalInformation.serviceId` — service path on the wire
- *   `header.descriptionByLang[]`   — multi-language descriptions
+ * Local shape (abap-file-format http-v1.json + SICF extensions) is the same
+ * nested shape.
  *
  * Both fields are SICF-specific extensions that the CLI round-trips even
  * though they're not in the abap-file-format http-v1.json schema.
@@ -16,30 +16,37 @@ import { localToWire, wireToLocal } from '../../src/abap_cli/formats/http/json.j
 
 describe('032/http-service-id', () => {
   describe('wireToLocal', () => {
-    it('maps wire serviceId → local generalInformation.serviceId', () => {
+    it('maps wire generalInformation.serviceId → local generalInformation.serviceId', () => {
       const local = wireToLocal({
-        name: 'ZMY_SERVICE',
-        description: 'My service',
-        originalLanguage: 'EN',
-        handlerClass: 'ZCL_MY_HANDLER',
-        url: '/sap/zfoo',
-        serviceId: '/sap/zfoo',
-        descriptionByLang: [{ language: 'EN', description: 'My service' }],
+        formatVersion: '1',
+        header: {
+          description: 'My service',
+          originalLanguage: 'EN',
+          descriptionByLang: [{ language: 'EN', description: 'My service' }],
+        },
+        generalInformation: {
+          handlerClass: 'ZCL_MY_HANDLER',
+          url: '/sap/zfoo',
+          serviceId: '/sap/zfoo',
+        },
       });
       const generalInformation = (local as Record<string, unknown>).generalInformation as Record<string, unknown>;
       expect(generalInformation.serviceId).toBe('/sap/zfoo');
     });
 
-    it('maps wire descriptionByLang[] → local header.descriptionByLang[]', () => {
+    it('maps wire header.descriptionByLang[] → local header.descriptionByLang[]', () => {
       const local = wireToLocal({
-        name: 'ZMY_SERVICE',
-        description: 'My service',
-        originalLanguage: 'EN',
-        descriptionByLang: [
-          { language: 'EN', description: 'My service' },
-          { language: 'DE', description: 'Mein Service' },
-          { language: 'ZH', description: '我的服务' },
-        ],
+        formatVersion: '1',
+        header: {
+          description: 'My service',
+          originalLanguage: 'EN',
+          descriptionByLang: [
+            { language: 'EN', description: 'My service' },
+            { language: 'DE', description: 'Mein Service' },
+            { language: 'ZH', description: '我的服务' },
+          ],
+        },
+        generalInformation: { url: '/sap/zfoo' },
       });
       const header = (local as Record<string, unknown>).header as Record<string, unknown>;
       expect(header.descriptionByLang).toEqual([
@@ -51,10 +58,9 @@ describe('032/http-service-id', () => {
 
     it('omits descriptionByLang when wire array is empty', () => {
       const local = wireToLocal({
-        name: 'ZMY_SERVICE',
-        description: 'Plain service',
-        originalLanguage: 'EN',
-        descriptionByLang: [],
+        formatVersion: '1',
+        header: { description: 'Plain service', originalLanguage: 'EN', descriptionByLang: [] },
+        generalInformation: { url: '/sap/zfoo' },
       });
       const header = (local as Record<string, unknown>).header as Record<string, unknown>;
       expect(header.descriptionByLang).toBeUndefined();
@@ -62,9 +68,9 @@ describe('032/http-service-id', () => {
 
     it('omits serviceId when wire field absent (existing objects without serviceId)', () => {
       const local = wireToLocal({
-        name: 'ZMY_OLD',
-        description: 'Legacy',
-        originalLanguage: 'EN',
+        formatVersion: '1',
+        header: { description: 'Legacy', originalLanguage: 'EN' },
+        generalInformation: { url: '/sap/zold' },
       });
       const generalInformation = (local as Record<string, unknown>).generalInformation as Record<string, unknown>;
       expect(generalInformation.serviceId).toBeUndefined();
@@ -72,7 +78,7 @@ describe('032/http-service-id', () => {
   });
 
   describe('localToWire (push passthrough)', () => {
-    it('maps local nested generalInformation.serviceId → wire serviceId', () => {
+    it('maps local nested generalInformation.serviceId → wire generalInformation.serviceId', () => {
       const wire = localToWire({
         name: 'ZMY_SERVICE',
         description: 'My service',
@@ -83,10 +89,10 @@ describe('032/http-service-id', () => {
           serviceId: '/sap/zfoo',
         },
       } as Record<string, unknown>);
-      expect(wire.serviceId).toBe('/sap/zfoo');
+      expect(wire.generalInformation?.serviceId).toBe('/sap/zfoo');
     });
 
-    it('maps local nested header.descriptionByLang[] → wire descriptionByLang[]', () => {
+    it('maps local nested header.descriptionByLang[] → wire header.descriptionByLang[]', () => {
       const wire = localToWire({
         name: 'ZMY_SERVICE',
         description: 'My service',
@@ -100,7 +106,7 @@ describe('032/http-service-id', () => {
           ],
         },
       } as Record<string, unknown>);
-      expect(wire.descriptionByLang).toEqual([
+      expect(wire.header?.descriptionByLang).toEqual([
         { language: 'EN', description: 'My service' },
         { language: 'DE', description: 'Mein Service' },
       ]);
@@ -114,8 +120,8 @@ describe('032/http-service-id', () => {
         serviceId: '/sap/zlegacy',
         descriptionByLang: [{ language: 'EN', description: 'Legacy form' }],
       } as Record<string, unknown>);
-      expect(wire.serviceId).toBe('/sap/zlegacy');
-      expect(wire.descriptionByLang).toEqual([{ language: 'EN', description: 'Legacy form' }]);
+      expect(wire.generalInformation?.serviceId).toBe('/sap/zlegacy');
+      expect(wire.header?.descriptionByLang).toEqual([{ language: 'EN', description: 'Legacy form' }]);
     });
 
     it('omits serviceId/descriptionByLang when neither nested nor flat input present', () => {
@@ -124,8 +130,8 @@ describe('032/http-service-id', () => {
         description: 'My service',
         originalLanguage: 'EN',
       });
-      expect(wire.serviceId).toBeUndefined();
-      expect(wire.descriptionByLang).toBeUndefined();
+      expect(wire.generalInformation?.serviceId).toBeUndefined();
+      expect(wire.header?.descriptionByLang).toBeUndefined();
     });
   });
 

@@ -69,10 +69,9 @@ describe('022 create HTTP service', () => {
     expect(res.exitCode).toBeUndefined();
     expect(icfPostHttp).toHaveBeenCalledWith('ZHTTP_TEST', expect.objectContaining({
       name: 'ZHTTP_TEST',
-      description: 'Test HTTP service',
-      originalLanguage: 'EN',
-      handlerClass: 'ZCL_HTTP_HANDLER',
-      url: '/sap/zhttp_test',
+      formatVersion: '1',
+      header: { description: 'Test HTTP service', originalLanguage: 'EN' },
+      generalInformation: { handlerClass: 'ZCL_HTTP_HANDLER', url: '/sap/zhttp_test' },
       package: '$TMP',
     }));
     expect(JSON.parse(res.stdout)).toMatchObject({
@@ -92,7 +91,7 @@ describe('022 create HTTP service', () => {
       '--yes', '--json',
     ], { cwd });
     const callBody = icfPostHttp.mock.calls[0]![1] as any;
-    expect(callBody.description).toBe('CLI override');
+    expect(callBody.header.description).toBe('CLI override');
   });
 
   it('reports INVALID_ARGUMENT for invalid namespace (non-Z/Y/slash)', async () => {

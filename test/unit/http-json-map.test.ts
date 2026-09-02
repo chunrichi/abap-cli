@@ -13,7 +13,7 @@ import {
 
 describe('022 HTTP JSON helpers', () => {
   describe('localToWire', () => {
-    it('maps the abap-file-format nested shape to wire', () => {
+    it('maps the abap-file-format nested shape to the nested wire (the contract the ICF handler deserializes)', () => {
       const local: HttpObjectLocal = {
         name: 'zhttp_test',
         formatVersion: '1',
@@ -23,17 +23,13 @@ describe('022 HTTP JSON helpers', () => {
       const wire = localToWire(local);
       expect(wire).toEqual({
         name: 'ZHTTP_TEST',
-        description: 'HTTP service',
-        originalLanguage: 'en',
-        abapLanguageVersion: 'standard',
-        handlerClass: 'ZCL_HTTP_HANDLER',
-        url: '/sap/zhttp_test',
-        package: undefined,
-        transportRequest: undefined,
+        formatVersion: '1',
+        header: { description: 'HTTP service', originalLanguage: 'en', abapLanguageVersion: 'standard' },
+        generalInformation: { handlerClass: 'ZCL_HTTP_HANDLER', url: '/sap/zhttp_test' },
       });
     });
 
-    it('accepts the flat CLI shape (description / handlerClass at top level)', () => {
+    it('maps the flat CLI shape (description / handlerClass at top level) into the nested wire', () => {
       const local: HttpObjectLocal = {
         name: 'ZHTTP_FLAT',
         description: 'Flat shape',
@@ -44,10 +40,9 @@ describe('022 HTTP JSON helpers', () => {
       const wire = localToWire(local);
       expect(wire).toMatchObject({
         name: 'ZHTTP_FLAT',
-        description: 'Flat shape',
-        originalLanguage: 'EN',
-        handlerClass: 'ZCL_FLAT_HANDLER',
-        url: '/sap/flat',
+        formatVersion: '1',
+        header: { description: 'Flat shape', originalLanguage: 'EN' },
+        generalInformation: { handlerClass: 'ZCL_FLAT_HANDLER', url: '/sap/flat' },
       });
     });
 
@@ -58,21 +53,32 @@ describe('022 HTTP JSON helpers', () => {
       };
       expect(localToWire(local).name).toBe('ZHTTP_LOWER');
     });
+
+    it('carries the transport envelope (package / transportRequest) at the wire top level', () => {
+      const local = {
+        name: 'ZHTTP_TRN',
+        header: { description: 'd', originalLanguage: 'EN' },
+        generalInformation: { url: '/sap/zhttp_trn' },
+        package: '$TMP',
+        transportRequest: 'A4HK900148',
+      };
+      const wire = localToWire(local as HttpObjectLocal);
+      expect(wire.package).toBe('$TMP');
+      expect(wire.transportRequest).toBe('A4HK900148');
+    });
   });
 
   describe('wireToLocal', () => {
-    it('produces the abap-file-format nested shape', () => {
+    it('maps the nested GET payload to the abap-file-format nested shape', () => {
       const wire: HttpWirePayload = {
-        name: 'ZHTTP_TEST',
-        description: 'HTTP service',
-        originalLanguage: 'EN',
-        handlerClass: 'ZCL_HTTP_HANDLER',
-        url: '/sap/zhttp_test',
+        formatVersion: '1',
+        header: { description: 'HTTP service', originalLanguage: 'EN', abapLanguageVersion: 'standard' },
+        generalInformation: { handlerClass: 'ZCL_HTTP_HANDLER', url: '/sap/zhttp_test' },
       };
       const local = wireToLocal(wire);
-      expect(local.name).toBe('ZHTTP_TEST');
+      expect(local.name).toBeUndefined();
       expect(local.formatVersion).toBe('1');
-      expect(local.header).toEqual({ description: 'HTTP service', originalLanguage: 'EN' });
+      expect(local.header).toEqual({ description: 'HTTP service', originalLanguage: 'EN', abapLanguageVersion: 'standard' });
       expect(local.generalInformation).toEqual({ handlerClass: 'ZCL_HTTP_HANDLER', url: '/sap/zhttp_test' });
     });
   });

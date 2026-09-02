@@ -243,7 +243,10 @@ async function runCreateHttp(type: 'HTTP', objectName: string, opts: CreateOptio
 
   // Convert to wire schema. CLI flags override file values when both are present.
   const wire = httpLocalToWire(local);
-  if (opts.description) wire.description = opts.description;
+  if (opts.description) {
+    wire.header = wire.header ?? {};
+    wire.header.description = opts.description;
+  }
   if (opts.package) wire.package = opts.package;
   if (opts.tr) wire.transportRequest = opts.tr;
 
@@ -425,8 +428,10 @@ export async function runCreate(type: string | undefined, name: string | undefin
         const code = (probeError as NodeJS.ErrnoException)?.code;
         if (code !== 'ENOENT') throw probeError;
       }
-      // Write the minimal skeleton.
+      // Write the minimal skeleton. `name` mirrors the pull layout so the
+      // file validates and can be pushed right after editing url/handler.
       const skeleton = {
+        name: objectName,
         formatVersion: '1',
         header: {
           description: opts.description ?? '',

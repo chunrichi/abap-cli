@@ -64,6 +64,7 @@ describe('032/http-create-skeleton', () => {
     expect(fs.existsSync(skeletonPath)).toBe(true);
 
     const skeleton = JSON.parse(fs.readFileSync(skeletonPath, 'utf-8'));
+    expect(skeleton.name).toBe('ZMY_SERVICE');
     expect(skeleton.formatVersion).toBe('1');
     expect(skeleton.header.description).toBe('My service');
     expect(skeleton.header.originalLanguage).toBe('en');

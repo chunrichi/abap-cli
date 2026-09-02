@@ -24,12 +24,11 @@ vi.mock('../../src/abap_cli/clients/adt-client.js', () => ({
 
 const icfGetHttp = vi.fn(async () => ({
   status: 'success' as const,
+  // Real SAP GET /http/<name> data: nested abap-file-format payload, no `name`.
   data: {
-    name: 'ZHTTP_TEST',
-    description: 'HTTP service',
-    originalLanguage: 'EN',
-    handlerClass: 'ZCL_HTTP_HANDLER',
-    url: '/sap/zhttp_test',
+    formatVersion: '1',
+    header: { description: 'HTTP service', originalLanguage: 'EN', abapLanguageVersion: 'standard' },
+    generalInformation: { handlerClass: 'ZCL_HTTP_HANDLER', url: '/sap/zhttp_test' },
   },
   error: null,
 }));

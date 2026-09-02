@@ -10,7 +10,7 @@
 - **`specs/032-aff-by-type-gap-fix/`**：spec kit 全流程立项 — `spec.md` (13 User Story / 35 FR / 12 SC) + `plan.md` (5 Phase) + `tasks.md` (66 T 编号)；治理 10 类已支持对象的 abap-file-format 合规性与本地文件处理 gap（spec 024 follow-up + memory B/D 沉淀 + `wiki/object-types.md` todo）。
 - **`src/abap_cli/types/registry.ts`**：单一类型注册表，统一三份既有分裂表（`formats/type-folder.ts#TYPE_FOLDER` + `flows/create-types.ts#TYPE_MAP` + `formats/{ddic,http,transport}/json.ts` 的 `*_SUPPORTED_TYPES`）。新增类型仅改 `registry.ts` 一行即可让 9 个 CLI 命令与 schema 自动识别。
 - **`src/abap_cli/cli/type-alias.ts`**：`normalizeTypeInput()` 处理 CLI 输入归一化。当前唯一别名 `SICF` → `HTTP`，返回 `aliasWarning` 字符串供 `meta.warnings[]` 承载。
-- **`abapLanguageVersion` 全类型落盘**：`header.abapLanguageVersion` 从 ADT `objectStructure.metaData['abapsource:abapLanguageVersion']` 读取；10 类对象 pull 端均写 `<name>.<type>.json#header`；FUGR 三件 JSON（`fugr.json` / `sapl*.reps.json` / `*.func.json`）均含该字段。cloud 系统推送不再因缺字段失败。
+- **`abapLanguageVersion` 全类型落盘**：`header.abapLanguageVersion` 从 ADT `objectStructure.metaData['adtcore:abapLanguageVersion']`（root attr）读取；10 类对象 pull 端均写 `<name>.<type>.json#header`；FUGR 三件 JSON（`fugr.json` / `sapl*.reps.json` / `*.func.json`）均含该字段。cloud 系统推送不再因缺字段失败。
 - **DOMA `fixedValues` 双向 round-trip**：wire `{fixedValue, fixedValueLong: {languageIndependent, languageDependent[]}}` ↔ local `{fixedValue, description: {...}}`；接受 abap-file-format 嵌套 `format.fixedValues` 与 top-level `fixedValues` 两种形态；特殊字符（引号 / 反斜杠 / Unicode）round-trip 不丢失。- **DTEL `typeRef` 第三种 category 支持**：wire `typeRef: { typeName, referencedTypeName? }` ↔ local `dataTypeInformation: { category: 'typeRef', typeName, referencedTypeName? }`；接受 abap-file-format 嵌套形态与 top-level 扁平 `typeRef` 两种 local 输入。`domain` / `predefinedType` category 行为保持不变（不强制统一嵌套）。
 - **DOMA `format.signFlag` / `format.lowercase` / `format.convExit` 双向落盘**：wire 字符串形态（`'X'` / `''` / `'ALPHA'`；空串保留）↔ local 嵌套 `format.{signFlag, lowercase, convExit}`（abap-file-format `doma-v1.json` 嵌套 schema）。Local top-level 扁平字段保留为 legacy fallback（向后兼容既有脚本）。Wire 类型从 `boolean` 修正为 `string`（与 SAP ICF wire 一致）。
 - **PROG `PROG/I` 子类型分流**：`pull-strategy.ts` 检测 `programType: 'I'`（mock raw）或 `objectType: 'PROG/I'`（real SAP fallback）时，单一 source part 的 subtype 从 `main` 重命名为 `include`，落盘 `<name>.prog.include.abap`（不混入 `<name>.prog.abap` main 路径）；JSON 元数据 `generalInformation.programType: 'include'`（abap-file-format prog-v1 枚举值）由 `object-metadata.ts` 已有的 `programTypeOf` 派生。CLAS/INTF（共享 `sourceObjectStrategy()`）不受影响。
@@ -25,6 +25,9 @@
 - **跨类型注册表合一（US11 / T046-T052）**：`types/registry.ts` 成为 10 类对象（4 源 + 4 DDIC + HTTP + TRAN）的单一真源。`formats/type-folder.ts` 的 `TYPE_FOLDER`、`flows/edit/create-types.ts` 的 `TYPE_MAP`、`formats/{ddic,http,transport}/json.ts` 的 `*_SUPPORTED_TYPES` 常量全部迁移到 registry（保留同名 re-export 维持外部 import 兼容）。`create --schema` 的 `arguments[0].allowedValues` 从 4 个源对象升级为全 10 类。新增类型只需要编辑 `registry.ts` 一行，9 命令与 schema 自动识别。`isDdicSupportedType` / `isHttpSupportedType` / `isTranSupportedType` 收紧为 type guard（要求 uppercase 字符串）。
 
 ### Fixed
+- **HTTP create/push wire 形态对齐嵌套契约**（真实 SAP 验证暴露，T059）：`formats/http/json.ts#localToWire` 之前输出扁平 wire（`description`/`handlerClass`/`url` 在顶层），而自建 ICF handler `dispatch_http` 用 `/ui2/cl_json` 反序列化到嵌套 `ty_http_service_data`（`formatVersion` / `header` / `generalInformation`）→ 真实 SAP create 永远报 `HTTP_SERVICE_INVALID`（mock 无 `/http` 路由，掩盖了 wire 契约分歧）。现 wire 即嵌套 abap-file-format 形态（与 GET 响应、`http-v1.json` 一致），`package` / `transportRequest` 留在顶层信封；GET data 无 `name`（非 ABAP 结构成员），pull 由请求对象名注入。真实 SAP `create → pull → push → pull` 字节级零差异闭环通过。`serviceId` / `descriptionByLang[]`（US10）仍仅 CLI 透传 —— ABAP 0.5.0 结构不含这两字段，真实 SAP 不持久化 / 不回传（见 `wiki/objects/http.md` 已知坑）。
+- **HTTP `create` 骨架补 `name`**：`abap create HTTP <name>`（无 `--file`）骨架落盘含 `name`（与 pull 布局一致）；此前缺 `name`，骨架编辑后 push 校验报 `Missing required field: name`，无法"编辑即 push"。
+- **`abapLanguageVersion` namespace 读错**（真实 SAP 验证暴露，T059）：`formats/object-parts.ts` + `formats/pull-fugr.ts` 之前读 `meta['abapsource:abapLanguageVersion']`；真实 ADT 返回 `adtcore:abapLanguageVersion`（root attr，`xmlns:adtcore`），mock fixture 伪造 `abapsource:` → mock 全绿、真实 SAP 永远拿不到 → pull 落盘缺失。修复后真实 pull 落盘 `"abapLanguageVersion": "standard"`。
 - **TABL/STRU push 走三件套**：`flows/edit/push.ts#pushDdicFile` 改用 `readDdicObjectForCreate`（之前直接 `readDdicJson`），TABL/STRU 三件套 `<name>.{tabl,stru}.{json,ddic,settings.json}` 在 push 路径与 create 路径行为一致（DDL 是字段定义唯一真相）。STRU 缺 `.settings.json` 不报错。DDL 解析失败 → `TABL_DDL_INVALID`（VALIDATION_ERROR/exit 7），含行号提示与三件套迁移 nextSteps。
 - **TABL DDL 解析器扩展**：`formats/ddic/tabl-artifact.ts#parseTablDDic` 新增支持：① `.INCLUDE ... WITH SUFFIX <suffix>`（写入 `field.includeSuffix`）；② 多列复合 key（每列 `keyFlag: true, notNull: true`）；③ 行内 foreign key（`abap.char(3) with foreign key [dependent] check t005;` 一行式）；④ `@AbapCatalog.foreignKeys [ ... ]` 块（写入 `field.foreignKeys[]`）；⑤ `@ClientHandling.type`（驱动 `clientDependent` 显式覆盖默认启发式）。
 
@@ -40,6 +43,10 @@
 - `test/unit/doma-format-flags.test.ts` — 13 cases（AC1 wire signFlag `'X'` → local `format.signFlag` / AC2 空串保留 / AC3 convExit 落盘 / 仅一个字段时仍写 format / localToWire 嵌套 + 扁平 fallback / 空串 round-trip / QUAN + CHAR + lowercase 三种典型组合）。
 - `test/unit/prog-subtype-include.test.ts` — 6 cases（PROG/I `programType: 'I'` → `*.prog.include.abap` / JSON `generalInformation.programType: 'include'` / real-SAP `objectType: 'PROG/I'` 单独触发子路由 / PROG executable 走 main 路径回归 / module pool + subroutine pool 不走 include 路径 / CLAS 不受影响回归）。
 - `test/unit/http-service-id.test.ts` — 10 cases（wire `serviceId` → nested `generalInformation.serviceId` / `descriptionByLang[]` → nested `header.descriptionByLang[]` / 空数组省略 / 老对象无字段省略 / 反向 `localToWire` 嵌套 + 扁平 fallback / 缺省省略 / round-trip 保真）。
+- `test/unit/http-json-map.test.ts` — 更新（`localToWire` 输出断言改嵌套 wire；`wireToLocal` 输入改嵌套 GET 形态；新增 transport 信封 case）。
+- `test/unit/http-create.test.ts` / `test/unit/http-push.test.ts` — 更新（POST body 断言改嵌套 `header` / `generalInformation`）。
+- `test/unit/http-pull.test.ts` — mock GET data 改真实 SAP 嵌套形态（无 `name`，pull 注入对象名）。
+- `test/unit/http-create-skeleton.test.ts` — 更新 1 case（骨架含 `name`）。
 - `test/unit/http-create-skeleton.test.ts` — 5 cases（`create HTTP` 无 `--file` 落骨架 / 不调 SAP / 已有文件 `OVERWRITE_REQUIRED` / `--description` 缺省时空串 / HTTP 骨架路径 `src/http/<name>/<name>.http.json` 类型子目录）。
 - `test/unit/textpool-multilang.test.ts` — 9 cases（CLAS texts + headings + selections-soft-warn / INTF texts + headings / FUGR texts + 2 warnings / TABL 三 3 类 / STRU texts + 2 warnings / `--type` 必需 / `--include-tests --textpool` 组合）。
 - `test/unit/textpool-cli.test.ts` — 更新 1 case（PROG pull 显式 `--type PROG`；US12 移除 PROG 默认后回归）。
@@ -48,13 +55,15 @@
 - `test/unit/ddic-create.test.ts` — 更新 1 case（DOMA create payload 用嵌套 `format.*` + 字符串值）。
 - `test/unit/ddic-pull.test.ts` — 更新 2 case（mock wire 用字符串 `'X'`/`''`；local 断言移到 `format.*`）。
 - `test/unit/schema.test.ts` — 更新 1 case（`create --schema` `allowedValues` 由 4 个源对象升级为 10 类）。
-- 基线：1000 → 1088 测试，1086/1088 通过；2 个失败均为既有（`skill-bundle` 审计与 `deploy-dryrun` ERR_DLOPEN_FAILED），不在本次范围。
+- 基线：1000 → 1089 测试，1087/1089 通过（+1 case：HTTP create 骨架含 `name`）；2 个失败均为既有（`skill-bundle` 审计与 `deploy-dryrun` ERR_DLOPEN_FAILED），不在本次范围。
 - tsc: 0 错误。
 
 ### Pending (未完成)
 
-- Phase 4：US12 5 类对象文本元素多语言贯通已完成（US8/9/10/13 已完成 — Phase 4 全部关闭）。Phase 5（验证 + 文档收尾）待真实 SAP 恢复后跑：vhcala4hci:50000 当前仍不可达。
-- Phase 5：真实 SAP 端到端（vhcala4hci:50000 当前不可达 — host 解析为 127.0.0.1 但 50000 端口无服务；需恢复 SAP 后跑 10 类对象 round-trip）+ wiki 同步 + 文档收尾。
+- Phase 4（US1-US13）已全部关闭。Phase 5 收口中：
+- 真实 SAP（vhcala4hci:50000，已恢复可达）T059 端到端：9 类可写对象 `create → pull → push → pull` 字节级零差异通过（CLAS/INTF/PROG/FUGR/DOMA/DTEL/TABL/STRU + 本会话补上 HTTP）；TRAN 按设计只读（GET only，`POST/PUT` 501）。
+- 剩余收尾：T063 `wiki/abap-file-format-export.md`「Resolved gaps」、T064 `wiki/objects/` 已知坑补 HTTP US10 缺口、T065 `wiki/object-types.md` `allowedValues`。
+- HTTP US10 `serviceId` / `descriptionByLang[]` 真实 SAP 闭环依赖 ABAP 端结构扩展（0.5.0 不含）→ 建议独立 US 跟进。
 
 ### Skills
 - **`skills/abap-cli-performance/`**：ABAP 性能 review 方法论 skill（5→6 skill）;`metadata.commands` 列出触发的只读命令（`search / inspect / pull / check / select`），实际归属仍是 4 个领域 skill；本 skill 全程不写对象。同步更新：`skills/abap-cli/SKILL.md` 路由表 + 决策树、`skills/README.md` 索引表 + 路由表 + 命令覆盖核对、`agents/abap-developer.agent.md` `skills` / `handoffs` / references / 错误恢复表。路由关键词：`慢 / 性能 / 优化 / N² / FOR ALL ENTRIES / 内表 / HASHED / AMDP / CDS`。
