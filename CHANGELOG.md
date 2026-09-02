@@ -13,7 +13,9 @@
 - **`abapLanguageVersion` 全类型落盘**：`header.abapLanguageVersion` 从 ADT `objectStructure.metaData['abapsource:abapLanguageVersion']` 读取；10 类对象 pull 端均写 `<name>.<type>.json#header`；FUGR 三件 JSON（`fugr.json` / `sapl*.reps.json` / `*.func.json`）均含该字段。cloud 系统推送不再因缺字段失败。
 - **DOMA `fixedValues` 双向 round-trip**：wire `{fixedValue, fixedValueLong: {languageIndependent, languageDependent[]}}` ↔ local `{fixedValue, description: {...}}`；接受 abap-file-format 嵌套 `format.fixedValues` 与 top-level `fixedValues` 两种形态；特殊字符（引号 / 反斜杠 / Unicode）round-trip 不丢失。- **DTEL `typeRef` 第三种 category 支持**：wire `typeRef: { typeName, referencedTypeName? }` ↔ local `dataTypeInformation: { category: 'typeRef', typeName, referencedTypeName? }`；接受 abap-file-format 嵌套形态与 top-level 扁平 `typeRef` 两种 local 输入。`domain` / `predefinedType` category 行为保持不变（不强制统一嵌套）。
 - **DOMA `format.signFlag` / `format.lowercase` / `format.convExit` 双向落盘**：wire 字符串形态（`'X'` / `''` / `'ALPHA'`；空串保留）↔ local 嵌套 `format.{signFlag, lowercase, convExit}`（abap-file-format `doma-v1.json` 嵌套 schema）。Local top-level 扁平字段保留为 legacy fallback（向后兼容既有脚本）。Wire 类型从 `boolean` 修正为 `string`（与 SAP ICF wire 一致）。
-- **PROG `PROG/I` 子类型分流**：`pull-strategy.ts` 检测 `programType: 'I'`（mock raw）或 `objectType: 'PROG/I'`（real SAP fallback）时，单一 source part 的 subtype 从 `main` 重命名为 `include`，落盘 `<name>.prog.include.abap`（不混入 `<name>.prog.abap` main 路径）；JSON 元数据 `generalInformation.programType: 'include'`（abap-file-format prog-v1 枚举值）由 `object-metadata.ts` 已有的 `programTypeOf` 派生。CLAS/INTF（共享 `sourceObjectStrategy()`）不受影响。- **FUGR create-then-pull 残留 `<group>.fugr.abap` 清理**：`runCreate` FUGR 分支走 `pullObject()`（即 standard abap-file-format 布局），不再写规范的 FUGR 不允许的单文件。
+- **PROG `PROG/I` 子类型分流**：`pull-strategy.ts` 检测 `programType: 'I'`（mock raw）或 `objectType: 'PROG/I'`（real SAP fallback）时，单一 source part 的 subtype 从 `main` 重命名为 `include`，落盘 `<name>.prog.include.abap`（不混入 `<name>.prog.abap` main 路径）；JSON 元数据 `generalInformation.programType: 'include'`（abap-file-format prog-v1 枚举值）由 `object-metadata.ts` 已有的 `programTypeOf` 派生。CLAS/INTF（共享 `sourceObjectStrategy()`）不受影响。
+- **HTTP `serviceId` + `descriptionByLang[]` 双向落盘**：wire ↔ local 在嵌套 `generalInformation.serviceId` 与 `header.descriptionByLang[]` 之间 round-trip（两者均为 SAP SICF 扩展字段，不在 abap-file-format `http-v1.json` schema 内但 SAP wire 必需）。接受 abap-file-format 嵌套形态与 top-level 扁平字段两种 local 输入。空 `descriptionByLang` 数组省略；`serviceId` 缺省时省略。
+- **HTTP `create` 最小骨架**：`abap create HTTP <name>` 无 `--file` 时落盘 `src/http/<name>/<name>.http.json` 最小骨架（`formatVersion` + `header{description, originalLanguage}` + `generalInformation{handlerClass, url}` 占位），`action: 'local'`（**不**调 SAP）。已有同名文件返回 `OVERWRITE_REQUIRED`（与 014 既有约定一致；可手动删除后重跑或传 `--file <other-path>`）。Help 文本更新。- **FUGR create-then-pull 残留 `<group>.fugr.abap` 清理**：`runCreate` FUGR 分支走 `pullObject()`（即 standard abap-file-format 布局），不再写规范的 FUGR 不允许的单文件。
 - **`SICF` → `HTTP` 类型码别名**：`pull --type SICF` / `create SICF` 内部映射到 `HTTP`；`create --help` 提示「alias: SICF, deprecated」。`schema.allowedValues` 仍严格仅 `HTTP`。
 - **Mock-adt 扩字段**：`test/mock-adt/server.js` 在 `structureXml` 输出 `abapsource:abapLanguageVersion`（默认 `standard`，`MOCK_CLOUD=1` 时 `cloudDevelopment`）。
 
@@ -36,16 +38,18 @@
 - `test/unit/dtel-typeRef.test.ts` — 12 cases（wire `typeRef` → local `dataTypeInformation` / 保留 `referencedTypeName` / 空 `typeName` 不写 / `localToWire` 反向 / 嵌套 vs 扁平 local 输入 / round-trip 保真 / AC3 未知 category 抛 `DTEL_CATEGORY_UNSUPPORTED` + message 含 3 个合法 category / 三个合法 category 不抛错 / 旧 flat shape 兼容）。
 - `test/unit/doma-format-flags.test.ts` — 13 cases（AC1 wire signFlag `'X'` → local `format.signFlag` / AC2 空串保留 / AC3 convExit 落盘 / 仅一个字段时仍写 format / localToWire 嵌套 + 扁平 fallback / 空串 round-trip / QUAN + CHAR + lowercase 三种典型组合）。
 - `test/unit/prog-subtype-include.test.ts` — 6 cases（PROG/I `programType: 'I'` → `*.prog.include.abap` / JSON `generalInformation.programType: 'include'` / real-SAP `objectType: 'PROG/I'` 单独触发子路由 / PROG executable 走 main 路径回归 / module pool + subroutine pool 不走 include 路径 / CLAS 不受影响回归）。
+- `test/unit/http-service-id.test.ts` — 10 cases（wire `serviceId` → nested `generalInformation.serviceId` / `descriptionByLang[]` → nested `header.descriptionByLang[]` / 空数组省略 / 老对象无字段省略 / 反向 `localToWire` 嵌套 + 扁平 fallback / 缺省省略 / round-trip 保真）。
+- `test/unit/http-create-skeleton.test.ts` — 5 cases（`create HTTP` 无 `--file` 落骨架 / 不调 SAP / 已有文件 `OVERWRITE_REQUIRED` / `--description` 缺省时空串 / HTTP 骨架路径 `src/http/<name>/<name>.http.json` 类型子目录）。
 - `test/unit/ddic-json-map.test.ts` — 更新 3 cases（DOMA localToWire 增加「嵌套 `format.*`」 case；round-trip 改为 nested string shape）。
 - `test/unit/ddic-create.test.ts` — 更新 1 case（DOMA create payload 用嵌套 `format.*` + 字符串值）。
 - `test/unit/ddic-pull.test.ts` — 更新 2 case（mock wire 用字符串 `'X'`/`''`；local 断言移到 `format.*`）。
 - `test/unit/schema.test.ts` — 更新 1 case（`create --schema` `allowedValues` 由 4 个源对象升级为 10 类）。
-- 基线：1000 → 1064 测试，1062/1064 通过；2 个失败均为既有（`skill-bundle` 审计与 `deploy-dryrun` ERR_DLOPEN_FAILED），不在本次范围。
+- 基线：1000 → 1079 测试，1077/1079 通过；2 个失败均为既有（`skill-bundle` 审计与 `deploy-dryrun` ERR_DLOPEN_FAILED），不在本次范围。
 - tsc: 0 错误。
 
 ### Pending (未完成)
 
-- Phase 4：US10 HTTP `serviceId/descriptionByLang` + create 骨架 + US12 5 类对象文本元素多语言（US8 DTEL `typeRef` + US9 DOMA format flags + US13 PROG/I 子类型分流已完成）。
+- Phase 4：US12 5 类对象文本元素多语言贯通（US8 DTEL `typeRef` + US9 DOMA format flags + US10 HTTP serviceId/descriptionByLang + HTTP create 骨架 + US13 PROG/I 子类型分流已完成）。
 - Phase 5：真实 SAP 端到端（vhcala4hci:50000 当前不可达 — host 解析为 127.0.0.1 但 50000 端口无服务；需恢复 SAP 后跑 10 类对象 round-trip）+ wiki 同步 + 文档收尾。
 
 ### Skills

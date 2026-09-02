@@ -14,6 +14,12 @@ export { HTTP_SUPPORTED_TYPES, type HttpSupportedType };
  *   ty_main  → { formatVersion, header, generalInformation }
  *   header   → { description, originalLanguage, abapLanguageVersion? }
  *   generalInformation → { handlerClass, url }
+ *
+ * 032 US10: SICF extension fields carried by SAP wire but not in
+ * abap-file-format http-v1.json schema:
+ *   generalInformation.serviceId — SICF node path (e.g. '/sap/zfoo')
+ *   header.descriptionByLang[]   — multi-language descriptions
+ *                                  [{ language: 'EN', description: '...' }, ...]
  */
 export interface HttpObjectLocal {
   name: string;
@@ -22,12 +28,21 @@ export interface HttpObjectLocal {
   abapLanguageVersion?: 'standard' | 'cloudDevelopment';
   handlerClass?: string;
   url?: string;
+  /** 032 US10: SICF service path (e.g. '/sap/zfoo'); not in abap-file-format schema. */
+  serviceId?: string;
+  /** 032 US10: multi-language descriptions (one entry per language). */
+  descriptionByLang?: Array<{ language: string; description: string }>;
   [key: string]: unknown;
 }
 
 /**
  * ICF wire representation (camelCase, transport envelope).
  * Mirrors the JSON the SAP-side handler will deserialize.
+ *
+ * 032 US10: SICF extension fields (`serviceId` / `descriptionByLang`) are
+ * SAP wire conventions that the CLI must round-trip even though they're
+ * not in the abap-file-format http-v1.json schema. The CLI extends
+ * `generalInformation` and `header` at runtime to carry them.
  */
 export interface HttpWirePayload {
   name: string;
@@ -36,6 +51,10 @@ export interface HttpWirePayload {
   abapLanguageVersion?: string;
   handlerClass?: string;
   url?: string;
+  /** 032 US10: SICF service path on the wire (server-side node path). */
+  serviceId?: string;
+  /** 032 US10: multi-language descriptions on the wire. */
+  descriptionByLang?: Array<{ language: string; description: string }>;
   package?: string;
   transportRequest?: string;
 }
@@ -75,6 +94,11 @@ export function localToWire(local: HttpObjectLocal): HttpWirePayload {
   const abapLanguageVersion = (l.abapLanguageVersion as string | undefined) ?? (headerObj?.abapLanguageVersion as string | undefined);
   const handlerClass = (l.handlerClass as string | undefined) ?? (generalObj?.handlerClass as string | undefined);
   const url = (l.url as string | undefined) ?? (generalObj?.url as string | undefined);
+  // 032 US10: SICF extension fields — read from nested generalInformation/header
+  // (preferred, abap-file-format consistent) or top-level flat (legacy fallback).
+  const serviceId = (l.serviceId as string | undefined) ?? (generalObj?.serviceId as string | undefined);
+  const descByLangRaw = (l.descriptionByLang as Array<{ language: string; description: string }> | undefined)
+    ?? (headerObj?.descriptionByLang as Array<{ language: string; description: string }> | undefined);
 
   return {
     name: String(local.name).toUpperCase(),
@@ -83,6 +107,8 @@ export function localToWire(local: HttpObjectLocal): HttpWirePayload {
     abapLanguageVersion,
     handlerClass,
     url,
+    serviceId,
+    descriptionByLang: descByLangRaw,
     package: l.package as string | undefined,
     transportRequest: l.transportRequest as string | undefined,
   };
@@ -102,6 +128,15 @@ export function wireToLocal(wire: HttpWirePayload): HttpObjectLocal {
   const generalInformation: Record<string, unknown> = {};
   if (wire.handlerClass !== undefined) generalInformation.handlerClass = wire.handlerClass;
   if (wire.url !== undefined) generalInformation.url = wire.url;
+  // 032 US10: SICF serviceId → nested generalInformation.serviceId
+  // (abap-file-format consistent location; not in schema but required by SAP wire).
+  if (wire.serviceId !== undefined) generalInformation.serviceId = wire.serviceId;
+
+  // 032 US10: multi-language descriptions → nested header.descriptionByLang[].
+  // Each entry is `{ language, description }` — both required per SAP wire.
+  if (wire.descriptionByLang !== undefined && wire.descriptionByLang.length > 0) {
+    header.descriptionByLang = wire.descriptionByLang;
+  }
 
   const local: HttpObjectLocal = {
     name: wire.name,

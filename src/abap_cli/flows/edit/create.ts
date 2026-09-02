@@ -400,9 +400,55 @@ export async function runCreate(type: string | undefined, name: string | undefin
   // HTTP service routes to the self-built ICF service.
   if (isHttpSupportedType(typeUpper)) {
     if (!opts.file) {
-      throw new CliError('USAGE', `HTTP service requires --file <path> with an abap-file-format JSON`, {
-        example: `abap create HTTP ${objectName} --file src/${objectName.toLowerCase()}.http.json --package $TMP --description "..."`,
-      });
+      // 032 US10 (T043/T044): HTTP create without --file writes a minimal
+      // abap-file-format skeleton to `src/http/<name>/<name>.http.json` and
+      // returns `status: local` (no SAP round-trip). The user can then edit
+      // the skeleton and `abap push` it.
+      const skeletonPath = path.join('src', 'http', objectName.toLowerCase(), `${objectName.toLowerCase()}.http.json`);
+      const absSkeleton = path.resolve(process.cwd(), skeletonPath);
+      try {
+        await fs.access(absSkeleton);
+        // File exists — refuse to overwrite without explicit consent (matches
+        // 014 OVERWRITE_REQUIRED convention used by pull flows).
+        throw new CliError('OVERWRITE_REQUIRED', `${skeletonPath} already exists; remove it first or pass --file to a different path`, {
+          file: skeletonPath,
+          nextSteps: [
+            'Remove the existing skeleton and re-run.',
+            'Or pass `--file <other-path>` to write a custom JSON file before the SAP round-trip.',
+          ],
+          example: `abap create HTTP ${objectName} --package $TMP --description "..."`,
+        });
+      } catch (probeError: unknown) {
+        // fs.access throws ENOENT when file doesn't exist — that's the green
+        // light to write the skeleton. Other errors (permission, etc.)
+        // propagate.
+        const code = (probeError as NodeJS.ErrnoException)?.code;
+        if (code !== 'ENOENT') throw probeError;
+      }
+      // Write the minimal skeleton.
+      const skeleton = {
+        formatVersion: '1',
+        header: {
+          description: opts.description ?? '',
+          originalLanguage: 'en',
+        },
+        generalInformation: {
+          handlerClass: '',
+          url: '',
+        },
+      };
+      await fs.mkdir(path.dirname(absSkeleton), { recursive: true });
+      await fs.writeFile(absSkeleton, JSON.stringify(skeleton, null, 2) + '\n', 'utf-8');
+      printResult(mode,
+        {
+          object: objectName,
+          type: typeUpper,
+          action: 'local',
+          file: skeletonPath,
+        },
+        `Wrote HTTP service skeleton ${skeletonPath} (no SAP round-trip; edit then abap push)`,
+      );
+      return;
     }
     await runCreateHttp(typeUpper, objectName, opts, mode);
     return;

@@ -22,7 +22,7 @@ export function registerCreateCommand(program: Command): void {
       '  DTEL  Data element       (ICF /ddic/dtel — requires --file)',
       '  TABL  Database table     (ICF /ddic/tabl — requires --file)',
       '  STRU  Structure          (ICF /ddic/stru — requires --file)',
-      '  HTTP  SICF service node  (ICF /http/<name> — requires --file; alias: SICF, deprecated)',
+      '  HTTP  SICF service node  (ICF /http/<name> — auto-skeleton if --file absent; alias: SICF, deprecated)',
       '',
       'Run `abap create <type> --schema` for the machine-readable contract of a specific type.',
       '',
