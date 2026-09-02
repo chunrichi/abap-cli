@@ -20,6 +20,8 @@
 - **`SICF` → `HTTP` 类型码别名**：`pull --type SICF` / `create SICF` 内部映射到 `HTTP`；`create --help` 提示「alias: SICF, deprecated」。`schema.allowedValues` 仍严格仅 `HTTP`。
 - **Mock-adt 扩字段**：`test/mock-adt/server.js` 在 `structureXml` 输出 `abapsource:abapLanguageVersion`（默认 `standard`，`MOCK_CLOUD=1` 时 `cloudDevelopment`）。
 
+- **ICF `/mime/*` 端点（扩展 0.6.0）**：自建 ICF handler `ZCL_ABAP_VIBE_ICF` 新增 `dispatch_mime` —— `POST /mime/folder`（建 root/嵌套目录，`package`→devclass，默认 `$TMP`）、`PUT /mime/folder?recursive=&transport=`（删目录）、`POST /mime/resources`（base64 单文件上传，父目录须已存在）。底层用 `CL_MIME_REPOSITORY_API`（SE80 MIME 存储库；本 S/4HANA 2023 release 无 `SCMS_*` 函数模块）。错误 envelope + 真实 HTTP 状态（`INVALID_ARGUMENT` 400 / `NOT_FOUND` 404 / `OBJECT_EXISTS` 409 / `VALIDATION_ERROR` 422 / 其余 500）。`extension status` 期望版本 0.5.0 → 0.6.0。
+
 ### Changed
 - **FUGR `fixPointArithmetic` mock fallback**：`src/abap_cli/formats/pull-fugr.ts` 在 `metaData['abapsource:fixPointArithmetic']` 缺省时默认 `false`（之前是字段缺失）。on-prem 消费者始终拿到布尔；cloud 系统明确 `true` 仍按 `true` 落盘。
 - **跨类型注册表合一（US11 / T046-T052）**：`types/registry.ts` 成为 10 类对象（4 源 + 4 DDIC + HTTP + TRAN）的单一真源。`formats/type-folder.ts` 的 `TYPE_FOLDER`、`flows/edit/create-types.ts` 的 `TYPE_MAP`、`formats/{ddic,http,transport}/json.ts` 的 `*_SUPPORTED_TYPES` 常量全部迁移到 registry（保留同名 re-export 维持外部 import 兼容）。`create --schema` 的 `arguments[0].allowedValues` 从 4 个源对象升级为全 10 类。新增类型只需要编辑 `registry.ts` 一行，9 命令与 schema 自动识别。`isDdicSupportedType` / `isHttpSupportedType` / `isTranSupportedType` 收紧为 type guard（要求 uppercase 字符串）。
@@ -32,12 +34,16 @@
 - **TABL/STRU push 走三件套**：`flows/edit/push.ts#pushDdicFile` 改用 `readDdicObjectForCreate`（之前直接 `readDdicJson`），TABL/STRU 三件套 `<name>.{tabl,stru}.{json,ddic,settings.json}` 在 push 路径与 create 路径行为一致（DDL 是字段定义唯一真相）。STRU 缺 `.settings.json` 不报错。DDL 解析失败 → `TABL_DDL_INVALID`（VALIDATION_ERROR/exit 7），含行号提示与三件套迁移 nextSteps。
 - **TABL DDL 解析器扩展**：`formats/ddic/tabl-artifact.ts#parseTablDDic` 新增支持：① `.INCLUDE ... WITH SUFFIX <suffix>`（写入 `field.includeSuffix`）；② 多列复合 key（每列 `keyFlag: true, notNull: true`）；③ 行内 foreign key（`abap.char(3) with foreign key [dependent] check t005;` 一行式）；④ `@AbapCatalog.foreignKeys [ ... ]` 块（写入 `field.foreignKeys[]`）；⑤ `@ClientHandling.type`（驱动 `clientDependent` 显式覆盖默认启发式）。
 
+- **`extension deploy` 捆绑源码目录解析回归**（flows/ 拆分后静默 no-op）：`bundledDir` 相对深度少一级（解析到不存在的 `dist/abap/src`），部署永远“空对象成功”、真实 SAP 收不到任何 `abap/src` 更新。改为 `bundledSourceDir()` 向上查找含 `abap/src/clas/zcl_abap_vibe_icf.clas.abap` 的包根（src/ / dist/ / npm 安装布局均适用）；找不到时抛 `CONFIG_ERROR` 而非静默成功。
+- **ICF handler 类源码无法激活（8/29 后未部署暴露）**：`resolve_handler_language_version`（>30 字符方法名）、`get_language_version`（本 release RTTI 无此方法，改 `cl_abap_language_version` 官方 API 并回落 `standard`）、`read_tran_tstc`/`build_tran_payload` 误按 `RETURNING` 调用、TSTCA 错用 `low/high`（实际列 `value`）、TSTC `CINFO` 非法字面量等编译错误全部修正，类可正常激活。
+
 ### Tests
 - `test/unit/dumps-feed.test.ts` — 9 cases（`$top`/`$filter` query 构造、请求形态断言、Atom feed 解析、空 feed）。
 - `test/unit/abapLanguageVersion.test.ts` — 3 cases（cloud / on-prem / standard fallback）。
 - `test/unit/doma-fixedValues-roundtrip.test.ts` — 5 cases（empty / single / multi-lang / special chars / nested `format.fixedValues`）。
 - `test/unit/type-alias-sicf-http.test.ts` — 5 cases（uppercase / lowercase / subtype suffix / HTTP passthrough / unknown passthrough）。
 - `test/unit/fugr-fixPointArithmetic-default.test.ts` — 3 cases（mock 三态：true / false / 缺字段默认 false）。
+- `test/unit/deploy-bundled-source-dir.test.ts` — 2 cases（默认捆绑目录存在且含 ICF handler 源码；`extension deploy` 不再因相对深度错误而静默 no-op）。
 - `test/unit/tabl-ddl-extended.test.ts` — 5 cases（`.INCLUDE WITH SUFFIX` / 复合 key / 行内 foreign key / `@ClientHandling.type` / canonical deliveryClass + inline semantics）。
 - `test/unit/push-ddic.test.ts` — 新增 3 cases（TABL 三件套 push 合并 DDL / STRU 三件套 push 缺 settings 不报错 / 残缺 DDL → `TABL_DDL_INVALID`）。
 - `test/unit/types-registry.test.ts` — 8 cases（10 类全覆盖 / ADT vs ICF 路由 / `createObjtypeFor` 4 源对象 / `folderFor` 大小写 + 子类型 suffix / legacy alias 一致性 / `TYPE_REGISTRY` 与 helpers 无漂移）。

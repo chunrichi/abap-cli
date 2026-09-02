@@ -1,5 +1,6 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError, toErrorShape } from '../../output/json.js';
@@ -70,8 +71,27 @@ export interface DeployOptions {
   profileName?: string;
 }
 
-// dist/src/abap_cli/sync → project root (ESM has no __dirname).
-const bundledDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../abap/src');
+/**
+ * Resolve the bundled abap/src directory — the package root whose abap/src
+ * holds the ICF handler sources. Walk up from this module so it works from
+ * src/ (unit tests), dist/ (runtime symlink), and an installed npm layout;
+ * a naive fixed-depth relative path silently misses on one of those.
+ */
+export function bundledSourceDir(): string {
+  const marker = path.join('abap', 'src', 'clas', 'zcl_abap_vibe_icf.clas.abap');
+  let dir = path.dirname(fileURLToPath(import.meta.url));
+  for (;;) {
+    if (existsSync(path.join(dir, marker))) {
+      return path.join(dir, 'abap', 'src');
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  throw new CliError('CONFIG_ERROR', 'Cannot locate the bundled abap/src directory next to this CLI installation', {
+    nextSteps: ['Ensure the package ships its abap/src folder (npm files list).', 'Re-install or rebuild the CLI so dist/ sits next to abap/src.'],
+  });
+}
 
 /** Map user-facing ADT type to the abap-adt-api `objtype` for createObject. */
 const ADT_OBJTYPE: Record<string, string> = {
@@ -108,7 +128,7 @@ interface BundledObject {
  * (using the bundled <name>.<type>.json metadata for description/language).
  */
 export async function deployBundled(client: AdtClientWrapper, opts: DeployOptions): Promise<DeploymentSummary> {
-  const sourceDir = opts.sourceDir ?? bundledDir;
+  const sourceDir = opts.sourceDir ?? bundledSourceDir();
   const files = await enumerateSources(sourceDir);
 
   // Non-interactive confirmation gate: actual deploys mutate SAP.

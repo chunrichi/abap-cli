@@ -7,9 +7,11 @@ import { probeAdtRuntime, type AdtRuntime } from '../adc/runtime-probe.js';
  *  bumped 0.2.0 → 0.3.0 for read-only table data query support;
  *  bumped 0.3.0 → 0.4.0 for select rows native-typed values;
  *  bumped 0.4.0 → 0.5.0 for TABL/STRU pull via zcl_abap_vibe_tabl_format,
- *  abap-file-format three-piece layout (main + ddic + settings.json).
+ *  abap-file-format three-piece layout (main + ddic + settings.json);
+ *  bumped 0.5.0 → 0.6.0 for MIME repository create/delete/push in the ICF
+ *  handler (dispatch_mime on /mime/folder + /mime/resources).
  *  Root version check stays backward compatible. */
-export const ICF_SERVICE_VERSION = '0.5.0';
+export const ICF_SERVICE_VERSION = '0.6.0';
 
 export type IcfDeploymentStatus = 'not_deployed' | 'current' | 'outdated' | 'unreachable';
 
