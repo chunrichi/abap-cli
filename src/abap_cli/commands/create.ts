@@ -18,6 +18,7 @@ export function registerCreateCommand(program: Command): void {
       '  INTF  Interface          (ADT route)',
       '  PROG  Program            (ADT route)',
       '  FUGR  Function group     (ADT route)',
+      '        + --func <name>    Create a function module inside an existing group (FUGR/FF)',
       '  DOMA  Domain             (ICF /ddic/doma — requires --file)',
       '  DTEL  Data element       (ICF /ddic/dtel — requires --file)',
       '  TABL  Database table     (ICF /ddic/tabl — requires --file)',
@@ -41,6 +42,7 @@ export function registerCreateCommand(program: Command): void {
     .option('--check-only', 'Validate without creating')
     .option('--audit', 'Include the before-checksum (extra SAP round-trip, off by default)')
     .option('--file <path>', 'abap-file-format JSON input (required for DOMA/DTEL/TABL/STRU/HTTP)')
+    .option('--func <name>', 'With FUGR: create a function module (FUGR/FF) inside the existing function group <name>')
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .option('--yes', 'Confirm in non-interactive mode')
     .action(async (type, name, opts, cmd) => {

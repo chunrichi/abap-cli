@@ -45,6 +45,7 @@ export function createSchema(type?: string): CreateCommandSchema {
       { name: '--check-only', type: 'boolean', description: 'Validate the proposed object without creating it' },
       { name: '--audit', type: 'boolean', description: 'Include the before-checksum (extra SAP round-trip, off by default)' },
       { name: '--file', type: 'string', valuePlaceholder: '<path>', description: 'abap-file-format DDIC JSON input (required for DOMA/DTEL/TABL/STRU)' },
+      { name: '--func', type: 'string', valuePlaceholder: '<name>', description: 'With FUGR: create a function module (FUGR/FF) inside the existing function group <name>' },
       { name: '--schema', type: 'boolean', default: false, description: 'Print the command parameter schema as JSON and exit (no SAP call).' },
       { name: '--yes', type: 'boolean', default: false, description: 'Confirm in non-interactive environments.' },
       { name: '--non-interactive', type: 'boolean', default: false, description: 'Alias of --yes.' },
