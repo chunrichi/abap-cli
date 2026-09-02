@@ -14,27 +14,55 @@ const ACTIVE_DEF = LATEST_DEF;
 const ACTIVE_IMP = LATEST_IMP;
 const ACTIVE_MAIN = ''; // ADT returns empty active for `main` INCLUDE program
 
-const searchObject = vi.fn(async () => [
-  {
-    'adtcore:name': 'ZCL_MULTI',
-    'adtcore:type': 'CLAS/OC',
-    'adtcore:uri': '/sap/bc/adt/oo/classes/zcl_multi',
-  },
-]);
+const searchObject = vi.fn(async (query: string) => {
+  if (query.includes('ZCLI_PROG')) {
+    return [
+      {
+        'adtcore:name': 'ZCLI_PROG',
+        'adtcore:type': 'PROG/P',
+        'adtcore:uri': '/sap/bc/adt/programs/programs/zcli_prog',
+        'adtcore:packageName': '$TMP',
+      },
+    ];
+  }
+  return [
+    {
+      'adtcore:name': 'ZCL_MULTI',
+      'adtcore:type': 'CLAS/OC',
+      'adtcore:uri': '/sap/bc/adt/oo/classes/zcl_multi',
+      'adtcore:packageName': '$TMP',
+    },
+  ];
+});
 
-const objectStructure = vi.fn(async () => ({
-  objectUrl: '/sap/bc/adt/oo/classes/zcl_multi',
-  metaData: {
-    'adtcore:name': 'ZCL_MULTI',
-    'adtcore:type': 'CLAS/OC',
-    'adtcore:description': 'Demo',
-  },
-  includes: [
-    { 'class:includeType': 'main', 'abapsource:sourceUri': '/source/main' },
-    { 'class:includeType': 'definitions', 'abapsource:sourceUri': '/source/locals_def' },
-    { 'class:includeType': 'implementations', 'abapsource:sourceUri': '/source/locals_imp' },
-  ],
-}));
+const objectStructure = vi.fn(async (url: string) => {
+  if (url.includes('zcli_prog')) {
+    return {
+      objectUrl: '/sap/bc/adt/programs/programs/zcli_prog',
+      metaData: {
+        'adtcore:name': 'ZCLI_PROG',
+        'adtcore:type': 'PROG/P',
+        'adtcore:description': 'Demo',
+      },
+      includes: [
+        { 'class:includeType': 'main', 'abapsource:sourceUri': '/source/main' },
+      ],
+    };
+  }
+  return {
+    objectUrl: '/sap/bc/adt/oo/classes/zcl_multi',
+    metaData: {
+      'adtcore:name': 'ZCL_MULTI',
+      'adtcore:type': 'CLAS/OC',
+      'adtcore:description': 'Demo',
+    },
+    includes: [
+      { 'class:includeType': 'main', 'abapsource:sourceUri': '/source/main' },
+      { 'class:includeType': 'definitions', 'abapsource:sourceUri': '/source/locals_def' },
+      { 'class:includeType': 'implementations', 'abapsource:sourceUri': '/source/locals_imp' },
+    ],
+  };
+});
 
 // Map sourceUri → return value: latest vs active.
 const getObjectSource = vi.fn(async (uri: string) => {
@@ -98,5 +126,41 @@ describe('inspect --activation (#4)', () => {
     expect(data.activation.inactive).toEqual([
       { includeType: 'implementations', reason: 'stale_active' },
     ]);
+  });
+
+  it('annotates OO class `main` part with a note about SAP INCLUDE byte-mismatch quirk', async () => {
+    // CLAS/OC `source/main` latest != active is structural (SAP regenerates the
+    // active INCLUDE with case-lowering + create-private + section headers), so
+    // the user must not act on `main.active: false`. Surface a per-part note.
+    // Reset the active-source mock so the prior test's stale-active state does
+    // not leak into this one.
+    raw.getObjectSource.mockImplementation(async (uri: string, opts?: { version?: string }) => {
+      if (opts?.version !== 'active') throw new Error('expected active version');
+      if (uri.includes('locals_def')) return ACTIVE_DEF;
+      if (uri.includes('locals_imp')) return ACTIVE_IMP;
+      if (uri.endsWith('main')) return ACTIVE_MAIN;
+      return '';
+    });
+    const program = makeProgram();
+    registerInspectCommand(program);
+    const res = await runCommand(program, ['inspect', 'ZCL_MULTI', '--activation', '--json']);
+    const data = JSON.parse(res.stdout).data;
+    const main = data.activation.parts.find((p: { includeType: string }) => p.includeType === 'main');
+    expect(main.note).toMatch(/system-managed|sap.*include|byte-mismatch|regenerat/i);
+    // Note is informational; ok stays driven by implementation parts.
+    expect(data.activation.ok).toBe(true);
+  });
+
+  it('does NOT add the OO-class quirk note on non-OO source/main parts (e.g. PROG)', async () => {
+    // PROG has no system-managed INCLUDE quirk — its `source/main` is a single
+    // user-editable include, so latest===active is the right signal. The
+    // searchObject / objectStructure mocks above already route PROG/P to its
+    // own single-main include layout.
+    const program = makeProgram();
+    registerInspectCommand(program);
+    const res = await runCommand(program, ['inspect', 'ZCLI_PROG', '--activation', '--json']);
+    const data = JSON.parse(res.stdout).data;
+    const main = data.activation.parts.find((p: { includeType: string }) => p.includeType === 'main');
+    expect(main.note).toBeUndefined();
   });
 });

@@ -38,6 +38,8 @@
 - **ICF handler 类源码无法激活（8/29 后未部署暴露）**：`resolve_handler_language_version`（>30 字符方法名）、`get_language_version`（本 release RTTI 无此方法，改 `cl_abap_language_version` 官方 API 并回落 `standard`）、`read_tran_tstc`/`build_tran_payload` 误按 `RETURNING` 调用、TSTCA 错用 `low/high`（实际列 `value`）、TSTC `CINFO` 非法字面量等编译错误全部修正，类可正常激活。
 - **Mock-adt `inactiveobjects` + `discovery` 端点补齐**（mock 与真实 SAP 端点对齐）：`test/mock-adt/server.js` 新增 `GET /sap/bc/adt/activation/inactiveobjects`（按真实 ADT `ioc:inactiveObjects` 形态枚举所有 `inactive:true` 对象）与 `GET /sap/bc/adt/discovery`（Atom service document，含 `/sap/bc/adt/icf/` 与各 ADT collection）。`createObject` POST handler 现在将新建对象标记为 `inactive:true`（匹配真实 SAP 后创建语义），`POST /sap/bc/adt/activation` 成功后翻转为 `false`；激活匹配的源 URL 解析扩展为 `byAnyUrl`（覆盖 method/OSI 部件源 URL，不仅 root objectUrl）。`addObject` 返回新对象供创建路径 mutate。`abap activate` 与 `abap doctor` 在 mock 上不再 404；FUGR/PROG/CLAS 创建后正确出现在 `/inactiveobjects`，`activate` 后被清除。`tests/260902001-all-commands-fugr-e2e/summary.md` 已知限制 L-5 关闭。
 
+- **`inspect --activation` 给 OO 类 `source/main` part 加 SAP 语义注释**：`ActivationPart` 新增可选 `note` 字段；OO 类（`CLAS/OC`、`INTF/OI`）的 `source/main` 是 SAP 系统生成的 INCLUDE 程序，其 active 版本由服务端重生成（lowercase、`create private .`、合成 section 头），字节永远不与用户写入的 latest 一致——这是 SAP 端语义而非 CLI 缺陷。带 `note` 的 part 不应驱动 agent 决策（不应据此触发 `abap activate`），仍以 `ok` 字段（基于 `definitions` / `implementations` / `testclasses` / `macros` 的 active 一致性）为权威。`wiki/commands/inspect.md` 同步增补说明。
+
 ### Tests
 - `test/unit/dumps-feed.test.ts` — 9 cases（`$top`/`$filter` query 构造、请求形态断言、Atom feed 解析、空 feed）。
 - `test/unit/abapLanguageVersion.test.ts` — 3 cases（cloud / on-prem / standard fallback）。
@@ -48,6 +50,7 @@
 - `test/unit/deploy-bundled-source-dir.test.ts` — 2 cases（默认捆绑目录存在且含 ICF handler 源码；`extension deploy` 不再因相对深度错误而静默 no-op）。
 - `test/unit/tabl-ddl-extended.test.ts` — 5 cases（`.INCLUDE WITH SUFFIX` / 复合 key / 行内 foreign key / `@ClientHandling.type` / canonical deliveryClass + inline semantics）。
 - `test/unit/push-ddic.test.ts` — 新增 3 cases（TABL 三件套 push 合并 DDL / STRU 三件套 push 缺 settings 不报错 / 残缺 DDL → `TABL_DDL_INVALID`）。
+- `test/unit/inspect-activation.test.ts` — 新增 2 cases（OO 类 `main` part 必带 SAP-managed INCLUDE note；PROG `main` 不带 note）。
 - `test/unit/types-registry.test.ts` — 8 cases（10 类全覆盖 / ADT vs ICF 路由 / `createObjtypeFor` 4 源对象 / `folderFor` 大小写 + 子类型 suffix / legacy alias 一致性 / `TYPE_REGISTRY` 与 helpers 无漂移）。
 - `test/unit/dtel-typeRef.test.ts` — 12 cases（wire `typeRef` → local `dataTypeInformation` / 保留 `referencedTypeName` / 空 `typeName` 不写 / `localToWire` 反向 / 嵌套 vs 扁平 local 输入 / round-trip 保真 / AC3 未知 category 抛 `DTEL_CATEGORY_UNSUPPORTED` + message 含 3 个合法 category / 三个合法 category 不抛错 / 旧 flat shape 兼容）。
 - `test/unit/doma-format-flags.test.ts` — 13 cases（AC1 wire signFlag `'X'` → local `format.signFlag` / AC2 空串保留 / AC3 convExit 落盘 / 仅一个字段时仍写 format / localToWire 嵌套 + 扁平 fallback / 空串 round-trip / QUAN + CHAR + lowercase 三种典型组合）。

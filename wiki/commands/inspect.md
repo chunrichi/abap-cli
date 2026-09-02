@@ -4,7 +4,7 @@ title: abap inspect
 description: 只读探测 SAP 对象元数据 — structure / includes / locks / activation / package，不获取锁、不修改 SAP
 tags: [abap-cli, command, inspect, metadata, read-only, agent-loop]
 created at: 2026-08-09 22:40:00
-changed at: 2026-09-02 23:10:19
+changed at: 2026-09-03 17:00:00
 ---
 
 # abap inspect
@@ -43,8 +43,18 @@ abap inspect ZCL_FOO --locks --json         # 谁锁着 / 绑定到哪个请求
 > `metadata`，退出码仍为 0。Agent 必须把缺失的 `activation` 视为「该对象类型不
 > 适用」，而非错误；FUGR 这类对象的激活/收敛用 `abap status` / `abap diff` 验证。
 
-- `ok: true` — 每个 part 的 active = latest（没有 stale）
-- `ok: false` — 有 part 未激活或不一致
+- `ok: true` — 每个 *implementation* part 的 active = latest（没有 stale）
+- `ok: false` — 有 implementation part 未激活或不一致
+
+> **OO 类 `source/main` part 的 `active` 字段不可信**：
+>
+> OO 类（`CLAS/OC`、`INTF/OI`）的 `source/main` 是 SAP 系统生成的 INCLUDE 程序，
+> 其 active 版本由服务端重生成（lowercase、`create private .`、合成 section
+> 头），字节永远不与用户写入的 latest 一致——这是 SAP 语义而非 CLI 缺陷。
+>
+> 这类 part 会带 `note` 字段说明，**Agent 不应根据 `main.active: false` 触发
+> `abap activate`**；应读 `ok`（基于 `definitions` / `implementations` /
+> `testclasses` / `macros` 的 active 一致性）。
 
 每 part 结构：
 
@@ -52,7 +62,9 @@ abap inspect ZCL_FOO --locks --json         # 谁锁着 / 绑定到哪个请求
 {
   "includeType": "main" | "definitions" | "implementations" | "testclasses" | "...",
   "sourceUri": "/sap/bc/adt/oo/classes/zcl_foo/source/main",
-  "active": true | false
+  "active": true | false,
+  // 仅 OO 类的 `main` 出现：解释 SAP 系统生成 INCLUDE 的字节 mismatch。
+  "note": "SAP-managed INCLUDE: active version is regenerated server-side ..."
 }
 ```
 
@@ -80,7 +92,7 @@ abap inspect ZCL_FOO --locks --json         # 谁锁着 / 绑定到哪个请求
     "activation": {
       "ok": false,
       "parts": [
-        { "includeType": "main", "sourceUri": ".../source/main", "active": true },
+        { "includeType": "main", "sourceUri": ".../source/main", "active": true, "note": "SAP-managed INCLUDE: ..." },
         { "includeType": "implementations", "sourceUri": ".../source/implementations", "active": false }
       ]
     }
