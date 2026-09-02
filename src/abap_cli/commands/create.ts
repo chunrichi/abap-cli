@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import { printError, printSchema, jsonFromCommand, type OutputMode } from '../output/json.js';
 import { runCreate, runCreateLocal, type CreateOptions, type CreateLocalOptions } from '../flows/edit/create.js';
 import { createSchema } from '../flows/edit/create-schema.js';
+import { normalizeTypeInput } from '../cli/type-alias.js';
 
 export function registerCreateCommand(program: Command): void {
   const createCmd = program
@@ -21,7 +22,7 @@ export function registerCreateCommand(program: Command): void {
       '  DTEL  Data element       (ICF /ddic/dtel — requires --file)',
       '  TABL  Database table     (ICF /ddic/tabl — requires --file)',
       '  STRU  Structure          (ICF /ddic/stru — requires --file)',
-      '  HTTP  SICF service node  (ICF /http/<name> — requires --file)',
+      '  HTTP  SICF service node  (ICF /http/<name> — requires --file; alias: SICF, deprecated)',
       '',
       'Run `abap create <type> --schema` for the machine-readable contract of a specific type.',
       '',
@@ -52,7 +53,12 @@ export function registerCreateCommand(program: Command): void {
           printSchema(createSchema(type), mode);
           return;
         }
-        await runCreate(type, name, opts, mode);
+        // --schema path is untyped (type may be undefined); only normalize when present.
+        const normalized = type ? normalizeTypeInput(type) : { type };
+        if (normalized.aliasWarning) {
+          (opts as CreateOptions & { aliasWarning?: string }).aliasWarning = normalized.aliasWarning;
+        }
+        await runCreate(normalized.type, name, opts, mode);
       } catch (error: unknown) {
         printError(mode, error);
       }

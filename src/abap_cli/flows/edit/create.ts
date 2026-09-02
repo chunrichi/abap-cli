@@ -490,14 +490,28 @@ export async function runCreate(type: string | undefined, name: string | undefin
   );
 
   // Create-then-pull default: write the local file so the agent has it.
+  // 032: FUGR must go through pullObject so the standard abap-file-format
+  // layout is written (sapl/l<group>top/.func.* + .fugr.json), not a stale
+  // single `<group>.fugr.abap` file the spec never defined.
   let localFile: string | undefined;
   if (opts.pull !== false) {
-    const content = await client.getObjectSource(mainPart.sourceUrl);
-    const filename = buildFilename(object.name, object.type, mainPart.subtype, '.abap');
-    const relPath = path.join('src', objectDirName(object.name), filename);
-    await writeAbapFile(path.resolve(process.cwd(), relPath), content);
-    // Normalize to POSIX for the JSON output boundary (P0 — Windows path contract).
-    localFile = toOutputPath(relPath);
+    if (type.toUpperCase() === 'FUGR') {
+      const { pullObject } = await import('./pull-source.js');
+      const pulled = await pullObject(
+        client,
+        { name: object.name, type: object.type, objectUrl: object.objectUrl },
+        { dir: 'src', overwrite: true, skipExisting: false },
+      );
+      const written = pulled.written[0];
+      if (written) localFile = toOutputPath(written);
+    } else {
+      const content = await client.getObjectSource(mainPart.sourceUrl);
+      const filename = buildFilename(object.name, object.type, mainPart.subtype, '.abap');
+      const relPath = path.join('src', objectDirName(object.name), filename);
+      await writeAbapFile(path.resolve(process.cwd(), relPath), content);
+      // Normalize to POSIX for the JSON output boundary (P0 — Windows path contract).
+      localFile = toOutputPath(relPath);
+    }
   }
 
   printResult(mode,

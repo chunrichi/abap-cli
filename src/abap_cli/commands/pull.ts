@@ -3,6 +3,7 @@ import { runPull, type PullOptions } from '../flows/edit/pull.js';
 import { printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
 import { SEARCH_RESULT_LIMIT } from '../core/limits.js';
 import { commandSchemas } from '../flows/setup/command-schemas.js';
+import { normalizeTypeInput } from '../cli/type-alias.js';
 
 export function registerPullCommand(program: Command): void {
   program
@@ -35,6 +36,7 @@ export function registerPullCommand(program: Command): void {
       }
       const mode = jsonFromCommand(cmd);
       try {
+        if (opts.type) opts.type = normalizeTypeInput(opts.type).type;
         const result = await runPull(objectName, opts);
         printResult(mode, result.data, result.human);
       } catch (error: unknown) {
