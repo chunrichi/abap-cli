@@ -457,6 +457,7 @@ const SUBTYPE_TO_INCLUDE_TYPE = {
 };
 
 function structureXml(obj) {
+  const abapLanguageVersion = process.env.MOCK_CLOUD === '1' ? 'cloudDevelopment' : 'standard';
   if (obj.type === 'CLAS') {
     const includes = obj.parts
       .map(
@@ -477,6 +478,7 @@ function structureXml(obj) {
       `adtcore:masterLanguage="EN" adtcore:language="EN" adtcore:masterSystem="MOCK" adtcore:version="active" adtcore:responsible="${CURRENT_USER}" ` +
       `adtcore:changedBy="${CURRENT_USER}" adtcore:createdBy="${CURRENT_USER}" adtcore:changedAt="${NOW}" adtcore:createdAt="${NOW}" ` +
       `adtcore:descriptionTextLimit="60" abapsource:activeUnicodeCheck="true" abapsource:fixPointArithmetic="true" ` +
+      `abapsource:abapLanguageVersion="${abapLanguageVersion}" ` +
       `class:visibility="public" class:category="00" class:final="false" class:abstract="false" class:sharedMemoryEnabled="false">\n` +
       includes +
       '\n</clas:class>'
@@ -490,7 +492,8 @@ function structureXml(obj) {
     `adtcore:description="${obj.description}" adtcore:masterLanguage="EN" adtcore:language="EN" adtcore:masterSystem="MOCK" ` +
     `adtcore:version="active" adtcore:responsible="${CURRENT_USER}" adtcore:changedBy="${CURRENT_USER}" adtcore:createdBy="${CURRENT_USER}" ` +
     `adtcore:changedAt="${NOW}" adtcore:createdAt="${NOW}" adtcore:descriptionTextLimit="60" ` +
-    `abapsource:sourceUri="${main.sourceUrl}" program:programType="${obj.programType}" program:lockedByEditor="false"/>`
+    `abapsource:sourceUri="${main.sourceUrl}" abapsource:abapLanguageVersion="${abapLanguageVersion}" ` +
+    `program:programType="${obj.programType}" program:lockedByEditor="false"/>`
   );
 }
 

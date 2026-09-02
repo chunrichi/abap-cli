@@ -61,6 +61,8 @@ export interface DdicWirePayload {
   signFlag?: boolean;
   lowercase?: boolean;
   convExit?: string;
+  /** DOMA fixed-value entry (multi-language). */
+  fixedValues?: DdomaFixedValueWire[];
   // DTEL-only:
   domain?: string;
   shortText?: string;
@@ -103,7 +105,24 @@ export function extractTablArtifactWire(wire: DdicWirePayload): {
     hasSettings: wire.hasSettings === true,
   };
 }
+/** 032: DOMA fixed-value wire shape — multi-language descriptions. */
+export interface DdomaFixedValueWire {
+  fixedValue: string;
+  fixedValueLong?: {
+    languageIndependent?: string;
+    languageDependent?: Array<{ language: string; description: string }>;
+  };
+}
 
+/** 032: DOMA fixed-value local shape (abap-file-format doma-v1.json). */
+export interface DomaFixedValueLocal {
+  fixedValue: string;
+  /** Multi-language description; undefined means "no language-dependent text". */
+  description?: {
+    languageIndependent?: string;
+    languageDependent?: Array<{ language: string; description: string }>;
+  };
+}
 /**
  * Read a DDIC JSON file from disk.
  */
@@ -369,6 +388,36 @@ export function localToWire(type: DdicSupportedType, local: DdicObject): DdicWir
       wire.signFlag = l.signFlag as boolean | undefined;
       wire.lowercase = l.lowercase as boolean | undefined;
       wire.convExit = l.convExit as string | undefined;
+      // 032: DOMA fixedValues — accept either top-level `fixedValues` or
+      // abap-file-format nested `format.fixedValues`. Empty array ⇒ omit wire.
+      const domaFixedRaw =
+        (Array.isArray(l.fixedValues) ? (l.fixedValues as unknown[]) : undefined) ??
+        (l.format && typeof l.format === 'object' && Array.isArray((l.format as Record<string, unknown>).fixedValues)
+          ? ((l.format as Record<string, unknown>).fixedValues as unknown[])
+          : undefined);
+      if (Array.isArray(domaFixedRaw) && domaFixedRaw.length > 0) {
+        wire.fixedValues = domaFixedRaw.map((raw) => {
+          const r = raw as Record<string, unknown>;
+          const longRaw = r.description as Record<string, unknown> | undefined;
+          const li = longRaw?.languageIndependent as string | undefined;
+          const ldRaw = Array.isArray(longRaw?.languageDependent)
+            ? (longRaw.languageDependent as Array<Record<string, unknown>>)
+            : undefined;
+          const out: DdomaFixedValueWire = { fixedValue: String(r.fixedValue ?? '') };
+          const long: { languageIndependent?: string; languageDependent?: Array<{ language: string; description: string }> } = {};
+          if (li !== undefined) long.languageIndependent = li;
+          if (ldRaw && ldRaw.length > 0) {
+            long.languageDependent = ldRaw.map((d) => ({
+              language: String(d.language ?? ''),
+              description: String(d.description ?? ''),
+            }));
+          }
+          if (long.languageIndependent !== undefined || long.languageDependent !== undefined) {
+            out.fixedValueLong = long;
+          }
+          return out;
+        });
+      }
       break;
     case 'DTEL':
       wire.domain = l.domain as string | undefined;
@@ -428,6 +477,23 @@ export function wireToLocal(type: DdicSupportedType, wire: DdicWirePayload): Ddi
       if (wire.signFlag !== undefined) local.signFlag = wire.signFlag;
       if (wire.lowercase !== undefined) local.lowercase = wire.lowercase;
       if (wire.convExit !== undefined) local.convExit = wire.convExit;
+      // 032: DOMA fixedValues — preserve on the local object as a top-level
+      // array (round-trippable shape). abap-file-format places them under
+      // `format.fixedValues`; we keep both for compatibility.
+      if (wire.fixedValues !== undefined && wire.fixedValues.length > 0) {
+        const fixedValuesLocal: DomaFixedValueLocal[] = wire.fixedValues.map((fv) => {
+          const out: DomaFixedValueLocal = { fixedValue: fv.fixedValue };
+          const li = fv.fixedValueLong?.languageIndependent;
+          const ld = fv.fixedValueLong?.languageDependent;
+          if (li !== undefined || (ld !== undefined && ld.length > 0)) {
+            out.description = {};
+            if (li !== undefined) out.description.languageIndependent = li;
+            if (ld !== undefined && ld.length > 0) out.description.languageDependent = ld;
+          }
+          return out;
+        });
+        local.fixedValues = fixedValuesLocal;
+      }
       break;
     case 'DTEL':
       if (wire.domain !== undefined) local.domain = wire.domain;
