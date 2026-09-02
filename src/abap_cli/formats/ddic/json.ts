@@ -1,6 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { DDIC_SUPPORTED_TYPES, type DdicSupportedType } from '../../types/registry.js';
+import { CliError } from '../../output/json.js';
 
 // Known DDIC object extensions
 export const DDIC_EXTENSIONS = ['.doma.json', '.dtel.json', '.tabl.json', '.stru.json', '.ttyp.json'];
@@ -73,6 +74,8 @@ export interface DdicWirePayload {
   mediumText?: string;
   longText?: string;
   headerText?: string;
+  /** 032 US8: DTEL typeRef (TTYP reference) — third category alongside domain / predefinedType. */
+  typeRef?: { typeName: string; referencedTypeName?: string };
   // TABL/STRU-only (flat pull wire — kept for round-trip tests):
   deliveryClass?: string;
   dataClass?: string;
@@ -432,6 +435,27 @@ export function localToWire(type: DdicSupportedType, local: DdicObject): DdicWir
       wire.mediumText = l.mediumText as string | undefined;
       wire.longText = l.longText as string | undefined;
       wire.headerText = l.headerText as string | undefined;
+      // 032 US8: DTEL typeRef (TTYP reference). Accept abap-file-format nested
+      // shape `dataTypeInformation: { category: 'typeRef', typeName }` and a
+      // flat `typeRef: { typeName }` legacy fallback. Both produce the same
+      // wire `typeRef: { typeName, referencedTypeName }` shape.
+      const dti = l.dataTypeInformation as Record<string, unknown> | undefined;
+      const flatTypeRef = l.typeRef as { typeName?: string; referencedTypeName?: string } | undefined;
+      if (dti && typeof dti === 'object' && dti.category === 'typeRef') {
+        wire.typeRef = {
+          typeName: String(dti.typeName ?? ''),
+          ...(dti.referencedTypeName !== undefined
+            ? { referencedTypeName: String(dti.referencedTypeName) }
+            : {}),
+        };
+      } else if (flatTypeRef && flatTypeRef.typeName) {
+        wire.typeRef = {
+          typeName: String(flatTypeRef.typeName),
+          ...(flatTypeRef.referencedTypeName !== undefined
+            ? { referencedTypeName: String(flatTypeRef.referencedTypeName) }
+            : {}),
+        };
+      }
       break;
     case 'TABL':
     case 'STRU':
@@ -508,6 +532,37 @@ export function wireToLocal(type: DdicSupportedType, wire: DdicWirePayload): Ddi
       if (wire.mediumText !== undefined) local.mediumText = wire.mediumText;
       if (wire.longText !== undefined) local.longText = wire.longText;
       if (wire.headerText !== undefined) local.headerText = wire.headerText;
+      // 032 US8: DTEL typeRef (TTYP reference) — third category. Wire `typeRef`
+      // surfaces as `dataTypeInformation: { category: 'typeRef', typeName,
+      // referencedTypeName? }` on the local object.
+      if (wire.typeRef && wire.typeRef.typeName) {
+        (local as Record<string, unknown>).dataTypeInformation = {
+          category: 'typeRef',
+          typeName: wire.typeRef.typeName,
+          ...(wire.typeRef.referencedTypeName !== undefined
+            ? { referencedTypeName: wire.typeRef.referencedTypeName }
+            : {}),
+        };
+      }
+      // 032 US8 AC3: if the local input carries an unknown `dataTypeInformation.category`,
+      // reject with DTEL_CATEGORY_UNSUPPORTED. Only fires when the wire
+      // payload itself had a `dataTypeInformation` field (i.e. a TTYP-style
+      // nested input) that we could not recognise — `domain` / flat type
+      // fields never trigger this guard.
+      const wireDti = (wire as unknown as Record<string, unknown>).dataTypeInformation as
+        | Record<string, unknown>
+        | undefined;
+      if (wireDti && typeof wireDti === 'object' && 'category' in wireDti) {
+        const cat = wireDti.category;
+        const supported = cat === 'domain' || cat === 'predefinedType' || cat === 'typeRef';
+        if (!supported) {
+          throw new CliError(
+            'DTEL_CATEGORY_UNSUPPORTED',
+            `Unsupported DTEL dataTypeInformation.category: "${String(cat)}" (expected one of domain, predefinedType, typeRef)`,
+            { details: { category: String(cat), dataTypeInformation: wireDti } },
+          );
+        }
+      }
       break;
     case 'TABL':
     case 'STRU':
