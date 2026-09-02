@@ -22,7 +22,7 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 ## Options
 
 - `<type>`: 对象类型 `CLAS` / `INTF` / `PROG` / `FUGR`；DDIC 类型 `DOMA` / `DTEL` / `TABL` / `STRU`（须配 `--file`）；其余类型 → `TYPE_NOT_SUPPORTED`，`TTYP` → `DDIC_NOT_SUPPORTED`
-- `<name>`: 对象名（自动转大写；命名空间名如 `/UI2/CL_JSON` 映射为 `#` 转义目录）
+- `<name>`: 对象名（自动转大写；命名空间名如 `/UI2/CL_JSON` 映射为 `#` 转义目录）。本地预校验：≤30 字符、仅 `A-Z 0-9 _`、命名空间形如 `/NS/NAME`（NS ≤10，总长 ≤30），违规 → `VALIDATION_ERROR`（exit 7）
 - `--package <package>`: 目标 SAP 包（必填）
 - `--description <desc>`: 对象描述（必填；有 `--file` 时可选，由 JSON 提供）
 - `--tr <transport>`: 传输请求号；缺省时 `resolveTransport` 解析（非 `$TMP` 包下 DDIC 必须显式给出）
@@ -44,6 +44,7 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 ## 行为规则
 
 - **三条路由**：源对象 → ADT REST `createObject`；DDIC（`--file`）→ ICF `POST /sap/zabap_vibe/ddic/<type>`；`local` → 仅写本地文件（零 SAP 调用、不读凭据）
+- **本地名称预校验**（快失败，零 SAP 往返，先于任何路由/`assertNotExists`）：所有带 `<name>` 的入口（源对象 / DDIC `--file` / HTTP / TRAN / `--check-only` / `create local`）先校验规范化（大写）后的名字——≤30 字符，仅 `A-Z 0-9 _`；命名空间形如 `/NS/NAME`（NS ≤10 且仅 `A-Z 0-9 _`，含斜杠总长 ≤30）；空名同样拒绝。**不强制 Z/Y 前缀**（`$TMP` 接受 `A123`）。违规 → `VALIDATION_ERROR`（exit 7），避免超长/非法名拨号 SAP 后报误导性的 `OBJECT_NOT_FOUND`；与 DDIC 客户端命名校验（exit 7）保持一致
 - **防覆盖**：创建前 `assertNotExists`；已存在 → `OBJECT_EXISTS`（不覆盖）
 - **创建即激活**：复用 push 流程（lock → 写 skeleton → activate → unlock）；`--no-activate` 跳过激活
 - **FUGR 与源对象的差异**：新 FUGR 用 `objectStructure` 取 parts（立即可读）；CLAS/INTF/PROG 对新建对象 objectStructure 有就绪延迟（真机 "wrong input data"），回退到稳定 `<objectUrl>/source/main`

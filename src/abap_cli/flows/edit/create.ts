@@ -51,6 +51,7 @@ export interface CreateLocalOptions {
 
 export async function runCreateLocal(type: string, name: string, opts: CreateLocalOptions,mode: OutputMode): Promise<void> {
   const objectName = normalizeName(name);
+  validateObjectName(objectName); // fail fast before writing any draft
   resolveType(type); // throws TYPE_NOT_SUPPORTED / DDIC_NOT_SUPPORTED before any write
   const typeUpper = type.toUpperCase();
 
@@ -388,6 +389,9 @@ export async function runCreate(type: string | undefined, name: string | undefin
   const skipActivate = opts.activate === false;
   const typeUpper = type.toUpperCase();
   const objectName = normalizeName(name);
+  // Local fail-fast (zero SAP round-trip) before routing: an oversized or
+  // illegal name must not reach SAP as a misleading OBJECT_NOT_FOUND.
+  validateObjectName(objectName);
 
   // DDIC types route to the self-built ICF service.
   if (isDdicSupportedType(typeUpper)) {
@@ -630,6 +634,41 @@ export function resolveType(type: string): CreateTypeSpec {
 
 function normalizeName(name: string): string {
   return name.trim().toUpperCase();
+}
+
+const OBJECT_NAME_MAX_LENGTH = 30;
+/** Legal chars for a non-namespaced segment; matches what SAP accepts in $TMP. */
+const OBJECT_NAME_SEGMENT = /^[A-Z0-9_]+$/;
+/** Namespaced object names: /<NS up to 10>/<name>; total length ≤ 30 (incl. slashes). */
+const NAMESPACED_OBJECT_NAME = /^\/[A-Z0-9_]{1,10}\/[A-Z0-9_]+$/;
+
+/**
+ * Local fail-fast object-name validation, mirroring DDIC's client-side name
+ * checks (VALIDATION_ERROR / exit 7). Runs on the uppercased name before any
+ * SAP round-trip. Deliberately does NOT enforce a Z/Y prefix: $TMP accepts
+ * names like A123, so only truly illegal shapes are rejected.
+ */
+function validateObjectName(objectName: string): void {
+  const namespaced = objectName.startsWith('/');
+  let reason: string;
+  if (!objectName) {
+    reason = 'name is empty';
+  } else if (objectName.length > OBJECT_NAME_MAX_LENGTH) {
+    reason = `name is ${objectName.length} characters; SAP object names are at most ${OBJECT_NAME_MAX_LENGTH}`;
+  } else if (namespaced ? !NAMESPACED_OBJECT_NAME.test(objectName) : !OBJECT_NAME_SEGMENT.test(objectName)) {
+    reason = namespaced
+      ? 'namespaced names must look like /<NS>/<NAME> with a namespace of up to 10 characters and only A-Z 0-9 _'
+      : 'name may only contain A-Z, 0-9 and _ (no spaces or punctuation)';
+  } else {
+    return;
+  }
+  throw new CliError('VALIDATION_ERROR', `Invalid object name '${objectName}': ${reason}`, {
+    object: objectName,
+    details: [reason],
+    nextSteps: [
+      `Use at most ${OBJECT_NAME_MAX_LENGTH} characters from A-Z 0-9 _ (namespaced: /<NS>/<NAME>), e.g. ZCL_MY_CLASS.`,
+    ],
+  });
 }
 
 async function assertNotExists(client: AdtClientWrapper, objectName: string): Promise<void> {
