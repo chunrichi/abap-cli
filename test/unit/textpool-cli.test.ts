@@ -117,7 +117,7 @@ describe('014/US4 textpool pull (ADT route — read=true cached)', () => {
     });
     const program = makeProgram();
     registerPullCommand(program);
-    const res = await runCommand(program, ['pull', 'ZPROG', '--textpool', '--json'], { cwd });
+    const res = await runCommand(program, ['pull', 'ZPROG', '--type', 'PROG', '--textpool', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(getTextElements).toHaveBeenCalledTimes(3); // texts/selections/headings
     const out = JSON.parse(res.stdout);

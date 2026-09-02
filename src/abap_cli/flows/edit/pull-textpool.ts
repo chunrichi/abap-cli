@@ -15,11 +15,27 @@ import { serializeTextpoolProperties, type TextElementCategory } from '../../for
 import { routeTextpool } from '../../clients/textpool-router.js';
 import { CliError } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
+import { collectWarning } from '../../output/meta.js';
 import { toOutputPath, normalizePullData } from '../../core/path-output.js';
 import type { PullEntry, PullOptions, PullResult } from './pull-shared.js';
 
 export async function runPullTextpool(objectName: string, type: string | undefined, opts: PullOptions): Promise<PullResult> {
-  const objType = (type ?? 'PROG').toUpperCase();
+  // 032 US12: textpool pull requires explicit --type (was previously defaulting
+  // to PROG, which made CLAS/INTF/FUGR/TABL/STRU textpool pulls silently miss).
+  // Per-type support list (texts/selections/headings all attempted on every
+  // type; mock or real-SAP TEXTPOOL_OBJECT_NOT_FOUND is treated as a warning
+  // for categories the object doesn't carry, not a failure).
+  const objType = type?.toUpperCase();
+  if (!objType) {
+    throw new CliError('USAGE', 'Textpool pull requires explicit --type (e.g. --type CLAS)', {
+      object: objectName,
+      nextSteps: [
+        'Re-run with --type <CLAS|INTF|PROG|FUGR|TABL|STRU>.',
+        'Use `abap search <query>` to look up the object type first.',
+      ],
+      example: `abap pull ${objectName} --type CLAS --textpool`,
+    });
+  }
   const { systemName } = await loadProjectConfig();
   const route = routeTextpool(systemName, 'read');
 
@@ -60,9 +76,25 @@ export async function runPullTextpool(objectName: string, type: string | undefin
     } else {
       const resp = await icf.getTextpool<{ elements?: Array<{ id: string; text: string }> }>(fileCat, objectName, objType);
       if (resp.status !== 'success' || !resp.data) {
-        const code = resp.error?.code === 'TEXTPOOL_OBJECT_NOT_FOUND' ? 'OBJECT_NOT_FOUND' : (resp.error?.code as ErrorCode | undefined) ?? 'SAP_ERROR';
+        // 032 US12 AC3: missing text elements on a per-type/per-category basis
+        // is a soft warning (TEXTPOOL_OBJECT_NOT_FOUND), not a hard failure.
+        // Different types carry different categories (CLAS typically has no
+        // selections; FUGR typically has no headings, etc.). Only non-404
+        // errors (real SAP problems) escalate to `failed`.
+        const code = resp.error?.code;
+        if (code === 'TEXTPOOL_OBJECT_NOT_FOUND') {
+          const outPath = toOutputPath(relPath);
+          skipped.push(outPath);
+          collectWarning(
+            'TEXTPOOL_CATEGORY_MISSING',
+            `${objType} ${objectName} has no ${fileCat} text elements on the system (skipped ${outPath})`,
+            { type: objType, object: objectName, category: fileCat },
+          );
+          continue;
+        }
+        const realCode = (code as ErrorCode | undefined) ?? 'SAP_ERROR';
         const outPath = toOutputPath(relPath);
-        entries.push({ object: objectName, type: objType, status: 'failed', code, detail: resp.error?.message, files: [outPath] });
+        entries.push({ object: objectName, type: objType, status: 'failed', code: realCode, detail: resp.error?.message, files: [outPath] });
         failed.push(outPath);
         continue;
       }

@@ -321,10 +321,81 @@ addObject('ZPROG_TOP', 'PROG/I', '/sap/bc/adt/programs/includes/zprog_top', 'Dem
   },
 ], { programType: 'I' });
 
+// 032 US12: 4 fixture objects (INTF/FUGR/TABL/STRU) for textpool multi-language
+// pulls. CLAS already exists above (ZCL_DEMO).
+addObject('ZIF_DEMO', 'INTF', '/sap/bc/adt/oo/interfaces/zif_demo', 'Demo interface', [
+  {
+    subtype: 'main',
+    sourceUrl: '/sap/bc/adt/oo/interfaces/zif_demo/source/main',
+    content: 'INTERFACE zif_demo PUBLIC.\nENDINTERFACE.\n',
+  },
+]);
+addObject('ZFG_DEMO', 'FUGR', '/sap/bc/adt/functiongroups/zfg_demo', 'Demo function group', [
+  {
+    subtype: 'main',
+    sourceUrl: '/sap/bc/adt/functiongroups/zfg_demo/source/main',
+    content: 'FUNCTION-POOL zfg_demo.\n',
+  },
+]);
+addObject('ZTB_DEMO', 'TABL', '/sap/bc/adt/ddic/tables/ztb_demo', 'Demo table', [
+  {
+    subtype: 'main',
+    sourceUrl: '/sap/bc/adt/ddic/tables/ztb_demo/source/main',
+    content: '',
+  },
+]);
+addObject('ZST_DEMO', 'STRU', '/sap/bc/adt/ddic/structures/zst_demo', 'Demo structure', [
+  {
+    subtype: 'main',
+    sourceUrl: '/sap/bc/adt/ddic/structures/zst_demo/source/main',
+    content: '',
+  },
+]);
+
 // 015: remote (Version Management) sources served by /version-source — keyed TYPE:NAME.
 remoteSourceStore.set('REPS:ZPROG', "REPORT zprog.\nWRITE: / 'production version'.\n");
 remoteSourceStore.set('INTF:ZIF_DEMO', 'INTERFACE zif_demo.\n  METHODS run.\nENDINTERFACE.\n');
 remoteSourceStore.set('CLSD:ZCL_DEMO', 'CLASS zcl_demo DEFINITION PUBLIC.\n  PUBLIC SECTION.\n    METHODS run.\nENDCLASS.\n');
+
+// 032 US12: textpool fixtures for the 5 supported types — multi-language symbols
+// (texts). Each object has at least one category populated; categories that are
+// intentionally empty for that type exercise the TEXTPOOL_OBJECT_NOT_FOUND soft
+// warning path. Keys are TYPE:NAME:category.
+textpoolStore.set('CLAS:ZCL_DEMO:symbols', [
+  { id: '001', text: 'Hello from ZCL_DEMO (en)' },
+]);
+textpoolStore.set('CLAS:ZCL_DEMO:headings', [
+  { id: 'COLUMNHEADER_1', text: 'Column 1 (en)' },
+]);
+// CLAS intentionally has no selections — exercises TEXTPOOL_CATEGORY_MISSING warning.
+
+textpoolStore.set('INTF:ZIF_DEMO:symbols', [
+  { id: '001', text: 'Interface demo (en)' },
+]);
+textpoolStore.set('INTF:ZIF_DEMO:headings', [
+  { id: 'LISTHEADER', text: 'Interface list header (en)' },
+]);
+
+textpoolStore.set('FUGR:ZFG_DEMO:symbols', [
+  { id: '001', text: 'Function group demo (en)' },
+]);
+// FUGR typically has no headings — exercises TEXTPOOL_CATEGORY_MISSING warning.
+
+textpoolStore.set('TABL:ZTB_DEMO:symbols', [
+  { id: '001', text: 'Table demo (en)' },
+]);
+textpoolStore.set('TABL:ZTB_DEMO:headings', [
+  { id: 'COLUMNHEADER_1', text: 'Field 1 (en)' },
+  { id: 'COLUMNHEADER_2', text: 'Field 2 (en)' },
+]);
+textpoolStore.set('TABL:ZTB_DEMO:selections', [
+  { id: 'P_LANG', text: 'Language (en)' },
+]);
+
+textpoolStore.set('STRU:ZST_DEMO:symbols', [
+  { id: '001', text: 'Structure demo (en)' },
+]);
+// STRU has no selections/headings — exercises TEXTPOOL_CATEGORY_MISSING warning.
 
 // ICF service classes (013): handler + setup, targets for deploy enumeration / classrun.
 addObject('ZCL_ABAP_VIBE_ICF', 'CLAS', '/sap/bc/adt/oo/classes/zcl_abap_vibe_icf', 'ICF handler for zabap_vibe', [

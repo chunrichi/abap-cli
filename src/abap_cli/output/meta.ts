@@ -39,6 +39,9 @@ export type WarningCode =
   | 'ICF_CHECK_DEGRADED'    // init ICF deployment check degraded (non-blocking)
   | 'ICF_OUTDATED_DEADLOCK' // extension status reports outdated gc_version (likely user transport holds the new source)
   | 'OAUTH_CLIENT_SECRET_ON_DISK' // oauth_password profile: client_secret stored in systems.json
+  // 032 US12 textpool pull — per-category soft warning when object has no
+  // elements of that category (CLAS has no selections, FUGR has no headings, etc.)
+  | 'TEXTPOOL_CATEGORY_MISSING'
   // 023-extension-mechanism
   | 'EXTENSION_DEGRADED'    // extension failed to load but CLI continues (lenient mode)
   // 030-runtime-deploy
