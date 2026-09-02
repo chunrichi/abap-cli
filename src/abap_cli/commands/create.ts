@@ -54,7 +54,7 @@ export function registerCreateCommand(program: Command): void {
           return;
         }
         // --schema path is untyped (type may be undefined); only normalize when present.
-        const normalized = type ? normalizeTypeInput(type) : { type };
+        const normalized = type ? normalizeTypeInput(type) : { type: type as string };
         if (normalized.aliasWarning) {
           (opts as CreateOptions & { aliasWarning?: string }).aliasWarning = normalized.aliasWarning;
         }

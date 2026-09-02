@@ -16,15 +16,25 @@
 - **`SICF` → `HTTP` 类型码别名**：`pull --type SICF` / `create SICF` 内部映射到 `HTTP`；`create --help` 提示「alias: SICF, deprecated」。`schema.allowedValues` 仍严格仅 `HTTP`。
 - **Mock-adt 扩字段**：`test/mock-adt/server.js` 在 `structureXml` 输出 `abapsource:abapLanguageVersion`（默认 `standard`，`MOCK_CLOUD=1` 时 `cloudDevelopment`）。
 
+### Changed
+- **FUGR `fixPointArithmetic` mock fallback**：`src/abap_cli/formats/pull-fugr.ts` 在 `metaData['abapsource:fixPointArithmetic']` 缺省时默认 `false`（之前是字段缺失）。on-prem 消费者始终拿到布尔；cloud 系统明确 `true` 仍按 `true` 落盘。
+
+### Fixed
+- **TABL/STRU push 走三件套**：`flows/edit/push.ts#pushDdicFile` 改用 `readDdicObjectForCreate`（之前直接 `readDdicJson`），TABL/STRU 三件套 `<name>.{tabl,stru}.{json,ddic,settings.json}` 在 push 路径与 create 路径行为一致（DDL 是字段定义唯一真相）。STRU 缺 `.settings.json` 不报错。DDL 解析失败 → `TABL_DDL_INVALID`（VALIDATION_ERROR/exit 7），含行号提示与三件套迁移 nextSteps。
+- **TABL DDL 解析器扩展**：`formats/ddic/tabl-artifact.ts#parseTablDDic` 新增支持：① `.INCLUDE ... WITH SUFFIX <suffix>`（写入 `field.includeSuffix`）；② 多列复合 key（每列 `keyFlag: true, notNull: true`）；③ 行内 foreign key（`abap.char(3) with foreign key [dependent] check t005;` 一行式）；④ `@AbapCatalog.foreignKeys [ ... ]` 块（写入 `field.foreignKeys[]`）；⑤ `@ClientHandling.type`（驱动 `clientDependent` 显式覆盖默认启发式）。
+
 ### Tests
 - `test/unit/abapLanguageVersion.test.ts` — 3 cases（cloud / on-prem / standard fallback）。
 - `test/unit/doma-fixedValues-roundtrip.test.ts` — 5 cases（empty / single / multi-lang / special chars / nested `format.fixedValues`）。
 - `test/unit/type-alias-sicf-http.test.ts` — 5 cases（uppercase / lowercase / subtype suffix / HTTP passthrough / unknown passthrough）。
-- 基线：1008 → 1013 测试，1011/1013 通过；2 个失败均为既有（`skill-bundle` 审计与 `deploy-dryrun` ERR_DLOPEN_FAILED），不在本次范围。
+- `test/unit/fugr-fixPointArithmetic-default.test.ts` — 3 cases（mock 三态：true / false / 缺字段默认 false）。
+- `test/unit/tabl-ddl-extended.test.ts` — 5 cases（`.INCLUDE WITH SUFFIX` / 复合 key / 行内 foreign key / `@ClientHandling.type` / canonical deliveryClass + inline semantics）。
+- `test/unit/push-ddic.test.ts` — 新增 3 cases（TABL 三件套 push 合并 DDL / STRU 三件套 push 缺 settings 不报错 / 残缺 DDL → `TABL_DDL_INVALID`）。
+- 基线：1000 → 1024 测试，1022/1024 通过；2 个失败均为既有（`skill-bundle` 审计与 `deploy-dryrun` ERR_DLOPEN_FAILED），不在本次范围。
 - tsc: 0 错误。
 
 ### Pending (未完成)
-- Phase 3 收尾：US4 FUGR `fixPointArithmetic` mock fallback + US5 TABL/STRU push 三件套 + US6 TABL DDL 解析扩展（`.INCLUDE` / 复合 key / foreignKeys / `@ClientHandling`）。
+
 - Phase 4：US8 DTEL `typeRef` + US9 DOMA `signFlag/lowercase/convExit` + US10 HTTP `serviceId/descriptionByLang` + create 骨架 + US11 跨类型注册表合一（迁移旧表）+ US12 5 类对象文本元素多语言 + US13 PROG/I 子类型分流。
 - Phase 5：真实 SAP 端到端（vhcala4hci:50000 当前不可达 — host 解析为 127.0.0.1 但 50000 端口无服务；需恢复 SAP 后跑 10 类对象 round-trip）+ wiki 同步 + 文档收尾 + 删除旧注册表常量。
 

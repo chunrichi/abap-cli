@@ -10,7 +10,7 @@ import { resolveObject, getObjectParts, validateLocalFile, type ResolvedObject }
 import { resolveTransport } from '../../core/transport.js';
 import { resolveLocalTargets } from '../../core/local-targets.js';
 import { requireWriteConfirmation } from '../../core/confirmation.js';
-import { readDdicJson, localToWire, validateDdicObject, type DdicSupportedType } from '../../formats/ddic/json.js';
+import { readDdicJson, readDdicObjectForCreate, localToWire, validateDdicObject, type DdicSupportedType } from '../../formats/ddic/json.js';
 import { readHttpJson, localToWire as httpLocalToWire, validateHttpObject } from '../../formats/http/json.js';
 import { readTranJson, localToWire as tranLocalToWire, validateTranObject } from '../../formats/transport/json.js';
 import { pushObject, type PushStage } from './push-object.js';
@@ -289,14 +289,29 @@ async function pushDdicFile(
   }
 
   let local: { name: string; package?: string; transportRequest?: string; [key: string]: unknown };
+  let type = resolved.objectType as DdicSupportedType;
   try {
-    local = await readDdicJson(path.resolve(process.cwd(), file));
+    // abap-file-format three-piece: TABL/STRU honor sibling .tabl.ddic / .tabl.settings.json
+    // when present (spec 032 US5). Falls back to legacy single JSON for DOMA/DTEL or
+    // when no sidecar exists. readTablArtifact throws on malformed DDL — map to TABL_DDL_INVALID.
+    local = await readDdicObjectForCreate(path.resolve(process.cwd(), file), type);
   } catch (error: unknown) {
     const m = error instanceof Error ? error.message : String(error);
     const outFile = toRelativeOutputPath(file);
-    throw new CliError('INVALID_ARGUMENT', `Cannot read DDIC file ${outFile}: ${m}`, { file: outFile });
+    const isTablDdlError = (type === 'TABL' || type === 'STRU') && /Invalid Table and Structure DDL/i.test(m);
+    const code: ErrorCode = isTablDdlError ? 'TABL_DDL_INVALID' : 'INVALID_ARGUMENT';
+    throw new CliError(code, `Cannot read ${type} file ${outFile}: ${m}`, {
+      file: outFile,
+      type,
+      object: resolved.objectName,
+      nextSteps: isTablDdlError
+        ? [
+            `Inspect the .${type.toLowerCase()}.ddic sidecar: it must start with \`define table|structure ${resolved.objectName} {\` and end with \`}\`.`,
+            `For TABL/STRU, see the abap-file-format three-piece layout (.${type.toLowerCase()}.json + .${type.toLowerCase()}.ddic + .${type.toLowerCase()}.settings.json).`,
+          ]
+        : ['Verify the file exists, is readable, and contains valid JSON.'],
+    });
   }
-  const type = resolved.objectType as DdicSupportedType;
   const errors = validateDdicObject(local, type);
   if (errors.length > 0) {
     const outFile = toRelativeOutputPath(file);

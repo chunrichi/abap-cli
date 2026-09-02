@@ -54,9 +54,20 @@ export async function readTablArtifact(filePath: string): Promise<TablArtifact |
   const generalInformation = settings?.generalInformation && typeof settings.generalInformation === 'object'
     ? settings.generalInformation as Record<string, unknown>
     : {};
-  const fields = parsed.fields.filter(field => !(parsed.type === 'TABL' && ['CLIENT', 'MANDT'].includes(field.fieldName.toUpperCase())));
-  const clientDependent = parsed.type === 'TABL'
-    && parsed.fields.some(field => ['CLIENT', 'MANDT'].includes(field.fieldName.toUpperCase()));
+  // US6: filter the synthetic @ClientHandling.type / @AbapCatalog.* sentinel fields
+  // — they are stash markers, not real table fields.
+  const realFields = parsed.fields.filter(f => !f.fieldName.startsWith('@'));
+  const fields = realFields.filter(field => !(parsed.type === 'TABL' && ['CLIENT', 'MANDT'].includes(field.fieldName.toUpperCase())));
+  // US6: explicit @ClientHandling.type beats field heuristic — `CLIENT_DEPENDENT` /
+  // `CLIENT_INDEPENDENT` map to clientDependent. The legacy fallback (presence of a
+  // CLIENT/MANDT field) keeps on-prem parity.
+  const clientHandlingField = realFields.find(f => f.fieldName === '@ClientHandling.type');
+  const explicitClientHandling = clientHandlingField?.dataType;
+  const clientDependent = parsed.type === 'TABL' && (
+    explicitClientHandling === 'CLIENT_DEPENDENT'
+    || (explicitClientHandling === undefined
+      && realFields.some(field => ['CLIENT', 'MANDT'].includes(field.fieldName.toUpperCase())))
+  );
 
   const local: DdicObject = {
     name: parsed.objectName,
@@ -92,6 +103,7 @@ export function parseTablDdic(source: string): ParsedTablDdic {
   let inBody = false;
   let pendingLabel: string | undefined;
   let pendingReference: { table: string; field: string } | undefined;
+  let pendingForeignKeys: Array<{ checkTable: string; label?: string }> | null = null;
   let pendingField: DdicFieldLocal | undefined;
   const fields: DdicFieldLocal[] = [];
 
@@ -106,6 +118,33 @@ export function parseTablDdic(source: string): ParsedTablDdic {
     const deliveryMatch = line.match(/^@AbapCatalog\.deliveryClass\s*:\s*#([A-Za-z0-9_]+)\s*$/i);
     if (deliveryMatch) {
       deliveryClass = deliveryMatch[1]!.toUpperCase();
+      continue;
+    }
+    const clientHandlingMatch = line.match(/^@ClientHandling\.type\s*:\s*#([A-Za-z0-9_]+)\s*$/i);
+    if (clientHandlingMatch) {
+      // US6: ClientHandling.type drives clientDependent at the artifact layer.
+      // Stash on a sentinel field so the caller (readTablArtifact) can pick it up.
+      pendingField = { fieldName: '@ClientHandling.type', dataType: clientHandlingMatch[1]!.toUpperCase() };
+      continue;
+    }
+    const foreignKeyAnn = line.match(/^@AbapCatalog\.foreignKeys\s*\.\s*([A-Za-z0-9_]+)\s*:\s*\[\s*$/i)
+      ?? line.match(/^@AbapCatalog\.foreignKeys\s*:\s*\[\s*$/i);
+    if (foreignKeyAnn) {
+      // Foreign-key block: lines until `]` are individual key entries with table + label.
+      pendingForeignKeys = [] as Array<{ checkTable: string; label?: string }>;
+      continue;
+    }
+    if (pendingForeignKeys) {
+      const fkLine = line.match(/^key\s+([\w/#]+)\s+with\s+(?:foreign\s+key\s+)?(?:\[[^\]]+\]\s+)?check\s+([\w/#]+)\s*;\s*$/i);
+      if (fkLine) {
+        pendingForeignKeys.push({ checkTable: fkLine[2]!.toUpperCase(), label: fkLine[1]!.toUpperCase() });
+        continue;
+      }
+      if (line === ']' || /^\]\s*,?\s*$/.test(line)) {
+        pendingForeignKeys = null;
+        continue;
+      }
+      // Skip annotation-only lines (e.g. label) inside the block — narrow allowance.
       continue;
     }
     const labelMatch = line.match(/^@EndUserText\.label\s*:\s*'(.*)'\s*$/i);
@@ -126,7 +165,7 @@ export function parseTablDdic(source: string): ParsedTablDdic {
       inBody = false;
       continue;
     }
-    if (pendingField) {
+    if (pendingField && pendingField.fieldName !== '@ClientHandling.type') {
       const foreignKeyMatch = line.match(/^with\s+foreign\s+key(?:\s+\[[^\]]+\])?\s+([\w/#]+)/i);
       if (foreignKeyMatch) {
         pendingField.checkTable = foreignKeyMatch[1]!.toUpperCase();
@@ -145,9 +184,11 @@ export function parseTablDdic(source: string): ParsedTablDdic {
       }
       throw new Error(`Invalid Table and Structure DDL: unfinished field ${pendingField.fieldName}`);
     }
-    const includeMatch = line.match(/^include\s+([\w/#]+)\s*;$/i);
+    const includeMatch = line.match(/^include\s+([\w/#]+)(?:\s+with\s+suffix\s+(\w+))?\s*;$/i);
     if (includeMatch) {
-      fields.push({ fieldName: '.INCLUDE', precField: includeMatch[1]!.toUpperCase() });
+      const includeField: DdicFieldLocal = { fieldName: '.INCLUDE', precField: includeMatch[1]!.toUpperCase() };
+      if (includeMatch[2]) includeField.includeSuffix = includeMatch[2]!.toUpperCase();
+      fields.push(includeField);
       pendingLabel = undefined;
       pendingReference = undefined;
       continue;
@@ -160,19 +201,27 @@ export function parseTablDdic(source: string): ParsedTablDdic {
     let fieldType = fieldMatch[3]!.trim();
     const notNull = /\s+not\s+null$/i.test(fieldType);
     if (notNull) fieldType = fieldType.replace(/\s+not\s+null$/i, '').trim();
+    // Inline foreign-key clause on the same line, e.g. `abap.char(3) with foreign key [dependent] check t005`.
+    const inlineFkMatch = fieldType.match(/\s+with\s+foreign\s+key(?:\s+\[[^\]]+\])?\s+check\s+([\w/#]+)\s*$/i);
+    if (inlineFkMatch) fieldType = fieldType.replace(inlineFkMatch[0], '').trim();
     const type = parseDdlType(fieldType);
     const field: DdicFieldLocal = {
       fieldName,
       ...type,
       keyFlag: Boolean(fieldMatch[1]),
       notNull,
+      ...(inlineFkMatch ? { checkTable: inlineFkMatch[1]!.toUpperCase() } : {}),
       ...(pendingLabel !== undefined ? { ddtext: pendingLabel } : {}),
       ...(pendingReference ? { refTable: pendingReference.table.toUpperCase(), refField: pendingReference.field.toUpperCase() } : {}),
     };
+    if (pendingForeignKeys) {
+      field.foreignKeys = (pendingForeignKeys as Array<{ checkTable: string; label?: string }>).map(fk => ({ checkTable: fk.checkTable, ...(fk.label ? { label: fk.label } : {}) }));
+    }
     if (hasSemicolon) fields.push(field);
     else pendingField = field;
     pendingLabel = undefined;
     pendingReference = undefined;
+    pendingForeignKeys = null;
   }
 
   if (!declaration || inBody) throw new Error('Invalid Table and Structure DDL: missing define declaration or closing brace');

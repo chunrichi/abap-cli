@@ -29,6 +29,10 @@ export interface DdicFieldLocal {
   checkTable?: string;
   /** 024: TABL include/append target structure name (.INCLUDE / .INCLU--AP). */
   precField?: string;
+  /** 032 US6: TABL `.INCLUDE ... WITH SUFFIX <suffix>` suffix. */
+  includeSuffix?: string;
+  /** 032 US6: foreign-key entries for `@AbapCatalog.foreignKeys` block. */
+  foreignKeys?: Array<{ checkTable: string; label?: string }>;
 }
 
 /** 014: ICF wire representation (camelCase, transport envelope). */
