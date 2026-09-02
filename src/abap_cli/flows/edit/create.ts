@@ -16,7 +16,14 @@ import { defaultSkeleton, getTemplate, listTemplates } from '../../formats/templ
 import { readDdicJson, readDdicObjectForCreate, localToWire, validateDdicObject, getDdicFlatJsonExample, type DdicSupportedType, type DdicObject } from '../../formats/ddic/json.js';
 import { readHttpJson, localToWire as httpLocalToWire, validateHttpObject } from '../../formats/http/json.js';
 import { readTranJson, localToWire as tranLocalToWire, validateTranObject } from '../../formats/transport/json.js';
-import { TYPE_MAP, DDIC_TYPES, HTTP_TYPES, TRAN_TYPES, isDdicSupportedType, isHttpSupportedType, isTranSupportedType, type CreateTypeSpec } from './create-types.js';
+import type { CreatableTypeIds } from 'abap-adt-api';
+import { createObjtypeFor, DDIC_TYPES, HTTP_TYPES, TRAN_TYPES, isDdicSupportedType, isHttpSupportedType, isTranSupportedType } from './create-types.js';
+import { allSupportedTypes } from '../../types/registry.js';
+
+/** ADT objtype for source objects (e.g. 'CLAS/OC'); undefined for DDIC/HTTP/TRAN. */
+export interface CreateTypeSpec {
+  objtype: CreatableTypeIds;
+}
 import { createSchema } from './create-schema.js';
 import { toOutputPath } from '../../core/path-output.js';
 
@@ -532,7 +539,8 @@ export async function runCreate(type: string | undefined, name: string | undefin
 
 export function resolveType(type: string): CreateTypeSpec {
   const t = type.toUpperCase();
-  if (DDIC_TYPES.has(t)) {
+  const supported = allSupportedTypes();
+  if (isDdicSupportedType(t)) {
     throw new CliError(
       'DDIC_NOT_SUPPORTED',
       `Object type ${t} is a DDIC object; not supported in this phase (ICF service not implemented yet)`,
@@ -542,31 +550,31 @@ export function resolveType(type: string): CreateTypeSpec {
   // HTTP service is supported via ICF (handled upstream by runCreate → runCreateHttp).
   // resolveType is only consulted by runCreateLocal; HTTP local draft skeletons are not
   // generated here — keep the rejection semantics aligned with DDIC for `create local`.
-  if (HTTP_TYPES.has(t)) {
+  if (isHttpSupportedType(t)) {
     throw new CliError(
       'TYPE_NOT_SUPPORTED',
       `Object type ${t} is an HTTP service; only \`abap create ${t} <name> --file <path>\` is supported (ICF route, not \`create local\`).`,
-      { type: t, supported: [...Object.keys(TYPE_MAP), ...DDIC_TYPES, ...HTTP_TYPES, ...TRAN_TYPES] },
+      { type: t, supported },
     );
   }
   // Transaction code is supported via ICF (handled upstream by runCreate → runCreateTran).
   // resolveType is only consulted by runCreateLocal — keep the same rejection semantics.
-  if (TRAN_TYPES.has(t)) {
+  if (isTranSupportedType(t)) {
     throw new CliError(
       'TYPE_NOT_SUPPORTED',
       `Object type ${t} is a transaction code; only \`abap create ${t} <name> --file <path>\` is supported (ICF route, not \`create local\`).`,
-      { type: t, supported: [...Object.keys(TYPE_MAP), ...DDIC_TYPES, ...HTTP_TYPES, ...TRAN_TYPES] },
+      { type: t, supported },
     );
   }
-  const spec = TYPE_MAP[t];
-  if (!spec) {
+  const objtype = createObjtypeFor(t);
+  if (!objtype) {
     throw new CliError(
       'TYPE_NOT_SUPPORTED',
-      `Object type ${t} is not supported. Supported types: ${Object.keys(TYPE_MAP).join(', ')}`,
-      { type: t, supported: Object.keys(TYPE_MAP) },
+      `Object type ${t} is not supported. Supported types: ${supported.join(', ')}`,
+      { type: t, supported },
     );
   }
-  return spec;
+  return { objtype: objtype as CreatableTypeIds };
 }
 
 function normalizeName(name: string): string {

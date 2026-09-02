@@ -1,12 +1,12 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { DDIC_SUPPORTED_TYPES, type DdicSupportedType } from '../../types/registry.js';
 
 // Known DDIC object extensions
 export const DDIC_EXTENSIONS = ['.doma.json', '.dtel.json', '.tabl.json', '.stru.json', '.ttyp.json'];
 
-/** DDIC types this CLI can create/pull (Q2: excludes TTYP). */
-export const DDIC_SUPPORTED_TYPES = ['DOMA', 'DTEL', 'TABL', 'STRU'] as const;
-export type DdicSupportedType = (typeof DDIC_SUPPORTED_TYPES)[number];
+/** Re-exported from `types/registry.ts` (T048, US11). */
+export { DDIC_SUPPORTED_TYPES, type DdicSupportedType };
 
 export interface DdicObject {
   name: string;

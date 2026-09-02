@@ -100,7 +100,11 @@ describe('abap create --schema (P0.1 introspection)', () => {
     expect(status).toBe('success');
     expect(data.command).toBe('create');
     expect(data.type).toBeUndefined();
-    expect(data.arguments[0].allowedValues).toEqual(['CLAS', 'INTF', 'PROG', 'FUGR']);
+    expect(data.arguments[0].allowedValues).toEqual([
+      'CLAS', 'INTF', 'PROG', 'FUGR',
+      'TABL', 'STRU', 'DOMA', 'DTEL',
+      'HTTP', 'TRAN',
+    ]);
     expect(data.options.map((o: { name: string }) => o.name)).toEqual(
       expect.arrayContaining(['--package', '--description', '--tr', '--no-activate', '--template', '--no-pull', '--check-only', '--audit']),
     );

@@ -65,3 +65,4 @@
 - 所有新增的 CLI 命令必须注册到 `src/abap_cli/index.ts`。
 - 沿用既有命令模式：`export function register<Name>Command(program: Command)`。
 - `abap/src/` 下的 ABAP 代码遵循 abap-file-format 文件命名约定。
+- 上下文过长的时候 压缩上下文 compression

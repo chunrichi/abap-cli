@@ -1,12 +1,12 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { HTTP_SUPPORTED_TYPES, type HttpSupportedType } from '../../types/registry.js';
 
 // Known HTTP Service object extension.
 export const HTTP_EXTENSIONS = ['.http.json'];
 
-/** HTTP service is the single type this CLI can create/pull via the ICF route. */
-export const HTTP_SUPPORTED_TYPES = ['HTTP'] as const;
-export type HttpSupportedType = (typeof HTTP_SUPPORTED_TYPES)[number];
+/** Re-exported from `types/registry.ts` (T049, US11). */
+export { HTTP_SUPPORTED_TYPES, type HttpSupportedType };
 
 /**
  * Local abap-file-format HTTP representation (snake_case / nested).

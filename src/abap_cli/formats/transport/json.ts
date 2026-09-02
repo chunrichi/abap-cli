@@ -1,12 +1,12 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { TRAN_SUPPORTED_TYPES, type TranSupportedType } from '../../types/registry.js';
 
 // Known Transaction Code object extension (abap-file-format).
 export const TRAN_EXTENSIONS = ['.tran.json'];
 
-/** Transaction (SE93) — the single object type this CLI can create/pull via the ICF route. */
-export const TRAN_SUPPORTED_TYPES = ['TRAN'] as const;
-export type TranSupportedType = (typeof TRAN_SUPPORTED_TYPES)[number];
+/** Re-exported from `types/registry.ts` (T050, US11). */
+export { TRAN_SUPPORTED_TYPES, type TranSupportedType };
 
 // Schema constants — mirror http-v1.json and abap-file-format http layout.
 export const TRAN_CODE_MAX_LENGTH = 20;

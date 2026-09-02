@@ -21,7 +21,6 @@ import { CliError } from '../../output/json.js';
 import { resolveObject } from '../../core/resolve.js';
 import { normalizePullData } from '../../core/path-output.js';
 import { DDIC_SUPPORTED_TYPES } from '../../formats/ddic/json.js';
-import type { DdicSupportedType } from '../../formats/ddic/json.js';
 import type { PullOptions, PullResult } from './pull-shared.js';
 import { pullObject, humanSummary } from './pull-source.js';
 import { runPullDdic, isDdicSupportedType } from './pull-ddic.js';
@@ -88,7 +87,7 @@ export async function runPull(objectName: string, opts: PullOptions): Promise<Pu
   if (typeUpper && isDdicSupportedType(typeUpper)) {
     return runPullDdic(objectName, typeUpper, opts);
   }
-  if (typeUpper && DDIC_SUPPORTED_TYPES.indexOf(typeUpper as DdicSupportedType) === -1) {
+  if (typeUpper && !isDdicSupportedType(typeUpper)) {
     if (/^(DOMA|DTEL|TABL|STRU|TTYP)$/.test(typeUpper)) {
       throw new CliError('DDIC_NOT_SUPPORTED', `Object type ${typeUpper} is not supported in this phase`, {
         type: typeUpper,

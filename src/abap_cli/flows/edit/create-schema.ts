@@ -1,9 +1,8 @@
 import type { CommandSchema } from '../../output/json.js';
-import { DDIC_SUPPORTED_TYPES, getDdicJsonExample, type DdicSupportedType } from '../../formats/ddic/json.js';
-import { HTTP_SUPPORTED_TYPES } from '../../formats/http/json.js';
-import { TRAN_SUPPORTED_TYPES } from '../../formats/transport/json.js';
+import { getDdicJsonExample, type DdicSupportedType } from '../../formats/ddic/json.js';
 import { listTemplates } from '../../formats/templates.js';
-import { TYPE_MAP, DDIC_TYPES, HTTP_TYPES, TRAN_TYPES } from './create-types.js';
+import { isDdicSupportedType, isHttpSupportedType, isTranSupportedType } from './create-types.js';
+import { allSupportedTypes, createObjtypeFor, isSupportedType } from '../../types/registry.js';
 
 /** `create --schema` 的返回类型：在通用 schema 上补充类型维度。 */
 export type CreateCommandSchema = CommandSchema & {
@@ -21,16 +20,19 @@ export type CreateCommandSchema = CommandSchema & {
 /**
  * Machine-readable parameter contract for `abap create --schema [type]` (P0.1).
  * 无 type → 通用 schema（列出支持的类型）；DDIC/未知类型 → supported:false。
+ *
+ * T051 (US11): all 10 supported types come from `types/registry.ts`.
  */
 export function createSchema(type?: string): CreateCommandSchema {
   const t = type?.trim().toUpperCase();
+  const supportedTypes = allSupportedTypes();
   const base: CreateCommandSchema = {
     schemaVersion: 1,
     command: 'create',
     description: 'Create a new ABAP source object (CLAS, INTF, PROG, FUGR) and activate it',
     usage: 'abap create <type> <name> [options]',
     arguments: [
-      { name: 'type', required: true, description: 'Object type', allowedValues: Object.keys(TYPE_MAP) },
+      { name: 'type', required: true, description: 'Object type', allowedValues: supportedTypes },
       { name: 'name', required: true, description: 'Object name' },
     ],
     options: [
@@ -54,7 +56,7 @@ export function createSchema(type?: string): CreateCommandSchema {
   if (!t) return base;
   // Supported DDIC types now report supported:true with the ICF route
   // (TTYP and unknown types stay rejected).
-  if (DDIC_TYPES.has(t)) {
+  if (isDdicSupportedType(t)) {
     return {
       ...base,
       type: t,
@@ -69,7 +71,7 @@ export function createSchema(type?: string): CreateCommandSchema {
     };
   }
   // HTTP service routed via the self-built ICF service.
-  if (HTTP_TYPES.has(t)) {
+  if (isHttpSupportedType(t)) {
     return {
       ...base,
       type: t,
@@ -82,7 +84,7 @@ export function createSchema(type?: string): CreateCommandSchema {
       ],
     };
   }
-  if (TRAN_TYPES.has(t)) {
+  if (isTranSupportedType(t)) {
     return {
       ...base,
       type: t,
@@ -104,13 +106,13 @@ export function createSchema(type?: string): CreateCommandSchema {
       message: `Object type ${t} is a DDIC object; deferred to a later phase (Q2).`,
     };
   }
-  if (!TYPE_MAP[t]) {
+  if (!isSupportedType(t) || !createObjtypeFor(t)) {
     return {
       ...base,
       type: t,
       supported: false,
       reason: 'TYPE_NOT_SUPPORTED',
-      message: `Object type ${t} is not supported. Supported types: ${[...Object.keys(TYPE_MAP), ...DDIC_SUPPORTED_TYPES, ...HTTP_SUPPORTED_TYPES, ...TRAN_SUPPORTED_TYPES].join(', ')}`,
+      message: `Object type ${t} is not supported. Supported types: ${supportedTypes.join(', ')}`,
     };
   }
 

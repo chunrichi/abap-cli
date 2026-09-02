@@ -76,31 +76,35 @@ export function allSupportedTypes(): string[] {
   return TYPE_REGISTRY.map((e) => e.type);
 }
 
-/** DDIC types (TABL/STRU/DOMA/DTEL) subset for convenience. */
-export const DDIC_TYPES: readonly string[] = TYPE_REGISTRY
-  .filter((e) => e.source === 'ICF' && ['TABL', 'STRU', 'DOMA', 'DTEL'].includes(e.type))
-  .map((e) => e.type);
+/** DDIC types (TABL/STRU/DOMA/DTEL) subset — single source of truth (US11, T048). */
+export const DDIC_TYPES = ['DOMA', 'DTEL', 'TABL', 'STRU'] as const;
+/** Legacy name retained for back-compat re-exports. */
+export const DDIC_SUPPORTED_TYPES = DDIC_TYPES;
+export type DdicSupportedType = (typeof DDIC_TYPES)[number];
 
-/** HTTP / TRAN subset for convenience. */
-export const HTTP_TYPES: readonly string[] = TYPE_REGISTRY
-  .filter((e) => e.type === 'HTTP')
-  .map((e) => e.type);
+/** HTTP service (SICF node) subset. */
+export const HTTP_TYPES = ['HTTP'] as const;
+/** Legacy name retained for back-compat re-exports. */
+export const HTTP_SUPPORTED_TYPES = HTTP_TYPES;
+export type HttpSupportedType = (typeof HTTP_TYPES)[number];
 
-export const TRAN_TYPES: readonly string[] = TYPE_REGISTRY
-  .filter((e) => e.type === 'TRAN')
-  .map((e) => e.type);
+/** Transaction code (SE93) subset. */
+export const TRAN_TYPES = ['TRAN'] as const;
+/** Legacy name retained for back-compat re-exports. */
+export const TRAN_SUPPORTED_TYPES = TRAN_TYPES;
+export type TranSupportedType = (typeof TRAN_TYPES)[number];
 
 /** Narrow an arbitrary type string to the supported DDIC types. */
-export function isDdicSupportedType(t: string): boolean {
-  return DDIC_TYPES.includes(t.toUpperCase());
+export function isDdicSupportedType(t: string): t is DdicSupportedType {
+  return (DDIC_TYPES as readonly string[]).includes(t);
 }
 
-/** Narrow an arbitrary type string to the HTTP type. */
-export function isHttpSupportedType(t: string): boolean {
-  return t.toUpperCase() === 'HTTP';
+/** 022: narrow an arbitrary type string to the supported HTTP types. */
+export function isHttpSupportedType(t: string): t is HttpSupportedType {
+  return (HTTP_TYPES as readonly string[]).includes(t);
 }
 
-/** Narrow an arbitrary type string to the Transaction type. */
-export function isTranSupportedType(t: string): boolean {
-  return t.toUpperCase() === 'TRAN';
+/** Narrow an arbitrary type string to the supported Transaction types. */
+export function isTranSupportedType(t: string): t is TranSupportedType {
+  return (TRAN_TYPES as readonly string[]).includes(t);
 }
