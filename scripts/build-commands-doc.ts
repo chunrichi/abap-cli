@@ -76,6 +76,7 @@ async function loadConst(modPath: string, exportName: string): Promise<unknown> 
 const RUN_SCHEMA = await loadConst(commands('run.js'), 'SCHEMA');
 const SELECT_SCHEMA = await loadConst(commands('select.js'), 'SCHEMA');
 const TCODE_SCHEMA = await loadConst(commands('tcode.js'), 'SCHEMA');
+const DUMPS_SCHEMA = await loadConst(commands('dumps.js'), 'DUMPS_SCHEMA');
 
 // ---------- Type narrowers --------------------------------------
 interface SchemaExample {
@@ -125,9 +126,9 @@ interface CommandSchemaDoc {
   notes?: string[];
 }
 
-// Collect all 19 command schemas in a stable display order. The 13 commands
-// in `commandSchemas` are the centralised ones; the remaining 6 keep their
-// SCHEMA const inline (create, run, select, search, tcode, where-used).
+// Collect all 21 command schemas in a stable display order. The 14 commands
+// in `commandSchemas` are the centralised ones; the remaining 7 keep their
+// SCHEMA const inline (create, run, select, search, tcode, where-used, dumps).
 const schemas: CommandSchemaDoc[] = [
   commandSchemas['init']!,
   commandSchemas['pull']!,
@@ -147,6 +148,8 @@ const schemas: CommandSchemaDoc[] = [
   commandSchemas['where-used'] ?? whereUsedCommandSchema,
   commandSchemas['tcode'] ?? TCODE_SCHEMA,
   commandSchemas['extensions']!,
+  commandSchemas['mime']!,
+  commandSchemas['dumps'] ?? DUMPS_SCHEMA,
 ].filter(Boolean) as CommandSchemaDoc[];
 
 // `create --schema` is parameterised on the type arg; surface the general

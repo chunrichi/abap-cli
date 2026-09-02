@@ -13,7 +13,7 @@ import {
   type DumpsResult,
 } from '../flows/core/dumps.js';
 
-const SCHEMA: CommandSchema = {
+export const DUMPS_SCHEMA: CommandSchema = {
   schemaVersion: 1,
   command: 'dumps',
   description: 'List recent ST22 ABAP runtime dumps through the read-only ADT feed.',
@@ -78,7 +78,7 @@ export function registerDumpsCommand(program: Command): void {
     .action(async (opts: DumpsOptions, cmd: Command) => {
       const mode = jsonFromCommand(cmd);
       if (opts.schema) {
-        printSchema(SCHEMA, mode);
+        printSchema(DUMPS_SCHEMA, mode);
         return;
       }
 

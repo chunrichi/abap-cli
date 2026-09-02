@@ -35,7 +35,7 @@ Exit codes (stable contract, only additive across versions): `0` success, `1` un
 
 ## Commands
 
-This generator emits **19** commands in a stable display order. New commands appear automatically once a schema is registered with `commandSchemas` (or a per-command `SCHEMA` constant) — see the generator source for the canonical list.
+This generator emits **21** commands in a stable display order. New commands appear automatically once a schema is registered with `commandSchemas` (or a per-command `SCHEMA` constant) — see the generator source for the canonical list.
 
 ## `abap init` _(local)_
 
@@ -954,6 +954,92 @@ abap extensions list
 | `EXTENSION_VALIDATION_FAILED` | VALIDATION_ERROR / 7 | (see docs/commands.md#error-codes) |
 
 
+## `abap mime` _(sap)_
+
+Create, delete, or upload MIME Repository resources (subcommands: create | delete | push).
+
+```bash
+abap mime create <path> [options]
+abap mime delete <path> [options]
+abap mime push <local> --root <path> [options]
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--schema` | Print the command parameter schema as JSON and exit (no SAP call). (default `false`) |
+
+### Global options
+
+- `--json`
+- `--pretty-json`
+
+### Examples
+
+```bash
+# Create a MIME folder under $TMP
+abap mime create /zntf_ui --package $TMP --yes
+# Recursively delete a folder (with transport)
+abap mime delete /zntf_ui --recursive --tr NDK123456 --yes
+# Upload local assets into an existing folder
+abap mime push ./out --root /zntf_ui/assets --tr NDK123456 --yes
+# Dry-run (no SAP calls)
+abap mime push ./out --root /zntf_ui/assets --dry-run
+```
+
+### Error codes
+
+| Code | Category / exit | Description |
+|------|-----------------|-------------|
+| `INVALID_ARGUMENT` | USAGE / 2 | (see docs/commands.md#error-codes) |
+| `USAGE` | USAGE / 2 | (see docs/commands.md#error-codes) |
+| `SAP_ERROR` | SAP_ERROR / 1 | (see docs/commands.md#error-codes) |
+
+
+## `abap dumps` _(sap)_
+
+List recent ST22 ABAP runtime dumps through the read-only ADT feed.
+
+```bash
+abap dumps [options]
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--limit <n>=<n>` | Maximum number of recent dump summaries to return. The limit is sent to ADT as $top. (default `20`) — min: `1` · max: `100` |
+| `--user <name>=<name>` | Filter to an SAP user. Omit to use the current SAP login user; pass an empty value to query all users. (default `"current SAP login user"`) |
+| `--schema` | Print this schema as JSON and exit 0 without any SAP call. (default `false`) |
+
+### Global options
+
+- `--json`
+- `--pretty-json`
+- `--report-stuck`
+
+### Examples
+
+```bash
+# List the most recent runtime dump summaries
+abap dumps
+# Agent integration: restrict the result to five compact entries
+abap dumps --limit 5 --json
+# Query all users (override default login-user filter)
+abap dumps --user ""
+```
+
+### Error codes
+
+| Code | Category / exit | Description |
+|------|-----------------|-------------|
+| `INVALID_ARGUMENT` | USAGE / 2 | (see docs/commands.md#error-codes) |
+| `CONFIG_ERROR` | CONFIG_ERROR / 2 | (see docs/commands.md#error-codes) |
+| `AUTH_ERROR` | AUTH_ERROR / 5 | (see docs/commands.md#error-codes) |
+| `SAP_ERROR` | SAP_ERROR / 6 | (see docs/commands.md#error-codes) |
+
+
 ## `abap create`
 
 Create a new ABAP source object (CLAS, INTF, PROG, FUGR) and activate it
@@ -1022,9 +1108,9 @@ Generated from the `errors` array of every command schema (single source of trut
 |------|-----------------|---------|
 | `ACTIVATION_FAILED` | VALIDATION_ERROR / 7 | `abap push`, `abap activate` |
 | `AMBIGUOUS_OBJECT` | NOT_FOUND / 8 | `abap search` |
-| `AUTH_ERROR` | AUTH_ERROR / 5 | `abap profile` |
+| `AUTH_ERROR` | AUTH_ERROR / 5 | `abap profile`, `abap dumps` |
 | `CLASS_NOT_RUNNABLE` | VALIDATION_ERROR / 7 | `abap run` |
-| `CONFIG_ERROR` | CONFIG_ERROR / 3 | `abap init`, `abap profile` |
+| `CONFIG_ERROR` | CONFIG_ERROR / 3 | `abap init`, `abap profile`, `abap dumps` |
 | `DDIC_NOT_SUPPORTED` | VALIDATION_ERROR / 7 | `abap pull` |
 | `EXTENSION_LOAD_FAILED` | CONFIG_ERROR / 3 | `abap extensions` |
 | `EXTENSION_VALIDATION_FAILED` | VALIDATION_ERROR / 7 | `abap extensions` |
@@ -1032,7 +1118,7 @@ Generated from the `errors` array of every command schema (single source of trut
 | `FILE_PARSE_ERROR` | USAGE / 2 | `abap push` |
 | `FORCE_BYPASSED` | VALIDATION_ERROR / 7 | `abap extension` |
 | `ICF_CHECK_DEGRADED` | VALIDATION_ERROR / 7 | `abap extension` |
-| `INVALID_ARGUMENT` | USAGE / 2 | `abap init`, `abap pull`, `abap check`, `abap search`, `abap status`, `abap diff`, `abap transport`, `abap profile`, `abap run`, `abap select`, `abap where-used`, `abap tcode` |
+| `INVALID_ARGUMENT` | USAGE / 2 | `abap init`, `abap pull`, `abap check`, `abap search`, `abap status`, `abap diff`, `abap transport`, `abap profile`, `abap run`, `abap select`, `abap where-used`, `abap tcode`, `abap mime`, `abap dumps` |
 | `INVALID_FIELD` | VALIDATION_ERROR / 7 | `abap select` |
 | `INVALID_WHERE` | VALIDATION_ERROR / 7 | `abap select` |
 | `LIMIT_EXCEEDED` | VALIDATION_ERROR / 7 | `abap select` |
@@ -1050,7 +1136,7 @@ Generated from the `errors` array of every command schema (single source of trut
 | `PULL_PARTIAL_FAILURE` | VALIDATION_ERROR / 7 | `abap pull` |
 | `PUSH_FAILED` | VALIDATION_ERROR / 7 | `abap push` |
 | `QUERY_FAILED` | SAP_ERROR / 6 | `abap select` |
-| `SAP_ERROR` | SAP_ERROR / 6 | `abap extension`, `abap profile` |
+| `SAP_ERROR` | SAP_ERROR / 6 | `abap extension`, `abap profile`, `abap mime`, `abap dumps` |
 | `STEAMPUNK_ICF_MANUAL` | VALIDATION_ERROR / 7 | `abap extension` |
 | `SYNTAX_ERROR` | VALIDATION_ERROR / 7 | `abap push`, `abap check` |
 | `TABLE_NOT_FOUND` | NOT_FOUND / 8 | `abap select` |
@@ -1062,7 +1148,7 @@ Generated from the `errors` array of every command schema (single source of trut
 | `TRANSPORT_CREATE_FAILED` | VALIDATION_ERROR / 7 | `abap transport` |
 | `TRANSPORT_NOT_FOUND` | VALIDATION_ERROR / 7 | `abap pull`, `abap transport` |
 | `TYPE_NOT_SUPPORTED` | VALIDATION_ERROR / 7 | `abap pull`, `abap inspect`, `abap where-used` |
-| `USAGE` | USAGE / 2 | `abap init`, `abap inspect`, `abap where-used` |
+| `USAGE` | USAGE / 2 | `abap init`, `abap inspect`, `abap where-used`, `abap mime` |
 | `VALIDATION_ERROR` | VALIDATION_ERROR / 7 | `abap push`, `abap check`, `abap activate`, `abap transport`, `abap doctor` |
 | `WRAPPER_NOT_DEPLOYED` | NOT_FOUND / 8 | `abap run` |
 
