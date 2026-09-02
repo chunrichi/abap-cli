@@ -2,7 +2,7 @@ import * as fs from 'fs/promises';
 import type { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError } from '../../output/json.js';
 import { resolveFile } from '../../formats/file-resolver.js';
-import { readAbapFile } from '../../formats/abap-source.js';
+import { readAbapFile, normalizeLineEndings } from '../../formats/abap-source.js';
 import { resolveLocalTargets } from '../../core/local-targets.js';
 import { resolveObject, getObjectParts } from '../../core/resolve.js';
 import { SEARCH_RESULT_LIMIT } from '../../core/limits.js';
@@ -59,7 +59,8 @@ export async function computeChangedParts(client: AdtClientWrapper, opts: Status
       const remoteContent = await client.getObjectSource(part.sourceUrl);
       const localContent = await readAbapFile(file);
       checked++;
-      if (remoteContent === localContent) {
+      // Compare normalized so CRLF/LF differences alone never mark a part changed.
+      if (normalizeLineEndings(remoteContent) === normalizeLineEndings(localContent)) {
         if (opts.all) {
           parts.push({ object: object.name, part: resolved.subtype, direction: 'unchanged', detail });
         }

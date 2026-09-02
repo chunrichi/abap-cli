@@ -11,11 +11,12 @@ const SAP_OBJECTS = [
   { 'adtcore:name': 'ZREMOTE_ONLY', 'adtcore:type': 'PROG/P', 'adtcore:uri': '/sap/bc/adt/programs/programs/zremote_only' },
 ];
 
-const searchObject = vi.fn(async (query: string, _type?: string, maxResults = 100) => {
+async function defaultSearchObject(query: string, _type?: string, maxResults = 100) {
   const q = (query || '').toUpperCase();
   const matches = SAP_OBJECTS.filter((o) => !q || o['adtcore:name'].includes(q) || q.includes(o['adtcore:name']));
   return matches.slice(0, maxResults);
-});
+}
+const searchObject = vi.fn(defaultSearchObject);
 const objectStructure = vi.fn(async (objectUrl: string) => ({
   objectUrl,
   includes: [
@@ -102,5 +103,22 @@ describe('abap status changedParts (US4..014)', () => {
     expect(res.exitCode).toBeUndefined();
     const data = parseSuccess(res);
     expect(data.changedParts ?? []).toEqual([]);
+  });
+
+  it('CRLF local vs LF remote identical content → unchanged (EOL-insensitive)', async () => {
+    // Restore the default search (a prior test may have overridden it).
+    searchObject.mockImplementation(defaultSearchObject);
+    // Remote ZCL_OK source is LF; store the same lines locally as CRLF.
+    fs.writeFileSync(
+      path.join(cwd, 'src/zcl_ok.clas.abap'),
+      'CLASS zcl_ok DEFINITION PUBLIC.\r\nENDCLASS.\r\nCLASS zcl_ok IMPLEMENTATION.\r\nENDCLASS.\r\n',
+    );
+    const program = makeProgram();
+    registerStatusCommand(program);
+    const res = await runCommand(program, ['status', '--all', '--json'], { cwd });
+    expect(res.exitCode).toBeUndefined();
+    const data = parseSuccess(res);
+    const byObj = Object.fromEntries(data.changedParts.map((p: { object: string; direction: string }) => [p.object, p.direction]));
+    expect(byObj.ZCL_OK).toBe('unchanged');
   });
 });

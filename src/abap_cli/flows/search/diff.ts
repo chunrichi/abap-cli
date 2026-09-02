@@ -3,7 +3,7 @@ import * as path from 'path';
 import type { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError } from '../../output/json.js';
 import { resolveFile } from '../../formats/file-resolver.js';
-import { readAbapFile } from '../../formats/abap-source.js';
+import { readAbapFile, normalizeLineEndings } from '../../formats/abap-source.js';
 import { resolveObject, getObjectParts } from '../../core/resolve.js';
 import { computeChangedParts, type ChangedPart, type ChangeDirection } from './status.js';
 
@@ -45,8 +45,9 @@ const MAX_CHANGED_LINES = 20;
  * collects the first MAX_CHANGED_LINES local line numbers that differ.
  */
 export function lineDiffSummary(local: string, remote: string): DiffSummary {
-  const localLines = local.split('\n');
-  const remoteLines = remote.split('\n');
+  // Normalize both sides first so `\r` never pollutes the line tokens.
+  const localLines = normalizeLineEndings(local).split('\n');
+  const remoteLines = normalizeLineEndings(remote).split('\n');
   const localSet = new Map<string, number>();
   const remoteSet = new Map<string, number>();
   for (const [i, line] of localLines.entries()) localSet.set(line, (localSet.get(line) ?? 0) + 1);
@@ -101,7 +102,8 @@ async function diffSingleFile(client: AdtClientWrapper, file: string): Promise<D
   }
   const remoteContent = await client.getObjectSource(part.sourceUrl);
   const localContent = await readAbapFile(file);
-  if (remoteContent === localContent) {
+  // Compare normalized so CRLF/LF differences alone never report divergence.
+  if (normalizeLineEndings(remoteContent) === normalizeLineEndings(localContent)) {
     return [{ object: object.name, part: resolved.subtype, direction: 'unchanged' }];
   }
   return [
