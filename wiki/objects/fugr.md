@@ -4,7 +4,7 @@ title: FUGR — 函数组（Function Group）
 description: FUGR 对象的多文件布局、include 规则、function module 字段
 tags: [abap-cli, object-type, fugr, abap-file-format, adt, fmodule]
 created at: 2026-09-01 00:00:00
-changed at: 2026-09-01 00:00:00
+changed at: 2026-09-02 22:06:00
 ---
 
 # FUGR — 函数组（Function Group）
@@ -86,9 +86,9 @@ abap push src/fugr/zfg_my_group/ --tr DEVK900001 --json
 ## 已知坑
 
 - **UXX include 在 pull 时被自动跳过写入本地**（spec 要求），但 CLI 仍会读它来解析 `includeNumber`
-- **`fixPointArithmetic`** 是 `fugr-v1.json` required；缺失时本地默认 `false`（见 `commands/pull.md` fixme B）
-- **创建骨架会留 `<name>.fugr.abap`**（多余文件，应是 `sapl<name>.reps.abap`）—— 当前 create 路径的已知遗留
-- **TEXT-POOL 不在 FUGR 内**：FUGR 的 textpool 走 `include` 内嵌，与 PROG/CLAS 分离
+- **`fixPointArithmetic`** 是 `fugr-v1.json` required；mock 等缺该元数据的来源 pull 时默认 `false` 兜底（已实现，commit `185252b`）
+- **create-then-pull 残留已清理**（commit `ad007c8`）：`create FUGR` 走 `pullObject()`，不再写 `<group>.fugr.abap` 单文件；create 后的文件集合与单独 pull 一致
+- **FUGR textpool**：`pull --type FUGR --textpool` 拉 texts（commit `7c336f4`）；selections / headings 通常为空 category，缺失时软警告不失败
 
 # references
 

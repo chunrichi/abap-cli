@@ -4,7 +4,7 @@ title: HTTP — SICF 服务节点（ICF Tree Node）
 description: HTTP 类型的 SICF 节点管理；走 ICF 自建通道
 tags: [abap-cli, object-type, http, sicf, icf, abap-file-format]
 created at: 2026-09-01 00:00:00
-changed at: 2026-09-01 00:00:00
+changed at: 2026-09-02 22:06:00
 ---
 
 # HTTP — SICF 服务节点（ICF Tree Node）
@@ -15,7 +15,7 @@ changed at: 2026-09-01 00:00:00
 
 ## 名称说明
 
-> **类型码是 `HTTP`，不是 `SICF`**。写 `--type SICF` 不会被识别，会被当成 ADT 类型下传，最终报 `OBJECT_NOT_FOUND`（对象不存在），而不是"类型不支持"。这是目前最容易踩的坑。
+> **类型码是 `HTTP`；`SICF` 是已弃用别名**（commit `ad007c8`）。写 `--type SICF` / `create SICF` 会映射到 `HTTP` 并给出 deprecation warning，不再降级为 `OBJECT_NOT_FOUND`。新脚本请直接写 `HTTP`。
 
 ## 本地文件形态
 
@@ -84,7 +84,7 @@ abap push src/http/zmy_service.http.json --tr DEVK900001 --json
 
 ## abap-file-format 合规性
 
-✅ 与 `http-v1.json` 对齐；CLI 接受两种写法。
+✅ 与 `http-v1.json` 对齐；CLI 接受两种写法。wire 已对齐嵌套 abap-file-format 形态（真实 SAP create 曾报 `HTTP_SERVICE_INVALID`，commit `7fd13ec`）；create 骨架含 `name`（同 commit）。
 
 ## 已知坑
 

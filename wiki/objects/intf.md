@@ -4,7 +4,7 @@ title: INTF — ABAP OO 接口
 description: INTF 对象的字段契约、本地文件形态、abap-file-format 合规性
 tags: [abap-cli, object-type, intf, abap-file-format, adt]
 created at: 2026-09-01 00:00:00
-changed at: 2026-09-01 00:00:00
+changed at: 2026-09-02 22:06:00
 ---
 
 # INTF — ABAP OO 接口
@@ -48,7 +48,7 @@ abap push src/intf/zif_my_iface/ --tr DEVK900001 --json
 
 ## 已知坑
 
-- **接口的 `abapLanguageVersion` 不能改**：push 时 CLI 不写该字段（SAP 端默认 `standard`）；如需 cloudDevelopment 需在 GUI 改后 pull
+- **`abapLanguageVersion` 已双向落盘**（commit `fe5d014`）：pull 读 ADT `adtcore:abapLanguageVersion` 写入 `header`，push 时回传；BTP trial 上 `cloudDevelopment` 仍可能被强制为 `standard`（与 CLAS 同）
 
 # references
 

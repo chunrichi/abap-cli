@@ -4,7 +4,7 @@ title: DTEL — 数据元素（Data Element）
 description: DTEL 对象的字段契约、单 JSON 嵌套结构、与 DOMA 的关系
 tags: [abap-cli, object-type, dtel, ddic, icf, abap-file-format, data-element]
 created at: 2026-09-01 00:00:00
-changed at: 2026-09-01 00:00:00
+changed at: 2026-09-02 22:06:00
 ---
 
 # DTEL — 数据元素（Data Element）
@@ -80,10 +80,11 @@ abap push src/dtel/zmy_dtel/ --tr DEVK900001 --json
 
 ## abap-file-format 合规性
 
-✅ 嵌套结构与 `dataelement-v1.json` 对齐。
+✅ 嵌套结构与 `dataelement-v1.json` 对齐；`dataTypeInformation.category` 支持 `domain` / `predefinedType` / `typeRef` 三类别。
 
 ## 已知坑
 
+- **`typeRef` 第三类别（TTYP 引用）**（commit `28235e2`）：本地 `dataTypeInformation: { category: 'typeRef', typeName, referencedTypeName? }` ↔ wire `typeRef: { typeName, referencedTypeName? }`；未知 category（如 `referenceClasIntType`）→ `DTEL_CATEGORY_UNSUPPORTED`（exit 7）
 - **DTEL 的 DOMA 必须先激活**：push DTEL 时如果 `dataElement.domain` 引用的 DOMA 不存在或未激活，SAP 端会拒
 - **`shortText` 是 10 字符限制**：CLI 不校验长度；超长时 SAP 端报 `TEXT_TOO_LONG`
 

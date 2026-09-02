@@ -4,7 +4,7 @@ title: STRU — 结构（Structure）
 description: STRU 对象与 TABL 同构（DDL + main + settings），但无 MANDT 注入；常被用作 type pool / 内部结构
 tags: [abap-cli, object-type, stru, ddic, icf, abap-file-format, structure]
 created at: 2026-09-01 00:00:00
-changed at: 2026-09-01 00:00:00
+changed at: 2026-09-02 22:06:00
 ---
 
 # STRU — 结构（Structure）
@@ -56,7 +56,7 @@ abap push src/stru/zs_my_struct/ --tr DEVK900001 --json
 
 ## abap-file-format 合规性
 
-✅ 与 TABL 同链路；abap-file-format 把 TABL 与 STRU 视为同一 `tabl-v1.json` schema。
+✅ 与 TABL 同链路；abap-file-format 把 TABL 与 STRU 视为同一 `tabl-v1.json` schema。push 与 create 同走三件套探测；STRU 缺 `.settings.json` 不报错（commit `185252b`）。DDL 扩展解析（`.INCLUDE WITH SUFFIX` / 复合 key / foreign key / `@ClientHandling.type`）与 TABL 相同。
 
 ## 已知坑
 

@@ -4,7 +4,7 @@ title: PROG — ABAP 报表程序
 description: PROG 对象的字段契约、4 种 programType、本地文件形态
 tags: [abap-cli, object-type, prog, abap-file-format, adt, textpool]
 created at: 2026-09-01 00:00:00
-changed at: 2026-09-01 00:00:00
+changed at: 2026-09-02 22:06:00
 ---
 
 # PROG — ABAP 报表程序
@@ -49,10 +49,12 @@ textpool 文件仅在 `pull --textpool` 时生成；`.en` 是语言后缀，按 
 | `classPool` | — | 类池（一般通过 CLAS 创建） |
 | `functionPool` | — | 函数池（一般通过 FUGR 创建） |
 | `interfacePool` | — | 接口池（一般通过 INTF 创建） |
-| `includeProgram` | `includeProgram` | INCLUDE 程序 |
+| `I`（raw）/ 缺省（从 `PROG/I` 推断） | `include` | INCLUDE 程序 |
 | `modulePool` | `modulePool` | 模态对话框（屏幕） |
 
 CLI 只 pull/push `executableProgram` 与 `includeProgram`；其他三种应该用对应对象类型创建。
+
+INCLUDE 程序（PROG/I）走独立子路由（commit `624fd3e`）：落盘 `<name>.prog.include.abap`（不混入 `<name>.prog.abap` main 路径），JSON 元数据 `generalInformation.programType: 'include'`。
 
 ## 命令示例
 
@@ -72,7 +74,7 @@ abap pull ZREPORT --textpool --json
 
 ## 已知坑
 
-- **INCLUDE 程序没有 main**：pull 时 main part 为空；只能改 INCLUDE 内引用方
+- **INCLUDE 程序（PROG/I）已分流**（commit `624fd3e`）：pull 落盘 `<name>.prog.include.abap` + JSON `generalInformation.programType: 'include'`；旧版会把 include 内容写进 main 路径
 - **modulePool**：应该用 CLAS 创建对话框类，而不是直接 PROG
 
 # references

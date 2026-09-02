@@ -4,7 +4,7 @@ title: TABL — 透明表（数据库表）
 description: TABL 对象的三件套文件格式（main + ddic + settings）、关键字段、已知坑
 tags: [abap-cli, object-type, tabl, ddic, icf, abap-file-format, transparent-table]
 created at: 2026-09-01 00:00:00
-changed at: 2026-09-01 00:00:00
+changed at: 2026-09-02 22:06:00
 ---
 
 # TABL — 透明表（数据库表）
@@ -72,6 +72,7 @@ define table zmy_table {
 - **`client` / `MANDT`**：CLI 自动剥掉用户声明的 CLIENT/MANDT 字段（防止与 SAP 自动注入冲突），并返回 `CLIENT_FIELD_STRIPPED` 诊断
 - **`key` 关键字**：DDL 源里的 `key` 对应 abap-file-format 的 `keyFlag: true`
 - **`.INCLUDE` / `.INCLU--AP`**：24 版支持；`precField` 字段保存 include 目标结构名
+- **DDL 扩展解析**（commit `185252b`）：`.INCLUDE ... WITH SUFFIX <suffix>` → `field.includeSuffix`；多列复合 key；行内 foreign key 与 `@AbapCatalog.foreignKeys` 块 → `field.foreignKeys[]`；`@ClientHandling.type` → 显式覆盖 `clientDependent`
 
 ## 命令示例
 
@@ -88,7 +89,7 @@ abap push src/tabl/zmy_table/ --tr DEVK900001 --json
 
 ## abap-file-format 合规性
 
-✅ 三件套完全合规；嵌套结构由 CLI 在 `dictionary/ddic-json.ts` 内部做 wire ↔ local 双向映射。
+✅ 三件套完全合规；嵌套结构由 CLI 在 `formats/ddic/json.ts` 内部做 wire ↔ local 双向映射。push 与 create 同走三件套探测（`.tabl.ddic` / `.settings.json`，commit `185252b`）。
 
 ## 已知坑
 
@@ -99,5 +100,5 @@ abap push src/tabl/zmy_table/ --tr DEVK900001 --json
 # references
 
 - abap-file-format TABL 规范：`https://github.com/SAP/abap-file-formats/tree/main/file-formats/tabl`
-- 实现：[`src/abap_cli/dictionary/tabl-artifact.ts`](../../src/abap_cli/dictionary/tabl-artifact.ts)、[`src/abap_cli/dictionary/ddic-json.ts`](../../src/abap_cli/dictionary/ddic-json.ts)
+- 实现：[`src/abap_cli/formats/ddic/tabl-artifact.ts`](../../src/abap_cli/formats/ddic/tabl-artifact.ts)、[`src/abap_cli/formats/ddic/json.ts`](../../src/abap_cli/formats/ddic/json.ts)
 - 类型索引：[`wiki/objects/index.md`](index.md)

@@ -4,7 +4,7 @@ title: CLAS — ABAP OO 类
 description: CLAS 对象的字段契约、本地文件形态、abap-file-format 合规性、已知坑
 tags: [abap-cli, object-type, clas, abap-file-format, adt]
 created at: 2026-09-01 00:00:00
-changed at: 2026-09-01 00:00:00
+changed at: 2026-09-02 22:06:00
 ---
 
 # CLAS — ABAP OO 类
@@ -52,7 +52,7 @@ src/clas/zcl_my_class/
 }
 ```
 
-CLI 当前只把 `description` / `originalLanguage` 双向映射；`abapLanguageVersion` 由 SAP 端补全，pull 时读 `objectStructure.metaData` 写入。
+CLI 双向映射 `description` / `originalLanguage` / `abapLanguageVersion`（commit `fe5d014`）：pull 时从 `objectStructure.metaData['adtcore:abapLanguageVersion']` 读取写入 `header`，push 时回传。
 
 ## 命令示例
 
