@@ -36,6 +36,7 @@
 
 - **`extension deploy` 捆绑源码目录解析回归**（flows/ 拆分后静默 no-op）：`bundledDir` 相对深度少一级（解析到不存在的 `dist/abap/src`），部署永远“空对象成功”、真实 SAP 收不到任何 `abap/src` 更新。改为 `bundledSourceDir()` 向上查找含 `abap/src/clas/zcl_abap_vibe_icf.clas.abap` 的包根（src/ / dist/ / npm 安装布局均适用）；找不到时抛 `CONFIG_ERROR` 而非静默成功。
 - **ICF handler 类源码无法激活（8/29 后未部署暴露）**：`resolve_handler_language_version`（>30 字符方法名）、`get_language_version`（本 release RTTI 无此方法，改 `cl_abap_language_version` 官方 API 并回落 `standard`）、`read_tran_tstc`/`build_tran_payload` 误按 `RETURNING` 调用、TSTCA 错用 `low/high`（实际列 `value`）、TSTC `CINFO` 非法字面量等编译错误全部修正，类可正常激活。
+- **Mock-adt `inactiveobjects` + `discovery` 端点补齐**（mock 与真实 SAP 端点对齐）：`test/mock-adt/server.js` 新增 `GET /sap/bc/adt/activation/inactiveobjects`（按真实 ADT `ioc:inactiveObjects` 形态枚举所有 `inactive:true` 对象）与 `GET /sap/bc/adt/discovery`（Atom service document，含 `/sap/bc/adt/icf/` 与各 ADT collection）。`createObject` POST handler 现在将新建对象标记为 `inactive:true`（匹配真实 SAP 后创建语义），`POST /sap/bc/adt/activation` 成功后翻转为 `false`；激活匹配的源 URL 解析扩展为 `byAnyUrl`（覆盖 method/OSI 部件源 URL，不仅 root objectUrl）。`addObject` 返回新对象供创建路径 mutate。`abap activate` 与 `abap doctor` 在 mock 上不再 404；FUGR/PROG/CLAS 创建后正确出现在 `/inactiveobjects`，`activate` 后被清除。`tests/260902001-all-commands-fugr-e2e/summary.md` 已知限制 L-5 关闭。
 
 ### Tests
 - `test/unit/dumps-feed.test.ts` — 9 cases（`$top`/`$filter` query 构造、请求形态断言、Atom feed 解析、空 feed）。
@@ -43,6 +44,7 @@
 - `test/unit/doma-fixedValues-roundtrip.test.ts` — 5 cases（empty / single / multi-lang / special chars / nested `format.fixedValues`）。
 - `test/unit/type-alias-sicf-http.test.ts` — 5 cases（uppercase / lowercase / subtype suffix / HTTP passthrough / unknown passthrough）。
 - `test/unit/fugr-fixPointArithmetic-default.test.ts` — 3 cases（mock 三态：true / false / 缺字段默认 false）。
+- `test/unit/mock-activate-doctor-parity.test.ts` — 4 cases（discovery endpoint 形态 + Atom 命名空间 + `/sap/bc/adt/icf/` collection；inactiveobjects 空列表 + create 后出现 + activate 后清除；fixture `ZCL_DEMO` 默认 active 不会被误报）。
 - `test/unit/deploy-bundled-source-dir.test.ts` — 2 cases（默认捆绑目录存在且含 ICF handler 源码；`extension deploy` 不再因相对深度错误而静默 no-op）。
 - `test/unit/tabl-ddl-extended.test.ts` — 5 cases（`.INCLUDE WITH SUFFIX` / 复合 key / 行内 foreign key / `@ClientHandling.type` / canonical deliveryClass + inline semantics）。
 - `test/unit/push-ddic.test.ts` — 新增 3 cases（TABL 三件套 push 合并 DDL / STRU 三件套 push 缺 settings 不报错 / 残缺 DDL → `TABL_DDL_INVALID`）。
