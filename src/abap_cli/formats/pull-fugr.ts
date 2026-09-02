@@ -62,7 +62,7 @@ export function fugrStrategy(): PullStrategy {
 
       const struc = await client.objectStructure(object.objectUrl);
       const meta = struc.metaData as unknown as Record<string, unknown>;
-      const abapLanguageVersion = meta['abapsource:abapLanguageVersion'] as string | undefined;
+      const abapLanguageVersion = meta['adtcore:abapLanguageVersion'] as string | undefined;
       // mock and partial fixtures may omit abapsource:fixPointArithmetic; spec US4
       // pins the default to `false` so on-prem consumers always see a boolean.
       const fixPointArithmetic = (meta['abapsource:fixPointArithmetic'] as boolean | undefined) ?? false;
