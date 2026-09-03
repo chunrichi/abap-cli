@@ -1,11 +1,10 @@
 /**
  * AFF canonical JSON schema validator.
  *
- * Loads <type>-v1.json schemas from the local AFF mirror
- * (`tmp/abap-file-formats/file-formats/<type>/<type>-v1.json`),
- * compiles them with ajv v8 (Draft 2020-12 strict), caches the
- * resulting `ValidateFunction`, and exposes per-file validation
- * with structured error reporting.
+ * Loads `<type>-v1.json` schemas (see `src/abap_cli/schema/`) and
+ * compiles them with ajv v8 (Draft 2020-12 strict). The schema root
+ * is resolved by `schema-paths.ts#resolveMirrorRoot` with priority
+ * env → bundled → legacy `tmp/` mirror.
  *
  * Schemas are loaded once, lazily on first use, then cached for
  * the process lifetime (Map<type, ValidateFunction>).
@@ -17,20 +16,9 @@ import { fileURLToPath } from 'url';
 import Ajv2020Import from 'ajv/dist/2020.js';
 import addFormatsImport from 'ajv-formats';
 import { CliError } from '../output/json.js';
-import { schemaPathFor } from './schema-paths.js';
+import { schemaPathFor, resolveMirrorRoot } from './schema-paths.js';
 
-const AFF_MIRROR_ENV = 'ABAP_CLI_AFF_MIRROR';
-
-/** Resolve the AFF mirror root (read-only local clone). */
-function resolveMirrorRoot(): string {
-  if (process.env[AFF_MIRROR_ENV]) return process.env[AFF_MIRROR_ENV]!;
-  // Walk up from this file: src/abap_cli/aff/schema-validator.ts → repo root.
-  const here = path.dirname(fileURLToPath(import.meta.url));
-  const repoRoot = path.resolve(here, '..', '..', '..');
-  return path.join(repoRoot, 'tmp', 'abap-file-formats', 'file-formats');
-}
-
-const MIRROR_ROOT = resolveMirrorRoot();
+const MIRROR_ROOT = resolveMirrorRoot().root;
 
 /**
  * ajv v8 ESM default-import interop: classes live on `.default`.
