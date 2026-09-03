@@ -13,8 +13,7 @@ JSON_FILE="$(mktemp)"
 trap "rm -f $JSON_FILE" EXIT
 
 cd "$ROOT"
-ABAP_CLI_AFF_MIRROR="$ROOT/tmp/abap-file-formats/file-formats" \
-  node "$ROOT/dist/src/abap_cli/index.js" validate:aff --json test/fixtures/ \
+node "$ROOT/dist/src/abap_cli/index.js" validate:aff --json test/fixtures/ \
   > "$JSON_FILE" 2>/dev/null || true
 
 node -e "

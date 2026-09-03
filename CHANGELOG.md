@@ -8,6 +8,7 @@
 
 ### Added
 - **GitHub Actions 自动发布 npm**（`.github/workflows/publish.yml`）：push `v*` tag 或 GitHub Release published 触发；`npm run verify`（build + 全量单测）通过后 `npm publish` 到官方源。走 npm Trusted Publishing（OIDC，免 token secret，需在 npmjs.com 把该 repo/workflow 登记为 trusted publisher；Node 24）。发布前用 `npm view` 探测目标版本，重复触发（tag + Release 同版本）自动跳过，不会重复发布。
+- **AFF schema vendor 进仓库（`src/abap_cli/schema/`）**：把 0.2.4 依赖 `tmp/abap-file-formats/` 的 10 类 schema（11 个 JSON）+ 上游 MIT LICENSE 静态纳入仓库；`schema-paths.ts` 解析优先级改为 env (`ABAP_CLI_AFF_MIRROR`) → bundled → 遗留 `tmp/` 镜像。新增 `scripts/sync-aff-schema.sh [<sha>]` 升级脚本（只复制 `router.ts` 命中的 10 类型 + `tabt-v1.json`，自动重写 README 的上游 SHA 引用），以及 `scripts/copy-bundled-schema.mjs` 在 `npm run build` 末尾把 `src/abap_cli/schema/` 镜像到 `dist/`（确保 dist 与 published npm tarball 都自带 schema，不依赖 clone/postinstall）。CI 不再隐式依赖 `tmp/` 或 `postinstall` 网络克隆。
 
 ## [0.2.4] - 2026-09-03
 
