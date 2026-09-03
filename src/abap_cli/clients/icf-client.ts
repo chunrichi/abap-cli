@@ -4,6 +4,10 @@ import { buildAuth } from '../auth/adapter.js';
 import { CliError } from '../output/json.js';
 import type { ErrorCode } from '../output/error-codes.js';
 import { classifyHttpError } from './http-error.js';
+import { effectivePolicy, isUnsupportedInContext, resolveSessionPolicy } from '../session/policy.js';
+import { loadJarFromDisk, icfCookieHeader } from '../session/reuse.js';
+import { loadOrCreateSessionKey } from '../session/key.js';
+import { registerIcfClient } from '../session/registry.js';
 
 export interface IcfResponse<T = unknown> {
   status: 'success' | 'error';
@@ -18,8 +22,10 @@ export interface IcfResponse<T = unknown> {
 export class IcfClient {
   private http: AxiosInstance;
   private baseUrl: string;
-
-  private constructor(config: ProjectConfig, authOpts: { passwordOrFetcher: string | (() => Promise<string>); options: import('abap-adt-api').ClientOptions }) {
+  /** Cookie header from the session jar when reuse is active (else undefined). */
+  private jarCookie: string | undefined;
+  /** Whether this client attempted a stale-session 401 fallback already. */
+  private fallbackUsed = false;  private constructor(config: ProjectConfig, authOpts: { passwordOrFetcher: string | (() => Promise<string>); options: import('abap-adt-api').ClientOptions }) {
     this.baseUrl = `${config.sap.url}/sap/zabap_vibe`;
 
     // Reuse the SAME artefacts `buildAuth()` produces for ADT — `httpsAgent`
@@ -52,7 +58,28 @@ export class IcfClient {
   static async create(): Promise<IcfClient> {
     const config = await loadConfig();
     const authOpts = await buildAuth(config.sap, config.systemName);
-    return new IcfClient(config, authOpts);
+
+    // Session reuse for ICF: same jar as ADT, so a pull + push pair on the
+    // same profile reuses the SAP session (no new `User Sessions` entry per
+    // push). cloud / btp / always-logout keep the legacy basic-auth path.
+    const policy = effectivePolicy(resolveSessionPolicy(config));
+    if (!isUnsupportedInContext(config) && policy === 'reuse') {
+      const { key } = await loadOrCreateSessionKey(config.sap);
+      const jar = await loadJarFromDisk(config.sap, key);
+      if (jar && jar.cookies.length > 0) {
+        const cookieHeader = icfCookieHeader(jar);
+        if (cookieHeader) {
+          const client = new IcfClient(config, authOpts);
+          client.jarCookie = cookieHeader;
+          client.http.defaults.headers.common['Cookie'] = cookieHeader;
+          registerIcfClient(client);
+          return client;
+        }
+      }
+    }
+    const client = new IcfClient(config, authOpts);
+    registerIcfClient(client);
+    return client;
   }
 
   async get<T>(path: string): Promise<IcfResponse<T>> {
@@ -145,25 +172,63 @@ export class IcfClient {
   private async request<T>(method: 'get' | 'post' | 'put', path: string, body?: unknown): Promise<IcfResponse<T>> {
     let resp: AxiosResponse<IcfResponse<T>>;
     try {
-      if (method === 'get') resp = await this.http.get<IcfResponse<T>>(path);
-      else if (method === 'post') resp = await this.http.post<IcfResponse<T>>(path, body);
-      else resp = await this.http.put<IcfResponse<T>>(path, body);
+      resp = await this.send<T>(method, path, body);
     } catch (error: unknown) {
-      // ICF endpoints return { status:'error', error:{ code, message, ... } } for
-      // validation/not-found failures (HTTP 400/404). Surface the envelope's code
-      // instead of a generic transport error so the flow maps it to the right
-      // exit code (e.g. INVALID_WHERE → 7, TABLE_NOT_FOUND → 8).
-      if (axios.isAxiosError(error)) {
-        const data = error.response?.data as { error?: { code?: string; message?: string; details?: unknown } } | undefined;
-        if (data && typeof data === 'object' && data.error && typeof data.error.code === 'string') {
-          throw new CliError(data.error.code as ErrorCode, data.error.message ?? 'ICF request failed', {
-            details: data.error.details,
-          });
+      // Stale jar cookie (401/403) in reuse mode: drop the Cookie header and
+      // retry once with plain basic-auth before surfacing a transport error.
+      if (
+        this.jarCookie &&
+        !this.fallbackUsed &&
+        axios.isAxiosError(error) &&
+        (error.response?.status === 401 || error.response?.status === 403)
+      ) {
+        this.fallbackUsed = true;
+        delete this.http.defaults.headers.common['Cookie'];
+        try {
+          resp = await this.send<T>(method, path, body);
+        } catch (retryError: unknown) {
+          return this.normalizeError(retryError);
         }
+        return resp.data;
       }
-      throw toHttpError(error);
+      return this.normalizeError(error);
     }
     return resp.data;
+  }
+
+  /** Low-level send used by `request` (single attempt, no cookie fallback). */
+  private async send<T>(method: 'get' | 'post' | 'put', path: string, body?: unknown): Promise<AxiosResponse<IcfResponse<T>>> {
+    if (method === 'get') return this.http.get<IcfResponse<T>>(path);
+    if (method === 'post') return this.http.post<IcfResponse<T>>(path, body);
+    return this.http.put<IcfResponse<T>>(path, body);
+  }
+
+  private normalizeError(error: unknown): never {
+    // ICF endpoints return { status:'error', error:{ code, message, ... } } for
+    // validation/not-found failures (HTTP 400/404). Surface the envelope's code
+    // instead of a generic transport error so the flow maps it to the right
+    // exit code (e.g. INVALID_WHERE → 7, TABLE_NOT_FOUND → 8).
+    if (axios.isAxiosError(error)) {
+      const data = error.response?.data as { error?: { code?: string; message?: string; details?: unknown } } | undefined;
+      if (data && typeof data === 'object' && data.error && typeof data.error.code === 'string') {
+        throw new CliError(data.error.code as ErrorCode, data.error.message ?? 'ICF request failed', {
+          details: data.error.details,
+        });
+      }
+    }
+    throw toHttpError(error);
+  }
+
+  /**
+   * Drop the reused session cookie. Called when the command ends in
+   * `always-logout` mode or on SIGINT/SIGTERM; keeps ICF from pinning a
+   * session the ADT side already logged out. Best-effort.
+   */
+  cleanup(): void {
+    if (this.jarCookie) {
+      delete this.http.defaults.headers.common['Cookie'];
+      this.jarCookie = undefined;
+    }
   }
 }
 

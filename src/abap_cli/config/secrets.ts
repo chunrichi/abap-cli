@@ -21,8 +21,11 @@ const SERVICE = 'abap-cli';
 /** Account suffix for X.509 cert passphrase (kept off the main keychain entry). */
 const CERT_PASSPHRASE_SUFFIX = '.cert-passphrase';
 
+/** 034-session-cookie-reuse: account name for the global session-jar encryption key. */
+export const SESSION_KEYCHAIN_ACCOUNT = 'abap-cli/session-key';
+
 /** Per-account credentials the CLI cares about (kept in sync with keychain account names). */
-export type SecretKind = 'password' | 'cert-passphrase';
+export type SecretKind = 'password' | 'cert-passphrase' | 'session-key';
 
 /**
  * Minimal credential-store contract. Implementations must NOT throw on
@@ -68,7 +71,9 @@ const keytarBackend: SecretsBackend = {
 };
 
 function accountKey(account: string, kind: SecretKind): string {
-  return kind === 'cert-passphrase' ? `${account}${CERT_PASSPHRASE_SUFFIX}` : account;
+  if (kind === 'cert-passphrase') return `${account}${CERT_PASSPHRASE_SUFFIX}`;
+  if (kind === 'session-key') return SESSION_KEYCHAIN_ACCOUNT;
+  return account;
 }
 
 /* ─────────── Public API (unchanged signatures) ─────────── */
@@ -95,6 +100,20 @@ export async function getCertPassphrase(account: string): Promise<string | null>
 
 export async function deleteCertPassphrase(account: string): Promise<boolean> {
   return keytarBackend.delete(account, 'cert-passphrase');
+}
+
+/* 034-session-cookie-reuse: the global 32-byte session-jar encryption key
+ * lives under SESSION_KEYCHAIN_ACCOUNT and is shared across profiles. */
+export async function getSessionKey(): Promise<string | null> {
+  return keytarBackend.get(SESSION_KEYCHAIN_ACCOUNT, 'session-key');
+}
+
+export async function storeSessionKey(base64: string): Promise<void> {
+  await keytarBackend.set(SESSION_KEYCHAIN_ACCOUNT, 'session-key', base64);
+}
+
+export async function deleteSessionKey(): Promise<boolean> {
+  return keytarBackend.delete(SESSION_KEYCHAIN_ACCOUNT, 'session-key');
 }
 
 function keychainError(op: string, error: unknown): never {

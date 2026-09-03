@@ -32,6 +32,7 @@ export const commandSchemas: { [k: string]: CommandSchema } = {
   extensions: extensionsSchema(),
   mime: mimeSchema(),
   'validate:aff': validateAffSchema(),
+  session: sessionSchema(),
 };
 
 /** Single source of the `--schema` option literal — every command schema
@@ -559,6 +560,30 @@ function validateAffSchema(): CommandSchema {
       { code: 'AFF_SCHEMA_MISSING', category: 'NOT_FOUND', exitCode: 2 },
       { code: 'AFF_SCHEMA_INVALID', category: 'NOT_FOUND', exitCode: 2 },
       { code: 'AFF_SCHEMA_COMPILE_ERROR', category: 'NOT_FOUND', exitCode: 2 },
+    ],
+  };
+}
+
+// ---------- session ----------
+function sessionSchema(): CommandSchema {
+  return {
+    schemaVersion: 1,
+    command: 'session',
+    description: 'Inspect the session cookie reuse state for the active profile (no SAP call).',
+    usage: 'abap session info [--profile <name>]',
+    scope: 'local',
+    arguments: [],
+    options: [
+      { name: '--profile', type: 'string', valuePlaceholder: '<name>', description: 'Override the active profile (defaults to .abap.json#system).' },
+      schemaOption(),
+    ],
+    globalOptions: ['--json', '--pretty-json'],
+    examples: [
+      { description: 'Show session jar state for the active profile', command: 'abap session info --json' },
+    ],
+    errors: [
+      { code: 'CONFIG_ERROR', category: 'CONFIG_ERROR', exitCode: 3 },
+      { code: 'SESSION_JAR_DECRYPT_FAILED', category: 'VALIDATION_ERROR', exitCode: 7 },
     ],
   };
 }

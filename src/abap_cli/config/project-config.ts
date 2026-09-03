@@ -21,6 +21,13 @@ export interface SapConfig {
   auth: AuthConfig;
   /** Base directory for whole-workspace scans (`push --all`, `check --all|--changed`, `status`, `diff`); falls back to cwd. */
   sourceDir: string;
+  /** 034: Optional system flavour tag (e.g. 'on-prem', 'cloud', 'btp', 'mock').
+   *  When omitted the CLI treats the profile as on-prem for session reuse
+   *  purposes. */
+  systemType?: 'on-prem' | 'cloud' | 'btp' | 'mock';
+  /** 034: Session policy override at the profile level. Equivalent to
+   *  `.abap.json#sap.sessionPolicy` and overridden by env var. */
+  sessionPolicy?: 'reuse' | 'always-logout' | 'default';
 }
 
 export interface ProjectConfig {
@@ -173,6 +180,8 @@ async function loadFileConfig(configPath: string | null): Promise<LoadedConfig> 
       caPath: profile.ca || '',
       auth: profile.auth,
       sourceDir: workspace.sourceDir || process.cwd(),
+      systemType: profile.systemType,
+      sessionPolicy: profile.sessionPolicy,
     },
     transport: workspace.transport || '',
     package: workspace.package || '',

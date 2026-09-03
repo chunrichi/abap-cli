@@ -190,7 +190,7 @@ async function checkActivation(
     try {
       const [latest, activeSrc] = await Promise.all([
         client.getObjectSource(abs),
-        client.raw.getObjectSource(abs, { version: 'active' }),
+        client.getActiveObjectSource(abs),
       ]);
       active = latest === activeSrc;
     } catch {

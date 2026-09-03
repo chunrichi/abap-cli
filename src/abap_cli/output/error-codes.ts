@@ -92,8 +92,10 @@ export type ErrorCode =
   | 'AFF_SCHEMA_MISSING'        // canonical schema file not found for a type (VALIDATION_ERROR/exit 7)
   | 'AFF_SCHEMA_INVALID'        // canonical schema file present but unparseable (VALIDATION_ERROR/exit 7)
   | 'AFF_SCHEMA_COMPILE_ERROR'  // ajv compile raised (VALIDATION_ERROR/exit 7)
-  | 'AFF_FIXTURE_INVALID'       // a fixture failed schema validation (VALIDATION_ERROR/exit 7)
-  ;
+  | 'AFF_FIXTURE_INVALID'       // a fixture failed schema validation (VALIDATION_ERROR/exit 7)  // 034-session-cookie-reuse
+  | 'SESSION_JAR_DECRYPT_FAILED' // AES-GCM tag mismatch / corrupt blob / wrong system hash (VALIDATION_ERROR)
+  | 'SESSION_INVALID'            // SAP 401/403/440 after cookie inject — caller should re-login (VALIDATION_ERROR)
+  | 'SESSION_REUSE_UNSUPPORTED'  // cloud/BTP system: cookie reuse not applicable (VALIDATION_ERROR)  ;
 
 const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   UNKNOWN: 'UNKNOWN',
@@ -163,6 +165,10 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   AFF_SCHEMA_INVALID: 'VALIDATION_ERROR',
   AFF_SCHEMA_COMPILE_ERROR: 'VALIDATION_ERROR',
   AFF_FIXTURE_INVALID: 'VALIDATION_ERROR',
+  // 034-session-cookie-reuse
+  SESSION_JAR_DECRYPT_FAILED: 'VALIDATION_ERROR',
+  SESSION_INVALID: 'VALIDATION_ERROR',
+  SESSION_REUSE_UNSUPPORTED: 'VALIDATION_ERROR',
 };
 
 export function categoryOf(code: ErrorCode): ErrorCategory {

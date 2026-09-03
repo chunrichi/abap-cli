@@ -5,6 +5,8 @@ import { probeSystem } from '../../clients/probe.js';
 import { assertValidProfile } from '../../config/validation.js';
 import { findWorkspaceConfig } from '../../config/project-config.js';
 import { toOutputPath } from '../../core/path-output.js';
+import { computeSystemHash } from '../../session/jar.js';
+import { isCloudOrBtpProfile } from '../../session/policy.js';
 
 export type DoctorStatus = 'ok' | 'err';
 
@@ -260,6 +262,43 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
         push(
           connection,
           errItem(`conn.${name}`, `Probe of '${name}' failed: ${message}`, `Diagnose per layer: abap profile test ${name}`),
+        );
+      }
+
+      // 034-session-cookie-reuse: per-profile session reuse summary. Always
+      // emitted as `ok` (a warning code is just a string in the detail line)
+      // so the doctor exit code stays 0 — the cloud/BTP advisory is a
+      // heads-up, not a hard failure.
+      const profileRaw = sys.systems[name] as { url?: string; client?: string; username?: string; systemType?: 'on-prem' | 'cloud' | 'btp' | 'mock' } | undefined;
+      const profileLikeSap = {
+        url: profileRaw?.url ?? '',
+        client: profileRaw?.client ?? '',
+        username: profileRaw?.username ?? '',
+        password: '',
+        language: 'EN',
+        insecure: false,
+        caPath: '',
+        auth: { method: 'basic' as const },
+        sourceDir: process.cwd(),
+        systemType: profileRaw?.systemType,
+      };
+      if (isCloudOrBtpProfile(profileLikeSap)) {
+        push(
+          connection,
+          okItem(
+            `session.reuse.${name}`,
+            `[WARN] SESSION_REUSE_UNSUPPORTED — cookie reuse not applicable on cloud/BTP systems; commands will use fresh login per invocation`,
+          ),
+        );
+      } else {
+        const hash = computeSystemHash(profileLikeSap);
+        const jarPath = path.join(os.homedir(), '.abap-cli', 'sessions', `${hash}.json`);
+        push(
+          connection,
+          okItem(
+            `session.reuse.${name}`,
+            verbose ? `cookie jar path: ${jarPath} (encrypted)` : `cookie jar: ${hash}.json (encrypted)`,
+          ),
         );
       }
     }

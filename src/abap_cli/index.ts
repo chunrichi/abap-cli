@@ -11,6 +11,8 @@ import { ExtensionRegistry, setExtensionRegistry } from './extensions/registry.j
 import { setExtensionRegistry as setExtRegJson, CliError, renderError } from './output/json.js';
 import { EXIT_GENERIC_FALLBACK } from './output/exit-codes.js';
 import { loadConfig } from './config/project-config.js';
+import { installSignalHandlers } from './session/signals.js';
+import { runAlwaysLogoutIfNeeded } from './session/end-of-command.js';
 
 // 声明式惰性注册：只有 name + description 在启动时加载，模块体在
 // 命令真正被调用（或请求其 --help）时才 import。
@@ -137,6 +139,12 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
     description: 'Validate JSON files against official abap-file-format (AFF) canonical schemas (Draft 2020-12)',
     load: () => import('./commands/validate-aff.js').then((m) => ({ register: m.registerValidateAffCommand })),
   },
+  {
+    // 034: session reuse inspector — read-only, no SAP traffic.
+    name: 'session',
+    description: 'Inspect / manage session cookie reuse state',
+    load: () => import('./commands/session.js').then((m) => ({ register: m.registerSessionCommand })),
+  },
 ];
 
 const require = createRequire(import.meta.url);
@@ -233,7 +241,14 @@ program.hook('postAction', async (_thisCmd, actionCmd) => {
     argv,
     ts: Date.now(),
   });
+  // 034: release SAP sessions at command end when the policy demands it
+  // (`always-logout`). The default `reuse` policy intentionally keeps the
+  // session alive so the next CLI process can reuse it.
+  await runAlwaysLogoutIfNeeded(config);
 });
+
+// 034: SIGINT/SIGTERM best-effort release of any live SAP session.
+installSignalHandlers();
 
 try {
   // parseAsync: lazy commands dispatch through an async _parseCommand,

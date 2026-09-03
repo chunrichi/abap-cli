@@ -58,6 +58,11 @@ changed at: 2026-09-03 17:00:00
 - [select](select.md) — 表数据只读查询（SE16N 等价）
 - [dumps](dumps.md) — 近期 ST22 ABAP runtime dump 摘要（只读，走 ADT Atom feed）
 
+## 会话管理
+
+- [session](session.md) — 查看 session cookie 复用状态（jar 路径 / 上次登录 / cookie / CSRF；只读，不联网）；`.abap.json#sap.sessionPolicy` 控制复用 vs 每条命令 logout
+
+
 ## 跨命令契约
 
 - [path-output](path-output.md) — `--json` 输出路径统一 POSIX（`/`），Windows / Linux / macOS Agent 消费到同一结构；边界 helper `toOutputPath` / `toOutputJoin` / `normalizePullData`

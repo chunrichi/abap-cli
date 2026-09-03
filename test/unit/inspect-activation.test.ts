@@ -80,6 +80,14 @@ const raw = {
     return '';
   }),
 };
+// inspect-ops reads the active version through the wrapper method (routed via
+// `_call`) rather than reaching into `raw`.
+const getActiveObjectSource = vi.fn(async (uri: string) => {
+  if (uri.includes('locals_def')) return ACTIVE_DEF;
+  if (uri.includes('locals_imp')) return ACTIVE_IMP;
+  if (uri.endsWith('main')) return ACTIVE_MAIN;
+  return '';
+});
 
 vi.mock('../../src/abap_cli/clients/adt-client.js', () => ({
   AdtClientWrapper: {
@@ -87,6 +95,7 @@ vi.mock('../../src/abap_cli/clients/adt-client.js', () => ({
       searchObject,
       objectStructure,
       getObjectSource,
+      getActiveObjectSource,
       raw,
       lock: vi.fn(),
     }),
@@ -111,8 +120,7 @@ describe('inspect --activation (#4)', () => {
   });
 
   it('ok=false when implementations part is stale (active != latest)', async () => {
-    raw.getObjectSource.mockImplementation(async (uri: string, opts?: { version?: string }) => {
-      if (opts?.version !== 'active') throw new Error('expected active version');
+    getActiveObjectSource.mockImplementation(async (uri: string) => {
       if (uri.includes('locals_imp')) return 'CLASS zcl_x IMPLEMENTATION.\n  STALE.\nENDCLASS.';
       if (uri.includes('locals_def')) return ACTIVE_DEF;
       if (uri.endsWith('main')) return ACTIVE_MAIN;
@@ -134,8 +142,7 @@ describe('inspect --activation (#4)', () => {
     // the user must not act on `main.active: false`. Surface a per-part note.
     // Reset the active-source mock so the prior test's stale-active state does
     // not leak into this one.
-    raw.getObjectSource.mockImplementation(async (uri: string, opts?: { version?: string }) => {
-      if (opts?.version !== 'active') throw new Error('expected active version');
+    getActiveObjectSource.mockImplementation(async (uri: string) => {
       if (uri.includes('locals_def')) return ACTIVE_DEF;
       if (uri.includes('locals_imp')) return ACTIVE_IMP;
       if (uri.endsWith('main')) return ACTIVE_MAIN;
