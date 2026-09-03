@@ -18,15 +18,17 @@ describe('schema-compliance / doma (T033-020)', () => {
     });
   }
 
-  it('a DOMA without outputCharacteristics fails', async () => {
+  it('a DOMA missing required `format` fails', async () => {
+    // AFF doma-v1.json requires formatVersion + header + format.
+    // `outputCharacteristics` is optional. Drop `format` to exercise the gate.
     const doc = {
       formatVersion: '1',
-      header: { description: 'no output', originalLanguage: 'EN' },
-      format: { dataType: 'CHAR', length: 3 },
+      header: { description: 'no format block', originalLanguage: 'EN' },
+      outputCharacteristics: { length: 3 },
     };
     const r = await validateAff('DOMA', doc);
     expect(r.status).toBe('fail');
-    expect(r.errors.some((e) => e.keyword === 'required' && e.message.includes('outputCharacteristics'))).toBe(true);
+    expect(r.errors.some((e) => e.keyword === 'required' && e.message.includes('format'))).toBe(true);
   });
 
   it('DOMA wire carries `format.{dataType,length}` (nested) and `outputCharacteristics.{style,length,conversionRoutine}`', async () => {

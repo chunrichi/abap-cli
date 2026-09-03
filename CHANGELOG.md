@@ -7,7 +7,49 @@
 ## [Unreleased]
 
 ### Added
-- **`specs/032-aff-by-type-gap-fix/`**：spec kit 全流程立项 — `spec.md` (13 User Story / 35 FR / 12 SC) + `plan.md` (5 Phase) + `tasks.md` (66 T 编号)；治理 10 类已支持对象的 abap-file-format 合规性与本地文件处理 gap（spec 024 follow-up + memory B/D 沉淀 + `wiki/object-types.md` todo）。
+- **`specs/033-aff-canonical-validator/`**：spec kit 立项（spec.md + plan.md + tasks.md 75 tasks）；引入官方 abap-file-format JSON Schema（Draft 2020-12）作为 10 类对象 canonical JSON 形态的合规判定唯一来源，落地 `ajv@^8` + 本地镜像 `tmp/abap-file-formats/file-formats/<type>/<type>-v1.json` 装载层（STRU → `tabl-v1.json` 别名；TABL/STRU `.settings.json` → `tabt-v1.json`）。10 类 × 22 fixture + `test/unit/schema-compliance/<type>.test.ts` 套件；fixture 可重 pull 后直接落入 schema-validated 形态。
+- **`npm run validate:aff`** CLI 命令：`<file-or-dir>` + `--wire <wire-dir>` + `--json` + `--schema`；路由 `<name>.<type>.json` → `<type>-v1.json` schema（STRU 走别名）；TABL/STRU/CLAS/FUGR companion 完整性探测；`--json` 模式输出 `{summary: {pass, warn, fail}, files[]}` 信封；退出码 PASS=0 / FAIL=1 / system=2。schema 启动装载 <500ms（10 schema ajv v8 编译 + `Map<type, ValidateFunction>` 缓存）。
+- **`src/abap_cli/aff/`** 校验层：`schema-validator.ts`（`loadSchema` / `validateAff` / `validateFile` / `formatLine`，Draft 2020-12 strict + `enumTitles` 等 vocab keyword 静默忽略）、`router.ts`（10 类型 + STRU + FUGR/CLAS companion 文件名前缀路由）、`schema-paths.ts`（`SCHEMA_FILE` / `SCHEMA_DIR` 表 + `schemaPathFor(type, mirrorRoot?, schemaFileOverride?)`，新增 `TABT` 类型指向 `tabt-v1.json`）、`companion-check.ts`（TABL `.tabl.settings.json`/`ddic` 配对探测；STRU settings optional；CLAS 4 个 .abap part 必需；TABL/STRU settings.json 文件本身不触发自身 companion 检查避免递归误报）。
+- **`src/abap_cli/types/registry.ts#affSchemaPath?`** + `schemaPathFor(type)` 导出：每类型声明其上游 schema 文件路径，STRU 显式覆盖 `tabl-v1.json`。
+- **`src/abap_cli/deployment/index.ts`** 占位：注释明确「reserved for future transport/package → deployment context migration；no implementation」（FR-008）。
+- **DOMA canonical fixture reshape**（`test/fixtures/doma/`）：5 fixture × 嵌套 AFF 形态（`format.{dataType, length}` + `outputCharacteristics.{length/style}` + `fixedValues[]` plain-string description + `header.{description, originalLanguage}`）；覆盖无 fixed / 单条 fixed / 多语言 / signFlag `style: 'signRight'` / convExit `conversionRoutine: 'ALPHA'` 5 种形态。
+- **DTEL canonical fixture reshape**（`test/fixtures/dtel/`）：3 fixture × 嵌套 AFF 形态（`dataTypeInformation.{category, typeName, predefinedType?}`）；覆盖 `domain`（引用 ZDM_DOM）/ `predefinedType`（CHAR 10）/ `referenceDictionaryType`（TTYP 引用）3 种 category。
+- **TABL 三件套 canonical fixture**（`test/fixtures/tabl/`）：5 fixture × 三件套（`<name>.tabl.json` + `<name>.tabl.ddic` + `<name>.tabl.settings.json`）；覆盖 basic / KEY 复合 / `.INCLUDE` / `@AbapCatalog.foreignKeys` / `@ClientHandling.type` 5 种 DDL 形态。settings.json 走 `tabt-v1.json` schema 校验。
+- **STRU 三件套 canonical fixture**（`test/fixtures/stru/`）：2 fixture × 三件套（共享 `tabl-v1.json` + `tabt-v1.json`）；settings.json optional 验证（`zmy_stru_no_settings.stru.json` + `.ddic` 缺 settings.json 不报错，optional companion 仅 WARN）。
+- **DTEL `dataTypeInformation` 全 5 个 AFF category 支持**：wire ↔ local 在 `domain` / `predefinedType` / `referenceToPredefinedType` / `referenceDictionaryType` / `referenceClasIntType` 之间 round-trip；AFF schema 不允许 `referencedTypeName` 字段于 `dataTypeInformation`（`additionalProperties: false`），wire 仍携带为回-compat 影子字段。032 旧别名 `typeRef` 在 local 入口映射为 AFF canonical `referenceDictionaryType`，wire 入口保留 `typeRef` 接收（避免硬 break）。
+- **`formatVersion` / `header` / `generalInformation` 全 DDIC 透传**：`localToWire` 在 DOMA / DTEL / TABL / STRU 各类下都把 `header.{description, originalLanguage, abapLanguageVersion?}` 前向到 wire；TABL 三件套产物 `generalInformation.{deliveryClass, dataClassCategory, sizeCategory, clientDependent, ...}` 从 `tabl-artifact.ts` 拼装后落 wire 嵌套（不再是 flat top-level `deliveryClass` / `dataClass` / `clientDependent`）。
+
+### Changed
+- **Wire 契约切换（014 flat → AFF nested）**：CLI `src/abap_cli/formats/ddic/json.ts#wireToLocal` / `localToWire` 整体改为 AFF 嵌套形态（DOMA `format.{dataType, length, decimals, signFlag, lowercase, convExit}` / DTEL `dataTypeInformation.{category, typeName, ...}` / TABL/STRU `header.* + generalInformation.* + fields[]`）。`flat top-level dataType / length / signFlag / domain / deliveryClass / clientDependent` 形态已删（local 入口仍接受 legacy014 flat JSON 以支持既有脚本；wire 输出统一 nested）。
+- **`validateDdicObject` 校验更新**：DOMA 必填 `format.dataType` + `format.length`（同时接受 legacy flat `dataType` + `length` 为 back-compat shim）；DTEL 必填 `dataTypeInformation.{category, typeName?}` 或 legacy flat `domain` / `dataType`；TABL/STRU 三件套检查沿用既有 `fields[]` 规则。
+- **DOMA `fixedValues[].description` 平铺与多语言并存**：AFF canonical 是 plain string description（与上游 `z_aff_example.doma.json` 一致）；wire 仍兼容 032 `fixedValueLong.{languageIndependent, languageDependent[]}` 多语言形态。`localToWire` 检测 plain string 直接放 `wire.fixedValues[i].description`，检测 object form 走 `fixedValueLong`；`wireToLocal` 反向。
+- **`<name>.tabl.settings.json` / `<name>.stru.settings.json` 走 `tabt-v1.json`**：router 注册 `*.tabl.settings.json` / `*.stru.settings.json` → `tabt-v1.json` schema 上游路径；`schema-validator.ts` 接受 `schemaFileOverride` 参数，缓存 key 拆分为 `schemaFileOverride ?? type` 以避免 STRU/TABL 共享冲突。
+
+### Removed (breaking)
+- **Wire flat top-level 字段全删**：DOMA `wire.signFlag` / `wire.lowercase` / `wire.convExit` / `wire.dataType` / `wire.length` 等 flat 字段不再出现（必须走 `wire.format.*`）；DTEL `wire.typeRef`（旧 032 独立字段）已合入 `wire.dataTypeInformation.*`；TABL `wire.deliveryClass` / `wire.dataClass` / `wire.sizeCategory` / `wire.clientDependent` 已合入 `wire.generalInformation.*`。迁移：重 pull 现有对象即可（CLI 在 flat local JSON → nested wire 时仍兼容）。
+- **`<group>.fugr.abap` 残留**：032 已记，033 进一步在 `validate-aff --schema` 输出与 `CHANGELOG` 复述。
+- **`SICF` 独立类型码**：032 已记，033 在 `validate:aff --json` 信封不再列 `SICF`（已并入 `HTTP`）。
+
+### Fixed
+- **DOMA `outputCharacteristics` 不再误为 required**：之前 schema-compliance 单测误以为 `outputCharacteristics` 是必填字段（实际 AFF doma-v1.json 仅要求 `formatVersion` / `header` / `format`）；修正后单测改校验 `format` 缺失（真正必填），`outputCharacteristics` 作为 optional 字段处理。
+- **TABL/STRU 三件套中 settings.json 自我递归 companion 误报**：`companion-check.ts` 检测文件本身就是 `*.tabl.settings.json` 时直接返回 `{missing:[], optional:[], severity:'ok'}`，不再尝试探测 `*.tabl.settings.settings.json` 等不存在文件。
+- **DTEL `dataTypeInformation.additionalProperties: false` 误判**：032 旧 `wire.typeRef` 字段曾被本地 wire 形状携带，033 改回 `wire.dataTypeInformation.{category, typeName, ...}` 嵌套；schema 校验路径不再触发 `additionalProperties` 误报。
+
+### Tests
+- `test/unit/schema-validator.test.ts` — 8 cases（`loadSchema` 缓存命中 / 未知 type 抛错 / 5 类 AFF fixture schema pass / missing formatVersion fail / 额外字段检测 / `validateFile` 读盘 / `formatLine` 三形态）。
+- `test/unit/aff-router.test.ts` — 10 类型 + STRU + PROG/HTTP + FUGR/CLAS companion 路由全覆盖。
+- `test/unit/schema-compliance/{clas,intf,tran,doma,dtel,tabl,stru}.test.ts` — 7 文件 40 cases（10 fixture / 5 fixture / 1 fixture / 5 fixture + wire round-trip + unknown-category / 3 fixture + round-trip / 5 fixture × 三件套 / 2 fixture）。
+- `test/unit/wire-aff-roundtrip.test.ts` — 6 cases（DOMA/DTEL/TABL/STRU/HTTP wire ↔ local round-trip byte-equivalence；DTEL unknown category 抛 `DTEL_CATEGORY_UNSUPPORTED`）。
+- `test/unit/dtel-typeRef.test.ts` — 重写为 AFF canonical（10 cases：5 AFF categories wire ↔ local / 032 legacy `typeRef` alias 映射 `referenceDictionaryType` / round-trip / 未知 category 抛错）。
+- `test/unit/doma-format-flags.test.ts` — 重写为 AFF nested wire（10 cases：wire `format.signFlag/lowercase/convExit` → local 同构；local `format.*` → wire 同构；QUAN/CHAR/lowercase 三种典型组合 round-trip）。
+- `test/unit/ddic-json-map.test.ts` — 更新 wire flat shape 断言为 AFF nested（DOMA 嵌套 `format.*` / DTEL `dataTypeInformation.*` / TABL `generalInformation.*`）。
+- `test/unit/ddic-create.test.ts` — 更新 `writeTableJson` 与 5 处 `clientDependent` 断言为 AFF 嵌套 `generalInformation.clientDependent`；3 处 wire 断言改 `generalInformation` nested objectContaining。
+- `test/unit/ddic-pull.test.ts` — 更新 mock wire（`format.*`）与断言（`parsed.format`）。
+- `test/unit/push-ddic.test.ts` — 更新 `writeTableJson` 与三件套 / 简单 push 断言为 `generalInformation.*`。
+- `test/unit/envelope-schema.test.ts` — 新增 `validate:aff --schema` 覆盖（52 cases 全绿）；`validate:aff [file-or-dir]` 参数改为 optional（兼容 `--schema` 单独调用）。
+
+### Specs/Plan/Tasks
+- **`specs/032-aff-by-type-gap-fix/`**：spec kit 全流程立项 — `spec.md` (13 User Story / 35 FR / 12 SC) + `plan.md` (5 Phase) + `tasks.md` (66 T 编号)；治理 10 类已支持对象的 abap-file-format 合规性与本地文件处理 gap（spec 024 follow-up + memory B/D 沉淀 + `wiki/object-types.md` todo）。 — `spec.md` (13 User Story / 35 FR / 12 SC) + `plan.md` (5 Phase) + `tasks.md` (66 T 编号)；治理 10 类已支持对象的 abap-file-format 合规性与本地文件处理 gap（spec 024 follow-up + memory B/D 沉淀 + `wiki/object-types.md` todo）。
 - **`src/abap_cli/types/registry.ts`**：单一类型注册表，统一三份既有分裂表（`formats/type-folder.ts#TYPE_FOLDER` + `flows/create-types.ts#TYPE_MAP` + `formats/{ddic,http,transport}/json.ts` 的 `*_SUPPORTED_TYPES`）。新增类型仅改 `registry.ts` 一行即可让 9 个 CLI 命令与 schema 自动识别。
 - **`src/abap_cli/cli/type-alias.ts`**：`normalizeTypeInput()` 处理 CLI 输入归一化。当前唯一别名 `SICF` → `HTTP`，返回 `aliasWarning` 字符串供 `meta.warnings[]` 承载。
 - **`abapLanguageVersion` 全类型落盘**：`header.abapLanguageVersion` 从 ADT `objectStructure.metaData['adtcore:abapLanguageVersion']`（root attr）读取；10 类对象 pull 端均写 `<name>.<type>.json#header`；FUGR 三件 JSON（`fugr.json` / `sapl*.reps.json` / `*.func.json`）均含该字段。cloud 系统推送不再因缺字段失败。

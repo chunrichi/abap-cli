@@ -24,9 +24,11 @@
 
 import * as path from 'node:path';
 
-/** Tuple of (suffix, type). Order matters — longer suffixes first to avoid
- *  ambiguous matches when a filename contains multiple dots. */
-const SUFFIX_RULES: ReadonlyArray<{ suffix: string; type: string }> = [
+/** Tuple of (suffix, type, schemaFile?). Order matters — longer suffixes first
+ *  to avoid ambiguous matches when a filename contains multiple dots.
+ *  `schemaFile` overrides the default schema filename for that type (used for
+ *  TABL/STRU `settings.json` which upstream validates with `tabt-v1.json`). */
+const SUFFIX_RULES: ReadonlyArray<{ suffix: string; type: string; schemaFile?: string }> = [
   { suffix: '.clas.json', type: 'CLAS' },
   { suffix: '.clas.definitions.abap', type: 'CLAS' },
   { suffix: '.clas.implementations.abap', type: 'CLAS' },
@@ -44,11 +46,15 @@ const SUFFIX_RULES: ReadonlyArray<{ suffix: string; type: string }> = [
   { suffix: '.reps.abap', type: 'FUGR' },
   { suffix: '.func.json', type: 'FUGR' },
   { suffix: '.func.abap', type: 'FUGR' },
-  { suffix: '.tabl.json', type: 'TABL' },
-  { suffix: '.tabl.settings.json', type: 'TABL' },
+  // TABL three-piece layout: main JSON + DDL source + technical-settings JSON.
+  // `.tabl.settings.json` is validated against `tabt-v1.json` (technical table
+  // settings), not `tabl-v1.json` (which only declares formatVersion + header).
+  { suffix: '.tabl.json', type: 'TABL', schemaFile: 'tabl-v1.json' },
+  { suffix: '.tabl.settings.json', type: 'TABL', schemaFile: 'tabt-v1.json' },
   { suffix: '.tabl.ddic', type: 'TABL' },
-  { suffix: '.stru.json', type: 'STRU' },
-  { suffix: '.stru.settings.json', type: 'STRU' },
+  // STRU three-piece layout: same split as TABL; schema alias via tabl-v1.json.
+  { suffix: '.stru.json', type: 'STRU', schemaFile: 'tabl-v1.json' },
+  { suffix: '.stru.settings.json', type: 'STRU', schemaFile: 'tabt-v1.json' },
   { suffix: '.stru.ddic', type: 'STRU' },
   { suffix: '.doma.json', type: 'DOMA' },
   { suffix: '.dtel.json', type: 'DTEL' },
@@ -75,12 +81,12 @@ export function routeAffSchema(filePath: string): RouteResult | undefined {
   const base = path.basename(filePath);
   if (!base) return undefined;
   // Try longest-suffix first: SUFFIX_RULES already sorted that way.
-  for (const { suffix, type } of SUFFIX_RULES) {
+  for (const { suffix, type, schemaFile } of SUFFIX_RULES) {
     if (base.endsWith(suffix)) {
       return {
         type,
         isJson: base.endsWith(JSON_SUFFIX),
-        schemaFile: schemaFileFor(type),
+        schemaFile: schemaFile ?? schemaFileFor(type),
       };
     }
   }

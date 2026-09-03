@@ -45,15 +45,18 @@ beforeEach(() => {
 });
 
 function writeTableJson(pkg = 'ZPKG', extra: Record<string, unknown> = {}) {
+  // 033: AFF canonical — settings under generalInformation.*.
   const json = {
     formatVersion: '1',
     header: { description: 'Test table', originalLanguage: 'EN' },
     name: 'ZTAB_TEST',
     package: pkg,
-    deliveryClass: 'A',
-    dataClass: 'APPL0',
-    sizeCategory: '0',
-    clientDependent: false,
+    generalInformation: {
+      deliveryClass: 'A',
+      dataClassCategory: 'APPL0',
+      sizeCategory: '0',
+      clientDependent: false,
+    },
     fields: [{ fieldName: 'FIELD1', dataType: 'CHAR', length: 20, keyFlag: true }],
     ...extra,
   };
@@ -70,7 +73,7 @@ describe('014 abap push DDIC (.json via ICF)', () => {
     expect(icfPostDdic).toHaveBeenCalledWith('tabl', expect.objectContaining({
       name: 'ZTAB_TEST',
       transportRequest: 'TRN001',
-      deliveryClass: 'A',
+      generalInformation: expect.objectContaining({ deliveryClass: 'A' }),
       fields: expect.arrayContaining([
         expect.objectContaining({ fieldName: 'FIELD1', dataType: 'CHAR', length: 20, keyFlag: true }),
       ]),
@@ -157,7 +160,8 @@ describe('014 abap push DDIC (.json via ICF)', () => {
       name: 'ZTAB_3PC',
       transportRequest: 'TRN001',
       // readTablArtifact strips CLIENT/MANDT for client-dependent TABLs.
-      clientDependent: true,
+      // 033: clientDependent lives under generalInformation.* (AFF canonical).
+      generalInformation: expect.objectContaining({ clientDependent: true }),
       fields: expect.arrayContaining([
         expect.objectContaining({ fieldName: 'COUNTRY', dataType: 'CHAR', length: 3, checkTable: 'T005' }),
       ]),

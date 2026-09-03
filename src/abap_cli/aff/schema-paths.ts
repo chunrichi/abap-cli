@@ -22,6 +22,9 @@ const SCHEMA_FILE: Record<string, string> = {
   // physically lives under `tabl/tabl-v1.json`, so we also remap the
   // directory to `tabl`.
   STRU: 'tabl-v1.json',
+  // TABL/STRU `settings.json` companion files use the technical-settings
+  // schema (the main `tabl-v1.json` only declares formatVersion + header).
+  TABT: 'tabt-v1.json',
   DOMA: 'doma-v1.json',
   DTEL: 'dtel-v1.json',
   HTTP: 'http-v1.json',
@@ -29,7 +32,8 @@ const SCHEMA_FILE: Record<string, string> = {
 };
 
 /** Mapping of canonical abap-cli type codes → AFF mirror directory (lowercase).
- *  STRU reuses TABL's directory because there is no `stru/` folder on disk. */
+ *  STRU reuses TABL's directory because there is no `stru/` folder on disk.
+ *  TABT (technical settings) also lives under `tabl/`. */
 const SCHEMA_DIR: Record<string, string> = {
   CLAS: 'clas',
   INTF: 'intf',
@@ -37,6 +41,7 @@ const SCHEMA_DIR: Record<string, string> = {
   FUGR: 'fugr',
   TABL: 'tabl',
   STRU: 'tabl',
+  TABT: 'tabl',
   DOMA: 'doma',
   DTEL: 'dtel',
   HTTP: 'http',
@@ -56,12 +61,22 @@ function defaultMirrorRoot(): string {
  * Resolve the absolute path of the AFF schema for a given type.
  * @param type Canonical abap-cli type code (uppercase).
  * @param mirrorRoot Optional explicit mirror root (tests only).
+ * @param schemaFileOverride Optional explicit schema filename (used for
+ *   TABL/STRU `.settings.json` → `tabt-v1.json`). When set, the type's
+ *   default file is ignored but the directory mapping is still honored.
  */
-export function schemaPathFor(type: string, mirrorRoot?: string): string {
+export function schemaPathFor(
+  type: string,
+  mirrorRoot?: string,
+  schemaFileOverride?: string,
+): string {
   const key = type.toUpperCase();
-  const file = SCHEMA_FILE[key];
   const dir = SCHEMA_DIR[key];
-  if (!file || !dir) {
+  if (!dir) {
+    throw new Error(`No AFF schema directory registered for type "${type}"`);
+  }
+  const file = schemaFileOverride ?? SCHEMA_FILE[key];
+  if (!file) {
     throw new Error(`No AFF schema mapping registered for type "${type}"`);
   }
   const root = mirrorRoot ?? defaultMirrorRoot();

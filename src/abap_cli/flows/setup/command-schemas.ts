@@ -31,6 +31,7 @@ export const commandSchemas: { [k: string]: CommandSchema } = {
   diff: diffSchema(),
   extensions: extensionsSchema(),
   mime: mimeSchema(),
+  'validate:aff': validateAffSchema(),
 };
 
 /** Single source of the `--schema` option literal — every command schema
@@ -531,6 +532,33 @@ function mimeSchema(): CommandSchema {
       { code: 'INVALID_ARGUMENT', category: 'USAGE', exitCode: 2 },
       { code: 'USAGE', category: 'USAGE', exitCode: 2 },
       { code: 'SAP_ERROR', category: 'SAP_ERROR', exitCode: 1 },
+    ],
+  };
+}
+
+// ---------- validate:aff ----------
+function validateAffSchema(): CommandSchema {
+  return {
+    schemaVersion: 1,
+    command: 'validate:aff',
+    description: 'Validate JSON files against official abap-file-format (AFF) canonical schemas (Draft 2020-12).',
+    usage: 'abap validate:aff <file-or-dir> [--wire <wire-dir>]',
+    scope: 'local',
+    arguments: [{ name: 'file-or-dir', type: 'string', required: true, description: 'A JSON file or directory of JSON files to validate.' }],
+    options: [
+      { name: '--wire', type: 'string', valuePlaceholder: '<wire-dir>', description: 'Also recursively validate every JSON under a wire directory.' },
+      schemaOption(),
+    ],
+    globalOptions: ['--json', '--pretty-json'],
+    examples: [
+      { description: 'Validate a single fixture', command: 'abap validate:aff test/fixtures/tabl/zmy_basic.tabl.json' },
+      { description: 'Validate all fixtures', command: 'abap validate:aff test/fixtures/' },
+      { description: 'Validate a wire payload directory', command: 'abap validate:aff --wire tmp/s4h/wire/' },
+    ],
+    errors: [
+      { code: 'AFF_SCHEMA_MISSING', category: 'NOT_FOUND', exitCode: 2 },
+      { code: 'AFF_SCHEMA_INVALID', category: 'NOT_FOUND', exitCode: 2 },
+      { code: 'AFF_SCHEMA_COMPILE_ERROR', category: 'NOT_FOUND', exitCode: 2 },
     ],
   };
 }

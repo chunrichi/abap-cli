@@ -54,14 +54,19 @@ beforeEach(() => {
 });
 
 function writeTableJson(name: string, fields: any[] = [{ fieldName: 'FIELD1', dataType: 'CHAR', length: 20, keyFlag: true }]) {
+  // 033: AFF canonical — table-level metadata lives under
+  // `generalInformation.*`. The flat top-level fields (`deliveryClass` etc.)
+  // are legacy014 and only accepted on read.
   const json = {
     formatVersion: '1',
     header: { description: 'Test table', originalLanguage: 'EN' },
     name,
-    deliveryClass: 'A',
-    dataClass: 'APPL0',
-    sizeCategory: '0',
-    clientDependent: false,
+    generalInformation: {
+      deliveryClass: 'A',
+      dataClassCategory: 'APPL0',
+      sizeCategory: '0',
+      clientDependent: false,
+    },
     fields,
   };
   fs.writeFileSync(path.join(cwd, 'src/ztab_test.tabl.json'), JSON.stringify(json, null, 2));
@@ -82,10 +87,12 @@ describe('014/US1 create TABL', () => {
     expect(icfPostDdic).toHaveBeenCalledWith('tabl', expect.objectContaining({
       name: 'ZTAB_TEST',
       description: 'Test table',
-      deliveryClass: 'A',
-      dataClass: 'APPL0',
-      sizeCategory: '0',
-      clientDependent: false,
+      generalInformation: expect.objectContaining({
+        deliveryClass: 'A',
+        dataClassCategory: 'APPL0',
+        sizeCategory: '0',
+        clientDependent: false,
+      }),
       fields: expect.arrayContaining([
         expect.objectContaining({ fieldName: 'FIELD1', dataType: 'CHAR', length: 20, keyFlag: true }),
       ]),
@@ -100,10 +107,10 @@ describe('014/US1 create TABL', () => {
     writeTableJson('ZTAB_CLI', [
       { fieldName: 'FIELD1', dataType: 'CHAR', length: 20, keyFlag: true },
     ]);
-    // Flip clientDependent on the local file.
+    // Flip clientDependent on the local file (AFF canonical: under generalInformation.*).
     const json = JSON.parse(fs.readFileSync(path.join(cwd, 'src/ztab_test.tabl.json'), 'utf-8'));
     json.name = 'ZTAB_CLI';
-    json.clientDependent = true;
+    json.generalInformation.clientDependent = true;
     fs.writeFileSync(path.join(cwd, 'src/ztab_test.tabl.json'), JSON.stringify(json));
 
     const program = makeProgram();
@@ -116,7 +123,7 @@ describe('014/US1 create TABL', () => {
     ], { cwd });
     expect(res.exitCode).toBeUndefined();
     const callBody = icfPostDdic.mock.calls[0]![1] as any;
-    expect(callBody.clientDependent).toBe(true);
+    expect(callBody.generalInformation?.clientDependent).toBe(true);
     // The MANDT prepend is a server-side concern (CLI sends what the file declares);
     // for the create-then-pull round-trip the server is responsible for SPRING.
   });
@@ -132,7 +139,7 @@ describe('014/US1 create TABL', () => {
     ]);
     const json = JSON.parse(fs.readFileSync(path.join(cwd, 'src/ztab_test.tabl.json'), 'utf-8'));
     json.name = 'ZTAB_CLI_STRIP';
-    json.clientDependent = true;
+    json.generalInformation.clientDependent = true;
     fs.writeFileSync(path.join(cwd, 'src/ztab_test.tabl.json'), JSON.stringify(json));
 
     const program = makeProgram();
@@ -145,7 +152,7 @@ describe('014/US1 create TABL', () => {
     ], { cwd });
     expect(res.exitCode).toBeUndefined();
     const callBody = icfPostDdic.mock.calls[0]![1] as any;
-    expect(callBody.clientDependent).toBe(true);
+    expect(callBody.generalInformation?.clientDependent).toBe(true);
     expect(callBody.fields.map((f: any) => f.fieldName)).toEqual(['ID']);
     expect(Array.isArray(callBody.warnings)).toBe(true);
     expect(callBody.warnings.some((w: any) => w.code === 'CLIENT_FIELD_STRIPPED')).toBe(true);
@@ -157,7 +164,7 @@ describe('014/US1 create TABL', () => {
     ]);
     const json = JSON.parse(fs.readFileSync(path.join(cwd, 'src/ztab_test.tabl.json'), 'utf-8'));
     json.name = 'ZEMPTY_CLI';
-    json.clientDependent = true;
+    json.generalInformation.clientDependent = true;
     fs.writeFileSync(path.join(cwd, 'src/ztab_test.tabl.json'), JSON.stringify(json));
 
     const program = makeProgram();
@@ -274,10 +281,12 @@ describe('014/US1 create TABL', () => {
     expect(icfPostDdic).toHaveBeenCalledWith('tabl', expect.objectContaining({
       name: 'ZTHREE',
       description: 'three-piece TABL',
-      deliveryClass: 'L',
-      dataClass: 'APPL1',
-      sizeCategory: '3',
-      clientDependent: true,
+      generalInformation: expect.objectContaining({
+        deliveryClass: 'L',
+        dataClassCategory: 'APPL1',
+        sizeCategory: '3',
+        clientDependent: true,
+      }),
       package: '$TMP',
     }));
     const callBody = icfPostDdic.mock.calls[0]![1] as any;
@@ -309,8 +318,10 @@ describe('014/US1 create TABL', () => {
   });
 
   it('abap-file-format TABL: only main JSON present → falls back to legacy wire-flat shape (backwards compat)', async () => {
-    // No .tabl.ddic sidecar: CLI should NOT crash, and should treat the main
-    // JSON as the legacy wire-flat single-file shape.
+    // No .tabl.ddic sidecar: CLI must NOT crash and must treat the main
+    // JSON as the legacy wire-flat single-file shape. The wire now nests
+    // fields/generalInformation on a happy path; the legacy local shape is
+    // accepted on input for migration and lifted into the AFF nested wire.
     fs.writeFileSync(path.join(cwd, 'src/zlegacy.tabl.json'), JSON.stringify({
       name: 'ZLEGACY',
       description: 'legacy flat',
@@ -328,7 +339,6 @@ describe('014/US1 create TABL', () => {
     expect(res.exitCode).toBeUndefined();
     expect(icfPostDdic).toHaveBeenCalledWith('tabl', expect.objectContaining({
       name: 'ZLEGACY',
-      deliveryClass: 'A',
       fields: [expect.objectContaining({ fieldName: 'F1', dataType: 'CHAR', length: 5 })],
     }));
   });
@@ -443,7 +453,10 @@ describe('014/US2 create STRU/DTEL/DOMA', () => {
     writeFile('src/zdtel_test.dtel.json', {
       name: 'ZDTEL_TEST',
       description: 'Data element',
-      domain: 'ZDOMA_TEST',
+      dataTypeInformation: {
+        category: 'domain',
+        typeName: 'ZDOMA_TEST',
+      },
       shortText: 'Short',
       mediumText: 'Medium text',
       longText: 'Long field text',
@@ -461,7 +474,7 @@ describe('014/US2 create STRU/DTEL/DOMA', () => {
     expect(icfPostDdic).toHaveBeenCalledWith('dtel', expect.objectContaining({
       name: 'ZDTEL_TEST',
       description: 'Data element',
-      domain: 'ZDOMA_TEST',
+      dataTypeInformation: { category: 'domain', typeName: 'ZDOMA_TEST' },
       shortText: 'Short',
       mediumText: 'Medium text',
       longText: 'Long field text',
@@ -469,15 +482,19 @@ describe('014/US2 create STRU/DTEL/DOMA', () => {
     }));
   });
 
-  it('creates a domain via POST /ddic/doma with type/length/decimals/sign/lowercase/convExit', async () => {
+  it('creates a domain via POST /ddic/doma with nested format.*', async () => {
     icfPostDdic.mockResolvedValue({ status: 'success' as const, data: { name: 'ZDOMA_TEST', type: 'DOMA', action: 'created' }, error: null });
     writeFile('src/zdoma_test.doma.json', {
       name: 'ZDOMA_TEST',
       description: 'Domain',
-      dataType: 'QUAN',
-      length: 13,
-      decimals: 3,
-      format: { signFlag: 'X', lowercase: '', convExit: 'ALPHA' },
+      format: {
+        dataType: 'QUAN',
+        length: 13,
+        decimals: 3,
+        signFlag: 'X',
+        lowercase: '',
+        convExit: 'ALPHA',
+      },
     });
     const program = makeProgram();
     registerCreateCommand(program);
@@ -491,12 +508,14 @@ describe('014/US2 create STRU/DTEL/DOMA', () => {
     expect(icfPostDdic).toHaveBeenCalledWith('doma', expect.objectContaining({
       name: 'ZDOMA_TEST',
       description: 'Domain',
-      dataType: 'QUAN',
-      length: 13,
-      decimals: 3,
-      signFlag: 'X',
-      lowercase: '',
-      convExit: 'ALPHA',
+      format: {
+        dataType: 'QUAN',
+        length: 13,
+        decimals: 3,
+        signFlag: 'X',
+        lowercase: '',
+        convExit: 'ALPHA',
+      },
     }));
   });
 

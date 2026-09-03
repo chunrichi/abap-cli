@@ -54,6 +54,11 @@ export async function checkCompanions(filePath: string): Promise<CompanionCheckR
   const baseNoJson = base.replace(/\.json$/, '');
 
   if (type === 'TABL' || type === 'STRU') {
+    // The settings.json file is part of the three-piece layout; companions
+    // are checked against the MAIN JSON, not against settings.json itself.
+    if (base.endsWith('.tabl.settings.json') || base.endsWith('.stru.settings.json')) {
+      return { missing: [], optional: [], severity: 'ok' };
+    }
     const ddlPath = path.join(dir, `${baseNoJson}.ddic`);
     const settingsPath = path.join(dir, `${baseNoJson}.settings.json`);
     const missing: string[] = [];

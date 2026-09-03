@@ -91,9 +91,10 @@ function getAjv(): InstanceType<typeof Ajv2020> {
 }
 
 /** Load (and cache) the parsed schema JSON for a given type. */
-export async function loadSchema(type: string): Promise<unknown> {
-  const schemaPath = schemaPathFor(type, MIRROR_ROOT);
-  const cached = _schemaCache.get(type);
+export async function loadSchema(type: string, schemaFileOverride?: string): Promise<unknown> {
+  const cacheKey = schemaFileOverride ?? type;
+  const schemaPath = schemaPathFor(type, MIRROR_ROOT, schemaFileOverride);
+  const cached = _schemaCache.get(cacheKey);
   if (cached !== undefined) return cached;
   let raw: string;
   try {
@@ -126,20 +127,21 @@ export async function loadSchema(type: string): Promise<unknown> {
       },
     );
   }
-  _schemaCache.set(type, parsed);
+  _schemaCache.set(cacheKey, parsed);
   return parsed;
 }
 
 /** Compile (and cache) a validate function for the given type. */
-export async function getValidate(type: string): Promise<ValidateFunction> {
-  const cached = _validateCache.get(type);
+export async function getValidate(type: string, schemaFileOverride?: string): Promise<ValidateFunction> {
+  const cacheKey = schemaFileOverride ?? type;
+  const cached = _validateCache.get(cacheKey);
   if (cached) return cached;
   const ajv = getAjv();
-  const schema = await loadSchema(type);
-  const schemaPathStr = schemaPathFor(type);
+  const schema = await loadSchema(type, schemaFileOverride);
+  const schemaPathStr = schemaPathFor(type, undefined, schemaFileOverride);
   const byFile = _compiledByFile.get(schemaPathStr);
   if (byFile) {
-    _validateCache.set(type, byFile);
+    _validateCache.set(cacheKey, byFile);
     return byFile;
   }
   let fn: ValidateFunction;
@@ -153,7 +155,7 @@ export async function getValidate(type: string): Promise<ValidateFunction> {
       { details: { cause: msg } },
     );
   }
-  _validateCache.set(type, fn);
+  _validateCache.set(cacheKey, fn);
   _compiledByFile.set(schemaPathStr, fn);
   return fn;
 }
@@ -224,9 +226,13 @@ function schemaAllowsExtras(schema: unknown): boolean {
  * Returns a structured ValidateResult; throws only on schema-load / compile
  * failures.
  */
-export async function validateAff(type: string, doc: unknown): Promise<ValidateResult> {
-  const schema = await loadSchema(type);
-  const fn = await getValidate(type);
+export async function validateAff(
+  type: string,
+  doc: unknown,
+  schemaFileOverride?: string,
+): Promise<ValidateResult> {
+  const schema = await loadSchema(type, schemaFileOverride);
+  const fn = await getValidate(type, schemaFileOverride);
   const ok = fn(doc);
   const declared = declaredTopLevel(schema);
   const allowExtra = schemaAllowsExtras(schema);
@@ -249,10 +255,13 @@ export async function validateAff(type: string, doc: unknown): Promise<ValidateR
 /**
  * Validate a JSON file against the AFF schema resolved for its filename.
  * `routeType` is the type-code inferred from the filename (router responsibility).
+ * `schemaFile` overrides the default schema filename when set (used for
+ * TABL/STRU `.settings.json` → `tabt-v1.json`).
  */
 export async function validateFile(
   filePath: string,
   routeType: string,
+  schemaFile?: string,
 ): Promise<ValidateResult> {
   let raw: string;
   try {
@@ -292,7 +301,7 @@ export async function validateFile(
       ],
     };
   }
-  const result = await validateAff(routeType, parsed);
+  const result = await validateAff(routeType, parsed, schemaFile);
   return { ...result, filePath };
 }
 

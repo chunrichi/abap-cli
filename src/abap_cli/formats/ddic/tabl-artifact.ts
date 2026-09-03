@@ -69,14 +69,23 @@ export async function readTablArtifact(filePath: string): Promise<TablArtifact |
       && realFields.some(field => ['CLIENT', 'MANDT'].includes(field.fieldName.toUpperCase())))
   );
 
+// 033: AFF canonical — settings live under `generalInformation.*` and the
+  // table-level deliveryClass / dataClass / sizeCategory / clientDependent
+  // are nested there too. `formatVersion` lives at the top level.
+  const localGeneral: Record<string, unknown> = { ...generalInformation };
+  if (parsed.deliveryClass !== undefined) localGeneral.deliveryClass = parsed.deliveryClass;
+  if (typeof generalInformation.dataClassCategory === 'string') {
+    localGeneral.dataClassCategory = generalInformation.dataClassCategory;
+  }
+  if (typeof generalInformation.sizeCategory === 'string') {
+    localGeneral.sizeCategory = generalInformation.sizeCategory;
+  }
+  localGeneral.clientDependent = clientDependent;
   const local: DdicObject = {
     name: parsed.objectName,
     formatVersion: main.formatVersion,
     description: typeof header.description === 'string' ? header.description : undefined,
-    deliveryClass: parsed.deliveryClass,
-    dataClass: typeof generalInformation.dataClassCategory === 'string' ? generalInformation.dataClassCategory : undefined,
-    sizeCategory: typeof generalInformation.sizeCategory === 'string' ? generalInformation.sizeCategory : undefined,
-    clientDependent,
+    generalInformation: localGeneral,
     fields,
   };
   if (typeof main.package === 'string') local.package = main.package;

@@ -1,0 +1,21 @@
+@EndUserText.label : 'Table with foreign key'
+@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+@AbapCatalog.tableCategory : #TRANSPARENT
+@AbapCatalog.deliveryClass : #A
+@AbapCatalog.dataMaintenance : #RESTRICTED
+@AbapCatalog.foreignKeys : [
+  {
+    "label": "Country",
+    "withForeignKey" : true,
+    "checkTable" : "T005",
+    "constant": "",
+    "valueTable" : ""
+  }
+]
+
+define table zmy_foreign_key {
+  key client   : abap.clnt not null;
+  key country  : abap.char(3) not null
+    with foreign key [t005.client, t005.land1] where t005.mandt = :client and t005.land1 = :country;
+  name         : abap.char(40);
+}

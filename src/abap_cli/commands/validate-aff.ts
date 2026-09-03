@@ -30,6 +30,8 @@ import {
 } from '../aff/schema-validator.js';
 import { routeAffSchema } from '../aff/router.js';
 import { checkCompanions } from '../aff/companion-check.js';
+import { printSchema, jsonFromCommand } from '../output/json.js';
+import { commandSchemas } from '../flows/setup/command-schemas.js';
 
 interface RunOptions {
   wire?: string;
@@ -84,7 +86,7 @@ async function validateOne(
       optional: [],
     };
   }
-  const result = await validateFile(filePath, route.type);
+  const result = await validateFile(filePath, route.type, route.schemaFile);
   let missing: string[] = [];
   let optional: string[] = [];
   if (options.reportCompanions) {
@@ -194,13 +196,20 @@ export async function runValidateAff(
 
 export function registerValidateAffCommand(program: Command): void {
   program
-    .command('validate:aff <file-or-dir>')
+    .command('validate:aff [file-or-dir]')
     .description(
       'Validate JSON files against official abap-file-format (AFF) canonical schemas (Draft 2020-12)',
     )
     .option('--wire <wire-dir>', 'also recursively validate all JSON under a wire directory')
     .option('--json', 'emit a single JSON envelope instead of per-line PASS/FAIL/WARN')
-    .action(async (target: string, opts: { wire?: string; json?: boolean }) => {
+    .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
+    .action(async (target: string, opts: { wire?: string; json?: boolean; schema?: boolean }, cmd) => {
+      // --schema: print the JSON parameter schema and exit (no validation, no SAP).
+      const allOpts = cmd.optsWithGlobals();
+      if (allOpts.schema) {
+        printSchema(commandSchemas['validate:aff']!, jsonFromCommand(cmd));
+        return;
+      }
       // The top-level --json / --pretty-json (added by index.ts) must also
       // activate JSON mode; merge it into our local option.
       const topOpts = (program.optsWithGlobals?.() ?? {}) as { json?: boolean; prettyJson?: boolean };
@@ -211,14 +220,16 @@ export function registerValidateAffCommand(program: Command): void {
 }
 
 // Allow `npx tsx src/abap_cli/commands/validate-aff.ts <target> [--wire ...] [--json]`
-// invocation outside commander.
+// invocation outside commander. Defaults to validating `test/fixtures/` when no
+// positional target is given (matches `npm run validate:aff` / `pretest` usage).
 if (typeof process !== 'undefined' && process.argv[1] && process.argv[1].endsWith('validate-aff.ts')) {
   const argv = process.argv.slice(2);
   const jsonIdx = argv.indexOf('--json');
   const wireIdx = argv.indexOf('--wire');
   const wireVal = wireIdx >= 0 ? argv[wireIdx + 1] : undefined;
-  const positional = argv.filter((a, i) => i !== wireIdx && i !== wireIdx + 1 && a !== '--json');
-  runValidateAff(positional, { wire: wireVal, json: jsonIdx >= 0 })
+  const positional = argv.filter((a, i) => i !== wireIdx && i !== wireIdx + 1 && a !== '--json' && !a.startsWith('-'));
+  const targets = positional.length > 0 ? positional : ['test/fixtures/'];
+  runValidateAff(targets, { wire: wireVal, json: jsonIdx >= 0 })
     .then((code) => process.exit(code))
     .catch((err: unknown) => {
       const msg = err instanceof Error ? err.message : String(err);

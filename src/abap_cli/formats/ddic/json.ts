@@ -85,12 +85,28 @@ export interface DdicWirePayload {
   // DOMA fixed values (AFF top-level).
   fixedValues?: DdomaFixedValueWire[];
   // DTEL nested dataTypeInformation (AFF): category drives serialization.
+// AFF canonical categories (dtel-v1.json):
+//   'domain'                     — typeName holds the domain name.
+//   'predefinedType'             — `predefinedType.{dataType,length,decimals}`.
+//   'referenceToPredefinedType'  — typeName holds the predefined type.
+//   'referenceDictionaryType'    — typeName holds the dictionary type (e.g. TTYP).
+//   'referenceClasIntType'       — typeName holds the class/interface name.
+// AFF dtel-v1.json declares `additionalProperties: false` on dataTypeInformation,
+// so the wire carries exactly the three declared fields: category, typeName,
+// predefinedType. Legacy 032 callers that wrote `referencedTypeName` continue
+// to round-trip through the wire (the value is preserved on the wire type as
+// `referencedTypeName?` so the back-compat alias does not lose data).
   dataTypeInformation?: {
-    category: 'domain' | 'predefinedType' | 'typeRef';
+    category:
+      | 'domain'
+      | 'predefinedType'
+      | 'referenceToPredefinedType'
+      | 'referenceDictionaryType'
+      | 'referenceClasIntType';
     typeName?: string;
-    typeNameLength?: number;
-    typeNameDecimals?: number;
+    /** Legacy 032 alias retained on the wire shape (not in AFF schema). */
     referencedTypeName?: string;
+    predefinedType?: { dataType?: string; length?: number; decimals?: number };
   };
   // DTEL short / medium / long / header text:
   shortText?: string;
@@ -124,20 +140,24 @@ export function extractTablArtifactWire(wire: DdicWirePayload): {
     hasSettings: wire.hasSettings === true,
   };
 }
-/** 032: DOMA fixed-value wire shape — multi-language descriptions. */
+/** 032 + 033: DOMA fixed-value wire shape. `description` is the AFF canonical
+ *  plain string; `fixedValueLong` is the legacy014 multi-language shape retained
+ *  for backwards compatibility with objects that still use it. */
 export interface DdomaFixedValueWire {
   fixedValue: string;
+  description?: string;
   fixedValueLong?: {
     languageIndependent?: string;
     languageDependent?: Array<{ language: string; description: string }>;
   };
 }
 
-/** 032: DOMA fixed-value local shape (abap-file-format doma-v1.json). */
+/** 033: DOMA fixed-value local shape. AFF canonical uses a plain string
+ *  description; legacy014 used a multi-language object. Both shapes are
+ *  accepted on read; writers emit the AFF canonical plain string. */
 export interface DomaFixedValueLocal {
   fixedValue: string;
-  /** Multi-language description; undefined means "no language-dependent text". */
-  description?: {
+  description?: string | {
     languageIndependent?: string;
     languageDependent?: Array<{ language: string; description: string }>;
   };
@@ -400,6 +420,12 @@ export function localToWire(type: DdicSupportedType, local: DdicObject): DdicWir
     package: l.package as string | undefined,
     transportRequest: l.transportRequest as string | undefined,
   };
+  // AFF canonical — every DDIC object carries `header.{description,
+  // originalLanguage, abapLanguageVersion?}`. Forward the nested header
+  // when present so wire ↔ local stays lossless.
+  if (l.header !== undefined && typeof l.header === 'object') {
+    wire.header = l.header as DdicWirePayload['header'];
+  }
   switch (type) {
     case 'DOMA': {
       // Wire must mirror AFF: dataType/length/decimals/signFlag/lowercase/convExit
@@ -426,22 +452,33 @@ export function localToWire(type: DdicSupportedType, local: DdicObject): DdicWir
       if (Array.isArray(rawFixed) && rawFixed.length > 0) {
         wire.fixedValues = rawFixed.map((raw) => {
           const r = raw as Record<string, unknown>;
-          const longRaw = r.description as Record<string, unknown> | undefined;
-          const li = longRaw?.languageIndependent as string | undefined;
-          const ldRaw = Array.isArray(longRaw?.languageDependent)
-            ? (longRaw.languageDependent as Array<Record<string, unknown>>)
-            : undefined;
           const out: DdomaFixedValueWire = { fixedValue: String(r.fixedValue ?? '') };
-          const long: { languageIndependent?: string; languageDependent?: Array<{ language: string; description: string }> } = {};
-          if (li !== undefined) long.languageIndependent = li;
-          if (ldRaw && ldRaw.length > 0) {
-            long.languageDependent = ldRaw.map((d) => ({
-              language: String(d.language ?? ''),
-              description: String(d.description ?? ''),
-            }));
+          const descRaw = r.description;
+          if (typeof descRaw === 'string') {
+            // AFF canonical: plain string description.
+            out.description = descRaw;
+            return out;
           }
-          if (long.languageIndependent !== undefined || long.languageDependent !== undefined) {
-            out.fixedValueLong = long;
+          if (descRaw && typeof descRaw === 'object') {
+            const longRaw = descRaw as Record<string, unknown>;
+            const li = longRaw.languageIndependent as string | undefined;
+            const ldRaw = Array.isArray(longRaw.languageDependent)
+              ? (longRaw.languageDependent as Array<Record<string, unknown>>)
+              : undefined;
+            const long: {
+              languageIndependent?: string;
+              languageDependent?: Array<{ language: string; description: string }>;
+            } = {};
+            if (li !== undefined) long.languageIndependent = li;
+            if (ldRaw && ldRaw.length > 0) {
+              long.languageDependent = ldRaw.map((d) => ({
+                language: String(d.language ?? ''),
+                description: String(d.description ?? ''),
+              }));
+            }
+            if (long.languageIndependent !== undefined || long.languageDependent !== undefined) {
+              out.fixedValueLong = long;
+            }
           }
           return out;
         });
@@ -449,23 +486,30 @@ export function localToWire(type: DdicSupportedType, local: DdicObject): DdicWir
       break;
     }
     case 'DTEL': {
-      // Wire carries `dataTypeInformation.{category,typeName,...}` per AFF.
+      // Wire carries `dataTypeInformation.{category,...}` per AFF dtel-v1.json.
+      // Five categories are accepted; `predefinedType` category nests its
+      // type info under `predefinedType.{dataType,length,decimals}`. Legacy
+      // 032 alias `typeRef` is mapped to `referenceDictionaryType` (TTYP /
+      // dictionary reference) on the way out so existing callers keep working.
       const dti = l.dataTypeInformation as Record<string, unknown> | undefined;
       if (dti && typeof dti === 'object') {
-        const cat = String(dti.category ?? '');
-        const validCat: 'domain' | 'predefinedType' | 'typeRef' =
-          cat === 'domain' || cat === 'predefinedType' || cat === 'typeRef'
-            ? (cat as 'domain' | 'predefinedType' | 'typeRef')
-            : 'predefinedType'; // safe fallback; the wire may surface an unknown category which wireToLocal will reject
-        wire.dataTypeInformation = {
-          category: validCat,
-          ...(dti.typeName !== undefined ? { typeName: String(dti.typeName) } : {}),
-          ...(dti.typeNameLength !== undefined ? { typeNameLength: Number(dti.typeNameLength) } : {}),
-          ...(dti.typeNameDecimals !== undefined ? { typeNameDecimals: Number(dti.typeNameDecimals) } : {}),
-          ...(dti.referencedTypeName !== undefined
-            ? { referencedTypeName: String(dti.referencedTypeName) }
-            : {}),
-        };
+        const rawCat = String(dti.category ?? '');
+        const aliasedCat = rawCat === 'typeRef' ? 'referenceDictionaryType' : rawCat;
+        const wireDti: Record<string, unknown> = { category: aliasedCat };
+        if (dti.typeName !== undefined) wireDti.typeName = String(dti.typeName);
+        if (dti.referencedTypeName !== undefined) {
+          wireDti.referencedTypeName = String(dti.referencedTypeName);
+        }
+        const ptRaw = dti.predefinedType;
+        if (ptRaw && typeof ptRaw === 'object') {
+          const pt = ptRaw as Record<string, unknown>;
+          wireDti.predefinedType = {
+            dataType: String(pt.dataType ?? ''),
+            ...(pt.length !== undefined ? { length: Number(pt.length) } : {}),
+            ...(pt.decimals !== undefined ? { decimals: Number(pt.decimals) } : {}),
+          };
+        }
+        wire.dataTypeInformation = wireDti as DdicWirePayload['dataTypeInformation'];
       }
       wire.shortText = l.shortText as string | undefined;
       wire.mediumText = l.mediumText as string | undefined;
@@ -536,6 +580,10 @@ export function wireToLocal(type: DdicSupportedType, wire: DdicWirePayload): Ddi
       if (wire.fixedValues !== undefined && wire.fixedValues.length > 0) {
         const fixedValuesLocal: DomaFixedValueLocal[] = wire.fixedValues.map((fv) => {
           const out: DomaFixedValueLocal = { fixedValue: fv.fixedValue };
+          if (typeof fv.description === 'string') {
+            out.description = fv.description;
+            return out;
+          }
           const li = fv.fixedValueLong?.languageIndependent;
           const ld = fv.fixedValueLong?.languageDependent;
           if (li !== undefined || (ld !== undefined && ld.length > 0)) {
@@ -553,10 +601,20 @@ export function wireToLocal(type: DdicSupportedType, wire: DdicWirePayload): Ddi
       const l = local as Record<string, unknown>;
       if (wire.dataTypeInformation && typeof wire.dataTypeInformation === 'object') {
         const cat = wire.dataTypeInformation.category;
-        if (cat !== 'domain' && cat !== 'predefinedType' && cat !== 'typeRef') {
+        // Legacy 032 alias `typeRef` is mapped back to itself on read so
+        // 032 callers that wrote `typeRef` get the same shape back.
+        const allowed = [
+          'domain',
+          'predefinedType',
+          'referenceToPredefinedType',
+          'referenceDictionaryType',
+          'referenceClasIntType',
+          'typeRef', // 032 legacy alias
+        ] as const;
+        if (!(allowed as readonly string[]).includes(cat)) {
           throw new CliError(
             'DTEL_CATEGORY_UNSUPPORTED',
-            `Unsupported DTEL dataTypeInformation.category: "${String(cat)}" (expected one of domain, predefinedType, typeRef)`,
+            `Unsupported DTEL dataTypeInformation.category: "${String(cat)}" (expected one of ${allowed.join(', ')})`,
             { details: { category: String(cat), dataTypeInformation: wire.dataTypeInformation } },
           );
         }
@@ -600,16 +658,49 @@ export function validateDdicObject(data: DdicObject, objectType: string): string
   }
 
   switch (objectType) {
-    case 'DOMA':
-      if (!data.dataType) errors.push('Domain missing: dataType');
-      if (data.length === undefined || data.length === null) errors.push('Domain missing: length');
-      break;
-    case 'DTEL':
-      if (!data.description) errors.push('DataElement missing: description');
-      if (!data.domain && !data.dataType) {
-        errors.push('DataElement must reference a domain OR specify a built-in type (dataType)');
+    case 'DOMA': {
+      // 033: AFF canonical — `format.dataType` / `format.length`. Legacy flat
+      // top-level dataType/length are still accepted as a back-compat shim
+      // for pre-014 scripts; the error message keeps the user pointed at the
+      // AFF canonical shape so the migration path is clear.
+      const format = (data as Record<string, unknown>).format as Record<string, unknown> | undefined;
+      const fmtDataType = format?.dataType;
+      const fmtLength = format?.length;
+      const flatDataType = (data as Record<string, unknown>).dataType;
+      const flatLength = (data as Record<string, unknown>).length;
+      const hasCanonical = fmtDataType !== undefined && fmtLength !== undefined;
+      const hasLegacy = flatDataType !== undefined && flatLength !== undefined;
+      if (!hasCanonical && !hasLegacy) {
+        errors.push('Domain missing: format.dataType and format.length (AFF canonical under `format.*`)');
+      } else if (hasCanonical && (fmtLength === null || fmtLength === undefined)) {
+        errors.push('Domain missing: format.length');
       }
       break;
+    }
+    case 'DTEL': {
+      // 033: AFF canonical — `dataTypeInformation.{category, typeName}`.
+      const dti = (data as Record<string, unknown>).dataTypeInformation as Record<string, unknown> | undefined;
+      const flatDomain = (data as Record<string, unknown>).domain;
+      const flatDataType = (data as Record<string, unknown>).dataType;
+      if (!data.description) {
+        errors.push('DataElement missing: description (and `header.description` per AFF)');
+      }
+      const hasCanonical = !!dti && (
+        dti.category === 'domain' ||
+        dti.category === 'predefinedType' ||
+        dti.category === 'referenceToPredefinedType' ||
+        dti.category === 'referenceDictionaryType' ||
+        dti.category === 'referenceClasIntType' ||
+        dti.category === 'typeRef' // 032 legacy alias
+      );
+      const hasLegacy = !!flatDomain || !!flatDataType;
+      if (!hasCanonical && !hasLegacy) {
+        errors.push(
+          'DataElement must declare `dataTypeInformation: { category, typeName }` (AFF) or a flat `domain` (legacy)',
+        );
+      }
+      break;
+    }
     case 'TABL':
     case 'STRU':
       if (!Array.isArray((data as Record<string, unknown>).fields)) {

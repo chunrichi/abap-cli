@@ -28,7 +28,7 @@ describe('schema-validator (T033-002)', () => {
   });
 
   it('loadSchema throws for an unknown type', async () => {
-    await expect(loadSchema('ZZZZ')).rejects.toThrow(/No AFF schema mapping/);
+    await expect(loadSchema('ZZZZ')).rejects.toThrow(/No AFF schema/);
   });
 
   it('validateAff accepts a minimal DOMA fixture (no-fixed)', async () => {
