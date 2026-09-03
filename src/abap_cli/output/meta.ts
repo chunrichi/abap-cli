@@ -42,6 +42,8 @@ export type WarningCode =
   // 032 US12 textpool pull — per-category soft warning when object has no
   // elements of that category (CLAS has no selections, FUGR has no headings, etc.)
   | 'TEXTPOOL_CATEGORY_MISSING'
+  // 035 push — $TMP object is transport-free; an explicit --tr is ignored
+  | 'PUSH_TR_IGNORED_TMP'
   // 023-extension-mechanism
   | 'EXTENSION_DEGRADED'    // extension failed to load but CLI continues (lenient mode)
   // 030-runtime-deploy

@@ -114,6 +114,25 @@ describe('abap push per-object transport resolution', () => {
     expect(out.data.results[0].transport).toBe('');
   });
 
+  it('035: ignores --tr on a $TMP object and emits PUSH_TR_IGNORED_TMP', async () => {
+    // A $TMP object is transport-free; an explicit --tr must NOT apply — warn + ignore.
+    searchObject.mockResolvedValue([
+      { 'adtcore:name': 'ZCL_TR', 'adtcore:type': 'CLAS/OC', 'adtcore:uri': '/sap/bc/adt/oo/classes/zcl_tr', 'adtcore:packageName': '$TMP' },
+    ]);
+    const program = makeProgram();
+    registerPushCommand(program);
+    const res = await runCommand(program, ['push', 'src/zcl_tr.clas.abap', '--tr', 'TRN001', '--yes', '--json'], { cwd });
+    expect(res.exitCode).toBeUndefined();
+    expect(setObjectSource).toHaveBeenCalledWith(expect.any(String), expect.any(String), 'lock-1', '');
+    const out = JSON.parse(res.stdout);
+    expect(out.data.results[0].transport).toBe('');
+    expect(out.meta.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'PUSH_TR_IGNORED_TMP', message: expect.stringContaining('ignoring --tr TRN001') }),
+      ]),
+    );
+  });
+
   it('falls back to the first modifiable user request when unbound', async () => {
     userTransports.mockResolvedValue({
       workbench: [{ modifiable: [{ 'tm:number': 'OPEN0001' }] }],

@@ -1,6 +1,6 @@
 import * as path from 'path';
 import { AdtClientWrapper } from '../../clients/adt-client.js';
-import { IcfClient } from '../../clients/icf-client.js';
+import { IcfClient, type IcfResponse } from '../../clients/icf-client.js';
 import { CliError, toErrorShape } from '../../output/json.js';
 import { collectWarning, type Warning } from '../../output/meta.js';
 import type { ErrorCode } from '../../output/error-codes.js';
@@ -209,6 +209,44 @@ function normalizePushResult(r: PushFileResult): PushFileResult {
 }
 
 /**
+ * 035: push updates existing objects only. Probe DDIC/TRAN targets over the
+ * same ICF GET pull uses, so a missing object surfaces as OBJECT_NOT_FOUND
+ * (with a `create` pointer) instead of the ICF POST silently creating one.
+ * HTTP is exempt — its SICF nodes ARE created by push (`create HTTP` without
+ * --file writes a local skeleton first; see wiki/objects/http.md).
+ */
+async function requirePushTargetExists(
+  icf: IcfClient,
+  notFoundCode: 'DDIC_OBJECT_NOT_FOUND' | 'TRAN_OBJECT_NOT_FOUND',
+  probe: () => Promise<IcfResponse<unknown>>,
+  object: { name: string; type: string },
+  file: string,
+): Promise<void> {
+  const resp = await probe();
+  if (resp.status === 'success' && resp.data) return;
+  const outFile = toRelativeOutputPath(file);
+  if (resp.error?.code === notFoundCode) {
+    throw new CliError('OBJECT_NOT_FOUND', `${object.type} ${object.name} does not exist; push updates existing objects only`, {
+      object: object.name,
+      type: object.type,
+      file: outFile,
+      nextSteps: [
+        `Create it first: abap create ${object.type} ${object.name} --file ${outFile} --package <package> --description "<desc>"`,
+        'Then push again to update the object.',
+      ],
+      example: `abap push ${outFile}`,
+    });
+  }
+  const rawCode = (resp.error?.code ?? 'SAP_ERROR') as ErrorCode;
+  throw new CliError(rawCode, resp.error?.message ?? `Failed to check whether ${object.type} ${object.name} exists`, {
+    object: object.name,
+    type: object.type,
+    file: outFile,
+    nextSteps: ['Re-run after fixing the cause above.'],
+  });
+}
+
+/**
  * Resolve the transport for one object:
  * - an object already assigned to a request reuses it — push must NOT change it
  * - explicit --tr is honored only when it matches the binding or the object is unbound
@@ -222,6 +260,19 @@ async function resolveObjectTransport(
 ): Promise<string> {
   if (opts.dryRun) {
     return opts.tr ?? client.getConfig().transport ?? 'DRY_RUN';
+  }
+
+  // 035 FR-1: $TMP objects are transport-free — an explicit --tr is ignored
+  // (warn instead of silently dropping, so agents don't assume it applied).
+  // Checked before transportInfo so $TMP objects skip the bound-request lookup.
+  if (object.packageName === '$TMP') {
+    if (opts.tr) {
+      collectWarning('PUSH_TR_IGNORED_TMP', `$TMP object ${object.name} is transport-free; ignoring --tr ${opts.tr}`, {
+        object: object.name,
+        tr: opts.tr,
+      });
+    }
+    return '';
   }
 
   // Which request already owns this object (read-only, best-effort)?
@@ -254,7 +305,6 @@ async function resolveObjectTransport(
   }
 
   if (bound) return bound;
-  if (object.packageName === '$TMP') return '';
   return resolveTransport(client, opts.tr, client.getConfig().transport);
 }
 
@@ -333,6 +383,14 @@ async function pushDdicFile(
   wire.transportRequest = transport || undefined;
 
   const icf = await IcfClient.create();
+  // 035: push updates existing objects only — never let the ICF upsert create one.
+  await requirePushTargetExists(
+    icf,
+    'DDIC_OBJECT_NOT_FOUND',
+    () => icf.getDdic(type.toLowerCase(), resolved.objectName),
+    { name: resolved.objectName, type },
+    file,
+  );
   const resp = await icf.postDdic<{ name: string; type: string; action: 'created' | 'updated' }>(type.toLowerCase(), wire);
   if (resp.status !== 'success' || !resp.data) {
     const code = (resp.error?.code ?? 'DDIC_CREATE_FAILED') as ErrorCode;
@@ -352,6 +410,10 @@ async function pushDdicFile(
 /**
  * Push a HTTP service .json file via ICF POST /http/<name>.
  * The SAP-side handler creates/updates a SICF node with the given handler class + URL.
+ *
+ * 035 exception: HTTP push KEEPS create-on-push. `create HTTP` without --file
+ * writes a local skeleton and `abap push` creates the SICF node, so no
+ * existence probe here (unlike DDIC/TRAN).
  */
 async function pushHttpFile(
   client: AdtClientWrapper,
@@ -443,6 +505,14 @@ async function pushTranFile(
   wire.transportRequest = transport || undefined;
 
   const icf = await IcfClient.create();
+  // 035: push updates existing objects only; a missing tcode goes through `create TRAN`.
+  await requirePushTargetExists(
+    icf,
+    'TRAN_OBJECT_NOT_FOUND',
+    () => icf.getTran(resolved.objectName),
+    { name: resolved.objectName, type: 'TRAN' },
+    file,
+  );
   const resp = await icf.postTran<{ name: string; type: string; action: 'created' | 'updated' }>(resolved.objectName, wire);
   if (resp.status !== 'success' || !resp.data) {
     const code = (resp.error?.code ?? 'TRAN_CREATE_FAILED') as ErrorCode;
@@ -494,7 +564,25 @@ async function pushOne(
     throw new CliError('FILE_PARSE_ERROR', `Cannot read ${outFile}: ${message(error)}`, { details: { file: outFile } });
   }
 
-  const object = await resolveObject(client, resolved.objectName, resolved.objectType);
+  // 035: a missing ADT object must not silently fall through to a write that
+  // creates it — surface OBJECT_NOT_FOUND with a `create` pointer.
+  let object: ResolvedObject;
+  try {
+    object = await resolveObject(client, resolved.objectName, resolved.objectType);
+  } catch (error: unknown) {
+    if (error instanceof CliError && error.code === 'OBJECT_NOT_FOUND') {
+      throw new CliError('OBJECT_NOT_FOUND', error.message, {
+        object: resolved.objectName,
+        type: resolved.objectType,
+        nextSteps: [
+          ...(Array.isArray(error.nextSteps) ? (error.nextSteps as string[]) : []),
+          `Create it first: abap create ${resolved.objectType} ${resolved.objectName} --package <package> --description "<desc>"`,
+        ],
+        example: `abap create ${resolved.objectType} ${resolved.objectName} --package <package> --description "<desc>"`,
+      });
+    }
+    throw error;
+  }
   const transport = await resolveObjectTransport(client, opts, object);
 
   if (resolved.objectType === 'FUGR') {

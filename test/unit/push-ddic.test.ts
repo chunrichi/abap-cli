@@ -16,11 +16,18 @@ const icfPostDdic = vi.fn(async () => ({
   error: null,
 }));
 
+// 035: DDIC push probes existence via ICF GET before POST; default = object exists.
+const icfGetDdic = vi.fn(async () => ({
+  status: 'success' as const,
+  data: {},
+  error: null,
+}));
+
 vi.mock('../../src/abap_cli/clients/icf-client.js', () => ({
   IcfClient: {
     create: async () => ({
       postDdic: icfPostDdic,
-      getDdic: vi.fn(),
+      getDdic: icfGetDdic,
       get: vi.fn(),
       post: vi.fn(),
       put: vi.fn(),
@@ -209,5 +216,40 @@ describe('014 abap push DDIC (.json via ICF)', () => {
     expect(icfPostDdic).not.toHaveBeenCalled();
     const out = JSON.parse(res.stderr);
     expect(out.error.code).toBe('TABL_DDL_INVALID');
+  });
+
+  it('035: rejects a push when the DDIC object does not exist (no create-on-push)', async () => {
+    writeTableJson('ZPKG');
+    icfGetDdic.mockResolvedValueOnce({
+      status: 'error',
+      data: null,
+      error: { code: 'DDIC_OBJECT_NOT_FOUND', message: 'TABL ZTAB_TEST not found in mock store' },
+    });
+    const program = makeProgram();
+    registerPushCommand(program);
+    const res = await runCommand(program, ['push', 'src/ztab_test.tabl.json', '--tr', 'TRN001', '--yes', '--json'], { cwd });
+    expect(res.exitCode).not.toBe(0);
+    const out = JSON.parse(res.stderr);
+    expect(out.error.code).toBe('OBJECT_NOT_FOUND');
+    expect(out.error.message).toContain('push updates existing objects only');
+    expect(out.error.nextSteps.join('\n')).toContain('abap create TABL ZTAB_TEST');
+    // The probe must stop the write — no POST reaches the ICF service.
+    expect(icfPostDdic).not.toHaveBeenCalled();
+  });
+
+  it('035: propagates a non-not-found probe failure (SAP_ERROR) and writes nothing', async () => {
+    writeTableJson('ZPKG');
+    icfGetDdic.mockResolvedValueOnce({
+      status: 'error',
+      data: null,
+      error: { code: 'ICF_UNAVAILABLE', message: 'service unreachable' },
+    });
+    const program = makeProgram();
+    registerPushCommand(program);
+    const res = await runCommand(program, ['push', 'src/ztab_test.tabl.json', '--tr', 'TRN001', '--yes', '--json'], { cwd });
+    expect(res.exitCode).not.toBe(0);
+    const out = JSON.parse(res.stderr);
+    expect(out.error.code).toBe('ICF_UNAVAILABLE');
+    expect(icfPostDdic).not.toHaveBeenCalled();
   });
 });
