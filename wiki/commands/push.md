@@ -4,7 +4,7 @@ title: abap push
 description: 推送本地 ABAP 文件到 SAP — lock → set source → syntax check → activate → unlock，支持源码对象、FUGR、textpool 与 DDIC JSON，按对象解析 transport
 tags: [abap-cli, command, push, upload, abap-file-format, ddic, textpool, transport]
 created at: 2026-08-07 00:11:03
-changed at: 2026-08-07 00:11:03
+changed at: 2026-09-03 00:00:00
 ---
 
 # abap push
@@ -20,7 +20,7 @@ abap push [options] [files...]
 ## Options
 
 - `[files...]`: 要推送的文件路径（一个或多个）
-- `--all`: 推送当前目录下所有 `.abap` 文件（遵循 `.abapignore`）
+- `--all`: 推送扫描根下所有 `.abap` 文件（遵循 `.abapignore`）——扫描根为 `.abap.json::sourceDir`（配置了时，相对配置文件所在目录解析），否则为当前工作目录；不遵循 `<name>.<type>.abap|xml` 布局的杂散文件会被跳过（显式 `[files...]` 路径永不跳过）
 - `--tr <transport>`: 传输请求号（按对象解析，见下文；多数场景不再必输）
 - `--check-only`: 只做语法检查不激活（与 `--no-activate` 互斥）
 - `--no-activate`: lock + write + 跳过 check + 跳过 activate + unlock
@@ -37,10 +37,20 @@ abap push [options] [files...]
 `runPush` **不再**在顶层统一解析一个 transport；改为 `pushOne` 拿到对象后逐对象解析（`resolveObjectTransport`）：
 
 1. **对象已绑定请求**（`client.transportInfo(objectUrl)` → `TRANSPORTS[0].TRKORR`）— 直接复用该请求，**无需 `--tr`**；若显式传了不同的 `--tr` → 抛 `VALIDATION_ERROR`（exit 7），提示去掉 `--tr` 或先用 `abap transport assign` 换请求。push 不允许顺手改对象的请求归属。
-2. **`$TMP` 对象**（search 命中 `adtcore:packageName === '$TMP'`，经 `ResolvedObject.packageName` 携带）— transport-free，空 transport 推送，无需 `--tr`（与 `abap extension deploy` 的 `$TMP` 规则一致）。
+2. **`$TMP` 对象**（search 命中 `adtcore:packageName === '$TMP'`，经 `ResolvedObject.packageName` 携带）— transport-free，空 transport 推送，无需 `--tr`（与 `abap extension deploy` 的 `$TMP` 规则一致）。显式传了非空 `--tr` → **告警 + 忽略**（`meta.warnings` 的 `PUSH_TR_IGNORED_TMP`，exit 不变），不会真的绑定到任何请求。
 3. 其余未绑定非 `$TMP` 对象：`--tr` > 项目 config `transport` > 用户第一个可修改请求（`userTransports`）> `NO_TRANSPORT`（exit 7）。
 
 `--dry-run` 不查真实请求，用 `--tr` > config > `'DRY_RUN'` 占位。每文件 JSON 结果带该文件实际解析到的 `transport`。
+
+## push 只更新已存在对象（035 设计收敛）
+
+push 是「把本地文件写进 SAP 的**已存在**对象」，不是创建入口。创建走 `abap create`（`--package` + `--tr`），改归属走 `abap transport assign`（独立 link），push 不承担这两者：
+
+- **ADT 源对象**（CLAS/INTF/PROG/FUGR）：对象不存在 → `OBJECT_NOT_FOUND`，`nextSteps` 引导 `abap create`（不自动创建）。
+- **DDIC**（DOMA/DTEL/TABL/STRU）与 **TRAN**：push 前先 ICF GET 探测存在性（`GET /ddic/<type>/<name>` / `GET /tran/<code>`，与 pull 同一端点）。对象不存在 → `OBJECT_NOT_FOUND`（`nextSteps` 引导 `abap create <TYPE> <name> --file ...`），**不再**让 ICF POST 隐式 upsert 创建。
+- **HTTP**（SICF 节点）：**明确例外，保留 push 即创建**。`create HTTP`（无 `--file`）只落本地骨架（`action: local`，不调 SAP），真正在 SAP 建 SICF 节点靠 `abap push`。若把 HTTP push 限为「必须已存在」会破坏该骨架工作流，故 HTTP 不做存在性探测。
+
+DDIC/TRAN 的探测在 `--dry-run` 之后（plan-only 不做多余 round-trip）；探测的 not-found 之外的错误（网络/权限）按原错误码传播。
 
 ## 对象路由（`pushOne`）
 
@@ -79,7 +89,7 @@ DDIC 推送时 `--atomic` 也会结构校验 JSON（`readDdicJson` + `validateDd
 | 场景 | 错误码 | 类别 / exit | 附带信息 |
 |------|--------|-------------|----------|
 | 对象被他人锁定 | `LOCK_FAILED` | LOCKED / 9 | `nextSteps`：`abap inspect <obj> --locks` 查锁 + SE03 手动释放；FUGR 额外带 `subtype` |
-| 对象不存在 | `OBJECT_NOT_FOUND` | NOT_FOUND / 8 | `nextSteps`：`abap search <name>` 验证 / `abap profile test` 确认系统；push 不自动创建（创建走 `abap create`） |
+| 对象不存在（ADT 源对象 / DDIC / TRAN） | `OBJECT_NOT_FOUND` | NOT_FOUND / 8 | `nextSteps`：`abap search <name>` 验证；**引导 `abap create <TYPE> <name> --file <path> --package ... --tr ...`**。push 不自动创建（创建走 `abap create`；HTTP 例外——push 会创建 SICF 节点） |
 | 命名的 include part 不存在（如 `.macros.abap` 而对象无 macros） | `SAP_ERROR` | SAP_ERROR / 6 | `subtype` + `nextSteps`：`abap inspect <obj> --includes` 列出可用 include |
 | 激活失败 | `ACTIVATION_FAILED` | VALIDATION_ERROR / 7 | `stage: 'activate'` + 原始 `detail` |
 | 写源码失败 | `SAP_ERROR` | SAP_ERROR / 6 | `stage: 'write'` + `subtype` |
@@ -179,8 +189,9 @@ abap push src/prog/zprog/zprog.prog.texts.en.properties
 
 ## todo
 
-- [ ] **DDIC push 不校验对象是否已存在** — `pushDdicFile` 直接 `POST /ddic/<type>`（ICF 端 create-or-update，`data.action` 区分）。若需在 push 前区分"新建"与"更新"，可先 `GET /ddic/<type>/<name>` 探测（类似 `abap create` 的语义），但目前 ICF 语义是覆盖式更新，行为自洽。
+- [x] **DDIC/TRAN push 前校验对象是否已存在** — 已实现（035）：`pushDdicFile` / `pushTranFile` 在 POST 前 ICF GET 探测，不存在 → `OBJECT_NOT_FOUND` 引导 `abap create`，不再让 ICF upsert 隐式创建；HTTP 例外保留 push 即创建（SICF 骨架工作流）。
 - [ ] **多文件失败聚合的 `nextSteps`** — 多文件失败目前给通用指引（看 `code`/`stage`、keep-going/--fail-fast）；可考虑按失败类别（LOCK_FAILED / ACTIVATION_FAILED / NO_TRANSPORT）分组聚合更具体的下一步。
+- [ ] **不可编辑态分类** — 非 `$TMP` 对象因 tr 已 release（游离）而不可编辑时，lock/写失败的错误签名尚未与「他人持锁」区分（FR-2，需真实 SAP 验证）；目标：游离 → 引导 `abap transport assign <obj> --tr <new>`。
 
 # references
 

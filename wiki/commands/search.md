@@ -4,7 +4,7 @@ title: abap search
 description: 在 SAP 中按名称搜索 ABAP 对象（类、程序、DDIC 等），支持类型/包过滤、通配符、精确匹配与全量抓取
 tags: [abap-cli, command, search, quickSearch, adt]
 created at: 2026-08-07 00:33:34
-changed at: 2026-08-07 00:33:34
+changed at: 2026-09-02 23:09:01
 ---
 
 # abap search
@@ -40,7 +40,7 @@ abap search --schema
 
 ## 行为规则
 
-- **空结果不是错误**：无匹配返回空列表，退出码 0，附 `hint` 提示放宽条件
+- **空结果不是错误**：无匹配退出码 0，附 `hint` 提示放宽条件；此时成功 envelope 的 `data` 不含 `items` 键（空数组被剥离，见下文「空结果 JSON 契约」）
 - **空/全空白 query** → `USAGE` 错误（exit 2），不发起搜索
 - **非法 `--limit`/`--page`/`--page-all-max`**（非正整数）→ `INVALID_ARGUMENT`（exit 2），不发起搜索
 - **`--exact` + `--fuzzy`、`--page` + `--page-all`** 互斥 → `INVALID_ARGUMENT`
@@ -102,6 +102,25 @@ abap search 'ZCL_*' --json
 
 `--page-all` 模式下的 `data` 差异：`pageAll: true`、`requested`（单次请求量）、`total`，无 `page`；`truncated: true` 时 `meta.warnings` 含 `PAGINATION_LIMITED`。
 
+### 空结果 JSON 契约
+
+**无匹配时成功 envelope 的 `data` 不含 `items` 键**——空数组/空对象为 token 经济性被全局剥离（见 `cli-output.schema.json` 对 `data` 的描述），Agent 必须把「缺失 `items`」视为零结果，而非错误：
+
+```json
+{
+  "status": "success",
+  "meta": { "command": "abap search", "warnings": [] },
+  "data": {
+    "page": 1,
+    "limit": 20,
+    "truncated": false,
+    "hint": "No matches. Broaden the query, drop --package, or use --fuzzy."
+  }
+}
+```
+
+`--page-all` 空结果同理：`data` 含 `pageAll: true`、`requested`、`limit`、`total: 0`、`hint`，无 `items`（亦无 `truncated`）。两种模式下空结果退出码均为 0。
+
 # More
 
 ## fixme
@@ -119,4 +138,4 @@ abap search 'ZCL_*' --json
 - 底层：`abap-adt-api` `api/search.js`（quickSearch 无 offset，maxResults 实测支持至 5000）
 - 测试：`test/unit/search-pagination.test.ts`、`test/unit/search-page-all.test.ts`
 - 相关：`src/abap_cli/core/resolve.ts`（对象解析的裸名 `*NAME*` 重试逻辑）
-- 文档：`specs/007-abap-search/spec.md`
+- 文档：见 wiki 顶层 `abap-search` 历史回顾（设计文档不入 git，详见仓库 wiki）

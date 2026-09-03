@@ -73,9 +73,9 @@ Then write `<RUN_DIR>/test-cases.md` with the strict checklist format:
   under test, plan the following minimum set of TCs. The count is **per command**, not per run:
   - **1 happy-path TC** (default flags, expected success output)
   - **≥2 negative TCs** tagged `[Error]`, drawn from: missing required flag, invalid name
-    (non-Z/Y or forbidden prefix), object not found on pull/search, package-without-`--tr`
-    for non-`$TMP` targets, permission/auth failure, mutually exclusive flags, invalid type
-    argument, schema violation
+    (too long — >30 chars — or illegal characters / malformed namespace), object not found
+    on pull/search, package-without-`--tr` for non-`$TMP` targets, permission/auth failure,
+    mutually exclusive flags, invalid type argument, schema violation
   - **≥1 edge-case TC** (tagged `[Edge]`), drawn from: empty result set (e.g. search returns
     `[]`), max-length name, unicode/special characters in query, zero results vs error
     distinction, `--json` output envelope shape verification (`status`/`data`/`error` keys

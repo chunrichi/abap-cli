@@ -1,8 +1,8 @@
 import { Command } from 'commander';
 import { CliError, printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
-import { runInitFromOpts, runInitWizard, runInitShowConfig, runInitUnset } from '../flows/init-flow.js';
-import { scaffoldAgents, type AgentTarget } from '../flows/init-agents.js';
-import { commandSchemas } from '../flows/command-schemas.js';
+import { runInitFromOpts, runInitWizard, runInitShowConfig, runInitUnset } from '../flows/setup/init.js';
+import { scaffoldAgents, type AgentTarget } from '../flows/setup/init-agents.js';
+import { commandSchemas } from '../flows/setup/command-schemas.js';
 
 /** `abap init` (parent) help: option groups, examples, profile references. */
 function initParamHelp(): string {
@@ -16,7 +16,7 @@ function initParamHelp(): string {
     '  Clear fields:     --unset-package | --unset-tr | --unset-source-dir',
     '                    (remove a single key from .abap.json; --yes to skip prompt)',
     '  Direct fields:    --url, --client, --username, --password, --language, --insecure, --ca',
-    '                    (TTY mode only — non-interactive refuses per FR-022)',
+    '                    (TTY mode only — non-interactive refuses)',
     '  Test/verify:      --test-connection, --test-tls, --test-auth',
     '  Agent scaffold:   --agent copilot|claude|cursor|generic [--force]',
     '  Non-interactive:  --yes / --non-interactive',

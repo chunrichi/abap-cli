@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { runRun, withTimeout } from '../../src/abap_cli/flows/run-flow.js';
+import { runRun, withTimeout } from '../../src/abap_cli/flows/data/run.js';
 import { AdtClientWrapper } from '../../src/abap_cli/clients/adt-client.js';
 import { CliError } from '../../src/abap_cli/output/json.js';
 

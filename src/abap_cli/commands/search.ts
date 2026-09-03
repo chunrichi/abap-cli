@@ -132,7 +132,7 @@ async function runSearch(query: string | undefined, opts: SearchOptions,mode: Ou
   // Single-page (default) path: keep the existing "fetch limit*page then slice"
   // behavior so back-compat with --page and --limit is unchanged.
   const page = parsePositiveInt(opts.page, '--page', 1);
-  // Fetch limit*page in one call, then slice client-side (research §1).
+  // Fetch limit*page in one call, then slice client-side.
   const results = await client.searchObject(effectiveQuery, type, limit * page);
 
   let mapped: SearchResultItem[] = results.map(toResultItem);

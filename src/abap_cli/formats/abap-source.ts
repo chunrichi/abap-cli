@@ -9,6 +9,15 @@ export async function readAbapFile(filePath: string): Promise<string> {
 }
 
 /**
+ * Normalize line endings so comparisons are insensitive to CRLF vs LF:
+ * `\r\n` and stray `\r` both become `\n`. Only for compare paths — files
+ * pulled from SAP keep their original bytes (pull stays byte-faithful).
+ */
+export function normalizeLineEndings(s: string): string {
+  return s.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
+/**
  * Write an ABAP source file to disk, creating parent directories as needed.
  */
 export async function writeAbapFile(filePath: string, content: string): Promise<void> {
@@ -26,21 +35,4 @@ export async function fileExists(filePath: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-/**
- * List all .abap and .xml files in a directory recursively.
- */
-export async function listAbapFiles(dirPath: string): Promise<string[]> {
-  const results: string[] = [];
-  const entries = await fs.readdir(dirPath, { withFileTypes: true });
-  for (const entry of entries) {
-    const fullPath = path.join(dirPath, entry.name);
-    if (entry.isDirectory()) {
-      results.push(...await listAbapFiles(fullPath));
-    } else if (entry.name.endsWith('.abap') || entry.name.endsWith('.xml')) {
-      results.push(fullPath);
-    }
-  }
-  return results;
 }

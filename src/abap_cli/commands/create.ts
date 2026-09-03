@@ -1,7 +1,8 @@
 import { Command } from 'commander';
 import { printError, printSchema, jsonFromCommand, type OutputMode } from '../output/json.js';
-import { runCreate, runCreateLocal, type CreateOptions, type CreateLocalOptions } from '../flows/create-flow.js';
-import { createSchema } from '../flows/create-schema.js';
+import { runCreate, runCreateLocal, type CreateOptions, type CreateLocalOptions } from '../flows/edit/create.js';
+import { createSchema } from '../flows/edit/create-schema.js';
+import { normalizeTypeInput } from '../cli/type-alias.js';
 
 export function registerCreateCommand(program: Command): void {
   const createCmd = program
@@ -17,11 +18,12 @@ export function registerCreateCommand(program: Command): void {
       '  INTF  Interface          (ADT route)',
       '  PROG  Program            (ADT route)',
       '  FUGR  Function group     (ADT route)',
+      '        + --func <name>    Create a function module inside an existing group (FUGR/FF)',
       '  DOMA  Domain             (ICF /ddic/doma — requires --file)',
       '  DTEL  Data element       (ICF /ddic/dtel — requires --file)',
       '  TABL  Database table     (ICF /ddic/tabl — requires --file)',
       '  STRU  Structure          (ICF /ddic/stru — requires --file)',
-      '  HTTP  SICF service node  (ICF /http/<name> — requires --file)',
+      '  HTTP  SICF service node  (ICF /http/<name> — auto-skeleton if --file absent; alias: SICF, deprecated)',
       '',
       'Run `abap create <type> --schema` for the machine-readable contract of a specific type.',
       '',
@@ -40,6 +42,7 @@ export function registerCreateCommand(program: Command): void {
     .option('--check-only', 'Validate without creating')
     .option('--audit', 'Include the before-checksum (extra SAP round-trip, off by default)')
     .option('--file <path>', 'abap-file-format JSON input (required for DOMA/DTEL/TABL/STRU/HTTP)')
+    .option('--func <name>', 'With FUGR: create a function module (FUGR/FF) inside the existing function group <name>')
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .option('--yes', 'Confirm in non-interactive mode')
     .action(async (type, name, opts, cmd) => {
@@ -52,7 +55,12 @@ export function registerCreateCommand(program: Command): void {
           printSchema(createSchema(type), mode);
           return;
         }
-        await runCreate(type, name, opts, mode);
+        // --schema path is untyped (type may be undefined); only normalize when present.
+        const normalized = type ? normalizeTypeInput(type) : { type: type as string };
+        if (normalized.aliasWarning) {
+          (opts as CreateOptions & { aliasWarning?: string }).aliasWarning = normalized.aliasWarning;
+        }
+        await runCreate(normalized.type, name, opts, mode);
       } catch (error: unknown) {
         printError(mode, error);
       }
@@ -62,7 +70,7 @@ export function registerCreateCommand(program: Command): void {
 }
 
 function registerCreateLocalCommand(createCmd: Command): void {
-  // 实验性：本地生成草稿骨架，不连接 SAP（FR-021-local）。
+  // 实验性：本地生成草稿骨架，不连接 SAP。
   createCmd
     .command('local')
     .description('Experimental: create a local draft skeleton file (no SAP connection)')

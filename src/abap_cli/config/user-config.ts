@@ -23,6 +23,10 @@ export interface SystemProfile {
   auth: AuthConfig;
   /** SAP release recorded at connect time (diagnostics). */
   systemVersion?: string;
+  /** 034: optional system flavour tag — drives cookie reuse opt-in/out. */
+  systemType?: 'on-prem' | 'cloud' | 'btp' | 'mock';
+  /** 034: session policy override at the profile level. */
+  sessionPolicy?: 'reuse' | 'always-logout' | 'default';
   /** ADT text-element capability recorded once at connect/init (Q1). */
   adtTextpool?: { read: boolean; write: boolean; checkedAt: string };
   /** 034: Cached ADT runtime tier from the last successful `probeAdtRuntime` /

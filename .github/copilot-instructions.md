@@ -65,3 +65,10 @@
 - 所有新增的 CLI 命令必须注册到 `src/abap_cli/index.ts`。
 - 沿用既有命令模式：`export function register<Name>Command(program: Command)`。
 - `abap/src/` 下的 ABAP 代码遵循 abap-file-format 文件命名约定。
+- 上下文过长的时候 压缩上下文 compression
+
+## 子任务
+
+- optional 使用 subagent 来处理超长上下文的任务。每个 subagent 只处理一个子任务，完成后返回结果给主 agent。主 agent 再根据结果继续处理或整合。
+- optional 使用 create-agent 来创建临时的 agents 用于 subagent 定制化任务。
+- `./.github` 目录是本地目录，除已经被 git 跟踪的内容外，其他内容不应该被提交到 git 仓库。包含 create agent 创建的 agent。

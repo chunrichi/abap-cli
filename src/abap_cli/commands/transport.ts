@@ -1,8 +1,8 @@
 import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError, printError, printResult, printSchema, jsonFromCommand, type OutputMode } from '../output/json.js';
-import { showTransport, resolveObjectTransport, assignObjectToTransport } from '../flows/transport-ops.js';
-import { commandSchemas } from '../flows/command-schemas.js';
+import { showTransport, resolveObjectTransport, assignObjectToTransport } from '../flows/core/transport-ops.js';
+import { commandSchemas } from '../flows/setup/command-schemas.js';
 
 interface TransportEntry {
   number: string;

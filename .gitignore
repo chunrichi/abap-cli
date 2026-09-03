@@ -51,4 +51,12 @@ wiki/*
 !wiki/adt-front-controller-s4h-2023.md
 !wiki/adt-front-controller-s4h-2022.md
 !wiki/adt-front-controller-ecc-ehp7.md
+!wiki/abap-file-format-export.md
+!wiki/cli-benchmark-learning.md
+!wiki/json-generation.md
+!wiki/agent-cookbook.md
+!wiki/coverage-matrix.md
+!wiki/architecture-diagrams.md
+!wiki/design-decisions/
+!wiki/objects/
 .claude-memory/

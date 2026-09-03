@@ -1,11 +1,11 @@
 /**
- * Top-level commander-error handler (P1.7).
+ * Top-level commander-error handler.
  *
  * Every commander error thrown by `program.parseAsync` flows through
  * `handleTopLevelError`. The handler is responsible for the stream-separation
  * contract:
  *  - Real help exits (`--help`, `--version`, no-args root): plain text on
- *    stdout, no stderr, exit 0 (per contract §1.4).
+ *    stdout, no stderr, exit 0.
  *  - USAGE / unknown-command / unknown-option exits: stdout carries the
  *    subcommand's help in human mode; in `--json` mode stdout stays empty and
  *    the help body accompanies the JSON envelope on stderr so the JSON
@@ -100,7 +100,7 @@ export function handleTopLevelError(
     if (error.code === 'commander.helpDisplayed') {
       // Real help exit (--help/--version/no-args root): commander has already
       // written the full help (including addHelpText sections) to stdout.
-      // Exit 0, no stderr (contract §1.4). Re-rendering would duplicate it.
+      // Exit 0, no stderr. Re-rendering would duplicate it.
       exit(0);
     }
     if (error.code === 'commander.help') {
@@ -131,8 +131,7 @@ export function handleTopLevelError(
       // usage to writeErr (via _displayError → outputHelp({ error: true })).
       // In human mode we mirror a plain help body to stdout so the user sees
       // the full options; helpInformation() omits addHelpText sections, which
-      // is acceptable on this error path. JSON mode keeps stdout empty per
-      // contract §1.4.
+      // is acceptable on this error path. JSON mode keeps stdout empty (envelope contract on failure).
       const firstArg = firstSubcommandArg(ctx.argv);
       const sub = resolveSubcommand(ctx.program, firstArg, ctx.argv);
       const helpBody = sub.helpInformation();

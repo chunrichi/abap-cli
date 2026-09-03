@@ -1,0 +1,12 @@
+@EndUserText.label : 'Compound-key table'
+@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+@AbapCatalog.tableCategory : #TRANSPARENT
+@AbapCatalog.deliveryClass : #A
+@AbapCatalog.dataMaintenance : #RESTRICTED
+define table zmy_key_compound {
+  key client : abap.clnt not null;
+  key docno  : abap.char(10) not null;
+  key itemno : abap.numc(6) not null;
+  qty       : abap.quan(13, 3);
+  unit      : abap.unit(3);
+}

@@ -4,7 +4,7 @@
  *
  * Cookie jar location: `~/.abap-cli/<profile>.sso.cookies.json` (TTL 30 min).
  * The user acquires cookies by running `abap profile login <profile>` (see
- * `flows/sso-flow.ts`), which opens a browser, listens on a loopback port,
+ * `flows/setup/sso.ts`), which opens a browser, listens on a loopback port,
  * and writes the returned cookies to disk.
  *
  * Distinguishes "file missing" from "file present but expired" so the error

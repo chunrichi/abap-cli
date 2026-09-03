@@ -4,14 +4,14 @@
  * Public API:
  *  - CliError: the in-process error type (extended with nextSteps/example).
  *  - toErrorShape: normalises any thrown value into the error contract shape
- *    (now with an explicit `category`, FR-005/FR-006).
+ *    (with an explicit `category`).
  *  - renderResult / renderError: pure functions returning a RenderedOutput
  *    (stdout lines, stderr lines, exitCode). No stream writes, no process.exit.
  *  - printResult / printError: thin shims that call the renderers, write to
  *    the streams, and (in printError's case) call process.exit. The `meta`
  *    argument is optional — it defaults to buildMeta().
  *
- * Contract (specs/012-unify-cli-output-contract/contracts/cli-output.md):
+ * Output envelope contract:
  *   success: { status: 'success', meta, data }
  *   failure: { status: 'error', meta, error: { code, category, message,
  *     details?, nextSteps?, example? } }.
@@ -28,7 +28,7 @@ export function setExtensionRegistry(r: ExtensionRegistry | undefined): void {
   _registry = r;
 }
 
-/** Three-state output mode (FR-001/025-abap-output-merge US1). */
+/** Three-state output mode. */
 export type OutputMode = 'human' | 'json' | 'pretty-json';
 
 /** True when `mode` emits a JSON envelope rather than human text. */
@@ -49,7 +49,7 @@ export interface CliErrorOptions {
   details?: Record<string, unknown>;
   /** Concrete actions the agent should try next. */
   nextSteps?: string[];
-  /** FR-009 — a single canonical invocation that would succeed. */
+  /** A single canonical invocation that would succeed. */
   example?: string;
   /** Repo-relative path to a skill reference doc that lists this error's
 *   meaning, category and recovery steps (e.g. 'skills/abap-cli-edit/references/errors.md#lock_failed'). */
@@ -89,7 +89,7 @@ export class CliError extends Error {
 /**
  * Normalize any thrown value into the contract error shape.
  * Includes details/nextSteps/example from CliError instances and the explicit
- * `category` derived from the error code (FR-005/FR-006).
+ * `category` derived from the error code.
  */
 export function toErrorShape(error: unknown): { code: ErrorCode; category: ErrorCategory; message: string; [key: string]: unknown } {
   if (error instanceof CliError) {
@@ -175,9 +175,9 @@ export function renderError(mode: OutputMode, error: unknown, meta: OutputMeta):
   const lines = [...meta.warnings.map((w) => `Warning: ${w.message}`), `Error: ${err.message}`];
   if (Array.isArray(err.nextSteps) && err.nextSteps.length > 0) {
     lines.push(`  Try: ${err.nextSteps.join(' / ')}`);
-  if (typeof err.references === 'string' && err.references.length > 0) {
-    lines.push(`  See:  ${err.references}`);
-  }
+    if (typeof err.references === 'string' && err.references.length > 0) {
+      lines.push(`  See:  ${err.references}`);
+    }
   }
   return { stdout: [], stderr: lines, exitCode };
 }

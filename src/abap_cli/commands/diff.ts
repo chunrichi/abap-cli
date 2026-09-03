@@ -1,9 +1,9 @@
 import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
-import { computeDiff } from '../flows/diff.js';
+import { computeDiff } from '../flows/search/diff.js';
 import { CliError, printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
 import { SEARCH_RESULT_LIMIT } from '../core/limits.js';
-import { commandSchemas } from '../flows/command-schemas.js';
+import { commandSchemas } from '../flows/setup/command-schemas.js';
 
 interface DiffOptions {
   file?: string;

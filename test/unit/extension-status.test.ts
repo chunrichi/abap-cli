@@ -86,12 +86,12 @@ describe('abap extension status (021: new subcommand)', () => {
   it('returns installed=true and match=true when remote version equals expected', async () => {
     mockGet.mockReset();
     probeAdtRuntime.mockResolvedValueOnce({ runtime: 'netweaver750', source: 'informationsystem', icfSetupBlocked: false });
-    mockGet.mockResolvedValueOnce({ status: 'success', data: { version: '0.5.0' } });
+    mockGet.mockResolvedValueOnce({ status: 'success', data: { version: '0.6.0' } });
     const { data } = await run(['extension', 'status', '--json']);
     const d = data as { installed: boolean; match: boolean; remoteVersion: string; expectedVersion: string; runtime: string };
     expect(d.installed).toBe(true);
     expect(d.match).toBe(true);
-    expect(d.remoteVersion).toBe('0.5.0');
+    expect(d.remoteVersion).toBe('0.6.0');
     expect(d.runtime).toBe('netweaver750');
   });
 

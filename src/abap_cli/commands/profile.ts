@@ -4,11 +4,11 @@ import * as path from 'path';
 import { printError, printResult, printSchema, jsonFromCommand, CliError, type OutputMode } from '../output/json.js';
 import { collectWarning } from '../output/meta.js';
 import { exportProfiles, importProfiles, type ProfileBundle } from '../config/profiles.js';
-import { runList, runShow, runTest, runDelete } from '../flows/profile-flow.js';
-import { runAdd, runSet } from '../flows/profile-flow.js';
-import { runLogin } from '../flows/sso-flow.js';
+import { runList, runShow, runTest, runDelete } from '../flows/setup/profile.js';
+import { runAdd, runSet } from '../flows/setup/profile.js';
+import { runLogin } from '../flows/setup/sso.js';
 import { toOutputPath } from '../core/path-output.js';
-import { commandSchemas } from '../flows/command-schemas.js';
+import { commandSchemas } from '../flows/setup/command-schemas.js';
 
 export function registerProfileCommand(program: Command): void {
   const profile = program

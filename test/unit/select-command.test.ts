@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { registerSelectCommand, formatHuman } from '../../src/abap_cli/commands/select.js';
 import { renderError } from '../../src/abap_cli/output/json.js';
 import { Command } from 'commander';
-import type { SelectResult } from '../../src/abap_cli/flows/select-flow.js';
+import type { SelectResult } from '../../src/abap_cli/flows/data/select.js';
 
 describe('select human rendering — native-typed values (017 Q1 B)', () => {
   it('formatHuman stringifies numbers/dates and renders null cells as empty', () => {

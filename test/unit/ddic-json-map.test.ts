@@ -17,7 +17,7 @@ import {
   getDdicJsonExample,
   getDdicFlatJsonExample,
   readDdicObjectForCreate,
-} from '../../src/abap_cli/dictionary/ddic-json.js';
+} from '../../src/abap_cli/formats/ddic/json.js';
 
 describe('014/ddic-json-map', () => {
   describe('supported types', () => {
@@ -109,16 +109,18 @@ describe('014/ddic-json-map', () => {
     });
   });
 
-  describe('localToWire — TABL', () => {
-    it('maps table fields, deliveryClass, clientDependent, etc.', () => {
+  describe('localToWire — TABL (AFF nested generalInformation)', () => {
+    it('maps table fields + generalInformation (AFF canonical)', () => {
       const wire = localToWire('TABL', {
         name: 'ztab',
         description: 'Example table',
-        deliveryClass: 'A',
-        dataClass: 'APPL0',
-        sizeCategory: '0',
-        clientDependent: true,
-        allowMaintenance: false,
+        header: { description: 'Example table', originalLanguage: 'EN' },
+        generalInformation: {
+          deliveryClass: 'A',
+          dataClassCategory: 'APPL0',
+          sizeCategory: '0',
+          clientDependent: true,
+        },
         fields: [
           { fieldName: 'FIELD1', dataType: 'CHAR', length: 20, keyFlag: true },
           { fieldName: 'FIELD2', rollname: 'ZDMY_DE' },
@@ -127,8 +129,14 @@ describe('014/ddic-json-map', () => {
         transportRequest: '',
       });
       expect(wire.name).toBe('ZTAB');
-      expect(wire.deliveryClass).toBe('A');
-      expect(wire.clientDependent).toBe(true);
+      // No flat top-level fields on the wire (AFF canonical).
+      expect((wire as Record<string, unknown>).deliveryClass).toBeUndefined();
+      expect((wire as Record<string, unknown>).clientDependent).toBeUndefined();
+      expect((wire as Record<string, unknown>).dataClass).toBeUndefined();
+      expect(wire.generalInformation?.deliveryClass).toBe('A');
+      expect(wire.generalInformation?.dataClassCategory).toBe('APPL0');
+      expect(wire.generalInformation?.sizeCategory).toBe('0');
+      expect(wire.generalInformation?.clientDependent).toBe(true);
       expect(wire.fields).toHaveLength(2);
       expect(wire.fields![0]!.fieldName).toBe('FIELD1');
       expect(wire.fields![0]!.keyFlag).toBe(true);
@@ -136,51 +144,59 @@ describe('014/ddic-json-map', () => {
     });
   });
 
-  describe('localToWire — DOMA', () => {
-    it('maps datatype, length, decimals, signFlag, lowercase, convExit', () => {
+  describe('localToWire — DOMA (AFF nested format.*)', () => {
+    it('reads dataType/length/decimals from nested format.* (AFF canonical)', () => {
       const wire = localToWire('DOMA', {
         name: 'ZD',
         description: 'Domain',
-        dataType: 'CHAR',
-        length: 3,
-        decimals: 0,
-        signFlag: false,
-        lowercase: true,
-        convExit: 'ALPHA',
+        format: {
+          dataType: 'CHAR',
+          length: 3,
+          decimals: 0,
+          signFlag: 'X',
+          lowercase: '',
+          convExit: 'ALPHA',
+        },
       });
-      expect(wire.dataType).toBe('CHAR');
-      expect(wire.length).toBe(3);
-      expect(wire.lowercase).toBe(true);
-      expect(wire.convExit).toBe('ALPHA');
+      // No flat top-level fields on the wire (AFF canonical).
+      expect((wire as Record<string, unknown>).dataType).toBeUndefined();
+      expect((wire as Record<string, unknown>).length).toBeUndefined();
+      expect((wire as Record<string, unknown>).signFlag).toBeUndefined();
+      expect(wire.format?.dataType).toBe('CHAR');
+      expect(wire.format?.length).toBe(3);
+      expect(wire.format?.signFlag).toBe('X');
+      expect(wire.format?.lowercase).toBe('');
+      expect(wire.format?.convExit).toBe('ALPHA');
     });
   });
 
-  describe('localToWire — DTEL', () => {
-    it('maps domain reference and screen texts', () => {
+  describe('localToWire — DTEL (AFF dataTypeInformation.*)', () => {
+    it('reads domain reference from nested dataTypeInformation (AFF canonical)', () => {
       const wire = localToWire('DTEL', {
         name: 'ZDE',
         description: 'Data element',
-        domain: 'ZD',
+        dataTypeInformation: {
+          category: 'domain',
+          typeName: 'ZD',
+        },
         shortText: 'Short',
         mediumText: 'Medium text',
         longText: 'Long text',
         headerText: 'Header',
       });
-      expect(wire.domain).toBe('ZD');
+      expect((wire as Record<string, unknown>).domain).toBeUndefined();
+      expect(wire.dataTypeInformation?.category).toBe('domain');
+      expect(wire.dataTypeInformation?.typeName).toBe('ZD');
       expect(wire.shortText).toBe('Short');
       expect(wire.headerText).toBe('Header');
     });
   });
 
   describe('wireToLocal / round-trip', () => {
-    it('TABL round-trip preserves all fields', () => {
+    it('TABL round-trip preserves fields[]', () => {
       const src = {
         name: 'ZTAB',
         description: 'Table',
-        deliveryClass: 'A',
-        dataClass: 'APPL0',
-        sizeCategory: '0',
-        clientDependent: true,
         fields: [
           { fieldName: 'A', dataType: 'CHAR', length: 10, keyFlag: true },
           { fieldName: 'B', rollname: 'ZDMY' },
@@ -193,16 +209,19 @@ describe('014/ddic-json-map', () => {
       });
     });
 
-    it('DOMA round-trip preserves signFlag, lowercase, convExit', () => {
+    it('DOMA round-trip preserves signFlag, lowercase, convExit (nested format.*)', () => {
       const src = {
         name: 'ZD',
         description: 'Domain',
-        dataType: 'QUAN',
-        length: 13,
-        decimals: 3,
-        signFlag: true,
-        lowercase: false,
-        convExit: 'ALPHA',
+        format: {
+          dataType: 'QUAN',
+          length: 13,
+          decimals: 3,
+          signFlag: 'X',
+          lowercase: '',
+          convExit: 'ALPHA',
+        },
+        outputCharacteristics: { length: 17 },
       };
       expect(wireToLocal('DOMA', localToWire('DOMA', src))).toEqual({
         ...src,
@@ -242,16 +261,16 @@ describe('014/ddic-json-map', () => {
       expect(validateDdicObject({ name: '/DMO/CL_FOO', description: 'x' } as any, 'DOMA').some((e) => e.includes('Invalid namespace'))).toBe(false);
     });
 
-    it('DOMA requires dataType and length', () => {
+    it('DOMA requires format.dataType and format.length (AFF canonical)', () => {
       const errors = validateDdicObject({ name: 'ZD', description: 'd' } as any, 'DOMA');
-      expect(errors).toContain('Domain missing: dataType');
-      expect(errors).toContain('Domain missing: length');
+      expect(errors.some((e) => e.includes('format.dataType'))).toBe(true);
+      expect(errors.some((e) => e.includes('format.length'))).toBe(true);
     });
 
-    it('DTEL requires description and at least one of domain or built-in type', () => {
+    it('DTEL requires description and dataTypeInformation (AFF canonical)', () => {
       const errors = validateDdicObject({ name: 'ZDE' } as any, 'DTEL');
-      expect(errors).toContain('DataElement missing: description');
-      expect(errors).toContain('DataElement must reference a domain OR specify a built-in type (dataType)');
+      expect(errors.some((e) => e.includes('description'))).toBe(true);
+      expect(errors.some((e) => e.includes('dataTypeInformation'))).toBe(true);
     });
 
     it('TABL/STRU require non-empty fields[]', () => {
@@ -334,10 +353,13 @@ describe('014/ddic-json-map', () => {
         const local = await readDdicObjectForCreate(path.join(dir, 'ztabx.tabl.json'), 'TABL');
         expect(local.name).toBe('ZTABX');
         expect(local.description).toBe('three-piece TABL');
-        expect(local.deliveryClass).toBe('L');
-        expect(local.dataClass).toBe('APPL1');
-        expect(local.sizeCategory).toBe('3');
-        expect(local.clientDependent).toBe(true);
+        // 033: AFF canonical — settings live under generalInformation.*.
+        expect((local as Record<string, unknown>).generalInformation).toMatchObject({
+          deliveryClass: 'L',
+          dataClassCategory: 'APPL1',
+          sizeCategory: '3',
+          clientDependent: true,
+        });
         // fields order matches DDL, MANDT/CLIENT dropped from output (server-side MANDT is server's job).
         expect((local.fields as any[]).map((f) => f.fieldName)).toEqual(['ID', 'PAYLOAD']);
         expect((local.fields as any[])[0]).toMatchObject({ fieldName: 'ID', dataType: 'CHAR', length: 10, keyFlag: true, notNull: true });

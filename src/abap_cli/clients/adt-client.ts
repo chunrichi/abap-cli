@@ -1,5 +1,6 @@
-import { ADTClient, session_types, type ClientOptions, type TextElement, type TextElementCategory } from 'abap-adt-api';
+import { ADTClient, session_types, type ClientOptions, type TextElement, type TextElementCategory, type DumpsFeed } from 'abap-adt-api';
 import type { BearerFetcher } from 'abap-adt-api/build/AdtHTTP.js';
+import { fetchDumpsFeed } from './dumps-feed.js';
 import {
   getTextElements as adtGetTextElements,
   setTextElements as adtSetTextElements,
@@ -8,6 +9,11 @@ import { loadConfig, type ProjectConfig } from '../config/project-config.js';
 import { CliError } from '../output/json.js';
 import { classifyHttpError } from './http-error.js';
 import { buildAuth } from '../auth/adapter.js';
+import { makeEmptyJar, type SessionJar } from '../session/jar.js';
+import { effectivePolicy, isUnsupportedInContext, resolveSessionPolicy } from '../session/policy.js';
+import { loadOrCreateSessionKey } from '../session/key.js';
+import { captureSessionFromAdt, clearJarFromDisk, injectSessionIntoAdt, loadJarFromDisk, markJarPersisted } from '../session/reuse.js';
+import { registerAdtClient } from '../session/registry.js';
 
 /**
  * Thin wrapper around abap-adt-api ADTClient.
@@ -27,6 +33,17 @@ export class AdtClientWrapper {
   /** Short label of the auth strategy actually used (e.g. "basic" / "cert"). */
   private authLabel: string;
 
+  /** Effective session policy (`reuse` / `always-logout`) after env/config resolution. */
+  private policy: 'reuse' | 'always-logout' = 'reuse';
+  /** Loaded jar in reuse mode; `null` when fresh login is required. */
+  private jar: SessionJar | null = null;
+  /** 32-byte AES key for jar persistence (reuse mode only). */
+  private sessionKey: Buffer | null = null;
+  /** True once the session is ready (reused OR fresh-logged-in). */
+  private sessionReady = false;
+  /** True once a 401 fallback re-login has been attempted. */
+  private fallbackUsed = false;
+
   private constructor(config: ProjectConfig, auth: { passwordOrFetcher: string | BearerFetcher; options: ClientOptions; label: string }) {
     this.config = config;
     this.authLabel = auth.label;
@@ -42,23 +59,121 @@ export class AdtClientWrapper {
   }
 
   /**
-   * Log in to the SAP system (sets basic-auth credentials + acquires the
-   * initial CSRF token via a fetch probe). Without this the first ADT request
-   * returns 401 because the auth context has not been negotiated.
+   * Force a fresh login now (used by flows that need to authenticate before
+   * a probe, e.g. runtime-probe / probe). Distinct from the lazy session
+   * path in `_call`: it logs in directly and captures the session into the
+   * jar when in reuse mode.
    */
   async login(): Promise<void> {
-    await this._call(() => this.client.login());
+    await this._loginNow();
+  }
+
+  private async _loginNow(): Promise<void> {
+    try {
+      await this.client.login();
+      this.sessionReady = true;
+      if (this.jar && this.sessionKey) {
+        captureSessionFromAdt(this.client, this.jar);
+        await markJarPersisted(this.jar, this.config.sap, this.sessionKey);
+      }
+    } catch (error: unknown) {
+      if (error instanceof CliError) throw error;
+      throw classifyHttpError(error, { name: this.config.systemName, authMethod: this.authLabel });
+    }
   }
 
   static async create(): Promise<AdtClientWrapper> {
     try {
       const config = await loadConfig();
       const auth = await buildAuth(config.sap, config.systemName);
-      return new AdtClientWrapper(config, auth);
+      const wrapper = new AdtClientWrapper(config, auth);
+      await wrapper.initSession();
+      registerAdtClient(wrapper);
+      return wrapper;
     } catch (error: unknown) {
       if (error instanceof CliError) throw error;
       const message = error instanceof Error ? error.message : String(error);
       throw new CliError('CONFIG_ERROR', message);
+    }
+  }
+
+  /** Effective session policy of this client (`reuse` or `always-logout`). */
+  get sessionPolicy(): 'reuse' | 'always-logout' {
+    return this.policy;
+  }
+
+  /** True when this wrapper reused a persisted SAP session (cookie jar). */
+  get reusedSession(): boolean {
+    return this.sessionReady && !!this.jar && this.jar.cookies.length > 0;
+  }
+
+  /**
+   * Decide whether to reuse a persisted SAP session or fall back to a fresh
+   * login on the first real request.
+   *
+   *  - cloud / btp: never touch the cookie jar (FR-005) — fresh login.
+   *  - `always-logout`: fresh login every command; no jar read/write.
+   *  - `reuse` + valid jar: inject cookie + csrf so the first request skips
+   *    the `ADTClient.login()` round-trip and reuses the SAP session.
+   *  - `reuse` + no jar: lazily fresh-login on first `_call`, then capture
+   *    the cookie map + csrf back into a new jar and persist it.
+   *
+   * Runs before any request (from `create()`), so every existing call site
+   * gets session reuse without touching the 23+ `create()` callers.
+   */
+  private async initSession(): Promise<void> {
+    this.policy = effectivePolicy(resolveSessionPolicy(this.config));
+    if (isUnsupportedInContext(this.config) || this.policy === 'always-logout') {
+      // Cloud/BTP or forced fresh login: no jar read/write at all.
+      this.sessionReady = false;
+      return;
+    }
+
+    const { key } = await loadOrCreateSessionKey(this.config.sap);
+    this.sessionKey = key;
+    const jar = await loadJarFromDisk(this.config.sap, key);
+    if (jar && jar.cookies.length > 0) {
+      injectSessionIntoAdt(this.client, jar);
+      this.jar = jar;
+      this.sessionReady = true; // first request reuses the saved SAP session
+    } else {
+      this.jar =
+        jar ??
+        makeEmptyJar(
+          { ...this.config.sap, password: '' },
+          this.config.sap.systemType ?? 'on-prem',
+          this.config.systemName,
+        );
+      this.sessionReady = false; // fresh login on first _call
+    }
+  }
+
+  /** Lazy fresh login + capture/persist of the new session (first real call). */
+  private async ensureSession(): Promise<void> {
+    if (this.sessionReady) return;
+    await this.client.login();
+    this.sessionReady = true;
+    if (this.jar) {
+      captureSessionFromAdt(this.client, this.jar);
+      if (this.sessionKey) await markJarPersisted(this.jar, this.config.sap, this.sessionKey);
+    }
+  }
+
+  /**
+   * Explicit logout — used by `always-logout` policy at command end and by
+   * the SIGINT/SIGTERM handlers. Best-effort: never throws to the caller.
+   * After logout the SAP session is gone, so the on-disk jar for this
+   * profile is cleared unconditionally (its cookies are now dead) — even in
+   * `always-logout` mode where this wrapper never loaded a jar itself but a
+   * stale one from a previous `reuse` run may still exist.
+   */
+  async logout(): Promise<void> {
+    try {
+      await this.client.logout();
+      this.sessionReady = false;
+      clearJarFromDisk(this.config.sap);
+    } catch {
+      // logout is best-effort — swallow transport/auth errors.
     }
   }
 
@@ -80,14 +195,46 @@ export class AdtClientWrapper {
    * (TLS / AUTH / SAP) and rethrow as a `CliError`. Existing CliError instances
    * pass through untouched so callers (push-flow, resolve) keep their
    * fine-grained sub-codes (LOCK_FAILED, OBJECT_NOT_FOUND, etc.).
+   *
+   * Session handling hooks here (single choke point for every round-trip):
+   *   - first call on a fresh wrapper triggers `ensureSession()` (login +
+   *     capture/persist when in reuse mode);
+   *   - a stale-jar 401 in reuse mode triggers one fallback re-login then
+   *     retries the original call once.
    */
   private async _call<T>(fn: () => Promise<T>): Promise<T> {
+    const attempt = async (): Promise<T> => {
+      await this.ensureSession();
+      return fn();
+    };
     try {
-      return await fn();
+      return await attempt();
     } catch (error: unknown) {
-      if (error instanceof CliError) throw error;
-      throw classifyHttpError(error, { name: this.config.systemName, authMethod: this.authLabel });
+      const classified = error instanceof CliError ? error : classifyHttpError(error, { name: this.config.systemName, authMethod: this.authLabel });
+      if (this.jar && !this.fallbackUsed && classified.code === 'AUTH_ERROR') {
+        this.fallbackUsed = true;
+        // Stale session: re-login, re-capture, persist, then retry the call.
+        await this.client.login();
+        captureSessionFromAdt(this.client, this.jar);
+        if (this.sessionKey) await markJarPersisted(this.jar, this.config.sap, this.sessionKey);
+        try {
+          return await attempt();
+        } catch (retryError: unknown) {
+          if (retryError instanceof CliError) throw retryError;
+          throw classifyHttpError(retryError, { name: this.config.systemName, authMethod: this.authLabel });
+        }
+      }
+      throw classified;
     }
+  }
+
+  /**
+   * Low-level transport access for callers that issue raw ADT requests
+   * (e.g. dumps-feed). Guarantees the session is ready before exposing it.
+   */
+  async ensureTransport(): Promise<ADTClient> {
+    await this.ensureSession();
+    return this.client;
   }
 
   // --- Object operations ---
@@ -98,6 +245,11 @@ export class AdtClientWrapper {
 
   getObjectSource(objectSourceUrl: string) {
     return this._call(() => this.client.getObjectSource(objectSourceUrl));
+  }
+
+  /** Active (compiled) version of an object source — routed through `_call`. */
+  getActiveObjectSource(objectSourceUrl: string) {
+    return this._call(() => this.client.getObjectSource(objectSourceUrl, { version: 'active' }));
   }
 
   /** Where-used: direct references to an object (ADT usageReferences). */
@@ -314,7 +466,7 @@ export class AdtClientWrapper {
     });
   }
 
-  /** Validate a proposed object without creating it (FR-021, `create --check-only`). */
+  /** Validate a proposed object without creating it (`create --check-only`). */
   validateNewObject(options: Parameters<ADTClient['validateNewObject']>[0]) {
     return this._call(() => this.client.validateNewObject(options));
   }
@@ -325,7 +477,7 @@ export class AdtClientWrapper {
     return this._call(() => this.client.deleteObject(objectUrl, lockHandle, transport));
   }
 
-  // --- ATC (check atc, FR-011) ---
+  // --- ATC (check atc) ---
 
   atcCheckVariant(variant: string) {
     return this._call(() => this.client.atcCheckVariant(variant));
@@ -341,5 +493,17 @@ export class AdtClientWrapper {
         ? this.client.atcWorklists(runResultId)
         : this.client.atcWorklists(runResultId, timestamp, usedObjectSet ?? '', includeExemptedFindings),
     );
+  }
+
+  // --- Runtime dumps (read-only) ---
+
+  /**
+   * List recent ST22 ABAP runtime dumps via the ADT Atom feed
+   * `/sap/bc/adt/runtime/dumps`. Read-only — never creates locks, transports,
+   * or SAP data. `$top` / `$filter` are sent as direct OData URL parameters so
+   * the server trims the result set before it reaches the CLI.
+   */
+  dumps(limit?: number, user?: string): Promise<DumpsFeed> {
+    return this._call(() => fetchDumpsFeed(this.client.httpClient, limit, user));
   }
 }

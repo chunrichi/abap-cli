@@ -41,19 +41,19 @@ vi.mock('../../src/abap_cli/config/user-config.js', () => ({
   saveUserConfig: vi.fn(),
 }));
 
-vi.mock('../../src/abap_cli/icf/service-version.js', () => ({
+vi.mock('../../src/abap_cli/clients/icf-version.js', () => ({
   checkIcfDeployment: vi.fn().mockResolvedValue({ status: 'not_deployed', expectedVersion: '0.1.0' }),
   ICF_SERVICE_VERSION: '0.1.0',
 }));
 
 // saveProfile() triggers an informational textpool capability probe — mock
 // it so the wizard can complete end-to-end without HTTP.
-vi.mock('../../src/abap_cli/textpool/textpool-capability.js', () => ({
+vi.mock('../../src/abap_cli/clients/textpool-capability.js', () => ({
   probeTextpoolCapability: vi.fn().mockResolvedValue({ adtTextpool: false }),
   recordCapability: vi.fn().mockResolvedValue(''),
 }));
 
-import { runInitWizard } from '../../src/abap_cli/flows/init-flow.js';
+import { runInitWizard } from '../../src/abap_cli/flows/setup/init.js';
 
 describe('abap init wizard — new-system prompt order', () => {
   it('asks for identity fields (URL/Client/Username/Language) before credentials (insecure/CA/password)', async () => {

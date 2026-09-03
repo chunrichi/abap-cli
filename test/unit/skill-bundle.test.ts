@@ -107,9 +107,9 @@ function getAllSkills(): SkillInfo[] {
 describe('skill bundle (019-cli-skill-agent-bundle) structural audit', () => {
   const skills = getAllSkills();
 
-  it('discovers exactly 5 skills (025 重构: meta + 4 领域)', () => {
+  it('discovers exactly 6 skills (meta + 5 领域/方法)', () => {
     const names = skills.map((s) => s.dirName).sort();
-    expect(names).toEqual(['abap-cli', 'abap-cli-data', 'abap-cli-edit', 'abap-cli-search', 'abap-cli-setup']);
+    expect(names).toEqual(['abap-cli', 'abap-cli-data', 'abap-cli-edit', 'abap-cli-performance', 'abap-cli-search', 'abap-cli-setup']);
   });
 
   it.each(skills.map((s) => [s.dirName, s] as const))(

@@ -1,6 +1,6 @@
 ---
 name: abap-cli
-description: abap-cli 用户的 agent 路由层 — 根据用户意图分发到 4 个领域 skill（abap-cli-setup / -search / -edit / -data）；串联 .github/skills/ 两层通用 ABAP 方法论。use when asking "这个查询该看哪个 skill" 或 agent 收到模糊意图需要先做路由决策。
+description: abap-cli 用户的 agent 路由层 — 根据用户意图分发到 4 个领域 skill（abap-cli-setup / -search / -edit / -data）与 1 个方法论 skill（abap-cli-performance）；串联 .github/skills/ 两层通用 ABAP 方法论。use when asking "这个查询该看哪个 skill" 或 agent 收到模糊意图需要先做路由决策。
 metadata:
   version: "0.3.0"
   scope: meta
@@ -11,7 +11,7 @@ metadata:
 
 `scope: meta` — 这个 skill **不直接管命令**，只做两件事：
 
-1. **路由表**：把用户意图映射到唯一目标领域 skill（4 选 1）
+1. **路由表**：把用户意图映射到唯一目标领域 skill（4 选 1）+ 1 个方法论 skill
 2. **边界说明**：澄清与 `.github/skills/` 两层通用 ABAP 方法论的关系
 
 加载本 skill 后，**第一步是查路由表**；命中目标后，**只加载那一个领域 skill 的 SKILL.md 全文**，不要把 4 棵决策树都读进上下文。
@@ -24,9 +24,12 @@ metadata:
 | 查对象元数据 / where-used / 业务码 / 拉取对账 / 状态只读 | `abap-cli-search` | `search` `where-used` `inspect` `tcode` `diff` `status` |
 | 拉对象 / 改 / 推 / 语法检查 / 激活 / 创建 | `abap-cli-edit` | `pull` `push` `check` `create` `activate` `create local` + DDIC 子集 |
 | 跑类 / 查表 / 翻页 select | `abap-cli-data` | `select` `run` |
+| ABAP 性能 review / 慢路径诊断 / 优化建议 | `abap-cli-performance` | （方法论 skill，不直接管命令） |
 | 意图模糊 / 不确定归哪类 | `abap-cli`（meta） | （路由查询本身） |
 
 > **同一命令唯一归属**：4 个领域 skill 的 `metadata.commands` 集合互不相交，并集 = 全部 19 个 CLI 命令（详见 `skills/README.md`）。
+>
+> **`abap-cli-performance` 例外**：它是方法论 skill，`metadata.commands` 列的是其**触发**的只读命令集合（`search / inspect / pull / check / select`），实际归属仍是上表 4 个领域 skill。本 skill 全程不写对象。
 
 ### 路由查询决策树
 
@@ -36,6 +39,7 @@ metadata:
 ├── 关键词含 "查询 / 哪些地方用 / 业务码 / 状态 / 差异" 且不含 "改 / 推 / 激活" → abap-cli-search
 ├── 关键词含 "拉 / 改 / 推 / 语法 / 激活 / 创建 / DDIC 定义" → abap-cli-edit
 ├── 关键词含 "跑 / 查表数据 / select / run / 翻页" → abap-cli-data
+├── 关键词含 "慢 / 性能 / 优化 / N² / FOR ALL ENTRIES / 内表 / HASHED / AMDP / CDS" → abap-cli-performance
 └── 模糊 / 无法分类 → 留在 abap-cli（meta），先问用户 1 个澄清问题，再路由
 ```
 

@@ -11,8 +11,10 @@ import { ExtensionRegistry, setExtensionRegistry } from './extensions/registry.j
 import { setExtensionRegistry as setExtRegJson, CliError, renderError } from './output/json.js';
 import { EXIT_GENERIC_FALLBACK } from './output/exit-codes.js';
 import { loadConfig } from './config/project-config.js';
+import { installSignalHandlers } from './session/signals.js';
+import { runAlwaysLogoutIfNeeded } from './session/end-of-command.js';
 
-// 声明式惰性注册（P1.6）：只有 name + description 在启动时加载，模块体在
+// 声明式惰性注册：只有 name + description 在启动时加载，模块体在
 // 命令真正被调用（或请求其 --help）时才 import。
 const COMMAND_SPECS: LazyCommandSpec[] = [
   {
@@ -113,10 +115,35 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
     load: () => import('./commands/diff.js').then((m) => ({ register: m.registerDiffCommand })),
   },
   {
+    name: 'dumps',
+    scope: 'sap',
+    description: 'List recent ST22 ABAP runtime dumps (read-only)',
+    load: () => import('./commands/dumps.js').then((m) => ({ register: m.registerDumpsCommand })),
+  },
+  {
     name: 'extensions',
     scope: 'local',
     description: 'Manage installed extensions',
     load: () => import('./commands/extensions.js').then((m) => ({ register: m.registerExtensionsCommand })),
+  },
+  {
+    name: 'mime',
+    scope: 'sap',
+    description: 'Create, delete, or upload MIME Repository resources (create | delete | push)',
+    load: () => import('./commands/mime.js').then((m) => ({ register: m.registerMimeCommand })),
+  },
+  {
+    // Two-segment command name: `abap validate:aff <file-or-dir> ...`.
+    // Lazy-loaded like any other command so it doesn't bloat startup.
+    name: 'validate:aff',
+    description: 'Validate JSON files against official abap-file-format (AFF) canonical schemas (Draft 2020-12)',
+    load: () => import('./commands/validate-aff.js').then((m) => ({ register: m.registerValidateAffCommand })),
+  },
+  {
+    // 034: session reuse inspector — read-only, no SAP traffic.
+    name: 'session',
+    description: 'Inspect / manage session cookie reuse state',
+    load: () => import('./commands/session.js').then((m) => ({ register: m.registerSessionCommand })),
   },
 ];
 
@@ -135,13 +162,13 @@ program
   .option('--json', 'Output in JSON format (compact, default for agents)')
   .option('--pretty-json', 'Output in pretty JSON format (overrides --json)');
 
-// 顶层错误处理（FR-005/FR-007）：commander 抛错（缺参/未知选项）由这里归一化为
+// 顶层错误处理：commander 抛错（缺参/未知选项）由这里归一化为
 // 结构化错误；--help/--version 让 commander 自己写 stdout（包含 addHelpText
 // 后置 section），我们在 catch 里只补 USAGE/JSON 信封和退出码，避免重复。
 program.exitOverride();
 program.configureOutput({ writeErr: () => {} });
 
-// Register all commands lazily (P1.6): stubs up front, modules on demand.
+// Register all commands lazily: stubs up front, modules on demand.
 registerLazyCommands(program, COMMAND_SPECS);
 
 setProgram(program);
@@ -214,10 +241,17 @@ program.hook('postAction', async (_thisCmd, actionCmd) => {
     argv,
     ts: Date.now(),
   });
+  // 034: release SAP sessions at command end when the policy demands it
+  // (`always-logout`). The default `reuse` policy intentionally keeps the
+  // session alive so the next CLI process can reuse it.
+  await runAlwaysLogoutIfNeeded(config);
 });
 
+// 034: SIGINT/SIGTERM best-effort release of any live SAP session.
+installSignalHandlers();
+
 try {
-  // parseAsync: lazy commands (P1.6) dispatch through an async _parseCommand,
+  // parseAsync: lazy commands dispatch through an async _parseCommand,
   // so commander's sync help/error throws surface as rejections that only
   // parseAsync (which awaits the chain) re-throws into this catch block.
   await registry.dispatch('beforeParse', {

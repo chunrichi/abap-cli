@@ -1,0 +1,4 @@
+@EndUserText.label : 'No-settings structure'
+define structure zmy_stru_no_settings {
+  field1 : abap.char(20);
+}

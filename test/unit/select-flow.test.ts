@@ -8,7 +8,7 @@ import {
   validateFields,
   validateOrderBy,
   type SelectResult,
-} from '../../src/abap_cli/flows/select-flow.js';
+} from '../../src/abap_cli/flows/data/select.js';
 import { IcfClient } from '../../src/abap_cli/clients/icf-client.js';
 import { CliError } from '../../src/abap_cli/output/json.js';
 

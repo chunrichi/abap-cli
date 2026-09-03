@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { deployBundled } from '../../src/abap_cli/flows/deploy-flow.js';
+import { deployBundled } from '../../src/abap_cli/flows/edit/deploy.js';
 
 const lock = vi.fn(async () => ({ LOCK_HANDLE: 'lock-1' }));
 const setObjectSource = vi.fn(async () => '');

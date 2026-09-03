@@ -27,11 +27,14 @@ const icfGetDdic = vi.fn(async () => ({
   data: {
     name: 'ZDOMA_TEST',
     description: 'Domain',
-    dataType: 'QUAN',
-    length: 13,
-    decimals: 3,
-    signFlag: true,
-    convExit: 'ALPHA',
+    format: {
+      dataType: 'QUAN',
+      length: 13,
+      decimals: 3,
+      signFlag: 'X',
+      lowercase: '',
+      convExit: 'ALPHA',
+    },
   },
   error: null,
 }));
@@ -71,9 +74,16 @@ describe('014/US3 pull DDIC', () => {
     const written = fs.readFileSync(path.join(cwd, 'src/doma/zdoma_test.doma.json'), 'utf-8');
     const parsed = JSON.parse(written);
     expect(parsed.name).toBe('ZDOMA_TEST');
-    expect(parsed.dataType).toBe('QUAN');
-    expect(parsed.length).toBe(13);
-    expect(parsed.convExit).toBe('ALPHA');
+    // 033: AFF canonical — dataType/length live under format.*, no flat top-level.
+    expect((parsed as Record<string, unknown>).dataType).toBeUndefined();
+    expect(parsed.format).toEqual({
+      dataType: 'QUAN',
+      length: 13,
+      decimals: 3,
+      signFlag: 'X',
+      lowercase: '',
+      convExit: 'ALPHA',
+    });
   });
 
   it('uses --overwrite to replace an existing file', async () => {

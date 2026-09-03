@@ -36,6 +36,13 @@ export interface PullStrategy {
 /**
  * CLAS/PROG/INTF share the objectStructure + source-parts layout:
  * one <name>.<type>.json metadata file plus one .abap per include part.
+ *
+ * 032 US13: PROG/I (include program) sub-route. The single source part on
+ * a PROG/I is a top-level include (no `main`), so its subtype is renamed
+ * `main → include` to land at `<name>.prog.include.abap` (abap-file-format
+ * PROG subtype). The `metadata.programType` (`'I'` raw / `'include'` enum)
+ * already maps to `generalInformation.programType: 'include'` via
+ * `renderObjectMetadataJson` — that's the JSON marker for INCLUDE.
  */
 function sourceObjectStrategy(): PullStrategy {
   return {
@@ -44,12 +51,21 @@ function sourceObjectStrategy(): PullStrategy {
       const parts = opts.includeAllParts
         ? allParts
         : allParts.filter((p) => (opts.includeTests ? true : p.subtype !== 'testclasses'));
+      // 032 US13: PROG/I — remap `main` subtype to `include` so the file
+      // lands at `<name>.prog.include.abap`. Object-detection reuses the
+      // primary-type split from `object.type` (PROG/I splits to PROG).
+      const isProgInclude = object.type.split('/')[0]!.toUpperCase() === 'PROG'
+        && (metadata.programType === 'I'
+          || object.type.toUpperCase().endsWith('/I'));
+      const remapped = isProgInclude
+        ? parts.map((p) => ({ ...p, subtype: p.subtype === 'main' ? 'include' : p.subtype }))
+        : parts;
       return [
         {
           filename: buildFilename(object.name, object.type, undefined, '.json'),
           content: async () => renderObjectMetadataJson(metadata),
         },
-        ...parts.map((p) => ({
+        ...remapped.map((p) => ({
           filename: buildFilename(object.name, object.type, p.subtype, '.abap'),
           content: async () => client.getObjectSource(p.sourceUrl),
         })),

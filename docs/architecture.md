@@ -32,7 +32,7 @@ src/abap_cli/
 ├── core/                 # shared infrastructure: lazy registration, polyfill, object/transport resolution, limits
 ├── dictionary/           # DDIC domain logic: ddic-json.ts (abap-file-format JSON ↔ wire mapping)
 ├── formats/              # abap-file-format file resolution + pull strategies
-├── icf/                  # ICF service version constants + deployment check
+├── clients/icf-version.ts # ICF service version + deployment check
 ├── textpool/             # textpool capability probe + mixed-mode route (ADT/ICF)
 ├── output/               # unified JSON output (CliError/printResult/printError), error/exit codes, help text, check-issue types — see output/README.md
 └── flows/                # workflow orchestration: push (object/fugr/textpool), pull, deploy, sync, create, config (params/wizard/write), connection (flow/profile), status/diff, inspect, doctor, atc

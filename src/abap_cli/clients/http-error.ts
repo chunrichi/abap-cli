@@ -8,7 +8,7 @@ import type { ErrorCode } from '../output/error-codes.js';
 import '../auth/registry-bootstrap.js';
 import { getAuthHints as lookupAuthHints } from '../auth/strategy.js';
 
-/** Node TLS error codes — see [research §4](../../../../specs/008-cli-foundation/research.md). */
+/** Node TLS error codes. */
 const TLS_ERROR_CODES = new Set<string>([
   'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
   'SELF_SIGNED_CERT_IN_CHAIN',

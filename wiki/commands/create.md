@@ -1,20 +1,23 @@
 ---
 type: command
 title: abap create
-description: 在 SAP 创建新对象并激活 — 源对象（CLAS/INTF/PROG/FUGR，ADT REST）与 DDIC（DOMA/DTEL/TABL/STRU，--file 走 ICF）；--no-activate / --template / --no-pull / --check-only / --audit；--schema 提供 agent 参数自省；create local 为离线草稿
-tags: [abap-cli, command, create, clas, intf, prog, fugr, doma, dtel, tabl, stru, ddic, icf, template, schema]
+description: 在 SAP 创建新对象并激活 — 源对象（CLAS/INTF/PROG/FUGR，ADT REST）与 DDIC（DOMA/DTEL/TABL/STRU，--file 走 ICF）；FUGR 配 --func 可在既有函数组内新建函数模块（FUGR/FF）；--no-activate / --template / --no-pull / --check-only / --audit；--schema 提供 agent 参数自省；create local 为离线草稿
+tags: [abap-cli, command, create, clas, intf, prog, fugr, fugr-ff, doma, dtel, tabl, stru, ddic, icf, template, schema]
 created at: 2026-08-07 00:00:00
-changed at: 2026-08-07 00:00:00
+changed at: 2026-09-02 00:00:00
 ---
 
 # abap create
 
 在 SAP 中创建新 ABAP 对象并激活。源对象（`CLAS`/`INTF`/`PROG`/`FUGR`）走 ADT REST API；DDIC 对象（`DOMA`/`DTEL`/`TABL`/`STRU`）走自建 ICF 服务（014，需 `--file`）。创建后默认 create-then-pull 写本地副本。拒绝覆盖已存在对象（`OBJECT_EXISTS`）。
 
+`FUGR` 类型有两种形态：`abap create FUGR <group>` 新建**函数组**；`abap create FUGR <group> --func <module>` 在**既有函数组内新建函数模块**（`FUGR/FF`，ADT `POST /sap/bc/adt/functions/groups/<group>/fmodules`）。后者的 `<name>` 是组名，须已存在于 SAP。
+
 ## Usage
 
 ```bash
 abap create [options] <type> <name>
+abap create FUGR <group> --func <module> [options]   # 在既有函数组内新建函数模块
 abap create local <type> <name> [options]     # 实验性：本地草稿，不连 SAP
 abap create --schema [type]                    # agent 参数自省，不连 SAP
 ```
@@ -22,7 +25,7 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 ## Options
 
 - `<type>`: 对象类型 `CLAS` / `INTF` / `PROG` / `FUGR`；DDIC 类型 `DOMA` / `DTEL` / `TABL` / `STRU`（须配 `--file`）；其余类型 → `TYPE_NOT_SUPPORTED`，`TTYP` → `DDIC_NOT_SUPPORTED`
-- `<name>`: 对象名（自动转大写；命名空间名如 `/UI2/CL_JSON` 映射为 `#` 转义目录）
+- `<name>`: 对象名（自动转大写；命名空间名如 `/UI2/CL_JSON` 映射为 `#` 转义目录）。本地预校验：≤30 字符、仅 `A-Z 0-9 _`、命名空间形如 `/NS/NAME`（NS ≤10，总长 ≤30），违规 → `VALIDATION_ERROR`（exit 7）
 - `--package <package>`: 目标 SAP 包（必填）
 - `--description <desc>`: 对象描述（必填；有 `--file` 时可选，由 JSON 提供）
 - `--tr <transport>`: 传输请求号；缺省时 `resolveTransport` 解析（非 `$TMP` 包下 DDIC 必须显式给出）
@@ -32,6 +35,7 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 - `--check-only`: 只校验对象可行性（`validateNewObject`），不创建
 - `--audit`: 额外一次 SAP 往返记录 before-checksum（默认关）
 - `--file <path>`: 014 — abap-file-format DDIC 输入（`DOMA`/`DTEL`/`TABL`/`STRU` 必填）。TABL/STRU 是三件套：`--file` 指向 main `.tabl.json`，CLI 自动读同目录 `.tabl.ddic`（DDL 源）与 `.tabl.settings.json`；只有 main JSON 时回落 legacy wire-flat 单文件（顶层 `name` / `fields[]`）。DDL 解析失败 → `TABL_DDL_INVALID`（exit 7）
+- `--func <module>`: 仅 `FUGR` 类型可用 — 在**既有函数组 `<name>`** 内新建函数模块（`FUGR/FF` 子对象）。组不存在 → `OBJECT_NOT_FOUND`（exit 8，附建组指引）；组内同名模块已存在 → `OBJECT_EXISTS`（exit 2）；模块名同样过本地预校验（≤30、`A-Z 0-9 _`）。`--check-only` 不支持该形态
 - `--schema`: 打印参数 schema 为 JSON 并退出（无 SAP 调用；`<type>`/`<name>` 可不传）
 - `--yes`: 非交互确认写操作；非 TTY 且无 `--yes` → `VALIDATION_ERROR`（exit 7）。`create` 本身暂无 `--dry-run` flag（014 走的是 `--check-only`），但 `requireWriteConfirmation` 仍识别 `dryRun` 字段作为 future flag 占位
 
@@ -44,9 +48,11 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 ## 行为规则
 
 - **三条路由**：源对象 → ADT REST `createObject`；DDIC（`--file`）→ ICF `POST /sap/zabap_vibe/ddic/<type>`；`local` → 仅写本地文件（零 SAP 调用、不读凭据）
+- **本地名称预校验**（快失败，零 SAP 往返，先于任何路由/`assertNotExists`）：所有带 `<name>` 的入口（源对象 / DDIC `--file` / HTTP / TRAN / `--check-only` / `create local`）先校验规范化（大写）后的名字——≤30 字符，仅 `A-Z 0-9 _`；命名空间形如 `/NS/NAME`（NS ≤10 且仅 `A-Z 0-9 _`，含斜杠总长 ≤30）；空名同样拒绝。**不强制 Z/Y 前缀**（`$TMP` 接受 `A123`）。违规 → `VALIDATION_ERROR`（exit 7），避免超长/非法名拨号 SAP 后报误导性的 `OBJECT_NOT_FOUND`；与 DDIC 客户端命名校验（exit 7）保持一致
 - **防覆盖**：创建前 `assertNotExists`；已存在 → `OBJECT_EXISTS`（不覆盖）
 - **创建即激活**：复用 push 流程（lock → 写 skeleton → activate → unlock）；`--no-activate` 跳过激活
 - **FUGR 与源对象的差异**：新 FUGR 用 `objectStructure` 取 parts（立即可读）；CLAS/INTF/PROG 对新建对象 objectStructure 有就绪延迟（真机 "wrong input data"），回退到稳定 `<objectUrl>/source/main`
+- **FUGR/FF（组内建函数模块）**：`--func` 形态不改组、只建模块。组须先存在（`resolveObject` 校验）；模块经 `createObject({objtype:'FUGR/FF', parentName:<group>, parentPath:<group URL>})` 打到 `/sap/bc/adt/functions/groups/<group>/fmodules`（abap-adt-api objectcreator 内建类型，真机 $TMP 下直接产出激活态模块）；随后按 `--no-activate` 决定是否显式 activate。create-then-pull 只补写 `src/fugr/<group>/<group>.fugr.<fm>.func.{abap,json}`（`skipExisting`，绝不覆盖用户已编辑的组文件）；`includeNumber`（UXX 编号）由 SAP 创建时自动分配、pull 时从 UXX include 读取（如 FF01→01、FF02→02）
 - **DDIC 客户端校验**（快失败，零 SAP 往返）：命名空间（Z/Y/slash）与必需字段 → `VALIDATION_ERROR`；非 `$TMP` 包必须 `--tr`
 - **DDIC TABL/STRU 三件套解析**：`readDdicObjectForCreate(filePath, type)` 探测同目录 `.tabl.ddic`（或 `.stru.ddic`）与 `.tabl.settings.json`；三件齐全走 `readTablArtifact`，否则回落 `readDdicJson`（legacy wire-flat）。DDL 解析失败 → `TABL_DDL_INVALID`（exit 7）；main JSON 缺 `header.description` 等必填 → `VALIDATION_ERROR`，`error.example` 字段附 wire-flat 最小模板
 - **CLI flag 覆盖文件值**：`--description` / `--package` / `--tr` 优先于 `--file` JSON 内字段；`--description` 覆盖 `header.description`
@@ -60,6 +66,13 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 ```bash
 # 创建并激活一个类（默认骨架 + create-then-pull 写本地副本）
 abap create CLAS ZCL_MY_CLASS --package ZPKG --description "My class" --yes
+
+# 先建函数组，再在组内新建函数模块（FF01/FF02 → UXX 自动编号 01/02）
+abap create FUGR ZFG_DEMO --package $TMP --description "demo group" --yes
+abap create FUGR ZFG_DEMO --func ZFG_DEMO_FF01 --package $TMP --description "first fm" --yes
+# → src/fugr/zfg_demo/zfg_demo.fugr.zfg_demo_ff01.func.abap + .func.json（includeNumber 01）
+
+# 组不存在时报 OBJECT_NOT_FOUND 并提示先建组；组内重名报 OBJECT_EXISTS
 
 # 带模板 + 不激活 + 不拉本地副本
 abap create PROG ZREPORT --package $TMP --description "Report" --template report --no-activate --no-pull
@@ -115,6 +128,25 @@ abap create local CLAS ZCL_DRAFT --template public-method --dir src/
     "activated": true,
     "template": null,
     "localFile": "src/clas/zcl_my_class/zcl_my_class.clas.abap"
+  }
+}
+```
+
+成功（FUGR/FF，组内新建函数模块）：
+
+```json
+{
+  "status": "success",
+  "meta": { "command": "abap create", "version": "0.2.3", "timestamp": "2026-09-02T00:00:00.000Z", "durationMs": 1600, "warnings": [] },
+  "data": {
+    "object": "ZFG_DEMO_FF01",
+    "type": "FUGR/FF",
+    "group": "ZFG_DEMO",
+    "package": "$TMP",
+    "description": "first fm",
+    "transport": "",
+    "activated": true,
+    "localFile": "src/fugr/zfg_demo/zfg_demo.fugr.zfg_demo_ff01.func.abap"
   }
 }
 ```
@@ -209,6 +241,6 @@ abap create local CLAS ZCL_DRAFT --template public-method --dir src/
 
 # references
 
-- 实现：`src/abap_cli/commands/create.ts`、`src/abap_cli/flows/create-flow.ts`、`src/abap_cli/flows/create-types.ts`、`src/abap_cli/flows/create-schema.ts`、`src/abap_cli/formats/templates.ts`、`src/abap_cli/dictionary/ddic-json.ts`、`src/abap_cli/core/confirmation.ts`
+- 实现：`src/abap_cli/commands/create.ts`、`src/abap_cli/flows/edit/create.ts`、`src/abap_cli/flows/edit/create-types.ts`、`src/abap_cli/formats/templates.ts`、`src/abap_cli/formats/ddic/json.ts`、`src/abap_cli/types/registry.ts`、`src/abap_cli/core/confirmation.ts`
 - 文档：`docs/commands.md`（`## abap create` 章节）
-- 设计：`specs/005-create-command/`、`specs/011-create-local/`、`specs/014-ddic-crud-textpool/`
+- 设计：见 wiki 顶层 `create-command` / `create-local` / `ddic-crud-textpool` 历史回顾

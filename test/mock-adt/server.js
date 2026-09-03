@@ -187,17 +187,24 @@ function projectFields(rows, fields, fieldDefs) {
 }
 
 function addObject(name, type, objectUrl, description, parts, opts = {}) {
-  objects.set(name, {
+  const obj = {
     name,
     type,
     objectUrl,
     description,
     packageName: opts.packageName ?? '$TMP',
     active: true,
+    // Tracks whether the object is awaiting activation (mirrors real SAP
+    // post-createObject semantics). Newly-created objects default to
+    // inactive:false so the existing create happy-path tests continue to
+    // pass; the createObject POST handler flips this to true on create.
+    inactive: false,
     lockedBy: opts.lockedBy ?? null, // { user, lockHandle }
     programType: opts.programType ?? '1', // ADT program:programType
     parts,
-  });
+  };
+  objects.set(name, obj);
+  return obj;
 }
 
 // Search pagination fixtures (US1/SC-001): 25 ZPAGE_* objects + exact "ZPAGE".
@@ -319,12 +326,83 @@ addObject('ZPROG_TOP', 'PROG/I', '/sap/bc/adt/programs/includes/zprog_top', 'Dem
     sourceUrl: '/sap/bc/adt/programs/includes/zprog_top/source/main',
     content: "TABLES: t001.\n",
   },
+], { programType: 'I' });
+
+// 032 US12: 4 fixture objects (INTF/FUGR/TABL/STRU) for textpool multi-language
+// pulls. CLAS already exists above (ZCL_DEMO).
+addObject('ZIF_DEMO', 'INTF', '/sap/bc/adt/oo/interfaces/zif_demo', 'Demo interface', [
+  {
+    subtype: 'main',
+    sourceUrl: '/sap/bc/adt/oo/interfaces/zif_demo/source/main',
+    content: 'INTERFACE zif_demo PUBLIC.\nENDINTERFACE.\n',
+  },
+]);
+addObject('ZFG_DEMO', 'FUGR', '/sap/bc/adt/functiongroups/zfg_demo', 'Demo function group', [
+  {
+    subtype: 'main',
+    sourceUrl: '/sap/bc/adt/functiongroups/zfg_demo/source/main',
+    content: 'FUNCTION-POOL zfg_demo.\n',
+  },
+]);
+addObject('ZTB_DEMO', 'TABL', '/sap/bc/adt/ddic/tables/ztb_demo', 'Demo table', [
+  {
+    subtype: 'main',
+    sourceUrl: '/sap/bc/adt/ddic/tables/ztb_demo/source/main',
+    content: '',
+  },
+]);
+addObject('ZST_DEMO', 'STRU', '/sap/bc/adt/ddic/structures/zst_demo', 'Demo structure', [
+  {
+    subtype: 'main',
+    sourceUrl: '/sap/bc/adt/ddic/structures/zst_demo/source/main',
+    content: '',
+  },
 ]);
 
 // 015: remote (Version Management) sources served by /version-source — keyed TYPE:NAME.
 remoteSourceStore.set('REPS:ZPROG', "REPORT zprog.\nWRITE: / 'production version'.\n");
 remoteSourceStore.set('INTF:ZIF_DEMO', 'INTERFACE zif_demo.\n  METHODS run.\nENDINTERFACE.\n');
 remoteSourceStore.set('CLSD:ZCL_DEMO', 'CLASS zcl_demo DEFINITION PUBLIC.\n  PUBLIC SECTION.\n    METHODS run.\nENDCLASS.\n');
+
+// 032 US12: textpool fixtures for the 5 supported types — multi-language symbols
+// (texts). Each object has at least one category populated; categories that are
+// intentionally empty for that type exercise the TEXTPOOL_OBJECT_NOT_FOUND soft
+// warning path. Keys are TYPE:NAME:category.
+textpoolStore.set('CLAS:ZCL_DEMO:symbols', [
+  { id: '001', text: 'Hello from ZCL_DEMO (en)' },
+]);
+textpoolStore.set('CLAS:ZCL_DEMO:headings', [
+  { id: 'COLUMNHEADER_1', text: 'Column 1 (en)' },
+]);
+// CLAS intentionally has no selections — exercises TEXTPOOL_CATEGORY_MISSING warning.
+
+textpoolStore.set('INTF:ZIF_DEMO:symbols', [
+  { id: '001', text: 'Interface demo (en)' },
+]);
+textpoolStore.set('INTF:ZIF_DEMO:headings', [
+  { id: 'LISTHEADER', text: 'Interface list header (en)' },
+]);
+
+textpoolStore.set('FUGR:ZFG_DEMO:symbols', [
+  { id: '001', text: 'Function group demo (en)' },
+]);
+// FUGR typically has no headings — exercises TEXTPOOL_CATEGORY_MISSING warning.
+
+textpoolStore.set('TABL:ZTB_DEMO:symbols', [
+  { id: '001', text: 'Table demo (en)' },
+]);
+textpoolStore.set('TABL:ZTB_DEMO:headings', [
+  { id: 'COLUMNHEADER_1', text: 'Field 1 (en)' },
+  { id: 'COLUMNHEADER_2', text: 'Field 2 (en)' },
+]);
+textpoolStore.set('TABL:ZTB_DEMO:selections', [
+  { id: 'P_LANG', text: 'Language (en)' },
+]);
+
+textpoolStore.set('STRU:ZST_DEMO:symbols', [
+  { id: '001', text: 'Structure demo (en)' },
+]);
+// STRU has no selections/headings — exercises TEXTPOOL_CATEGORY_MISSING warning.
 
 // ICF service classes (013): handler + setup, targets for deploy enumeration / classrun.
 addObject('ZCL_ABAP_VIBE_ICF', 'CLAS', '/sap/bc/adt/oo/classes/zcl_abap_vibe_icf', 'ICF handler for zabap_vibe', [
@@ -366,6 +444,15 @@ addObject('ZCL_ABAP_VIBE_ICF_SETUP', 'CLAS', '/sap/bc/adt/oo/classes/zcl_abap_vi
 ]);
 
 const byObjectUrl = (path) => [...objects.values()].find((o) => o.objectUrl === path);
+// Match either the object's own objectUrl or any of its source URLs. Used
+// by the activation handler, which receives the sourceUri of the
+// method/OSI part (not the root objectUrl) in the request body.
+const byAnyUrl = (path) => {
+  const norm = path.split('?')[0];
+  return [...objects.values()].find(
+    (o) => o.objectUrl === norm || o.parts.some((p) => p.sourceUrl === norm),
+  );
+};
 const bySourceUrl = (path) => {
   for (const o of objects.values()) {
     const part = o.parts.find((p) => p.sourceUrl === path);
@@ -457,6 +544,7 @@ const SUBTYPE_TO_INCLUDE_TYPE = {
 };
 
 function structureXml(obj) {
+  const abapLanguageVersion = process.env.MOCK_CLOUD === '1' ? 'cloudDevelopment' : 'standard';
   if (obj.type === 'CLAS') {
     const includes = obj.parts
       .map(
@@ -477,6 +565,7 @@ function structureXml(obj) {
       `adtcore:masterLanguage="EN" adtcore:language="EN" adtcore:masterSystem="MOCK" adtcore:version="active" adtcore:responsible="${CURRENT_USER}" ` +
       `adtcore:changedBy="${CURRENT_USER}" adtcore:createdBy="${CURRENT_USER}" adtcore:changedAt="${NOW}" adtcore:createdAt="${NOW}" ` +
       `adtcore:descriptionTextLimit="60" abapsource:activeUnicodeCheck="true" abapsource:fixPointArithmetic="true" ` +
+      `abapsource:abapLanguageVersion="${abapLanguageVersion}" ` +
       `class:visibility="public" class:category="00" class:final="false" class:abstract="false" class:sharedMemoryEnabled="false">\n` +
       includes +
       '\n</clas:class>'
@@ -490,7 +579,8 @@ function structureXml(obj) {
     `adtcore:description="${obj.description}" adtcore:masterLanguage="EN" adtcore:language="EN" adtcore:masterSystem="MOCK" ` +
     `adtcore:version="active" adtcore:responsible="${CURRENT_USER}" adtcore:changedBy="${CURRENT_USER}" adtcore:createdBy="${CURRENT_USER}" ` +
     `adtcore:changedAt="${NOW}" adtcore:createdAt="${NOW}" adtcore:descriptionTextLimit="60" ` +
-    `abapsource:sourceUri="${main.sourceUrl}" program:programType="${obj.programType}" program:lockedByEditor="false"/>`
+    `abapsource:sourceUri="${main.sourceUrl}" abapsource:abapLanguageVersion="${abapLanguageVersion}" ` +
+    `program:programType="${obj.programType}" program:lockedByEditor="false"/>`
   );
 }
 
@@ -782,6 +872,32 @@ const server = http.createServer(async (req, res) => {
     if (path === '/sap/bc/adt/compatibility/graph') {
       if (AUTH_FAIL) return adtError(res, 401, 'Simulated auth failure (MOCK_AUTH_FAIL=1)');
       return ok(res, '{}', 'application/json');
+    }
+
+    // ADT service document / discovery — used by `abap doctor` and the
+    // runtime probe (`probeAdtRuntime`) as a lightweight reachability +
+    // capability check. Real SAP returns an Atom service document with
+    // workspace/collection children; we mirror the minimal subset the CLI
+    // actually parses (href + title per collection) so the doctor check
+    // reports conn.mock=ok instead of SAP_ERROR.
+    if (path === '/sap/bc/adt/discovery' && req.method === 'GET') {
+      const xml =
+        '<?xml version="1.0" encoding="UTF-8"?>\n' +
+        '<app:service xmlns:app="http://www.w3.org/2007/app" ' +
+        'xmlns:atom="http://www.w3.org/2005/Atom" ' +
+        'xmlns:sap="http://www.sap.com/adt/xmlns/sap">\n' +
+        '  <app:workspace>\n' +
+        '    <atom:title>ADT Workspace</atom:title>\n' +
+        '    <app:collection href="/sap/bc/adt/oo/classes"><atom:title>ABAP Classes</atom:title></app:collection>\n' +
+        '    <app:collection href="/sap/bc/adt/oo/interfaces"><atom:title>ABAP Interfaces</atom:title></app:collection>\n' +
+        '    <app:collection href="/sap/bc/adt/programs/programs"><atom:title>ABAP Programs</atom:title></app:collection>\n' +
+        '    <app:collection href="/sap/bc/adt/functions/groups"><atom:title>Function Groups</atom:title></app:collection>\n' +
+        '    <app:collection href="/sap/bc/adt/icf/sicf"><atom:title>ICF (SICF)</atom:title></app:collection>\n' +
+        '    <app:collection href="/sap/bc/adt/ddic/tables"><atom:title>DDIC Tables</atom:title></app:collection>\n' +
+        '    <app:collection href="/sap/bc/adt/cts/transportrequests"><atom:title>Transport Organizer</atom:title></app:collection>\n' +
+        '  </app:workspace>\n' +
+        '</app:service>';
+      return ok(res, xml, 'application/atomsvc+xml');
     }
 
     // self-built ICF service root (probeIcf target for `profile test` / `doctor`)
@@ -1348,7 +1464,13 @@ const server = http.createServer(async (req, res) => {
         if (objects.has(name)) {
           return adtError(res, 409, `Object ${name} already exists`);
         }
-        addObject(name, route.type, route.urlBase + name.toLowerCase(), description, skeletonParts(route.type, name));
+        const obj = addObject(name, route.type, route.urlBase + name.toLowerCase(), description, skeletonParts(route.type, name));
+        // Mirror real SAP semantics: a freshly created object is inactive
+        // until an explicit activate call. The CLI's `create` happy-path
+        // reports `activated:true` because it auto-runs activate after
+        // createObject — that activate call (POST /activation) clears
+        // this flag below.
+        obj.inactive = true;
         return ok(res, '', 'application/xml');
       }
     }
@@ -1404,12 +1526,59 @@ const server = http.createServer(async (req, res) => {
       return ok(res, checkXml(sourceUrl, inclUrl, validateSource(content)));
     }
 
-    // activation
+    // activation — list inactive objects (GET). Mirrors real ADT response
+    // shape: ioc:inactiveObjects root with ioc:entry children, each holding
+    // an ioc:object (or ioc:transport) wrapping an ioc:ref element whose
+    // attributes carry adtcore:uri/type/name. abap-adt-api's
+    // inactiveObjects() expects this exact structure.
+    //
+    // URI convention: use the object's objectUrl so the CLI's activate
+    // filter (`uri.split('#')[0] === resolved.objectUrl`) matches cleanly.
+    // Real SAP typically emits the per-include sourceUrl with a #fragment
+    // marker; the CLI's filter strips the fragment and would also accept
+    // that form, but emitting the bare objectUrl keeps the mock contract
+    // simple and matches what abap-adt-api's activate() function expects
+    // for the POST body.
+    if (path === '/sap/bc/adt/activation/inactiveobjects' && req.method === 'GET') {
+      const entries = [];
+      for (const obj of objects.values()) {
+        if (!obj.inactive) continue;
+        const mainPart = obj.parts.find((p) => p.subtype === 'main') ?? obj.parts[0];
+        const includeType = obj.type === 'CLAS' ? '/MA' : '/1';
+        const fragment = mainPart && mainPart.sourceUrl !== obj.objectUrl ? `#${obj.name.toLowerCase()}` : '';
+        entries.push(
+          `<ioc:entry>` +
+            `<ioc:object ioc:user="${CURRENT_USER}">` +
+              `<ioc:ref adtcore:uri="${esc(obj.objectUrl)}${fragment}" ` +
+              `adtcore:type="${esc(obj.type)}${includeType}" ` +
+              `adtcore:name="${esc(obj.name)}"/>` +
+            `</ioc:object>` +
+          `</ioc:entry>`,
+        );
+      }
+      const xml =
+        '<?xml version="1.0" encoding="UTF-8"?>\n' +
+        '<ioc:inactiveObjects xmlns:ioc="http://www.sap.com/adt/activation" ' +
+        'xmlns:adtcore="http://www.sap.com/adt/core" ' +
+        'xmlns:chkl="http://www.sap.com/adt/checklist">\n' +
+        entries.join('\n') +
+        '\n</ioc:inactiveObjects>';
+      return ok(res, xml);
+    }
+
+    // activation — POST the items to activate. Real SAP returns an envelope
+    // with chkl:messages and any remaining ioc:inactiveObjects; we mirror
+    // the empty success shape (same as before) but also clear the
+    // `inactive` flag on every activated object so a follow-up
+    // /inactiveobjects call reports zero items.
     if (path === '/sap/bc/adt/activation' && req.method === 'POST') {
       const body = await readBody(req);
       for (const uri of body.matchAll(/adtcore:uri="([^"]+)"/g)) {
-        const obj = byObjectUrl(uri[1].split('?')[0]);
-        if (obj) obj.active = true;
+        const obj = byAnyUrl(uri[1]);
+        if (obj) {
+          obj.active = true;
+          obj.inactive = false;
+        }
       }
       return ok(
         res,

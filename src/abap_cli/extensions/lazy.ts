@@ -1,11 +1,9 @@
 /**
- * Lazy extension loading — argv first-word sniff (027 FR-001 / FR-003).
+ * Lazy extension loading — argv first-word sniff.
  *
  * Startup must not `import()` any extension module. Two trigger points replace
  * the eager load: this argv sniff (so extension-contributed command names are
  * reachable by commander) and a `preAction` hook (validation / lifecycle).
- *
- * See contracts/lazy-load-contract.md §2.
  */
 
 import type { Command } from 'commander';

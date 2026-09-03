@@ -16,7 +16,7 @@ import type { OutputFile, PullContext, PullStrategy } from './pull-strategy.js';
  */
 
 /** Render <name>.fugr.json — header + fixPointArithmetic (spec $required). */
-function renderFugrMetadata(meta: { description?: string; masterLanguage?: string; fixPointArithmetic?: boolean }): string {
+function renderFugrMetadata(meta: { description?: string; masterLanguage?: string; fixPointArithmetic?: boolean; abapLanguageVersion?: string }): string {
   const doc: Record<string, unknown> = {
     formatVersion: '1',
     header: {
@@ -24,23 +24,30 @@ function renderFugrMetadata(meta: { description?: string; masterLanguage?: strin
       originalLanguage: (meta.masterLanguage ?? 'EN').toLowerCase(),
     },
   };
+  if (meta.abapLanguageVersion) {
+    (doc.header as Record<string, unknown>).abapLanguageVersion = meta.abapLanguageVersion;
+  }
   if (meta.fixPointArithmetic !== undefined) doc.fixPointArithmetic = meta.fixPointArithmetic;
   return JSON.stringify(doc, null, 2) + '\n';
 }
 
 /** Render <name>...reps.json — includeType is $required. */
-function renderRepsMetadata(description: string, includeType: 'functionGroup' | 'include'): string {
+function renderRepsMetadata(description: string, includeType: 'functionGroup' | 'include', abapLanguageVersion?: string): string {
+  const header: Record<string, unknown> = { description };
+  if (abapLanguageVersion) header.abapLanguageVersion = abapLanguageVersion;
   return JSON.stringify(
-    { formatVersion: '1', header: { description }, includeType },
+    { formatVersion: '1', header, includeType },
     null,
     2,
   ) + '\n';
 }
 
 /** Render <name>...func.json — processingType + includeNumber are $required. */
-function renderFuncMetadata(description: string, processingType: string | undefined, includeNumber: string): string {
+function renderFuncMetadata(description: string, processingType: string | undefined, includeNumber: string, abapLanguageVersion?: string): string {
+  const header: Record<string, unknown> = { description };
+  if (abapLanguageVersion) header.abapLanguageVersion = abapLanguageVersion;
   return JSON.stringify(
-    { formatVersion: '1', header: { description }, processingType: processingType ?? 'normal', includeNumber },
+    { formatVersion: '1', header, processingType: processingType ?? 'normal', includeNumber },
     null,
     2,
   ) + '\n';
@@ -55,6 +62,10 @@ export function fugrStrategy(): PullStrategy {
 
       const struc = await client.objectStructure(object.objectUrl);
       const meta = struc.metaData as unknown as Record<string, unknown>;
+      const abapLanguageVersion = meta['adtcore:abapLanguageVersion'] as string | undefined;
+      // mock and partial fixtures may omit abapsource:fixPointArithmetic; spec US4
+      // pins the default to `false` so on-prem consumers always see a boolean.
+      const fixPointArithmetic = (meta['abapsource:fixPointArithmetic'] as boolean | undefined) ?? false;
 
       // <name>.fugr.json
       files.push({
@@ -62,7 +73,8 @@ export function fugrStrategy(): PullStrategy {
         content: async () => renderFugrMetadata({
           description: meta['adtcore:description'] as string,
           masterLanguage: meta['adtcore:masterLanguage'] as string,
-          fixPointArithmetic: meta['abapsource:fixPointArithmetic'] as boolean,
+          fixPointArithmetic,
+          abapLanguageVersion,
         }),
       });
 
@@ -73,7 +85,7 @@ export function fugrStrategy(): PullStrategy {
       });
       files.push({
         filename: `${groupLow}.fugr.sapl${groupLow}.reps.json`,
-        content: async () => renderRepsMetadata(meta['adtcore:description'] as string, 'functionGroup'),
+        content: async () => renderRepsMetadata(meta['adtcore:description'] as string, 'functionGroup', abapLanguageVersion),
       });
 
       // l<name>top.reps.abap + .json (TOP include)
@@ -85,7 +97,7 @@ export function fugrStrategy(): PullStrategy {
         });
         files.push({
           filename: `${groupLow}.fugr.l${groupLow}top.reps.json`,
-          content: async () => renderRepsMetadata(top.description, 'include'),
+          content: async () => renderRepsMetadata(top.description, 'include', abapLanguageVersion),
         });
       }
 
@@ -104,7 +116,7 @@ export function fugrStrategy(): PullStrategy {
         });
         files.push({
           filename: `${groupLow}.fugr.${fmLow}.func.json`,
-          content: async () => renderFuncMetadata(fm.description, fm.processingType, includeNumber),
+          content: async () => renderFuncMetadata(fm.description, fm.processingType, includeNumber, abapLanguageVersion),
         });
       }
 

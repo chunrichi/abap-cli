@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { scaffoldAgents } from '../../src/abap_cli/flows/init-agents.js';
+import { scaffoldAgents } from '../../src/abap_cli/flows/setup/init-agents.js';
 
 /**
  * Each test gets a tmp dir we point `process.cwd()` at (init-agents uses

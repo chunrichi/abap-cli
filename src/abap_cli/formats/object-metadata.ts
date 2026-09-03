@@ -34,6 +34,9 @@ export function renderObjectMetadataJson(metadata: ObjectMetadata): string {
       originalLanguage: (metadata.masterLanguage ?? 'EN').toLowerCase(),
     },
   };
+  if (metadata.abapLanguageVersion) {
+    (doc.header as Record<string, unknown>).abapLanguageVersion = metadata.abapLanguageVersion;
+  }
   const programType = programTypeOf(metadata);
   if (programType) {
     doc.generalInformation = { programType };

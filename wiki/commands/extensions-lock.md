@@ -99,7 +99,5 @@ Lockfile written: /abs/path/to/extensions.lock.json
 
 ## references
 
-- spec: [`specs/027-extension-trust/spec.md`](../../specs/027-extension-trust/spec.md) §FR-007 / §FR-008
-- contract: [`specs/027-extension-trust/contracts/extensions-lock-v1.md`](../../specs/027-extension-trust/contracts/extensions-lock-v1.md)
-- data model: [`specs/027-extension-trust/data-model.md`](../../specs/027-extension-trust/data-model.md) §1 / §3
+- 信任硬化设计：见 wiki 顶层 `extension-trust` 历史回顾
 - sibling: [`wiki/commands/extension.md`](extension.md) (the ICF ABAP extension manager — unrelated)

@@ -24,7 +24,7 @@ Top-level commander 错误（unknown command / missing arg / unknown option）�
 
 | 文件 | 职责 |
 |------|------|
-| [error-codes.ts](error-codes.ts) | `ErrorCode` 枚举 + `ErrorCategory` 分类（单一事实来源 FR-008） |
+| [error-codes.ts](error-codes.ts) | `ErrorCode` 枚举 + `ErrorCategory` 分类（单一事实来源） |
 | [exit-codes.ts](exit-codes.ts) | 分类 → 退出码映射（0–9，稳定契约，改码需扩展合同文档） |
 | [json.ts](json.ts) | `OutputMode` / `isJsonMode`、`CliError` 类、`printResult` / `printError` / `renderError`、`printSchema`、`jsonFromCommand`、`CommandSchema` 类型 + `stripEmpty` token-efficient helper |
 | [meta.ts](meta.ts) | 普通信封 `meta` 块（command/version/timestamp/durationMs/warnings）与 schema 精简 meta（command/version/durationMs）+ `collectWarning` / `getOriginalArgv` |
@@ -33,8 +33,7 @@ Top-level commander 错误（unknown command / missing arg / unknown option）�
 ## 关键约定
 
 - **`CliError` 是唯一用户可见错误类型**：命令边界（`commands/`、`flows/`、
-  `config/`、`formats/`、`clients/`、`core/`、`textpool/`、`dictionary/`、
-  `icf/`）抛出的必须构造 `CliError`，由 `test/unit/cli-error-boundary.test.ts` 强制。
+  `config/`、`formats/`、`clients/`、`core/`、`textpool/`）抛出的必须构造 `CliError`，由 `test/unit/cli-error-boundary.test.ts` 强制。
 - **退出码稳定性**：`EXIT_CODES` 的值跨版本不变；新增分类只能占用保留区间
   （≥10）或走合同扩展。`EXIT_CODES` 的表与分类枚举保持同步。
 - **warning ≠ error**：非致命问题（如解锁失败、ICF 探测降级）走

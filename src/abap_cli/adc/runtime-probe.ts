@@ -314,7 +314,7 @@ export function steampunkDeployHint(systemUrl: string): string[] {
     `       URL:            ${trimmed}/sap/zabap_vibe`,
     `       ProxyType:      Internet`,
     `       Authentication: NoAuthentication (or per your security policy)`,
-    `  3. Verify:   curl ${trimmed}/sap/zabap_vibe/   → {"service":"zabap_vibe","version":"0.5.0",…}`,
+    `  3. Verify:   curl ${trimmed}/sap/zabap_vibe/   → {"service":"zabap_vibe","version":"0.6.0",…}`,
     `  4. (Optional) bind a route:  cf map-route <app> <domain> --path zabap_vibe`,
   ];
 }

@@ -4,7 +4,7 @@ title: Commands
 description: abap CLI 命令参考索引
 tags: [abap-cli, commands, index]
 created at: 2026-08-06 23:10:00
-changed at: 2026-08-19 23:00:00
+changed at: 2026-09-03 17:00:00
 ---
 
 # Commands
@@ -42,19 +42,26 @@ changed at: 2026-08-19 23:00:00
 ## 扩展
 
 - [extension](extension.md) — 管理内置 ICF ABAP 扩展（deploy 部署 / status 只读探测版本匹配）
-- [extensions](extensions.md) — 管理第三方扩展：list（只读列状态 + lockfile 状态）/ lock（重新生成 extensions.lock.json，027）
-- [extensions-lock](extensions-lock.md) — 027扩展加载信任硬化：算 / 刷新 `extensions.lock.json`（npm 扩展 sha512 钉死；`--allow-unsigned` 首次必填）
+- [extensions](extensions.md) — 管理第三方扩展：list（只读列状态 + lockfile 状态）/ [lock](extensions-lock.md)（027 信任硬化：算 / 刷新 `extensions.lock.json`，npm 扩展 sha512 钉死；`--allow-unsigned` 首次必填）
+
+## MIME 资源
+
+- [mime](mime.md) — 创建 / 删除 / 上传 SAP MIME Repository 资源（SE80 存储库；走自建 ICF `dispatch_mime`）
 
 ## 搜索与探查（增量）
 
-> 详见 [wiki/index.md#搜索与探查](../index.md) — 本索引只列命令；`diff` / `status` / `inspect` / `select` 在该分组：
+> 详见 [wiki/index.md#搜索与探查](../index.md) — 本索引只列命令；`diff` / `status` / `inspect` / `select` / `dumps` 在该分组：
 
 - [inspect](inspect.md) — 只读对象元数据（structure / includes / locks / activation / package）
 - [status](status.md) — 本地 vs SAP 差异（changed parts）
 - [diff](diff.md) — 本地 ↔ SAP 按 part 对比（只读）
 - [select](select.md) — 表数据只读查询（SE16N 等价）
+- [dumps](dumps.md) — 近期 ST22 ABAP runtime dump 摘要（只读，走 ADT Atom feed）
 
-## 跨命令契约
+## 会话管理
+
+- [session](session.md) — 查看 session cookie 复用状态（jar 路径 / 上次登录 / cookie / CSRF；只读，不联网）；`.abap.json#sap.sessionPolicy` 控制复用 vs 每条命令 logout
+
 
 ## 跨命令契约
 

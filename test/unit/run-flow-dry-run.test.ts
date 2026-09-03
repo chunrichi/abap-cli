@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildDryRun } from '../../src/abap_cli/flows/run-flow.js';
+import { buildDryRun } from '../../src/abap_cli/flows/data/run.js';
 import { registerRunCommand } from '../../src/abap_cli/commands/run.js';
 import { makeProgram, runCommand } from './cli-helper.js';
 

@@ -10,8 +10,8 @@ import {
   recordCapability,
   readCapability,
   type TextpoolCapability,
-} from '../../src/abap_cli/textpool/textpool-capability.js';
-import { routeTextpool, type TextpoolRoute } from '../../src/abap_cli/textpool/textpool-router.js';
+} from '../../src/abap_cli/clients/textpool-capability.js';
+import { routeTextpool, type TextpoolRoute } from '../../src/abap_cli/clients/textpool-router.js';
 
 // --- adt-textpool / adt-client mocks (probe uses getTextElements + setTextElements) ---
 const adtGetTextElements = vi.fn();

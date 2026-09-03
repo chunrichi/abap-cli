@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { runRun, validateTimeout, RUNNER_CLASS } from '../../src/abap_cli/flows/run-flow.js';
+import { runRun, validateTimeout, RUNNER_CLASS } from '../../src/abap_cli/flows/data/run.js';
 import { AdtClientWrapper } from '../../src/abap_cli/clients/adt-client.js';
 
 // US3 acceptance 2 — default timeout 30000.

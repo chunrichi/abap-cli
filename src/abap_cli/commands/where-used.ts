@@ -16,7 +16,7 @@ import {
   MAX_WHERE_USED_LIMIT,
   type WhereUsedOptions,
   type WhereUsedResult,
-} from '../flows/where-used-ops.js';
+} from '../flows/search/where-used-ops.js';
 
 export function registerWhereUsedCommand(program: Command): void {
   program

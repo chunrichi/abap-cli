@@ -1,5 +1,5 @@
 /**
- * ExtensionRegistry: process-wide extension state and dispatcher (FR-001 / FR-002 / FR-007).
+ * ExtensionRegistry: process-wide extension state and dispatcher.
  *
  * Responsible for:
  * - Loading + validating extension modules from ProjectConfig.extensions[]

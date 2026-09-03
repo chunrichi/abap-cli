@@ -4,12 +4,14 @@ title: abap status
 description: 本地 vs SAP 同步状态 — 按 part 列出差异（local-new / local-changed / remote-new / remote-changed / unchanged）；可选 --remote-only / --local-only / --all / --since / --limit
 tags: [abap-cli, command, status, sync, diff, parts]
 created at: 2026-08-28 00:00:00
-changed at: 2026-08-28 00:00:00
+changed at: 2026-09-02 00:00:00
 ---
 
 # abap status
 
 扫描工作区下的 `.abap` 文件，对照 SAP 端对象按 **part**（`main` / `testclasses` / `definitions` / `implementations` / `macros`）计算差异。只读，不获取锁，不修改 SAP。
+
+扫描根为 `.abap.json::sourceDir`（配置了时，相对配置文件所在目录解析），否则为当前工作目录。不遵循 `<name>.<type>.abap|xml` 布局的杂散文件会被跳过；显式文件路径永不跳过。
 
 ## Usage
 
@@ -89,5 +91,5 @@ abap status --json
 ## references
 
 - 实现：`src/abap_cli/commands/status.ts`、`src/abap_cli/flows/status.ts`（`computeChangedParts`）
-- 设计：`specs/004-pull-push-check-loop/spec.md`
+- 设计：见 wiki 顶层 `pull-push-check-loop` 历史回顾（设计文档不入 git，详见仓库 wiki）
 - 配合：`wiki/commands/diff.md`（精细按 part 比对）

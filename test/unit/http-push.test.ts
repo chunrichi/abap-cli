@@ -66,10 +66,9 @@ describe('022 abap push HTTP service (.json via ICF)', () => {
     expect(res.exitCode).toBeUndefined();
     expect(icfPostHttp).toHaveBeenCalledWith('ZHTTP_TEST', expect.objectContaining({
       name: 'ZHTTP_TEST',
-      description: 'Test HTTP service',
-      originalLanguage: 'EN',
-      handlerClass: 'ZCL_HTTP_HANDLER',
-      url: '/sap/zhttp_test',
+      formatVersion: '1',
+      header: { description: 'Test HTTP service', originalLanguage: 'EN' },
+      generalInformation: { handlerClass: 'ZCL_HTTP_HANDLER', url: '/sap/zhttp_test' },
       transportRequest: 'TRN001',
     }));
     const out = JSON.parse(res.stdout);

@@ -9,7 +9,7 @@ import {
   validateFields,
   validateOrderBy,
   type SelectResult,
-} from '../flows/select-flow.js';
+} from '../flows/data/select.js';
 
 export const SCHEMA = {
   schemaVersion: 1,

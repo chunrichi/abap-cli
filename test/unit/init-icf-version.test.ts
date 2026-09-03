@@ -24,7 +24,7 @@ vi.mock('../../src/abap_cli/config/user-config.js', () => ({
 
 // ICF deployment check — control all four states without real HTTP.
 const checkIcfDeployment = vi.fn();
-vi.mock('../../src/abap_cli/icf/service-version.js', () => ({
+vi.mock('../../src/abap_cli/clients/icf-version.js', () => ({
   checkIcfDeployment: (...a: unknown[]) => checkIcfDeployment(...a),
   ICF_SERVICE_VERSION: '0.1.0',
 }));

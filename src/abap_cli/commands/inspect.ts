@@ -1,8 +1,8 @@
 import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
-import { inspectObject, type InspectFlags } from '../flows/inspect-ops.js';
+import { inspectObject, type InspectFlags } from '../flows/search/inspect-ops.js';
 import { CliError, printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
-import { commandSchemas } from '../flows/command-schemas.js';
+import { commandSchemas } from '../flows/setup/command-schemas.js';
 
 interface InspectOptions extends InspectFlags {}
 

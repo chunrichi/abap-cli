@@ -16,11 +16,18 @@ const icfPostDdic = vi.fn(async () => ({
   error: null,
 }));
 
+// 035: DDIC push probes existence via ICF GET before POST; default = object exists.
+const icfGetDdic = vi.fn(async () => ({
+  status: 'success' as const,
+  data: {},
+  error: null,
+}));
+
 vi.mock('../../src/abap_cli/clients/icf-client.js', () => ({
   IcfClient: {
     create: async () => ({
       postDdic: icfPostDdic,
-      getDdic: vi.fn(),
+      getDdic: icfGetDdic,
       get: vi.fn(),
       post: vi.fn(),
       put: vi.fn(),
@@ -45,15 +52,18 @@ beforeEach(() => {
 });
 
 function writeTableJson(pkg = 'ZPKG', extra: Record<string, unknown> = {}) {
+  // 033: AFF canonical — settings under generalInformation.*.
   const json = {
     formatVersion: '1',
     header: { description: 'Test table', originalLanguage: 'EN' },
     name: 'ZTAB_TEST',
     package: pkg,
-    deliveryClass: 'A',
-    dataClass: 'APPL0',
-    sizeCategory: '0',
-    clientDependent: false,
+    generalInformation: {
+      deliveryClass: 'A',
+      dataClassCategory: 'APPL0',
+      sizeCategory: '0',
+      clientDependent: false,
+    },
     fields: [{ fieldName: 'FIELD1', dataType: 'CHAR', length: 20, keyFlag: true }],
     ...extra,
   };
@@ -70,7 +80,7 @@ describe('014 abap push DDIC (.json via ICF)', () => {
     expect(icfPostDdic).toHaveBeenCalledWith('tabl', expect.objectContaining({
       name: 'ZTAB_TEST',
       transportRequest: 'TRN001',
-      deliveryClass: 'A',
+      generalInformation: expect.objectContaining({ deliveryClass: 'A' }),
       fields: expect.arrayContaining([
         expect.objectContaining({ fieldName: 'FIELD1', dataType: 'CHAR', length: 20, keyFlag: true }),
       ]),
@@ -129,5 +139,117 @@ describe('014 abap push DDIC (.json via ICF)', () => {
     const out = JSON.parse(res.stdout);
     expect(out.data.dryRun).toBe(true);
     expect(out.data.results[0].plan).toContain('ddic-icf');
+  });
+
+  it('032 US5: pushes a three-piece TABL artifact (.tabl.json + .tabl.ddic) — wire merges DDL fields', async () => {
+    // 024 abap-file-format three-piece layout — wire picks up fields from .tabl.ddic.
+    const main = {
+      formatVersion: '1',
+      header: { description: 'Three-piece test', originalLanguage: 'EN' },
+      name: 'ZTAB_3PC',
+      package: 'ZPKG',
+      deliveryClass: 'A',
+      fields: [],
+    };
+    const ddic = [
+      'define table ztab_3pc {',
+      '  key mandt : abap.clnt not null;',
+      '  country   : abap.char(3) with foreign key [dependent] check t005;',
+      '}',
+    ].join('\n');
+    fs.writeFileSync(path.join(cwd, 'src/ztab_3pc.tabl.json'), JSON.stringify(main, null, 2));
+    fs.writeFileSync(path.join(cwd, 'src/ztab_3pc.tabl.ddic'), ddic);
+    const program = makeProgram();
+    registerPushCommand(program);
+    const res = await runCommand(program, ['push', 'src/ztab_3pc.tabl.json', '--tr', 'TRN001', '--yes', '--json'], { cwd });
+    expect(res.exitCode).toBeUndefined();
+    expect(icfPostDdic).toHaveBeenCalledWith('tabl', expect.objectContaining({
+      name: 'ZTAB_3PC',
+      transportRequest: 'TRN001',
+      // readTablArtifact strips CLIENT/MANDT for client-dependent TABLs.
+      // 033: clientDependent lives under generalInformation.* (AFF canonical).
+      generalInformation: expect.objectContaining({ clientDependent: true }),
+      fields: expect.arrayContaining([
+        expect.objectContaining({ fieldName: 'COUNTRY', dataType: 'CHAR', length: 3, checkTable: 'T005' }),
+      ]),
+    }));
+  });
+
+  it('032 US5: STRU push accepts three-piece without .tabl.settings.json sidecar', async () => {
+    const main = {
+      formatVersion: '1',
+      header: { description: 'Structure no-settings', originalLanguage: 'EN' },
+      name: 'ZSTR_3PC',
+      package: 'ZPKG',
+      fields: [],
+    };
+    const ddic = [
+      'define structure zstr_3pc {',
+      '  field1 : abap.char(10);',
+      '}',
+    ].join('\n');
+    fs.writeFileSync(path.join(cwd, 'src/zstr_3pc.stru.json'), JSON.stringify(main, null, 2));
+    fs.writeFileSync(path.join(cwd, 'src/zstr_3pc.stru.ddic'), ddic);
+    const program = makeProgram();
+    registerPushCommand(program);
+    const res = await runCommand(program, ['push', 'src/zstr_3pc.stru.json', '--tr', 'TRN002', '--yes', '--json'], { cwd });
+    expect(res.exitCode).toBeUndefined();
+    expect(icfPostDdic).toHaveBeenCalledWith('stru', expect.objectContaining({
+      name: 'ZSTR_3PC',
+      fields: expect.arrayContaining([expect.objectContaining({ fieldName: 'FIELD1' })]),
+    }));
+  });
+
+  it('032 US5: malformed .tabl.ddic surfaces TABL_DDL_INVALID (exit 7), no ICF call', async () => {
+    fs.writeFileSync(path.join(cwd, 'src/ztab_bad.tabl.json'), JSON.stringify({
+      formatVersion: '1',
+      header: { description: 'Bad DDL', originalLanguage: 'EN' },
+      name: 'ZTAB_BAD',
+      package: 'ZPKG',
+      fields: [],
+    }, null, 2));
+    fs.writeFileSync(path.join(cwd, 'src/ztab_bad.tabl.ddic'), '@AbapCatalog.deliveryClass : #L\n');
+    const program = makeProgram();
+    registerPushCommand(program);
+    const res = await runCommand(program, ['push', 'src/ztab_bad.tabl.json', '--tr', 'TRN003', '--yes', '--json'], { cwd });
+    expect(res.exitCode).not.toBe(0);
+    expect(icfPostDdic).not.toHaveBeenCalled();
+    const out = JSON.parse(res.stderr);
+    expect(out.error.code).toBe('TABL_DDL_INVALID');
+  });
+
+  it('035: rejects a push when the DDIC object does not exist (no create-on-push)', async () => {
+    writeTableJson('ZPKG');
+    icfGetDdic.mockResolvedValueOnce({
+      status: 'error',
+      data: null,
+      error: { code: 'DDIC_OBJECT_NOT_FOUND', message: 'TABL ZTAB_TEST not found in mock store' },
+    });
+    const program = makeProgram();
+    registerPushCommand(program);
+    const res = await runCommand(program, ['push', 'src/ztab_test.tabl.json', '--tr', 'TRN001', '--yes', '--json'], { cwd });
+    expect(res.exitCode).not.toBe(0);
+    const out = JSON.parse(res.stderr);
+    expect(out.error.code).toBe('OBJECT_NOT_FOUND');
+    expect(out.error.message).toContain('push updates existing objects only');
+    expect(out.error.nextSteps.join('\n')).toContain('abap create TABL ZTAB_TEST');
+    // The probe must stop the write — no POST reaches the ICF service.
+    expect(icfPostDdic).not.toHaveBeenCalled();
+  });
+
+  it('035: propagates a non-not-found probe failure (SAP_ERROR) and writes nothing', async () => {
+    writeTableJson('ZPKG');
+    icfGetDdic.mockResolvedValueOnce({
+      status: 'error',
+      data: null,
+      error: { code: 'ICF_UNAVAILABLE', message: 'service unreachable' },
+    });
+    const program = makeProgram();
+    registerPushCommand(program);
+    const res = await runCommand(program, ['push', 'src/ztab_test.tabl.json', '--tr', 'TRN001', '--yes', '--json'], { cwd });
+    expect(res.exitCode).not.toBe(0);
+    const out = JSON.parse(res.stderr);
+    expect(out.error.code).toBe('ICF_UNAVAILABLE');
+    expect(icfPostDdic).not.toHaveBeenCalled();
   });
 });

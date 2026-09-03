@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { withTimeout } from '../../src/abap_cli/flows/run-flow.js';
+import { withTimeout } from '../../src/abap_cli/flows/data/run.js';
 import { CliError } from '../../src/abap_cli/output/json.js';
 
 // US3 acceptance 4 — timeout triggers abort(); connection released.

@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { jsonFromCommand, printError, printResult, printSchema } from '../output/json.js';
-import { runTcode, type TcodeResult } from '../flows/tcode-flow.js';
+import { runTcode, type TcodeResult } from '../flows/search/tcode.js';
 
 export const SCHEMA = {
   schemaVersion: 1,

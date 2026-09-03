@@ -5,7 +5,7 @@
  * transport itself is a thin IcfClient.getTcode wrapper.
  */
 import { describe, expect, it } from 'vitest';
-import { interpretTcode, validateTcode } from '../../src/abap_cli/flows/tcode-flow.js';
+import { interpretTcode, validateTcode } from '../../src/abap_cli/flows/search/tcode.js';
 import { CliError } from '../../src/abap_cli/output/json.js';
 import { categoryOf } from '../../src/abap_cli/output/error-codes.js';
 

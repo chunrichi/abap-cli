@@ -16,6 +16,8 @@ export interface ObjectMetadata {
   programType?: string;
   /** ADT object type (e.g. 'PROG/P', 'PROG/I') from the structure root. */
   objectType?: string;
+  /** abapLanguageVersion — "standard" | "cloudDevelopment" | "keyUser" | undefined. */
+  abapLanguageVersion?: string;
 }
 
 export interface ObjectPartsResult {
@@ -56,12 +58,13 @@ async function getObjectPartsOnce(
   object: { name: string; objectUrl: string },
 ): Promise<ObjectPartsResult> {
   const struc = await client.objectStructure(object.objectUrl);
-  const meta = (struc as { metaData?: { 'adtcore:description'?: string; 'adtcore:masterLanguage'?: string; 'abapsource:sourceUri'?: string; 'program:programType'?: string; 'adtcore:type'?: string } }).metaData;
+  const meta = (struc as { metaData?: { 'adtcore:description'?: string; 'adtcore:masterLanguage'?: string; 'abapsource:sourceUri'?: string; 'program:programType'?: string; 'adtcore:type'?: string; 'adtcore:abapLanguageVersion'?: string } }).metaData;
   const metadata: ObjectMetadata = {
     description: meta?.['adtcore:description'],
     masterLanguage: meta?.['adtcore:masterLanguage'],
     programType: meta?.['program:programType'],
     objectType: meta?.['adtcore:type'],
+    abapLanguageVersion: meta?.['adtcore:abapLanguageVersion'],
   };
   const parts: ObjectPart[] = [];
   const push = (subtype: string, sourceUrl: string) =>

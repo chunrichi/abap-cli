@@ -31,7 +31,7 @@ vi.mock('../../src/abap_cli/auth/sso-cookie.js', async (importOriginal) => {
   };
 });
 
-import { runDelete } from '../../src/abap_cli/flows/profile-flow.js';
+import { runDelete } from '../../src/abap_cli/flows/setup/profile.js';
 
 describe('profile-flow.runDelete — v2 canonical cookie jar cleanup', () => {
   beforeEach(() => {

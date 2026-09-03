@@ -4,7 +4,7 @@ title: abap check
 description: 校验本地 ABAP 文件 — 子命令 syntax（默认，SAP 语法检查）/ content（本地校验，零 SAP 调用）/ atc（ATC 检查）；--files 是 syntax 的父命令快捷方式；--out 可将原始 ATC worklist 持久化到本地
 tags: [abap-cli, command, check, syntax, atc, validation, worklist]
 created at: 2026-08-17 00:00:00
-changed at: 2026-08-17 00:00:00
+changed at: 2026-09-02 00:00:00
 ---
 
 # abap check
@@ -24,7 +24,7 @@ abap check --files <f...>                 # 父命令快捷方式 = check syntax
 
 - `[files...]`: 要检查的本地 `.abap` 文件路径（一个或多个）
 - `--variant <variant>`: ATC 检查 variant（仅 `check atc`，必填）
-- `--all`: 检查当前目录下所有 `.abap` 文件
+- `--all`: 检查扫描根下所有 `.abap` 文件
 - `--changed`: 仅检查本地 mtime 比 SAP 对象 `changedAt` 新（允许 1s 时钟偏差）的文件；变更集为空则快速失败
 - `--strict`: 把 warning 也视为失败
 - `--out [file]`: 把原始 ATC worklist 持久化到本地文件（仅 `check atc`）；无值默认写 `.abap/atc/<variant>-<timestamp>.json`，有值写指定路径
@@ -35,6 +35,7 @@ abap check --files <f...>                 # 父命令快捷方式 = check syntax
 
 - **子命令互斥**：`syntax` / `content` / `atc` 只能选一个（各自独立注册）
 - **范围互斥**：`[files...]` / `--all` / `--changed` 混用 → `INVALID_ARGUMENT`（exit 2）
+- **`--all` / `--changed` 作用域**：扫描根为 `.abap.json::sourceDir`（配置了时，相对配置文件所在目录解析），否则为当前工作目录；不遵循 `<name>.<type>.abap|xml` 布局的杂散文件会被跳过；显式文件路径永不跳过
 - **`check atc` 必须配 `--variant`**，缺省 → `INVALID_ARGUMENT`（exit 2）
 - **`--out` 仅限 `check atc`**，其他子命令传 → commander 报 unknown option（USAGE 类错误）
 - **裸 `abap check`**（无子命令、无 `--files`）打印 help（exit 0）
