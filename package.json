@@ -1,6 +1,6 @@
 {
   "name": "abap-cli",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "CLI tool for ABAP vibe coding — agent-driven ABAP development in any agent",
   "type": "module",
   "main": "dist/src/abap_cli/index.js",

@@ -6,6 +6,8 @@
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-09-03
+
 ### Added
 - **SAP session cookie 复用（`specs/034-session-cookie-reuse/`）**：治理每次命令在 SAP `User Sessions` 堆积的问题。新增 `src/abap_cli/session/` 五模块 —— `jar.ts`（`SessionJar` + AES-256-GCM encrypt/decrypt + `computeSystemHash` = `sha256(url|username|client)`）、`key.ts`（OS keychain 存 32B 密钥，keychain 不可用时 PBKDF2 派生降级）、`policy.ts`（`resolveSessionPolicy` + cloud/btp opt-out）、`reuse.ts`（ADT cookie/CSRF 注入与捕获 + jar 磁盘读写）、`signals.ts` + `registry.ts` + `end-of-command.ts`（SIGINT/SIGTERM 释放 + 命令结束 logout）。`AdtClientWrapper` / `IcfClient` 在 `create()` 自动接入：on-prem 复用 jar 跳过 `login()`，401 fallback 一次 fresh login；cloud/btp 不读不写 jar。
 - **`abap session info` 命令**：只读查看会话状态（`{policy, systemHash, jarPath, keychainAccount, lastLoginAt, cookieCount, csrfPresent}`），不发起网络调用；`--schema` 自省。
@@ -56,7 +58,7 @@
 - `test/unit/envelope-schema.test.ts` — 新增 `validate:aff --schema` 覆盖（52 cases 全绿）；`validate:aff [file-or-dir]` 参数改为 optional（兼容 `--schema` 单独调用）。
 
 ### Specs/Plan/Tasks
-- **`specs/032-aff-by-type-gap-fix/`**：spec kit 全流程立项 — `spec.md` (13 User Story / 35 FR / 12 SC) + `plan.md` (5 Phase) + `tasks.md` (66 T 编号)；治理 10 类已支持对象的 abap-file-format 合规性与本地文件处理 gap（spec 024 follow-up + memory B/D 沉淀 + `wiki/object-types.md` todo）。 — `spec.md` (13 User Story / 35 FR / 12 SC) + `plan.md` (5 Phase) + `tasks.md` (66 T 编号)；治理 10 类已支持对象的 abap-file-format 合规性与本地文件处理 gap（spec 024 follow-up + memory B/D 沉淀 + `wiki/object-types.md` todo）。
+- **`specs/032-aff-by-type-gap-fix/`**：spec kit 全流程立项 — `spec.md` (13 User Story / 35 FR / 12 SC) + `plan.md` (5 Phase) + `tasks.md` (66 T 编号)；治理 10 类已支持对象的 abap-file-format 合规性与本地文件处理 gap（spec 024 follow-up + memory B/D 沉淀 + `wiki/object-types.md` todo）。
 - **`src/abap_cli/types/registry.ts`**：单一类型注册表，统一三份既有分裂表（`formats/type-folder.ts#TYPE_FOLDER` + `flows/create-types.ts#TYPE_MAP` + `formats/{ddic,http,transport}/json.ts` 的 `*_SUPPORTED_TYPES`）。新增类型仅改 `registry.ts` 一行即可让 9 个 CLI 命令与 schema 自动识别。
 - **`src/abap_cli/cli/type-alias.ts`**：`normalizeTypeInput()` 处理 CLI 输入归一化。当前唯一别名 `SICF` → `HTTP`，返回 `aliasWarning` 字符串供 `meta.warnings[]` 承载。
 - **`abapLanguageVersion` 全类型落盘**：`header.abapLanguageVersion` 从 ADT `objectStructure.metaData['adtcore:abapLanguageVersion']`（root attr）读取；10 类对象 pull 端均写 `<name>.<type>.json#header`；FUGR 三件 JSON（`fugr.json` / `sapl*.reps.json` / `*.func.json`）均含该字段。cloud 系统推送不再因缺字段失败。
@@ -70,6 +72,8 @@
 - **Mock-adt 扩字段**：`test/mock-adt/server.js` 在 `structureXml` 输出 `abapsource:abapLanguageVersion`（默认 `standard`，`MOCK_CLOUD=1` 时 `cloudDevelopment`）。
 
 - **ICF `/mime/*` 端点（扩展 0.6.0）**：自建 ICF handler `ZCL_ABAP_VIBE_ICF` 新增 `dispatch_mime` —— `POST /mime/folder`（建 root/嵌套目录，`package`→devclass，默认 `$TMP`）、`PUT /mime/folder?recursive=&transport=`（删目录）、`POST /mime/resources`（base64 单文件上传，父目录须已存在）。底层用 `CL_MIME_REPOSITORY_API`（SE80 MIME 存储库；本 S/4HANA 2023 release 无 `SCMS_*` 函数模块）。错误 envelope + 真实 HTTP 状态（`INVALID_ARGUMENT` 400 / `NOT_FOUND` 404 / `OBJECT_EXISTS` 409 / `VALIDATION_ERROR` 422 / 其余 500）。`extension status` 期望版本 0.5.0 → 0.6.0。
+- **`abap dumps` 命令**：新增 `abap dumps [--limit n] [--user u]` 读取 ADT Atom feed `/sap/bc/adt/runtime/dumps`，输出近期 ST22 ABAP runtime dump 的紧凑摘要（空白合并 + 500 字符截断 + 空字段省略）；完全只读、不建 lock / transport、ABAP 侧零改动；`--json` 信封 + `wiki/commands/dumps.md`。
+- **`abap create FUGR <group> --func <module>`**：在既有 function group 里新建 function module（ADT `/fmodules` 端点），activate 后落盘 `<group>.fugr.<fm>.func` 对（`skipExisting` 不覆盖用户已编辑的 group 文件）。真实 SAP `$TMP` 验证：重复 module → `OBJECT_EXISTS`，group 缺失 → `OBJECT_NOT_FOUND`。
 
 ### Changed
 - **FUGR `fixPointArithmetic` mock fallback**：`src/abap_cli/formats/pull-fugr.ts` 在 `metaData['abapsource:fixPointArithmetic']` 缺省时默认 `false`（之前是字段缺失）。on-prem 消费者始终拿到布尔；cloud 系统明确 `true` 仍按 `true` 落盘。
@@ -88,6 +92,9 @@
 - **Mock-adt `inactiveobjects` + `discovery` 端点补齐**（mock 与真实 SAP 端点对齐）：`test/mock-adt/server.js` 新增 `GET /sap/bc/adt/activation/inactiveobjects`（按真实 ADT `ioc:inactiveObjects` 形态枚举所有 `inactive:true` 对象）与 `GET /sap/bc/adt/discovery`（Atom service document，含 `/sap/bc/adt/icf/` 与各 ADT collection）。`createObject` POST handler 现在将新建对象标记为 `inactive:true`（匹配真实 SAP 后创建语义），`POST /sap/bc/adt/activation` 成功后翻转为 `false`；激活匹配的源 URL 解析扩展为 `byAnyUrl`（覆盖 method/OSI 部件源 URL，不仅 root objectUrl）。`addObject` 返回新对象供创建路径 mutate。`abap activate` 与 `abap doctor` 在 mock 上不再 404；FUGR/PROG/CLAS 创建后正确出现在 `/inactiveobjects`，`activate` 后被清除。`tests/260902001-all-commands-fugr-e2e/summary.md` 已知限制 L-5 关闭。
 
 - **`inspect --activation` 给 OO 类 `source/main` part 加 SAP 语义注释**：`ActivationPart` 新增可选 `note` 字段；OO 类（`CLAS/OC`、`INTF/OI`）的 `source/main` 是 SAP 系统生成的 INCLUDE 程序，其 active 版本由服务端重生成（lowercase、`create private .`、合成 section 头），字节永远不与用户写入的 latest 一致——这是 SAP 端语义而非 CLI 缺陷。带 `note` 的 part 不应驱动 agent 决策（不应据此触发 `abap activate`），仍以 `ok` 字段（基于 `definitions` / `implementations` / `testclasses` / `macros` 的 active 一致性）为权威。`wiki/commands/inspect.md` 同步增补说明。
+- **`abap create` 本地先行校验对象名**：create 在发起任何 SAP 调用前先本地校验对象名长度 / 字符集（超长或非法字符立即报 `INVALID_ARGUMENT`，不再先打 SAP 再失败）。
+- **`--all` 扫描尊重 `sourceDir` + 跳过 stray 文件**：`pull/push/check/status/diff --all` 的本地扫描按 `.abap.json#sourceDir` 收敛范围，遇到不可解析的游离文件（不属于任何已知对象形态）直接跳过而非报错。
+- **`diff` / `status` 忽略 CRLF/LF 行尾差异**：内容比较先归一化行尾（`\r\n` ↔ `\n`），纯换行风格差异不再误报 changed parts。
 
 ### Tests
 - `test/unit/dumps-feed.test.ts` — 9 cases（`$top`/`$filter` query 构造、请求形态断言、Atom feed 解析、空 feed）。
@@ -176,8 +183,6 @@
 ### Known limitations
 - **BTP trial `extension deploy` 仅 source-only**：on-prem 走 `cl_icf_tree`，Steampunk 仅 deploy sources + 自动 hint CF destination。
 - **BTP trial `reentranceticket` 当前不接受裸调**：trial 上唯一自动化 SSO 是 `oauth_password`。
-
-## [0.2.3] - 2026-08-31
 
 ## [0.2.2] - 2026-08-28
 
