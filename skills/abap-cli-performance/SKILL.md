@@ -1,6 +1,6 @@
 ---
 name: abap-cli-performance
-description: Review or improve ABAP performance through abap-cli. Use when diagnosing slow ABAP reads, loops, memory use, or mass processing while keeping ECC/S4HANA product evidence separate from HANA database evidence.
+description: Review or improve ABAP performance through abap-cli's read-only commands (search, inspect, pull, check, select). Use when diagnosing slow ABAP reads, loops, memory use, or mass processing while keeping ECC/S4HANA product evidence separate from HANA database evidence.
 argument-hint: "Describe the ABAP code path, observed bottleneck, data volume, and available platform evidence"
 user-invocable: true
 metadata:
