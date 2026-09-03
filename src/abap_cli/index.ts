@@ -130,6 +130,13 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
     description: 'Create, delete, or upload MIME Repository resources (create | delete | push)',
     load: () => import('./commands/mime.js').then((m) => ({ register: m.registerMimeCommand })),
   },
+  {
+    // Two-segment command name: `abap validate:aff <file-or-dir> ...`.
+    // Lazy-loaded like any other command so it doesn't bloat startup.
+    name: 'validate:aff',
+    description: 'Validate JSON files against official abap-file-format (AFF) canonical schemas (Draft 2020-12)',
+    load: () => import('./commands/validate-aff.js').then((m) => ({ register: m.registerValidateAffCommand })),
+  },
 ];
 
 const require = createRequire(import.meta.url);

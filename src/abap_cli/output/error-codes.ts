@@ -88,6 +88,11 @@ export type ErrorCode =
   // tcode: ICF /tcode/<code> transaction lookup
   | 'TCODE_NOT_FOUND'           // TSTC entry does not exist (NOT_FOUND/exit 8)
   | 'TCODE_NOT_AUTHORIZED'      // S_TCODE authority check failed (AUTH_ERROR/exit 5)
+  // 033-aff-canonical-validator: AFF validator/CLI errors
+  | 'AFF_SCHEMA_MISSING'        // canonical schema file not found for a type (VALIDATION_ERROR/exit 7)
+  | 'AFF_SCHEMA_INVALID'        // canonical schema file present but unparseable (VALIDATION_ERROR/exit 7)
+  | 'AFF_SCHEMA_COMPILE_ERROR'  // ajv compile raised (VALIDATION_ERROR/exit 7)
+  | 'AFF_FIXTURE_INVALID'       // a fixture failed schema validation (VALIDATION_ERROR/exit 7)
   ;
 
 const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
@@ -153,6 +158,11 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   // tcode
   TCODE_NOT_FOUND: 'NOT_FOUND',
   TCODE_NOT_AUTHORIZED: 'AUTH_ERROR',
+  // 033 AFF
+  AFF_SCHEMA_MISSING: 'VALIDATION_ERROR',
+  AFF_SCHEMA_INVALID: 'VALIDATION_ERROR',
+  AFF_SCHEMA_COMPILE_ERROR: 'VALIDATION_ERROR',
+  AFF_FIXTURE_INVALID: 'VALIDATION_ERROR',
 };
 
 export function categoryOf(code: ErrorCode): ErrorCategory {

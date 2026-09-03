@@ -22,24 +22,30 @@ export interface ObjectTypeEntry {
   source: ObjectSource;
   /** ADT objtype for source objects (CLAS/INTF/PROG/FUGR); undefined for DDIC/HTTP/TRAN. */
   createObjtype?: string;
+  /**
+   * AFF schema filename (relative to mirror root/<type>/). Default: `<type>-v1.json`.
+   * STRU records `tabl-v1.json` to share the TABL schema (spec 018 / spec 033).
+   * Optional here because the registry predates the validator; populated lazily.
+   */
+  affSchemaFile?: string;
 }
 
 /** Single registry; iterated in `allSupportedTypes()` for deterministic order. */
 export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
   // Source objects (ADT)
-  { type: 'CLAS', folder: 'clas', source: 'ADT', createObjtype: 'CLAS/OC' },
-  { type: 'INTF', folder: 'intf', source: 'ADT', createObjtype: 'INTF/OI' },
-  { type: 'PROG', folder: 'prog', source: 'ADT', createObjtype: 'PROG/P' },
-  { type: 'FUGR', folder: 'fugr', source: 'ADT', createObjtype: 'FUGR/F' },
-  // DDIC objects (ICF)
-  { type: 'TABL', folder: 'tabl', source: 'ICF' },
-  { type: 'STRU', folder: 'stru', source: 'ICF' },
-  { type: 'DOMA', folder: 'doma', source: 'ICF' },
-  { type: 'DTEL', folder: 'dtel', source: 'ICF' },
+  { type: 'CLAS', folder: 'clas', source: 'ADT', createObjtype: 'CLAS/OC', affSchemaFile: 'clas-v1.json' },
+  { type: 'INTF', folder: 'intf', source: 'ADT', createObjtype: 'INTF/OI', affSchemaFile: 'intf-v1.json' },
+  { type: 'PROG', folder: 'prog', source: 'ADT', createObjtype: 'PROG/P', affSchemaFile: 'prog-v1.json' },
+  { type: 'FUGR', folder: 'fugr', source: 'ADT', createObjtype: 'FUGR/F', affSchemaFile: 'fugr-v1.json' },
+  // DDIC objects (ICF) — STRU reuses TABL's schema (spec 018 / spec 033 US5).
+  { type: 'TABL', folder: 'tabl', source: 'ICF', affSchemaFile: 'tabl-v1.json' },
+  { type: 'STRU', folder: 'stru', source: 'ICF', affSchemaFile: 'tabl-v1.json' },
+  { type: 'DOMA', folder: 'doma', source: 'ICF', affSchemaFile: 'doma-v1.json' },
+  { type: 'DTEL', folder: 'dtel', source: 'ICF', affSchemaFile: 'dtel-v1.json' },
   // HTTP service (SICF node) via ICF
-  { type: 'HTTP', folder: 'http', source: 'ICF' },
+  { type: 'HTTP', folder: 'http', source: 'ICF', affSchemaFile: 'http-v1.json' },
   // Transaction code (SE93) via ICF
-  { type: 'TRAN', folder: 'tran', source: 'ICF' },
+  { type: 'TRAN', folder: 'tran', source: 'ICF', affSchemaFile: 'tran-v1.json' },
 ] as const;
 
 const DEFAULT_FOLDER = 'unknown';
@@ -107,4 +113,22 @@ export function isHttpSupportedType(t: string): t is HttpSupportedType {
 /** Narrow an arbitrary type string to the supported Transaction types. */
 export function isTranSupportedType(t: string): t is TranSupportedType {
   return (TRAN_TYPES as readonly string[]).includes(t);
+}
+
+/**
+ * Resolve the absolute filesystem path of the AFF canonical schema for `type`.
+ * Wraps `aff/schema-paths.ts#schemaPathFor` so legacy call sites stay decoupled
+ * from the AFF submodule.
+ */
+export function schemaPathFor(type: string, mirrorRoot?: string): string {
+  // Lazy import keeps tree-shaking happy; tests can override mirrorRoot.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+  const mod = require('../aff/schema-paths.js') as typeof import('../aff/schema-paths.js');
+  return mod.schemaPathFor(type, mirrorRoot);
+}
+
+/** AFF schema filename only (relative under the mirror). */
+export function affSchemaFileFor(type: string): string | undefined {
+  const primary = type.split('/')[0]!.toUpperCase();
+  return INDEX[primary]?.affSchemaFile;
 }
