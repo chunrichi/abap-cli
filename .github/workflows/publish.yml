@@ -1,0 +1,70 @@
+# Publish abap-cli to the official npm registry via npm Trusted Publishing (OIDC).
+#
+# Prereq: on npmjs.com → package Settings → "Trusted publishing", register this
+# repo's workflow file (publish.yml). No NODE_AUTH_TOKEN secret is needed.
+#
+# Triggers:
+#   - pushing a `v*` tag (e.g. `git tag v0.3.0 && git push origin v0.3.0`)
+#   - publishing a GitHub Release
+#
+# The two triggers can fire for the same version (tag push + Release publish).
+# A pre-publish `npm view` guard makes the job idempotent: if the version is
+# already on npm, publish is skipped and the run stays green.
+name: publish-to-npm
+
+on:
+  push:
+    tags:
+      - 'v*'
+  release:
+    types:
+      - published
+
+permissions:
+  contents: read
+  id-token: write # Required for npm Trusted Publishing (OIDC)
+
+# Serialize runs for the same tag so a tag push + Release double-trigger never
+# races; the second run sees the version already published and skips.
+concurrency:
+  group: npm-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Verify & publish to npm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org/
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run verify (build + unit tests)
+        run: npm run verify
+
+      - name: Resolve package version
+        id: version
+        run: echo "version=$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
+
+      - name: Check if version is already published
+        id: published
+        run: |
+          if npm view abap-cli@${{ steps.version.outputs.version }} version \
+            --registry=https://registry.npmjs.org >/dev/null 2>&1; then
+            echo "already=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::abap-cli@${{ steps.version.outputs.version }} already published on npm — skipping publish"
+          else
+            echo "already=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to npm
+        if: steps.published.outputs.already == 'false'
+        run: npm publish --registry=https://registry.npmjs.org

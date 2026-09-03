@@ -6,6 +6,9 @@
 
 ## [Unreleased]
 
+### Added
+- **GitHub Actions 自动发布 npm**（`.github/workflows/publish.yml`）：push `v*` tag 或 GitHub Release published 触发；`npm run verify`（build + 全量单测）通过后 `npm publish` 到官方源。走 npm Trusted Publishing（OIDC，免 token secret，需在 npmjs.com 把该 repo/workflow 登记为 trusted publisher；Node 24）。发布前用 `npm view` 探测目标版本，重复触发（tag + Release 同版本）自动跳过，不会重复发布。
+
 ## [0.2.4] - 2026-09-03
 
 ### Added
