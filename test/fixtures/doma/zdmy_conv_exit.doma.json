@@ -1,0 +1,15 @@
+{
+  "formatVersion": "1",
+  "header": {
+    "description": "Domain with conversion exit",
+    "originalLanguage": "EN"
+  },
+  "format": {
+    "dataType": "CHAR",
+    "length": 10
+  },
+  "outputCharacteristics": {
+    "length": 10,
+    "conversionRoutine": "ALPHA"
+  }
+}
