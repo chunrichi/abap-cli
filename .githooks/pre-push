@@ -9,15 +9,20 @@
 # skips verification entirely.
 set -euo pipefail
 
-# `git push` passes refs on stdin, one per line: <local_ref> <local_sha> <remote_ref> <remote_sha>.
-# A tag push has local_ref starting with `refs/tags/`. Skip those — the tagged
-# commit was already verified when its underlying branch was pushed.
-while IFS=' ' read -r local_ref local_sha _remote_ref _remote_sha; do
-  [[ -z "$local_ref" ]] && continue
-  if [[ "$local_ref" == "refs/tags/"* ]]; then
-    exit 0
-  fi
-done
+# `git push` feeds refs on stdin. Two formats observed:
+#   - Branch/tag push:  "refs/heads/<name> <sha> refs/heads/<name> <sha>\n"
+#                       "refs/tags/<name> <sha> refs/tags/<name> <sha>\n"
+#   - Ref deletion:      "\0<ref>\0<ref>\0"  (NUL-separated, no sha)
+#
+# Strategy: slurp stdin, strip NULs (turn them into newlines so both formats
+# look line-oriented), then check whether any line mentions refs/tags/.
+# If so, skip — tag pushes don't need verify (commit was already verified),
+# and ref deletions never need it.
+stdin_text=$(cat | tr '\0' '\n')
+
+if printf '%s' "$stdin_text" | grep -q '^refs/tags/'; then
+  exit 0
+fi
 
 echo "▶ pre-push: npm run verify"
 npm run verify
