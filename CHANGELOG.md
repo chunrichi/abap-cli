@@ -6,6 +6,9 @@
 
 ## [Unreleased]
 
+
+## [0.2.5] - 2026-09-04
+
 ### Added
 - **TTYP / MSAG / DDLS 三类型支持（`specs/036-ttyp-msag-ddls/`）**：`create` / `pull` / `push` 三个命令一次性接入表类型、消息类与 CDS 视图源，支持类型总数 10 → 13。TTYP 与 MSAG 走双通道（S/4HANA 与 ECC EHP7+ 用 ADT，ECC EHP5/6 自动降级 ICF）；DDLS 仅 ADT，旧内核直接硬错而不静默降级。新增 `flows/edit/channel-detect.ts`（纯函数通道判定 + `isEccOldRelease` + 进程内缓存 + `clearChannelCache()` 供测试）、`formats/{ttyp,msag,ddls}/json.ts` 三个 wire ↔ local 映射、`formats/ddls/acds.ts`（识别 `viewEntity` / `projectionView` / `tableFunction` / `viewEntityExtend` / `viewExtend` / `ddicBasedView` 等 CDS 形态）、`flows/edit/{pull,push}-{ttyp,msag,ddls}.ts` 六个流程模块。
 - **envelope 新增 `data.channel` 与 `data.fallbackReason`**：三类型的 `pull` / `push` / `create` 都报告实际使用的通道（`"adt"` / `"icf"`）；走兜底时附 `ECC_EHP6_NO_ADT_TABLETYPE` 或 `ECC_EHP6_NO_ADT_MESSAGECLASS`，让 agent 无需猜测路径。
