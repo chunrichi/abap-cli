@@ -1,4 +1,4 @@
-CLASS zcl_abap_vibe_tabl_format DEFINITION PUBLIC FINAL CREATE PUBLIC.
+CLASS zcl_abap_vibe_ttyp_format DEFINITION PUBLIC FINAL CREATE PUBLIC.
   PUBLIC SECTION.
     TYPES:
       BEGIN OF ty_warning,
@@ -148,7 +148,7 @@ CLASS zcl_abap_vibe_tabl_format DEFINITION PUBLIC FINAL CREATE PUBLIC.
       CHANGING  ct_warnings TYPE tt_warning.
 ENDCLASS.
 
-CLASS zcl_abap_vibe_tabl_format IMPLEMENTATION.
+CLASS zcl_abap_vibe_ttyp_format IMPLEMENTATION.
   METHOD generate.
     DATA ls_header TYPE dd02v.
     DATA ls_technical TYPE dd09l.
