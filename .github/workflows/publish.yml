@@ -6,8 +6,9 @@
 # Triggers:
 #   - pushing a `v*` tag (e.g. `git tag v0.3.0 && git push origin v0.3.0`)
 #   - publishing a GitHub Release
+#   - manual workflow_dispatch (dry-run only: verify + npm view guard, no publish)
 #
-# The two triggers can fire for the same version (tag push + Release publish).
+# The two auto triggers can fire for the same version (tag push + Release publish).
 # A pre-publish `npm view` guard makes the job idempotent: if the version is
 # already on npm, publish is skipped and the run stays green.
 name: publish-to-npm
@@ -19,6 +20,13 @@ on:
   release:
     types:
       - published
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (verify + npm view guard only, no publish)'
+        type: boolean
+        default: true
+        required: true
 
 permissions:
   contents: read
@@ -73,5 +81,10 @@ jobs:
           fi
 
       - name: Publish to npm
-        if: steps.published.outputs.already == 'false'
+        if: steps.published.outputs.already == 'false' && github.event_name != 'workflow_dispatch'
         run: npm publish --registry=https://registry.npmjs.org
+
+      - name: Dry-run summary
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          echo "::notice::Dry run complete — verify passed and version check ran, but publish was skipped (workflow_dispatch)."
