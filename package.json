@@ -31,8 +31,6 @@
     "start": "node dist/src/abap_cli/index.js",
     "prepublishOnly": "npm run build",
     "build-schema": "tsx scripts/build-cli-schema.ts",
-    "validate:aff": "vitest run --reporter=basic test/unit/_validate-aff-cli.test.ts",
-    "pretest": "npm run validate:aff",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

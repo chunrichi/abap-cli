@@ -3,20 +3,28 @@ import { runRun } from '../../src/abap_cli/flows/data/run.js';
 import { AdtClientWrapper } from '../../src/abap_cli/clients/adt-client.js';
 import { CliError } from '../../src/abap_cli/output/json.js';
 
-// Real-SAP limitation — classrun endpoint may not inject method args.
-// When the wrapper echoes a heartbeat (no `method` field) for a --method
-// request, the CLI must surface WRAPPER_INPUT_UNAVAILABLE instead of
+// Real-SAP limitation: the classrun endpoint on some kernels does not inject
+// method args. When the wrapper echoes a heartbeat (no `method` field) for a
+// --method request, the CLI must surface WRAPPER_INPUT_UNAVAILABLE instead of
 // silently reporting the heartbeat as the method result.
+//
+// Distinguish:
+//   - wrapper with --method + heartbeat → WRAPPER_INPUT_UNAVAILABLE
+//   - wrapper with --method + real result (has method field) → success
+//   - direct classrun (no --method) + heartbeat → normal classrun success
 
 function fakeClient(stdout: string): AdtClientWrapper {
   return { runClass: async () => stdout } as unknown as AdtClientWrapper;
 }
 
 const HEARTBEAT = JSON.stringify({
-  status: 'ok', exitCode: 0, message: 'classrun heartbeat', version: '0.7.0',
+  status: 'ok',
+  exitCode: 0,
+  message: 'classrun heartbeat',
+  version: '0.7.0',
 });
 
-describe('run-flow wrapper input unavailable', () => {
+describe('run-flow wrapper heartbeat detection', () => {
   it('--method request that returns a heartbeat → WRAPPER_INPUT_UNAVAILABLE (exit 6)', async () => {
     try {
       await runRun('ZCL_X', { method: 'add', args: '{"a":3}' }, fakeClient(HEARTBEAT));

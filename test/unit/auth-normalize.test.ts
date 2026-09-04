@@ -87,6 +87,48 @@ describe('auth/normalize', () => {
         expect.objectContaining({ code: 'INVALID_ARGUMENT' }),
       );
     });
+
+    it('basic with no auth block (full profile fields) → ok', () => {
+      const base = { url: 'http://vhcala4hci:50000', client: '001', username: 'u', language: 'EN' };
+      expect(() => normalizeAuth(base)).not.toThrow();
+    });
+
+    it('oauth_password with full oauth block → ok', () => {
+      const base = { url: 'http://vhcala4hci:50000', client: '001', username: 'u', language: 'EN' };
+      expect(() => normalizeAuth({
+        ...base, authMethod: 'oauth_password',
+        oauthPassword: { uaaUrl: 'https://x.authentication.ap21.hana.ondemand.com', clientId: 'cid', clientSecret: 'sec' },
+      })).not.toThrow();
+    });
+
+    it('oauthPassword block without oauth_password authMethod → CONFIG_ERROR', () => {
+      // Silent-broken guard: a leftover block with default basic method is a
+      // misconfiguration, not a basic profile.
+      expect(() => normalizeAuth({
+        url: 'http://vhcala4hci:50000', client: '001', username: 'u', language: 'EN',
+        oauthPassword: { uaaUrl: 'https://x', clientId: 'cid', clientSecret: 'sec' },
+      })).toThrowError(
+        expect.objectContaining({ code: 'CONFIG_ERROR' }),
+      );
+    });
+
+    it('cert with certAuth block (full profile) → ok', () => {
+      const base = { url: 'http://vhcala4hci:50000', client: '001', username: 'u', language: 'EN' };
+      expect(() => normalizeAuth({
+        ...base, authMethod: 'cert',
+        certAuth: { certPath: '/a', keyPath: '/b' },
+      })).not.toThrow();
+    });
+
+    it('certAuth block without cert authMethod → CONFIG_ERROR', () => {
+      // Silent-broken guard: a leftover certAuth with default basic method.
+      expect(() => normalizeAuth({
+        url: 'http://vhcala4hci:50000', client: '001', username: 'u', language: 'EN',
+        certAuth: { certPath: '/a', keyPath: '/b' },
+      })).toThrowError(
+        expect.objectContaining({ code: 'CONFIG_ERROR' }),
+      );
+    });
   });
 
   describe('v2 → canonical', () => {

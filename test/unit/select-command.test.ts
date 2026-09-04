@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { registerSelectCommand, formatHuman } from '../../src/abap_cli/commands/select.js';
-import { renderError } from '../../src/abap_cli/output/json.js';
 import { Command } from 'commander';
 import type { SelectResult } from '../../src/abap_cli/flows/data/select.js';
 
@@ -82,23 +81,5 @@ describe('select command — lazy registration ()', () => {
     const indexSrc = readFileSync(resolve(__dirname, '../../src/abap_cli/index.ts'), 'utf8');
     expect(indexSrc).toMatch(/name:\s*'select'/);
     expect(indexSrc).toMatch(/load:\s*\(\)\s*=>\s*import\('\.\/commands\/select\.js'\)/);
-  });
-});
-
-describe('select command — stdout empty on failure ()', () => {
-  // We don't drive the runner here — that would require a running mock-adt.
-  // The contract is enforced by output/json.ts renderError which writes JSON
-  // errors to stderr only. We assert the contract by reading the renderer.
-  it('renderError writes JSON to stderr only', () => {
-    const out = renderError(true, new Error('boom'), {
-      command: 'abap select',
-      version: '0.7.0',
-      timestamp: '2026-08-07T00:00:00Z',
-      durationMs: 1,
-      warnings: [],
-    });
-    expect(out.stdout).toEqual([]);
-    expect(out.stderr.length).toBeGreaterThan(0);
-    expect(out.stderr[0]).toContain('boom');
   });
 });

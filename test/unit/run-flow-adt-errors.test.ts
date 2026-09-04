@@ -3,7 +3,8 @@ import { runRun } from '../../src/abap_cli/flows/data/run.js';
 import { CliError } from '../../src/abap_cli/output/json.js';
 
 // US4 acceptance 4 — errors thrown by AdtClientWrapper._call (TLS/AUTH) pass
-// through unchanged; run-flow does not re-map them.
+// through unchanged; run-flow does not re-map them. This is the boundary
+// between transport-layer failures and protocol-layer error envelopes.
 
 describe('run-flow ADT wrapper failures', () => {
   it('lets AUTH_ERROR from the client wrapper pass through', async () => {
