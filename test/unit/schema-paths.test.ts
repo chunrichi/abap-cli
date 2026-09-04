@@ -54,13 +54,17 @@ describe('schema-paths priority chain', () => {
     );
   });
 
-  it('affSupportedTypes matches the router table (10 router types + TABT override)', () => {
+  it('affSupportedTypes matches the router table (13 router types + TABT override)', () => {
     const types = affSupportedTypes();
     expect(types).toEqual(
-      expect.arrayContaining(['CLAS', 'INTF', 'PROG', 'FUGR', 'TABL', 'STRU', 'TABT', 'DOMA', 'DTEL', 'HTTP', 'TRAN']),
+      expect.arrayContaining([
+        'CLAS', 'INTF', 'PROG', 'FUGR', 'TABL', 'STRU', 'TABT', 'DOMA', 'DTEL', 'HTTP', 'TRAN',
+        // 036: channel-routed types.
+        'TTYP', 'MSAG', 'DDLS',
+      ]),
     );
     // TABT is exposed as a schema key for the .settings.json override path.
-    expect(types).toHaveLength(11);
+    expect(types).toHaveLength(14);
   });
 
   it('bundled root contains every supported schema', () => {

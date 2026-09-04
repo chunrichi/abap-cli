@@ -30,6 +30,9 @@ import { runPullTextpool } from './pull-textpool.js';
 import { runPullRemote } from './pull-remote.js';
 import { runPackagePull } from './pull-package.js';
 import { runTransportPull } from './pull-tr.js';
+import { runPullTtyp } from './pull-ttyp.js';
+import { runPullMsag } from './pull-msag.js';
+import { runPullDdls } from './pull-ddls.js';
 
 export type { PullOptions, PullEntry, PullResult } from './pull-shared.js';
 export { parsePositiveInt } from './pull-shared.js';
@@ -86,6 +89,55 @@ export async function runPull(objectName: string, opts: PullOptions): Promise<Pu
   }
   if (typeUpper && isDdicSupportedType(typeUpper)) {
     return runPullDdic(objectName, typeUpper, opts);
+  }
+  // 036-ttyp-msag-ddls: dual-channel DDIC + CDS routing. ADT preferred,
+  // ICF fallback for TTYP/MSAG, hard-error for DDLS on ECC.
+  if (typeUpper === 'TTYP') {
+    const r = await runPullTtyp(objectName, opts);
+    return {
+      data: normalizePullData({
+        object: r.object,
+        type: 'TTYP',
+        entries: [{ object: r.object, type: 'TTYP', status: 'written', files: r.files }],
+        written: r.files.length,
+        skipped: 0,
+        failed: 0,
+        channel: r.channel,
+        ...(r.fallbackReason ? { fallbackReason: r.fallbackReason } : {}),
+      }),
+      human: `Pulled TTYP ${r.object} via ${r.channel}${r.fallbackReason ? ` (${r.fallbackReason})` : ''}; wrote ${r.files.length} file(s)`,
+    };
+  }
+  if (typeUpper === 'MSAG') {
+    const r = await runPullMsag(objectName, opts);
+    return {
+      data: normalizePullData({
+        object: r.object,
+        type: 'MSAG',
+        entries: [{ object: r.object, type: 'MSAG', status: 'written', files: r.files }],
+        written: r.files.length,
+        skipped: 0,
+        failed: 0,
+        channel: r.channel,
+        ...(r.fallbackReason ? { fallbackReason: r.fallbackReason } : {}),
+      }),
+      human: `Pulled MSAG ${r.object} via ${r.channel}${r.fallbackReason ? ` (${r.fallbackReason})` : ''}; wrote ${r.files.length} file(s)`,
+    };
+  }
+  if (typeUpper === 'DDLS') {
+    const r = await runPullDdls(objectName, opts);
+    return {
+      data: normalizePullData({
+        object: r.object,
+        type: 'DDLS',
+        entries: [{ object: r.object, type: 'DDLS', status: 'written', files: r.files }],
+        written: r.files.length,
+        skipped: 0,
+        failed: 0,
+        channel: r.channel,
+      }),
+      human: `Pulled DDLS ${r.object} via ${r.channel}; wrote ${r.files.length} file(s)`,
+    };
   }
   if (typeUpper && !isDdicSupportedType(typeUpper)) {
     if (/^(DOMA|DTEL|TABL|STRU|TTYP)$/.test(typeUpper)) {

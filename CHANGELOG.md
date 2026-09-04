@@ -7,8 +7,36 @@
 ## [Unreleased]
 
 ### Added
+- **TTYP / MSAG / DDLS 三类型支持（`specs/036-ttyp-msag-ddls/`）**：`create` / `pull` / `push` 三个命令一次性接入表类型、消息类与 CDS 视图源，支持类型总数 10 → 13。TTYP 与 MSAG 走双通道（S/4HANA 与 ECC EHP7+ 用 ADT，ECC EHP5/6 自动降级 ICF）；DDLS 仅 ADT，旧内核直接硬错而不静默降级。新增 `flows/edit/channel-detect.ts`（纯函数通道判定 + `isEccOldRelease` + 进程内缓存 + `clearChannelCache()` 供测试）、`formats/{ttyp,msag,ddls}/json.ts` 三个 wire ↔ local 映射、`formats/ddls/acds.ts`（识别 `viewEntity` / `projectionView` / `tableFunction` / `viewEntityExtend` / `viewExtend` / `ddicBasedView` 等 CDS 形态）、`flows/edit/{pull,push}-{ttyp,msag,ddls}.ts` 六个流程模块。
+- **envelope 新增 `data.channel` 与 `data.fallbackReason`**：三类型的 `pull` / `push` / `create` 都报告实际使用的通道（`"adt"` / `"icf"`）；走兜底时附 `ECC_EHP6_NO_ADT_TABLETYPE` 或 `ECC_EHP6_NO_ADT_MESSAGECLASS`，让 agent 无需猜测路径。
+- **两个新错误码 + 保留区间退出码**：`DDLS_NOT_SUPPORTED_ON_ECC`（exit 64）与 `CHANNEL_DETECTION_FAILED`（exit 65）。两者都落在退出码保留区间（≥10）并在 `specs/012-unify-cli-output-contract/contracts/cli-output.md` §4 显式登记，CI 可直接按数值 grep 失败类型。
+- **ICF 兜底 ABAP 实现**：新增 `zcl_abap_vibe_ttyp_format`（DD40V + DD42V → AFF JSON + `define type ...` DDL 侧车）与 `zcl_abap_vibe_msag_format`（T100A + T100 → AFF JSON，登录语言无译文时回退英语）；`zcl_abap_vibe_icf` 扩展 `/ddic/ttyp` 与 `/ddic/msag` 的 GET/POST/PUT handler，写路径走 SAP 标准 LUW（enqueue → 写 → activate → dequeue，dequeue 在所有退出路径都执行）。
+- **自维护 `ttyp-v1.json` schema**：上游 abap-file-formats 没有 table-type schema（`type/type-v1.json` 是 type-pool），本项目手写并在文件头标注 handcrafted；MSAG / DDLS 复用上游 `msag-v1.json` / `ddls-v1.json`。
+- **`profile test` 能力矩阵**：输出 `data.capabilities.{ttyp,msag,ddls}.{adt,icf,supported}` 与顶层 `data.ddlSourceSupported`，让 agent 在动手前就知道目标系统支持哪些类型。
+- **三类型 fixture 与测试**：`test/fixtures/{ttyp,msag,ddls}/` 三份 canonical fixture 纳入 `npm run validate:aff` 门禁；新增 `channel-detect` 决策矩阵、三类型 round-trip、`.acds` 形态解析、pull/push 协调器路由与 ICF 兜底共 40+ vitest case。
 - **GitHub Actions 自动发布 npm**（`.github/workflows/publish.yml`）：push `v*` tag 或 GitHub Release published 触发；`npm run verify`（build + 全量单测）通过后 `npm publish` 到官方源。走 npm Trusted Publishing（OIDC，免 token secret，需在 npmjs.com 把该 repo/workflow 登记为 trusted publisher；Node 24）。发布前用 `npm view` 探测目标版本，重复触发（tag + Release 同版本）自动跳过，不会重复发布。
 - **AFF schema vendor 进仓库（`src/abap_cli/schema/`）**：把 0.2.4 依赖 `tmp/abap-file-formats/` 的 10 类 schema（11 个 JSON）+ 上游 MIT LICENSE 静态纳入仓库；`schema-paths.ts` 解析优先级改为 env (`ABAP_CLI_AFF_MIRROR`) → bundled → 遗留 `tmp/` 镜像。新增 `scripts/sync-aff-schema.sh [<sha>]` 升级脚本（只复制 `router.ts` 命中的 10 类型 + `tabt-v1.json`，自动重写 README 的上游 SHA 引用），以及 `scripts/copy-bundled-schema.mjs` 在 `npm run build` 末尾把 `src/abap_cli/schema/` 镜像到 `dist/`（确保 dist 与 published npm tarball 都自带 schema，不依赖 clone/postinstall）。CI 不再隐式依赖 `tmp/` 或 `postinstall` 网络克隆。
+
+### Changed
+- **`types/registry.ts` 增 3 类型**：TTYP / MSAG / DDLS 三条 `ObjectTypeEntry`，每条带 `channel: {icfFallback, eccSupported, fallbackReason?}`；随之 `folderFor()` 新增 `ttyp` / `msag` / `ddls` 三个子目录，`allSupportedTypes()` 与 `create --schema` 的 `allowedValues` 从 10 项变 13 项。
+- **`push` 协调器路由顺序**：`.ttyp.json` / `.msag.json` / `.ddls.json` 与 DDIC 共用 `.json` 扩展名，因此在 `route === 'icf'` 分支**之前**被拦截并交给 `channel-detect`；`--atomic` 结构校验同样对这三类走各自的 AFF 校验函数而非 `readDdicJson`。
+- **`PushStage` 增两个阶段值**：`channel-adt` 与 `channel-icf`，用于区分三类型实际落到哪条通道。
+- **ICF 错误码透传**：TTYP / MSAG 的 ICF 兜底写路径不再把所有失败压成 `DDIC_CREATE_FAILED`，改为原样透传 handler 返回的错误码（`LOCK_FAILED` / `VALIDATION_ERROR` 等），退出码因此能正确反映失败类别。
+- **`validate-aff` 对不存在目标的处理**：`collectJsonFiles` 遇到不存在的路径返回空列表而非抛 `ENOENT`，与「无文件可校验即通过」的门禁语义一致。
+
+### Fixed
+- **`profile test` 不持久化 `systemVersion`**（`src/abap_cli/clients/probe.ts`）：`probeCapabilities` 走 `readKernelRelease` 但返回值被丢弃，导致后续 `channel-detect` 永远拿不到 release 触发 `CHANNEL_DETECTION_FAILED`；改为把 release 透传到 `upsertSystem(name, { systemVersion })`，profile 自此首跑即可路由。
+- **`readKernelRelease` 端点错**（同文件）：`/sap/bc/adt/discovery` 已经没有 `<app:release>` 标签；改读 `/sap/bc/adt/system/information`（Atom feed）的 `<atom:id>KernelRelease</atom:id>`，并补上必需的 `type=feed` Accept 修饰。
+- **ADT DDIC 端点 `Accept: application/xml` 报 406**（`src/abap_cli/clients/adt-client.ts`）：TTYP / MSAG / DDLS 的 GET 与 PUT 端点 SAP 端不收 narrow content type，统一改为 `application/*` 通配，避开 content negotiation 失败。
+- **DDLS `getDdls` 只返回 metadata envelope**（同文件）：`/sap/bc/adt/ddic/ddl/sources/<name>` 实际不带 inline `<ddl:ddlSourceString>`，显式补一次 `${baseUrl}/source/main` 拿真正的 DDL 源（`Accept: text/plain`）。
+- **`validateLocalFile` 把 TTYP / MSAG / DDLS 误判为 `DDIC_NOT_SUPPORTED`**（`src/abap_cli/core/resolve.ts`）：`ICF_ROUTED_TYPES` 仅含 DOMA/DTEL/TABL/STRU + HTTP/TRAN，三类型没在内；新增 `VALIDATED_ROUTE_TYPES` = `ICF_ROUTED_TYPES ∪ ADT_ROUTED_TYPES`，让 `validateLocalFile` 通过、留给 `pushChannelRoutedFile` 路由。
+- **`pull-{ttyp,msag,ddls}.ts#resolveRoot` 只认 `rootDir`**（3 文件）：`runPull` 协调器传的 `PullOptions.dir` 被忽略，pull 永远写到 workspace root 而非 `--dir` 指定路径；重载为 `(opts: { rootDir?; dir? })` 优先取 `rootDir` → `dir`。
+- **`http-error.ts` 不解析 SAP `<exc:exception>` 信封**（同文件）：之前 `body?.message` 只匹配 JSON，遇到 SAP XML 异常时全部退化成固定字符串「Resource …: wrong input data for processing」；新增 `extractExcMessage` 从 `<message lang="EN">…</message>` 抽出真实文案，并把完整 body（截 400 字符）附到 `details.sapErrorBody`，让 agent 一眼看到 SAP 端究竟在报什么。
+- **SAP 服务端 cookie 过期被误报 400 权限错误**（`src/abap_cli/clients/http-error.ts`）：reused cookie jar 的 `SAP_SESSIONID` 在 SAP 端被服务端踢下线后，SAP 返回 `400 Session Timed Out`（**不是** 401，也不是 XML envelope），abap-adt-api fallback 成 `AdtHttpException` 时把 body 丢光；CLI 看上去是 `Request failed with status code 400`，但其实是 session 失效。检测 `400 + /session\s+timed\s+out/i` → 改分类为 `AUTH_ERROR`，触发 `_call` 的 re-login fallback；非-Axios 分支同时把 body 从 `parent.response.body` 链上挖出来写入 `details.sapErrorBody`，避免后续真·SAP 异常也被误报为权限问题。
+
+### Removed (breaking)
+- **TTYP 不再报 `DDIC_NOT_SUPPORTED` / `TYPE_NOT_SUPPORTED`**：`pull ZX --type TTYP` 与 `create TTYP ZX --file ...` 以前被 DDIC 路由当作未支持类型拒绝，现在走 `channel-detect` 正常执行。迁移：依赖旧错误码做分支的脚本改为检查 `data.channel` 与新错误码（`DDLS_NOT_SUPPORTED_ON_ECC` / `CHANNEL_DETECTION_FAILED`）。
+
 
 ## [0.2.4] - 2026-09-03
 

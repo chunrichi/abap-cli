@@ -40,6 +40,10 @@ const SCHEMA_FILE: Record<string, string> = {
   DTEL: 'dtel-v1.json',
   HTTP: 'http-v1.json',
   TRAN: 'tran-v1.json',
+  // 036-ttyp-msag-ddls: three new dual-channel types.
+  TTYP: 'ttyp-v1.json',   // handcrafted (upstream has type-pool only)
+  MSAG: 'msag-v1.json',
+  DDLS: 'ddls-v1.json',
 };
 
 /** Resolve the bundled-schema directory shipped with the package.

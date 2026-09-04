@@ -261,6 +261,163 @@ export class AdtClientWrapper {
     return this._call(() => this.client.setObjectSource(objectSourceUrl, source, lockHandle, transport));
   }
 
+  // --- 036-ttyp-msag-ddls: dual-channel ADT endpoints (TTYP / MSAG / DDLS) ---
+
+  /** GET /sap/bc/adt/ddic/tabletypes/<name> — retrieve a TTYP (table type).
+   *  Returns the XML body verbatim; the caller (formats/ttyp/json.ts#wireToLocal)
+   *  maps the wire to the local AFF nested shape. */
+  getTtyp(name: string): Promise<string> {
+    return this._call(async () => {
+      const url = `/sap/bc/adt/ddic/tabletypes/${name.toUpperCase()}`;
+      // 036: DDIC atom endpoints reject narrow Accept types (406); fall back
+      // to a wildcard that the SAP gateway accepts while we wait for the
+      // canonical vnd.sap.adt.* content type registration.
+      const resp = await this.client.httpClient.request(url, {
+        method: 'GET',
+        headers: { Accept: 'application/*' },
+      });
+      return String(resp.body);
+    });
+  }
+
+  /** POST /sap/bc/adt/ddic/tabletypes — create a new TTYP object. */
+  createTtyp(name: string, xml: string, packageName: string, transport?: string): Promise<void> {
+    return this._call(async () => {
+      const url = `/sap/bc/adt/ddic/tabletypes?_action=create&objtype=ttyp&objname=${encodeURIComponent(name.toUpperCase())}&corrNr=${encodeURIComponent(transport ?? '')}`;
+      await this.client.httpClient.request(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/xml',
+          Accept: 'application/*',
+          ...(packageName ? { 'X-CPACKAGE': packageName } : {}),
+          ...(transport ? { 'X-CORR-NR': transport } : {}),
+        },
+        body: xml,
+      });
+    });
+  }
+
+  /** PUT /sap/bc/adt/ddic/tabletypes/<name> — overwrite an existing TTYP. */
+  updateTtyp(name: string, xml: string, lockHandle: string, transport?: string): Promise<void> {
+    return this._call(async () => {
+      const url = `/sap/bc/adt/ddic/tabletypes/${name.toUpperCase()}`;
+      await this.client.httpClient.request(url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/xml',
+          Accept: 'application/*',
+          ...(lockHandle ? { 'X-LOCK': lockHandle } : {}),
+          ...(transport ? { 'X-CORR-NR': transport } : {}),
+        },
+        body: xml,
+      });
+    });
+  }
+
+  /** GET /sap/bc/adt/messageclass/<name> — retrieve a MSAG (message class). */
+  getMsag(name: string): Promise<string> {
+    return this._call(async () => {
+      const url = `/sap/bc/adt/messageclass/${name.toUpperCase()}`;
+      const resp = await this.client.httpClient.request(url, {
+        method: 'GET',
+        headers: { Accept: 'application/*' },
+      });
+      return String(resp.body);
+    });
+  }
+
+  /** POST /sap/bc/adt/messageclass — create a new MSAG. */
+  createMsag(name: string, xml: string, packageName: string, transport?: string): Promise<void> {
+    return this._call(async () => {
+      const url = `/sap/bc/adt/messageclass?_action=create&objtype=msag&objname=${encodeURIComponent(name.toUpperCase())}&corrNr=${encodeURIComponent(transport ?? '')}`;
+      await this.client.httpClient.request(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/xml',
+          Accept: 'application/*',
+          ...(packageName ? { 'X-CPACKAGE': packageName } : {}),
+          ...(transport ? { 'X-CORR-NR': transport } : {}),
+        },
+        body: xml,
+      });
+    });
+  }
+
+  /** PUT /sap/bc/adt/messageclass/<name> — overwrite an existing MSAG. */
+  updateMsag(name: string, xml: string, lockHandle: string, transport?: string): Promise<void> {
+    return this._call(async () => {
+      const url = `/sap/bc/adt/messageclass/${name.toUpperCase()}`;
+      await this.client.httpClient.request(url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/xml',
+          Accept: 'application/*',
+          ...(lockHandle ? { 'X-LOCK': lockHandle } : {}),
+          ...(transport ? { 'X-CORR-NR': transport } : {}),
+        },
+        body: xml,
+      });
+    });
+  }
+
+  /** GET /sap/bc/adt/ddic/ddl/sources/<name> — retrieve a DDLS (CDS view).
+   *  The bare endpoint returns the metadata envelope (`<ddl:ddlSource>` with
+   *  atom:link rel=source); the actual DDL body lives at the `<sourceUri>`-
+   *  derived path (`/source/main`). We fetch both and return them split. */
+  getDdls(name: string): Promise<{ xml: string; source: string }> {
+    return this._call(async () => {
+      const baseUrl = `/sap/bc/adt/ddic/ddl/sources/${name.toLowerCase()}`;
+      const meta = await this.client.httpClient.request(baseUrl, {
+        method: 'GET',
+        headers: { Accept: 'application/*' },
+      });
+      const xml = String(meta.body);
+      // Source endpoint — S/4 CDS consistently exposes it as `${baseUrl}/source/main`.
+      // The wire rarely carries an inline ddlSourceString, so we always issue the
+      // secondary fetch; this matches what the SAP GUI's "Show Source" pane reads.
+      const sourceResp = await this.client.httpClient.request(`${baseUrl}/source/main`, {
+        method: 'GET',
+        headers: { Accept: 'text/plain' },
+      }).catch((err: unknown) => ({ body: '' as string, status: 0, error: err }));
+      const source = String(sourceResp.body ?? '');
+      return { xml, source };
+    });
+  }
+
+  /** POST /sap/bc/adt/ddic/ddl/sources — create a new DDLS. */
+  createDdls(name: string, xml: string, packageName: string, transport?: string): Promise<void> {
+    return this._call(async () => {
+      const url = `/sap/bc/adt/ddic/ddl/sources?_action=create&objtype=ddls&objname=${encodeURIComponent(name.toLowerCase())}&corrNr=${encodeURIComponent(transport ?? '')}`;
+      await this.client.httpClient.request(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/xml',
+          Accept: 'application/*',
+          ...(packageName ? { 'X-CPACKAGE': packageName } : {}),
+          ...(transport ? { 'X-CORR-NR': transport } : {}),
+        },
+        body: xml,
+      });
+    });
+  }
+
+  /** PUT /sap/bc/adt/ddic/ddl/sources/<name> — overwrite an existing DDLS. */
+  updateDdls(name: string, xml: string, lockHandle: string, transport?: string): Promise<void> {
+    return this._call(async () => {
+      const url = `/sap/bc/adt/ddic/ddl/sources/${name.toLowerCase()}`;
+      await this.client.httpClient.request(url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/xml',
+          Accept: 'application/*',
+          ...(lockHandle ? { 'X-LOCK': lockHandle } : {}),
+          ...(transport ? { 'X-CORR-NR': transport } : {}),
+        },
+        body: xml,
+      });
+    });
+  }
+
   // --- Lock operations ---
 
   lock(objectUrl: string) {

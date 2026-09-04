@@ -472,6 +472,23 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
       EXPORTING es_payload TYPE REF TO data
                 ev_error   TYPE ty_error.
 
+    " 036: ICF fallback writes for the two types ECC EHP5/6 cannot serve via ADT.
+    METHODS write_ddic_table_type
+      IMPORTING iv_name    TYPE ttypename
+                iv_payload TYPE string
+                iv_package TYPE devclass
+                iv_request TYPE trkorr
+      EXPORTING es_payload TYPE ty_ddic_create
+                ev_error   TYPE ty_error.
+
+    METHODS write_ddic_message_class
+      IMPORTING iv_name    TYPE arbgb
+                iv_payload TYPE string
+                iv_package TYPE devclass
+                iv_request TYPE trkorr
+      EXPORTING es_payload TYPE ty_ddic_create
+                ev_error   TYPE ty_error.
+
     " ----- Transaction Code (SE93) CRUD over abap-file-format tran-v1 -----
     TYPES:
       BEGIN OF ty_tran_dialog,
@@ -1572,7 +1589,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
     DATA lv_match_name TYPE string.
     DATA lv_pkg TYPE string.
     DATA lv_req TYPE string.
-    FIND REGEX '^/ddic/(doma|dtel|tabl|stru)(?:/(.+))?$' IN iv_path IGNORING CASE
+    FIND REGEX '^/ddic/(doma|dtel|tabl|stru|ttyp|msag)(?:/(.+))?$' IN iv_path IGNORING CASE
       SUBMATCHES lv_match_type lv_match_name.
     IF sy-subrc <> 0 OR lv_match_type IS INITIAL.
       respond_error( io_server = io_server
@@ -1589,6 +1606,48 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
 
     DATA lv_package TYPE devclass.
     DATA lv_request TYPE trkorr.
+    " 036: TTYP/MSAG accept both POST (create) and PUT (update) through the
+    " same DDIF/table write path — the SAP APIs are upsert-shaped.
+    IF ( iv_method = 'POST' OR iv_method = 'PUT' ) AND ( lv_type = 'TTYP' OR lv_type = 'MSAG' ).
+      FIND FIRST OCCURRENCE OF REGEX '"package"\s*:\s*"([^"]+)"' IN iv_body IGNORING CASE
+        SUBMATCHES lv_pkg.
+      lv_package = COND devclass( WHEN sy-subrc = 0 THEN lv_pkg ELSE '$TMP' ).
+      FIND FIRST OCCURRENCE OF REGEX '"transport(?:Request)?"\s*:\s*"([^"]+)"' IN iv_body IGNORING CASE
+        SUBMATCHES lv_req.
+      IF sy-subrc = 0.
+        lv_request = lv_req.
+      ENDIF.
+
+      DATA ls_write     TYPE ty_ddic_create.
+      DATA ls_write_err TYPE ty_error.
+      IF lv_type = 'TTYP'.
+        write_ddic_table_type( EXPORTING iv_name    = CONV ttypename( lv_name )
+                                         iv_payload = iv_body
+                                         iv_package = lv_package
+                                         iv_request = lv_request
+                               IMPORTING es_payload = ls_write
+                                         ev_error   = ls_write_err ).
+      ELSE.
+        write_ddic_message_class( EXPORTING iv_name    = CONV arbgb( lv_name )
+                                            iv_payload = iv_body
+                                            iv_package = lv_package
+                                            iv_request = lv_request
+                                  IMPORTING es_payload = ls_write
+                                            ev_error   = ls_write_err ).
+      ENDIF.
+      IF ls_write_err IS NOT INITIAL.
+        respond_error( io_server  = io_server
+                       iv_status  = 200
+                       iv_reason  = 'OK'
+                       iv_code    = ls_write_err-error-code
+                       iv_msg     = ls_write_err-error-message
+                       iv_details = ls_write_err-error-details ).
+      ELSE.
+        respond_json( io_server = io_server iv_status = 200 iv_reason = 'OK' is_payload = ls_write ).
+      ENDIF.
+      RETURN.
+    ENDIF.
+
     IF iv_method = 'POST'.
       " Extract package/transportRequest from the wire payload via static regex
       " (the per-type handlers do the full JSON deserialize for typed fields).
@@ -2128,6 +2187,195 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
                                                                          action = 'created' ) ).
   ENDMETHOD.
 
+  METHOD write_ddic_table_type.
+    " 036 ICF fallback write. DDIF_TTYP_PUT is the only supported API on ECC
+    " EHP5/6; the SAP LUW is lock → PUT → activate → unlock, with unlock in
+    " every exit path so a failed activation never leaves a stale enqueue.
+    DATA ls_dd40v TYPE dd40v.
+    DATA lt_dd42v TYPE STANDARD TABLE OF dd42v WITH EMPTY KEY.
+    DATA lt_dd43v TYPE STANDARD TABLE OF dd43v WITH EMPTY KEY.
+    DATA lv_rc TYPE sy-subrc.
+    DATA lv_access TYPE string.
+    DATA lv_row_type TYPE string.
+    DATA lv_description TYPE string.
+
+    " The wire payload nests the AFF document under `main`. The fields we need
+    " are scalars, so static regex extraction beats a full deserialize here.
+    FIND FIRST OCCURRENCE OF REGEX '"accessType"\s*:\s*"([^"]+)"' IN iv_payload IGNORING CASE
+      SUBMATCHES lv_access.
+    FIND FIRST OCCURRENCE OF REGEX '"rowType"\s*:\s*"([^"]+)"' IN iv_payload IGNORING CASE
+      SUBMATCHES lv_row_type.
+    FIND FIRST OCCURRENCE OF REGEX '"description"\s*:\s*"([^"]*)"' IN iv_payload IGNORING CASE
+      SUBMATCHES lv_description.
+    IF lv_row_type IS INITIAL.
+      ev_error = VALUE ty_error( status = 'error'
+                                 error = VALUE ty_error_body( code = 'VALIDATION_ERROR'
+                                                              message = |TTYP { iv_name } payload has no lineType.rowType| ) ).
+      RETURN.
+    ENDIF.
+
+    ls_dd40v-typename = iv_name.
+    ls_dd40v-rowtype = to_upper( lv_row_type ).
+    ls_dd40v-rowkind = 'S'.
+    ls_dd40v-ddtext = lv_description.
+    ls_dd40v-ddlanguage = sy-langu.
+    ls_dd40v-typelen = 0.
+    ls_dd40v-accessmode = SWITCH dd40v-accessmode( to_lower( lv_access )
+      WHEN 'sorted' THEN 'S'
+      WHEN 'hashed' THEN 'H'
+      ELSE 'T' ).
+    IF ls_dd40v-accessmode <> 'T'.
+      ls_dd40v-keydef = 'D'.
+      ls_dd40v-keykind = COND dd40v-keykind( WHEN ls_dd40v-accessmode = 'H' THEN 'U' ELSE 'N' ).
+    ENDIF.
+
+    CALL FUNCTION 'ENQUEUE_E_TABLE'
+      EXPORTING
+        mode_rstable = 'E'
+        tabname      = CONV tabname( iv_name )
+      EXCEPTIONS
+        foreign_lock = 1
+        system_failure = 2
+        OTHERS       = 3.
+    IF sy-subrc <> 0.
+      ev_error = VALUE ty_error( status = 'error'
+                                 error = VALUE ty_error_body( code = 'LOCK_FAILED'
+                                                              message = |TTYP { iv_name } is locked by another user| ) ).
+      RETURN.
+    ENDIF.
+
+    CALL FUNCTION 'DDIF_TTYP_PUT'
+      EXPORTING
+        name              = iv_name
+        dd40v_wa          = ls_dd40v
+      TABLES
+        dd42v_tab         = lt_dd42v
+        dd43v_tab         = lt_dd43v
+      EXCEPTIONS
+        ttyp_not_found    = 1
+        name_inconsistent = 2
+        ttyp_inconsistent = 3
+        put_failure       = 4
+        put_refused       = 5
+        OTHERS            = 6.
+    lv_rc = sy-subrc.
+    IF lv_rc = 0.
+      CALL FUNCTION 'DDIF_TTYP_ACTIVATE'
+        EXPORTING
+          name        = iv_name
+        IMPORTING
+          rc          = lv_rc
+        EXCEPTIONS
+          not_found   = 1
+          put_failure = 2
+          OTHERS      = 3.
+      IF sy-subrc <> 0.
+        lv_rc = sy-subrc.
+      ENDIF.
+    ENDIF.
+
+    CALL FUNCTION 'DEQUEUE_E_TABLE'
+      EXPORTING
+        mode_rstable = 'E'
+        tabname      = CONV tabname( iv_name ).
+
+    IF lv_rc <> 0.
+      ev_error = VALUE ty_error( status = 'error'
+                                 error = VALUE ty_error_body( code = 'DDIC_CREATE_FAILED'
+                                                              message = |TTYP { iv_name } write failed (rc={ lv_rc })| ) ).
+      RETURN.
+    ENDIF.
+
+    es_payload = VALUE ty_ddic_create( status = 'success'
+                                       data = VALUE ty_ddic_create_data( name   = iv_name
+                                                                         type   = 'TTYP'
+                                                                         action = 'updated' ) ).
+  ENDMETHOD.
+
+  METHOD write_ddic_message_class.
+    " 036 ICF fallback write. T100A/T100 are plain tables; the SAP-sanctioned
+    " write path is RS_CORR_INSERT for the header + direct MODIFY of T100.
+    DATA lv_rc TYPE sy-subrc.
+    DATA lv_description TYPE string.
+    DATA lt_t100 TYPE STANDARD TABLE OF t100 WITH EMPTY KEY.
+
+    FIND FIRST OCCURRENCE OF REGEX '"description"\s*:\s*"([^"]*)"' IN iv_payload IGNORING CASE
+      SUBMATCHES lv_description.
+
+    DATA lv_offset TYPE i.
+    DATA lv_number TYPE string.
+    DATA lv_text TYPE string.
+    DATA lv_rest TYPE string.
+    lv_rest = iv_payload.
+    " Walk the `messages` array pair by pair; the payload is machine-generated
+    " so the `number` / `text` order is stable.
+    WHILE lv_rest IS NOT INITIAL.
+      FIND FIRST OCCURRENCE OF REGEX '"number"\s*:\s*"([^"]+)"\s*,\s*"text"\s*:\s*"([^"]*)"'
+        IN lv_rest IGNORING CASE MATCH OFFSET lv_offset SUBMATCHES lv_number lv_text.
+      IF sy-subrc <> 0.
+        EXIT.
+      ENDIF.
+      APPEND VALUE t100( sprsl = sy-langu
+                         arbgb = iv_name
+                         msgnr = lv_number
+                         text  = lv_text ) TO lt_t100.
+      lv_rest = substring( val = lv_rest off = lv_offset + 1 ).
+    ENDWHILE.
+
+    CALL FUNCTION 'ENQUEUE_E_TABLEE'
+      EXPORTING
+        mode_rstable = 'E'
+        tabname      = 'T100'
+        varkey       = CONV char120( iv_name )
+      EXCEPTIONS
+        foreign_lock   = 1
+        system_failure = 2
+        OTHERS         = 3.
+    IF sy-subrc <> 0.
+      ev_error = VALUE ty_error( status = 'error'
+                                 error = VALUE ty_error_body( code = 'LOCK_FAILED'
+                                                              message = |MSAG { iv_name } is locked by another user| ) ).
+      RETURN.
+    ENDIF.
+
+    DATA ls_t100a TYPE t100a.
+    ls_t100a-arbgb = iv_name.
+    ls_t100a-stext = lv_description.
+    ls_t100a-masterlang = sy-langu.
+    ls_t100a-lastuser = sy-uname.
+    ls_t100a-ldate = sy-datum.
+    ls_t100a-ltime = sy-uzeit.
+    MODIFY t100a FROM ls_t100a.
+    lv_rc = sy-subrc.
+    IF lv_rc = 0 AND lines( lt_t100 ) > 0.
+      MODIFY t100 FROM TABLE lt_t100.
+      lv_rc = sy-subrc.
+    ENDIF.
+    IF lv_rc = 0.
+      COMMIT WORK AND WAIT.
+    ELSE.
+      ROLLBACK WORK.
+    ENDIF.
+
+    CALL FUNCTION 'DEQUEUE_E_TABLEE'
+      EXPORTING
+        mode_rstable = 'E'
+        tabname      = 'T100'
+        varkey       = CONV char120( iv_name ).
+
+    IF lv_rc <> 0.
+      ev_error = VALUE ty_error( status = 'error'
+                                 error = VALUE ty_error_body( code = 'DDIC_CREATE_FAILED'
+                                                              message = |MSAG { iv_name } write failed (rc={ lv_rc })| ) ).
+      RETURN.
+    ENDIF.
+
+    es_payload = VALUE ty_ddic_create( status = 'success'
+                                       data = VALUE ty_ddic_create_data( name   = iv_name
+                                                                         type   = 'MSAG'
+                                                                         action = 'updated' ) ).
+  ENDMETHOD.
+
   METHOD get_ddic_object.
     " Pull a DDIC object definition and return the wire JSON (mirrors the
     " create payload so round-trip is consistent). Object missing → DDIC_OBJECT_NOT_FOUND.
@@ -2224,6 +2472,34 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
         CREATE DATA es_payload TYPE zcl_abap_vibe_tabl_format=>ty_result.
         ASSIGN es_payload->* TO FIELD-SYMBOL(<ls_stru_payload>).
         <ls_stru_payload> = ls_stru_artifact.
+      WHEN 'TTYP'.
+        " 036: ECC EHP5/6 has no ADT tabletypes endpoint — this is the fallback.
+        DATA(ls_ttyp_artifact) = zcl_abap_vibe_ttyp_format=>generate( iv_name = CONV ttypename( iv_name ) ).
+        IF ls_ttyp_artifact-success = abap_false.
+          ev_error = VALUE ty_error( status = 'error'
+                                     error = VALUE ty_error_body( code = COND string( WHEN ls_ttyp_artifact-error_code IS INITIAL
+                                                                                      THEN 'DDIC_OBJECT_NOT_FOUND'
+                                                                                      ELSE ls_ttyp_artifact-error_code )
+                                                                  message = ls_ttyp_artifact-error_message ) ).
+          RETURN.
+        ENDIF.
+        CREATE DATA es_payload TYPE zcl_abap_vibe_ttyp_format=>ty_result.
+        ASSIGN es_payload->* TO FIELD-SYMBOL(<ls_ttyp_payload>).
+        <ls_ttyp_payload> = ls_ttyp_artifact.
+      WHEN 'MSAG'.
+        " 036: ECC EHP5/6 has no ADT messageclass endpoint — this is the fallback.
+        DATA(ls_msag_artifact) = zcl_abap_vibe_msag_format=>generate( iv_name = CONV arbgb( iv_name ) ).
+        IF ls_msag_artifact-success = abap_false.
+          ev_error = VALUE ty_error( status = 'error'
+                                     error = VALUE ty_error_body( code = COND string( WHEN ls_msag_artifact-error_code IS INITIAL
+                                                                                      THEN 'DDIC_OBJECT_NOT_FOUND'
+                                                                                      ELSE ls_msag_artifact-error_code )
+                                                                  message = ls_msag_artifact-error_message ) ).
+          RETURN.
+        ENDIF.
+        CREATE DATA es_payload TYPE zcl_abap_vibe_msag_format=>ty_result.
+        ASSIGN es_payload->* TO FIELD-SYMBOL(<ls_msag_payload>).
+        <ls_msag_payload> = ls_msag_artifact.
       WHEN OTHERS.
         ev_error = VALUE ty_error( status = 'error'
                                    error = VALUE ty_error_body( code = 'DDIC_NOT_SUPPORTED'

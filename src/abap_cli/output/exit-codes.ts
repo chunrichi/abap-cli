@@ -16,6 +16,11 @@ export const EXIT_CODES: Record<ErrorCategory, number> = {
   VALIDATION_ERROR: 7,
   NOT_FOUND: 8,
   LOCKED: 9,
+  // 036-ttyp-msag-ddls: reserved-range slots. These explicit values are part
+  // of the public contract so agents / CI greppers can identify the failure
+  // shape unambiguously without diffing envelope data.
+  DDLS_NOT_SUPPORTED: 64,
+  CHANNEL_DETECT: 65,
 };
 
 /** Exit code 1 — unknown / unmapped failure (same value as EXIT_CODES.UNKNOWN). */

@@ -37,17 +37,17 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | 创建/修改结构（STRU） | `create / pull / push STRU` | ✅ | 三件套 + ICF |
 | 创建/修改 SICF 节点（HTTP） | `create / pull /push HTTP` | ✅ | ICF |
 | 创建/修改事务码（SE93 / TRAN） | `create / pull TRAN` | ✅ | ICF，5 种 transactionType |
-| Table Type（TTYP） | — | ❌ | spec 033 候选 |
+| Table Type（TTYP） | `create / pull / push TTYP` | ✅ | ADT 主通道；ECC EHP5/6 自动 ICF 兜底 |
 | Pool/Cluster Table | — | ❌ | 仅 TABL/STRU |
 | View（VIEW） | `select` 仅查 | ⚪ | 仅查询；不能创建 view |
-| CDS View（DDLS） | — | ❌ | spec 候选 |
+| CDS View（DDLS） | `create / pull / push DDLS` | ✅ | 仅 ADT；ECC 旧内核硬错 `DDLS_NOT_SUPPORTED_ON_ECC` |
 | CDS Table Function | — | ❌ | |
 | AMDP 类 | — | ❌ | |
 | Enhancement（ENHO / ENHS） | — | ❌ | |
 | BAdI 定义/实现 | — | ❌ | |
 | Package | `pull --package` 仅查 | ⚪ | 不能创建 package |
 | 文本元素（textpool） | `pull --textpool` | ✅ | 但不与 push 链路一体 |
-| 消息类（MSAG） | — | ❌ | |
+| 消息类（MSAG） | `create / pull / push MSAG` | ✅ | ADT 主通道；ECC EHP5/6 自动 ICF 兜底 |
 | Lock Object | — | ❌ | |
 | Search Help | — | ❌ | |
 | Authorization Object | — | ❌ | |
@@ -212,7 +212,6 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 
 | 缺失能力 | 候选 spec | 价值 | 工作量估计 |
 |---|---|---|---|
-| CDS View（DDLS） | 033 | 高（核心 SAP 现代对象） | 大 |
 | ABAP Unit 测试运行 | — | 高（端到端验证） | 中 |
 | AMDP 类 | — | 中（数据库近计算） | 中 |
 | Enhancement（ENHO / ENHS） | — | 中（遗留代码改造） | 中 |
@@ -228,7 +227,7 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | Authorization Object | — | 低（安全配置） | 中 |
 | SAPscript / Smart / Adobe Form | — | 低（打印） | 中 |
 
-**最值得做（高价值 + 中等工作量）**：CDS View（DDLS）、ABAP Unit 测试运行、Enhancement、Cross-reference 全集、Pull latest/inactive 版本。
+**最值得做（高价值 + 中等工作量）**：ABAP Unit 测试运行、Enhancement、Cross-reference 全集、Pull latest/inactive 版本。
 
 ## AFF Fixture Coverage (spec 033 SC-005)
 

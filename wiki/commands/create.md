@@ -61,6 +61,27 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 - **`create local` 落库路径**：本地草稿 → `abap create <type> <name> --package <pkg> --description <desc> --no-pull` → `abap push src/<obj>/<obj>.<type>.abap --tr <transport>`（帮助文本中给出）
 - **写保护**：非 TTY 必须 `--yes`（或 `--dry-run` 占位），由 `core/confirmation.ts#requireWriteConfirmation` 统一处理，TTY 模式直接执行不提示
 
+### 新增 TTYP / MSAG / DDLS（双通道）
+
+这三类走**第四条路由**：`--file` 读本地 AFF JSON → schema 校验 → `channel-detect` 判定通道 → ADT POST 或 ICF POST。
+
+| 类型 | 主通道（kernel ≥ 753） | 兜底（kernel < 753） | `--file` 要求 |
+|---|---|---|---|
+| TTYP | ADT POST `/sap/bc/adt/ddic/tabletypes` | ICF POST `/ddic/ttyp/<name>` | `<name>.ttyp.json` |
+| MSAG | ADT POST `/sap/bc/adt/messageclass` | ICF POST `/ddic/msag/<name>` | `<name>.msag.json` |
+| DDLS | ADT POST `/sap/bc/adt/ddic/ddl/sources` | **无兜底** → 硬错 | `<name>.ddls.json` **且** `<name>.ddls.acds` |
+
+envelope 附加 `data.channel`（`"adt"` / `"icf"`）。
+
+错误码映射：
+
+| 错误码 | exit | 触发条件 |
+|---|---|---|
+| `DDLS_NOT_SUPPORTED_ON_ECC` | 64 | DDLS + 旧内核；不发起任何 SAP 调用 |
+| `CHANNEL_DETECTION_FAILED` | 65 | system profile 缺 `kernelRelease` 且缺 `ddlsSupported` |
+| `VALIDATION_ERROR` | 7 | AFF schema 不合规，或 DDLS 缺 `.ddls.acds` 侧车 |
+| `FILE_PARSE_ERROR` | 2 | `--file` 指向的文件读不出 / 不是合法 JSON |
+
 ## Examples
 
 ```bash

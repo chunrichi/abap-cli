@@ -22,12 +22,13 @@ import {
 } from '../../src/abap_cli/types/registry.js';
 
 describe('types/registry.ts (US11 — single source of truth)', () => {
-  it('contains exactly 10 supported types (4 source + 4 DDIC + HTTP + TRAN)', () => {
-    expect(allSupportedTypes()).toHaveLength(10);
+  it('contains exactly 13 supported types (4 source + 4 DDIC + HTTP + TRAN + 3 dual-channel)', () => {
+    expect(allSupportedTypes()).toHaveLength(13);
     expect(allSupportedTypes()).toEqual([
       'CLAS', 'INTF', 'PROG', 'FUGR',         // ADT source
-      'TABL', 'STRU', 'DOMA', 'DTEL',         // DDIC
+      'TABL', 'STRU', 'DOMA', 'DTEL',         // ICF DDIC
       'HTTP', 'TRAN',                          // ICF
+      'TTYP', 'MSAG', 'DDLS',                  // 036 dual-channel
     ]);
   });
 
@@ -40,9 +41,13 @@ describe('types/registry.ts (US11 — single source of truth)', () => {
     expect(createObjtypeFor('TABL')).toBeUndefined();
     expect(createObjtypeFor('HTTP')).toBeUndefined();
     expect(createObjtypeFor('TRAN')).toBeUndefined();
+    // TTYP/MSAG/DDLS reach via channel-detect on ADT; no createObjtype string.
+    expect(createObjtypeFor('TTYP')).toBeUndefined();
+    expect(createObjtypeFor('MSAG')).toBeUndefined();
+    expect(createObjtypeFor('DDLS')).toBeUndefined();
   });
 
-  it('routes source objects to ADT and others to ICF', () => {
+  it('routes source objects (ADT) and TTYP/MSAG/DDLS dual-channel; TABL/HTTP/TRAN ICF only', () => {
     expect(sourceFor('CLAS')).toBe('ADT');
     expect(sourceFor('INTF')).toBe('ADT');
     expect(sourceFor('PROG')).toBe('ADT');
@@ -50,9 +55,13 @@ describe('types/registry.ts (US11 — single source of truth)', () => {
     expect(sourceFor('TABL')).toBe('ICF');
     expect(sourceFor('HTTP')).toBe('ICF');
     expect(sourceFor('TRAN')).toBe('ICF');
+    // 036: TTYP/MSAG/DDLS are ADT by default with optional ICF fallback.
+    expect(sourceFor('TTYP')).toBe('ADT');
+    expect(sourceFor('MSAG')).toBe('ADT');
+    expect(sourceFor('DDLS')).toBe('ADT');
   });
 
-  it('resolves folders uniformly for all 10 types', () => {
+  it('resolves folders uniformly for all 13 types', () => {
     expect(folderFor('CLAS')).toBe('clas');
     expect(folderFor('INTF')).toBe('intf');
     expect(folderFor('PROG')).toBe('prog');
@@ -63,12 +72,17 @@ describe('types/registry.ts (US11 — single source of truth)', () => {
     expect(folderFor('DTEL')).toBe('dtel');
     expect(folderFor('HTTP')).toBe('http');
     expect(folderFor('TRAN')).toBe('tran');
+    // 036: dual-channel DDIC + CDS folders.
+    expect(folderFor('TTYP')).toBe('ttyp');
+    expect(folderFor('MSAG')).toBe('msag');
+    expect(folderFor('DDLS')).toBe('ddls');
   });
 
   it('isSupportedType / subset helpers narrow correctly', () => {
     expect(isSupportedType('CLAS')).toBe(true);
-    expect(isSupportedType('TTYP')).toBe(false);
-    expect(isSupportedType('MSAG')).toBe(false);
+    expect(isSupportedType('TTYP')).toBe(true);
+    expect(isSupportedType('MSAG')).toBe(true);
+    expect(isSupportedType('DDLS')).toBe(true);
 
     expect(isDdicSupportedType('TABL')).toBe(true);
     expect(isDdicSupportedType('CLAS')).toBe(false);

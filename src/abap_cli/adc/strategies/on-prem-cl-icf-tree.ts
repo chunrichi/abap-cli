@@ -50,9 +50,19 @@ export class OnPremClIcfTreeStrategy implements IcfRegisterStrategy {
       // Non-JSON classrun output or class-not-found; surface as structured error.
       // Preserve the raw classrun text so debugging unparseable responses does
       // not require rerunning the deploy.
+      // The wrapper has already classified the transport error into a
+      // CliError (http-error.ts: SAP_ERROR with details.sapErrorBody /
+      // details.httpStatus). Reach into that details bag so the user can see
+      // what the ABAP server actually said instead of a bare "Request failed
+      // with status code 400".
       const parserError = error instanceof SyntaxError;
-      const message = parserError ? `Unparseable classrun output: ${raw}` : (error instanceof Error ? error.message : String(error));
-      const code = parserError ? 'ICF_SETUP_OUTPUT' : (error instanceof CliError ? error.code : 'ICF_SETUP_FAILED');
+      const cliErr = error instanceof CliError ? error : undefined;
+      const sapBody = typeof cliErr?.details?.sapErrorBody === 'string' ? cliErr.details.sapErrorBody : '';
+      const baseMessage = parserError
+        ? `Unparseable classrun output: ${raw}`
+        : (error instanceof Error ? error.message : String(error));
+      const message = sapBody ? `${baseMessage} | SAP body: ${sapBody.slice(0, 400)}` : baseMessage;
+      const code = parserError ? 'ICF_SETUP_OUTPUT' : (cliErr?.code ?? 'ICF_SETUP_FAILED');
       return {
         status: 'error',
         strategyId: this.id,

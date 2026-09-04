@@ -4,7 +4,7 @@ import { DDIC_SUPPORTED_TYPES, type DdicSupportedType } from '../../types/regist
 import { CliError } from '../../output/json.js';
 
 // Known DDIC object extensions
-export const DDIC_EXTENSIONS = ['.doma.json', '.dtel.json', '.tabl.json', '.stru.json', '.ttyp.json'];
+export const DDIC_EXTENSIONS = ['.doma.json', '.dtel.json', '.tabl.json', '.stru.json', '.ttyp.json', '.msag.json', '.ddls.json'];
 
 /** Re-exported from `types/registry.ts` (T048, US11). */
 export { DDIC_SUPPORTED_TYPES, type DdicSupportedType };

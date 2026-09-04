@@ -28,6 +28,18 @@ export interface ObjectTypeEntry {
    * Optional here because the registry predates the validator; populated lazily.
    */
   affSchemaFile?: string;
+  /** 036-ttyp-msag-ddls: dual-channel capability (ICF fallback + ECC support). */
+  channel?: ChannelCapability;
+}
+
+/** 036-ttyp-msag-ddls: per-type capability hints for channel-detect. */
+export interface ChannelCapability {
+  /** Type code routed to detect-channel / ICF fallback when ADT is absent. */
+  icfFallback: boolean;
+  /** Whether ECC releases (EHP5+) carry the type at all. DDLS = no, full stop. */
+  eccSupported: boolean;
+  /** Human-readable reason for the fallback (consumed by `data.fallbackReason`). */
+  fallbackReason?: 'ECC_EHP6_NO_ADT_TABLETYPE' | 'ECC_EHP6_NO_ADT_MESSAGECLASS';
 }
 
 /** Single registry; iterated in `allSupportedTypes()` for deterministic order. */
@@ -46,8 +58,37 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
   { type: 'HTTP', folder: 'http', source: 'ICF', affSchemaFile: 'http-v1.json' },
   // Transaction code (SE93) via ICF
   { type: 'TRAN', folder: 'tran', source: 'ICF', affSchemaFile: 'tran-v1.json' },
+  // 036-ttyp-msag-ddls: dual-channel DDIC + CDS.
+  // TTYP — handcrafted schema (upstream type-v1.json is type-pool, not table-type).
+  {
+    type: 'TTYP',
+    folder: 'ttyp',
+    source: 'ADT',
+    affSchemaFile: 'ttyp-v1.json',
+    channel: { icfFallback: true, eccSupported: true, fallbackReason: 'ECC_EHP6_NO_ADT_TABLETYPE' },
+  },
+  // MSAG — upstream schema available at msag/msag-v1.json.
+  {
+    type: 'MSAG',
+    folder: 'msag',
+    source: 'ADT',
+    affSchemaFile: 'msag-v1.json',
+    channel: { icfFallback: true, eccSupported: true, fallbackReason: 'ECC_EHP6_NO_ADT_MESSAGECLASS' },
+  },
+  // DDLS — ADT only. There is no ICF fallback; ECC releases pre-7.40 simply
+  // cannot host CDS sources, so the channel-detect layer hard-errors with
+  // DDLS_NOT_SUPPORTED_ON_ECC (exit 64) instead of silently degrading.
+  {
+    type: 'DDLS',
+    folder: 'ddls',
+    source: 'ADT',
+    affSchemaFile: 'ddls-v1.json',
+    channel: { icfFallback: false, eccSupported: false },
+  },
 ] as const;
 
+/** 036-ttyp-msag-ddls: sub-registry types for channel-detect / ICF fallback gating. */
+export const ADT_ROUTED_TYPES_LEGACY = ['CLAS', 'INTF', 'PROG', 'FUGR', 'TTYP', 'MSAG', 'DDLS'] as const;
 const DEFAULT_FOLDER = 'unknown';
 const INDEX: Record<string, ObjectTypeEntry> = Object.fromEntries(
   TYPE_REGISTRY.map((e) => [e.type, e]),
@@ -76,6 +117,15 @@ export function isSupportedType(type: string): boolean {
   const primary = type.split('/')[0]!.toUpperCase();
   return primary in INDEX;
 }
+
+/** 036: resolver for the per-type channel capability. */
+export function channelFor(type: string): ChannelCapability | undefined {
+  const primary = type.split('/')[0]!.toUpperCase();
+  return INDEX[primary]?.channel;
+}
+
+/** 036: sub-registry of types routed through channel-detect (TTYP/MSAG/DDLS). */
+export const ADT_ROUTED_TYPES = new Set(['TTYP', 'MSAG', 'DDLS']) as ReadonlySet<string>;
 
 /** Return all supported type codes (uppercase, in registry order). */
 export function allSupportedTypes(): string[] {

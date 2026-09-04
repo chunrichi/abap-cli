@@ -31,3 +31,9 @@ for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
   count += 1;
 }
 console.log(`copy-bundled-schema: copied ${count} entries to ${dst}`);
+
+// tsc emits index.js without the exec bit, which breaks the `abap` bin symlink.
+const binEntry = path.join(repoRoot, 'dist', 'src', 'abap_cli', 'index.js');
+if (fs.existsSync(binEntry)) {
+  fs.chmodSync(binEntry, 0o755);
+}
