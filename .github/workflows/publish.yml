@@ -6,9 +6,12 @@
 # Triggers:
 #   - pushing a `v*` tag (e.g. `git tag v0.3.0 && git push origin v0.3.0`)
 #   - publishing a GitHub Release
-#   - manual workflow_dispatch (dry-run only: verify + npm view guard, no publish)
+#   - manual workflow_dispatch (dry-run only: npm view guard, no publish)
 #
-# The two auto triggers can fire for the same version (tag push + Release publish).
+# Note: `verify` is NOT run here. The release pipeline trusts verify.yml, which
+# gates every push and PR. Tag push implies the tagged commit was already
+# verified (either by an earlier push trigger, or by the local pre-push hook).
+#
 # A pre-publish `npm view` guard makes the job idempotent: if the version is
 # already on npm, publish is skipped and the run stays green.
 name: publish-to-npm
@@ -23,7 +26,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'Dry run (verify + npm view guard only, no publish)'
+        description: 'Dry run (npm view guard only, no publish). verify is not re-run here.'
         type: boolean
         default: true
         required: true
@@ -40,7 +43,7 @@ concurrency:
 
 jobs:
   publish:
-    name: Verify & publish to npm
+    name: Publish to npm
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -61,9 +64,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Run verify (build + unit tests)
-        run: npm run verify
 
       - name: Resolve package version
         id: version
@@ -87,4 +87,4 @@ jobs:
       - name: Dry-run summary
         if: github.event_name == 'workflow_dispatch'
         run: |
-          echo "::notice::Dry run complete — verify passed and version check ran, but publish was skipped (workflow_dispatch)."
+          echo "::notice::Dry run complete — npm view guard ran, but publish was skipped (workflow_dispatch). Verify ran via verify.yml on the commit that introduced this tag."

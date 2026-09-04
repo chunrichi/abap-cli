@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Pre-push hook — runs `npm run verify` before any non-tag push.
+# Wired via `git config core.hooksPath .githooks` (see scripts/setup-hooks.sh).
+# Escape hatch: `git push --no-verify` (use only when CI is the gate).
+set -euo pipefail
+
+# `git push` passes refs on stdin, one per line: <local_ref> <local_sha> <remote_ref> <remote_sha>.
+# A tag push has local_ref starting with `refs/tags/`. Skip those — publish.yml
+# trusts verify.yml's gate for the tagged commit.
+while IFS=' ' read -r local_ref local_sha _remote_ref _remote_sha; do
+  [[ -z "$local_ref" ]] && continue
+  if [[ "$local_ref" == "refs/tags/"* ]]; then
+    exit 0
+  fi
+done
+
+echo "▶ pre-push: npm run verify"
+npm run verify
