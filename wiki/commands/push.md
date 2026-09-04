@@ -62,8 +62,34 @@ DDIC/TRAN 的探测在 `--dry-run` 之后（plan-only 不做多余 round-trip）
 | FUGR | `push-fugr.ts` | 子对象（FM/include）是独立 ADT 锁对象，逐文件锁自己的目标、写源，最后激活整个 function group |
 | Textpool | `push-textpool.ts` | 混合模式：profile 缓存能力决定走 ADT `setTextElements`（lock→write→unlock）还是 ICF `/textpool/*`；`--check-only` 不支持（`VALIDATION_ERROR`） |
 | DDIC（icf） | `pushDdicFile` | `.doma/.dtel/.tabl/.stru.json` 经 ICF `POST /ddic/<type>`（与 `abap create --file` 同一端点）；结果 `written` / stage `ddic-icf`；`--check-only` 不支持；transport 缺省时回退文件里记录的 `transportRequest` |
+| TTYP / MSAG / DDLS（通道路由） | `pushChannelRoutedFile` | 见下节 |
 
 DDIC 推送时 `--atomic` 也会结构校验 JSON（`readDdicJson` + `validateDdicObject`），不是只读文本。
+
+### 新增 TTYP / MSAG / DDLS（双通道）
+
+这三类的扩展名同样是 `.json`，但**在 DDIC 分支之前**被拦截——它们先经 `flows/edit/channel-detect.ts` 判定通道，再走各自的 `push-{ttyp,msag,ddls}.ts`：
+
+| 类型 | 主通道（kernel ≥ 753） | 兜底（kernel < 753） | stage |
+|---|---|---|---|
+| TTYP | ADT PUT `/sap/bc/adt/ddic/tabletypes/<name>`（lock → PUT → unlock） | ICF PUT `/ddic/ttyp/<name>` | `channel-adt` / `channel-icf` |
+| MSAG | ADT PUT `/sap/bc/adt/messageclass/<name>`（lock → PUT → unlock） | ICF PUT `/ddic/msag/<name>` | `channel-adt` / `channel-icf` |
+| DDLS | ADT PUT `/sap/bc/adt/ddic/ddl/sources/<name>` | **无兜底** → 硬错 | `channel-adt` |
+
+`--atomic` 阶段对这三类走各自的 `validate{Ttyp,Msag,Ddls}Object`（AFF schema），而不是 `readDdicJson`。
+
+沿用 035 语义：对象不存在时报 `OBJECT_NOT_FOUND` 并提示改用 `abap create`，push **绝不隐式创建**。
+
+错误码映射：
+
+| 错误码 | exit | 触发条件 |
+|---|---|---|
+| `DDLS_NOT_SUPPORTED_ON_ECC` | 64 | DDLS + 旧内核；不发起任何 SAP 调用 |
+| `CHANNEL_DETECTION_FAILED` | 65 | system profile 缺 `kernelRelease` 且缺 `ddlsSupported` |
+| `OBJECT_NOT_FOUND` | 8 | 对象不存在（引导 `abap create`） |
+| `LOCK_FAILED` | 9 | ICF 兜底写路径拿不到 enqueue 锁（ICF handler 的错误码原样透传） |
+| `VALIDATION_ERROR` | 7 | DDLS 缺 `.ddls.acds`，或 `sourceType` 与 `.acds` 顶部 `define` 不一致 |
+| `AFF_FIXTURE_INVALID` | 7 | push 前 AFF schema 校验失败 |
 
 ### 支持的文件类型
 
@@ -75,10 +101,11 @@ DDIC 推送时 `--atomic` 也会结构校验 JSON（`readDdicJson` + `validateDd
 | `zif_foo.intf.abap` / `.intf.definitions.abap` / `.intf.implementations.abap` | adt | 接口及各 part |
 | `zprog.prog.abap` | adt | 程序 main |
 | `zfg.fugr.abap` / `.fugr.sapl<name>.reps.abap` / `.fugr.l<name>top.reps.abap` / `.fugr.<fm>.func.abap` | adt | 函数组（含 include 与 FM 子对象，各自独立加锁） |
-| `zmy_table.tabl.json` / `.doma.json` / `.dtel.json` / `.stru.json` | icf | 四种 DDIC 对象（TTYP 等其余类型抛 `DDIC_NOT_SUPPORTED`） |
+| `zmy_table.tabl.json` / `.doma.json` / `.dtel.json` / `.stru.json` | icf | 四种 DDIC 对象 |
+| `zmy_ttyp.ttyp.json` / `zmy_msag.msag.json` / `zmy_view.ddls.json` | 通道路由 | 036 三类型，`channel-detect` 决定 ADT / ICF |
 | `zprog.prog.texts.en.properties`（`texts`/`selections`/`headings`） | textpool | 文本元素，混合模式路由 |
 
-**不支持的**：`.clas.json` 等源码对象的元数据 JSON — 被解析为 route `icf` 但对象类型不在四种 DDIC 之内，`validateLocalFile` 抛 `DDIC_NOT_SUPPORTED`（exit 7）。源码对象的创建/更新走 `abap create`，不是 push。
+**不支持的**：`.clas.json` 等源码对象的元数据 JSON — 被解析为 route `icf` 但对象类型既不在四种 DDIC 之内、也不是 036 的三类型，`validateLocalFile` 抛 `DDIC_NOT_SUPPORTED`（exit 7）。源码对象的创建/更新走 `abap create`，不是 push。
 
 **目录约定（与 pull / create local 对齐）**：push 路径上的目录层级（`src/<typeFolder>/<objectName>/...`）仅作约定，不影响路由与解析——`file-resolver.ts#resolveFile` 只看 `path.basename`。pull / create local 默认把产物放到对应类型的顶层子目录下（`src/clas/`、`src/prog/`、`src/intf/`、`src/fugr/`、`src/tabl/`、`src/doma/`、`src/stru/`、`src/dtel/`），push 沿用同一目录读 basename 即可；推老路径（裸 `src/<name>.<type>.abap`）也仍然能正常解析并推送。
 

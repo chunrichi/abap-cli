@@ -63,28 +63,44 @@ export async function getObjectParts(
 }
 
 /** 014: DDIC types the CLI can create/pull via the ICF service.
- *  Q2 scope: keep TTYP rejected (deferred to a later phase). */
+ *  036-ttyp-msag-ddls: TTYP/MSAG reach ICF only via the channel-detect
+ *  fallback (not via this set — they default to ADT). Keep this set
+ *  exclusively the four "ICF-only" DDIC types. */
 const DDIC_ICF_SUPPORTED = new Set(['DOMA', 'DTEL', 'TABL', 'STRU']);
+
+/** 036-ttyp-msag-ddls: types routed through channel-detect.
+ *  These types prefer ADT but allow ICF fallback when the system profile
+ *  reports an ECC release. Distinct from `DDIC_ICF_SUPPORTED` (which is
+ *  ICF-only) — `ADT_ROUTED_TYPES` is "ICF optional". */
+const ADT_ROUTED_TYPES = new Set(['TTYP', 'MSAG', 'DDLS']);
 
 /** 022: object types the CLI can create/pull/push via the self-built ICF service. */
 const ICF_ROUTED_TYPES = new Set<string>([...DDIC_ICF_SUPPORTED, 'HTTP', 'TRAN']);
+
+/** 036-ttyp-msag-ddls: union of all types the push validator should let
+ *  through. ADT-routed types (TTYP/MSAG/DDLS) reach the SAP via channel-detect
+ *  rather than the legacy /ddic/<type> ICF route, but they are still valid
+ *  push targets from the perspective of `validateLocalFile`. Keep the ADT
+ *  set separate so the legacy ICF branch can stay strict. */
+const VALIDATED_ROUTE_TYPES = new Set<string>([...ICF_ROUTED_TYPES, ...ADT_ROUTED_TYPES]);
 
 /**
  * 014/022: validate a local file before push. Source files are passed through;
  * DDIC files for the four supported types (DOMA/DTEL/TABL/STRU), HTTP service
  * (.http.json), and Transaction code (.tran.json) are allowed through to the
- * matching ICF endpoint. Unknown DDIC-looking types (notably TTYP) still raise
- * DDIC_NOT_SUPPORTED.
+ * matching ICF endpoint. TTYP/MSAG/DDLS share the .json extension but route
+ * through channel-detect in `pushChannelRoutedFile`, so they are also accepted
+ * here. Unknown DDIC-looking types still raise DDIC_NOT_SUPPORTED.
  */
 export function validateLocalFile(resolved: { objectName: string; objectType: string; route: string }): void {
   if (resolved.route === 'icf') {
-    if (!ICF_ROUTED_TYPES.has(resolved.objectType)) {
+    if (!VALIDATED_ROUTE_TYPES.has(resolved.objectType)) {
       throw new CliError(
         'DDIC_NOT_SUPPORTED',
         `Object ${resolved.objectName} (${resolved.objectType}) is a DDIC object; not supported in this phase`,
         { object: resolved.objectName, type: resolved.objectType },
       );
     }
-    // Supported ICF-routed type — allowed through (handler picks the endpoint).
+    // Supported route — allowed through (handler picks the endpoint).
   }
 }

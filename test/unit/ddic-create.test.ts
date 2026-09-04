@@ -374,7 +374,7 @@ describe('014/US1 create TABL', () => {
     expect(out.error.message).toContain('transportRequest');
   });
 
-  it('still rejects unknown types like TTYP with TYPE_NOT_SUPPORTED', async () => {
+  it('routes TTYP through the 036 channel flow instead of rejecting the type', async () => {
     writeTableJson('ZTAB_X');
     fs.writeFileSync(path.join(cwd, 'src/ztab_x.ttyp.json'), '{"name":"ZTAB_X","rowType":"ZREF"}');
     const program = makeProgram();
@@ -386,9 +386,11 @@ describe('014/US1 create TABL', () => {
       '--yes', '--json',
     ], { cwd });
     expect(res.exitCode).toBe(7);
-    // create.ts raises TYPE_NOT_SUPPORTED for unknown DDIC types (TTYP).
+    // The file above is not a valid ttyp-v1 document, so the schema check
+    // rejects it — the type itself is now supported.
     const out = JSON.parse(res.stderr);
-    expect(out.error.code).toBe('TYPE_NOT_SUPPORTED');
+    expect(out.error.code).toBe('VALIDATION_ERROR');
+    expect(out.error.code).not.toBe('TYPE_NOT_SUPPORTED');
   });
 
   it('ICF failure maps to SAP_ERROR (exit 6)', async () => {

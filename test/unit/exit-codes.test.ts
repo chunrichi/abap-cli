@@ -14,15 +14,20 @@ import {
 import { categoryOf, type ErrorCode } from '../../src/abap_cli/output/error-codes.js';
 
 describe('exit codes ', () => {
-  it('every ErrorCategory has a unique exit code (UNKNOWN=1, categories 2..9)', () => {
+  it('every ErrorCategory has a unique exit code (UNKNOWN=1, categories 2..9, reserved ≥64)', () => {
     const codes = Object.values(EXIT_CODES);
-    expect(codes).toHaveLength(9);
-    expect(new Set(codes).size).toBe(9);
+    expect(new Set(codes).size).toBe(codes.length);
     expect(exitCodeFor('UNKNOWN')).toBe(1);
-    for (const c of codes) {
+    // Categories 1..9 are the stable core; the reserved range (≥64) carries
+    // the explicitly-numbered categories introduced by later specs.
+    const core = codes.filter((c) => c < 64);
+    expect(core).toHaveLength(9);
+    for (const c of core) {
       expect(c).toBeGreaterThanOrEqual(1);
       expect(c).toBeLessThanOrEqual(9);
     }
+    expect(exitCodeFor('DDLS_NOT_SUPPORTED')).toBe(64);
+    expect(exitCodeFor('CHANNEL_DETECT')).toBe(65);
     expect(EXIT_SUCCESS).toBe(0);
     expect(EXIT_GENERIC_FALLBACK).toBe(1); // same value as EXIT_CODES.UNKNOWN
   });

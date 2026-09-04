@@ -60,3 +60,6 @@ wiki/*
 !wiki/design-decisions/
 !wiki/objects/
 .claude-memory/
+
+# validate:aff negative scratch fixtures (created on demand by tests; must not be scanned)
+test/fixtures/_negative/

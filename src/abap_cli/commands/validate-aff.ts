@@ -48,9 +48,16 @@ interface JsonLine {
   optionalCompanions?: string[];
 }
 
-/** Collect *.json under a single file or recursively under a directory. */
+/** Collect *.json under a single file or recursively under a directory.
+ *  A missing target yields no files rather than throwing — callers treat an
+ *  empty result as "nothing to validate". */
 async function collectJsonFiles(root: string): Promise<string[]> {
-  const stat = await fsp.stat(root);
+  let stat;
+  try {
+    stat = await fsp.stat(root);
+  } catch {
+    return [];
+  }
   if (stat.isFile()) return [path.resolve(root)];
   const out: string[] = [];
   async function walk(p: string): Promise<void> {

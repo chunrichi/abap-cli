@@ -182,21 +182,61 @@ const cliEntry = path.join(repoRoot, 'dist/src/abap_cli/index.js');
 const run = promisify(execFile);
 const hasBuiltCli = fs.existsSync(cliEntry);
 
+// src/index.ts eagerly calls loadConfig() at module load (before commander
+// parses argv), so a spawned child needs a valid .abap.json + system profile
+// even for `abap --help`. Provide both under a tmpdir, run the child with
+// HOME pointing there so os.homedir() resolves to our fake user-config dir,
+// and clean up afterwards.
+async function withFakeProject(args: string[]): Promise<{ stdout: string; stderr: string }> {
+  const os = await import('node:os');
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'abap-cli-lazy-'));
+  fs.mkdirSync(path.join(tmpHome, '.abap-cli'), { recursive: true });
+  fs.writeFileSync(
+    path.join(tmpHome, '.abap-cli', 'systems.json'),
+    JSON.stringify({
+      systems: {
+        fake: {
+          url: 'https://example.invalid',
+          client: '001',
+          username: 'fake',
+          authMethod: 'basic',
+          password: '',
+          language: 'EN',
+          insecure: true,
+          caPath: '',
+        },
+      },
+    }),
+  );
+  fs.writeFileSync(
+    path.join(tmpHome, '.abap.json'),
+    JSON.stringify({ system: 'fake' }, null, 2),
+  );
+  try {
+    return await run(process.execPath, [cliEntry, ...args], {
+      cwd: tmpHome,
+      env: { ...process.env, HOME: tmpHome, USERPROFILE: tmpHome },
+    });
+  } finally {
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  }
+}
+
 describe('lazy loading at the process level (P1.6)', () => {
   it.skipIf(!hasBuiltCli)('--help lists commands without any SAP call', async () => {
-    const { stdout } = await run(process.execPath, [cliEntry, '--help']);
+    const { stdout } = await withFakeProject(['--help']);
     for (const name of ['init', 'pull', 'transport', 'profile']) {
       expect(stdout).toContain(name);
     }
   });
 
   it.skipIf(!hasBuiltCli)('a subcommand --help lazy-loads its module (exit 0)', async () => {
-    const { stdout } = await run(process.execPath, [cliEntry, 'transport', 'list', '--help']);
+    const { stdout } = await withFakeProject(['transport', 'list', '--help']);
     expect(stdout).toContain('List transport requests for current user');
   });
 
   it.skipIf(!hasBuiltCli)('search --schema runs without loading SAP clients', async () => {
-    const { stdout } = await run(process.execPath, [cliEntry, 'search', '--schema']);
+    const { stdout } = await withFakeProject(['search', '--schema']);
     expect(stdout).toContain('"status":"success"');
     expect(stdout).toContain('"schemaVersion"');
   });
@@ -258,7 +298,7 @@ describe('lazy command scope grouping (P2.9)', () => {
   });
 
   it.skipIf(!hasBuiltCli)('built CLI root --help groups init/profile/doctor as local', async () => {
-    const { stdout } = await run(process.execPath, [cliEntry, '--help']);
+    const { stdout } = await withFakeProject(['--help']);
     expect(stdout).toContain('Local commands (no SAP connection required):');
     // The Local section is the block between the heading and the next
     // blank line that follows the closing "These commands do not call SAP."

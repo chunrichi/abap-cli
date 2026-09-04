@@ -19,6 +19,14 @@ import { readTranJson, localToWire as tranLocalToWire, validateTranObject } from
 import type { CreatableTypeIds } from 'abap-adt-api';
 import { createObjtypeFor, DDIC_TYPES, HTTP_TYPES, TRAN_TYPES, isDdicSupportedType, isHttpSupportedType, isTranSupportedType } from './create-types.js';
 import { allSupportedTypes } from '../../types/registry.js';
+import { runPullTtyp } from './pull-ttyp.js';
+import { runPullMsag } from './pull-msag.js';
+import { runPullDdls } from './pull-ddls.js';
+import { detectChannel } from './channel-detect.js';
+import { loadConfig } from '../../config/project-config.js';
+import { readTtypJson, validateTtypObject, localToWire as ttypLocalToWire } from '../../formats/ttyp/json.js';
+import { readMsagJson, validateMsagObject, localToWire as msagLocalToWire } from '../../formats/msag/json.js';
+import { readDdlsJson, validateDdlsObject, localToWire as ddlsLocalToWire } from '../../formats/ddls/json.js';
 
 /** ADT objtype for source objects (e.g. 'CLAS/OC'); undefined for DDIC/HTTP/TRAN. */
 export interface CreateTypeSpec {
@@ -487,6 +495,136 @@ async function fugrFuncExists(client: AdtClientWrapper, group: string, funcName:
   );
 }
 
+/**
+ * 036: TTYP / MSAG / DDLS create helpers.
+ *
+ * Each one reads the local abap-file-format JSON, validates against the
+ * canonical schema, then routes through channel-detect (ADT preferred,
+ * ICF fallback for TTYP/MSAG, hard-error for DDLS on ECC).
+ *
+ * These intentionally mirror the spec 014 `runCreateDdic` shape — same
+ * `read → validate → POST → envelope` flow — but skip the legacy
+ * wire-flat layout: TTYP/MSAG/DDLS only ship the AFF nested form.
+ */
+
+async function loadChannelProfile(): Promise<{ kernelRelease?: string }> {
+  const cfg = await loadConfig();
+  return { kernelRelease: cfg.systemVersion };
+}
+
+async function runCreateTtyp(name: string, opts: CreateOptions, mode: OutputMode): Promise<void> {
+  const filePath = path.resolve(process.cwd(), opts.file!);
+  let doc: Awaited<ReturnType<typeof readTtypJson>>;
+  try {
+    doc = await readTtypJson(filePath);
+  } catch (error: unknown) {
+    throw new CliError('FILE_PARSE_ERROR', `Cannot read TTYP file ${toOutputPath(opts.file)}: ${error instanceof Error ? error.message : String(error)}`, {
+      file: toOutputPath(opts.file),
+    });
+  }
+  const errors = await validateTtypObject(doc);
+  if (errors.length > 0) {
+    throw new CliError('VALIDATION_ERROR', `Invalid TTYP definition in ${toOutputPath(opts.file)}: ${errors.join('; ')}`, {
+      file: toOutputPath(opts.file),
+      details: errors,
+    });
+  }
+  const profile = await loadChannelProfile();
+  const decision = detectChannel(profile, 'ttyp');
+  const wire = ttypLocalToWire(doc);
+  if (decision.channel === 'adt') {
+    const client = await AdtClientWrapper.create();
+    await client.createTtyp(name, wire, opts.package, opts.tr);
+    printResult(mode, { object: name, type: 'TTYP', action: 'created', channel: 'adt' }, `Created TTYP ${name} via ADT`);
+  } else {
+    const icf = await IcfClient.create();
+    const resp = await icf.post(`/ddic/ttyp/${encodeURIComponent(name)}`, { main: doc, ...(opts.tr ? { transportRequest: opts.tr } : {}) });
+    if (resp.status !== 'success') {
+      throw new CliError('DDIC_CREATE_FAILED' as never, resp.error?.message ?? 'ICF TTYP create failed', { object: name, type: 'TTYP', details: resp.error?.details });
+    }
+    printResult(mode, { object: name, type: 'TTYP', action: 'created', channel: 'icf' }, `Created TTYP ${name} via ICF fallback`);
+  }
+}
+
+async function runCreateMsag(name: string, opts: CreateOptions, mode: OutputMode): Promise<void> {
+  const filePath = path.resolve(process.cwd(), opts.file!);
+  let doc: Awaited<ReturnType<typeof readMsagJson>>;
+  try {
+    doc = await readMsagJson(filePath);
+  } catch (error: unknown) {
+    throw new CliError('FILE_PARSE_ERROR', `Cannot read MSAG file ${toOutputPath(opts.file)}: ${error instanceof Error ? error.message : String(error)}`, {
+      file: toOutputPath(opts.file),
+    });
+  }
+  const errors = await validateMsagObject(doc);
+  if (errors.length > 0) {
+    throw new CliError('VALIDATION_ERROR', `Invalid MSAG definition in ${toOutputPath(opts.file)}: ${errors.join('; ')}`, {
+      file: toOutputPath(opts.file),
+      details: errors,
+    });
+  }
+  const profile = await loadChannelProfile();
+  const decision = detectChannel(profile, 'msag');
+  const wire = msagLocalToWire(doc);
+  if (decision.channel === 'adt') {
+    const client = await AdtClientWrapper.create();
+    await client.createMsag(name, wire, opts.package, opts.tr);
+    printResult(mode, { object: name, type: 'MSAG', action: 'created', channel: 'adt' }, `Created MSAG ${name} via ADT`);
+  } else {
+    const icf = await IcfClient.create();
+    const resp = await icf.post(`/ddic/msag/${encodeURIComponent(name)}`, { main: doc, ...(opts.tr ? { transportRequest: opts.tr } : {}) });
+    if (resp.status !== 'success') {
+      throw new CliError('DDIC_CREATE_FAILED' as never, resp.error?.message ?? 'ICF MSAG create failed', { object: name, type: 'MSAG', details: resp.error?.details });
+    }
+    printResult(mode, { object: name, type: 'MSAG', action: 'created', channel: 'icf' }, `Created MSAG ${name} via ICF fallback`);
+  }
+}
+
+async function runCreateDdls(name: string, opts: CreateOptions, mode: OutputMode): Promise<void> {
+  const filePath = path.resolve(process.cwd(), opts.file!);
+  let doc: Awaited<ReturnType<typeof readDdlsJson>>;
+  try {
+    doc = await readDdlsJson(filePath);
+  } catch (error: unknown) {
+    throw new CliError('FILE_PARSE_ERROR', `Cannot read DDLS file ${toOutputPath(opts.file)}: ${error instanceof Error ? error.message : String(error)}`, {
+      file: toOutputPath(opts.file),
+    });
+    // unreachable but keeps the linter happy
+    void doc;
+  }
+  const errors = await validateDdlsObject(doc);
+  if (errors.length > 0) {
+    throw new CliError('VALIDATION_ERROR', `Invalid DDLS definition in ${toOutputPath(opts.file)}: ${errors.join('; ')}`, {
+      file: toOutputPath(opts.file),
+      details: errors,
+    });
+  }
+  const profile = await loadChannelProfile();
+  // channel-detect throws DDLS_NOT_SUPPORTED_ON_ECC if the system is too old.
+  const decision = detectChannel(profile, 'ddls');
+  if (decision.channel !== 'adt') {
+    // Defensive: channel-detect already throws — but TS can't infer that.
+    throw new CliError('DDLS_NOT_SUPPORTED_ON_ECC', 'DDLS on ECC is not supported', { object: name, type: 'DDLS' });
+  }
+  // Read the companion .ddls.acds for the source string. Create flow
+  // requires the user to ship both files (the JSON without the source is
+  // meaningless).
+  const basePath = filePath.replace(/\.ddls\.json$/, '');
+  let source = '';
+  try {
+    source = await fs.readFile(`${basePath}.ddls.acds`, 'utf8');
+  } catch {
+    throw new CliError('VALIDATION_ERROR', `DDLS companion file missing: ${basePath}.ddls.acds`, {
+      file: `${basePath}.ddls.acds`,
+      nextSteps: ['Both files must be supplied on create — write the DDL next to the JSON.'],
+    });
+  }
+  const wire = ddlsLocalToWire(doc, source);
+  const client = await AdtClientWrapper.create();
+  await client.createDdls(name, wire, opts.package, opts.tr);
+  printResult(mode, { object: name, type: 'DDLS', action: 'created', channel: 'adt' }, `Created DDLS ${name} via ADT`);
+}
+
 export async function runCreate(type: string | undefined, name: string | undefined, opts: CreateOptions,mode: OutputMode): Promise<void> {
   if (opts.schema) {
     printSchema(createSchema(type));
@@ -514,14 +652,22 @@ export async function runCreate(type: string | undefined, name: string | undefin
       example: 'abap create CLAS ZCL_MY_CLASS --package ZPKG --description "desc"',
     });
   }
+  const typeUpper = type.toUpperCase();
+  const objectName = normalizeName(name);
+  // 036: TTYP / MSAG / DDLS use --file <path> as the only required input (description is part of the JSON).
+  if (typeUpper === 'TTYP' || typeUpper === 'MSAG' || typeUpper === 'DDLS') {
+    if (!opts.file) {
+      throw new CliError('USAGE', `Type ${typeUpper} requires --file <path> with an abap-file-format JSON`, {
+        example: `abap create ${typeUpper} ${objectName} --file src/${objectName.toLowerCase()}/${objectName.toLowerCase()}.${typeUpper.toLowerCase()}.json --package $TMP --yes`,
+      });
+    }
+  }
   requireWriteConfirmation(
     'abap create',
     { ...opts, supportsDryRun: true },
     `abap create ${type ?? '<type>'} ${name ?? '<name>'} --package ${opts.package} --yes`,
   );
   const skipActivate = opts.activate === false;
-  const typeUpper = type.toUpperCase();
-  const objectName = normalizeName(name);
   // Local fail-fast (zero SAP round-trip) before routing: an oversized or
   // illegal name must not reach SAP as a misleading OBJECT_NOT_FOUND.
   validateObjectName(objectName);
@@ -604,6 +750,20 @@ export async function runCreate(type: string | undefined, name: string | undefin
       });
     }
     await runCreateTran(typeUpper, objectName, opts, mode);
+    return;
+  }
+
+  // 036-ttyp-msag-ddls: dual-channel DDIC + CDS via ADT (or ICF for TTYP/MSAG on ECC).
+  if (typeUpper === 'TTYP') {
+    await runCreateTtyp(objectName, opts, mode);
+    return;
+  }
+  if (typeUpper === 'MSAG') {
+    await runCreateMsag(objectName, opts, mode);
+    return;
+  }
+  if (typeUpper === 'DDLS') {
+    await runCreateDdls(objectName, opts, mode);
     return;
   }
 

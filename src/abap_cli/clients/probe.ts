@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as tls from 'tls';
 import type { ClientOptions } from 'abap-adt-api';
-import { getSystem } from '../config/user-config.js';
+import { getSystem, upsertSystem } from '../config/user-config.js';
 import { getPassword } from '../config/secrets.js';
 import { readCaCertificate, type SapConfig } from '../config/project-config.js';
 import { CliError } from '../output/json.js';
@@ -21,11 +21,27 @@ export interface ProbeLayerResult {
   authMethod?: AuthMethodV2;
 }
 
+/** 036-ttyp-msag-ddls: per-type capability snapshot surfaced in `profile test`.
+ *  Each subject has three orthogonal bits: ADT reachability, ICF reachability,
+ *  and whether the system is *intrinsically* able to host that object type. */
+export interface ProfileCapabilitySnapshot {
+  ttyp: { adt: 'ok' | 'absent'; icf: 'ok' | 'absent'; supported: boolean };
+  msag: { adt: 'ok' | 'absent'; icf: 'ok' | 'absent'; supported: boolean };
+  ddls: { adt: 'ok' | 'absent'; icf: 'ok' | 'absent'; supported: boolean };
+}
+
 export interface SystemProbe {
   tls: ProbeLayerResult;
   auth: ProbeLayerResult;
   adt: ProbeLayerResult;
   icf: ProbeLayerResult;
+  /** 036-ttyp-msag-ddls: per-type capability matrix. Empty only when adt.icf
+   *  both failed and we couldn't run any type-level probe. */
+  capabilities?: ProfileCapabilitySnapshot;
+  /** 036: shortcut for DDLS — `true` iff the system can host CDS / DDL sources.
+   *  Mirrors `capabilities.ddls.supported` but is promoted to top-level per
+   *  SC-008 so agent-side greppers have a one-stop field. */
+  ddlSourceSupported?: boolean;
 }
 
 /**
@@ -87,12 +103,148 @@ export async function probeSystem(name: string): Promise<SystemProbe> {
   const authResult = tlsResult.ok ? await probeAuth(name, config) : SKIP(authMethod);
   const adtResult = authResult.ok ? await probeAdt(name, config) : SKIP(authMethod);
   const icfResult = authResult.ok ? await probeIcf(name, config) : SKIP(authMethod);
+  // 036-ttyp-msag-ddls: per-type capability snapshot — only when ADT/ICF
+  // both finished probing (else we cannot tell "absent" from "skipped").
+  const probeOut = adtResult.ok || icfResult.ok
+    ? await probeCapabilities(config, { adtOk: adtResult.ok, icfOk: icfResult.ok })
+    : undefined;
+  const capabilities = probeOut?.capabilities;
+  // 036: persist the discovered kernel release back into the profile so that
+  // channel-detect (which reads cfg.systemVersion) can route TTYP/MSAG/DDLS
+  // without re-probing. Best-effort: missing or unparseable release leaves
+  // the profile untouched. SC-008 contract.
+  if (probeOut?.kernelRelease) {
+    try {
+      upsertSystem(name, { ...profile, systemVersion: probeOut.kernelRelease });
+    } catch {
+      // Persist is best-effort — probe output still surfaces below.
+    }
+  }
   return {
     tls: { ...tlsResult, authMethod },
     auth: { ...authResult, authMethod },
     adt: { ...adtResult, authMethod },
     icf: { ...icfResult, authMethod },
+    ...(capabilities ? { capabilities, ddlSourceSupported: capabilities.ddls.supported } : {}),
   };
+}
+
+/** 036-ttyp-msag-ddls: probe the four per-type endpoints.
+ *
+ * Strategy: hit each ADT/ICF endpoint with a HEAD-ish GET and watch the
+ * HTTP status code (401 / 404 are fine — they prove the endpoint exists on
+ * this SAP system; only 5xx or unreachable means "absent"). Errors never
+ * throw; we surface "absent" so a non-supported ECC release still reports
+ * a usable capabilities matrix.
+ *
+ * Also returns the discovered kernel release (via readKernelRelease) so the
+ * caller can persist it on the profile and downstream channel-detect can
+ * make its decision without re-probing.
+ */
+async function probeCapabilities(
+  config: ProbeConfig,
+  state: { adtOk: boolean; icfOk: boolean },
+): Promise<{ capabilities: ProfileCapabilitySnapshot; kernelRelease?: string }> {
+  const probeUrl = async (path: string): Promise<'ok' | 'absent'> => {
+    try {
+      const { ADTClient } = await import('abap-adt-api');
+      const auth = await buildAuthForProbe(config.username, config);
+      const client = new ADTClient(
+        config.url,
+        config.username,
+        auth.passwordOrFetcher,
+        config.client,
+        config.language,
+        auth.options,
+      );
+      await client.login();
+      // `request` returns a response with statusCode (4xx == present, 5xx/none == absent).
+      const resp = await client.httpClient.request(path, {
+        method: 'GET',
+        headers: { Accept: 'application/xml' },
+      }).catch((err: unknown) => ({ statusCode: 0, error: err }));
+      const code = (resp as { status?: number }).status ?? 0;
+      if (code >= 200 && code < 500) return 'ok';
+      return 'absent';
+    } catch {
+      return 'absent';
+    }
+  };
+  const adtProbe = state.adtOk
+    ? {
+        ttyp: await probeUrl('/sap/bc/adt/ddic/tabletypes/LVC_T_TABL'),
+        msag: await probeUrl('/sap/bc/adt/messageclass/SADT_TOOLS_CORE'),
+        ddls: await probeUrl('/sap/bc/adt/ddic/ddl/sources/I_ABAPAPPLICATIONCOMPONENT'),
+      }
+    : { ttyp: 'absent' as const, msag: 'absent' as const, ddls: 'absent' as const };
+  const icfProbe = state.icfOk
+    ? {
+        ttyp: await probeUrl('/sap/zabap_vibe/ddic/ttyp/LVC_T_TABL'),
+        msag: await probeUrl('/sap/zabap_vibe/ddic/msag/SADT_TOOLS_CORE'),
+        // DDLS has no ICF handler on purpose — always absent.
+        ddls: 'absent' as const,
+      }
+    : { ttyp: 'absent' as const, msag: 'absent' as const, ddls: 'absent' as const };
+
+  // `supported` is intrinsic to the system; for the heuristic we treat
+  // modern kernels (>= 753) or S/4HANA as supporting DDLS. For the live
+  // ADT endpoint to register "ok", we already trust the kernel.
+  const supportedByKernel = await readKernelRelease(config);
+  const ddlsIntrinsic = supportedByKernel === undefined
+    ? false
+    : supportedByKernel === 'S4' || !isEccOldRelease(supportedByKernel);
+  return {
+    capabilities: {
+      ttyp: { adt: adtProbe.ttyp, icf: icfProbe.ttyp, supported: true },
+      msag: { adt: adtProbe.msag, icf: icfProbe.msag, supported: true },
+      ddls: { adt: adtProbe.ddls, icf: icfProbe.ddls, supported: ddlsIntrinsic },
+    },
+    kernelRelease: supportedByKernel,
+  };
+}
+
+/** Best-effort kernel release probe without a runtime library dependency.
+ *  Falls back to undefined when the SAP release isn't reachable. */
+async function readKernelRelease(config: ProbeConfig): Promise<string | undefined> {
+  try {
+    const { ADTClient } = await import('abap-adt-api');
+    const auth = await buildAuthForProbe(config.username, config);
+    const client = new ADTClient(
+      config.url,
+      config.username,
+      auth.passwordOrFetcher,
+      config.client,
+      config.language,
+      auth.options,
+    );
+    await client.login();
+    // ADT /sap/bc/adt/system/information returns an Atom feed with one
+    // <atom:entry> per system property; the KernelRelease entry carries
+    // e.g. "793" or "S4". The older <app:release> tag in /sap/bc/adt/discovery
+    // was removed in newer kernels, so we go to system-information for a
+    // stable read.
+    const raw = (await client.httpClient.request('/sap/bc/adt/system/information', {
+      method: 'GET',
+      headers: { Accept: 'application/atom+xml;type=feed' },
+    })) as { body?: string };
+    const body = raw.body ?? '';
+    const m = body.match(/<atom:id>KernelRelease<\/atom:id>\s*<atom:title>([^<]+)<\/atom:title>/i);
+    return m?.[1]?.trim();
+  } catch {
+    return undefined;
+  }
+}
+
+/** Local copy of the parser — keeping it private avoids a duplicate
+ *  `flows/edit/channel-detect.ts` import path that's painful for the CLI's
+ *  layer separation (probe lives under clients/, channel-detect under flows/). */
+function isEccOldRelease(kernelRelease: string | undefined): boolean {
+  if (!kernelRelease) return true;
+  const trimmed = kernelRelease.trim().toUpperCase().replace('/', '').replace('.', '');
+  if (trimmed === 'S4') return false;
+  const parsed = parseInt(trimmed, 10);
+  if (Number.isNaN(parsed)) return true;
+  return parsed < 753;
 }
 
 /** TLS layer — raw handshake for https URLs; http is trivially ok.

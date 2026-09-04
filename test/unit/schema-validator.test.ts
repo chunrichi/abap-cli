@@ -73,7 +73,10 @@ describe('schema-validator (T033-002)', () => {
 
   it('validateFile reads from disk and reports FAIL', async () => {
     const file = path.join(process.cwd(), 'test/fixtures/_negative/aff/missing-formatVersion.doma.json');
-    const { writeFileSync } = await import('node:fs');
+    const { writeFileSync, mkdirSync } = await import('node:fs');
+    // The negative fixtures dir is scratch space — validate:aff must not scan
+    // it, so it is not committed. Create it on demand.
+    mkdirSync(path.dirname(file), { recursive: true });
     writeFileSync(
       file,
       JSON.stringify({

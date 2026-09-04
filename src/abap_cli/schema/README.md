@@ -18,6 +18,9 @@ actually consumes via `routeAffSchema()` in `src/abap_cli/aff/router.ts`:
 | `dtel-v1.json` | DTEL | `validate:aff *.dtel.json` |
 | `http-v1.json` | HTTP | `validate:aff *.http.json` |
 | `tran-v1.json` | TRAN | `validate:aff *.tran.json` |
+| `ttyp-v1.json` | TTYP | `validate:aff *.ttyp.json` *(036: handcrafted — upstream ships type-pool only)* |
+| `msag-v1.json` | MSAG | `validate:aff *.msag.json` *(036)* |
+| `ddls-v1.json` | DDLS | `validate:aff *.ddls.json` *(036)* |
 
 ## License
 

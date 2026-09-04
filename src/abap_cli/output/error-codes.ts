@@ -13,7 +13,12 @@ export type ErrorCategory =
   | 'SAP_ERROR'        // exit 6 — server error / ICF status='error'
   | 'VALIDATION_ERROR' // exit 7 — semantic rejection (see below)
   | 'NOT_FOUND'        // exit 8 — OBJECT_NOT_FOUND, AMBIGUOUS_OBJECT
-  | 'LOCKED';          // exit 9 — LOCK_FAILED
+  | 'LOCKED'           // exit 9 — LOCK_FAILED
+  // 036-ttyp-msag-ddls: reserved-range categories with explicit exit codes.
+  // Split from VALIDATION_ERROR so the agent/exit-channel tells the user
+  // *which* validation failure happened (capability gap vs. semantic rejection).
+  | 'DDLS_NOT_SUPPORTED' // exit 64 — DDLS requested on ECC release that lacks DDL sources
+  | 'CHANNEL_DETECT';    // exit 65 — channel-detect could not classify the system profile
 
 /**
  * Sub-codes are emitted as the `code` value to preserve backward compatibility
@@ -95,7 +100,11 @@ export type ErrorCode =
   | 'AFF_FIXTURE_INVALID'       // a fixture failed schema validation (VALIDATION_ERROR/exit 7)  // 034-session-cookie-reuse
   | 'SESSION_JAR_DECRYPT_FAILED' // AES-GCM tag mismatch / corrupt blob / wrong system hash (VALIDATION_ERROR)
   | 'SESSION_INVALID'            // SAP 401/403/440 after cookie inject — caller should re-login (VALIDATION_ERROR)
-  | 'SESSION_REUSE_UNSUPPORTED'  // cloud/BTP system: cookie reuse not applicable (VALIDATION_ERROR)  ;
+  | 'SESSION_REUSE_UNSUPPORTED'  // cloud/BTP system: cookie reuse not applicable (VALIDATION_ERROR)
+  // 036-ttyp-msag-ddls: channel detection failure / DDLS not supported on ECC
+  | 'CHANNEL_DETECTION_FAILED'   // system profile could not be parsed (CONFIG_ERROR/exit 3) → see spec 036 FR-008 / US1-AS5
+  | 'DDLS_NOT_SUPPORTED_ON_ECC'  // DDLS has no ICF fallback; ECC releases before DDL sources cannot serve CDS (VALIDATION_ERROR/exit 64 per spec 036 FR-008 / US4-AS4)
+  ;
 
 const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   UNKNOWN: 'UNKNOWN',
@@ -169,6 +178,9 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   SESSION_JAR_DECRYPT_FAILED: 'VALIDATION_ERROR',
   SESSION_INVALID: 'VALIDATION_ERROR',
   SESSION_REUSE_UNSUPPORTED: 'VALIDATION_ERROR',
+  // 036-ttyp-msag-ddls: 2 reserved-range categories
+  CHANNEL_DETECTION_FAILED: 'CHANNEL_DETECT',
+  DDLS_NOT_SUPPORTED_ON_ECC: 'DDLS_NOT_SUPPORTED',
 };
 
 export function categoryOf(code: ErrorCode): ErrorCategory {

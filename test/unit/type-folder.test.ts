@@ -27,9 +27,13 @@ describe('folderFor (local type→subdirectory mapping, Q5=B)', () => {
     expect(folderFor('DOMA')).toBe('doma');
   });
 
+  it('maps the 036 channel-routed types onto their own folders', () => {
+    expect(folderFor('TTYP')).toBe('ttyp');
+    expect(folderFor('MSAG')).toBe('msag');
+    expect(folderFor('DDLS')).toBe('ddls');
+  });
+
   it('falls back to "unknown" for unsupported types so we never write outside the documented layout', () => {
-    expect(folderFor('TTYP')).toBe('unknown');
-    expect(folderFor('MSAG')).toBe('unknown');
     expect(folderFor('SCREEN')).toBe('unknown');
     expect(folderFor('')).toBe('unknown');
   });

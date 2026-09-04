@@ -1,0 +1,12 @@
+{
+  "formatVersion": "1",
+  "header": {
+    "description": "Sample message class for CLI tests",
+    "originalLanguage": "EN"
+  },
+  "messages": [
+    { "number": "001", "text": "Invalid input &1" },
+    { "number": "002", "text": "Object &1 not found" },
+    { "number": "003", "text": "Operation completed" }
+  ]
+}

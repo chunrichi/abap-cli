@@ -13,7 +13,10 @@ export type PushStage =
   | 'textpool-adt'
   | 'textpool-icf'
   // 014 DDIC stages (ICF route).
-  | 'ddic-icf';
+  | 'ddic-icf'
+  // 036 TTYP/MSAG/DDLS stages (channel-detect route).
+  | 'channel-adt'
+  | 'channel-icf';
 
 export interface PushPart {
   subtype: string;

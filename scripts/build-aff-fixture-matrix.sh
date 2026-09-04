@@ -3,7 +3,8 @@
 # and append it to wiki/coverage-matrix.md as a new section.
 #
 # Source: `npm run validate:aff --json test/fixtures/` — schema PASS/WARN/FAIL
-# per file. Aggregated by AFF type (CLAS/INTF/PROG/FUGR/TABL/STRU/DOMA/DTEL/HTTP/TRAN).
+# per file. Aggregated by AFF type (CLAS/INTF/PROG/FUGR/TABL/STRU/DOMA/DTEL/
+# HTTP/TRAN/TTYP/MSAG/DDLS).
 #
 # Usage: bash scripts/build-aff-fixture-matrix.sh
 set -euo pipefail
@@ -35,7 +36,7 @@ for (const f of files) {
   else if (f.status === 'warn') slot.warn++;
   else slot.fail++;
 }
-const order = ['CLAS','INTF','PROG','FUGR','TABL','STRU','DOMA','DTEL','HTTP','TRAN'];
+const order = ['CLAS','INTF','PROG','FUGR','TABL','STRU','DOMA','DTEL','HTTP','TRAN','TTYP','MSAG','DDLS'];
 const rows = order
   .filter(t => byType.has(t))
   .map(t => {

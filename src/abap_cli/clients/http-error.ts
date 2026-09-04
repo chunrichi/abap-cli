@@ -8,6 +8,17 @@ import type { ErrorCode } from '../output/error-codes.js';
 import '../auth/registry-bootstrap.js';
 import { getAuthHints as lookupAuthHints } from '../auth/strategy.js';
 
+/** Extract the human-readable English message from a SAP `<exc:exception>`
+ *  envelope. Falls back to undefined when no `<message>` element is found,
+ *  so the caller can keep the legacy `body.message` path. */
+function extractExcMessage(body: string): string | undefined {
+  const m = body.match(/<message\s+lang="EN"[^>]*>([\s\S]*?)<\/message>/i);
+  if (!m) return undefined;
+  return m[1]
+    ?.replace(/<[^>]+>/g, '')
+    .trim();
+}
+
 /** Node TLS error codes. */
 const TLS_ERROR_CODES = new Set<string>([
   'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
@@ -87,11 +98,36 @@ export function classifyHttpError(
         references: AUTH_REFERENCE,
       });
     }
+    // Pull the SAP response body out of the wrapped HttpClientException so
+    // the user can see what the ABAP server actually said (mirrors the
+    // AxiosError branch below; otherwise transport errors from
+    // abap-adt-api lose their context entirely). abap-adt-api nests the
+    // original HttpClientException under `.parent` for AdtHttpException;
+    // walk that chain so we never lose the body.
+    const wrapped = httpEx as { response?: { body?: unknown }; parent?: { response?: { body?: unknown }; status?: unknown } };
+    const exBody = wrapped.response?.body ?? wrapped.parent?.response?.body;
+    const rawBody = typeof exBody === 'string' ? exBody : '';
+    // SAP returns "400 Session Timed Out" (plain text, not the usual XML
+    // envelope) when a reused cookie jar has gone stale on the server.
+    // Surface it as AUTH_ERROR so `_call`'s re-login fallback kicks in
+    // instead of bubbling a misleading SAP_ERROR.
+    if (status === 400 && /session\s+timed\s+out/i.test(rawBody)) {
+      const hints = authHints(context?.authMethod);
+      return new CliError('AUTH_ERROR', 'SAP session timed out', {
+        details: { httpStatus: 400, ...(context?.name ? { system: context.name, authMethod: context.authMethod } : { authMethod: context?.authMethod }), sapErrorBody: rawBody.slice(0, 400) },
+        nextSteps: hints.nextSteps,
+        example: hints.example,
+        references: AUTH_REFERENCE,
+      });
+    }
+    const parsed = rawBody ? extractExcMessage(rawBody) : undefined;
+    const message = parsed || rawBody || httpEx.message || `HTTP ${status}`;
     const opts: CliErrorOptions = {
       details: { httpStatus: status, ...(context?.name ? { system: context.name } : {}) },
       references: SAP_ERROR_REFERENCE,
     };
-    return new CliError('SAP_ERROR', httpEx.message || `HTTP ${status}`, opts);
+    if (rawBody) opts.details = { ...opts.details, sapErrorBody: rawBody.slice(0, 400) };
+    return new CliError('SAP_ERROR', message, opts);
   }
 
   // Non-Axios Node system errors (TLS, ECONNRESET, etc.) — sometimes arrive
@@ -128,13 +164,21 @@ export function classifyHttpError(
       });
     }
     if (typeof status === 'number') {
-      const body = error.response?.data as { message?: string } | undefined;
+      const body = error.response?.data as { message?: string } | string | undefined;
+      // SAP error envelopes are usually <exc:exception> XML; pull the first
+      // <message lang="EN">…</message> child so the user can see what the
+      // ABAP server actually complained about. When the body is already a
+      // plain object (rare with ADT), fall back to .message.
+      const raw = typeof body === 'string' ? body : body?.message;
+      const parsed = typeof raw === 'string' ? extractExcMessage(raw) : undefined;
+      const message = parsed || raw || error.message;
       const opts: CliErrorOptions = {
         details: { httpStatus: status, ...(context?.name ? { system: context.name } : {}) },
         references: SAP_ERROR_REFERENCE,
       };
       if (error.response?.statusText) opts.details = { ...opts.details, httpStatusText: error.response.statusText };
-      return new CliError('SAP_ERROR', body?.message || error.message, opts);
+      if (typeof body === 'string' && body.length > 0) opts.details = { ...opts.details, sapErrorBody: body.slice(0, 400) };
+      return new CliError('SAP_ERROR', message, opts);
     }
   }
 

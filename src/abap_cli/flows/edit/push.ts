@@ -16,6 +16,13 @@ import { readTranJson, localToWire as tranLocalToWire, validateTranObject } from
 import { pushObject, type PushStage } from './push-object.js';
 import { pushFugrOne } from './push-fugr.js';
 import { pushTextpoolFile } from './push-textpool.js';
+import { runPushTtyp } from './push-ttyp.js';
+import { runPushMsag } from './push-msag.js';
+import { runPushDdls } from './push-ddls.js';
+import { readTtypJson, validateTtypObject } from '../../formats/ttyp/json.js';
+import { readMsagJson, validateMsagObject } from '../../formats/msag/json.js';
+import { readDdlsJson, validateDdlsObject } from '../../formats/ddls/json.js';
+import { ADT_ROUTED_TYPES } from '../../types/registry.js';
 import { getExtensionRegistry } from '../../extensions/registry.js';
 import { toRelativeOutputPath } from '../../core/path-output.js';
 
@@ -95,8 +102,11 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
         const resolved = resolveFile(file);
         validateLocalFile(resolved);
         if (resolved.route === 'icf') {
-          // HTTP service uses its own JSON shape; route via the dedicated helper.
-          if (resolved.objectType === 'HTTP') {
+          // 036: TTYP/MSAG/DDLS validate through their own format modules —
+          // readDdicJson would reject their AFF-nested shape.
+          if (ADT_ROUTED_TYPES.has(resolved.objectType)) {
+            await validateChannelRoutedFile(resolved.objectType, file);
+          } else if (resolved.objectType === 'HTTP') {
             const local = await readHttpJson(path.resolve(process.cwd(), file));
             const errors = validateHttpObject(local);
             if (errors.length > 0) throw new CliError('VALIDATION_ERROR', errors.join('; '));
@@ -529,6 +539,37 @@ async function pushTranFile(
   return { transport, status: 'written' };
 }
 
+/**
+ * 036: TTYP / MSAG / DDLS push through the dual-channel flows. Each one runs
+ * channel-detect itself; DDLS hard-errors on ECC rather than falling back.
+ */
+async function validateChannelRoutedFile(objectType: string, file: string): Promise<void> {
+  const abs = path.resolve(process.cwd(), file);
+  const errors =
+    objectType === 'TTYP'
+      ? await validateTtypObject(await readTtypJson(abs))
+      : objectType === 'MSAG'
+        ? await validateMsagObject(await readMsagJson(abs))
+        : await validateDdlsObject(await readDdlsJson(abs));
+  if (errors.length > 0) throw new CliError('VALIDATION_ERROR', errors.join('; '));
+}
+
+async function pushChannelRoutedFile(
+  objectType: string,
+  file: string,
+  opts: PushFileOptions,
+  onStage: (s: PushStage) => void,
+): Promise<PushOneResult> {
+  const result =
+    objectType === 'TTYP'
+      ? await runPushTtyp(file, { transport: opts.tr })
+      : objectType === 'MSAG'
+        ? await runPushMsag(file, { transport: opts.tr })
+        : await runPushDdls(file, { transport: opts.tr });
+  onStage(result.channel === 'adt' ? 'channel-adt' : 'channel-icf');
+  return { transport: opts.tr ?? '', status: 'written' };
+}
+
 async function pushOne(
   client: AdtClientWrapper,
   file: string,
@@ -553,6 +594,11 @@ async function pushOne(
 
   // DDIC .json files (DOMA/DTEL/TABL/STRU) push via ICF /ddic/<type>.
   if (resolved.route === 'icf') {
+    // 036: TTYP/MSAG/DDLS share the .json extension but route through
+    // channel-detect (ADT primary), so they must be intercepted first.
+    if (ADT_ROUTED_TYPES.has(resolved.objectType)) {
+      return pushChannelRoutedFile(resolved.objectType, file, opts, onStage);
+    }
     return pushDdicFile(client, resolved, file, opts, onStage);
   }
 

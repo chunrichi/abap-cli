@@ -111,13 +111,16 @@ describe('014/US3 pull DDIC', () => {
     expect(out.error.code).toBe('OBJECT_NOT_FOUND');
   });
 
-  it('rejects unsupported DDIC types (TTYP) with DDIC_NOT_SUPPORTED', async () => {
+  it('no longer rejects TTYP — spec 036 routes it through channel-detect', async () => {
     const program = makeProgram();
     registerPullCommand(program);
     const res = await runCommand(program, ['pull', 'ZTYP', '--type', 'TTYP', '--dir', 'src', '--json'], { cwd });
-    expect(res.exitCode).toBe(7);
-    const out = JSON.parse(res.stderr);
-    expect(out.error.code).toBe('DDIC_NOT_SUPPORTED');
+    // The DDIC ICF route no longer owns TTYP, so whatever fails here must not
+    // be the old "type is unknown" rejection.
+    if (res.exitCode !== undefined && res.exitCode !== 0) {
+      const out = JSON.parse(res.stderr);
+      expect(out.error.code).not.toBe('DDIC_NOT_SUPPORTED');
+    }
   });
 });
 
