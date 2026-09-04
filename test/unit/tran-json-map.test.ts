@@ -13,7 +13,7 @@ import {
 
 describe('TRAN JSON helpers', () => {
   describe('localToWire', () => {
-    it('maps the abap-file-format nested shape to wire', () => {
+    it('maps the abap-file-format nested shape to nested wire (037 S07)', () => {
       const local: TranObjectLocal = {
         name: 'ztran_test',
         formatVersion: '1',
@@ -31,15 +31,20 @@ describe('TRAN JSON helpers', () => {
       const wire = localToWire(local);
       expect(wire).toMatchObject({
         name: 'ZTRAN_TEST',
-        description: 'Sample transaction',
-        originalLanguage: 'en',
-        abapLanguageVersion: 'standard',
-        transactionType: 'parameterTransaction',
-        lockStatus: 'notLocked',
-        parameterTransaction: {
-          parParentTransactionCode: 'SE16',
-          skipInitialScreenMode: 'skip',
-          parameterValues: [{ parameterName: 'DATABROWSE-TABLENAME', parameterValue: 'TSTC' }],
+        formatVersion: '1',
+        header: {
+          description: 'Sample transaction',
+          originalLanguage: 'en',
+          abapLanguageVersion: 'standard',
+        },
+        generalInformation: {
+          transactionType: 'parameterTransaction',
+          lockStatus: 'notLocked',
+          parameterTransaction: {
+            parParentTransactionCode: 'SE16',
+            skipInitialScreenMode: 'skip',
+            parameterValues: [{ parameterName: 'DATABROWSE-TABLENAME', parameterValue: 'TSTC' }],
+          },
         },
       });
     });
@@ -56,13 +61,15 @@ describe('TRAN JSON helpers', () => {
   });
 
   describe('wireToLocal', () => {
-    it('produces the abap-file-format nested shape', () => {
+    it('produces the abap-file-format nested shape from nested wire', () => {
       const wire: TranWirePayload = {
         name: 'ZTRAN_TEST',
-        description: 'Sample transaction',
-        originalLanguage: 'EN',
-        transactionType: 'dialogTransaction',
-        dialogTransaction: { programName: 'SAPMZTST', programDynnr: '0100', stvMaintenanceMode: 'notAllowed' },
+        formatVersion: '1',
+        header: { description: 'Sample transaction', originalLanguage: 'EN' },
+        generalInformation: {
+          transactionType: 'dialogTransaction',
+          dialogTransaction: { programName: 'SAPMZTST', programDynnr: '0100', stvMaintenanceMode: 'notAllowed' },
+        },
         userInterface: {
           uiAttributes: {
             uiClassification: 'professionalUserTransaction',
@@ -77,12 +84,16 @@ describe('TRAN JSON helpers', () => {
       expect(local.formatVersion).toBe('1');
       expect(local.header.description).toBe('Sample transaction');
       expect(local.generalInformation.transactionType).toBe('dialogTransaction');
-      expect(local.generalInformation.dialogTransaction).toEqual(wire.dialogTransaction);
+      expect(local.generalInformation.dialogTransaction).toEqual(wire.generalInformation?.dialogTransaction);
       expect(local.userInterface?.uiAttributes?.uiClassification).toBe('professionalUserTransaction');
     });
 
     it('omits empty wire fields from the local shape', () => {
-      const wire: TranWirePayload = { name: 'ZTRAN', transactionType: 'reportTransaction' };
+      const wire: TranWirePayload = {
+        name: 'ZTRAN',
+        formatVersion: '1',
+        generalInformation: { transactionType: 'reportTransaction' },
+      };
       const local = wireToLocal(wire);
       expect(local.header.description).toBe('');
       expect(local.header.originalLanguage).toBe('');

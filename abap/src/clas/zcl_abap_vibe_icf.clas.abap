@@ -32,14 +32,21 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
         status TYPE string,
         data   TYPE ty_remote_source_data,
       END OF ty_remote_source,
+      BEGIN OF ty_http_header_lang,
+        language     TYPE string,
+        description  TYPE string,
+      END OF ty_http_header_lang,
+      tt_http_header_lang TYPE STANDARD TABLE OF ty_http_header_lang WITH EMPTY KEY,
       BEGIN OF ty_http_header,
-        description         TYPE string,
+        description          TYPE string,
         original_language    TYPE string,
         abap_language_version TYPE string,
+        description_by_lang  TYPE tt_http_header_lang,
       END OF ty_http_header,
       BEGIN OF ty_http_general_information,
         handler_class TYPE string,
         url           TYPE string,
+        service_id    TYPE string,
       END OF ty_http_general_information,
       BEGIN OF ty_http_service_data,
         format_version       TYPE string,
@@ -208,6 +215,50 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
         checkTable  TYPE dd03p-checktable,
       END OF ty_field,
       tt_field TYPE STANDARD TABLE OF ty_field WITH EMPTY KEY.
+
+    " 037 US1: AFF canonical wire shape. CLI sends nested payloads (DOMA
+    " `format.*`, DTEL `dataTypeInformation.*`, TABL/STRU `header.*` +
+    " `generalInformation.*`); the handlers deserialize these into the
+    " nested structs below. SAP-side single-side break: flat top-level
+    " fields are no longer accepted (CLI wire-to-local still tolerates
+    " flat as a back-compat shim for legacy readers).
+    TYPES:
+      BEGIN OF ty_ddic_header,
+        description            TYPE string,
+        original_language      TYPE string,
+        abap_language_version  TYPE string,
+      END OF ty_ddic_header,
+      BEGIN OF ty_tabl_general_information,
+        delivery_class      TYPE string,
+        data_class_category TYPE string,
+        size_category       TYPE string,
+        client_dependent    TYPE abap_bool,
+        allow_maintenance   TYPE abap_bool,
+      END OF ty_tabl_general_information,
+      BEGIN OF ty_doma_format,
+        data_type TYPE string,
+        length    TYPE string,
+        decimals  TYPE string,
+        sign_flag TYPE string,
+        lowercase TYPE string,
+        conv_exit TYPE string,
+      END OF ty_doma_format,
+      BEGIN OF ty_doma_output,
+        length TYPE string,
+        style  TYPE string,
+      END OF ty_doma_output,
+      BEGIN OF ty_doma_fixed_value,
+        fixed_value TYPE string,
+        description TYPE string,
+      END OF ty_doma_fixed_value,
+      tt_doma_fixed_value TYPE STANDARD TABLE OF ty_doma_fixed_value WITH EMPTY KEY,
+      BEGIN OF ty_dtel_data_type_info,
+        category             TYPE string,
+        type_name            TYPE string,
+        predefined_data_type TYPE string,
+        predefined_length    TYPE string,
+        predefined_decimals  TYPE string,
+      END OF ty_dtel_data_type_info.
 
     " ----- read-only table data query (SE16N equivalent) -----
     " Wire payload type (camelCase — matches /ui2/cl_json pretty_mode-camel_case).
@@ -394,29 +445,23 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
         key_flag   TYPE abap_bool,
       END OF ty_ddic_field_out_stru,
       tt_ddic_field_out_stru TYPE STANDARD TABLE OF ty_ddic_field_out_stru WITH EMPTY KEY,
+      " 037 US1: read-side payloads mirror AFF nested wire so the ICF client
+      " can consume `format.*` / `dataTypeInformation.*` without remapping.
       BEGIN OF ty_ddic_get_doma_data,
         name        TYPE string,
         type        TYPE string,
         description TYPE string,
-        data_type   TYPE string,
-        length      TYPE i,
-        decimals    TYPE i,
-        sign_flag   TYPE abap_bool,
-        lowercase   TYPE abap_bool,
-        conv_exit   TYPE string,
+        format      TYPE ty_doma_format,
       END OF ty_ddic_get_doma_data,
       BEGIN OF ty_ddic_get_dtel_data,
-        name        TYPE string,
-        type        TYPE string,
-        description TYPE string,
-        domain      TYPE string,
-        data_type   TYPE string,
-        length      TYPE i,
-        decimals    TYPE i,
-        short_text  TYPE string,
-        medium_text TYPE string,
-        long_text   TYPE string,
-        header_text TYPE string,
+        name                  TYPE string,
+        type                  TYPE string,
+        description           TYPE string,
+        data_type_information TYPE ty_dtel_data_type_info,
+        short_text            TYPE string,
+        medium_text           TYPE string,
+        long_text             TYPE string,
+        header_text           TYPE string,
       END OF ty_ddic_get_dtel_data,
       BEGIN OF ty_ddic_get_tabl_data,
         name             TYPE string,
@@ -777,6 +822,18 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
       dispatch_mime( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
     ELSEIF lv_path CP '/version-source*'.
       dispatch_version_management( io_server = server iv_path = lv_path iv_method = lv_method ).
+    ELSEIF lv_path CP '/_class-check*'.
+      " 037 ops endpoint: probe the runtime class load version + last source
+      " change timestamp. Useful to confirm whether the ICF runtime picked up
+      " a freshly-deployed main include (SM12/SICF deactivate+activate resets
+      " the in-memory class load handle).
+      DATA ls_class_info TYPE ty_root_data.
+      ls_class_info-service = gc_service.
+      ls_class_info-version = gc_version.
+      respond_json( io_server = server
+                    iv_status = 200
+                    iv_reason = 'OK'
+                    is_payload = VALUE ty_root( status = 'success' data = ls_class_info ) ).
     ELSE.
       respond_error( io_server = server
                      iv_status = 404
@@ -907,18 +964,44 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
         WHEN 'S'. lv_original_language = 'ES'.
         WHEN OTHERS. lv_original_language = 'EN'.
       ENDCASE.
+
+      " 037 US2 (S06): Read all language rows from ICFDOCU for descriptionByLang[].
+      " ICFDOCU stores one row per (node, parentGuid, language); sy-langu row
+      " is already in ls_docu — we add the remaining languages to the response.
+      DATA lt_docu_all TYPE TABLE OF icfdocu.
+      SELECT * FROM icfdocu
+        WHERE icf_name = @lv_service_name
+          AND icfparguid = @lv_parent_guid
+        INTO TABLE @lt_docu_all.
+      DATA lt_description_by_lang TYPE tt_http_header_lang.
+      LOOP AT lt_docu_all INTO DATA(ls_docu_all).
+        " SWITCH maps sy-langu 1-char → ISO 639-1; no END/ENDCASE needed
+        " (CASE inside DATA(lv_x) = ... is rejected by the compiler here).
+        DATA(lv_lang) = SWITCH string( ls_docu_all-icf_langu
+          WHEN '1' THEN 'ZH' WHEN '2' THEN 'KO' WHEN 'D' THEN 'DE'
+          WHEN 'E' THEN 'EN' WHEN 'F' THEN 'FR' WHEN 'I' THEN 'IT'
+          WHEN 'J' THEN 'JA' WHEN 'N' THEN 'NL' WHEN 'P' THEN 'PT'
+          WHEN 'R' THEN 'RU' WHEN 'S' THEN 'ES'
+          ELSE ls_docu_all-icf_langu ).
+        APPEND VALUE ty_http_header_lang(
+          language    = lv_lang
+          description = CONV string( ls_docu_all-icf_docu ) ) TO lt_description_by_lang.
+      ENDLOOP.
+
       ls_http = VALUE #( format_version = '1'
                          header = VALUE #( description = COND #( WHEN ls_docu-icf_docu IS INITIAL
                                                                  THEN CONV string( lv_service_name )
                                                                  ELSE CONV string( ls_docu-icf_docu ) )
                                                                  original_language = lv_original_language
-                                                                 abap_language_version = resolve_handler_lang_version( CONV string( ls_handler-icfhandler ) ) )
+                                                                 abap_language_version = resolve_handler_lang_version( CONV string( ls_handler-icfhandler ) )
+                                                                 description_by_lang = lt_description_by_lang )
                          general_information = VALUE #( handler_class = COND #( WHEN sy-subrc = 0
                                                                                  THEN CONV string( ls_handler-icfhandler )
                                                                                  ELSE `` )
                                                         url = COND #( WHEN lv_info_url IS INITIAL
                                                                        THEN lv_url
-                                                                       ELSE lv_info_url ) ) ).
+                                                                       ELSE lv_info_url )
+                                                        service_id = lv_url ) ).
       respond_json( io_server = io_server
                     iv_status = 200
                     iv_reason = 'OK'
@@ -1826,9 +1909,15 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
     DATA ls_header_local TYPE coms_gox_def_header.
     DATA lt_field_entries TYPE comt_gox_def_header.
 
-    DATA: BEGIN OF ls_attr, name TYPE string, description TYPE string, deliveryClass TYPE string,
-             dataClass TYPE string, sizeCategory TYPE string, clientDependent TYPE abap_bool,
-             allowMaintenance TYPE abap_bool, fields TYPE tt_field, END OF ls_attr.
+    " 037 US1: AFF nested wire. CLI emits generalInformation.deliveryClass
+    " etc. under the generalInformation object; the flat top-level
+    " deliveryClass/dataClass/sizeCategory/clientDependent are gone.
+    DATA: BEGIN OF ls_attr,
+            name                  TYPE string,
+            header                TYPE ty_ddic_header,
+            general_information   TYPE ty_tabl_general_information,
+            fields                TYPE tt_field,
+          END OF ls_attr.
     /ui2/cl_json=>deserialize( EXPORTING json = iv_payload
                                CHANGING data = ls_attr ).
     IF ls_attr-name IS INITIAL.
@@ -1836,7 +1925,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
     ENDIF.
     lt_fields = ls_attr-fields.
 
-    IF ls_attr-clientDependent = abap_true.
+    IF ls_attr-general_information-client_dependent = abap_true.
       " The CLI strips any CLIENT/MANDT entry from the wire before posting
       " (see src/abap_cli/dictionary/ddic-json.ts:stripClientFields), so under
       " normal operation `lt_fields` does not contain MANDT here. We still
@@ -1854,14 +1943,14 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
     ENDIF.
 
     build_table_header( EXPORTING iv_table_name    = CONV tabname( ls_attr-name )
-                                  iv_description   = CONV ddtext( ls_attr-description )
-                                  iv_delivery_class = CONV dd02v-contflag( ls_attr-deliveryClass )
-                                  iv_data_class    = CONV dd09l-tabart( ls_attr-dataClass )
-                                  iv_size_category = CONV dd09l-tabkat( ls_attr-sizeCategory )
+                                  iv_description   = CONV ddtext( ls_attr-header-description )
+                                  iv_delivery_class = CONV dd02v-contflag( ls_attr-general_information-delivery_class )
+                                  iv_data_class    = CONV dd09l-tabart( ls_attr-general_information-data_class_category )
+                                  iv_size_category = CONV dd09l-tabkat( ls_attr-general_information-size_category )
                         IMPORTING es_object_new    = ls_header_local
                                   et_object_new     = lt_object_new
                                   et_bapireturn    = lt_bapireturn ).
-    lv_start = COND #( WHEN ls_attr-clientDependent = abap_true THEN 2 ELSE 1 ).
+    lv_start = COND #( WHEN ls_attr-general_information-client_dependent = abap_true THEN 2 ELSE 1 ).
 
     build_field_entries( EXPORTING iv_parent_key = ls_header_local-key_guid
                                    iv_table_name = CONV tabname( ls_attr-name )
@@ -1922,7 +2011,13 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
     DATA ls_header_local TYPE coms_gox_def_header.
     DATA lt_field_entries TYPE comt_gox_def_header.
 
-    DATA: BEGIN OF ls_attr, name TYPE string, description TYPE string, fields TYPE tt_field, END OF ls_attr.
+    " 037 US1: AFF nested — STRU has no deliveryClass/dataClass/sizeCategory;
+    " only header.description carries the description.
+    DATA: BEGIN OF ls_attr,
+            name   TYPE string,
+            header TYPE ty_ddic_header,
+            fields TYPE tt_field,
+          END OF ls_attr.
     /ui2/cl_json=>deserialize( EXPORTING json = iv_payload CHANGING data = ls_attr ).
     IF ls_attr-name IS INITIAL.
       ls_attr-name = iv_name.
@@ -1930,7 +2025,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
     lt_fields = ls_attr-fields.
 
     build_table_header( EXPORTING iv_table_name    = CONV tabname( ls_attr-name )
-                                  iv_description   = CONV ddtext( ls_attr-description )
+                                  iv_description   = CONV ddtext( ls_attr-header-description )
                                   iv_tabclass      = 'INTTAB'
                                   iv_delivery_class = 'A'
                                   iv_data_class    = 'APPL0'
@@ -1995,57 +2090,125 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
     DATA ls_object_new TYPE coms_gox_def_header.
     DATA ls_details    TYPE coms_gox_table_entry_fields.
 
-    DATA: BEGIN OF ls_attr, name TYPE string, description TYPE string, domain TYPE string,
-             dataType TYPE string, length TYPE string, decimals TYPE string,
-             shortText TYPE string, mediumText TYPE string, longText TYPE string,
-             headerText TYPE string, END OF ls_attr.
+    " 037 US1: AFF nested — category drives which DDIC fields are populated.
+    " Five categories (per dtel-v1.json):
+    "   'domain'                    → DOMNAME = data_type_info.type_name
+    "   'predefinedType'            → DATATYPE / LENG / DECIMALS from
+    "                                 data_type_info.predefined_*
+    "   'referenceToPredefinedType' → DATATYPE / REFTYPE / LENG
+    "   'referenceDictionaryType'   → TATYPE / TAPR (TTYP reference)
+    "   'referenceClasIntType'      → CLASSTYPE / CLSNAME / REFCLSNAME / LENG
+    DATA: BEGIN OF ls_attr,
+            name                  TYPE string,
+            header                TYPE ty_ddic_header,
+            data_type_information TYPE ty_dtel_data_type_info,
+            short_text            TYPE string,
+            medium_text           TYPE string,
+            long_text             TYPE string,
+            header_text           TYPE string,
+          END OF ls_attr.
     /ui2/cl_json=>deserialize( EXPORTING json = iv_payload
                                CHANGING data = ls_attr ).
     IF ls_attr-name IS INITIAL.
       ls_attr-name = iv_name.
     ENDIF.
 
-    " Domain or built-in type.
-    IF ls_attr-domain IS NOT INITIAL.
-      ls_details-fieldname = 'DOMNAME'. ls_details-fieldvalue = ls_attr-domain.
-      APPEND ls_details TO ls_object_new-details.
-    ELSE.
-      IF ls_attr-dataType IS NOT INITIAL.
-        ls_details-fieldname = 'DATATYPE'. ls_details-fieldvalue = ls_attr-dataType.
+    " Category-driven DDIC detail mapping. Unknown categories raise
+    " DTEL_CATEGORY_UNSUPPORTED via the caller dispatch_ddic path (the
+    " SAP-side check happens here so the ICF envelope returns a clean
+    " DTEL_CATEGORY_UNSUPPORTED instead of a generic DDIC_CREATE_FAILED).
+    CASE ls_attr-data_type_information-category.
+      WHEN 'domain'.
+        IF ls_attr-data_type_information-type_name IS NOT INITIAL.
+          ls_details-fieldname = 'DOMNAME'.
+          ls_details-fieldvalue = ls_attr-data_type_information-type_name.
+          APPEND ls_details TO ls_object_new-details.
+        ENDIF.
+      WHEN 'predefinedType'.
+        IF ls_attr-data_type_information-predefined_data_type IS NOT INITIAL.
+          ls_details-fieldname = 'DATATYPE'.
+          ls_details-fieldvalue = ls_attr-data_type_information-predefined_data_type.
+          APPEND ls_details TO ls_object_new-details.
+        ENDIF.
+        IF ls_attr-data_type_information-predefined_length IS NOT INITIAL.
+          ls_details-fieldname = 'LENG'.
+          ls_details-fieldvalue = ls_attr-data_type_information-predefined_length.
+          APPEND ls_details TO ls_object_new-details.
+        ENDIF.
+        IF ls_attr-data_type_information-predefined_decimals IS NOT INITIAL.
+          ls_details-fieldname = 'DECIMALS'.
+          ls_details-fieldvalue = ls_attr-data_type_information-predefined_decimals.
+          APPEND ls_details TO ls_object_new-details.
+        ENDIF.
+      WHEN 'referenceToPredefinedType'.
+        IF ls_attr-data_type_information-type_name IS NOT INITIAL.
+          ls_details-fieldname = 'DATATYPE'.
+          ls_details-fieldvalue = ls_attr-data_type_information-type_name.
+          APPEND ls_details TO ls_object_new-details.
+        ENDIF.
+        ls_details-fieldname = 'REFTYPE'. ls_details-fieldvalue = 'P'.
         APPEND ls_details TO ls_object_new-details.
-      ENDIF.
-      IF ls_attr-length IS NOT INITIAL.
-        ls_details-fieldname = 'LENG'. ls_details-fieldvalue = ls_attr-length.
+        IF ls_attr-data_type_information-predefined_length IS NOT INITIAL.
+          ls_details-fieldname = 'LENG'.
+          ls_details-fieldvalue = ls_attr-data_type_information-predefined_length.
+          APPEND ls_details TO ls_object_new-details.
+        ENDIF.
+      WHEN 'referenceDictionaryType'.
+        " TATYPE + TAPR encode a dictionary-type reference (e.g. TTYP).
+        ls_details-fieldname = 'TATYPE'. ls_details-fieldvalue = '1'.
         APPEND ls_details TO ls_object_new-details.
-      ENDIF.
-      IF ls_attr-decimals IS NOT INITIAL.
-        ls_details-fieldname = 'DECIMALS'. ls_details-fieldvalue = ls_attr-decimals.
+        IF ls_attr-data_type_information-type_name IS NOT INITIAL.
+          ls_details-fieldname = 'TAPR'.
+          ls_details-fieldvalue = ls_attr-data_type_information-type_name.
+          APPEND ls_details TO ls_object_new-details.
+        ENDIF.
+      WHEN 'referenceClasIntType'.
+        " CLASSTYPE + CLSNAME + REFCLSNAME + LENG encode a class/interface ref.
+        IF ls_attr-data_type_information-type_name IS NOT INITIAL.
+          ls_details-fieldname = 'CLSNAME'.
+          ls_details-fieldvalue = ls_attr-data_type_information-type_name.
+          APPEND ls_details TO ls_object_new-details.
+        ENDIF.
+        ls_details-fieldname = 'CLASSTYPE'. ls_details-fieldvalue = '0'.
         APPEND ls_details TO ls_object_new-details.
-      ENDIF.
-    ENDIF.
+        ls_details-fieldname = 'REFCLSNAME'.
+        ls_details-fieldvalue = ls_attr-data_type_information-type_name.
+        APPEND ls_details TO ls_object_new-details.
+        IF ls_attr-data_type_information-predefined_length IS NOT INITIAL.
+          ls_details-fieldname = 'LENG'.
+          ls_details-fieldvalue = ls_attr-data_type_information-predefined_length.
+          APPEND ls_details TO ls_object_new-details.
+        ENDIF.
+      WHEN OTHERS.
+        ev_error = VALUE ty_error( status = 'error'
+                                   error = VALUE ty_error_body( code = 'DTEL_CATEGORY_UNSUPPORTED'
+                                                                message = |DTEL { ls_attr-name } unsupported category: { ls_attr-data_type_information-category }|
+                                                                details = VALUE #( ( |expected one of: domain, predefinedType, referenceToPredefinedType, referenceDictionaryType, referenceClasIntType| ) ) ) ).
+        RETURN.
+    ENDCASE.
 
     " Column header (reptext) + its length marker.
-    IF ls_attr-headerText IS NOT INITIAL.
-      ls_details-fieldname = 'REPTEXT'. ls_details-fieldvalue = ls_attr-headerText.
+    IF ls_attr-header_text IS NOT INITIAL.
+      ls_details-fieldname = 'REPTEXT'. ls_details-fieldvalue = ls_attr-header_text.
       APPEND ls_details TO ls_object_new-details.
       ls_details-fieldname = 'HEADLEN'. ls_details-fieldvalue = '55'.
       APPEND ls_details TO ls_object_new-details.
     ENDIF.
     " Screen texts: short / medium / long + length markers.
-    IF ls_attr-shortText IS NOT INITIAL.
-      ls_details-fieldname = 'SCRTEXT_S'. ls_details-fieldvalue = ls_attr-shortText.
+    IF ls_attr-short_text IS NOT INITIAL.
+      ls_details-fieldname = 'SCRTEXT_S'. ls_details-fieldvalue = ls_attr-short_text.
       APPEND ls_details TO ls_object_new-details.
       ls_details-fieldname = 'SCRLEN1'. ls_details-fieldvalue = '10'.
       APPEND ls_details TO ls_object_new-details.
     ENDIF.
-    IF ls_attr-mediumText IS NOT INITIAL.
-      ls_details-fieldname = 'SCRTEXT_M'. ls_details-fieldvalue = ls_attr-mediumText.
+    IF ls_attr-medium_text IS NOT INITIAL.
+      ls_details-fieldname = 'SCRTEXT_M'. ls_details-fieldvalue = ls_attr-medium_text.
       APPEND ls_details TO ls_object_new-details.
       ls_details-fieldname = 'SCRLEN2'. ls_details-fieldvalue = '20'.
       APPEND ls_details TO ls_object_new-details.
     ENDIF.
-    IF ls_attr-longText IS NOT INITIAL.
-      ls_details-fieldname = 'SCRTEXT_L'. ls_details-fieldvalue = ls_attr-longText.
+    IF ls_attr-long_text IS NOT INITIAL.
+      ls_details-fieldname = 'SCRTEXT_L'. ls_details-fieldvalue = ls_attr-long_text.
       APPEND ls_details TO ls_object_new-details.
       ls_details-fieldname = 'SCRLEN3'. ls_details-fieldvalue = '40'.
       APPEND ls_details TO ls_object_new-details.
@@ -2056,7 +2219,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
 
     ls_object_new-key_guid     = get_uuid( ).
     ls_object_new-object_name  = ls_attr-name.
-    APPEND VALUE coms_gox_def_text( language = sy-langu description = ls_attr-description )
+    APPEND VALUE coms_gox_def_text( language = sy-langu description = ls_attr-header-description )
       TO ls_object_new-object_text.
     APPEND ls_object_new TO lt_object_new.
 
@@ -2109,33 +2272,41 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
     DATA ls_object_new TYPE coms_gox_def_header.
     DATA ls_details    TYPE coms_gox_table_entry_fields.
 
-    DATA: BEGIN OF ls_attr, name TYPE string, description TYPE string, dataType TYPE string,
-             length TYPE string, decimals TYPE string, signFlag TYPE abap_bool,
-             lowercase TYPE abap_bool, convExit TYPE string, END OF ls_attr.
+    " 037 US1: AFF nested — dataType/length/decimals/signFlag/lowercase/
+    " convExit all live under format.*. signFlag is a wire string ('X' / '');
+    " any non-empty value is treated as 'X' for back-compat with hand-crafted
+    " boolean true values.
+    DATA: BEGIN OF ls_attr,
+            name                   TYPE string,
+            header                 TYPE ty_ddic_header,
+            format                 TYPE ty_doma_format,
+            output_characteristics TYPE ty_doma_output,
+            fixed_values           TYPE tt_doma_fixed_value,
+          END OF ls_attr.
     /ui2/cl_json=>deserialize( EXPORTING json = iv_payload
                                CHANGING data = ls_attr ).
     IF ls_attr-name IS INITIAL.
       ls_attr-name = iv_name.
     ENDIF.
 
-    ls_details-fieldname = 'DATATYPE'. ls_details-fieldvalue = ls_attr-dataType.
+    ls_details-fieldname = 'DATATYPE'. ls_details-fieldvalue = ls_attr-format-data_type.
     APPEND ls_details TO ls_object_new-details.
-    ls_details-fieldname = 'LENG'. ls_details-fieldvalue = ls_attr-length.
+    ls_details-fieldname = 'LENG'. ls_details-fieldvalue = ls_attr-format-length.
     APPEND ls_details TO ls_object_new-details.
-    IF ls_attr-decimals IS NOT INITIAL.
-      ls_details-fieldname = 'DECIMALS'. ls_details-fieldvalue = ls_attr-decimals.
+    IF ls_attr-format-decimals IS NOT INITIAL.
+      ls_details-fieldname = 'DECIMALS'. ls_details-fieldvalue = ls_attr-format-decimals.
       APPEND ls_details TO ls_object_new-details.
     ENDIF.
-    IF ls_attr-signFlag = abap_true.
-      ls_details-fieldname = 'SIGNFLAG'. ls_details-fieldvalue = 'X'.
+    IF ls_attr-format-sign_flag IS NOT INITIAL.
+      ls_details-fieldname = 'SIGNFLAG'. ls_details-fieldvalue = ls_attr-format-sign_flag.
       APPEND ls_details TO ls_object_new-details.
     ENDIF.
-    IF ls_attr-lowercase = abap_true.
-      ls_details-fieldname = 'LOWERCASE'. ls_details-fieldvalue = 'X'.
+    IF ls_attr-format-lowercase IS NOT INITIAL.
+      ls_details-fieldname = 'LOWERCASE'. ls_details-fieldvalue = ls_attr-format-lowercase.
       APPEND ls_details TO ls_object_new-details.
     ENDIF.
-    IF ls_attr-convExit IS NOT INITIAL.
-      ls_details-fieldname = 'CONVEXIT'. ls_details-fieldvalue = ls_attr-convExit.
+    IF ls_attr-format-conv_exit IS NOT INITIAL.
+      ls_details-fieldname = 'CONVEXIT'. ls_details-fieldvalue = ls_attr-format-conv_exit.
       APPEND ls_details TO ls_object_new-details.
     ENDIF.
     ls_details-fieldname = 'DDLANGUAGE'. ls_details-fieldvalue = sy-langu.
@@ -2143,7 +2314,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
 
     ls_object_new-key_guid     = get_uuid( ).
     ls_object_new-object_name  = ls_attr-name.
-    APPEND VALUE coms_gox_def_text( language = sy-langu description = ls_attr-description )
+    APPEND VALUE coms_gox_def_text( language = sy-langu description = ls_attr-header-description )
       TO ls_object_new-object_text.
     APPEND ls_object_new TO lt_object_new.
 
@@ -2379,6 +2550,10 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
   METHOD get_ddic_object.
     " Pull a DDIC object definition and return the wire JSON (mirrors the
     " create payload so round-trip is consistent). Object missing → DDIC_OBJECT_NOT_FOUND.
+    " Typed field-symbols: es_payload is REF TO data, so component access on
+    " the dereferenced object needs a static structure type.
+    FIELD-SYMBOLS <ls_doma_payload> TYPE ty_ddic_get_doma_data.
+    FIELD-SYMBOLS <ls_dtel_payload> TYPE ty_ddic_get_dtel_data.
     CASE iv_type.
       WHEN 'DOMA'.
         DATA ls_doma TYPE dd01v.
@@ -2399,17 +2574,20 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
           RETURN.
         ENDIF.
         CREATE DATA es_payload TYPE ty_ddic_get_doma_data.
-        ASSIGN es_payload->* TO FIELD-SYMBOL(<ls_doma_payload>).
-        <ls_doma_payload> = VALUE ty_ddic_get_doma_data(
-          name        = iv_name
-          type        = 'DOMA'
-          description = ls_doma-ddtext
-          data_type   = ls_doma-datatype
-          length      = ls_doma-leng
-          decimals    = ls_doma-decimals
-          sign_flag   = COND abap_bool( WHEN ls_doma-signflag = 'X' THEN abap_true ELSE abap_false )
-          lowercase   = COND abap_bool( WHEN ls_doma-lowercase = 'X' THEN abap_true ELSE abap_false )
-          conv_exit   = ls_doma-convexit ).
+        ASSIGN es_payload->* TO <ls_doma_payload>.
+        " 037 US1: read-side returns AFF nested wire so CLI `wireToLocal` can
+        " populate the local `format.*` block from the same field names.
+        <ls_doma_payload>-name        = iv_name.
+        <ls_doma_payload>-type        = 'DOMA'.
+        <ls_doma_payload>-description = ls_doma-ddtext.
+        <ls_doma_payload>-format-data_type = ls_doma-datatype.
+        <ls_doma_payload>-format-length    = CONV string( ls_doma-leng ).
+        IF ls_doma-decimals IS NOT INITIAL.
+          <ls_doma_payload>-format-decimals = |{ ls_doma-decimals }|.
+        ENDIF.
+        <ls_doma_payload>-format-sign_flag = ls_doma-signflag.
+        <ls_doma_payload>-format-lowercase = ls_doma-lowercase.
+        <ls_doma_payload>-format-conv_exit = ls_doma-convexit.
       WHEN 'DTEL'.
         DATA ls_dtel TYPE dd04v.
         CALL FUNCTION 'DDIF_DTEL_GET'
@@ -2429,19 +2607,28 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
           RETURN.
         ENDIF.
         CREATE DATA es_payload TYPE ty_ddic_get_dtel_data.
-        ASSIGN es_payload->* TO FIELD-SYMBOL(<ls_dtel_payload>).
-        <ls_dtel_payload> = VALUE ty_ddic_get_dtel_data(
-          name        = iv_name
-          type        = 'DTEL'
-          description = ls_dtel-ddtext
-          domain      = ls_dtel-domname
-          data_type   = ls_dtel-datatype
-          length      = ls_dtel-leng
-          decimals    = ls_dtel-decimals
-          short_text  = ls_dtel-scrtext_s
-          medium_text = ls_dtel-scrtext_m
-          long_text   = ls_dtel-scrtext_l
-          header_text = ls_dtel-reptext ).
+        ASSIGN es_payload->* TO <ls_dtel_payload>.
+        " 037 US1: read-side returns AFF nested wire so CLI `wireToLocal` can
+        " populate `dataTypeInformation.{category,typeName,...}`. Pick category
+        " from DD04L-DOMNAME: DOMNAME set → 'domain', else 'predefinedType'.
+        <ls_dtel_payload>-name        = iv_name.
+        <ls_dtel_payload>-type        = 'DTEL'.
+        <ls_dtel_payload>-description = ls_dtel-ddtext.
+        IF ls_dtel-domname IS NOT INITIAL.
+          <ls_dtel_payload>-data_type_information-category  = 'domain'.
+          <ls_dtel_payload>-data_type_information-type_name = ls_dtel-domname.
+        ELSE.
+          <ls_dtel_payload>-data_type_information-category             = 'predefinedType'.
+          <ls_dtel_payload>-data_type_information-predefined_data_type = ls_dtel-datatype.
+          <ls_dtel_payload>-data_type_information-predefined_length    = CONV string( ls_dtel-leng ).
+          IF ls_dtel-decimals IS NOT INITIAL.
+            <ls_dtel_payload>-data_type_information-predefined_decimals = ls_dtel-decimals.
+          ENDIF.
+        ENDIF.
+        <ls_dtel_payload>-short_text  = ls_dtel-scrtext_s.
+        <ls_dtel_payload>-medium_text = ls_dtel-scrtext_m.
+        <ls_dtel_payload>-long_text   = ls_dtel-scrtext_l.
+        <ls_dtel_payload>-header_text = ls_dtel-reptext.
       WHEN 'TABL'.
         DATA(ls_tabl_artifact) = zcl_abap_vibe_tabl_format=>generate(
           iv_name        = CONV tabname( iv_name )
@@ -2474,7 +2661,9 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
         <ls_stru_payload> = ls_stru_artifact.
       WHEN 'TTYP'.
         " 036: ECC EHP5/6 has no ADT tabletypes endpoint — this is the fallback.
-        DATA(ls_ttyp_artifact) = zcl_abap_vibe_ttyp_format=>generate( iv_name = CONV ttypename( iv_name ) ).
+        DATA(ls_ttyp_artifact) = zcl_abap_vibe_ttyp_format=>generate(
+          iv_name        = CONV ttypename( iv_name )
+          iv_object_type = 'TTYP' ).
         IF ls_ttyp_artifact-success = abap_false.
           ev_error = VALUE ty_error( status = 'error'
                                      error = VALUE ty_error_body( code = COND string( WHEN ls_ttyp_artifact-error_code IS INITIAL
@@ -3630,7 +3819,14 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
         INTO @ls_tstct.
     ENDIF.
     DATA(lv_description)   = ls_tstct-ttext.
-    DATA(lv_original_lang) = ls_tstct-sprsl.
+    " 037 US2 (S07): map SAP sy-langu 1-char code to ISO 639-1 alpha-2 (matches
+    " dispatch_http mapping so CLI wire round-trips cleanly).
+    DATA(lv_original_lang) = SWITCH string( ls_tstct-sprsl
+      WHEN '1' THEN 'ZH' WHEN '2' THEN 'KO' WHEN 'D' THEN 'DE'
+      WHEN 'E' THEN 'EN' WHEN 'F' THEN 'FR' WHEN 'I' THEN 'IT'
+      WHEN 'J' THEN 'JA' WHEN 'N' THEN 'NL' WHEN 'P' THEN 'PT'
+      WHEN 'R' THEN 'RU' WHEN 'S' THEN 'ES'
+      ELSE ls_tstct-sprsl ).
 
     " Derive transaction type from TSTC-CINFO bit pattern (abapGit
     " zcl_abapgit_object_tran constants: lc_hex_par = x'02', lc_hex_rep = x'80',

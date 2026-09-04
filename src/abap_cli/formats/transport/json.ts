@@ -213,25 +213,23 @@ export interface TranObjectLocal {
 
 /**
  * ICF wire representation (camelCase + transport envelope).
- * Matches the JSON the SAP-side handler will deserialize.
+ *
+ * 037 US2 (S07): matches SAP `ty_tran_data` (nested `header / generalInformation`
+ * etc.) one-to-one. SAP-side `build_tran_payload` returns nested; CLI used to
+ * send a flat wire (description / originalLanguage / transactionType at top
+ * level), which the ABAP deserialize mapped to empty nested slots.
  */
 export interface TranWirePayload {
   name: string;
-  description?: string;
-  originalLanguage?: string;
-  abapLanguageVersion?: string;
-  transactionType: TranTransactionType;
-  lockStatus?: string;
-  dialogTransaction?: TranDialogTransaction;
-  parameterTransaction?: TranParameterTransaction;
-  reportTransaction?: TranReportTransaction;
-  ooTransaction?: TranOoTransaction;
-  variantTransaction?: TranVariantTransaction;
+  formatVersion?: '1';
+  header?: TranHeader;
+  generalInformation?: TranGeneralInformation;
   transactionServices?: TranTransactionService[];
   transactionRelationships?: TranTransactionRelationship[];
   serviceRelationships?: TranServiceRelationship[];
   userInterface?: TranUserInterface;
   authorizations?: TranAuthorizations;
+  /** Transport envelope — top-level only, not part of the SAP struct. */
   package?: string;
   transportRequest?: string;
 }
@@ -257,16 +255,9 @@ export function localToWire(local: TranObjectLocal): TranWirePayload {
   const l = local as Record<string, unknown>;
   const wire: TranWirePayload = {
     name: String(local.name).toUpperCase(),
-    description: local.header.description,
-    originalLanguage: local.header.originalLanguage,
-    abapLanguageVersion: local.header.abapLanguageVersion,
-    transactionType: local.generalInformation.transactionType,
-    lockStatus: local.generalInformation.lockStatus,
-    dialogTransaction: local.generalInformation.dialogTransaction,
-    parameterTransaction: local.generalInformation.parameterTransaction,
-    reportTransaction: local.generalInformation.reportTransaction,
-    ooTransaction: local.generalInformation.ooTransaction,
-    variantTransaction: local.generalInformation.variantTransaction,
+    formatVersion: '1',
+    header: local.header,
+    generalInformation: local.generalInformation,
     transactionServices: local.transactionServices,
     transactionRelationships: local.transactionRelationships,
     serviceRelationships: local.serviceRelationships,
@@ -280,19 +271,25 @@ export function localToWire(local: TranObjectLocal): TranWirePayload {
 
 /** Convert a wire payload back to local abap-file-format shape (header / generalInformation nesting). */
 export function wireToLocal(wire: TranWirePayload): TranObjectLocal {
+  const wireHeader = wire.header;
+  const wireGeneral = wire.generalInformation;
   const header: TranHeader = {
-    description: wire.description ?? '',
-    originalLanguage: wire.originalLanguage ?? '',
+    description: wireHeader?.description ?? '',
+    originalLanguage: wireHeader?.originalLanguage ?? '',
   };
-  if (wire.abapLanguageVersion !== undefined) header.abapLanguageVersion = wire.abapLanguageVersion as TranAbapLanguageVersion;
+  if (wireHeader?.abapLanguageVersion !== undefined) {
+    header.abapLanguageVersion = wireHeader.abapLanguageVersion as TranAbapLanguageVersion;
+  }
 
-  const generalInformation: TranGeneralInformation = { transactionType: wire.transactionType };
-  if (wire.lockStatus !== undefined) generalInformation.lockStatus = wire.lockStatus as TranGeneralInformation['lockStatus'];
-  if (wire.dialogTransaction) generalInformation.dialogTransaction = wire.dialogTransaction;
-  if (wire.parameterTransaction) generalInformation.parameterTransaction = wire.parameterTransaction;
-  if (wire.reportTransaction) generalInformation.reportTransaction = wire.reportTransaction;
-  if (wire.ooTransaction) generalInformation.ooTransaction = wire.ooTransaction;
-  if (wire.variantTransaction) generalInformation.variantTransaction = wire.variantTransaction;
+  const generalInformation: TranGeneralInformation = {
+    transactionType: wireGeneral?.transactionType ?? 'dialogTransaction',
+  };
+  if (wireGeneral?.lockStatus !== undefined) generalInformation.lockStatus = wireGeneral.lockStatus;
+  if (wireGeneral?.dialogTransaction) generalInformation.dialogTransaction = wireGeneral.dialogTransaction;
+  if (wireGeneral?.parameterTransaction) generalInformation.parameterTransaction = wireGeneral.parameterTransaction;
+  if (wireGeneral?.reportTransaction) generalInformation.reportTransaction = wireGeneral.reportTransaction;
+  if (wireGeneral?.ooTransaction) generalInformation.ooTransaction = wireGeneral.ooTransaction;
+  if (wireGeneral?.variantTransaction) generalInformation.variantTransaction = wireGeneral.variantTransaction;
 
   const local: TranObjectLocal = {
     name: wire.name,

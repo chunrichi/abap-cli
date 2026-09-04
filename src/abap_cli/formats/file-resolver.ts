@@ -1,5 +1,6 @@
 import * as path from 'path';
 import { CliError } from '../output/json.js';
+import { sourceFor } from '../types/registry.js';
 
 export interface ResolvedFile {
   /** Full file path */
@@ -89,7 +90,12 @@ export function resolveFile(filePath: string): ResolvedFile {
   const objectName = parts[0]!.toUpperCase().replace(/#/g, '/');
   const objectType = parts[1]!.toUpperCase();
   const subtype = parts.slice(2).join('.') || 'main';
-  const route = EXT_ROUTE_MAP[ext] || 'adt';
+  // 037 US3: type-based routing takes priority. ADT types (CLAS/INTF/PROG/FUGR
+  // /TTYP/MSAG/DDLS) resolve to 'adt' regardless of `.json` extension;
+  // DDIC/HTTP/TRAN resolve to 'icf'. Falls back to the legacy extension map
+  // for unknown type codes (kept as a safety net).
+  const sourceRoute = sourceFor(objectType)?.toLowerCase() as 'adt' | 'icf' | undefined;
+  const route: 'adt' | 'icf' = sourceRoute ?? EXT_ROUTE_MAP[ext] ?? 'adt';
   const format: 'abap' | 'xml' | 'json' = ext === '.json' ? 'json' : ext === '.xml' ? 'xml' : 'abap';
 
   return { filePath, objectName, objectType, subtype, route, format };
