@@ -30,7 +30,7 @@ export interface SystemProfile {
   /** ADT text-element capability recorded once at connect/init (Q1). */
   adtTextpool?: { read: boolean; write: boolean; checkedAt: string };
   /** 034: Cached ADT runtime tier from the last successful `probeAdtRuntime` /
-   *  `profile test`. Used by `extension deploy` to pick an ICF register
+   *  `profile test`. Used by `deploy` to pick an ICF register
    *  strategy without re-probing the network. Refreshed by `profile test`
    *  and `init`. Absent on first use — `probeAdtRuntime` runs lazily. */
   runtime?: CachedRuntime;

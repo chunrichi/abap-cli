@@ -173,7 +173,7 @@ abap init --agent copilot --force
 
 - [abap profile](profile.md) — 创建/管理全局 profile；`abap init --profile` 引用
 - [abap doctor](doctor.md) — 本地环境诊断（与 init 的 ICF 检查互补）
-- [abap extension deploy](extension.md) — `data.icf` 提示时部署 ICF 服务
+- [abap deploy](deploy.md) — `data.icf` 提示时部署 ICF 服务
 
 ## references
 

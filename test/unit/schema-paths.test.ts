@@ -54,17 +54,23 @@ describe('schema-paths priority chain', () => {
     );
   });
 
-  it('affSupportedTypes matches the router table (13 router types + TABT override)', () => {
+  it('affSupportedTypes matches the router table (16 + 6 Phase 3 types)', () => {
     const types = affSupportedTypes();
     expect(types).toEqual(
       expect.arrayContaining([
         'CLAS', 'INTF', 'PROG', 'FUGR', 'TABL', 'STRU', 'TABT', 'DOMA', 'DTEL', 'HTTP', 'TRAN',
         // 036: channel-routed types.
         'TTYP', 'MSAG', 'DDLS',
+        // T1.5: FUGR companion schemas for .reps.json and .func.json files.
+        'REPS', 'FUNC',
+        // T3.x — Phase 3 type extensions.
+        'SRVB', 'SRVD', 'BDEF', 'DCLS', 'DDLX', 'DDLA',
       ]),
     );
     // TABT is exposed as a schema key for the .settings.json override path.
-    expect(types).toHaveLength(14);
+    // REPS + FUNC added in T1.5 (FUGR pull) — 16 pre-Phase-3.
+    // Phase 3 added SRVB / SRVD / BDEF / DCLS / DDLX / DDLA = 6 more = 22 total.
+    expect(types).toHaveLength(22);
   });
 
   it('bundled root contains every supported schema', () => {

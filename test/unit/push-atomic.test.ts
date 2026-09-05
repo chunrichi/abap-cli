@@ -39,12 +39,15 @@ beforeEach(() => {
 
 describe('abap push --atomic ()', () => {
   it('a file that fails validation writes nothing (zero mutating calls)', async () => {
-    // A DDIC-route file with a type outside the 014 supported scope (TTYP)
-    // fails structural validation (validateLocalFile → DDIC_NOT_SUPPORTED).
-    fs.writeFileSync(path.join(cwd, 'src/zlocal.ttyp.json'), '{"rowType":"ZREF"}');
+    // A DDIC-route file with an unregistered type (UNKN) hits the legacy
+    // extension fallback (`.json` → `icf`), then validateLocalFile rejects
+    // it with DDIC_NOT_SUPPORTED. 037 changed TTYP/MSAG/DDLS to ADT routing
+    // so we use a deliberately unregistered type code that keeps the
+    // icf-route branch alive.
+    fs.writeFileSync(path.join(cwd, 'src/zlocal.unkn.json'), '{"any":"payload"}');
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/zcl_ok.clas.abap', 'src/zlocal.ttyp.json', '--tr', 'TRN001', '--atomic', '--yes', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/zcl_ok.clas.abap', 'src/zlocal.unkn.json', '--tr', 'TRN001', '--atomic', '--yes', '--json'], { cwd });
     expect(res.exitCode).not.toBe(0);
     expect(lock).not.toHaveBeenCalled();
     expect(setObjectSource).not.toHaveBeenCalled();

@@ -70,4 +70,67 @@ describe('push dry-run ', () => {
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toMatchObject({ code: 'UNLOCK_WARNING', details: { unlock: 'failed' } });
   });
+
+  // ----- T2.4 stage-order assertion -----
+
+  it('records all stages in lock → write → activate → unlock order (full push, no separate check)', async () => {
+    const client = mockClient();
+    (client.lock as ReturnType<typeof vi.fn>).mockResolvedValue({ LOCK_HANDLE: 'h1' });
+    (client.setObjectSource as ReturnType<typeof vi.fn>).mockResolvedValue({});
+    (client.activate as ReturnType<typeof vi.fn>).mockResolvedValue({});
+    (client.unLock as ReturnType<typeof vi.fn>).mockResolvedValue({});
+    const stages: string[] = [];
+    await pushObject(
+      client,
+      { name: 'ZCL_FULL', type: 'CLAS', objectUrl: '/x' },
+      [
+        { subtype: 'main', sourceUrl: '/x/source/main', content: 'class ZCL_FULL.' },
+        { subtype: 'testclasses', sourceUrl: '/x/source/test', content: '' },
+      ],
+      { transport: 'T1', checkOnly: false, onStage: (s) => stages.push(s) },
+    );
+    // Full push: lock → 2× write → activate → unlock.
+    // No explicit 'check' stage in full mode — the activation itself runs
+    // the server-side syntax check (see push-object.ts:130 comment).
+    expect(stages).toEqual([
+      'lock',
+      'write',
+      'write',
+      'activate',
+      'unlock',
+    ]);
+  });
+
+  it('skips the activate stage when checkOnly=true', async () => {
+    const client = mockClient();
+    (client.lock as ReturnType<typeof vi.fn>).mockResolvedValue({ LOCK_HANDLE: 'h1' });
+    (client.setObjectSource as ReturnType<typeof vi.fn>).mockResolvedValue({});
+    (client.syntaxCheckContent as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+    (client.unLock as ReturnType<typeof vi.fn>).mockResolvedValue({});
+    const stages: string[] = [];
+    await pushObject(
+      client,
+      { name: 'ZCL_CHECK', type: 'CLAS', objectUrl: '/x' },
+      [{ subtype: 'main', sourceUrl: '/x/source/main', content: 'class ZCL_CHECK.' }],
+      { transport: 'T1', checkOnly: true, onStage: (s) => stages.push(s) },
+    );
+    expect(stages).toEqual(['lock', 'write', 'check', 'unlock']);
+    expect(stages).not.toContain('activate');
+  });
+
+  it('skips the activate stage when activate=false (write-only mode)', async () => {
+    const client = mockClient();
+    (client.lock as ReturnType<typeof vi.fn>).mockResolvedValue({ LOCK_HANDLE: 'h1' });
+    (client.setObjectSource as ReturnType<typeof vi.fn>).mockResolvedValue({});
+    (client.unLock as ReturnType<typeof vi.fn>).mockResolvedValue({});
+    const stages: string[] = [];
+    await pushObject(
+      client,
+      { name: 'ZCL_NOACT', type: 'CLAS', objectUrl: '/x' },
+      [{ subtype: 'main', sourceUrl: '/x/source/main', content: 'class ZCL_NOACT.' }],
+      { transport: 'T1', checkOnly: false, activate: false, onStage: (s) => stages.push(s) },
+    );
+    expect(stages).toEqual(['lock', 'write', 'unlock']);
+    expect(client.activate).not.toHaveBeenCalled();
+  });
 });

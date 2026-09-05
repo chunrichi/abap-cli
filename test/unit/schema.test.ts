@@ -105,6 +105,7 @@ describe('abap create --schema (P0.1 introspection)', () => {
       'TABL', 'STRU', 'DOMA', 'DTEL',
       'HTTP', 'TRAN',
       'TTYP', 'MSAG', 'DDLS',
+      'SRVB', 'SRVD', 'BDEF', 'DCLS', 'DDLX', 'DDLA',
     ]);
     expect(data.options.map((o: { name: string }) => o.name)).toEqual(
       expect.arrayContaining(['--package', '--description', '--tr', '--no-activate', '--template', '--no-pull', '--check-only', '--audit']),

@@ -41,6 +41,8 @@ beforeEach(() => {
     if (query === 'LZFG_WECHAT_TABLE*') {
       return [
         { 'adtcore:name': 'LZFG_WECHAT_TABLETOP', 'adtcore:type': 'FUGR/I', 'adtcore:uri': '/sap/bc/adt/programs/includes/lzfg_wechat_tabletop' },
+        { 'adtcore:name': 'LZFG_WECHAT_TABLEF01', 'adtcore:type': 'FUGR/I', 'adtcore:uri': '/sap/bc/adt/programs/includes/lzfg_wechat_tablef01' },
+        { 'adtcore:name': 'LZFG_WECHAT_TABLEO01', 'adtcore:type': 'FUGR/I', 'adtcore:uri': '/sap/bc/adt/programs/includes/lzfg_wechat_tableo01' },
         { 'adtcore:name': 'LZFG_WECHAT_TABLEUXX', 'adtcore:type': 'FUGR/I', 'adtcore:uri': '/sap/bc/adt/programs/includes/lzfg_wechat_tableuxx' },
       ];
     }
@@ -108,6 +110,11 @@ describe('abap pull FUGR (abap-file-format layout)', () => {
       'zfg_wechat_table.fugr.saplzfg_wechat_table.reps.json',
       'zfg_wechat_table.fugr.lzfg_wechat_tabletop.reps.abap',
       'zfg_wechat_table.fugr.lzfg_wechat_tabletop.reps.json',
+      // T1.5: FXX / OXX are now kept (previously dropped silently).
+      'zfg_wechat_table.fugr.lzfg_wechat_tablef01.reps.abap',
+      'zfg_wechat_table.fugr.lzfg_wechat_tablef01.reps.json',
+      'zfg_wechat_table.fugr.lzfg_wechat_tableo01.reps.abap',
+      'zfg_wechat_table.fugr.lzfg_wechat_tableo01.reps.json',
       'zfg_wechat_table.fugr.tableframe_zfg_wechat_table.func.abap',
       'zfg_wechat_table.fugr.tableframe_zfg_wechat_table.func.json',
       'zfg_wechat_table.fugr.tableproc_zfg_wechat_table.func.abap',
@@ -116,6 +123,10 @@ describe('abap pull FUGR (abap-file-format layout)', () => {
     for (const f of expected) {
       expect(fs.existsSync(path.join(dir, f)), f).toBe(true);
     }
+    // UXX include is metadata-only → no .reps files for it.
+    expect(
+      fs.existsSync(path.join(dir, 'zfg_wechat_table.fugr.lzfg_wechat_tableuxx.reps.abap')),
+    ).toBe(false);
 
     const fugr = JSON.parse(fs.readFileSync(path.join(dir, 'zfg_wechat_table.fugr.json'), 'utf-8'));
     expect(fugr.fixPointArithmetic).toBe(true);

@@ -18,8 +18,8 @@ import { registerActivateCommand } from '../../src/abap_cli/commands/activate.js
 import { registerCheckCommand } from '../../src/abap_cli/commands/check.js';
 import { registerCreateCommand } from '../../src/abap_cli/commands/create.js';
 import { registerDiffCommand } from '../../src/abap_cli/commands/diff.js';
+import { registerDeployCommand } from '../../src/abap_cli/commands/deploy.js';
 import { registerDoctorCommand } from '../../src/abap_cli/commands/doctor.js';
-import { registerExtensionCommand } from '../../src/abap_cli/commands/extension.js';
 import { registerExtensionsCommand } from '../../src/abap_cli/commands/extensions.js';
 import { registerInitCommand } from '../../src/abap_cli/commands/init.js';
 import { registerInspectCommand } from '../../src/abap_cli/commands/inspect.js';
@@ -40,8 +40,8 @@ const ALL_COMMANDS: ReadonlyArray<{ name: string; register: Registerer }> = [
   { name: 'check', register: registerCheckCommand },
   { name: 'create', register: registerCreateCommand },
   { name: 'diff', register: registerDiffCommand },
+  { name: 'deploy', register: registerDeployCommand },
   { name: 'doctor', register: registerDoctorCommand },
-  { name: 'extension', register: registerExtensionCommand },
   { name: 'extensions', register: registerExtensionsCommand },
   { name: 'init', register: registerInitCommand },
   { name: 'inspect', register: registerInspectCommand },

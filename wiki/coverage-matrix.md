@@ -67,7 +67,7 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | 任务 | 命令 | 覆盖 | 备注 |
 |---|---|---|---|
 | 跑 OO 类（classrun） | `run <class>` | ✅ | 走 ADT /sap/bc/adt/oo/classrun |
-| 跑 PUBLIC STATIC 方法 | `run <class> --method` | ✅ | 走 ICF wrapper（需 `extension deploy`） |
+| 跑 PUBLIC STATIC 方法 | `run <class> --method` | ✅ | 走 ICF wrapper（需 `deploy`） |
 | SELECT 表数据 | `select --table` | ✅ | 走 ICF /data/query；最大 10000 行 |
 | SELECT with WHERE / LIMIT / ORDER BY | `select --where --limit --order-by` | ✅ | 全功能 |
 | COUNT-only | `select --count-only` | ✅ | |
@@ -162,13 +162,13 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 
 | 任务 | 命令 | 覆盖 | 备注 |
 |---|---|---|---|
-| 部署 ICF 服务 | `extension deploy` | ✅ | on-prem / Steampunk / BTP trial |
-| 检查 ICF 状态 | `extension status` | ✅ | 版本 + 已部署 |
+| 部署 ICF 服务 | `deploy` | ✅ | on-prem / Steampunk / BTP trial |
+| 检查 ICF 状态 | `deploy status` | ✅ | 版本 + 已部署 |
 | 解析 SICF 节点（HTTP 类型） | `pull / create / push HTTP` | ✅ | ICF |
 | 解析事务码（TRAN 类型） | `pull / create / push TRAN` | ✅ | ICF |
 | DDIC CRUD（DOMA/DTEL/TABL/STRU） | `pull / create / push` | ✅ | ICF |
 | 数据查询（SELECT） | `select` | ✅ | ICF |
-| classrun wrapper | `extension deploy` | ✅ | ZCL_ABAP_VIBE_RUNNER |
+| classrun wrapper | `deploy` | ✅ | ZCL_ABAP_VIBE_RUNNER |
 | tcode wrapper | `tcode` | ✅ | ICF |
 
 **覆盖率**：8/8 ✅。

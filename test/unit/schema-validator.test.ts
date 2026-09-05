@@ -124,4 +124,42 @@ describe('schema-validator (T033-002)', () => {
     expect(warnLine).toContain('WARN p.json');
     expect(warnLine).toContain('unknown');
   });
+
+  // ----- T2.5 single-Map cache behaviour -----
+
+  it('repeated validateAff calls for the same type do not re-compile (timing)', async () => {
+    resetSchemaCache();
+    const doc = {
+      formatVersion: '1',
+      header: { description: 'x', originalLanguage: 'EN' },
+      format: { dataType: 'CHAR', length: 3 },
+      outputCharacteristics: { length: 3 },
+    };
+    // Warm up the cache; the first call pays the compile cost.
+    await validateAff('DOMA', doc);
+    const t0 = performance.now();
+    for (let i = 0; i < 50; i++) {
+      // eslint-disable-next-line no-await-in-loop
+      await validateAff('DOMA', doc);
+    }
+    const elapsed = performance.now() - t0;
+    // 50 cached revalidations must stay well under 50ms (the first uncached
+    // compile on the same payload typically takes 5–20ms on developer
+    // machines). Generous bound to keep the test stable across CI hardware.
+    expect(elapsed).toBeLessThan(50);
+  });
+
+  it('STRU and TABL share the same compiled validator (same schema file)', async () => {
+    resetSchemaCache();
+    const minimalDoc = { formatVersion: '1', header: { description: 'x', originalLanguage: 'EN' } };
+    // Both must succeed against their shared schema (just formatVersion + header).
+    const tablResult = await validateAff('TABL', minimalDoc);
+    const struResult = await validateAff('STRU', minimalDoc);
+    expect(tablResult.status).toBe('pass');
+    expect(struResult.status).toBe('pass');
+    // Now confirm cache sharing: a second validateAff for TABL after STRU was
+    // compiled must still pass (single Map; STRU compile did not evict TABL).
+    const reT = await validateAff('TABL', minimalDoc);
+    expect(reT.status).toBe('pass');
+  });
 });

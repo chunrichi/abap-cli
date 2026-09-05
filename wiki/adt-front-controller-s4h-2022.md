@@ -196,7 +196,7 @@ Accept: application/atomsvc+xml
 - FUGR includes（含 PROG includes）与 Message Class
 - search / where-used / inspect / transport 所需的 Repository Information、对象结构与 CTS 资源
 
-### 3.2 不能直接走 ADT、要先 `abap extension deploy` 的（CLI 走 ICF）
+### 3.2 不能直接走 ADT、要先 `abap deploy` 的（CLI 走 ICF）
 
 - DDIC 三件套：TABL / STRU / DOMA / DTEL —— 自建 ICF `/sap/zabap_vibe/dictionary/...`
 - textpool / text elements —— 自建 ICF `/sap/zabap_vibe/textpool/...`

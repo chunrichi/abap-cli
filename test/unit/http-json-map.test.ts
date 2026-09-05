@@ -2,11 +2,17 @@
   HTTP service JSON helpers — local↔wire conversion, validation, namespace.
  * Mirrors ddic-json-map.test.ts but for the HTTP service object type.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import * as os from 'node:os';
 import {
   localToWire,
   wireToLocal,
   validateHttpObject,
+  validateHttpService,
+  readHttpService,
+  writeHttpService,
   type HttpObjectLocal,
   type HttpWirePayload,
 } from '../../src/abap_cli/formats/http/json.js';
@@ -144,6 +150,86 @@ describe('022 HTTP JSON helpers', () => {
         generalInformation: { handlerClass: 'ZCL_X', url: '/x' },
       };
       expect(validateHttpObject(local)).toEqual([]);
+    });
+  });
+
+  // ----- T2.2 AFF schema-based validation -----
+
+  describe('validateHttpService (AFF schema)', () => {
+    it('passes a valid AFF-shaped document', () => {
+      const doc = {
+        formatVersion: '1',
+        header: { description: 'HTTP service', originalLanguage: 'EN' },
+        generalInformation: { handlerClass: 'ZCL_HTTP_HANDLER', url: '/sap/zhttp_test' },
+      };
+      expect(validateHttpService(doc)).toEqual([]);
+    });
+
+    it('rejects documents missing formatVersion (AFF schema)', () => {
+      const doc = {
+        header: { description: 'x', originalLanguage: 'EN' },
+        generalInformation: {},
+      };
+      const errors = validateHttpService(doc);
+      expect(errors.length).toBeGreaterThan(0);
+      // ajv error shape: <instancePath>: <message>
+      expect(errors.join('\n')).toMatch(/formatVersion/);
+    });
+
+    it('rejects documents with description > 60 chars', () => {
+      const doc = {
+        formatVersion: '1',
+        header: { description: 'd'.repeat(61), originalLanguage: 'EN' },
+        generalInformation: {},
+      };
+      const errors = validateHttpService(doc);
+      expect(errors.length).toBeGreaterThan(0);
+    });
+
+    it('rejects documents with extra top-level fields (AFF additionalProperties:false)', () => {
+      const doc = {
+        formatVersion: '1',
+        header: { description: 'x', originalLanguage: 'EN' },
+        generalInformation: {},
+        rogueField: 'oops',
+      };
+      const errors = validateHttpService(doc);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors.join('\n')).toMatch(/rogueField|additional/);
+    });
+  });
+
+  describe('writeHttpService (AFF schema pre-write)', () => {
+    let tmpDir: string;
+    beforeEach(async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'abap-cli-http-test-'));
+    });
+    afterEach(async () => {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    });
+
+    it('round-trips a valid document', async () => {
+      const filePath = path.join(tmpDir, 'nested', 'zhttp_rt.http.json');
+      const doc = {
+        formatVersion: '1' as const,
+        header: { description: 'round-trip', originalLanguage: 'EN' },
+        generalInformation: { handlerClass: 'ZCL_RT', url: '/sap/zrt' },
+      };
+      await writeHttpService(filePath, doc);
+      const back = await readHttpService(filePath);
+      expect(back).toEqual(doc);
+    });
+
+    it('throws on an invalid document before writing', async () => {
+      const filePath = path.join(tmpDir, 'zhttp_bad.http.json');
+      const bad = {
+        // missing required formatVersion
+        header: { description: 'x', originalLanguage: 'EN' },
+        generalInformation: {},
+      };
+      await expect(writeHttpService(filePath, bad)).rejects.toThrow(/AFF HTTP fixture invalid/);
+      // The file must NOT have been written.
+      await expect(fs.stat(filePath)).rejects.toThrow();
     });
   });
 });

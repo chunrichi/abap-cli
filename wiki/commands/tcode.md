@@ -88,7 +88,7 @@ resolution: entry_only
 | `TCODE_NOT_FOUND` | NOT_FOUND / 8 | TSTC 中无此事务码 | SE93 校对；确认在当前系统/client 有效 |
 | `TCODE_NOT_AUTHORIZED` | AUTH_ERROR / 5 | `S_TCODE` 权限检查未通过 | 申请该事务码的查看授权；SU53 / PFCG 核对角色 |
 | `INVALID_ARGUMENT` | USAGE / 2 | 空 / 含空白 / 超 20 字符 | 只传事务码本身，去掉 `/n` 等 GUI 前缀 |
-| `SAP_ERROR` | SAP_ERROR / 6 | ICF 未知错码，或响应缺 `entry.program` | `abap extension deploy` 升级服务；`abap doctor` 查连接 |
+| `SAP_ERROR` | SAP_ERROR / 6 | ICF 未知错码，或响应缺 `entry.program` | `abap deploy` 升级服务；`abap doctor` 查连接 |
 
 ## v1 边界
 
@@ -109,9 +109,9 @@ abap where-used ZPROG_FOO --json      # 谁引用了它（影响面）
 - [pull](pull.md) — 拿到 `entry.program` 后下载源码
 - [where-used](where-used.md) — 对入口程序做影响分析
 - [inspect](inspect.md) — 查该程序的元数据与激活状态
-- [extension](extension.md) — `deploy` 部署含 `/tcode` 端点的 `ZCL_ABAP_VIBE_ICF`
+- [deploy](deploy.md) — `deploy` 部署含 `/tcode` 端点的 `ZCL_ABAP_VIBE_ICF`
 
 ## 版本与服务依赖
 
 - **CLI 版本**: 0.2.0（含 `tcode` 命令）。
-- **ICF 服务**: `ZCL_ABAP_VIBE_ICF` 的 `dispatch_tcode` / `read_tcode`（GET only）。`abap extension deploy` 部署后可用；`abap doctor` 探测版本匹配。
+- **ICF 服务**: `ZCL_ABAP_VIBE_ICF` 的 `dispatch_tcode` / `read_tcode`（GET only）。`abap deploy` 部署后可用；`abap doctor` 探测版本匹配。

@@ -162,7 +162,7 @@ async function runCreateDdic(type: DdicSupportedType, objectName: string, opts: 
 
   // Non-$TMP package requires a transport request.
   // $TMP is case-insensitive — shells sometimes expand $TMP to "" and users retype it,
-  // so accept $TMP / $tmp / $Tmp the same way extension.ts does.
+  // so accept $TMP / $tmp / $Tmp the same way deploy.ts does.
   const targetPackage = (opts.package ?? '$TMP').trim().toUpperCase();
   if (targetPackage !== '$TMP' && !opts.tr) {
     throw new CliError('VALIDATION_ERROR', 'transportRequest is required when package is not $TMP', {
@@ -243,7 +243,7 @@ async function runCreateHttp(type: 'HTTP', objectName: string, opts: CreateOptio
     });
   }
 
-  // Nnsitive $TMP matching: extension.ts uses the same convention.
+  // Nnsitive $TMP matching: deploy.ts uses the same convention.
   const targetPackage = (opts.package ?? '$TMP').trim().toUpperCase();
   if (targetPackage !== '$TMP' && !opts.tr) {
     throw new CliError('VALIDATION_ERROR', 'transportRequest is required when package is not $TMP', {
@@ -334,7 +334,9 @@ async function runCreateTran(type: 'TRAN', objectName: string, opts: CreateOptio
   }
 
   const wire = tranLocalToWire(local);
-  if (opts.description) wire.description = opts.description;
+  if (opts.description) {
+    wire.header = { ...(wire.header ?? { description: opts.description, originalLanguage: 'en' }), description: opts.description };
+  }
   if (opts.package) wire.package = opts.package;
   if (opts.tr) wire.transportRequest = opts.tr;
 

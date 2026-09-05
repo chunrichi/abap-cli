@@ -1,11 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 import { getPassword } from './secrets.js';
 import { getSystem } from './user-config.js';
 import { CliError } from '../output/json.js';
 import type { ExtensionManifest } from '../extensions/types.js';
 import type { AuthConfig } from '../auth/v2-types.js';
+import { userConfigPath } from './paths.js';
 
 export interface SapConfig {
   url: string;
@@ -54,11 +54,19 @@ interface LoadedConfig {
   extensions?: ExtensionManifest[];
 }
 
-let cached: LoadedConfig | null = null;
-let cachedMtimes: { configPath: number; systemsPath: number } | null = null;
-let cachedConfigPath: string | null = null;
+/**
+ * Per-cwd cache key.
+ *
+ * `project-config` results are cached in a `Map<resolvedCwd, entry>` so a
+ * single CLI process that walks into a sibling workspace sees the new
+ * config without stale reuse. We mirror that here with `cachedByCwd`,
+ * keyed by the **resolved** workspace config path (the file path) —
+ * same isolation guarantee, simpler invalidation.
+ */
+let cachedByCwd: Map<string, LoadedConfig> | null = null;
+let cachedMtimesByCwd: Map<string, { configPath: number; systemsPath: number }> | null = null;
 
-const SYSTEMS_PATH = path.join(os.homedir(), '.abap-cli', 'systems.json');
+const SYSTEMS_PATH = userConfigPath();
 
 function fileMtime(p: string): number {
   try {
@@ -77,6 +85,9 @@ function fileMtime(p: string): number {
  *
  * This makes a parent `.abap.json` apply to nested subdirectories by default, while
  * a child directory's own `.abap.json` always wins because the search starts there.
+ *
+ * Semantics: walk up from cwd, stop at `.git` or filesystem root,
+ * nearest wins.
  */
 export function findWorkspaceConfig(startDir: string = process.cwd()): string | null {
   let dir = path.resolve(startDir);
@@ -94,45 +105,71 @@ export function findWorkspaceConfig(startDir: string = process.cwd()): string | 
   return null;
 }
 
-function currentMtimes(): { configPath: number; systemsPath: number } {
-  const configPath = findWorkspaceConfig() ?? path.resolve(process.cwd(), '.abap.json');
+/**
+ * `existingWorkspaceConfigPath(cwd)` — returns the path that
+ * `writeProjectConfig` should target (the existing `.abap.json` if any, else
+ * the candidate in `cwd`). Centralised so every write site agrees.
+ */
+export function existingWorkspaceConfigPath(cwd: string = process.cwd()): string {
+  return findWorkspaceConfig(cwd) ?? path.join(path.resolve(cwd), '.abap.json');
+}
+
+function currentMtimes(configPath: string | null): { configPath: number; systemsPath: number } {
+  const resolved = configPath ?? path.resolve(process.cwd(), '.abap.json');
   return {
-    configPath: fileMtime(configPath),
+    configPath: fileMtime(resolved),
     systemsPath: fileMtime(SYSTEMS_PATH),
   };
 }
 
+/** Internal cache key = absolute config file path (or its candidate). */
+function cacheKeyFor(configPath: string | null, cwd: string): string {
+  return configPath ?? path.resolve(cwd, '.abap.json');
+}
+
 /**
  * Load project configuration from .abap.json (system reference) + user-level system profile + OS keychain.
- * The search starts at the current directory and walks up to the nearest `.abap.json`
- * (or stops at the repository root / filesystem root). The file cache auto-invalidates
- * on mtime change (abap init / profile set); the password is re-read from the keychain
- * every call so updates apply immediately.
+ *
+ * - `cwd` parameter (defaults to `process.cwd()`) lets callers (and tests)
+ *   force the search start without monkey-patching `process.cwd()`.
+ * - The cache is keyed by resolved config file path, so calling
+ *   `loadConfig({ cwd: '/repo-a' })` then `loadConfig({ cwd: '/repo-b' })`
+ *   produces two independent loads instead of one shared cache entry.
  */
-export async function loadConfig(): Promise<ProjectConfig> {
-  const mtimes = currentMtimes();
-  if (
-    !cached ||
-    !cachedMtimes ||
-    !cachedConfigPath ||
-    cachedMtimes.configPath !== mtimes.configPath ||
-    cachedMtimes.systemsPath !== mtimes.systemsPath
-  ) {
-    const configPath = findWorkspaceConfig();
-    cached = await loadFileConfig(configPath);
-    cachedConfigPath = configPath;
-    cachedMtimes = mtimes;
+export interface LoadConfigOptions {
+  /** Directory to start the upward `.abap.json` walk from (defaults to `process.cwd()`). */
+  cwd?: string;
+}
+
+export async function loadConfig(options: LoadConfigOptions | string = {}): Promise<ProjectConfig> {
+  const opts: LoadConfigOptions = typeof options === 'string' ? { cwd: options } : options;
+  const startCwd = opts.cwd ?? process.cwd();
+  const configPath = findWorkspaceConfig(startCwd);
+  const cacheKey = cacheKeyFor(configPath, startCwd);
+
+  // Lazy-init caches on first use so test reset() can null them safely.
+  if (!cachedByCwd) cachedByCwd = new Map();
+  if (!cachedMtimesByCwd) cachedMtimesByCwd = new Map();
+
+  const mtimes = currentMtimes(configPath);
+  const cachedMtimes = cachedMtimesByCwd.get(cacheKey);
+  const cached = cachedByCwd.get(cacheKey);
+  if (!cached || !cachedMtimes || cachedMtimes.configPath !== mtimes.configPath || cachedMtimes.systemsPath !== mtimes.systemsPath) {
+    const fresh = await loadFileConfig(configPath);
+    cachedByCwd.set(cacheKey, fresh);
+    cachedMtimesByCwd.set(cacheKey, mtimes);
   }
 
-  const password = (await getPassword(cached.systemName)) || '';
+  const live = cachedByCwd.get(cacheKey)!;
+  const password = (await getPassword(live.systemName)) || '';
   return {
-    sap: { ...cached.sap, password },
-    transport: cached.transport,
-    package: cached.package,
-    systemName: cached.systemName,
-    adtTextpool: cached.adtTextpool,
-    systemVersion: cached.systemVersion,
-    extensions: cached.extensions,
+    sap: { ...live.sap, password },
+    transport: live.transport,
+    package: live.package,
+    systemName: live.systemName,
+    adtTextpool: live.adtTextpool,
+    systemVersion: live.systemVersion,
+    extensions: live.extensions,
   };
 }
 
@@ -208,15 +245,22 @@ export function readCaCertificate(caPath: string): string | undefined {
 /**
  * Write the workspace config (.abap.json) to disk.
  * Merges with existing content, only overwriting the keys provided.
+ *
+ * `cwd` parameter (defaults to `process.cwd()`) so callers can target a
+ * sibling workspace without mutating `process.cwd()`.
  */
-export async function writeProjectConfig(updates: {
-  systemName?: string;
-  package?: string;
-  transport?: string;
-  sourceDir?: string;
-  extensions?: ExtensionManifest[];
-}): Promise<void> {
-  const configPath = findWorkspaceConfig() ?? path.join(process.cwd(), '.abap.json');
+export async function writeProjectConfig(
+  updates: {
+    systemName?: string;
+    package?: string;
+    transport?: string;
+    sourceDir?: string;
+    extensions?: ExtensionManifest[];
+  },
+  options: { cwd?: string } = {},
+): Promise<void> {
+  const startCwd = options.cwd ?? process.cwd();
+  const configPath = existingWorkspaceConfigPath(startCwd);
   let existing: Record<string, unknown> = {};
   if (fs.existsSync(configPath)) {
     try {
@@ -242,7 +286,6 @@ export async function writeProjectConfig(updates: {
  * Reset cached config (for testing).
  */
 export function resetConfig(): void {
-  cached = null;
-  cachedMtimes = null;
-  cachedConfigPath = null;
+  cachedByCwd = null;
+  cachedMtimesByCwd = null;
 }

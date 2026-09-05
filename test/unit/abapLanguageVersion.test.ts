@@ -24,7 +24,10 @@ describe('032 P0: abapLanguageVersion pull', () => {
     expect(doc.header).not.toHaveProperty('abapLanguageVersion');
   });
 
-  it('renders standard fallback when metadata carries "standard"', () => {
+  it('T1.2: does NOT render abapLanguageVersion for PROG (CLAS/INTF only)', () => {
+    // 0.3.0 (T1.2) spec change: abapLanguageVersion is rendered only for
+    // CLAS / INTF metadata. PROG fixtures must not carry it; SAP would
+    // reject the file.
     const meta: ObjectMetadata = {
       description: 'Demo program',
       masterLanguage: 'EN',
@@ -33,6 +36,6 @@ describe('032 P0: abapLanguageVersion pull', () => {
       abapLanguageVersion: 'standard',
     };
     const doc = JSON.parse(renderObjectMetadataJson(meta));
-    expect(doc.header.abapLanguageVersion).toBe('standard');
+    expect(doc.header.abapLanguageVersion).toBeUndefined();
   });
 });

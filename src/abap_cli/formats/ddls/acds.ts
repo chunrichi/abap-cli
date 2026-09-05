@@ -1,21 +1,43 @@
 /**
- * Spec 036 US4: DDLS `.ddls.acds` companion file parser.
+ * Spec 036 US4 + T3.5: DDLS `.ddls.acds` companion file parser.
  *
- * Recognises 5 top-level CDS shapes (per spec 036 T036-031):
- *   1. `define view entity ...`              → "viewEntity"
- *   2. `define projection view ...`          → "projectionView"
- *   3. `define table function ...`           → "tableFunction"
- *   4. `define view entity ... extend [...]` → "viewEntityExtend" (with parentName)
- *   5. `define view ... extend [...]`        → "viewExtend"      (with parentName)
+ * Recognises all 11 top-level CDS shapes defined by abap-file-format:
+ *   1.  `define view entity ...`              → "viewEntity"
+ *   2.  `define view entity ... extend [...]` → "viewEntityExtend" (with parentName)
+ *   3.  `define view ... extend [...]`        → "viewExtend"      (with parentName)
+ *   4.  `define projection view ...`          → "projectionView"
+ *   5.  `define table function ...`           → "tableFunction"
+ *   6.  `define view ... as select from ...`  → "ddicBasedView"
+ *   7.  `define table entity ...`             → "tableEntity"
+ *   8.  `define abstract entity ...`          → "abstractEntity"
+ *   9.  `define custom entity ...`            → "customEntity"
+ *   10. `define hierarchy ...`                → "hierarchy"
+ *   11. `define external entity ...`          → "externalEntity"
  *
- * Each form may include `with [parent=...]`; we capture the parent name
- * via a single regex pass over the first 200 chars of the file (CDS
- * extensions always carry their target on the same line as `extend`).
+ * Anything not matching returns `"unknown"`. Each form may include
+ * `with [parent=...]`; we capture the parent name via a single regex
+ * pass over the first 240 chars (CDS extensions carry the target on
+ * the same line as `extend`).
  */
 
-const DEFINE_FALLBACK = /^\s*define\s+(table|abstract|custom|hierarchy|external)\s+(entity|view)\s+(\w+)\s*(.*)$/im;
-const DEFINE_DDIC = /^\s*define\s+(view)\s+(\w+)\s+as\s+select\b/im;
 const EXTEND_PARENT_RE = /extend\s+(?:view\s+(?:entity\s+)?)?\[?\s*([^\s;\]]+)/i;
+
+// Lowercase → canonical sourceType for the 6 secondary forms. T3.5 keeps
+// this map as the single source of truth so the fallback branch does not
+// need to format a `${kind}${entity}` string and risk mis-cased output.
+const SECONDARY_SOURCE_TYPE: Record<string, AcdsShape['sourceType']> = {
+  'table entity': 'tableEntity',
+  'abstract entity': 'abstractEntity',
+  'custom entity': 'customEntity',
+  'hierarchy': 'hierarchy',
+  'external entity': 'externalEntity',
+};
+
+// Match the six secondary forms (table entity / abstract entity / custom
+// entity / hierarchy / external entity). The two-token forms need explicit
+// alternation so we don't double-match a primary `define view entity ...`.
+const DEFINE_FALLBACK = /^\s*define\s+(table\s+entity|abstract\s+entity|custom\s+entity|hierarchy|external\s+entity)\s+(\w+)\s*(.*)$/im;
+const DEFINE_DDIC = /^\s*define\s+(view)\s+(\w+)\s+as\s+select\b/im;
 
 /** Parse the .acds body and return both the sourceType enum + parentName (if any). */
 export interface AcdsShape {
@@ -71,13 +93,14 @@ export function parseAcds(source: string): AcdsShape {
       return { sourceType: 'viewEntity', objectName: name };
     }
   }
-  // Fallback shapes (table entity, abstract entity, etc.)
+  // Fallback shapes (table entity, abstract entity, hierarchy, …).
   const m2 = leading.match(DEFINE_FALLBACK);
   if (m2) {
     const kind = m2[1]!.toLowerCase();
-    const entity = m2[2]!.toLowerCase();
-    const variant = `${kind}${entity}` as AcdsShape['sourceType'];
-    return { sourceType: variant, objectName: m2[3] };
+    const canonical = SECONDARY_SOURCE_TYPE[kind];
+    if (canonical) {
+      return { sourceType: canonical, objectName: m2[2] };
+    }
   }
   // Legacy DDIC view: `define view <name> as select from ...`
   const m3 = leading.match(DEFINE_DDIC);

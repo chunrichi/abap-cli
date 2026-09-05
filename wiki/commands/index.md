@@ -39,9 +39,9 @@ changed at: 2026-09-03 17:00:00
 
 - [transport](transport.md) — 管理 SAP 传输请求（list / create / show / resolve / assign；create 与 assign 为写操作，非 TTY 需 `--yes` 或 `--dry-run`）
 
-## 扩展
+## 部署
 
-- [extension](extension.md) — 管理内置 ICF ABAP 扩展（deploy 部署 / status 只读探测版本匹配）
+- [deploy](deploy.md) — 部署内置 ICF ABAP 服务（`deploy` 部署 / `deploy status` 只读探测版本匹配）
 - [extensions](extensions.md) — 管理第三方扩展：list（只读列状态 + lockfile 状态）/ [lock](extensions-lock.md)（027 信任硬化：算 / 刷新 `extensions.lock.json`，npm 扩展 sha512 钉死；`--allow-unsigned` 首次必填）
 
 ## MIME 资源

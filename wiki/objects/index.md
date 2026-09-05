@@ -30,7 +30,7 @@ changed at: 2026-09-04 00:00:00
 ## 路由速查
 
 - **ADT**（源对象）：无需 ICF 部署；直接打 SAP ADT REST API；走 `abap-adt-api` 库
-- **ICF** 自建（DDIC/HTTP/TRAN）：需要先 `abap extension deploy`；走 `/sap/zabap_vibe/<domain>/<type>/<name>`
+- **ICF** 自建（DDIC/HTTP/TRAN）：需要先 `abap deploy`；走 `/sap/zabap_vibe/<domain>/<type>/<name>`
 - **ADT + ICF 兜底**（TTYP/MSAG）：优先 ADT；ECC EHP5/6 内核（< 753）自动切 ICF，envelope 写 `data.channel` + `data.fallbackReason`
 - **ADT 无兜底**（DDLS）：旧内核直接硬错 `DDLS_NOT_SUPPORTED_ON_ECC`（exit 64），不发起任何 SAP 调用
 

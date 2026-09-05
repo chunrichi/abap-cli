@@ -53,22 +53,25 @@ export interface DdicFieldWire {
   precField?: string;
 }
 
-/** 014 + 033: DDIC payload wire shape. Wire mirrors AFF nested layout. */
-export interface DdicWirePayload {
+/**
+ * T2.1: split `DdicWirePayload` into per-type wire interfaces so each
+ * DDIC variant (DOMA / DTEL / TABL settings) declares only the fields
+ * its AFF schema actually carries. The legacy union `DdicWirePayload`
+ * is preserved as a backward-compatible alias; new code should pick the
+ * narrowed interface that matches its `wireToLocal<…>(type, wire)` call.
+ */
+
+/** DOMA wire payload — fields declared by `doma-v1.json`. */
+export interface DdicDomaWire {
   name: string;
   description?: string;
   package?: string;
   transportRequest?: string;
-  // Aff-format nested header (used by TABL/STRU to convey generalInformation).
   header?: {
     description?: string;
     originalLanguage?: string;
     abapLanguageVersion?: string;
   };
-  // Aff-format generalInformation (TABL/STRU three-piece persistence target).
-  generalInformation?: Record<string, unknown>;
-  // DOMA nested format block (AFF): dataType, length, decimals, signFlag,
-  // lowercase, convExit.
   format?: {
     dataType?: string;
     length?: number;
@@ -77,25 +80,28 @@ export interface DdicWirePayload {
     lowercase?: string;
     convExit?: string;
   };
-  // DOMA output characteristics (AFF top-level).
   outputCharacteristics?: {
     length?: number;
     [k: string]: unknown;
   };
-  // DOMA fixed values (AFF top-level).
   fixedValues?: DdomaFixedValueWire[];
-  // DTEL nested dataTypeInformation (AFF): category drives serialization.
-// AFF canonical categories (dtel-v1.json):
-//   'domain'                     — typeName holds the domain name.
-//   'predefinedType'             — `predefinedType.{dataType,length,decimals}`.
-//   'referenceToPredefinedType'  — typeName holds the predefined type.
-//   'referenceDictionaryType'    — typeName holds the dictionary type (e.g. TTYP).
-//   'referenceClasIntType'       — typeName holds the class/interface name.
-// AFF dtel-v1.json declares `additionalProperties: false` on dataTypeInformation,
-// so the wire carries exactly the three declared fields: category, typeName,
-// predefinedType. Legacy 032 callers that wrote `referencedTypeName` continue
-// to round-trip through the wire (the value is preserved on the wire type as
-// `referencedTypeName?` so the back-compat alias does not lose data).
+  warnings?: Array<{ code: string; message: string }>;
+  errorCode?: string;
+  errorMessage?: string;
+}
+
+/** DTEL wire payload — fields declared by `dtel-v1.json`. */
+export interface DdicDtelWire {
+  name: string;
+  description?: string;
+  package?: string;
+  transportRequest?: string;
+  header?: {
+    description?: string;
+    originalLanguage?: string;
+    abapLanguageVersion?: string;
+  };
+  // See DdicDtelWire.dataTypeInformation for the AFF canonical categories.
   dataTypeInformation?: {
     category:
       | 'domain'
@@ -108,12 +114,27 @@ export interface DdicWirePayload {
     referencedTypeName?: string;
     predefinedType?: { dataType?: string; length?: number; decimals?: number };
   };
-  // DTEL short / medium / long / header text:
   shortText?: string;
   mediumText?: string;
   longText?: string;
   headerText?: string;
-  // TABL/STRU fields and three-piece diagnostics:
+  warnings?: Array<{ code: string; message: string }>;
+  errorCode?: string;
+  errorMessage?: string;
+}
+
+/** TABL/STRU technical-settings wire payload — fields declared by `tabt-v1.json`. */
+export interface DdicTableSettingsWire {
+  name: string;
+  description?: string;
+  package?: string;
+  transportRequest?: string;
+  header?: {
+    description?: string;
+    originalLanguage?: string;
+    abapLanguageVersion?: string;
+  };
+  generalInformation?: Record<string, unknown>;
   fields?: DdicFieldWire[];
   type?: 'TABL' | 'STRU';
   mainJson?: string;
@@ -125,6 +146,23 @@ export interface DdicWirePayload {
   errorMessage?: string;
 }
 
+/**
+ * @deprecated Use {@link DdicDomaWire} | {@link DdicDtelWire} | {@link DdicTableSettingsWire}
+ * depending on the DDIC variant you are handling. Kept as a structural union
+ * for backward compatibility with the pre-T2.1 single-interface contract.
+ */
+export type DdicWirePayload = DdicDomaWire | DdicDtelWire | DdicTableSettingsWire;
+
+/**
+ * T2.1: type-level mapping from a DDIC variant code to its narrowed wire
+ * interface. Lets `localToWire<DOMA>(...)` / `wireToLocal<DTEL>(...)`
+ * return / accept exactly the wire shape the AFF schema declares.
+ */
+export type WireForDdicType<T extends DdicSupportedType> =
+  T extends 'DOMA' ? DdicDomaWire :
+  T extends 'DTEL' ? DdicDtelWire :
+  DdicTableSettingsWire;
+
 /** 024: extract the canonical three-piece strings from a wire payload. */
 export function extractTablArtifactWire(wire: DdicWirePayload): {
   mainJson: string;
@@ -132,12 +170,15 @@ export function extractTablArtifactWire(wire: DdicWirePayload): {
   settingsJson: string | undefined;
   hasSettings: boolean;
 } | undefined {
-  if (typeof wire.mainJson !== 'string' || typeof wire.ddicSource !== 'string') return undefined;
+  // T2.1: TABL/STRU three-piece payload lives on the TABL-settings wire
+  // variant. Narrow via unknown before reading to keep the union type safe.
+  const w = wire as unknown as Partial<DdicTableSettingsWire> & Record<string, unknown>;
+  if (typeof w.mainJson !== 'string' || typeof w.ddicSource !== 'string') return undefined;
   return {
-    mainJson: wire.mainJson,
-    ddicSource: wire.ddicSource,
-    settingsJson: typeof wire.settingsJson === 'string' ? wire.settingsJson : undefined,
-    hasSettings: wire.hasSettings === true,
+    mainJson: w.mainJson,
+    ddicSource: w.ddicSource,
+    settingsJson: typeof w.settingsJson === 'string' ? w.settingsJson : undefined,
+    hasSettings: w.hasSettings === true,
   };
 }
 /** 032 + 033: DOMA fixed-value wire shape. `description` is the AFF canonical
@@ -406,11 +447,16 @@ export function getDdicFlatJsonExample(type: DdicSupportedType): string {
   }
 }
 
-/** 033 US12 (breaking): convert a local abap-file-format nested DDIC object
- *  to the ICF wire payload. Wire equals the AFF nested shape (no flat
- *  fallback). DOMA under `format.*`, DTEL under `dataTypeInformation.*`,
- *  TABL/STRU as three-piece (DDL + settings + json). */
-export function localToWire(type: DdicSupportedType, local: DdicObject): DdicWirePayload {
+/**
+ * T2.1: convert a local abap-file-format nested DDIC object to the ICF
+ * wire payload. Wire equals the AFF nested shape (no flat fallback).
+ * DOMA under `format.*`, DTEL under `dataTypeInformation.*`,
+ * TABL/STRU as three-piece (DDL + settings + json).
+ *
+ * Generic over the type so the return narrows to the matching wire
+ * interface (DdicDomaWire / DdicDtelWire / DdicTableSettingsWire).
+ */
+export function localToWire<T extends DdicSupportedType>(type: T, local: DdicObject): WireForDdicType<T> {
   const l = local as Record<string, unknown>;
   const headerObj = (l.header && typeof l.header === 'object') ? (l.header as Record<string, unknown>) : undefined;
   const description = (headerObj?.description as string | undefined) ?? (l.description as string | undefined);
@@ -441,16 +487,16 @@ export function localToWire(type: DdicSupportedType, local: DdicObject): DdicWir
         if (srcFormat.lowercase !== undefined) nested.lowercase = String(srcFormat.lowercase);
         if (srcFormat.convExit !== undefined) nested.convExit = String(srcFormat.convExit);
       }
-      if (Object.keys(nested).length > 0) wire.format = nested;
+      if (Object.keys(nested).length > 0) (wire as DdicDomaWire).format = nested as DdicDomaWire['format'];
       // outputCharacteristics is at top level on both local and wire (AFF shape).
       const oc = l.outputCharacteristics as Record<string, unknown> | undefined;
-      if (oc) wire.outputCharacteristics = { ...oc };
+      if (oc) (wire as DdicDomaWire).outputCharacteristics = { ...oc } as DdicDomaWire['outputCharacteristics'];
       // fixedValues: prefer top-level (AFF canonical). Empty array ⇒ omit wire.
       const rawFixed =
         (Array.isArray(l.fixedValues) ? (l.fixedValues as unknown[]) : undefined) ??
         (srcFormat && Array.isArray(srcFormat.fixedValues) ? (srcFormat.fixedValues as unknown[]) : undefined);
       if (Array.isArray(rawFixed) && rawFixed.length > 0) {
-        wire.fixedValues = rawFixed.map((raw) => {
+        (wire as DdicDomaWire).fixedValues = rawFixed.map((raw) => {
           const r = raw as Record<string, unknown>;
           const out: DdomaFixedValueWire = { fixedValue: String(r.fixedValue ?? '') };
           const descRaw = r.description;
@@ -509,12 +555,13 @@ export function localToWire(type: DdicSupportedType, local: DdicObject): DdicWir
             ...(pt.decimals !== undefined ? { decimals: Number(pt.decimals) } : {}),
           };
         }
-        wire.dataTypeInformation = wireDti as DdicWirePayload['dataTypeInformation'];
+        (wire as DdicDtelWire).dataTypeInformation = wireDti as DdicDtelWire['dataTypeInformation'];
       }
-      wire.shortText = l.shortText as string | undefined;
-      wire.mediumText = l.mediumText as string | undefined;
-      wire.longText = l.longText as string | undefined;
-      wire.headerText = l.headerText as string | undefined;
+      const w = wire as DdicDtelWire;
+      w.shortText = l.shortText as string | undefined;
+      w.mediumText = l.mediumText as string | undefined;
+      w.longText = l.longText as string | undefined;
+      w.headerText = l.headerText as string | undefined;
       break;
     }
     case 'TABL':
@@ -525,6 +572,7 @@ export function localToWire(type: DdicSupportedType, local: DdicObject): DdicWir
       // and settings.json remain external artifact files. Top-level
       // `header` and `generalInformation` are forwarded when present so the
       // ICF handler can persist deliveryClass / dataClass / sizeCategory.
+      const w = wire as DdicTableSettingsWire;
       if (Array.isArray(l.fields)) {
         const original = l.fields as DdicFieldLocal[];
         const stripped = stripClientFields(original);
@@ -532,53 +580,59 @@ export function localToWire(type: DdicSupportedType, local: DdicObject): DdicWir
           .filter((f) => isClientFieldName(f.fieldName))
           .map((f) => String(f.fieldName).toUpperCase());
         if (dropped.length > 0) {
-          const ws = (wire.warnings ?? (wire.warnings = []));
+          const ws = (w.warnings ?? (w.warnings = []));
           ws.push({
             code: 'CLIENT_FIELD_STRIPPED',
             message: `dropped ${dropped.join(', ')} from fields[] — the server prepends MANDT when clientDependent: true`,
           });
         }
-        wire.fields = stripped.map(localFieldToWire);
+        w.fields = stripped.map(localFieldToWire);
       }
       // Forward abap-file-format nested header + generalInformation.
-      if (l.header !== undefined) wire.header = l.header as DdicWirePayload['header'];
+      if (l.header !== undefined) w.header = l.header as DdicTableSettingsWire['header'];
       if (l.generalInformation !== undefined) {
-        wire.generalInformation = l.generalInformation as DdicWirePayload['generalInformation'];
+        w.generalInformation = l.generalInformation as DdicTableSettingsWire['generalInformation'];
       }
       break;
     }
   }
-  return wire;
+  return wire as WireForDdicType<T>;
 }
 
 /** 033 US12: convert wire payload back to local abap-file-format shape.
- *  Wire is now nested AFF; local mirrors it. */
-export function wireToLocal(type: DdicSupportedType, wire: DdicWirePayload): DdicObject {
-  const local: DdicObject = { name: wire.name };
-  if (wire.description !== undefined) local.description = wire.description;
-  if (wire.package !== undefined) (local as Record<string, unknown>).package = wire.package;
-  if (wire.transportRequest !== undefined) (local as Record<string, unknown>).transportRequest = wire.transportRequest;
+ *  Wire is now nested AFF; local mirrors it.
+ *
+ *  T2.1: generic over the type so callers get a typed `wire` argument
+ *  (DdicDomaWire | DdicDtelWire | DdicTableSettingsWire).
+ */
+export function wireToLocal<T extends DdicSupportedType>(type: T, wire: WireForDdicType<T>): DdicObject {
+  const wAny = wire as unknown as Record<string, unknown>;
+  const local: DdicObject = { name: String(wAny.name ?? '') };
+  if (wAny.description !== undefined) local.description = wAny.description as string;
+  if (wAny.package !== undefined) (local as Record<string, unknown>).package = wAny.package;
+  if (wAny.transportRequest !== undefined) (local as Record<string, unknown>).transportRequest = wAny.transportRequest;
   // Forward nested header / generalInformation if the wire carried them.
-  if (wire.header !== undefined) (local as Record<string, unknown>).header = wire.header;
-  if (wire.generalInformation !== undefined) {
-    (local as Record<string, unknown>).generalInformation = wire.generalInformation;
+  if (wAny.header !== undefined) (local as Record<string, unknown>).header = wAny.header;
+  if (wAny.generalInformation !== undefined) {
+    (local as Record<string, unknown>).generalInformation = wAny.generalInformation;
   }
   switch (type) {
     case 'DOMA': {
       const l = local as Record<string, unknown>;
-      if (wire.format) {
+      const w = wire as DdicDomaWire;
+      if (w.format) {
         const nested: Record<string, unknown> = {};
-        if (wire.format.dataType !== undefined) nested.dataType = wire.format.dataType;
-        if (wire.format.length !== undefined) nested.length = wire.format.length;
-        if (wire.format.decimals !== undefined) nested.decimals = wire.format.decimals;
-        if (wire.format.signFlag !== undefined) nested.signFlag = String(wire.format.signFlag);
-        if (wire.format.lowercase !== undefined) nested.lowercase = String(wire.format.lowercase);
-        if (wire.format.convExit !== undefined) nested.convExit = String(wire.format.convExit);
+        if (w.format.dataType !== undefined) nested.dataType = w.format.dataType;
+        if (w.format.length !== undefined) nested.length = w.format.length;
+        if (w.format.decimals !== undefined) nested.decimals = w.format.decimals;
+        if (w.format.signFlag !== undefined) nested.signFlag = String(w.format.signFlag);
+        if (w.format.lowercase !== undefined) nested.lowercase = String(w.format.lowercase);
+        if (w.format.convExit !== undefined) nested.convExit = String(w.format.convExit);
         if (Object.keys(nested).length > 0) l.format = nested;
       }
-      if (wire.outputCharacteristics) l.outputCharacteristics = { ...wire.outputCharacteristics };
-      if (wire.fixedValues !== undefined && wire.fixedValues.length > 0) {
-        const fixedValuesLocal: DomaFixedValueLocal[] = wire.fixedValues.map((fv) => {
+      if (w.outputCharacteristics) l.outputCharacteristics = { ...w.outputCharacteristics };
+      if (w.fixedValues !== undefined && w.fixedValues.length > 0) {
+        const fixedValuesLocal: DomaFixedValueLocal[] = w.fixedValues.map((fv) => {
           const out: DomaFixedValueLocal = { fixedValue: fv.fixedValue };
           if (typeof fv.description === 'string') {
             out.description = fv.description;
@@ -599,8 +653,9 @@ export function wireToLocal(type: DdicSupportedType, wire: DdicWirePayload): Ddi
     }
     case 'DTEL': {
       const l = local as Record<string, unknown>;
-      if (wire.dataTypeInformation && typeof wire.dataTypeInformation === 'object') {
-        const cat = wire.dataTypeInformation.category;
+      const w = wire as DdicDtelWire;
+      if (w.dataTypeInformation && typeof w.dataTypeInformation === 'object') {
+        const cat = w.dataTypeInformation.category;
         // Legacy 032 alias `typeRef` is mapped back to itself on read so
         // 032 callers that wrote `typeRef` get the same shape back.
         const allowed = [
@@ -615,20 +670,21 @@ export function wireToLocal(type: DdicSupportedType, wire: DdicWirePayload): Ddi
           throw new CliError(
             'DTEL_CATEGORY_UNSUPPORTED',
             `Unsupported DTEL dataTypeInformation.category: "${String(cat)}" (expected one of ${allowed.join(', ')})`,
-            { details: { category: String(cat), dataTypeInformation: wire.dataTypeInformation } },
+            { details: { category: String(cat), dataTypeInformation: w.dataTypeInformation } },
           );
         }
-        l.dataTypeInformation = { ...wire.dataTypeInformation };
+        l.dataTypeInformation = { ...w.dataTypeInformation };
       }
-      if (wire.shortText !== undefined) local.shortText = wire.shortText;
-      if (wire.mediumText !== undefined) local.mediumText = wire.mediumText;
-      if (wire.longText !== undefined) local.longText = wire.longText;
-      if (wire.headerText !== undefined) local.headerText = wire.headerText;
+      if (w.shortText !== undefined) local.shortText = w.shortText;
+      if (w.mediumText !== undefined) local.mediumText = w.mediumText;
+      if (w.longText !== undefined) local.longText = w.longText;
+      if (w.headerText !== undefined) local.headerText = w.headerText;
       break;
     }
     case 'TABL':
     case 'STRU': {
-      if (wire.fields !== undefined) local.fields = wire.fields.map(wireFieldToLocal);
+      const w = wire as DdicTableSettingsWire;
+      if (w.fields !== undefined) local.fields = w.fields.map(wireFieldToLocal);
       break;
     }
   }

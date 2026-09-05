@@ -11,7 +11,7 @@ changed at: 2026-09-03 17:00:00
 
 管理 SAP MIME Repository（SE80 MIME 存储库）中的资源——目录与文件。命令通过自建 ICF handler `dispatch_mime` 与 SAP 对接；底层调用 `CL_MIME_REPOSITORY_API`（SE80 MIME 存储库 API，本 S/4HANA 2023 release 无 `SCMS_*` 函数模块）。所有子命令支持 `--dry-run`（仅打印计划、不调 SAP）与 `--yes`（非 TTY 必填）。
 
-> 与 `abap extension` 不同：`extension` 管理内置 ICF ABAP handler 的部署/状态；`mime` 是面向终端用户 MIME 资源的 CRUD。
+> 与 `abap deploy` 不同：`deploy` 管理内置 ICF ABAP handler 的部署/状态；`mime` 是面向终端用户 MIME 资源的 CRUD。
 
 ## 子命令总览
 
@@ -148,7 +148,7 @@ abap mime --schema
 
 ## 关联命令
 
-- **`abap extension`**：管理内置 ICF handler（含 `dispatch_mime`）的部署/状态。`mime` 子命令可用前提是 `extension status` 报告版本 ≥ 0.6.0（`dispatch_mime` 端点在该版本启用）
+- **`abap deploy`**：管理内置 ICF handler（含 `dispatch_mime`）的部署/状态。`mime` 子命令可用前提是 `deploy status` 报告版本 ≥ 0.6.0（`dispatch_mime` 端点在该版本启用）
 - **`abap search`**：MIME 资源不进 SAP 对象索引，需直接走 `mime` CRUD
 - **`abap doctor`**：ICF 端点不可达或 401/403 时排查
 

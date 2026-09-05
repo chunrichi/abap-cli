@@ -140,7 +140,7 @@ const schemas: CommandSchemaDoc[] = [
   commandSchemas['activate']!,
   commandSchemas['diff']!,
   commandSchemas['transport']!,
-  commandSchemas['extension']!,
+  commandSchemas['deploy']!,
   commandSchemas['profile']!,
   commandSchemas['doctor']!,
   commandSchemas['run'] ?? RUN_SCHEMA,
@@ -407,7 +407,7 @@ sections.push('');
 
 sections.push('## See also');
 sections.push('');
-sections.push('- Unified envelope contract: see the repo design history under specs/012-unify-cli-output-contract/contracts/cli-output.md');
+sections.push('- Unified envelope contract: `src/abap_cli/output/cli-output.schema.json` (envelope shape) + `src/abap_cli/output/cli-output-codes.schema.json` (exit-code and error-code maps)');
 sections.push('- [`cli-output.schema.json`](../src/abap_cli/output/cli-output.schema.json) — machine-readable envelope schema (JSON Schema draft-07)');
 sections.push('- [`error-codes.ts`](../src/abap_cli/output/error-codes.ts) — error-code → category → exit-code mapper');
 sections.push('- [`json.ts`](../src/abap_cli/output/json.ts) — `CliError.references` field; rendered as `See: <path>` on human error output');

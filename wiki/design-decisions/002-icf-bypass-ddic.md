@@ -33,14 +33,14 @@ changed at: 2026-09-01 00:00:00
 
 ## 当前代价
 
-- 用户必须先 `abap extension deploy` 一次（把 ICF 服务部署到 SAP）
+- 用户必须先 `abap deploy` 一次（把 ICF 服务部署到 SAP）
 - ICF 服务本身的 ABAP 代码（`abap/src/clas/zcl_abap_vibe_icf.clas.abap`）需要独立维护
 - 增加了"DDIC 走 ICF"的认知负担（`wiki/object-types.md` 顶部专门标注了路由矩阵）
 
 ## 后果
 
 - **正面**：DDIC 写成功率提升到 ~99%；CLI 与 SAP 端的契约变成我们自己定义（不依赖 SAP 何时改 ADT）
-- **负面**：首装流程多一步；ICF 服务升级需要 `extension deploy`
+- **负面**：首装流程多一步；ICF 服务升级需要 `deploy`
 
 # references
 

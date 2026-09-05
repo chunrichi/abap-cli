@@ -2,7 +2,7 @@
 name: abap-cli-search
 description: abap-cli 元数据探查（纯只读）— `search` 定位 / `where-used` 评估重构冲击 / `inspect` 查 metadata+activation+locks / `tcode` 查业务码 / `diff` 比较本地与 SAP / `status` 工作区对账。use when asking where an object lives / what uses an object / what state is an object in / what is the business code behind a tcode / what differs between local and SAP / what objects are in the workspace.
 metadata:
-  version: "0.3.0"
+  version: "0.2.6"
   scope: sap
   commands: [search, where-used, inspect, tcode, diff, status]
   tags: [read-only, no-lock, no-transport]

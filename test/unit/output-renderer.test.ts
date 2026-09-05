@@ -166,7 +166,7 @@ describe('output renderer ', () => {
 
   it('renderError("json", ...) includes references in the error envelope', () => {
     const err = new CliError('WRAPPER_NOT_DEPLOYED', 'wrapper missing', {
-      nextSteps: ['abap extension deploy'],
+      nextSteps: ['abap deploy'],
       references: 'skills/abap-cli-setup/references/errors.md',
     });
     const out = renderError('json', err, meta);

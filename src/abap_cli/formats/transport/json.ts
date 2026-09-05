@@ -1,12 +1,49 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { TRAN_SUPPORTED_TYPES, type TranSupportedType } from '../../types/registry.js';
+import { validateAffMetadata } from '../../aff/schema-validator.js';
+import { stripCliEnvelope } from '../../aff/assert-metadata.js';
 
 // Known Transaction Code object extension (abap-file-format).
 export const TRAN_EXTENSIONS = ['.tran.json'];
 
 /** Re-exported from `types/registry.ts` (T050, US11). */
 export { TRAN_SUPPORTED_TYPES, type TranSupportedType };
+
+// ---------------------------------------------------------------------------
+// T2.3 AFF schema integration
+// ---------------------------------------------------------------------------
+// The hand-rolled `validateTranObject` below predates the AFF schema validator
+// and duplicates all length / enum checks already declared in
+// `src/abap_cli/schema/tran-v1.json`. The new `validateTranJson` is the
+// canonical entry point and delegates to ajv. The legacy helpers stay
+// exported as deprecated so downstream code (and existing tests) keep
+// compiling. New code should prefer `validateTranJson`.
+// ---------------------------------------------------------------------------
+
+/**
+ * Validate a Transaction document against the vendored AFF `tran-v1.json`
+ * schema. Returns an array of human-readable error strings (empty when valid).
+ *
+ * T2.3: this is the AFF-schema-based replacement for the hand-rolled
+ * `validateTranObject`. The CLI / SICF integration layer should migrate to
+ * this entry point over time; for now `validateTranObject` is preserved.
+ */
+export function validateTranJson(data: unknown): string[] {
+  // The SAP `tran-v1.json` schema rejects CLI envelope fields via
+  // `additionalProperties:false`; the CLI transport envelope (name /
+  // package / transportRequest) is not part of the SAP structure.
+  return validateAffMetadata('TRAN', stripCliEnvelope(data));
+}
+
+/**
+ * @deprecated Use {@link validateTranJson}. Kept because the existing CLI /
+ * SICF integration layer and tests depend on the specific error message
+ * shape (e.g. "Missing required field: name", "header.description too long").
+ */
+export function validateTranObject(data: unknown): string[] {
+  return validateTranObjectLegacy(data as TranObjectLocal);
+}
 
 // Schema constants — mirror http-v1.json and abap-file-format http layout.
 export const TRAN_CODE_MAX_LENGTH = 20;
@@ -213,25 +250,23 @@ export interface TranObjectLocal {
 
 /**
  * ICF wire representation (camelCase + transport envelope).
- * Matches the JSON the SAP-side handler will deserialize.
+ *
+ * 037 US2 (S07): matches SAP `ty_tran_data` (nested `header / generalInformation`
+ * etc.) one-to-one. SAP-side `build_tran_payload` returns nested; CLI used to
+ * send a flat wire (description / originalLanguage / transactionType at top
+ * level), which the ABAP deserialize mapped to empty nested slots.
  */
 export interface TranWirePayload {
   name: string;
-  description?: string;
-  originalLanguage?: string;
-  abapLanguageVersion?: string;
-  transactionType: TranTransactionType;
-  lockStatus?: string;
-  dialogTransaction?: TranDialogTransaction;
-  parameterTransaction?: TranParameterTransaction;
-  reportTransaction?: TranReportTransaction;
-  ooTransaction?: TranOoTransaction;
-  variantTransaction?: TranVariantTransaction;
+  formatVersion?: '1';
+  header?: TranHeader;
+  generalInformation?: TranGeneralInformation;
   transactionServices?: TranTransactionService[];
   transactionRelationships?: TranTransactionRelationship[];
   serviceRelationships?: TranServiceRelationship[];
   userInterface?: TranUserInterface;
   authorizations?: TranAuthorizations;
+  /** Transport envelope — top-level only, not part of the SAP struct. */
   package?: string;
   transportRequest?: string;
 }
@@ -245,9 +280,19 @@ export async function readTranJson(filePath: string): Promise<TranObjectLocal> {
 }
 
 /**
- * Write a Transaction JSON file to disk, creating parent directories as needed.
+ * Write a Transaction JSON file to disk, validating against the AFF
+ * `tran-v1.json` schema before writing. Throws on schema violation.
+ *
+ * The validator is applied to the AFF-shaped core (formatVersion / header /
+ * generalInformation / …) so CLI-only transport fields (`name`, `package`,
+ * `transportRequest`) — which the SAP schema explicitly rejects via
+ * `additionalProperties:false` — do not block legitimate round-trips.
  */
 export async function writeTranJson(filePath: string, data: TranObjectLocal): Promise<void> {
+  const errors = validateTranJson(data);
+  if (errors.length > 0) {
+    throw new Error(`AFF TRAN fixture invalid: ${errors.join('; ')}`);
+  }
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   await fs.writeFile(filePath, JSON.stringify(data, null, 2) + '\n', 'utf-8');
 }
@@ -257,16 +302,9 @@ export function localToWire(local: TranObjectLocal): TranWirePayload {
   const l = local as Record<string, unknown>;
   const wire: TranWirePayload = {
     name: String(local.name).toUpperCase(),
-    description: local.header.description,
-    originalLanguage: local.header.originalLanguage,
-    abapLanguageVersion: local.header.abapLanguageVersion,
-    transactionType: local.generalInformation.transactionType,
-    lockStatus: local.generalInformation.lockStatus,
-    dialogTransaction: local.generalInformation.dialogTransaction,
-    parameterTransaction: local.generalInformation.parameterTransaction,
-    reportTransaction: local.generalInformation.reportTransaction,
-    ooTransaction: local.generalInformation.ooTransaction,
-    variantTransaction: local.generalInformation.variantTransaction,
+    formatVersion: '1',
+    header: local.header,
+    generalInformation: local.generalInformation,
     transactionServices: local.transactionServices,
     transactionRelationships: local.transactionRelationships,
     serviceRelationships: local.serviceRelationships,
@@ -280,19 +318,25 @@ export function localToWire(local: TranObjectLocal): TranWirePayload {
 
 /** Convert a wire payload back to local abap-file-format shape (header / generalInformation nesting). */
 export function wireToLocal(wire: TranWirePayload): TranObjectLocal {
+  const wireHeader = wire.header;
+  const wireGeneral = wire.generalInformation;
   const header: TranHeader = {
-    description: wire.description ?? '',
-    originalLanguage: wire.originalLanguage ?? '',
+    description: wireHeader?.description ?? '',
+    originalLanguage: wireHeader?.originalLanguage ?? '',
   };
-  if (wire.abapLanguageVersion !== undefined) header.abapLanguageVersion = wire.abapLanguageVersion as TranAbapLanguageVersion;
+  if (wireHeader?.abapLanguageVersion !== undefined) {
+    header.abapLanguageVersion = wireHeader.abapLanguageVersion as TranAbapLanguageVersion;
+  }
 
-  const generalInformation: TranGeneralInformation = { transactionType: wire.transactionType };
-  if (wire.lockStatus !== undefined) generalInformation.lockStatus = wire.lockStatus as TranGeneralInformation['lockStatus'];
-  if (wire.dialogTransaction) generalInformation.dialogTransaction = wire.dialogTransaction;
-  if (wire.parameterTransaction) generalInformation.parameterTransaction = wire.parameterTransaction;
-  if (wire.reportTransaction) generalInformation.reportTransaction = wire.reportTransaction;
-  if (wire.ooTransaction) generalInformation.ooTransaction = wire.ooTransaction;
-  if (wire.variantTransaction) generalInformation.variantTransaction = wire.variantTransaction;
+  const generalInformation: TranGeneralInformation = {
+    transactionType: wireGeneral?.transactionType ?? 'dialogTransaction',
+  };
+  if (wireGeneral?.lockStatus !== undefined) generalInformation.lockStatus = wireGeneral.lockStatus;
+  if (wireGeneral?.dialogTransaction) generalInformation.dialogTransaction = wireGeneral.dialogTransaction;
+  if (wireGeneral?.parameterTransaction) generalInformation.parameterTransaction = wireGeneral.parameterTransaction;
+  if (wireGeneral?.reportTransaction) generalInformation.reportTransaction = wireGeneral.reportTransaction;
+  if (wireGeneral?.ooTransaction) generalInformation.ooTransaction = wireGeneral.ooTransaction;
+  if (wireGeneral?.variantTransaction) generalInformation.variantTransaction = wireGeneral.variantTransaction;
 
   const local: TranObjectLocal = {
     name: wire.name,
@@ -332,8 +376,13 @@ function expectPattern(value: string, pattern: RegExp, label: string): string | 
 /**
  * Validate a local Transaction object against the abap-file-format contract.
  * Returns an array of human-readable errors (empty when valid).
+ *
+ * @deprecated Internal — use the public {@link validateTranJson} (AFF-schema)
+ * for new code. This implementation duplicates the schema and is kept only
+ * to support the deprecated `validateTranObject` alias and existing tests
+ * that rely on the specific error message shapes.
  */
-export function validateTranObject(data: TranObjectLocal): string[] {
+function validateTranObjectLegacy(data: TranObjectLocal): string[] {
   const errors: string[] = [];
 
   // name: required, namespace Z/Y/slash, ≤ 20 chars (TSTC-TCODE length).

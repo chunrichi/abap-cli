@@ -20,7 +20,38 @@ import type { PullOptions, PullResult } from './pull-shared.js';
 
 export async function runPullDdic(objectName: string, type: DdicSupportedType, opts: PullOptions): Promise<PullResult> {
   const icf = await IcfClient.create();
-  const resp = await icf.getDdic<Record<string, unknown>>(type.toLowerCase(), objectName);
+  let resp;
+  try {
+    resp = await icf.getDdic<Record<string, unknown>>(type.toLowerCase(), objectName);
+  } catch (err) {
+    // 037 US4: SAP-side DDL parser bug surfaces as HTTP 500 with an ABAP
+    // short dump carrying `abap.string(N)` (e.g. `abap.string(000000)` for
+    // empty .INCLUDE fragments). Convert to a structured TABL_DDL_PARSE_FAILED
+    // so the agent can recognise the failure mode and try an alternate path.
+    // Non-TABL types fall through (DOMA/DTEL/STRU have no DDL parser layer).
+    const details = err instanceof CliError ? err.details : undefined;
+    const httpStatus = (details?.httpStatus as number | undefined) ?? 0;
+    const sapBody = (details?.sapErrorBody as string | undefined) ?? '';
+    const isDdlParserFailure = /abap\.string\(\d+\)/.test(sapBody);
+    if (type === 'TABL' && httpStatus >= 500 && isDdlParserFailure) {
+      throw new CliError(
+        'TABL_DDL_PARSE_FAILED',
+        `TABL ${objectName} pulled but its DDL source could not be parsed by the SAP DDL parser`,
+        {
+          object: objectName,
+          type,
+          details: { httpStatus, sapErrorBody: sapBody.slice(0, 400) },
+          nextSteps: [
+            'SAP-side DDL parser bug (CX_DD_DDL_PARSE_ERROR on abap.string(N)); pull of the .tabl.ddic source is blocked.',
+            'Push the .tabl.json + .tabl.ddic sidecars with `abap push` — the create path uses the GOX_TABLE_STD API and does not re-parse the DDL.',
+            'If the object is already in SAP, leave it; no round-trip is required.',
+          ],
+          example: `abap push src/tabl/${objectName.toLowerCase()}/${objectName.toLowerCase()}.tabl.json`,
+        },
+      );
+    }
+    throw err;
+  }
   if (resp.status !== 'success' || !resp.data) {
     const rawCode = resp.error?.code ?? 'SAP_ERROR';
     const code: ErrorCode = rawCode === 'DDIC_OBJECT_NOT_FOUND' ? 'OBJECT_NOT_FOUND' : (rawCode as ErrorCode);

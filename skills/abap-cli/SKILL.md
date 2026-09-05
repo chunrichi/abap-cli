@@ -2,7 +2,7 @@
 name: abap-cli
 description: abap-cli 用户的 agent 路由层 — 根据用户意图分发到 4 个领域 skill（abap-cli-setup / -search / -edit / -data）与 1 个方法论 skill（abap-cli-performance）；串联 .github/skills/ 两层通用 ABAP 方法论。use when asking "这个查询该看哪个 skill" 或 agent 收到模糊意图需要先做路由决策。
 metadata:
-  version: "0.3.0"
+  version: "0.2.6"
   scope: meta
   commands: []
 ---

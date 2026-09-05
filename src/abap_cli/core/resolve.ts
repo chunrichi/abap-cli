@@ -77,12 +77,16 @@ const ADT_ROUTED_TYPES = new Set(['TTYP', 'MSAG', 'DDLS']);
 /** 022: object types the CLI can create/pull/push via the self-built ICF service. */
 const ICF_ROUTED_TYPES = new Set<string>([...DDIC_ICF_SUPPORTED, 'HTTP', 'TRAN']);
 
-/** 036-ttyp-msag-ddls: union of all types the push validator should let
- *  through. ADT-routed types (TTYP/MSAG/DDLS) reach the SAP via channel-detect
- *  rather than the legacy /ddic/<type> ICF route, but they are still valid
- *  push targets from the perspective of `validateLocalFile`. Keep the ADT
- *  set separate so the legacy ICF branch can stay strict. */
-const VALIDATED_ROUTE_TYPES = new Set<string>([...ICF_ROUTED_TYPES, ...ADT_ROUTED_TYPES]);
+/** 037 US3: union of all types the push validator should let through.
+ *  Derived from `types/registry.ts` (the single source of truth) — every
+ *  registered type, regardless of source. ADT-routed types (TTYP/MSAG/DDLS)
+ *  reach the SAP via channel-detect rather than the legacy /ddic/<type>
+ *  ICF route, but they are still valid push targets from the perspective
+ *  of `validateLocalFile`. */
+import { allSupportedTypes, sourceFor } from '../types/registry.js';
+const VALIDATED_ROUTE_TYPES = new Set<string>(
+  allSupportedTypes().filter((t) => sourceFor(t) !== undefined),
+);
 
 /**
  * 014/022: validate a local file before push. Source files are passed through;

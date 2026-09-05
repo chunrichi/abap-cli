@@ -2,17 +2,20 @@ import { describe, expect, it } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'node:url';
+import Ajv from 'ajv';
 import { EXIT_CODES } from '../../src/abap_cli/output/exit-codes.js';
-import { categoryOf, type ErrorCode } from '../../src/abap_cli/output/error-codes.js';
+import { categoryOf, type ErrorCategory, type ErrorCode } from '../../src/abap_cli/output/error-codes.js';
 import { makeProgram, runCommand } from './cli-helper.js';
 import { registerSearchCommand } from '../../src/abap_cli/commands/search.js';
 import { registerCreateCommand } from '../../src/abap_cli/commands/create.js';
 
-// --- FR-012: contract ↔ implementation ↔ actual command output ---
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const contractPath = path.join(repoRoot, 'specs/012-unify-cli-output-contract/contracts/cli-output.md');
-const contract = fs.readFileSync(contractPath, 'utf-8');
+const codesSchemaPath = path.join(repoRoot, 'src/abap_cli/output/cli-output-codes.schema.json');
+const codesSchema = JSON.parse(fs.readFileSync(codesSchemaPath, 'utf-8'));
 const srcRoot = path.join(repoRoot, 'src/abap_cli');
+
+const ajv = new Ajv({ allErrors: true, strict: false });
+const validateCodes = ajv.compile(codesSchema);
 
 function listTsFiles(dir: string): string[] {
   const out: string[] = [];
@@ -24,40 +27,37 @@ function listTsFiles(dir: string): string[] {
   return out;
 }
 
-describe('output contract audit (FR-012, US-4/002/005)', () => {
-  it('§4 exit-code table in the contract matches EXIT_CODES', () => {
-    // Rows like `| 1 | \`UNKNOWN\` |` — category name is the backticked token.
-    const parsed = new Map<number, string>();
-    for (const m of contract.matchAll(/^\| (\d+) \| `([A-Z_]+)` \|/gm)) {
-      parsed.set(Number(m[1]), m[2]!);
-    }
-    expect(parsed.size).toBeGreaterThanOrEqual(9);
-    for (const [category, code] of Object.entries(EXIT_CODES)) {
-      expect(parsed.get(code)).toBe(category);
-    }
-  });
+// Re-parse CATEGORY_OF_CODE from error-codes.ts so the audit sees every key,
+// even ones only referenced via categoryOf(). Ajv rejects extra / missing
+// properties against the schema's `required` array.
+function categoryOfEveryCode(): Record<ErrorCode, ErrorCategory> {
+  const src = fs.readFileSync(path.join(repoRoot, 'src/abap_cli/output/error-codes.ts'), 'utf-8');
+  const m = src.match(/const CATEGORY_OF_CODE[^=]*=([\s\S]*?)\};/);
+  if (!m) throw new Error('CATEGORY_OF_CODE not found in error-codes.ts');
+  const map: Record<string, string> = {};
+  for (const entry of m[1]!.matchAll(/^\s*([A-Z_][A-Z0-9_]*)\s*:\s*'([A-Z_]+)'/gm)) {
+    map[entry[1]!] = entry[2]!;
+  }
+  return map as Record<ErrorCode, ErrorCategory>;
+}
 
-  it('§5 error-code table in the contract matches categoryOf for every code', () => {
-    // Rows like `| \`USAGE\` (2) | \`USAGE\`、\`INVALID_ARGUMENT\`、... |`
-    const codeRe = /`([A-Z_]+)`/g;
-    let rows = 0;
-    for (const m of contract.matchAll(/^\| `([A-Z_]+)` \((\d+)\) \| (.+?) \|$/gm)) {
-      rows++;
-      const category = m[1]!;
-      const exitCode = Number(m[2]);
-      const cell = m[3]!;
-      expect(parsedExitCodeFor(category)).toBe(exitCode); // consistent with §4
-      let cm: RegExpExecArray | null;
-      while ((cm = codeRe.exec(cell)) !== null) {
-        const code = cm[1] as ErrorCode;
-        expect(categoryOf(code)).toBe(category);
-      }
+describe('output contract audit', () => {
+  it('TS exit-code map matches the codes schema (round-trip)', () => {
+    const tsShape = {
+      exitCodeByCategory: EXIT_CODES,
+      errorCodeByCategory: categoryOfEveryCode(),
+    };
+    const ok = validateCodes(tsShape);
+    if (!ok) {
+      throw new Error('TS constants drift from cli-output-codes.schema.json:\n' +
+        ajv.errorsText(validateCodes.errors, { separator: '\n' }));
     }
-    expect(rows).toBeGreaterThanOrEqual(9);
+    expect(Object.keys(EXIT_CODES).sort()).toEqual(
+      [...codesSchema.definitions.exitCodeByCategory.required].sort(),
+    );
   });
 
   it('no command builds its own envelope JSON (renderer bypass)', () => {
-    // output/json.ts IS the renderer — the only legitimate place to build envelopes.
     const rendererPath = path.join(srcRoot, 'output/json.ts');
     const offenders: string[] = [];
     for (const file of listTsFiles(srcRoot)) {
@@ -78,7 +78,7 @@ describe('output contract audit (FR-012, US-4/002/005)', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('--schema outputs share the unified envelope with reduced meta (US-3, 025)', async () => {
+  it('--schema outputs share the unified envelope with reduced meta', async () => {
     const program = makeProgram();
     registerSearchCommand(program);
     registerCreateCommand(program);
@@ -90,7 +90,6 @@ describe('output contract audit (FR-012, US-4/002/005)', () => {
     expect(createKeys).toEqual(['data', 'meta', 'status']);
     for (const res of [search, create]) {
       const parsed = JSON.parse(res.stdout);
-      // buildSchemaMeta: only command/version/durationMs (no timestamp/warnings).
       expect(Object.keys(parsed.meta).sort()).toEqual(['command', 'durationMs', 'version']);
       expect(parsed.meta).toMatchObject({
         command: expect.any(String),
@@ -102,21 +101,9 @@ describe('output contract audit (FR-012, US-4/002/005)', () => {
     }
   });
 
-  it('DDIC_TABL_FORMAT_UNSUPPORTED and PULL_PARTIAL_FAILURE map to VALIDATION_ERROR (US5, 025)', () => {
+  it('DDIC_TABL_FORMAT_UNSUPPORTED and PULL_PARTIAL_FAILURE map to VALIDATION_ERROR', () => {
     expect(categoryOf('DDIC_TABL_FORMAT_UNSUPPORTED')).toBe('VALIDATION_ERROR');
     expect(categoryOf('PULL_PARTIAL_FAILURE')).toBe('VALIDATION_ERROR');
     expect(EXIT_CODES.VALIDATION_ERROR).toBe(7);
-    // Both codes should appear in the §5 contract table (they were added in 025).
-    expect(contract).toContain('`DDIC_TABL_FORMAT_UNSUPPORTED`');
-    expect(contract).toContain('`PULL_PARTIAL_FAILURE`');
   });
 });
-
-// Shared helper: the §4 table maps exit code → category; invert for lookups.
-const parsedExitCodeFor = (() => {
-  const map = new Map<string, number>();
-  for (const m of contract.matchAll(/^\| (\d+) \| `([A-Z_]+)` \|/gm)) {
-    map.set(m[2]!, Number(m[1]));
-  }
-  return (category: string): number | undefined => map.get(category);
-})();

@@ -222,7 +222,7 @@ abap pull ZCL_BAD --remote PRD --json  # PRD 是上一个未污染版本
 # 1. 接入就绪
 abap doctor --json
 abap transport list --open --json
-abap extension status --json  # classrun 走 ADT，无需部署 wrapper
+abap deploy status --json  # classrun 走 ADT，无需部署 wrapper
 
 # 2. 确认不存在
 abap search ZCL_NEW_CLASS --exact --json

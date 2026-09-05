@@ -30,6 +30,59 @@ export interface DdlsLocal {
   acds?: string;
 }
 
+/**
+ * Canonical DDLS source-type set (per abap-file-format). 11 enum values
+ * + the `'unknown'` fallback. Used by {@link enumOrDefault} to normalise
+ * values returned from the wire (real SAP) and from local fixtures
+ * before the AFF schema validator sees them.
+ */
+export const DDLS_SOURCE_TYPES: ReadonlySet<string> = new Set([
+  'ddicBasedView',
+  'viewEntity',
+  'viewExtend',
+  'viewEntityExtend',
+  'tableFunction',
+  'tableEntity',
+  'abstractEntity',
+  'customEntity',
+  'hierarchy',
+  'projectionView',
+  'externalEntity',
+  'unknown',
+]);
+
+/**
+ * Canonical DDLS source-origin set (per abap-file-format). 10 enum values
+ * defined by SAP, plus the `'abapDevelopmentTools'` default. Used by
+ * {@link enumOrDefault} to fill missing or unrecognised values.
+ */
+export const DDLS_SOURCE_ORIGINS: ReadonlySet<string> = new Set([
+  'abapDevelopmentTools',
+  'customCdsViews',
+  'customAnalyticalQueries',
+  'customBusinessObject',
+  'customCodeList',
+  'customCdsViewsVariantConfg',
+  'customFields',
+  'extensionsForDataSources',
+  'customSearchModeler',
+  'serviceConsumptionModel',
+]);
+
+/**
+ * Normalise an enum value against an allowed set, falling back to
+ * `fallback` when the value is missing or unrecognised. Used by
+ * {@link normaliseDdlsMetadata} so the `.ddls.json` always carries a
+ * value the AFF schema validator accepts.
+ */
+export function enumOrDefault(
+  value: string | undefined,
+  allowed: ReadonlySet<string>,
+  fallback: string,
+): string {
+  return value && allowed.has(value) ? value : fallback;
+}
+
 export async function readDdlsJson(filePath: string): Promise<DdlsLocal> {
   const raw = await fs.readFile(filePath, 'utf8');
   return JSON.parse(raw) as DdlsLocal;
@@ -55,27 +108,43 @@ export function wireToLocal(xml: string): { doc: DdlsLocal; source: string } {
   const sourceType = detectSourceTypeFromDdl(source || xml);
   const parentName = tag(/<[^>]*parentName[^>]*>([^<]+)<\/[^>]+>/i) || undefined;
   return {
-    doc: {
+    doc: normaliseDdlsMetadata({
       formatVersion: '1',
       header: { description, originalLanguage, ...(abapLanguageVersion ? { abapLanguageVersion } : {}) },
       sourceOrigin,
       sourceType,
       ...(parentName ? { parentName } : {}),
-    },
+    }),
     source,
   };
 }
 
+/**
+ * Normalise a {@link DdlsLocal} in place: sourceOrigin defaults to
+ * `'abapDevelopmentTools'` and sourceType to `'unknown'` when the
+ * value is missing or not in the canonical set. T3.5 closes the gap
+ * between real-SAP wire responses (which always carry a value) and
+ * locally-edited fixtures (which may carry a typo or future enum).
+ */
+export function normaliseDdlsMetadata(doc: DdlsLocal): DdlsLocal {
+  return {
+    ...doc,
+    sourceOrigin: enumOrDefault(doc.sourceOrigin, DDLS_SOURCE_ORIGINS, 'abapDevelopmentTools'),
+    sourceType: enumOrDefault(doc.sourceType, DDLS_SOURCE_TYPES, 'unknown') as DdlsLocal['sourceType'],
+  };
+}
+
 export function localToWire(local: DdlsLocal, source: string): string {
+  const normalised = normaliseDdlsMetadata(local);
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<ddl:ddlSource xmlns:ddl="http://www.sap.com/adt/ddic/ddl/sources">',
-    `  <ddl:description>${local.header.description ?? ''}</ddl:description>`,
-    `  <ddl:originalLanguage>${local.header.originalLanguage}</ddl:originalLanguage>`,
-    ...(local.header.abapLanguageVersion ? [`  <ddl:abapLanguageVersion>${local.header.abapLanguageVersion}</ddl:abapLanguageVersion>`] : []),
-    `  <ddl:sourceOrigin>${local.sourceOrigin ?? 'abapDevelopmentTools'}</ddl:sourceOrigin>`,
-    `  <ddl:sourceType>${local.sourceType}</ddl:sourceType>`,
-    ...(local.parentName ? [`  <ddl:parentName>${local.parentName}</ddl:parentName>`] : []),
+    `  <ddl:description>${normalised.header.description ?? ''}</ddl:description>`,
+    `  <ddl:originalLanguage>${normalised.header.originalLanguage}</ddl:originalLanguage>`,
+    ...(normalised.header.abapLanguageVersion ? [`  <ddl:abapLanguageVersion>${normalised.header.abapLanguageVersion}</ddl:abapLanguageVersion>`] : []),
+    `  <ddl:sourceOrigin>${normalised.sourceOrigin}</ddl:sourceOrigin>`,
+    `  <ddl:sourceType>${normalised.sourceType}</ddl:sourceType>`,
+    ...(normalised.parentName ? [`  <ddl:parentName>${normalised.parentName}</ddl:parentName>`] : []),
     '  <ddl:ddlSourceString><![CDATA[',
     source,
     '  ]]></ddl:ddlSourceString>',

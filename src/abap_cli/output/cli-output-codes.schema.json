@@ -1,0 +1,371 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "abap-cli://output/codes.schema.json",
+  "title": "abap-cli error codes and exit codes contract",
+  "description": "Single source of truth for the three coupled tables that drive the --json error envelope: exit-code-per-category, error-code enum, and code-to-category mapping. Enforced by test/unit/output-contract-audit.test.ts against src/abap_cli/output/{exit-codes.ts,error-codes.ts}. Categories are stable; existing values 0-9 never change; reserved range >= 10 only grows via this schema.",
+  "type": "object",
+  "definitions": {
+    "category": {
+      "type": "string",
+      "enum": [
+        "UNKNOWN",
+        "USAGE",
+        "CONFIG_ERROR",
+        "TLS_ERROR",
+        "AUTH_ERROR",
+        "SAP_ERROR",
+        "VALIDATION_ERROR",
+        "NOT_FOUND",
+        "LOCKED",
+        "DDLS_NOT_SUPPORTED",
+        "CHANNEL_DETECT"
+      ]
+    },
+    "exitCode": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 255
+    },
+    "exitCodeByCategory": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/exitCode"
+      },
+      "properties": {
+        "UNKNOWN": {
+          "const": 1
+        },
+        "USAGE": {
+          "const": 2
+        },
+        "CONFIG_ERROR": {
+          "const": 3
+        },
+        "TLS_ERROR": {
+          "const": 4
+        },
+        "AUTH_ERROR": {
+          "const": 5
+        },
+        "SAP_ERROR": {
+          "const": 6
+        },
+        "VALIDATION_ERROR": {
+          "const": 7
+        },
+        "NOT_FOUND": {
+          "const": 8
+        },
+        "LOCKED": {
+          "const": 9
+        },
+        "DDLS_NOT_SUPPORTED": {
+          "const": 64
+        },
+        "CHANNEL_DETECT": {
+          "const": 65
+        }
+      },
+      "required": [
+        "UNKNOWN",
+        "USAGE",
+        "CONFIG_ERROR",
+        "TLS_ERROR",
+        "AUTH_ERROR",
+        "SAP_ERROR",
+        "VALIDATION_ERROR",
+        "NOT_FOUND",
+        "LOCKED",
+        "DDLS_NOT_SUPPORTED",
+        "CHANNEL_DETECT"
+      ]
+    },
+    "errorCodeByCategory": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/category"
+      },
+      "properties": {
+        "UNKNOWN": {
+          "$ref": "#/definitions/category"
+        },
+        "CONFIG_ERROR": {
+          "$ref": "#/definitions/category"
+        },
+        "SAP_ERROR": {
+          "$ref": "#/definitions/category"
+        },
+        "TLS_ERROR": {
+          "$ref": "#/definitions/category"
+        },
+        "AUTH_ERROR": {
+          "$ref": "#/definitions/category"
+        },
+        "USAGE": {
+          "$ref": "#/definitions/category"
+        },
+        "INVALID_ARGUMENT": {
+          "$ref": "#/definitions/category"
+        },
+        "FILE_PARSE_ERROR": {
+          "$ref": "#/definitions/category"
+        },
+        "OVERWRITE_REQUIRED": {
+          "$ref": "#/definitions/category"
+        },
+        "OBJECT_NOT_FOUND": {
+          "$ref": "#/definitions/category"
+        },
+        "AMBIGUOUS_OBJECT": {
+          "$ref": "#/definitions/category"
+        },
+        "NOT_FOUND": {
+          "$ref": "#/definitions/category"
+        },
+        "LOCK_FAILED": {
+          "$ref": "#/definitions/category"
+        },
+        "LOCKED": {
+          "$ref": "#/definitions/category"
+        },
+        "ACTIVATION_FAILED": {
+          "$ref": "#/definitions/category"
+        },
+        "SYNTAX_ERROR": {
+          "$ref": "#/definitions/category"
+        },
+        "NO_TRANSPORT": {
+          "$ref": "#/definitions/category"
+        },
+        "TRANSPORT_CREATE_FAILED": {
+          "$ref": "#/definitions/category"
+        },
+        "TRANSPORT_NOT_FOUND": {
+          "$ref": "#/definitions/category"
+        },
+        "CREATE_FAILED": {
+          "$ref": "#/definitions/category"
+        },
+        "DDIC_NOT_SUPPORTED": {
+          "$ref": "#/definitions/category"
+        },
+        "DDIC_TABL_FORMAT_UNSUPPORTED": {
+          "$ref": "#/definitions/category"
+        },
+        "DTEL_CATEGORY_UNSUPPORTED": {
+          "$ref": "#/definitions/category"
+        },
+        "DDIC_CREATE_FAILED": {
+          "$ref": "#/definitions/category"
+        },
+        "DDIC_OBJECT_NOT_FOUND": {
+          "$ref": "#/definitions/category"
+        },
+        "TYPE_NOT_SUPPORTED": {
+          "$ref": "#/definitions/category"
+        },
+        "VALIDATION_ERROR": {
+          "$ref": "#/definitions/category"
+        },
+        "PULL_PARTIAL_FAILURE": {
+          "$ref": "#/definitions/category"
+        },
+        "OBJECT_EXISTS": {
+          "$ref": "#/definitions/category"
+        },
+        "FILE_EXISTS": {
+          "$ref": "#/definitions/category"
+        },
+        "PUSH_FAILED": {
+          "$ref": "#/definitions/category"
+        },
+        "COMMAND_MOVED": {
+          "$ref": "#/definitions/category"
+        },
+        "METHOD_FAILED": {
+          "$ref": "#/definitions/category"
+        },
+        "METHOD_NOT_SUPPORTED": {
+          "$ref": "#/definitions/category"
+        },
+        "CLASS_NOT_RUNNABLE": {
+          "$ref": "#/definitions/category"
+        },
+        "LOCAL_CLASS_NOT_RUNNABLE": {
+          "$ref": "#/definitions/category"
+        },
+        "OBJECT_NOT_ACTIVE": {
+          "$ref": "#/definitions/category"
+        },
+        "WRAPPER_NOT_DEPLOYED": {
+          "$ref": "#/definitions/category"
+        },
+        "TIMEOUT": {
+          "$ref": "#/definitions/category"
+        },
+        "WRAPPER_INPUT_UNAVAILABLE": {
+          "$ref": "#/definitions/category"
+        },
+        "TABLE_NOT_FOUND": {
+          "$ref": "#/definitions/category"
+        },
+        "TABLE_TYPE_NOT_SUPPORTED": {
+          "$ref": "#/definitions/category"
+        },
+        "INVALID_FIELD": {
+          "$ref": "#/definitions/category"
+        },
+        "INVALID_WHERE": {
+          "$ref": "#/definitions/category"
+        },
+        "LIMIT_EXCEEDED": {
+          "$ref": "#/definitions/category"
+        },
+        "OFFSET_EXCEEDED": {
+          "$ref": "#/definitions/category"
+        },
+        "QUERY_FAILED": {
+          "$ref": "#/definitions/category"
+        },
+        "HTTP_CREATE_FAILED": {
+          "$ref": "#/definitions/category"
+        },
+        "HTTP_OBJECT_NOT_FOUND": {
+          "$ref": "#/definitions/category"
+        },
+        "EXTENSION_LOAD_FAILED": {
+          "$ref": "#/definitions/category"
+        },
+        "EXTENSION_VALIDATION_FAILED": {
+          "$ref": "#/definitions/category"
+        },
+        "EXTENSION_COMMAND_BLOCKED": {
+          "$ref": "#/definitions/category"
+        },
+        "TABL_DDL_INVALID": {
+          "$ref": "#/definitions/category"
+        },
+        "TABL_ARTIFACT_INCOMPLETE": {
+          "$ref": "#/definitions/category"
+        },
+        "TABL_DDL_PARSE_FAILED": {
+          "$ref": "#/definitions/category"
+        },
+        "TCODE_NOT_FOUND": {
+          "$ref": "#/definitions/category"
+        },
+        "TCODE_NOT_AUTHORIZED": {
+          "$ref": "#/definitions/category"
+        },
+        "AFF_SCHEMA_MISSING": {
+          "$ref": "#/definitions/category"
+        },
+        "AFF_SCHEMA_INVALID": {
+          "$ref": "#/definitions/category"
+        },
+        "AFF_SCHEMA_COMPILE_ERROR": {
+          "$ref": "#/definitions/category"
+        },
+        "AFF_FIXTURE_INVALID": {
+          "$ref": "#/definitions/category"
+        },
+        "SESSION_JAR_DECRYPT_FAILED": {
+          "$ref": "#/definitions/category"
+        },
+        "SESSION_INVALID": {
+          "$ref": "#/definitions/category"
+        },
+        "SESSION_REUSE_UNSUPPORTED": {
+          "$ref": "#/definitions/category"
+        },
+        "CHANNEL_DETECTION_FAILED": {
+          "$ref": "#/definitions/category"
+        },
+        "DDLS_NOT_SUPPORTED_ON_ECC": {
+          "$ref": "#/definitions/category"
+        }
+      },
+      "required": [
+        "UNKNOWN",
+        "CONFIG_ERROR",
+        "SAP_ERROR",
+        "TLS_ERROR",
+        "AUTH_ERROR",
+        "USAGE",
+        "INVALID_ARGUMENT",
+        "FILE_PARSE_ERROR",
+        "OVERWRITE_REQUIRED",
+        "OBJECT_NOT_FOUND",
+        "AMBIGUOUS_OBJECT",
+        "NOT_FOUND",
+        "LOCK_FAILED",
+        "LOCKED",
+        "ACTIVATION_FAILED",
+        "SYNTAX_ERROR",
+        "NO_TRANSPORT",
+        "TRANSPORT_CREATE_FAILED",
+        "TRANSPORT_NOT_FOUND",
+        "CREATE_FAILED",
+        "DDIC_NOT_SUPPORTED",
+        "DDIC_TABL_FORMAT_UNSUPPORTED",
+        "DTEL_CATEGORY_UNSUPPORTED",
+        "DDIC_CREATE_FAILED",
+        "DDIC_OBJECT_NOT_FOUND",
+        "TYPE_NOT_SUPPORTED",
+        "VALIDATION_ERROR",
+        "PULL_PARTIAL_FAILURE",
+        "OBJECT_EXISTS",
+        "FILE_EXISTS",
+        "PUSH_FAILED",
+        "COMMAND_MOVED",
+        "METHOD_FAILED",
+        "METHOD_NOT_SUPPORTED",
+        "CLASS_NOT_RUNNABLE",
+        "LOCAL_CLASS_NOT_RUNNABLE",
+        "OBJECT_NOT_ACTIVE",
+        "WRAPPER_NOT_DEPLOYED",
+        "TIMEOUT",
+        "WRAPPER_INPUT_UNAVAILABLE",
+        "TABLE_NOT_FOUND",
+        "TABLE_TYPE_NOT_SUPPORTED",
+        "INVALID_FIELD",
+        "INVALID_WHERE",
+        "LIMIT_EXCEEDED",
+        "OFFSET_EXCEEDED",
+        "QUERY_FAILED",
+        "HTTP_CREATE_FAILED",
+        "HTTP_OBJECT_NOT_FOUND",
+        "EXTENSION_LOAD_FAILED",
+        "EXTENSION_VALIDATION_FAILED",
+        "EXTENSION_COMMAND_BLOCKED",
+        "TABL_DDL_INVALID",
+        "TABL_ARTIFACT_INCOMPLETE",
+        "TABL_DDL_PARSE_FAILED",
+        "TCODE_NOT_FOUND",
+        "TCODE_NOT_AUTHORIZED",
+        "AFF_SCHEMA_MISSING",
+        "AFF_SCHEMA_INVALID",
+        "AFF_SCHEMA_COMPILE_ERROR",
+        "AFF_FIXTURE_INVALID",
+        "SESSION_JAR_DECRYPT_FAILED",
+        "SESSION_INVALID",
+        "SESSION_REUSE_UNSUPPORTED",
+        "CHANNEL_DETECTION_FAILED",
+        "DDLS_NOT_SUPPORTED_ON_ECC"
+      ]
+    }
+  },
+  "properties": {
+    "exitCodeByCategory": {
+      "$ref": "#/definitions/exitCodeByCategory"
+    },
+    "errorCodeByCategory": {
+      "$ref": "#/definitions/errorCodeByCategory"
+    }
+  },
+  "required": [
+    "exitCodeByCategory",
+    "errorCodeByCategory"
+  ],
+  "additionalProperties": false
+}

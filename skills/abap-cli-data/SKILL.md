@@ -2,7 +2,7 @@
 name: abap-cli-data
 description: abap-cli 对对象的运行时消费 — `select` 查表/视图数据 / `run` 跑类（classrun 或静态方法）。use when asking how to query a table / how to run a class / how to see the output of a classrun / how to do read-only data analysis against SAP.
 metadata:
-  version: "0.3.0"
+  version: "0.2.6"
   scope: sap
   commands: [select, run]
   tags: [read-only, no-lock, no-transport, no-data-mutation]

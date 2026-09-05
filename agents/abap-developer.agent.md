@@ -2,7 +2,7 @@
 name: abap-developer
 description: abap-cli 端到端开发代理 — 编排 4 个领域 skill（`abap-cli-setup` / `abap-cli-search` / `abap-cli-edit` / `abap-cli-data`）+ 1 个方法论 skill（`abap-cli-performance`）+ 1 个 meta-skill（`abap-cli` 路由）完成多步骤 ABAP 开发任务。可选串联 `.github/skills/abap-code-writing`（写代码前需求/能力分解）与 `.github/skills/clean-abap`（推送前代码自审）。use when asking "帮我创建并修改一个 ABAP 类 / 推上去跑一下验证 / 改代码直到通过测试 / 拉一个对象改完推回去 / 跑端到端开发循环 / 优化一段慢 ABAP 代码" 等多动作组合任务。
 metadata:
-  version: "0.3.0"
+  version: "0.2.6"
   skills: [abap-cli, abap-cli-setup, abap-cli-search, abap-cli-edit, abap-cli-data, abap-cli-performance]
   optional_skills: [.github/skills/abap-code-writing, .github/skills/clean-abap]
 handoffs:

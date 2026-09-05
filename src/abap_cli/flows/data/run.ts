@@ -428,7 +428,7 @@ function nextStepsFor(code: ErrorCode, className: string, method: string | null)
     case 'LOCAL_CLASS_NOT_RUNNABLE':
       return ['abap run must target a global class (no ~ in name)'];
     case 'WRAPPER_NOT_DEPLOYED':
-      return ['abap extension deploy (installs ZCL_ABAP_VIBE_RUNNER)'];
+      return ['abap deploy (installs ZCL_ABAP_VIBE_RUNNER)'];
     case 'WRAPPER_INPUT_UNAVAILABLE':
       return [
         'The target SAP system does not support classrun parameter injection',
@@ -455,7 +455,7 @@ function nextStepsFor(code: ErrorCode, className: string, method: string | null)
 /** Map a run-flow error code to the skill reference anchor that documents it.
  *  025 重构后：
  *  - WRAPPER_NOT_DEPLOYED / AUTH_ERROR 由 abap-cli-setup 文档
- *    （extension deploy / profile test 修复路径）
+ *    （deploy / profile test 修复路径）
  *  - 其他 run 错误（METHOD_FAILED / TIMEOUT / OBJECT_NOT_ACTIVE / WRAPPER_INPUT_UNAVAILABLE ...）
  *    由 abap-cli-data 文档（运行时消费域） */
 function referenceFor(code: ErrorCode): string {

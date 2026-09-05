@@ -120,7 +120,7 @@ skills/<name>/
 
 ## 版本
 
-- **CLI 版本**：`0.3.0`
+- **CLI 版本**：`0.2.6`
 - **本特性设计回顾**：见 wiki 顶层 `skill-restructure`
 - **agentskills.io 标准**：<https://agentskills.io/>
 

@@ -4,7 +4,7 @@
 # repo's workflow file (publish.yml). No NODE_AUTH_TOKEN secret is needed.
 #
 # Triggers:
-#   - pushing a `v*` tag (e.g. `git tag v0.3.0 && git push origin v0.3.0`)
+#   - pushing a `v*` tag (e.g. `git tag v0.2.6 && git push origin v0.2.6`)
 #   - publishing a GitHub Release
 #   - manual workflow_dispatch (dry-run only: npm view guard, no publish)
 #
