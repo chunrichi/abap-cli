@@ -26,7 +26,28 @@ const EXT_ROUTE_MAP: Record<string, 'adt' | 'icf'> = {
 /** 014: textpool .properties categories (abap-file-format layout). */
 const TEXTPOOL_EXTENSIONS = new Set(['texts', 'selections', 'headings']);
 
-const SOURCE_EXTENSIONS = new Set(['.abap', '.asddls', '.asbdef', '.assrvd']);
+const SOURCE_EXTENSIONS = new Set(['.abap', '.asddls', '.asbdef', '.assrvd', '.acds', '.abdl']);
+
+/**
+ * T3.1 / T3.3 / T3.4 — canonical source extension per object type.
+ * Five CDS-family types share `.acds` (DDLS / DCLS / DDLX / DDLA / SRVD);
+ * BDEF carries ABAP Behavior Language in `.abdl`; everything else stays
+ * in classic `.abap`. Keep this in sync with the supported-type set in
+ * `types/registry.ts#TYPE_REGISTRY`.
+ */
+export const SOURCE_EXTENSION_BY_TYPE: Record<string, '.abap' | '.acds' | '.abdl'> = {
+  DDLS: '.acds',
+  DCLS: '.acds',
+  DDLX: '.acds',
+  DDLA: '.acds',
+  SRVD: '.acds',
+  BDEF: '.abdl',
+};
+
+export function sourceExtensionForObjectType(objectType: string): '.abap' | '.acds' | '.abdl' {
+  const primary = objectType.split('/')[0]!.toUpperCase();
+  return SOURCE_EXTENSION_BY_TYPE[primary] ?? '.abap';
+}
 
 /**
  * Parse a filename into object metadata.

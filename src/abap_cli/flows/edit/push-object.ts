@@ -88,6 +88,7 @@ export async function pushObject(
   try {
     // Write each part's source (locked)
     for (const part of parts) {
+      opts.onStage?.('write');
       try {
         await client.setObjectSource(part.sourceUrl, part.content, lockHandle, opts.transport);
       } catch (error: unknown) {
@@ -107,6 +108,7 @@ export async function pushObject(
     // object in real SAP, which makes the subsequent activate fail with
     // "currently editing". Activation itself performs a complete syntax check.
     if (opts.checkOnly) {
+      opts.onStage?.('check');
       const checkErrors: { line: number; offset: number; severity: string; text: string; uri: string }[] = [];
       for (const part of parts) {
         if (part.content.trim() === '') continue;
@@ -132,6 +134,7 @@ export async function pushObject(
     }
 
     // Activate — performs a complete syntax check server-side
+    opts.onStage?.('activate');
     try {
       await client.activate(object.objectUrl, object.type, object.name);
     } catch (error: unknown) {

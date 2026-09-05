@@ -44,12 +44,21 @@ FILES=(
   "intf/intf-v1.json"
   "prog/prog-v1.json"
   "fugr/fugr-v1.json"
+  "fugr/reps-v1.json"
+  "fugr/func-v1.json"
   "tabl/tabl-v1.json"
   "tabl/tabt-v1.json"
   "doma/doma-v1.json"
   "dtel/dtel-v1.json"
   "http/http-v1.json"
   "tran/tran-v1.json"
+  # Phase 3 type extensions (SRVB / SRVD / BDEF / DCLS / DDLX / DDLA).
+  "srvb/srvb-v1.json"
+  "srvd/srvd-v1.json"
+  "bdef/bdef-v1.json"
+  "dcls/dcls-v1.json"
+  "ddlx/ddlx-v1.json"
+  "ddla/ddla-v1.json"
 )
 
 echo ">> Copying ${#FILES[@]} schema files"

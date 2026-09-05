@@ -111,13 +111,13 @@ describe('run-flow error semantics (details / nextSteps / references)', () => {
     expect(ns.some((s) => s.includes('inspect'))).toBe(true);
   });
 
-  it('WRAPPER_NOT_DEPLOYED nextSteps reference "abap extension deploy"', async () => {
+  it('WRAPPER_NOT_DEPLOYED nextSteps reference "abap deploy"', async () => {
     const err = await expectThrown(
       'WRAPPER_NOT_DEPLOYED',
       { message: 'ZCL_ABAP_VIBE_RUNNER missing on target system' },
     );
-    expect(err.nextSteps?.some((s) => s.includes('abap extension deploy'))).toBe(true);
-    // 025 重构：WRAPPER_NOT_DEPLOYED 修复动作在 abap-cli-setup（extension deploy）
+    expect(err.nextSteps?.some((s) => s.includes('abap deploy'))).toBe(true);
+    // 025 重构：WRAPPER_NOT_DEPLOYED 修复动作在 abap-cli-setup（deploy）
     expect(err.references).toBe('skills/abap-cli-setup/references/errors.md');
   });
 

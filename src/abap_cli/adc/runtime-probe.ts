@@ -20,7 +20,7 @@ export interface RuntimeProbeResult {
   /** Optional release string (`sap:rel`) when the Atom XML exposes it. */
   release?: string;
   /** IcfApi + HttpServiceApi detected from the discovery endpoint.
-   *  Used by `extension deploy` to pick the right register strategy without
+   *  Used by `deploy` to pick the right register strategy without
    *  re-probing the network. Absent on 'none' source. */
   apiCapabilities?: IcfApiCapabilities;
   error?: { code: string; message: string };
@@ -299,7 +299,7 @@ function extractBody(resp: unknown): string {
 
 /**
  * Build the structured `nextSteps` for Steampunk users who just ran
- * `extension deploy`. The hint walks through the BTP Cockpit
+ * `deploy`. The hint walks through the BTP Cockpit
  * destination + route setup so the ICF handler is reachable end-to-end.
  */
 export function steampunkDeployHint(systemUrl: string): string[] {

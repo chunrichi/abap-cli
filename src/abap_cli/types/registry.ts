@@ -85,6 +85,57 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
     affSchemaFile: 'ddls-v1.json',
     channel: { icfFallback: false, eccSupported: false },
   },
+  // T3.2 — Service binding metadata only (no source code). Pull writes a
+  // single `<name>.srvb.json` via `metadataOnlyStrategy`. createObjtype
+  // is unused on the pull path; bindings are managed in SAP GUI, not
+  // pushed via the CLI.
+  {
+    type: 'SRVB',
+    folder: 'srvb',
+    source: 'ADT',
+    createObjtype: 'SRVB/SB',
+    affSchemaFile: 'srvb-v1.json',
+  },
+  // T3.1 — Service definition source object (`.acds`). Pull writes
+  // `<name>.srvd.json` + `<name>.srvd.acds`.
+  {
+    type: 'SRVD',
+    folder: 'srvd',
+    source: 'ADT',
+    createObjtype: 'SRVD/SD',
+    affSchemaFile: 'srvd-v1.json',
+  },
+  // T3.3 — Behaviour definition source object (`.abdl`).
+  {
+    type: 'BDEF',
+    folder: 'bdef',
+    source: 'ADT',
+    createObjtype: 'BDEF/BD',
+    affSchemaFile: 'bdef-v1.json',
+  },
+  // T3.4 — Three CDS companion types (`.acds`). DCLS carries access
+  // control, DDLX metadata extensions, DDLA annotation definitions.
+  {
+    type: 'DCLS',
+    folder: 'dcls',
+    source: 'ADT',
+    createObjtype: 'DCLS/DC',
+    affSchemaFile: 'dcls-v1.json',
+  },
+  {
+    type: 'DDLX',
+    folder: 'ddlx',
+    source: 'ADT',
+    createObjtype: 'DDLX/EX',
+    affSchemaFile: 'ddlx-v1.json',
+  },
+  {
+    type: 'DDLA',
+    folder: 'ddla',
+    source: 'ADT',
+    createObjtype: 'DDLA/AE',
+    affSchemaFile: 'ddla-v1.json',
+  },
 ] as const;
 
 /** 036-ttyp-msag-ddls: sub-registry types for channel-detect / ICF fallback gating. */

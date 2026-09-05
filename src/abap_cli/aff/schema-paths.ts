@@ -44,6 +44,17 @@ const SCHEMA_FILE: Record<string, string> = {
   TTYP: 'ttyp-v1.json',   // handcrafted (upstream has type-pool only)
   MSAG: 'msag-v1.json',
   DDLS: 'ddls-v1.json',
+  // T1.5 FUGR pull: REPS + FUNC companion schemas.
+  REPS: 'reps-v1.json',
+  FUNC: 'func-v1.json',
+  // T3.2 / T3.1 / T3.3 / T3.4 — Phase 3 type extensions (SRVB metadata-only;
+  // SRVD / BDEF / DCLS / DDLX / DDLA all source-bearing).
+  SRVB: 'srvb-v1.json',
+  SRVD: 'srvd-v1.json',
+  BDEF: 'bdef-v1.json',
+  DCLS: 'dcls-v1.json',
+  DDLX: 'ddlx-v1.json',
+  DDLA: 'ddla-v1.json',
 };
 
 /** Resolve the bundled-schema directory shipped with the package.

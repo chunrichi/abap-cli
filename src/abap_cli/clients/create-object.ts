@@ -181,7 +181,7 @@ export async function createObjectXml(
 /**
  * Convenience wrapper used by `AdtClientWrapper.createObject`. Picks the
  * BTP-friendly path when supported, otherwise delegates to the library. Used
- * by `abap create` and `abap extension deploy`.
+ * by `abap create` and `abap deploy`.
  */
 export async function createObjectSafe(
   http: AdtHTTP,

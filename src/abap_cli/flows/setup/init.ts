@@ -207,12 +207,12 @@ export async function icfDeploymentCheck(mode: OutputMode, profileName?: string)
   }
   if (!mode) {
     if (icf.status === 'not_deployed') {
-      console.log('ICF service not deployed — run "abap extension deploy" to deploy/update it.');
+      console.log('ICF service not deployed — run "abap deploy" to deploy/update it.');
     } else if (icf.status === 'current') {
       console.log(`ICF service deployed (version ${icf.remoteVersion}).`);
     } else {
       console.log(
-        `ICF service version mismatch (remote ${icf.remoteVersion ?? 'unknown'} vs expected ${icf.expectedVersion}) — run "abap extension deploy" to upgrade.`,
+        `ICF service version mismatch (remote ${icf.remoteVersion ?? 'unknown'} vs expected ${icf.expectedVersion}) — run "abap deploy" to upgrade.`,
       );
     }
   }

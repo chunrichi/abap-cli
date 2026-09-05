@@ -2,11 +2,17 @@
  * Transaction (SE93) JSON helpers — local↔wire conversion, validation, namespace.
  * Mirrors ddic-json-map.test.ts and http-json-map.test.ts but for the TRAN object type.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import * as os from 'node:os';
 import {
   localToWire,
   wireToLocal,
   validateTranObject,
+  validateTranJson,
+  readTranJson,
+  writeTranJson,
   type TranObjectLocal,
   type TranWirePayload,
 } from '../../src/abap_cli/formats/transport/json.js';
@@ -306,6 +312,91 @@ describe('TRAN JSON helpers', () => {
         },
       };
       expect(validateTranObject(local).some((e) => e.includes('programDynnr'))).toBe(true);
+    });
+  });
+
+  // ----- T2.3 AFF schema-based validation -----
+
+  describe('validateTranJson (AFF schema)', () => {
+    it('passes a minimal valid document (name is stripped as CLI envelope)', () => {
+      const doc = {
+        name: 'ZTRAN_TEST',
+        formatVersion: '1',
+        header: { description: 'x', originalLanguage: 'EN' },
+        generalInformation: { transactionType: 'dialogTransaction' },
+      };
+      expect(validateTranJson(doc)).toEqual([]);
+    });
+
+    it('rejects documents missing formatVersion (AFF required)', () => {
+      const doc = {
+        header: { description: 'x', originalLanguage: 'EN' },
+        generalInformation: { transactionType: 'dialogTransaction' },
+      };
+      const errors = validateTranJson(doc);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors.join('\n')).toMatch(/formatVersion/);
+    });
+
+    it('rejects documents with rogue top-level fields (AFF additionalProperties:false)', () => {
+      const doc = {
+        formatVersion: '1',
+        header: { description: 'x', originalLanguage: 'EN' },
+        generalInformation: { transactionType: 'dialogTransaction' },
+        rogueField: 'oops',
+      };
+      const errors = validateTranJson(doc);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors.join('\n')).toMatch(/rogueField|additional/);
+    });
+
+    it('strips CLI transport envelope (name / package / transportRequest) before validation', () => {
+      const doc = {
+        name: 'ZTRAN_TEST',
+        package: '$TMP',
+        transportRequest: 'A4HK900148',
+        formatVersion: '1',
+        header: { description: 'x', originalLanguage: 'EN' },
+        generalInformation: { transactionType: 'dialogTransaction' },
+      };
+      // Despite carrying CLI envelope fields that the AFF schema forbids,
+      // validateTranJson must accept the document by stripping them first.
+      expect(validateTranJson(doc)).toEqual([]);
+    });
+  });
+
+  describe('writeTranJson (AFF schema pre-write)', () => {
+    let tmpDir: string;
+    beforeEach(async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'abap-cli-tran-test-'));
+    });
+    afterEach(async () => {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    });
+
+    it('round-trips a valid document', async () => {
+      const filePath = path.join(tmpDir, 'nested', 'ztran_rt.tran.json');
+      const doc: TranObjectLocal = {
+        name: 'ZTRAN_RT',
+        formatVersion: '1',
+        header: { description: 'round-trip', originalLanguage: 'EN' },
+        generalInformation: { transactionType: 'dialogTransaction' },
+      };
+      await writeTranJson(filePath, doc);
+      const back = await readTranJson(filePath);
+      expect(back).toEqual(doc);
+    });
+
+    it('throws on an invalid document before writing', async () => {
+      const filePath = path.join(tmpDir, 'ztran_bad.tran.json');
+      const bad = {
+        name: 'ZTRAN_BAD',
+        // missing required formatVersion
+        header: { description: 'x', originalLanguage: 'EN' },
+        generalInformation: { transactionType: 'dialogTransaction' },
+      };
+      await expect(writeTranJson(filePath, bad as TranObjectLocal)).rejects.toThrow(/AFF TRAN fixture invalid/);
+      await expect(fs.stat(filePath)).rejects.toThrow();
     });
   });
 });

@@ -9,7 +9,7 @@ changed at: 2026-09-02 22:06:00
 
 # 支持的对象类型
 
-abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`，commit `89b331f`）覆盖 **10 个对象类型**（4 源 + 4 DDIC + HTTP + TRAN），分两条路由：**ADT**（`abap-adt-api` 走标准 ADT REST API）与 **ICF**（自建服务 `/sap/zabap_vibe`，需先 `abap extension deploy`）。
+abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`，commit `89b331f`）覆盖 **10 个对象类型**（4 源 + 4 DDIC + HTTP + TRAN），分两条路由：**ADT**（`abap-adt-api` 走标准 ADT REST API）与 **ICF**（自建服务 `/sap/zabap_vibe`，需先 `abap deploy`）。
 
 `create <type>` 的 `--schema` 参数 `allowedValues` 即这 10 个类型码：`CLAS, INTF, PROG, FUGR, TABL, STRU, DOMA, DTEL, HTTP, TRAN`。先查能力再动手：`abap create --schema <TYPE>` 会给出某个类型的字段契约。
 
@@ -70,7 +70,7 @@ abap push src/http/zmy_service.http.json --tr <TR>
 
 | | 含义 | 对应 |
 |---|---|---|
-| **ICF 作为通道** | 自建服务 `/sap/zabap_vibe` 旁路 ADT，承载 DDIC CRUD / textpool / `select` / `tcode` / `run` | `abap extension deploy` / `extension status` |
+| **ICF 作为通道** | 自建服务 `/sap/zabap_vibe` 旁路 ADT，承载 DDIC CRUD / textpool / `select` / `tcode` / `run` | `abap deploy` / `deploy status` |
 | **ICF 作为对象** | 被管理的 SICF 服务节点本身 | `--type HTTP` |
 
 也就是说：**用 ICF（通道）来管理 ICF（节点）**。前者是前提，后者是能力——`--type HTTP` 依赖扩展已部署。
@@ -89,7 +89,7 @@ abap push src/http/zmy_service.http.json --tr <TR>
 - `abap pull X --type SICF` / `abap create SICF ...` → 自动映射 `HTTP` + deprecation warning（commit `ad007c8`）；新脚本请直接写 `HTTP`。
 - `create <type>` 的 `--schema` `allowedValues` 已是全 10 类（commit `89b331f`）：`CLAS, INTF, PROG, FUGR, TABL, STRU, DOMA, DTEL, HTTP, TRAN`。
 - `DDIC_NOT_SUPPORTED` (exit 7) → 类型在 DOMA/DTEL/TABL/STRU 之外。
-- 所有 ICF 路由类型在扩展未部署时都会失败 → 先 `abap extension status`。
+- 所有 ICF 路由类型在扩展未部署时都会失败 → 先 `abap deploy status`。
 
 # More
 
@@ -104,5 +104,5 @@ abap push src/http/zmy_service.http.json --tr <TR>
 - [create](commands/create.md)
 - [pull](commands/pull.md)
 - [push](commands/push.md)
-- [extension](commands/extension.md)
+- [deploy](commands/deploy.md)
 - [abap-file-format 导出与兼容](abap-file-format-export.md)

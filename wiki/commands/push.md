@@ -37,7 +37,7 @@ abap push [options] [files...]
 `runPush` **不再**在顶层统一解析一个 transport；改为 `pushOne` 拿到对象后逐对象解析（`resolveObjectTransport`）：
 
 1. **对象已绑定请求**（`client.transportInfo(objectUrl)` → `TRANSPORTS[0].TRKORR`）— 直接复用该请求，**无需 `--tr`**；若显式传了不同的 `--tr` → 抛 `VALIDATION_ERROR`（exit 7），提示去掉 `--tr` 或先用 `abap transport assign` 换请求。push 不允许顺手改对象的请求归属。
-2. **`$TMP` 对象**（search 命中 `adtcore:packageName === '$TMP'`，经 `ResolvedObject.packageName` 携带）— transport-free，空 transport 推送，无需 `--tr`（与 `abap extension deploy` 的 `$TMP` 规则一致）。显式传了非空 `--tr` → **告警 + 忽略**（`meta.warnings` 的 `PUSH_TR_IGNORED_TMP`，exit 不变），不会真的绑定到任何请求。
+2. **`$TMP` 对象**（search 命中 `adtcore:packageName === '$TMP'`，经 `ResolvedObject.packageName` 携带）— transport-free，空 transport 推送，无需 `--tr`（与 `abap deploy` 的 `$TMP` 规则一致）。显式传了非空 `--tr` → **告警 + 忽略**（`meta.warnings` 的 `PUSH_TR_IGNORED_TMP`，exit 不变），不会真的绑定到任何请求。
 3. 其余未绑定非 `$TMP` 对象：`--tr` > 项目 config `transport` > 用户第一个可修改请求（`userTransports`）> `NO_TRANSPORT`（exit 7）。
 
 `--dry-run` 不查真实请求，用 `--tr` > config > `'DRY_RUN'` 占位。每文件 JSON 结果带该文件实际解析到的 `transport`。
@@ -127,7 +127,7 @@ DDIC 推送时 `--atomic` 也会结构校验 JSON（`readDdicJson` + `validateDd
 
 **按文件隔离**：每个文件独立 try/catch，失败进 `results`（`status: 'failed'` + `code`/`stage`/`message`/`nextSteps`），不中断其他文件（默认 keep-going）；`--fail-fast` 可选提前停。聚合错误以首个失败文件的错误码作为聚合 `code`；**单文件失败时透出原始 `message` 与 `nextSteps`**（不再笼统 "N file(s) failed"），多文件时给通用指引。
 
-**写保护**：与 `create` / `transport create|assign` / `extension deploy` 共用 `core/confirmation.ts#requireWriteConfirmation`，非 TTY 必须 `--yes` 或 `--dry-run`，否则 `VALIDATION_ERROR`（exit 7）并附 `nextSteps` + `example`（如 `abap push <files...> --tr <transport> --yes`）。
+**写保护**：与 `create` / `transport create|assign` / `deploy` 共用 `core/confirmation.ts#requireWriteConfirmation`，非 TTY 必须 `--yes` 或 `--dry-run`，否则 `VALIDATION_ERROR`（exit 7）并附 `nextSteps` + `example`（如 `abap push <files...> --tr <transport> --yes`）。
 
 ## Examples
 

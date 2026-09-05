@@ -98,7 +98,7 @@ abap doctor --system dev
 ## todo
 
 - [ ] **`--fix --all` 分级修复** — roadmap 建议按"安全/需确认"分级；当前 `--fix` 只做安全可逆项，可扩展输出"修复前后 diff"。
-- [ ] **015 wrapper 健康检查** — 增加 `ZCL_ABAP_VIBE_RUNNER` 部署/激活状态检查（类似 ICF 节点检查），在 `doctor` 的 connection 段提示 `abap extension deploy` 是否滞后。
+- [ ] **015 wrapper 健康检查** — 增加 `ZCL_ABAP_VIBE_RUNNER` 部署/激活状态检查（类似 ICF 节点检查），在 `doctor` 的 connection 段提示 `abap deploy` 是否滞后。
 
 # references
 

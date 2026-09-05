@@ -20,7 +20,7 @@ vi.mock('../../src/abap_cli/config/project-config.js', () => ({
 }));
 
 import { Command } from 'commander';
-import { registerExtensionCommand } from '../../src/abap_cli/commands/extension.js';
+import { registerDeployCommand } from '../../src/abap_cli/commands/deploy.js';
 import { CliError } from '../../src/abap_cli/output/json.js';
 
 async function run(args: string[]): Promise<{ data: unknown; exitCode: number | undefined }> {
@@ -33,7 +33,7 @@ async function run(args: string[]): Promise<{ data: unknown; exitCode: number | 
  *  than the bundled one). */
 async function runWithMeta(args: string[]): Promise<{ data: unknown; meta: unknown; exitCode: number | undefined }> {
   const program = new Command().option('--json', 'json').exitOverride();
-  registerExtensionCommand(program);
+  registerDeployCommand(program);
   const stdoutLines: string[] = [];
   let exitCode: number | undefined;
   const logSpy = vi.spyOn(console, 'log').mockImplementation((...a) => { stdoutLines.push(a.map(String).join(' ')); });
@@ -62,7 +62,7 @@ async function runWithMeta(args: string[]): Promise<{ data: unknown; meta: unkno
   return { data: env?.data, meta: env?.meta, exitCode };
 }
 
-describe('abap extension status (021: new subcommand)', () => {
+describe('abap deploy status', () => {
   beforeEach(() => {
     probeAdtRuntime.mockReset();
     loadConfig.mockReset();
@@ -73,7 +73,7 @@ describe('abap extension status (021: new subcommand)', () => {
     mockGet.mockReset();
     probeAdtRuntime.mockResolvedValueOnce({ runtime: 'unknown', source: 'none', icfSetupBlocked: false });
     mockGet.mockRejectedValueOnce(new CliError('NOT_FOUND', 'not found', { details: { httpStatus: 404 } }));
-    const { data, exitCode } = await run(['extension', 'status', '--json']);
+    const { data, exitCode } = await run(['deploy', 'status', '--json']);
     // eslint-disable-next-line no-console
     expect(exitCode).toBeUndefined();
     const d = data as { installed: boolean; status: string; runtime: string; icfSetupBlocked: boolean };
@@ -87,7 +87,7 @@ describe('abap extension status (021: new subcommand)', () => {
     mockGet.mockReset();
     probeAdtRuntime.mockResolvedValueOnce({ runtime: 'netweaver750', source: 'informationsystem', icfSetupBlocked: false });
     mockGet.mockResolvedValueOnce({ status: 'success', data: { version: '0.6.0' } });
-    const { data } = await run(['extension', 'status', '--json']);
+    const { data } = await run(['deploy', 'status', '--json']);
     const d = data as { installed: boolean; match: boolean; remoteVersion: string; expectedVersion: string; runtime: string };
     expect(d.installed).toBe(true);
     expect(d.match).toBe(true);
@@ -99,7 +99,7 @@ describe('abap extension status (021: new subcommand)', () => {
     mockGet.mockReset();
     probeAdtRuntime.mockResolvedValueOnce({ runtime: 'netweaver740', source: 'discovery', icfSetupBlocked: false });
     mockGet.mockResolvedValueOnce({ status: 'success', data: { version: '0.3.0' } });
-    const { data, meta } = await runWithMeta(['extension', 'status', '--json']);
+    const { data, meta } = await runWithMeta(['deploy', 'status', '--json']);
     const d = data as { installed: boolean; match: boolean; remoteVersion: string };
     expect(d.installed).toBe(true);
     expect(d.match).toBe(false);
@@ -113,14 +113,16 @@ describe('abap extension status (021: new subcommand)', () => {
     const details = deadlock?.details as { nextSteps?: string[] } | undefined;
     const steps = details?.nextSteps ?? [];
     expect(steps.some((s) => s.includes('transport list --open'))).toBe(true);
-    expect(steps.some((s) => s.includes('extension deploy --yes'))).toBe(true);
+    expect(
+      steps.some((s) => /\babap deploy --yes\b/.test(s)),
+    ).toBe(true);
   });
 
   it('returns installed=false on unreachable (non-blocking)', async () => {
     mockGet.mockReset();
     probeAdtRuntime.mockResolvedValueOnce({ runtime: 'unknown', source: 'none', icfSetupBlocked: false });
     mockGet.mockRejectedValueOnce(new Error('ECONNREFUSED'));
-    const { data } = await run(['extension', 'status', '--json']);
+    const { data } = await run(['deploy', 'status', '--json']);
     const d = data as { installed: boolean; status: string };
     expect(d.installed).toBe(false);
     expect(d.status).toBe('unreachable');
@@ -130,7 +132,7 @@ describe('abap extension status (021: new subcommand)', () => {
     mockGet.mockReset();
     probeAdtRuntime.mockResolvedValueOnce({ runtime: 'steampunk', source: 'informationsystem', icfSetupBlocked: true, sapComponent: 'SAPBTP' });
     mockGet.mockRejectedValueOnce(new CliError('NOT_FOUND', 'not found', { details: { httpStatus: 404 } }));
-    const { data } = await run(['extension', 'status', '--json']);
+    const { data } = await run(['deploy', 'status', '--json']);
     const d = data as { runtime: string; icfSetupBlocked: boolean; status: string };
     expect(d.runtime).toBe('steampunk');
     expect(d.icfSetupBlocked).toBe(true);

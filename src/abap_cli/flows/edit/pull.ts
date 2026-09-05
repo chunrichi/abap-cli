@@ -33,6 +33,9 @@ import { runTransportPull } from './pull-tr.js';
 import { runPullTtyp } from './pull-ttyp.js';
 import { runPullMsag } from './pull-msag.js';
 import { runPullDdls } from './pull-ddls.js';
+import { runPullSrvd } from './pull-srvd.js';
+import { runPullBdef } from './pull-bdef.js';
+import { runPullCdsExtension } from './pull-cds-extension.js';
 
 export type { PullOptions, PullEntry, PullResult } from './pull-shared.js';
 export { parsePositiveInt } from './pull-shared.js';
@@ -137,6 +140,61 @@ export async function runPull(objectName: string, opts: PullOptions): Promise<Pu
         channel: r.channel,
       }),
       human: `Pulled DDLS ${r.object} via ${r.channel}; wrote ${r.files.length} file(s)`,
+    };
+  }
+  // T3.1 — SRVD pull. Routes through the sourceObjectStrategy in
+  // pull-strategy.ts (SRVD lives in SOURCE_OBJECT_TYPES), but the
+  // explicit dispatcher case is kept so callers can pass --type SRVD
+  // without going through the resolveObject default path.
+  if (typeUpper === 'SRVD') {
+    const r = await runPullSrvd(objectName, opts);
+    return {
+      data: normalizePullData({
+        object: r.object,
+        type: 'SRVD',
+        entries: [{ object: r.object, type: 'SRVD', status: 'written', files: r.files }],
+        written: r.files.length,
+        skipped: 0,
+        failed: 0,
+        channel: 'adt',
+      }),
+      human: `Pulled SRVD ${r.object} via adt; wrote ${r.files.length} file(s)`,
+    };
+  }
+  // T3.3 — BDEF pull. Routes through the sourceObjectStrategy in
+  // pull-strategy.ts with the `.abdl` extension (BDEF carries the
+  // ABAP Behavior Language, distinct from the `.acds` CDS family).
+  if (typeUpper === 'BDEF') {
+    const r = await runPullBdef(objectName, opts);
+    return {
+      data: normalizePullData({
+        object: r.object,
+        type: 'BDEF',
+        entries: [{ object: r.object, type: 'BDEF', status: 'written', files: r.files }],
+        written: r.files.length,
+        skipped: 0,
+        failed: 0,
+        channel: 'adt',
+      }),
+      human: `Pulled BDEF ${r.object} via adt; wrote ${r.files.length} file(s)`,
+    };
+  }
+  // T3.4 — DCLS / DDLX / DDLA. All three share the sourceObjectStrategy
+  // flow with the .acds extension; only the AFF folder and ADT endpoint
+  // differ (the helper handles that internally).
+  if (typeUpper === 'DCLS' || typeUpper === 'DDLX' || typeUpper === 'DDLA') {
+    const r = await runPullCdsExtension(typeUpper as 'DCLS' | 'DDLX' | 'DDLA', objectName, opts);
+    return {
+      data: normalizePullData({
+        object: r.object,
+        type: typeUpper,
+        entries: [{ object: r.object, type: typeUpper, status: 'written', files: r.files }],
+        written: r.files.length,
+        skipped: 0,
+        failed: 0,
+        channel: 'adt',
+      }),
+      human: `Pulled ${typeUpper} ${r.object} via adt; wrote ${r.files.length} file(s)`,
     };
   }
   if (typeUpper && !isDdicSupportedType(typeUpper)) {

@@ -490,4 +490,95 @@ describe('014/ddic-json-map', () => {
       expect(errors.some((e) => e.includes('declared more than once'))).toBe(true);
     });
   });
+
+  // ----- T2.1 wire payload split -----
+
+  describe('T2.1 per-type wire payloads', () => {
+    it('localToWire<DOMA> returns a DdicDomaWire carrying format.* fields', () => {
+      const wire = localToWire('DOMA', {
+        name: 'ZDOMA_SPLIT',
+        format: { dataType: 'CHAR', length: 10 },
+        outputCharacteristics: { length: 10 },
+      });
+      // Type-level narrowing: wire.format must exist; wire.dataTypeInformation must NOT.
+      expect(wire.format?.dataType).toBe('CHAR');
+      expect(wire.format?.length).toBe(10);
+      expect((wire as Record<string, unknown>).dataTypeInformation).toBeUndefined();
+      expect((wire as Record<string, unknown>).fields).toBeUndefined();
+    });
+
+    it('localToWire<DTEL> returns a DdicDtelWire carrying dataTypeInformation (all 5 categories)', () => {
+      // domain category
+      const w1 = localToWire('DTEL', {
+        name: 'ZDTEL_D',
+        dataTypeInformation: { category: 'domain', typeName: 'ZDOMA_D' },
+      });
+      expect(w1.dataTypeInformation?.category).toBe('domain');
+      expect(w1.dataTypeInformation?.typeName).toBe('ZDOMA_D');
+
+      // predefinedType category
+      const w2 = localToWire('DTEL', {
+        name: 'ZDTEL_P',
+        dataTypeInformation: { category: 'predefinedType', predefinedType: { dataType: 'I', length: 4 } },
+      });
+      expect(w2.dataTypeInformation?.category).toBe('predefinedType');
+      expect(w2.dataTypeInformation?.predefinedType?.dataType).toBe('I');
+
+      // referenceToPredefinedType category
+      const w3 = localToWire('DTEL', {
+        name: 'ZDTEL_RP',
+        dataTypeInformation: { category: 'referenceToPredefinedType', typeName: 'STRING' },
+      });
+      expect(w3.dataTypeInformation?.category).toBe('referenceToPredefinedType');
+
+      // referenceDictionaryType category
+      const w4 = localToWire('DTEL', {
+        name: 'ZDTEL_RD',
+        dataTypeInformation: { category: 'referenceDictionaryType', typeName: 'ZTAB_RD' },
+      });
+      expect(w4.dataTypeInformation?.category).toBe('referenceDictionaryType');
+
+      // referenceClasIntType category
+      const w5 = localToWire('DTEL', {
+        name: 'ZDTEL_RC',
+        dataTypeInformation: { category: 'referenceClasIntType', typeName: 'ZCL_FOO' },
+      });
+      expect(w5.dataTypeInformation?.category).toBe('referenceClasIntType');
+    });
+
+    it('localToWire<TABL> forwards fields + generalInformation through the TABL settings wire', () => {
+      const wire = localToWire('TABL', {
+        name: 'ZTAB_SPLIT',
+        header: { description: 'split test', originalLanguage: 'EN' },
+        generalInformation: { deliveryClass: 'A', dataClass: 'APPL0', sizeCategory: '0' },
+        fields: [
+          { fieldName: 'KEY1', dataType: 'CHAR', length: 10, keyFlag: true },
+          { fieldName: 'VAL1', dataType: 'CHAR', length: 20 },
+        ],
+      });
+      expect(wire.fields).toHaveLength(2);
+      expect(wire.fields?.[0]?.fieldName).toBe('KEY1');
+      expect(wire.fields?.[0]?.keyFlag).toBe(true);
+      expect(wire.generalInformation?.['deliveryClass']).toBe('A');
+      // wire.format / wire.dataTypeInformation live on the DOMA / DTEL wires,
+      // not the TABL settings wire.
+      expect((wire as Record<string, unknown>).format).toBeUndefined();
+      expect((wire as Record<string, unknown>).dataTypeInformation).toBeUndefined();
+    });
+
+    it('DdicWirePayload alias still accepts all three variants (backward compat)', () => {
+      const domaWire: import('../../src/abap_cli/formats/ddic/json.js').DdicWirePayload = {
+        name: 'ZDOMA_BC', format: { dataType: 'CHAR', length: 3 },
+      };
+      const dtelWire: import('../../src/abap_cli/formats/ddic/json.js').DdicWirePayload = {
+        name: 'ZDTEL_BC', dataTypeInformation: { category: 'domain', typeName: 'ZDOMA_BC' },
+      };
+      const tablWire: import('../../src/abap_cli/formats/ddic/json.js').DdicWirePayload = {
+        name: 'ZTAB_BC', fields: [], generalInformation: {},
+      };
+      expect(domaWire.name).toBe('ZDOMA_BC');
+      expect(dtelWire.name).toBe('ZDTEL_BC');
+      expect(tablWire.name).toBe('ZTAB_BC');
+    });
+  });
 });

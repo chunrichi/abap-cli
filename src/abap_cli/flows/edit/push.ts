@@ -431,7 +431,7 @@ async function pushHttpFile(
   file: string,
   opts: PushFileOptions,
 ): Promise<PushOneResult> {
-  let local: { name: string; package?: string; transportRequest?: string; [key: string]: unknown };
+  let local: { name?: string; package?: string; transportRequest?: string; [key: string]: unknown };
   try {
     local = await readHttpJson(path.resolve(process.cwd(), file));
   } catch (error: unknown) {

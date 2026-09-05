@@ -54,7 +54,7 @@ export function clearRuntimeCache(name: string): void {
 }
 
 /** 034: minimal load — read only the cached runtime without triggering a probe.
- *  Used by `extension deploy` and `init` when the caller wants the cache hit
+ *  Used by `deploy` and `init` when the caller wants the cache hit
  *  only (no network). Returns undefined when there is no cache entry. */
 export function readCachedRuntime(name: string): CachedRuntime | undefined {
   return loadUserConfig().systems[name]?.runtime;

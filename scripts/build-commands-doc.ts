@@ -140,7 +140,7 @@ const schemas: CommandSchemaDoc[] = [
   commandSchemas['activate']!,
   commandSchemas['diff']!,
   commandSchemas['transport']!,
-  commandSchemas['extension']!,
+  commandSchemas['deploy']!,
   commandSchemas['profile']!,
   commandSchemas['doctor']!,
   commandSchemas['run'] ?? RUN_SCHEMA,

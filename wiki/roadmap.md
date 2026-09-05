@@ -28,14 +28,14 @@
 | `abap watch` | 监听本地目录，文件变更自动 `check`→`push` | 本地编辑时实时反馈 | 开发者体验提升（注意与 agent 模型配合） | - [ ] |
 | `abap export` | 批量导出对象快照（含文本池/DDIC）到可版本化目录 | 备份、迁移、审计 | 使本地成为可版本化的完整镜像 | - [ ] |
 | `abap package` | 包管理：`list`/`show`/`create`、查看包内对象与依赖 | 探索系统结构、批量操作 | 弥补 `pull --package` 之外的管理能力 | - [ ] |
-| `abap upgrade` | 对比本地 CLI 内置 ICF 服务版本与远端，一键升级 | 版本漂移（`extension status` 已能探测 outdated） | 把 `extension deploy` 的升级路径独立出来 | - [ ] |
+| `abap upgrade` | 对比本地 CLI 内置 ICF 服务版本与远端，一键升级 | 版本漂移（`deploy status` 已能探测 outdated） | 把 `deploy` 的升级路径独立出来 | - [ ] |
 | `abap logs` | 查看 ICF 服务/应用日志、ATC 结果历史 | 排障、审计 | 诊断闭环 | - [ ] |
 
 ## 三、真正的差异化新命令（脱离 roadmap 的终局能力）
 
 | 命令 | 功能 | 为什么这是空白 | 价值 | 状态 |
 |------|------|--------------|------|------|
-| `abap run` | 执行类方法或 report（`ZCL_X=>method` 或 classrun），返回 stdout/返回码 | 底层 `runClass` 已存在（`extension deploy` 在用）但只对内部暴露；现在 agent 只能"编译"不能"运行" | 从静态开发跨到动态验证：push 后直接跑一次看结果。agent 闭环里最缺的一环 | - [ ] |
+| `abap run` | 执行类方法或 report（`ZCL_X=>method` 或 classrun），返回 stdout/返回码 | 底层 `runClass` 已存在（`deploy` 在用）但只对内部暴露；现在 agent 只能"编译"不能"运行" | 从静态开发跨到动态验证：push 后直接跑一次看结果。agent 闭环里最缺的一环 | - [ ] |
 | `abap select` | 只读查询表数据（`--table ZTAB --fields ... --where ... --limit`），走 ICF 新增 `/data` 端点 | 014 spec 只做 DDIC **定义** CRUD，完全不碰**数据**；ABAP 排障 90% 是"看这条记录" | 给 agent 提供 SE16N 等价能力，测试/验证/排障全自动化 | - [ ] |
 | `abap gen` | 基于系统元数据生成代码：给表名 → 生成 CRUD 类/报告/选择屏幕骨架 | `create --template` 是**静态**模板，不知道系统里有什么 | 把"系统知识"变成生成输入，agent 生产力放大器 | - [ ] |
 | `abap impact` | 影响分析：对象被谁引用、引用链、激活风险，输出 JSON 调用图 | `search`/`inspect` 只答"是什么"，不答"改它会炸什么" | 重构安全性的核心决策数据 | - [ ] |

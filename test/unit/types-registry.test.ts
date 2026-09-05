@@ -22,13 +22,16 @@ import {
 } from '../../src/abap_cli/types/registry.js';
 
 describe('types/registry.ts (US11 — single source of truth)', () => {
-  it('contains exactly 13 supported types (4 source + 4 DDIC + HTTP + TRAN + 3 dual-channel)', () => {
-    expect(allSupportedTypes()).toHaveLength(13);
+  it('contains exactly 19 supported types (4 source + 4 DDIC + HTTP + TRAN + 3 dual-channel + 6 Phase 3)', () => {
+    // Phase 3 added: SRVB (metadata-only), SRVD, BDEF, DCLS, DDLX, DDLA.
+    expect(allSupportedTypes()).toHaveLength(19);
     expect(allSupportedTypes()).toEqual([
       'CLAS', 'INTF', 'PROG', 'FUGR',         // ADT source
       'TABL', 'STRU', 'DOMA', 'DTEL',         // ICF DDIC
       'HTTP', 'TRAN',                          // ICF
       'TTYP', 'MSAG', 'DDLS',                  // 036 dual-channel
+      'SRVB', 'SRVD', 'BDEF',                  // T3.2 / T3.1 / T3.3
+      'DCLS', 'DDLX', 'DDLA',                  // T3.4
     ]);
   });
 
@@ -45,6 +48,14 @@ describe('types/registry.ts (US11 — single source of truth)', () => {
     expect(createObjtypeFor('TTYP')).toBeUndefined();
     expect(createObjtypeFor('MSAG')).toBeUndefined();
     expect(createObjtypeFor('DDLS')).toBeUndefined();
+    // Phase 3: SRVB / SRVD / BDEF / DCLS / DDLX / DDLA carry their own
+    // objtype string for create() (T3.x spec).
+    expect(createObjtypeFor('SRVB')).toBe('SRVB/SB');
+    expect(createObjtypeFor('SRVD')).toBe('SRVD/SD');
+    expect(createObjtypeFor('BDEF')).toBe('BDEF/BD');
+    expect(createObjtypeFor('DCLS')).toBe('DCLS/DC');
+    expect(createObjtypeFor('DDLX')).toBe('DDLX/EX');
+    expect(createObjtypeFor('DDLA')).toBe('DDLA/AE');
   });
 
   it('routes source objects (ADT) and TTYP/MSAG/DDLS dual-channel; TABL/HTTP/TRAN ICF only', () => {

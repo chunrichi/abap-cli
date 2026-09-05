@@ -22,7 +22,7 @@ export const commandSchemas: { [k: string]: CommandSchema } = {
   push: pushSchema(),
   check: checkSchema(),
   transport: transportSchema(),
-  extension: extensionSchema(),
+  deploy: deploySchema(),
   profile: profileSchema(),
   status: statusSchema(),
   doctor: doctorSchema(),
@@ -239,10 +239,10 @@ function transportSchema(): CommandSchema {
   };
 }
 
-// ---------- extension ----------
-function extensionSchema(): CommandSchema {
+// ---------- deploy ----------
+function deploySchema(): CommandSchema {
   return {
-    ...base('extension', 'Manage the bundled ICF ABAP extension (deploy / status).', 'abap extension <deploy|status> [options]', 'sap'),
+    ...base('deploy', 'Deploy bundled ICF ABAP service to SAP.', 'abap deploy [options] | abap deploy status [options]', 'sap'),
     arguments: [],
     options: [
       { name: '--tr', type: 'string', valuePlaceholder: '<transport>', description: 'Transport number (required when --package is not $TMP).' },
@@ -254,9 +254,9 @@ function extensionSchema(): CommandSchema {
       schemaOption(),
     ],
     examples: [
-      { description: 'Deploy to $TMP (no transport)', command: 'abap extension deploy --yes' },
-      { description: 'Deploy to a custom package', command: 'abap extension deploy --package ZPKG --tr DEVK900001 --yes' },
-      { description: 'Read-only status probe', command: 'abap extension status' },
+      { description: 'Deploy to $TMP (no transport)', command: 'abap deploy --yes' },
+      { description: 'Deploy to a custom package', command: 'abap deploy --package ZPKG --tr DEVK900001 --yes' },
+      { description: 'Read-only status probe', command: 'abap deploy status' },
     ],
     errors: [
       { code: 'NO_TRANSPORT', category: 'VALIDATION_ERROR', exitCode: 7 },

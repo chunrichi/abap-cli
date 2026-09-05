@@ -113,7 +113,7 @@ abap push src/zcl_my_class/zcl_my_class.clas.abap --tr DEVK900001
 
 ### When You Have No Transport Request
 
-`abap push` resolves the transport **per object**: an object already assigned to a request reuses it, and objects in `$TMP` push with no transport at all — so a freshly `abap create`d or `abap extension deploy`ed `$TMP` object can be pushed without `--tr`. Only an unbound object in a real package needs an explicit request:
+`abap push` resolves the transport **per object**: an object already assigned to a request reuses it, and objects in `$TMP` push with no transport at all — so a freshly `abap create`d or `abap deploy`ed `$TMP` object can be pushed without `--tr`. Only an unbound object in a real package needs an explicit request:
 
 ```bash
 # See what's available
@@ -146,7 +146,7 @@ abap push src/zcl_my_new_class/zcl_my_new_class.clas.abap --tr DEVK900001
 - **Read-only execution & data access** — `abap run` (classrun / static method, push → run → verify), `abap select` (SE16N equivalent), `abap where-used` (impact assessment before refactor / delete), `abap tcode` (TSTC → TSTCT)
 - **Transport management** — `abap transport list` / `create` / `show` / `resolve` / `assign`
 - **Diagnosis & workflows** — `abap doctor`, `abap inspect`, `abap diff`, `abap status`, `abap activate`
-- **ICF service lifecycle** — `abap extension deploy` deploys the bundled ICF service (`/sap/zabap_vibe`) and triggers its SICF node setup; `abap extension status` reports installation/version state; `abap init` checks deployment/version state; `abap activate` fixes stale activation (see [Commands](commands.md))
+- **ICF service lifecycle** — `abap deploy` deploys the bundled ICF service (`/sap/zabap_vibe`) and triggers its SICF node setup; `abap deploy status` reports installation/version state; `abap init` checks deployment/version state; `abap activate` fixes stale activation (see [Commands](commands.md))
 - **Textpool (text elements)** — read/write program text symbols, selection texts and list headings via `abap pull <name> --textpool` and `abap push <name>.<type>.texts|selections|headings.<lang>.properties`. Mixed mode: the ADT text-elements API is used when the system supports it; ECC/older systems route through the ICF `/textpool/*` endpoint. Capability is probed once when the connection profile is created (`abap profile add/set`, `abap init`) and cached in the profile — no runtime fallback (see [Commands](commands.md) for details).
 
 ## Deploy the Bundled ICF Service
@@ -155,12 +155,12 @@ The bundled service (handler + setup classes in `abap/src/clas/`) provides the `
 
 ```bash
 # Deploy sources and trigger SICF node creation/activation (idempotent)
-abap extension deploy --yes --json
+abap deploy --yes --json
 # → data.icfNode: { status: "success", action: "created|already_active", url: "/sap/zabap_vibe", active: true, handler: "ZCL_ABAP_VIBE_ICF" }
 
 # Verify the endpoint
 abap profile test <name> --json       # icf layer should be ok
-abap extension status --json          # installed / version match
+abap deploy status --json          # installed / version match
 abap init --profile <name> --yes --json   # data.icf.status: current / not_deployed / outdated
 ```
 

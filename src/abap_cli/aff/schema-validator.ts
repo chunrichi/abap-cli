@@ -7,10 +7,14 @@
  * env → bundled → legacy `tmp/` mirror.
  *
  * Schemas are loaded once, lazily on first use, then cached for
- * the process lifetime (Map<type, ValidateFunction>).
+ * the process lifetime in a single `Map<resolvedSchemaPath, ValidateFunction>`.
+ * The cache key is the absolute schema file path (not the type code), so
+ * types that share a schema file (e.g. TABL / STRU both use `tabl-v1.json`)
+ * automatically share the compiled validator.
  */
 
 import * as fs from 'fs/promises';
+import * as fsSync from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import Ajv2020Import from 'ajv/dist/2020.js';
@@ -51,16 +55,31 @@ interface ValidateFunction {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _ajv: any | undefined;
 
-/** Cache key by resolved file path (not by type) so STRU / TABL share the
- *  same compiled validate function. The "type" parameter is still used
- *  for diagnostics and the cache key returned in ValidateResult. */
-const _compiledByFile = new Map<string, ValidateFunction>();
+/**
+ * Single compiled-validator cache, keyed by the absolute resolved schema path.
+ *
+ * Why one Map instead of three:
+ *  - The cache key is the *file path* (not the type code), so types sharing a
+ *    schema file (TABL/STRU → `tabl-v1.json`) automatically share the compiled
+ *    function. A separate per-type cache would double-compile in that case.
+ *  - The raw parsed schema is derivable from the compiled validator when needed
+ *    (and only `loadSchema` callers need the raw shape), so we store the raw
+ *    schema + compiled function as a small entry — but the entry is keyed by
+ *    the same single path key, so there is exactly one Map.
+ *  - The mirror-resolution priority (env → bundled → legacy) lives in
+ *    `schema-paths.ts` and is unchanged; we just stop caching in three places.
+ */
+interface CompiledEntry {
+  /** Raw parsed schema (kept so loadSchema callers do not re-read the file). */
+  schema: unknown;
+  /** Compiled ajv validator. */
+  fn: ValidateFunction;
+}
+const _compiled = new Map<string, CompiledEntry>();
 
-/** Per-type validate-function cache. */
-const _validateCache = new Map<string, ValidateFunction>();
-
-/** Raw schema cache (path → parsed JSON) — avoids re-reading the file. */
-const _schemaCache = new Map<string, unknown>();
+/** In-flight compile promises keyed by file path. Prevents two concurrent
+ *  callers from racing the same compile. Resolves with the CompiledEntry. */
+const _inflight = new Map<string, Promise<CompiledEntry>>();
 
 function getAjv(): InstanceType<typeof Ajv2020> {
   if (!_ajv) {
@@ -78,74 +97,86 @@ function getAjv(): InstanceType<typeof Ajv2020> {
   return _ajv;
 }
 
+/** Resolve + load + compile the schema for a type, returning the cached entry.
+ *  All read paths funnel through this so the single Map stays consistent. */
+async function ensureCompiled(type: string, schemaFileOverride?: string): Promise<CompiledEntry> {
+  // The cache key is the resolved schema path. Resolving it here (instead of
+  // inside loadSchema) lets us serve the cache without going through the
+  // mirror-resolution priority chain twice.
+  const schemaPath = schemaPathFor(type, MIRROR_ROOT, schemaFileOverride);
+  const cached = _compiled.get(schemaPath);
+  if (cached) return cached;
+
+  // Coalesce concurrent compiles of the same schema.
+  const pending = _inflight.get(schemaPath);
+  if (pending) return pending;
+
+  const promise = (async (): Promise<CompiledEntry> => {
+    let raw: string;
+    try {
+      raw = await fs.readFile(schemaPath, 'utf8');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new CliError(
+        'AFF_SCHEMA_MISSING',
+        `AFF schema not found for type "${type}"`,
+        {
+          details: { schemaPath, cause: msg },
+          nextSteps: [
+            `Verify that ${schemaPath} exists`,
+            'If the AFF mirror is in a different location, set ABAP_CLI_AFF_MIRROR',
+          ],
+        },
+      );
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new CliError(
+        'AFF_SCHEMA_INVALID',
+        `AFF schema for type "${type}" is not valid JSON`,
+        {
+          details: { schemaPath, cause: msg },
+          nextSteps: [`Inspect ${schemaPath} for syntax errors`],
+        },
+      );
+    }
+    const ajv = getAjv();
+    let fn: ValidateFunction;
+    try {
+      fn = ajv.compile(parsed as object);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new CliError(
+        'AFF_SCHEMA_COMPILE_ERROR',
+        `Failed to compile AFF schema for type "${type}"`,
+        { details: { cause: msg } },
+      );
+    }
+    const entry: CompiledEntry = { schema: parsed, fn };
+    _compiled.set(schemaPath, entry);
+    return entry;
+  })();
+  _inflight.set(schemaPath, promise);
+  try {
+    return await promise;
+  } finally {
+    _inflight.delete(schemaPath);
+  }
+}
+
 /** Load (and cache) the parsed schema JSON for a given type. */
 export async function loadSchema(type: string, schemaFileOverride?: string): Promise<unknown> {
-  const cacheKey = schemaFileOverride ?? type;
-  const schemaPath = schemaPathFor(type, MIRROR_ROOT, schemaFileOverride);
-  const cached = _schemaCache.get(cacheKey);
-  if (cached !== undefined) return cached;
-  let raw: string;
-  try {
-    raw = await fs.readFile(schemaPath, 'utf8');
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new CliError(
-      'AFF_SCHEMA_MISSING',
-      `AFF schema not found for type "${type}"`,
-      {
-        details: { schemaPath, cause: msg },
-        nextSteps: [
-          `Verify that ${schemaPath} exists`,
-          'If the AFF mirror is in a different location, set ABAP_CLI_AFF_MIRROR',
-        ],
-      },
-    );
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new CliError(
-      'AFF_SCHEMA_INVALID',
-      `AFF schema for type "${type}" is not valid JSON`,
-      {
-        details: { schemaPath, cause: msg },
-        nextSteps: [`Inspect ${schemaPath} for syntax errors`],
-      },
-    );
-  }
-  _schemaCache.set(cacheKey, parsed);
-  return parsed;
+  const entry = await ensureCompiled(type, schemaFileOverride);
+  return entry.schema;
 }
 
 /** Compile (and cache) a validate function for the given type. */
 export async function getValidate(type: string, schemaFileOverride?: string): Promise<ValidateFunction> {
-  const cacheKey = schemaFileOverride ?? type;
-  const cached = _validateCache.get(cacheKey);
-  if (cached) return cached;
-  const ajv = getAjv();
-  const schema = await loadSchema(type, schemaFileOverride);
-  const schemaPathStr = schemaPathFor(type, undefined, schemaFileOverride);
-  const byFile = _compiledByFile.get(schemaPathStr);
-  if (byFile) {
-    _validateCache.set(cacheKey, byFile);
-    return byFile;
-  }
-  let fn: ValidateFunction;
-  try {
-    fn = ajv.compile(schema as object);
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new CliError(
-      'AFF_SCHEMA_COMPILE_ERROR',
-      `Failed to compile AFF schema for type "${type}"`,
-      { details: { cause: msg } },
-    );
-  }
-  _validateCache.set(cacheKey, fn);
-  _compiledByFile.set(schemaPathStr, fn);
-  return fn;
+  const entry = await ensureCompiled(type, schemaFileOverride);
+  return entry.fn;
 }
 
 export type ValidateStatus = 'pass' | 'fail' | 'warn';
@@ -312,9 +343,91 @@ export function formatLine(r: ValidateResult): string {
 
 /** Reset all caches (used in tests). */
 export function resetSchemaCache(): void {
-  _validateCache.clear();
-  _schemaCache.clear();
+  _compiled.clear();
+  _inflight.clear();
   _ajv = undefined;
+}
+
+/**
+ * Synchronous AFF metadata validator.
+ *
+ * Returns a flat array of human-readable error strings (empty when valid).
+ * HTTP/TRAN metadata callers can use the validator from sync hot paths
+ * (e.g. `writeHttpService` before writing to disk) without going through
+ * `validateAff`'s async / result-object shape.
+ *
+ * Lazy-compiles the schema on first call via synchronous `fs.readFileSync` +
+ * `ajv.compile`, then caches in the same single Map used by `validateAff`.
+ *
+ * Concurrency note: this function and the async `ensureCompiled` both write
+ * to `_compiled`. In Node.js the event-loop model makes the overlap narrow
+ * (the sync path cannot interleave with itself, and a sync compile runs
+ * to completion before any pending microtask resumes), so the worst-case
+ * outcome is "schema is compiled twice on first use" — a one-time cost,
+ * not a correctness issue. Tests can `resetSchemaCache()` to force a clean
+ * re-compile.
+ */
+export function validateAffMetadata(type: string, value: unknown): string[] {
+  const schemaPath = schemaPathFor(type, MIRROR_ROOT);
+  let entry = _compiled.get(schemaPath);
+  if (!entry) {
+    // Sync compile path. Read the schema file synchronously and compile.
+    // This path is rare (cold start); the typical case hits the cache.
+    let raw: string;
+    try {
+      raw = fsSync.readFileSync(schemaPath, 'utf8');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new CliError(
+        'AFF_SCHEMA_MISSING',
+        `AFF schema not found for type "${type}"`,
+        {
+          details: { schemaPath, cause: msg },
+          nextSteps: [
+            `Verify that ${schemaPath} exists`,
+            'If the AFF mirror is in a different location, set ABAP_CLI_AFF_MIRROR',
+          ],
+        },
+      );
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new CliError(
+        'AFF_SCHEMA_INVALID',
+        `AFF schema for type "${type}" is not valid JSON`,
+        {
+          details: { schemaPath, cause: msg },
+          nextSteps: [`Inspect ${schemaPath} for syntax errors`],
+        },
+      );
+    }
+    const ajv = getAjv();
+    let fn: ValidateFunction;
+    try {
+      fn = ajv.compile(parsed as object);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new CliError(
+        'AFF_SCHEMA_COMPILE_ERROR',
+        `Failed to compile AFF schema for type "${type}"`,
+        { details: { cause: msg } },
+      );
+    }
+    entry = { schema: parsed, fn };
+    _compiled.set(schemaPath, entry);
+  }
+  const ok = entry.fn(value);
+  if (ok) return [];
+  return (entry.fn.errors ?? []).map((e) => {
+    const location = e.instancePath || '$';
+    if (e.keyword === 'additionalProperties' && typeof e.params?.additionalProperty === 'string') {
+      return `${location}: additional property '${e.params.additionalProperty}' is not allowed`;
+    }
+    return `${location}: ${e.message ?? e.keyword}`;
+  });
 }
 
 export const __testing = { MIRROR_ROOT };

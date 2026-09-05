@@ -11,7 +11,7 @@ changed at: 2026-09-02 22:06:00
 
 ## 路由
 
-**ICF 自建**。需要先 `abap extension deploy`；走 `/sap/zabap_vibe/ddic/TABL/<name>`。原因见 [design-decisions/002](../design-decisions/002-icf-bypass-ddic.md)。
+**ICF 自建**。需要先 `abap deploy`；走 `/sap/zabap_vibe/ddic/TABL/<name>`。原因见 [design-decisions/002](../design-decisions/002-icf-bypass-ddic.md)。
 
 ## 本地文件形态（abap-file-format 三件套）
 

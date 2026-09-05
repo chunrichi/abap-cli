@@ -45,7 +45,7 @@ Agent 在 Windows / Linux / macOS 下消费同一份结构化输出时，看到�
 | `create <DDIC\|HTTP>` | `data.file`（`--file` 输入路径回显）、`error.details.file` |
 | `pull`（所有子路径） | `data.file` / `data.entries[].file` / `data.entries[].files` / `data.written` / `data.skipped` / `data.failed` / `error.details.file` |
 | `push` | `data.results[].file`（cwd-relative）、`--atomic` 失败 `details.failures[].file`、DDIC/HTTP 校验与 `FILE_PARSE_ERROR` 的 `details.file` / message |
-| `extension deploy` | `data.files[].file` |
+| `deploy` | `data.files[].file` |
 | `check` | `data.issues[].file`（cwd-relative）、`data.out`（默认相对 POSIX `.abap/atc/<variant>-<ts>.json`）、persisted ATC JSON 的 `files[].file`（cwd-relative） |
 | `init --agent` | `data.written` / `data.skipped` |
 | `init` | `data.configPath`（`--show-config` / `--unset-*`）、`CONFIG_ERROR` 的 `details.file` |

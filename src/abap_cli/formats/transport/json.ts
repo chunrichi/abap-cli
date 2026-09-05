@@ -1,12 +1,49 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { TRAN_SUPPORTED_TYPES, type TranSupportedType } from '../../types/registry.js';
+import { validateAffMetadata } from '../../aff/schema-validator.js';
+import { stripCliEnvelope } from '../../aff/assert-metadata.js';
 
 // Known Transaction Code object extension (abap-file-format).
 export const TRAN_EXTENSIONS = ['.tran.json'];
 
 /** Re-exported from `types/registry.ts` (T050, US11). */
 export { TRAN_SUPPORTED_TYPES, type TranSupportedType };
+
+// ---------------------------------------------------------------------------
+// T2.3 AFF schema integration
+// ---------------------------------------------------------------------------
+// The hand-rolled `validateTranObject` below predates the AFF schema validator
+// and duplicates all length / enum checks already declared in
+// `src/abap_cli/schema/tran-v1.json`. The new `validateTranJson` is the
+// canonical entry point and delegates to ajv. The legacy helpers stay
+// exported as deprecated so downstream code (and existing tests) keep
+// compiling. New code should prefer `validateTranJson`.
+// ---------------------------------------------------------------------------
+
+/**
+ * Validate a Transaction document against the vendored AFF `tran-v1.json`
+ * schema. Returns an array of human-readable error strings (empty when valid).
+ *
+ * T2.3: this is the AFF-schema-based replacement for the hand-rolled
+ * `validateTranObject`. The CLI / SICF integration layer should migrate to
+ * this entry point over time; for now `validateTranObject` is preserved.
+ */
+export function validateTranJson(data: unknown): string[] {
+  // The SAP `tran-v1.json` schema rejects CLI envelope fields via
+  // `additionalProperties:false`; the CLI transport envelope (name /
+  // package / transportRequest) is not part of the SAP structure.
+  return validateAffMetadata('TRAN', stripCliEnvelope(data));
+}
+
+/**
+ * @deprecated Use {@link validateTranJson}. Kept because the existing CLI /
+ * SICF integration layer and tests depend on the specific error message
+ * shape (e.g. "Missing required field: name", "header.description too long").
+ */
+export function validateTranObject(data: unknown): string[] {
+  return validateTranObjectLegacy(data as TranObjectLocal);
+}
 
 // Schema constants — mirror http-v1.json and abap-file-format http layout.
 export const TRAN_CODE_MAX_LENGTH = 20;
@@ -243,9 +280,19 @@ export async function readTranJson(filePath: string): Promise<TranObjectLocal> {
 }
 
 /**
- * Write a Transaction JSON file to disk, creating parent directories as needed.
+ * Write a Transaction JSON file to disk, validating against the AFF
+ * `tran-v1.json` schema before writing. Throws on schema violation.
+ *
+ * The validator is applied to the AFF-shaped core (formatVersion / header /
+ * generalInformation / …) so CLI-only transport fields (`name`, `package`,
+ * `transportRequest`) — which the SAP schema explicitly rejects via
+ * `additionalProperties:false` — do not block legitimate round-trips.
  */
 export async function writeTranJson(filePath: string, data: TranObjectLocal): Promise<void> {
+  const errors = validateTranJson(data);
+  if (errors.length > 0) {
+    throw new Error(`AFF TRAN fixture invalid: ${errors.join('; ')}`);
+  }
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   await fs.writeFile(filePath, JSON.stringify(data, null, 2) + '\n', 'utf-8');
 }
@@ -329,8 +376,13 @@ function expectPattern(value: string, pattern: RegExp, label: string): string | 
 /**
  * Validate a local Transaction object against the abap-file-format contract.
  * Returns an array of human-readable errors (empty when valid).
+ *
+ * @deprecated Internal — use the public {@link validateTranJson} (AFF-schema)
+ * for new code. This implementation duplicates the schema and is kept only
+ * to support the deprecated `validateTranObject` alias and existing tests
+ * that rely on the specific error message shapes.
  */
-export function validateTranObject(data: TranObjectLocal): string[] {
+function validateTranObjectLegacy(data: TranObjectLocal): string[] {
   const errors: string[] = [];
 
   // name: required, namespace Z/Y/slash, ≤ 20 chars (TSTC-TCODE length).

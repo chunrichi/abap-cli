@@ -57,7 +57,7 @@ Endpoints exposed under `/sap/zabap_vibe/` (current service version `0.5.0`):
 
 | Endpoint | Used by |
 |---|---|
-| `/` (root, version probe) | `abap extension status`, `abap init` ICF check |
+| `/` (root, version probe) | `abap deploy status`, `abap init` ICF check |
 | `/ddic/<type>` (POST/GET — `DOMA`/`DTEL`/`TABL`/`STRU`) | `abap create` / `abap push` / `abap pull` for DDIC |
 | `/http/<name>` (POST/GET — HTTP service) | `abap create HTTP` / `abap push <file>.http.json` / `abap pull --type HTTP` |
 | `/textpool/*` (POST/GET) | `abap pull --textpool` / `abap push <file>.texts/selections/headings.*.properties` on systems without ADT text-elements support |
@@ -65,7 +65,7 @@ Endpoints exposed under `/sap/zabap_vibe/` (current service version `0.5.0`):
 | `/version-source` (POST) | `abap pull --remote <system>` (TMS RFC destination) |
 | `/data/query` (POST) | `abap select --table <name>` (SE16N equivalent, read-only) |
 
-`abap extension deploy` pushes the bundled sources then triggers the setup class; `abap extension status` / `abap init` check deployment state/version. JSON generation on the SAP side is unified on `/ui2/cl_json=>serialize` — about 74 handcrafted JSON concatenations across the ICF handler / runner / setup classes were replaced. Development of this layer follows the **Dogfooding** principle — it is itself developed via the CLI's create → pull → edit → push loop.
+`abap deploy` pushes the bundled sources then triggers the setup class; `abap deploy status` / `abap init` check deployment state/version. JSON generation on the SAP side is unified on `/ui2/cl_json=>serialize` — about 74 handcrafted JSON concatenations across the ICF handler / runner / setup classes were replaced. Development of this layer follows the **Dogfooding** principle — it is itself developed via the CLI's create → pull → edit → push loop.
 
 ## Extension Layer
 

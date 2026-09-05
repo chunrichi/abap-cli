@@ -110,7 +110,7 @@ export function interpretTcode(
   if (!program) {
     throw new CliError('SAP_ERROR', 'ICF response is missing entry.program', {
       details: { tcode: requestedTcode },
-      nextSteps: ['Deploy the current ICF service: abap extension deploy'],
+      nextSteps: ['Deploy the current ICF service: abap deploy'],
     });
   }
 
@@ -163,6 +163,6 @@ function nextStepsFor(code: ErrorCode, tcode: string): string[] {
     case 'AUTH_ERROR':
       return ['Verify the active connection credentials and SAP authorization'];
     default:
-      return ['Deploy the current ICF service: abap extension deploy', 'Run abap doctor to check the SAP connection'];
+      return ['Deploy the current ICF service: abap deploy', 'Run abap doctor to check the SAP connection'];
   }
 }

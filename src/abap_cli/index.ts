@@ -71,9 +71,9 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
     load: () => import('./commands/transport.js').then((m) => ({ register: m.registerTransportCommand })),
   },
   {
-    name: 'extension',
-    description: 'Manage the bundled ICF ABAP extension (deploy / status)',
-    load: () => import('./commands/extension.js').then((m) => ({ register: m.registerExtensionCommand })),
+    name: 'deploy',
+    description: 'Deploy bundled ICF ABAP service to SAP',
+    load: () => import('./commands/deploy.js').then((m) => ({ register: m.registerDeployCommand })),
   },
   {
     name: 'profile',

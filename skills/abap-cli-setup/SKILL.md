@@ -2,7 +2,7 @@
 name: abap-cli-setup
 description: abap-cli 接入、诊断与基础设施就绪 — 配置工作区（`abap init` / `profile`）、诊断环境（`abap doctor`）、管理传输请求（`abap transport`）、部署/探测自带 ICF 服务（`abap extension deploy` / `abap extension status`）。use when asking how to connect to SAP / configure a workspace / add a system profile / diagnose the CLI environment / list / create / show / resolve / assign a transport request / install or upgrade the bundled ICF service / check whether the ICF extension is current.
 metadata:
-  version: "0.3.0"
+  version: "0.2.6"
   scope: workspace-and-sap
   commands: [init, profile, doctor, transport, extension]
 ---

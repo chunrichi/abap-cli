@@ -1,5 +1,6 @@
 import { ADTClient, session_types, type ClientOptions, type TextElement, type TextElementCategory, type DumpsFeed } from 'abap-adt-api';
 import type { BearerFetcher } from 'abap-adt-api/build/AdtHTTP.js';
+import { parseServiceBinding, type ServiceBinding } from 'abap-adt-api/build/api/tablecontents.js';
 import { fetchDumpsFeed } from './dumps-feed.js';
 import {
   getTextElements as adtGetTextElements,
@@ -488,6 +489,39 @@ export class AdtClientWrapper {
   /** Structure elements for `inspect --structure`. */
   objectStructureElements(objectUrl: string, version?: Parameters<ADTClient['objectStructureElements']>[1]) {
     return this._call(() => this.client.objectStructureElements(objectUrl, version));
+  }
+
+  /**
+   * T3.2 — Fetch the nested service-binding metadata omitted by
+   * `objectStructure()`. Returns the parsed `ServiceBinding` payload
+   * (services, binding type / category, packageRef, …) — the consumer
+   * is responsible for projecting it into the AFF `<name>.srvb.json`
+   * shape via `formats/pull-strategy.ts#renderServiceBindingMetadata`.
+   *
+   * abap-adt-api 8.4.1 does not expose a typed `serviceBinding()` method,
+   * so we round-trip through `httpClient.request()` and parse the
+   * `application/vnd.sap.adt.businessservices.servicebinding.v2+xml` body
+   * via the package's `parseServiceBinding`.
+   */
+  serviceBinding(objectUrl: string): Promise<ServiceBinding> {
+    return this._call(async () => {
+      const response = await this.client.httpClient.request(objectUrl, {
+        method: 'GET',
+        headers: { Accept: 'application/vnd.sap.adt.businessservices.servicebinding.v2+xml' },
+      });
+      return parseServiceBinding(String(response.body));
+    });
+  }
+
+  /**
+   * T3.1 — Fetch the source DDL for a service definition (SRVD).
+   * SRVD objects carry a DDL-like body (define service …) wrapped in
+   * the standard ADT source envelope. abap-adt-api exposes the same
+   * `getObjectSource` for every type, so this is a thin convenience
+   * wrapper.
+   */
+  getSrvd(objectSourceUrl: string): Promise<string> {
+    return this._call(() => this.client.getObjectSource(objectSourceUrl));
   }
 
   /**

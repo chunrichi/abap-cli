@@ -20,7 +20,7 @@ changed at: 2026-08-19 23:00:00
 - [init](commands/init.md) — 工作区的唯一入口：首次绑定（写 `.abap.json`） / 修改字段 / 自省（`--show-config`） / 清空（`--unset-*`） / 脚手架 agent 上下文
 - [profile](commands/profile.md) — 管理全局连接 profiles
 - [doctor](commands/doctor.md) — 诊断 CLI 环境
-- [extension](commands/extension.md) — 管理内置 ICF ABAP 扩展（deploy / status）
+- [deploy](commands/deploy.md) — 部署内置 ICF ABAP 服务（`deploy` / `deploy status`）
 - [extensions](commands/extensions.md) — 管理第三方扩展（list 探测 / lock 钉 hash；027 信任硬化）
 
 ### 创建 / 拉取 / 推送
