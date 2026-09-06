@@ -10,7 +10,7 @@ import { resolveObject, getObjectParts, validateLocalFile, type ResolvedObject }
 import { resolveTransport } from '../../core/transport.js';
 import { resolveLocalTargets } from '../../core/local-targets.js';
 import { requireWriteConfirmation } from '../../core/confirmation.js';
-import { readDdicJson, readDdicObjectForCreate, localToWire, validateDdicObject, type DdicSupportedType } from '../../formats/ddic/json.js';
+import { readDdicJson, readDdicObjectForCreate, localToWire, validateDdicObject, validateTabtPayload, type DdicSupportedType } from '../../formats/ddic/json.js';
 import { readHttpJson, localToWire as httpLocalToWire, validateHttpObject } from '../../formats/http/json.js';
 import { readTranJson, localToWire as tranLocalToWire, validateTranObject } from '../../formats/transport/json.js';
 import { pushObject, type PushStage } from './push-object.js';
@@ -385,6 +385,31 @@ async function pushDdicFile(
 
   const wire = localToWire(type, local);
   // Transport: --tr > config > file's recorded request > ($TMP → none) > user's open request.
+
+  // P3.1: TABT schema validation - gate the wire payload against tabt-v1.json
+  // enum values so the CLI rejects invalid buffering/state/storageType before
+  // posting to SAP (where apply_ddic_table_settings would raise
+  // DDIC_FIELD_UNSUPPORTED instead).
+  if (type === 'TABL' || type === 'STRU') {
+    const settingsWire = (local as Record<string, unknown>).generalInformation;
+    if (settingsWire) {
+      const tabtErrors = validateTabtPayload(settingsWire);
+      if (tabtErrors) {
+        const outFile = toRelativeOutputPath(file);
+        throw new CliError('TABT_VALIDATION_FAILED', `Invalid TABT settings in ${outFile}: ${tabtErrors.join('; ')}`, {
+          file: outFile,
+          type,
+          object: resolved.objectName,
+          details: { schemaFile: 'tabt-v1.json', errors: tabtErrors },
+          nextSteps: [
+            'Inspect the .tabl.settings.json (or .tabl.json embedded generalInformation).',
+            `Run \`abap pull ${resolved.objectName} --type ${type}\` to refresh the file with current SAP-side values.`,
+          ],
+        });
+      }
+    }
+  }
+
   const packageName = (wire.package ?? '').toUpperCase();
   let transport = opts.tr ?? client.getConfig().transport ?? local.transportRequest ?? '';
   if (!transport && packageName !== '$TMP') {
