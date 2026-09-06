@@ -47,4 +47,32 @@ export function registerExtensionsCommand(program: Command): void {
           : 'human';
       await runExtensionsLock(mode, { allowUnsigned: Boolean(opts.allowUnsigned) });
     });
+
+  // P3.2: `extensions verify` re-checks every lockfile entry's integrity
+  // against the on-disk package contents. Useful in CI / pre-deploy hooks.
+  extensions
+    .command('verify')
+    .description('Verify extensions.lock.json integrity against on-disk packages')
+    .action(async (_opts: unknown, cmd: unknown) => {
+      const { verifyLockfile } = await import('../extensions/lockfile.js');
+      const c = cmd as { optsWithGlobals: () => { json?: boolean; prettyJson?: boolean } };
+      const flags = c.optsWithGlobals();
+      const result = await verifyLockfile(process.cwd());
+      if (flags.prettyJson) {
+        process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+      } else if (flags.json) {
+        process.stdout.write(JSON.stringify(result) + '\n');
+      } else {
+        if (result.ok) {
+          console.log(`OK: ${result.total} extension(s) verified at ${result.lockfilePath}`);
+        } else {
+          console.error(`FAIL: ${result.mismatches.length} mismatch(es) at ${result.lockfilePath}`);
+          for (const m of result.mismatches) {
+            const reason = m.result.ok ? 'UNKNOWN' : m.result.reason;
+            console.error(`  - ${m.packageName}: ${reason}`);
+          }
+          process.exit(1);
+        }
+      }
+    });
 }

@@ -46,6 +46,8 @@ export type WarningCode =
   | 'PUSH_TR_IGNORED_TMP'
   // 023-extension-mechanism
   | 'EXTENSION_DEGRADED'    // extension failed to load but CLI continues (lenient mode)
+  // P3.3: stuck-reports writer
+  | 'STUCK_REPORT_DEGRADED' // writeStuckReport encountered non-fatal issues
   // 030-runtime-deploy
   | 'STEAMPUNK_ICF_MANUAL'  // deploy on Steampunk: ICF node must be wired via CF route
   ;

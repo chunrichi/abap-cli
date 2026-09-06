@@ -18,7 +18,10 @@
         "NOT_FOUND",
         "LOCKED",
         "DDLS_NOT_SUPPORTED",
-        "CHANNEL_DETECT"
+        "CHANNEL_DETECT",
+        "CONFLICT",
+        "PERSISTENCE_ERROR",
+        "HTTP_ERROR"
       ]
     },
     "exitCode": {
@@ -64,6 +67,15 @@
         },
         "CHANNEL_DETECT": {
           "const": 65
+        },
+        "CONFLICT": {
+          "const": 66
+        },
+        "PERSISTENCE_ERROR": {
+          "const": 67
+        },
+        "HTTP_ERROR": {
+          "const": 68
         }
       },
       "required": [
@@ -77,7 +89,10 @@
         "NOT_FOUND",
         "LOCKED",
         "DDLS_NOT_SUPPORTED",
-        "CHANNEL_DETECT"
+        "CHANNEL_DETECT",
+        "CONFLICT",
+        "PERSISTENCE_ERROR",
+        "HTTP_ERROR"
       ]
     },
     "errorCodeByCategory": {
@@ -282,6 +297,18 @@
           "$ref": "#/definitions/category"
         },
         "DDLS_NOT_SUPPORTED_ON_ECC": {
+          "$ref": "#/definitions/category"
+        },
+        "TABT_VALIDATION_FAILED": {
+          "$ref": "#/definitions/category"
+        },
+        "CONFLICT": {
+          "$ref": "#/definitions/category"
+        },
+        "PERSISTENCE_ERROR": {
+          "$ref": "#/definitions/category"
+        },
+        "HTTP_ERROR": {
           "$ref": "#/definitions/category"
         }
       },

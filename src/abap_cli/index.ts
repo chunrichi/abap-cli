@@ -127,6 +127,18 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
     load: () => import('./commands/extensions.js').then((m) => ({ register: m.registerExtensionsCommand })),
   },
   {
+    // P3.3: feedback command
+    name: 'feedback',
+    description: 'Send CLI feedback to upstream tracker',
+    load: () => import('./commands/feedback.js').then((m) => ({ register: m.registerFeedbackCommand })),
+  },
+  {
+    // P3.3: report-stuck command
+    name: 'report-stuck',
+    description: 'Write a stuck-operation report for offline triage',
+    load: () => import('./commands/report-stuck.js').then((m) => ({ register: m.registerReportStuckCommand })),
+  },
+  {
     name: 'mime',
     scope: 'sap',
     description: 'Create, delete, or upload MIME Repository resources (create | delete | push)',

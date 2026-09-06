@@ -21,6 +21,10 @@ export const EXIT_CODES: Record<ErrorCategory, number> = {
   // shape unambiguously without diffing envelope data.
   DDLS_NOT_SUPPORTED: 64,
   CHANNEL_DETECT: 65,
+  // P3.3: feedback service error categories - reserved range.
+  CONFLICT: 66,
+  PERSISTENCE_ERROR: 67,
+  HTTP_ERROR: 68,
 };
 
 /** Exit code 1 — unknown / unmapped failure (same value as EXIT_CODES.UNKNOWN). */
