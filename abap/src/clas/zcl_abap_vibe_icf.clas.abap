@@ -235,6 +235,28 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
         client_dependent    TYPE abap_bool,
         allow_maintenance   TYPE abap_bool,
       END OF ty_tabl_general_information,
+
+      " P2.1: technical settings for apply_ddic_table_settings (TABT writeback).
+      " Mirrors `tabt-v1.json#buffering` + `dbSpecificSettings`, plus the
+      " apply-time fields (logChanges/translation) nested under
+      " generalInformation but the plan flattens here for readability.
+      TYPES:
+        BEGIN OF ty_ddic_table_buffering,
+          state                       TYPE string,
+          type                        TYPE string,
+          nr_of_key_flds4_generic_buff TYPE i,
+        END OF ty_ddic_table_buffering,
+        BEGIN OF ty_ddic_table_db_specific,
+          storage_type TYPE string,
+          load_unit    TYPE string,
+        END OF ty_ddic_table_db_specific,
+        BEGIN OF ty_ddic_table_settings,
+          log_changes          TYPE abap_bool,
+          writable_by_amdp     TYPE abap_bool,
+          translation          TYPE string,
+          buffering            TYPE ty_ddic_table_buffering,
+          db_specific_settings TYPE ty_ddic_table_db_specific,
+        END OF ty_ddic_table_settings.
       BEGIN OF ty_doma_format,
         data_type TYPE string,
         length    TYPE string,
@@ -478,6 +500,15 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
         type        TYPE string,
         description TYPE string,
         fields      TYPE tt_ddic_field_out_stru,
+      " P2.1: TABT writeback - apply buffering/storageType/loadUnit/logChanges/translation
+      " to an existing TABL via DDIF_TABL_GET + DDIF_TABL_PUT. The wire payload
+      " nested `is_settings-general_information-*` paths; this type keeps them flat.
+    METHODS apply_ddic_table_settings
+      IMPORTING iv_name     TYPE tabname
+                iv_payload  TYPE string
+                is_settings TYPE ty_ddic_table_settings
+      EXPORTING ev_error    TYPE ty_error.
+
       END OF ty_ddic_get_stru_data.
     METHODS create_ddic_table
       IMPORTING iv_name    TYPE tabname
@@ -1897,6 +1928,176 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
       APPEND ls_object_new TO et_object_new.
     ENDLOOP.
   ENDMETHOD.
+  METHOD apply_ddic_table_settings.
+
+    " P2.1: TABT writeback - apply buffering/storageType/loadUnit/logChanges/
+    " translation to an existing TABL. Read current DD09L via DDIF_TABL_GET,
+    " mutate the requested fields, and persist via DDIF_TABL_PUT. Each field
+    " is gated by an `iv_payload CS '"<key>"'` substring check so partial
+    " payloads (e.g. CLI sends only `buffering`) don't clobber untouched
+    " SAP-side settings.
+    DATA ls_header TYPE dd02v.
+    DATA ls_technical TYPE dd09v.
+    DATA lt_dd03p TYPE STANDARD TABLE OF dd03p WITH EMPTY KEY.
+    DATA lt_dd05m TYPE STANDARD TABLE OF dd05m WITH EMPTY KEY.
+    DATA lt_dd08v TYPE STANDARD TABLE OF dd08v WITH EMPTY KEY.
+    DATA lt_dd35v TYPE STANDARD TABLE OF dd35v WITH EMPTY KEY.
+    DATA lt_dd36m TYPE STANDARD TABLE OF dd36m WITH EMPTY KEY.
+    DATA lv_error_message TYPE string.
+
+    " Read current technical settings + foreign-key/index/text metadata.
+    CALL FUNCTION 'DDIF_TABL_GET'
+      EXPORTING
+        name     = iv_name
+        state    = 'A'
+        langu    = sy-langu
+      IMPORTING
+        dd02v_wa = ls_header
+        dd09l_wa = ls_technical
+      TABLES
+        dd03p_tab = lt_dd03p
+        dd05m_tab = lt_dd05m
+        dd08v_tab = lt_dd08v
+        dd35v_tab = lt_dd35v
+        dd36m_tab = lt_dd36m
+      EXCEPTIONS
+        illegal_input = 1
+        OTHERS = 2.
+    IF sy-subrc <> 0 OR ls_header-tabname IS INITIAL.
+      ev_error = VALUE ty_error( status = 'error'
+                                 error = VALUE ty_error_body(
+                                   code = 'DDIC_OBJECT_NOT_FOUND'
+                                   message = |TABL { iv_name } not found while applying technical settings| ) ).
+      RETURN.
+    ENDIF.
+
+    " Apply logChanges -> DD09L-protokoll (X / space).
+    IF iv_payload CS '"logChanges"'.
+      ls_technical-protokoll = COND #( WHEN is_settings-log_changes = abap_true
+                                       THEN 'X' ELSE space ).
+    ENDIF.
+
+    " Apply translation -> DD09L-uebersetz (enum mapping per AFF schema).
+    IF iv_payload CS '"translation"'.
+      CASE is_settings-translation.
+        WHEN 'noLanguageKey'.
+          ls_technical-uebersetz = space.
+        WHEN 'standard'.
+          ls_technical-uebersetz = 'X'.
+        WHEN 'loadTable'.
+          ls_technical-uebersetz = 'L'.
+        WHEN 'objectSpecific'.
+          ls_technical-uebersetz = 'T'.
+        WHEN 'notRelevant'.
+          ls_technical-uebersetz = 'N'.
+        WHEN OTHERS.
+          lv_error_message = |unsupported TABT translation value { is_settings-translation }|.
+      ENDCASE.
+    ENDIF.
+
+    " Apply buffering.state -> DD09L-bufallow (N / X / A).
+    IF iv_payload CS '"state"'.
+      CASE is_settings-buffering-state.
+        WHEN 'notAllowed'.
+          ls_technical-bufallow = 'N'.
+        WHEN 'switchedOn'.
+          ls_technical-bufallow = 'X'.
+        WHEN 'allowedButSwitchedOff'.
+          ls_technical-bufallow = 'A'.
+        WHEN OTHERS.
+          lv_error_message = |unsupported TABT buffering state { is_settings-buffering-state }|.
+      ENDCASE.
+    ENDIF.
+
+    " Apply buffering.type -> DD09L-pufferung (space / P / G / X).
+    IF iv_payload CS '"type"'.
+      CASE is_settings-buffering-type.
+        WHEN 'noBuffer'.
+          ls_technical-pufferung = space.
+        WHEN 'single'.
+          ls_technical-pufferung = 'P'.
+        WHEN 'generic'.
+          ls_technical-pufferung = 'G'.
+        WHEN 'full'.
+          ls_technical-pufferung = 'X'.
+        WHEN OTHERS.
+          lv_error_message = |unsupported TABT buffering type { is_settings-buffering-type }|.
+      ENDCASE.
+    ENDIF.
+
+    " Apply generic-buffer key-field count.
+    IF iv_payload CS '"nrOfKeyFlds4GenericBuff"'.
+      ls_technical-schfeldanz = is_settings-buffering-nr_of_key_flds4_generic_buff.
+    ENDIF.
+
+    " Apply storageType -> DD09L-roworcolst (R / C / space).
+    IF iv_payload CS '"storageType"'.
+      CASE is_settings-db_specific_settings-storage_type.
+        WHEN 'undefined'.
+          ls_technical-roworcolst = space.
+        WHEN 'rowStore'.
+          ls_technical-roworcolst = 'R'.
+        WHEN 'columnStore'.
+          ls_technical-roworcolst = 'C'.
+        WHEN OTHERS.
+          lv_error_message = |unsupported TABT storage type { is_settings-db_specific_settings-storage_type }|.
+      ENDCASE.
+    ENDIF.
+
+    " Apply loadUnit -> DD09L-load_unit (space / P / A / Q).
+    IF iv_payload CS '"loadUnit"'.
+      CASE is_settings-db_specific_settings-load_unit.
+        WHEN 'columnPreferred'.
+          ls_technical-load_unit = space.
+        WHEN 'pagePreferred'.
+          ls_technical-load_unit = 'P'.
+        WHEN 'columnEnforced'.
+          ls_technical-load_unit = 'A'.
+        WHEN 'pageEnforced'.
+          ls_technical-load_unit = 'Q'.
+        WHEN OTHERS.
+          lv_error_message = |unsupported TABT load unit { is_settings-db_specific_settings-load_unit }|.
+      ENDCASE.
+    ENDIF.
+
+    " Reject on any unknown enum value before persisting (atomic semantics).
+    IF lv_error_message IS NOT INITIAL.
+      ev_error = VALUE ty_error( status = 'error'
+                                 error = VALUE ty_error_body(
+                                   code = 'DDIC_FIELD_UNSUPPORTED'
+                                   message = lv_error_message ) ).
+      RETURN.
+    ENDIF.
+
+    " Persist via DDIF_TABL_PUT. Foreign-key/index/text tables are forwarded
+    " unchanged so we don't lose metadata the read pulled in.
+    CALL FUNCTION 'DDIF_TABL_PUT'
+      EXPORTING
+        name     = iv_name
+        dd02v_wa = ls_header
+        dd09l_wa = ls_technical
+      TABLES
+        dd03p_tab = lt_dd03p
+        dd05m_tab = lt_dd05m
+        dd08v_tab = lt_dd08v
+        dd35v_tab = lt_dd35v
+        dd36m_tab = lt_dd36m
+      EXCEPTIONS
+        tabl_not_found     = 1
+        name_inconsistent  = 2
+        tabl_inconsistent  = 3
+        put_failure        = 4
+        put_refused        = 5
+        OTHERS             = 6.
+    IF sy-subrc <> 0.
+      ev_error = VALUE ty_error( status = 'error'
+                                 error = VALUE ty_error_body(
+                                   code = 'DDIC_SETTINGS_WRITE_FAILED'
+                                   message = |Could not apply technical settings to TABL { iv_name }| ) ).
+    ENDIF.
+
+  ENDMETHOD.
+
 
   METHOD create_ddic_table.
     DATA lt_object_new TYPE comt_gox_def_header.
@@ -1995,6 +2196,26 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
                                                               details = lt_details ) ).
       RETURN.
     ENDIF.
+      " P2.1: TABT writeback. When payload carries logChanges/translation/
+      " buffering/dbSpecificSettings, deserialize into a dedicated settings
+      " struct (avoids nesting all TABT keys under ty_tabl_general_information
+      " which only carries create-time fields) and forward to apply_ddic_table_settings.
+      IF iv_payload CS '"logChanges"'
+         OR iv_payload CS '"translation"'
+         OR iv_payload CS '"buffering"'
+         OR iv_payload CS '"dbSpecificSettings"'.
+        DATA ls_settings TYPE ty_ddic_table_settings.
+        /ui2/cl_json=>deserialize( EXPORTING json = iv_payload
+                                     pretty_name = /ui2/cl_json=>pretty_mode-camel_case
+                               CHANGING data = ls_settings ).
+        apply_ddic_table_settings( EXPORTING iv_name     = CONV tabname( ls_attr-name )
+                                             iv_payload  = iv_payload
+                                             is_settings = ls_settings
+                                    IMPORTING ev_error    = ev_error ).
+        IF ev_error IS NOT INITIAL.
+          RETURN.
+        ENDIF.
+      ENDIF.
 
     es_payload = VALUE ty_ddic_create( status = 'success'
                                        data = VALUE ty_ddic_create_data( name   = ls_attr-name
