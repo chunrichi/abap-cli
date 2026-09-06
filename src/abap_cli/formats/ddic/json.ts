@@ -123,6 +123,30 @@ export interface DdicDtelWire {
   errorMessage?: string;
 }
 
+/** TABT buffering section - matches `tabt-v1.json#buffering`. */
+export interface DdicTableBufferingWire {
+  state?: 'notAllowed' | 'switchedOn' | 'allowedButSwitchedOff';
+  type?: 'noBuffer' | 'single' | 'generic' | 'full';
+  nrOfKeyFlds4GenericBuff?: number;
+}
+
+/** TABT dbSpecificSettings section - matches `tabt-v1.json#dbSpecificSettings`. */
+export interface DdicTableDbSpecificSettingsWire {
+  storageType?: 'undefined' | 'rowStore' | 'columnStore';
+  loadUnit?: 'columnPreferred' | 'pagePreferred' | 'columnEnforced' | 'pageEnforced';
+}
+
+/** TABT generalInformation section - matches `tabt-v1.json#generalInformation`. */
+export interface DdicTableGeneralInformationWire {
+  dataClassCategory?: string;
+  sizeCategory?: 'undefined' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9';
+  logChanges?: boolean;
+  writableByAmdp?: boolean;
+  translation?: 'noLanguageKey' | 'standard' | 'loadTable' | 'objectSpecific' | 'notRelevant';
+  buffering?: DdicTableBufferingWire;
+  dbSpecificSettings?: DdicTableDbSpecificSettingsWire;
+}
+
 /** TABL/STRU technical-settings wire payload — fields declared by `tabt-v1.json`. */
 export interface DdicTableSettingsWire {
   name: string;
@@ -134,7 +158,7 @@ export interface DdicTableSettingsWire {
     originalLanguage?: string;
     abapLanguageVersion?: string;
   };
-  generalInformation?: Record<string, unknown>;
+  generalInformation?: DdicTableGeneralInformationWire;
   fields?: DdicFieldWire[];
   type?: 'TABL' | 'STRU';
   mainJson?: string;
@@ -798,5 +822,59 @@ export function validateDdicObject(data: DdicObject, objectType: string): string
       break;
   }
   return errors;
+}
+
+
+/**
+ * P3.1: TABT settings valid enums - mirrors `tabt-v1.json` enum values.
+ * Kept in sync with `src/abap_cli/schema/tabt-v1.json` (the AFF schema is
+ * the source of truth; this map is a synchronous shortcut for the CLI push
+ * path so we can validate without the AJV overhead).
+ */
+const TABT_VALID_ENUMS = {
+  translation: ['noLanguageKey', 'standard', 'loadTable', 'objectSpecific', 'notRelevant'],
+  bufferingState: ['notAllowed', 'switchedOn', 'allowedButSwitchedOff'],
+  bufferingType: ['noBuffer', 'single', 'generic', 'full'],
+  storageType: ['undefined', 'rowStore', 'columnStore'],
+  loadUnit: ['columnPreferred', 'pagePreferred', 'columnEnforced', 'pageEnforced'],
+  sizeCategory: ['undefined', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
+} as const;
+
+/**
+ * P3.1: validate a TABL/STRU `generalInformation` payload against the
+ * `tabt-v1.json` enum values. Synchronous (no AJV dependency) so it can
+ * run inline in push.ts / create.ts without an `await` boundary.
+ *
+ * Returns null on success, or a list of human-readable errors.
+ */
+export function validateTabtPayload(settings: unknown): string[] | null {
+  if (!settings || typeof settings !== 'object') return null;
+  const s = settings as Record<string, unknown>;
+  const errors: string[] = [];
+  if (typeof s.translation === 'string' && !(TABT_VALID_ENUMS.translation as readonly string[]).includes(s.translation)) {
+    errors.push(`generalInformation.translation: '${s.translation}' is not a valid TABT enum value (expected one of ${TABT_VALID_ENUMS.translation.join('|')})`);
+  }
+  if (typeof s.sizeCategory === 'string' && !(TABT_VALID_ENUMS.sizeCategory as readonly string[]).includes(s.sizeCategory)) {
+    errors.push(`generalInformation.sizeCategory: '${s.sizeCategory}' is not a valid TABT enum value (expected one of ${TABT_VALID_ENUMS.sizeCategory.join('|')})`);
+  }
+  const buffering = s.buffering as Record<string, unknown> | undefined;
+  if (buffering && typeof buffering === 'object') {
+    if (typeof buffering.state === 'string' && !(TABT_VALID_ENUMS.bufferingState as readonly string[]).includes(buffering.state)) {
+      errors.push(`buffering.state: '${buffering.state}' is not a valid TABT enum value (expected one of ${TABT_VALID_ENUMS.bufferingState.join('|')})`);
+    }
+    if (typeof buffering.type === 'string' && !(TABT_VALID_ENUMS.bufferingType as readonly string[]).includes(buffering.type)) {
+      errors.push(`buffering.type: '${buffering.type}' is not a valid TABT enum value (expected one of ${TABT_VALID_ENUMS.bufferingType.join('|')})`);
+    }
+  }
+  const db = s.dbSpecificSettings as Record<string, unknown> | undefined;
+  if (db && typeof db === 'object') {
+    if (typeof db.storageType === 'string' && !(TABT_VALID_ENUMS.storageType as readonly string[]).includes(db.storageType)) {
+      errors.push(`dbSpecificSettings.storageType: '${db.storageType}' is not a valid TABT enum value (expected one of ${TABT_VALID_ENUMS.storageType.join('|')})`);
+    }
+    if (typeof db.loadUnit === 'string' && !(TABT_VALID_ENUMS.loadUnit as readonly string[]).includes(db.loadUnit)) {
+      errors.push(`dbSpecificSettings.loadUnit: '${db.loadUnit}' is not a valid TABT enum value (expected one of ${TABT_VALID_ENUMS.loadUnit.join('|')})`);
+    }
+  }
+  return errors.length === 0 ? null : errors;
 }
 
