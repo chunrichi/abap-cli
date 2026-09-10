@@ -78,10 +78,16 @@ describe('025 routing coverage (SC-002: metadata.commands 互不相交)', () => 
     }
   });
 
-  it('meta skill (abap-cli) 的 metadata.commands 是空数组（FR-009）', () => {
+  it('meta skill (abap-cli) 的 metadata.commands 仅含 agent 元命令（FR-009）', () => {
     const meta = skills.find((s) => s.name === 'abap-cli')!;
-    expect(meta.fm.metadata?.commands, 'meta skill 必须有 metadata.commands 字段').toBeDefined();
-    expect(meta.fm.metadata?.commands, 'meta skill 的 commands 必须是空数组').toEqual([]);
+    const cmds = meta.fm.metadata?.commands ?? [];
+    // meta skill 允许有 commands，但这些必须是 agent 元命令（feedback / report-stuck 等），
+    // 不允许混入任何领域 skill 已声明的命令（互不相交）。
+    // 与 0.2.6+ P3.3 spec 对齐：feedback / report-stuck 不操作 SAP 对象，归属 meta。
+    expect(cmds, 'meta skill 必须有 metadata.commands 字段').toBeDefined();
+    for (const cmd of cmds) {
+      expect(commandToSkill.has(cmd), `meta 命令 ${cmd} 与领域 skill 重名`).toBe(false);
+    }
   });
 
   it('同一命令不出现于多个领域 skill 的 metadata.commands（SC-002 / FR-002 / FR-010）', () => {
@@ -94,14 +100,28 @@ describe('025 routing coverage (SC-002: metadata.commands 互不相交)', () => 
       }
     }
     // 同时核对每条命令确实只命中一个
-    expect(commandToSkill.size, '至少应有 17 条命令（不含 create local 子命令）').toBeGreaterThanOrEqual(17);
+    expect(commandToSkill.size, '至少应有 22 条领域命令（不含 create local 子命令）').toBeGreaterThanOrEqual(22);
   });
 
   it('4 领域 skill 的 metadata.commands 并集覆盖全部 CLI 命令（SC-002）', () => {
+    // 0.2.6 起，'extension' 改名 'deploy'（CHANGELOG 移除 breaking）；
+    // 此外新增：dumps / extensions / session / mime / validate:aff
     const expected = [
-      'init', 'profile', 'doctor', 'transport', 'extension',
-      'search', 'where-used', 'pull', 'push', 'check', 'create', 'activate', 'inspect', 'diff', 'status',
-      'select', 'run', 'tcode',
+      // abap-cli-setup（7）
+      'init', 'profile', 'doctor', 'transport', 'deploy',
+      // abap-cli-search（7）
+      'search', 'where-used', 'inspect', 'diff', 'status', 'dumps',
+      // abap-cli-edit（6 顶层 + mime）
+      'pull', 'push', 'check', 'create', 'activate', 'mime',
+      // abap-cli-data（2）
+      'select', 'run',
+      // 公共
+      'tcode',
+      // 0.2.6 接入 setup：第三方扩展 + session 探查
+      'extensions',
+      'session',
+      // 0.2.6 接入 edit：AFF 校验
+      'validate:aff',
     ];
     for (const cmd of expected) {
       expect(commandToSkill.has(cmd), `${cmd} 未被任何领域 skill 覆盖`).toBe(true);
