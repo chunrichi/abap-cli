@@ -38,7 +38,7 @@ if (status === 'current') {
 
 if (status === 'not_deployed' || status === 'outdated') {
     process.stderr.write(`ICF 状态: ${status}，开始部署\n`);
-    await run(['extension', 'deploy', '--yes', '--json']);
+    await run(['deploy', '--yes', '--json']);
     process.exit(0);
 }
 

@@ -61,10 +61,10 @@ cp agents/abap-developer.agent.md <your-project>/.github/agents/abap-developer.a
 
 | skill | scope | 覆盖命令 | 一句话职责 |
 |---|---|---|---|
-| **`abap-cli`** | meta | （无命令，纯路由） | 入口路由层：根据用户意图分发到 4 个领域 skill + 1 个方法论 skill；串联 `.github/skills/` 两层方法论 |
-| **`abap-cli-setup`** | workspace-and-sap | `init` `profile` `doctor` `transport` `extension`（deploy/status） | 环境就绪：workspace 配置、profile 凭证、本地诊断、SAP 传输请求、ICF 服务部署 |
-| **`abap-cli-search`** | sap（只读） | `search` `where-used` `inspect` `tcode` `diff` `status` | 元数据探查：纯只读命令集合；不改对象、不加锁、不写 transport |
-| **`abap-cli-edit`** | sap（写） | `pull` `push` `check` `create` `activate` `create local` + DDIC 子集 | 写路径：所有会改 SAP 对象的命令；DDIC CRUD 与源码 CRUD 同源 |
+| **`abap-cli`** | meta | `feedback` `report-stuck`（agent 元命令；无领域命令时也提供路由查询） | 入口路由层：根据用户意图分发到 4 个领域 skill + 1 个方法论 skill；串联 `.github/skills/` 两层方法论；代理 `feedback / report-stuck` 反馈链路 |
+| **`abap-cli-setup`** | workspace-and-sap | `init` `profile` `doctor` `transport` `deploy` (deploy/status) `extensions` (list/lock) `session` (info) | 环境就绪：workspace 配置、profile 凭证、本地诊断、SAP 传输请求、ICF 服务部署、第三方扩展管理、session cookie 探查 |
+| **`abap-cli-search`** | sap（只读） | `search` `where-used` `inspect` `tcode` `diff` `status` `dumps` | 元数据探查：纯只读命令集合；不改对象、不加锁、不写 transport；`dumps` 列近期 ST22 ABAP runtime dump |
+| **`abap-cli-edit`** | sap（写） | `pull` `push` `check` `create` `activate` `create local` `mime` (create/delete/push) `validate:aff` + DDIC 子集（13 类：CLAS / INTF / PROG / FUGR / TABL / STRU / DOMA / DTEL / TTYP / MSAG / DDLS / HTTP / TRAN；`SRVB` 仅 pull；CDS/RAP 5 类支持完整 create） | 写路径：所有会改 SAP 对象的命令；DDIC CRUD 与源码 CRUD 同源；`mime` 管 MIME Repository；`validate:aff` 写盘前本地校验 |
 | **`abap-cli-data`** | sap（只读消费） | `select` `run` | 对象运行时消费：对一个已存在对象做不修改数据的查询/执行 |
 | **`abap-cli-performance`** | abap-performance-review | （方法论；触发的只读命令： `search` `inspect` `pull` `check` `select`） | ABAP 性能 review：慢路径诊断、HANA/传统数据库分平台建议、`abap check` / `abap check atc` 核验 |
 
@@ -90,33 +90,39 @@ skills/<name>/
 
 | 用户意图 | 唯一目标 skill | 触发命令 |
 |---|---|---|
-| 配置 / 接 SAP / 加 profile / 诊断 / 传输请求 / 部署 ICF | `abap-cli-setup` | `init` `profile` `doctor` `transport` `extension` |
-| 查对象元数据 / where-used / 业务码 / 拉取对账 / 状态只读 | `abap-cli-search` | `search` `where-used` `inspect` `tcode` `diff` `status` |
-| 拉对象 / 改 / 推 / 语法检查 / 激活 / 创建 | `abap-cli-edit` | `pull` `push` `check` `create` `activate` `create local` + DDIC 子集 |
+| 配置 / 接 SAP / 加 profile / 诊断 / 传输请求 / 部署 ICF / 管理扩展 / 看 session | `abap-cli-setup` | `init` `profile` `doctor` `transport` `deploy` `extensions` `session` |
+| 查对象元数据 / where-used / 业务码 / 拉取对账 / 状态只读 / 看 ST22 dump | `abap-cli-search` | `search` `where-used` `inspect` `tcode` `diff` `status` `dumps` |
+| 拉对象 / 改 / 推 / 语法检查 / 激活 / 创建 / MIME / AFF 校验 | `abap-cli-edit` | `pull` `push` `check` `create` `activate` `create local` `mime` `validate:aff` + 13 类 DDIC/CDS 子集 |
 | 跑类 / 查表 / 翻页 select | `abap-cli-data` | `select` `run` |
 | ABAP 性能 review / 慢路径诊断 / 优化建议 | `abap-cli-performance` | （方法论 skill，不直接管命令；触发其他 4 个领域的只读命令） |
+| Agent 提交反馈 / 卡死留痕 | `abap-cli`（meta） | `feedback` `report-stuck` |
 | 意图模糊 / 不确定归哪类 | `abap-cli`（meta） | （路由查询本身） |
 
 > ⚠️ **`pull` 归 `abap-cli-edit`**（写路径的中间步骤），**`inspect` 归 `abap-cli-search`**（只读元数据，修复动作归 edit）。
 >
 > ⚠️ **`abap-cli-performance` 不是领域 skill**——它的 `metadata.commands` 列出的是触发的只读命令（`search / inspect / pull / check / select`），实际归属仍是上表 4 个领域 skill。本 skill 全程不写对象。
+>
+> ⚠️ **`feedback` / `report-stuck` 归 `abap-cli`（meta）**——它们是 agent 反馈链路（spec P3.3），不操作 SAP 对象，不属于 4 个领域 skill；`feedback` 走云端服务（需网络），`report-stuck` 纯本地留痕。
 
 ### 错误码不重叠（硬性约束）
 
 - `WRAPPER_NOT_DEPLOYED` / `TABLE_NOT_FOUND` / `LIMIT_EXCEEDED` / `TIMEOUT` — **仅** `abap-cli-data`
 - `LOCK_FAILED` / `SYNTAX_ERROR` / `DDIC_NOT_SUPPORTED` / `INACTIVE_PARTS` — **仅** `abap-cli-edit`
-- `OBJECT_NOT_FOUND` / `TCODE_NOT_FOUND` / `NOT_AUTHORIZED` — **仅** `abap-cli-search`
-- `CONFIG_ERROR` / `TLS_ERROR` / `NO_TRANSPORT` / `ICF_CHECK_DEGRADED` — **仅** `abap-cli-setup`
+- `OBJECT_NOT_FOUND` / `TCODE_NOT_FOUND` / `NOT_AUTHORIZED` / `OBJECT_NOT_INDEXED` / `DUMPS_LIMIT_OUT_OF_RANGE` — **仅** `abap-cli-search`
+- `CONFIG_ERROR` / `TLS_ERROR` / `NO_TRANSPORT` / `ICF_CHECK_DEGRADED` / `STEAMPUNK_ICF_MANUAL` / `FORCE_BYPASSED` / `EXTENSION_LOAD_FAILED` / `EXTENSION_VALIDATION_FAILED` / `SESSION_JAR_DECRYPT_FAILED` — **仅** `abap-cli-setup`
+- `CHANNEL_DETECTION_FAILED` / `DDLS_NOT_SUPPORTED_ON_ECC` — **仅** `abap-cli-edit`（TTYP/MSAG/DDLS 通道检测；保留区间 exit 65/64）
+- `HTTP_ERROR` / `CONFLICT` / `PERSISTENCE_ERROR` — **仅** `abap-cli`（meta 的 `feedback / report-stuck`，保留区间 exit 66-68）
 - 公共错误（`INVALID_ARGUMENT` / `USAGE` 等）在涉及它的每个 skill 中各自内联完整描述，不做 cross-reference
 
-## 命令覆盖核对（v0.3 — 6-skill）
+## 命令覆盖核对（v0.3 — 6-skill, 25 CLI 命令）
 
-- ✅ `abap-cli-setup`：`init` `profile` `doctor` `transport` `extension`（deploy/status）
-- ✅ `abap-cli-search`：`search` `where-used` `inspect` `tcode` `diff` `status`
-- ✅ `abap-cli-edit`：`pull` `push` `check` `create` `activate` `create local` + DDIC 子集
-- ✅ `abap-cli-data`：`select` `run`
+- ✅ `abap-cli-setup`：`init` `profile` `doctor` `transport` `deploy` (deploy/status) `extensions` (list/lock) `session` (info) — **7 顶层**
+- ✅ `abap-cli-search`：`search` `where-used` `inspect` `tcode` `diff` `status` `dumps` — **7 顶层**
+- ✅ `abap-cli-edit`：`pull` `push` `check` `create` (含 `create local`) `activate` `mime` (create/delete/push) `validate:aff` — **7 顶层 + 子命令**
+- ✅ `abap-cli-data`：`select` `run` — **2 顶层**
 - ✅ `abap-cli-performance`：方法论 skill；触发的只读命令（`search / inspect / pull / check / select`）归属上 4 个领域 skill
-- ✅ `abap-cli`（meta）：路由层，**不**直接管命令
+- ✅ `abap-cli`（meta）：路由层 + `feedback / report-stuck` 元命令 — **2 顶层**
+- **合计**：7 + 7 + 7 + 2 + 0 + 2 = **25 顶层命令**（与 `src/abap_cli/index.ts` 的 `COMMAND_SPECS` 1:1 对齐）
 
 ## 版本
 

@@ -2,7 +2,7 @@
 
 > 按需加载。本文件仅覆盖写路径错误码。
 
-## 本 skill 错误码清单（6 命令范围）
+## 本 skill 错误码清单（8 命令范围：pull/push/check/create/activate/create local/mime/validate:aff）
 
 | code | cat/exit | 触发命令 | 修复 |
 |---|---|---|---|

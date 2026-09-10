@@ -8,7 +8,7 @@
 
 | code | cat/exit | 触发 | 修复 |
 |---|---|---|---|
-| `WRAPPER_NOT_DEPLOYED` | NOT_FOUND/8 | run --method 缺失 wrapper | 跳 `abap-cli-setup`：`extension deploy --yes` 安装 `ZCL_ABAP_VIBE_RUNNER` |
+| `WRAPPER_NOT_DEPLOYED` | NOT_FOUND/8 | run --method 缺失 wrapper | 跳 `abap-cli-setup`：`deploy --yes` 安装 `ZCL_ABAP_VIBE_RUNNER` |
 | `WRAPPER_INPUT_UNAVAILABLE` | SAP_ERROR/6 | run --method（ADT classrun 不注入） | 改用直接 classrun 路径 |
 | `METHOD_NOT_SUPPORTED` | VALIDATION_ERROR/7 | run --method（签名不可反射） | 改 wrapper 类签名（避免 CHANGING/TABLES/instance/private/deep） |
 | `METHOD_FAILED` | VALIDATION_ERROR/7 | run（目标方法抛 `cx_root`） | 读 `data.parsed` 看异常 |
@@ -30,7 +30,7 @@
 | `OFFSET_EXCEEDED` | VALIDATION_ERROR/7 | select | `--offset` ∈ `[0, 100000]` |
 | `QUERY_FAILED` | SAP_ERROR/6 | select（动态 SQL 运行时异常） | 本 skill 直接 `activate <table>`（[abap-cli-edit]） |
 | `AUTH_ERROR` | AUTH_ERROR/5 | select | 跳 `abap-cli-setup`：`profile test`；检查 `S_TABU_DIS` |
-| `ICF_CHECK_DEGRADED` | warning（`meta.warnings`） | select | 不阻断；跳 `abap-cli-setup` 跑 `extension status` |
+| `ICF_CHECK_DEGRADED` | **select 不报此码**；仅 `init` 与 `deploy status` 探测时可能落入 `meta.warnings`（详见 [abap-cli-setup] 错误码全表）| 不适用；agent 不应假设 select 报此码 |
 
 ## JSON 输出契约参考
 

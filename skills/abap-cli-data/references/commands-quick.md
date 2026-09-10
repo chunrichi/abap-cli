@@ -45,7 +45,7 @@ abap run ZCL_FOO --timeout 60000
 | 路径 | 触发 | 条件 |
 |---|---|---|
 | **classrun** | 不传 `--method` | 类实现 `if_oo_adt_classrun~main` |
-| **wrapper** | 传 `--method` | 部署 `ZCL_ABAP_VIBE_RUNNER`（`abap extension deploy`，[abap-cli-setup]） |
+| **wrapper** | 传 `--method` | 部署 `ZCL_ABAP_VIBE_RUNNER`（`abap deploy`，[abap-cli-setup]） |
 
 **已知限制**（vhcala4hci 验证）：ADT classrun 端点**不注入** `--method` 入参——此时 `WRAPPER_INPUT_UNAVAILABLE`，应改用直接 classrun 路径。
 
@@ -122,7 +122,7 @@ VALUE:
 }
 ```
 
-### 017 原生行值（service 0.4.0）
+### 017 原生行值（service 0.6.0）
 
 `data.rows` 单元格遵循 `/ui2/cl_json` 原生序列化：
 

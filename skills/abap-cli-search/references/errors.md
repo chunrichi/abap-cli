@@ -2,7 +2,7 @@
 
 > 按需加载。
 
-## 本 skill 错误码清单（6 命令范围）
+## 本 skill 错误码清单（7 命令范围）
 
 | code | cat/exit | 触发命令 | 修复 |
 |---|---|---|---|
@@ -11,9 +11,10 @@
 | `TCODE_NOT_FOUND` | NOT_FOUND/8 | tcode | 业务码未在 TSTC；校对拼写 |
 | `TCODE_NOT_AUTHORIZED` | AUTH_ERROR/5 | tcode | 用户无 `S_TCODE`；换有权限用户 |
 | `OBJECT_NOT_INDEXED` | SAP_ERROR/6 | where-used | 暂时无索引；改用 `search <obj>` + `pull`（[abap-cli-edit]）看代码 |
+| `DUMPS_LIMIT_OUT_OF_RANGE` | VALIDATION_ERROR/7 | dumps | `--limit` 不在 [1, 100] |
 | `INVALID_ARGUMENT` | USAGE/2 | 任意 | 看 `error.nextSteps` / `error.references`（help 已不再含错误恢复表） |
 | `USAGE` | USAGE/2 | 任意 | 缺必填参数；看 `error.nextSteps` |
-| `SAP_ERROR` | SAP_ERROR/6 | 任意 | `data.objects[]` 看哪个失败；ICF 端未知错码时跳 `abap-cli-setup` 跑 `extension status` |
+| `SAP_ERROR` | SAP_ERROR/6 | 任意 | `data.objects[]` 看哪个失败；ICF 端未知错码时跳 `abap-cli-setup` 跑 `deploy status` |
 
 ## 012 通用退出码（稳定契约）
 

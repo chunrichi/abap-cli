@@ -1,4 +1,4 @@
-# abap-cli-edit — 6 命令完整速查
+# abap-cli-edit — 8 命令完整速查（6 写 + mime + validate:aff）
 
 > 按需加载。本文件覆盖写路径：`pull` / `push` / `check` / `create` / `activate` / `create local`。
 
@@ -106,4 +106,109 @@ abap create <type> <name> --json
 ```
 
 | flag | 含义 |
+|---|---|---|
+| `<type>` | 对象类型（13 类：`CLAS / INTF / PROG / FUGR / TABL / STRU / DOMA / DTEL / TTYP / MSAG / DDLS / HTTP / TRAN`；`SRVB` 仅 pull；CDS/RAP 5 类支持完整 create） | 必填 |
+| `<name>` | 对象名（命名空间 `Z` / `Y` / `/`） | 必填 |
+| `--package <pkg>` | 目标包；默认 `$TMP` | `$TMP` |
+| `--description <text>` | 对象描述（`TRAN` 等 ICF 类型走 `.http.json::generalInformation.description`） | — |
+| `--tr <transport>` | transport 请求；非 `$TMP` 必填（除非对象已绑定） | — |
+| `--template <name>` | 骨架模板（仅 ADT 源对象）：`empty` / `default` | `default` |
+| `--no-activate` | 建完不激活（仅写 + 锁，不 activateAll） | false |
+| `--no-pull` | 建完不拉完整源（用于 `create local` 离线草稿后导入） | false |
+| `--file <path>` | DDIC / FUGR / HTTP 等 wire 源文件路径；TABL/STRU 三件套时指向 main `.tabl.json` | 必填（DDIC + HTTP） |
+| `--dir <path>` | `create local` 输出目录 | `./src/` |
+| `--yes` | 跳过提示；非交互必填 | — |
+
+## `abap activate`
+
+激活一个对象的所有 inactive items（method / OSI 层级）。**不**改源、不写 transport——只触发 SAP 端 activation。
+
+```bash
+abap activate ZCL_FOO --yes                              # 按名字激活
+abap activate ZCL_FOO --type CLAS --yes                  # 同前缀多对象时消歧
+abap activate ZCL_FOO --schema                           # 参数自省（无 SAP 调用）
+```
+
+何时用：`push` 报 activated 但 `inspect --activation` 报 `ok: false`——method/OSI 层级没激活（013 落地经验：root-URI `activate` 在真实 SAP 上静默 no-op）；修复走 `activate --yes` 后再 `inspect --activation` 复核。
+
+## `abap mime`
+
+管理 SAP MIME Repository（SE80 MIME 存储库）的目录与文件。命令走自建 ICF handler `dispatch_mime`（`CL_MIME_REPOSITORY_API`）；**依赖 `deploy`**（handler 类 `ZCL_ABAP_VIBE_ICF` 部署后才可用）。
+
+> **与 `abap deploy` 不同**：`deploy` 装内置 ICF ABAP handler；`mime` 是面向终端用户 MIME 资源的 CRUD。
+
+```bash
+# 建目录（默认 $TMP，无需 transport）
+abap mime create /zntf_ui --package $TMP --description "UI root" --yes
+
+# 删目录（非空须 --recursive）
+abap mime delete /zntf_ui --recursive --tr NDK123456 --yes
+abap mime delete /zntf_ui --recursive --dry-run          # 计划模式
+
+# 传本地文件/目录到 MIME 根（每文件一次 POST）
+abap mime push ./dist --root /zntf_ui/assets --tr NDK123456 --yes
+abap mime push ./logo.png --root /zntf_ui/assets --yes    # 单文件
+
+# 自省（无 SAP 调用）
+abap mime --schema
+```
+
+| 子命令 | 用途 | 端点 | 关键 flag |
+|---|---|---|---|
+| `mime create <path>` | 建 root 或嵌套目录 | `POST /mime/folder` | `--package $TMP` `--description` `--tr` |
+| `mime delete <path>` | 删目录（非空须 `--recursive`） | `PUT /mime/folder?recursive=&transport=` | `--recursive` `--tr` |
+| `mime push <local>` | 上传本地文件/目录到指定 MIME 根 | `POST /mime/resources` | `--root <path>` `--tr` |
+
+写操作保护（与 `deploy` / `transport` 一致）：
+
+- **TTY**：无确认
+- **非 TTY**：必须 `--yes` 或 `--dry-run`，否则 `VALIDATION_ERROR` (exit 7)
+- **路径约束**：`<path>` 必须 `/` 开头；不允许 `..` 或尾部 `/`
+
+## `abap validate:aff`
+
+校验本地 JSON 是否满足 **官方 abap-file-format** 规范。10 个支持类型（CLAS / INTF / PROG / FUGR / TABL / STRU / DOMA / DTEL / HTTP / TRAN）共享同一套 ajv@^8 + Draft 2020-12；schema 来自 `src/abap_cli/schema/<type>-v1.json`（STRU 共享 `tabl-v1.json`；TABL/STRU `.settings.json` 走 `tabt-v1.json`）。
+
+**纯本地，不进 SAP**；CI / pretest gate。`pretest` 默认扫 `test/fixtures/`。
+
+```bash
+# 默认扫 test/fixtures/（pretest 入口）
+abap validate:aff
+
+# 单文件
+abap validate:aff test/fixtures/tabl/zmy_basic.tabl.json --json
+
+# 多路径
+abap validate:aff test/fixtures/ --wire tmp/s4h/wire/ --json
+
+# 自省
+abap validate:aff --schema
+```
+
+| flag | 含义 | 默认 |
+|---|---|---|
+| `<file-or-dir>` | 单文件或目录（递归 `.json`） | `test/fixtures/` |
+| `--wire <wire-dir>` | 额外扫 wire payload 目录 | — |
+| `--schema` | 参数自省（无 I/O） | — |
+
+输出信封（`--json`）：
+
+```jsonc
+{
+    "status": "success",
+    "summary": { "pass": 32, "warn": 0, "fail": 0 },
+    "files": [
+        { "path": "test/fixtures/tabl/zt_x.tabl.json", "result": "PASS" },
+        { "path": "test/fixtures/tabl/zt_y.tabl.json", "result": "FAIL",
+          "errors": [{ "instancePath": "/fields/0/dataType", "keyword": "enum", "message": "must be one of ..." }] }
+    ]
+}
+```
+
+退出码：
+
+| exit | 含义 |
 |---|---|
+| 0 | 全部 PASS（可含 WARN） |
+| 1 | 至少一个 FAIL 或解析失败 |
+| 2 | USAGE（未知 option / 缺参数） |
