@@ -72,11 +72,11 @@ CLI 同时接受**扁平写法**（方便手写）：
 # 拉一个已有 SICF 节点
 abap pull ZMY_SERVICE --type HTTP --json
 
-# 无 --file：落最小骨架（action local，不调 SAP），编辑后 push
-abap create HTTP ZMY_SERVICE --package $TMP --description "My service" --json
-
-# 有 --file：直接在 SAP 建 SICF 节点（--package $TMP 无需 --tr）
+# 建 SICF 节点：必须带 --file（abap-file-format JSON，--package $TMP 无需 --tr）
 abap create HTTP ZMY_SERVICE --file src/http/zmy_service.http.json --package $TMP --json
+
+# 或者手写 .http.json 后直接 push —— HTTP push 允许 create-on-push
+abap push src/http/zmy_service.http.json --tr DEVK900001 --json
 
 # 改完推回
 abap push src/http/zmy_service.http.json --tr DEVK900001 --json
@@ -84,13 +84,13 @@ abap push src/http/zmy_service.http.json --tr DEVK900001 --json
 
 ## abap-file-format 合规性
 
-✅ 与 `http-v1.json` 对齐；CLI 接受两种写法。wire 已对齐嵌套 abap-file-format 形态（真实 SAP create 曾报 `HTTP_SERVICE_INVALID`，commit `7fd13ec`）；create 骨架含 `name`（同 commit）。
+✅ 与 `http-v1.json` 对齐；CLI 接受两种写法。wire 已对齐嵌套 abap-file-format 形态（真实 SAP create 曾报 `HTTP_SERVICE_INVALID`，commit `7fd13ec`）。
 
 ## 已知坑
 
 - **`serviceId` / `descriptionByLang[]` 仅 CLI 透传**：032 US10 落盘字段。当前 ABAP handler（0.5.0 结构）不含这两字段——POST 忽略、GET 不回传，真实 SAP 上无法 round-trip（标准 http-v1 字段已闭环）。本地手写文件若含扩展字段，push 后再次 pull 会丢失，属预期（待 ABAP 端扩展）。
 - **pull 落盘 `originalLanguage` 取登录语言**：ABAP GET 按 `sy-langu` 推导（如登录语言 ZH 则落 `ZH`），不一定等于创建时的值；两次 pull 间一致，不影响 push/pull 幂等闭环。
-- **`create HTTP` 无 `--file` 落最小骨架**：`src/http/<name>/<name>.http.json`（含 `name`；`action: local`，不调 SAP）；编辑 `url` / `handlerClass` 后即可 `abap push`。已有同名文件返回 `OVERWRITE_REQUIRED`。
+- **`create HTTP` 必须带 `--file`**：032 US10 曾支持"无 `--file` 落最小骨架（`action: local`，不调 SAP，已有同名文件返回 `OVERWRITE_REQUIRED`）"，该路径已按重构决策 1A 删除，与 DDIC / DDLS 行为对齐。要起本地草稿请手写 `.http.json`（见 `abap create --schema HTTP` 的 `exampleJson`），或先 `abap pull` 一个同类节点再改；`abap create local HTTP` 不支持 HTTP。
 - **`url` 必须以 `/` 开头**：不写 `/` 时 SAP 端会拒；CLI 不做前缀校验
 - **`handlerClass` 必须存在**：push 时 SAP 端会校验；不存在的类会报 `CLASS_NOT_FOUND`
 - **BTP Steampunk 上 ICF 节点不在本地**：Steampunk SaaS 的 ICF 服务由 BTP 平台管理；CLI 走 source-only + CF destination 提示

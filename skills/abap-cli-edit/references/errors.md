@@ -10,7 +10,7 @@
 | `OBJECT_EXISTS` | USAGE/2 | create | 改用 `pull` + `push`；不要重复 `create` |
 | `LOCK_FAILED` | LOCKED/9 | push | `inspect <obj> --locks`（[abap-cli-search]）查持有者；SE03 手动释放 |
 | `ACTIVATION_FAILED` | VALIDATION_ERROR/7 | push / create / activate | `data.errors` 含行号；修复后重推 |
-| `SYNTAX_ERROR` | VALIDATION_ERROR/7 | check / push --check-only | `data.errors[]` 含 `{line, offset, severity, text}` |
+| `SYNTAX_ERROR` | VALIDATION_ERROR/7 | check / push --check-only（源码对象） | `data.errors[]` 含 `{line, offset, severity, text}` |
 | `NO_TRANSPORT` | VALIDATION_ERROR/7 | push / create | 跳 `abap-cli-setup`：`transport list` / `transport create` → `--tr` 重试 |
 | `DDIC_NOT_SUPPORTED` | VALIDATION_ERROR/7 | pull / create / push | 类型不在白名单（DOMA/DTEL/TABL/STRU 之外）；看 `abap create --schema` |
 | `TABL_DDL_INVALID` | VALIDATION_ERROR/7 | create TABL/STRU | 三件套的 `.tabl.ddic` / `.stru.ddic` 解析失败（缺 `define table|structure ... {` 或 `}`）；`error.message` 含 DDL 解析行；详见 [workflow.md 变体 2](workflow.md) |
@@ -33,7 +33,7 @@
 | `check` | 语法检查 | `SYNTAX_ERROR` |
 | `activate` | 激活 | `ACTIVATION_FAILED` |
 | `unlock` | 释放锁 | `UNLOCK_WARNING`（仅 `meta.warnings`，exit 0） |
-| `ddic-icf` | DDIC JSON 写 | `INVALID_FIELD` / `MISSING_FIELD` |
+| `ddic-icf` | 所有 ICF/通道 JSON 推送的统一进入 stage（DDIC / HTTP / TRAN / TTYP / MSAG / DDLS）；`--dry-run` 也记录 | 视类型而定（DDIC: `INVALID_FIELD` / `MISSING_FIELD`；HTTP: `HTTP_CREATE_FAILED`；TRAN: `TRAN_CREATE_FAILED`） |
 | `textpool-adt` / `textpool-icf` | textpool 写 | 视 mode 而定 |
 
 ## 写操作保护（P0.3）

@@ -16,6 +16,7 @@ import type { SystemProfile } from './channel-detect.js';
 import { wireToLocal, writeMsagJson, validateMsagObject, type MsagLocal } from '../../formats/msag/json.js';
 import { loadConfig, findWorkspaceConfig } from '../../config/project-config.js';
 import { folderFor } from '../../formats/type-folder.js';
+import { registerPullHandler } from '../../types/registry.js';
 
 export interface PullMsagOptions { profile?: SystemProfile; rootDir?: string; type?: string; package?: string; tr?: string; dir?: string; overwrite?: boolean; skipExisting?: boolean; includeTests?: boolean; includeAllParts?: boolean; limit?: string; page?: string; textpool?: boolean; remote?: string }
 export interface PullMsagResult {
@@ -93,3 +94,9 @@ export async function runPullMsag(name: string, opts: PullMsagOptions = {}): Pro
     doc,
   };
 }
+
+// Module-load side effect: register MSAG in the pull handler table. Decision 2A.
+registerPullHandler('MSAG', async ({ objectName, opts }) => {
+  const r = await runPullMsag(objectName, opts as Parameters<typeof runPullMsag>[1]);
+  return { object: r.object, files: r.files, channel: r.channel, ...(r.fallbackReason ? { fallbackReason: r.fallbackReason } : {}) };
+});

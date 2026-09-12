@@ -26,16 +26,19 @@ abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **19 个
 | `DOMA` | 域 | ICF | ✅ | ✅ | ✅ | ❌ | `doma/*.doma.json` |
 | `DTEL` | 数据元素 | ICF | ✅ | ✅ | ✅ | ❌ | `dtel/*.dtel.json` |
 | `HTTP` | **ICF / SICF 节点** | ICF | ✅ | ✅ | ✅ | ❌ | `http/*.http.json` |
-| `TRAN` | 事务码 (SE93) | ICF | ✅ | ✅ | ❌ (GET-only) | ❌ | `tran/*.tran.json` |
-| `TTYP` | 表类型 | ADT | ✅ | ✅ | ✅ | ✅ | `ttyp/*.ttyp.json` |
-| `MSAG` | 消息类 | ADT | ✅ | ✅ | ✅ | ✅ | `msag/*.msag.json` |
-| `DDLS` | CDS 源对象 | ADT | ✅ | ✅ | ✅ | ✅ | `ddls/*.ddls.json` + `*.asddls` |
+| `TRAN` | 事务码 (SE93) | ICF | ✅（`--file`） | ✅ | ✅ | ❌ | `tran/*.tran.json` |
+| `TTYP` | 表类型 | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `ttyp/*.ttyp.json` |
+| `MSAG` | 消息类 | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `msag/*.msag.json` |
+| `DDLS` | CDS 源对象 | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `ddls/*.ddls.json` + `*.acds` |
 | `SRVB` | Service Binding (metadata only) | ADT | ❌ | ✅ | ❌ | ❌ | `srvb/*.srvb.json` |
-| `SRVD` | Service Definition | ADT | ✅ | ✅ | ✅ | ✅ | `srvd/*.srvd.json` + `*.acds` |
-| `BDEF` | Behaviour Definition | ADT | ✅ | ✅ | ✅ | ✅ | `bdef/*.bdef.json` + `*.abdl` |
-| `DCLS` | CDS Access Control | ADT | ✅ | ✅ | ✅ | ✅ | `dcls/*.dcls.json` + `*.acds` |
-| `DDLX` | CDS Metadata Extension | ADT | ✅ | ✅ | ✅ | ✅ | `ddlx/*.ddlx.json` + `*.acds` |
-| `DDLA` | CDS Annotation Definition | ADT | ✅ | ✅ | ✅ | ✅ | `ddla/*.ddla.json` + `*.acds` |
+| `SRVD` | Service Definition | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `srvd/*.srvd.json` + `*.acds` |
+| `BDEF` | Behaviour Definition | ADT | ❌（pull-only：SAP 不接受 CLI 创建 BDEF） | ✅ | ✅ | ❌ | `bdef/*.bdef.json` + `*.abdl` |
+| `DCLS` | CDS Access Control | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `dcls/*.dcls.json` + `*.acds` |
+| `DDLX` | CDS Metadata Extension | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `ddlx/*.ddlx.json` + `*.acds` |
+| `DDLA` | CDS Annotation Definition | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `ddla/*.ddla.json` + `*.acds` |
+
+> **`create local` 只支持 `CLAS` / `INTF` / `PROG` / `FUGR`**（`formats/templates.ts` 只有这四类模板），其余类型一律 `TYPE_NOT_SUPPORTED`（exit 7）。
+> **`create` 的 `--file` 是数据驱动必填项**（`types/registry.ts` 的 `ObjectTypeEntry.requiresFile`）：`TABL` / `STRU` / `DOMA` / `DTEL` / `HTTP` / `TRAN` / `TTYP` / `MSAG` / `DDLS` / `SRVD` / `DCLS` / `DDLX` / `DDLA` 缺 `--file` 直接 `USAGE`（exit 2）。`BDEF` 是 pull-only（SAP 不接受 CLI 创建）；`SRVB` 仅 pull（SAP GUI 管理 binding）。
 
 DDIC 三件套（TABL / STRU）与 DOMA / DTEL 的详细字段契约见 [create](commands/create.md) 与 [pull](commands/pull.md)。
 
@@ -49,7 +52,7 @@ DDIC 三件套（TABL / STRU）与 DOMA / DTEL 的详细字段契约见 [create]
 # 拉一个已有 SICF 节点
 abap pull ZMY_SERVICE --type HTTP --json
 
-# 创建 / 更新（--file 走真实 SAP；无 --file 自动落最小骨架）
+# 创建（必须 --file，走真实 SAP）
 abap create HTTP ZMY_SERVICE --file src/http/zmy_service.http.json --package $TMP --description "My service"
 
 # 改完推回
@@ -72,7 +75,7 @@ abap push src/http/zmy_service.http.json --tr <TR>
 }
 ```
 
-`create HTTP` 无 `--file` 时自动落最小骨架（`src/http/<name>/<name>.http.json`，含 `name`，`action: local`，不调 SAP，commit `7fd13ec`）；有 `--file` 走真实 SAP create/push。`create local` 命令仍不支持 HTTP。
+`create HTTP` 必须带 `--file`（abap-file-format JSON）走真实 SAP create；032 US10 的"无 `--file` 自动落最小骨架（`action: local`）"路径已按重构决策 1A 删除，与 DDIC / DDLS 对齐。`abap create local HTTP` 不支持 HTTP；要手写 JSON 可参考 `abap create --schema HTTP` 的 `exampleJson`，或先 `abap pull` 一个同类节点。HTTP push 仍允许 create-on-push（见 [commands/push](commands/push.md)）。
 
 ## 两种 "ICF" 的区别
 
@@ -89,10 +92,10 @@ abap push src/http/zmy_service.http.json --tr <TR>
 
 | 类型 | 状态 | 替代 |
 |---|---|---|
-| `TRAN` 事务码 | 只读（ABAP `/tran/*` GET-only） | [tcode](commands/tcode.md) 解析；虽在 `create` 的 `allowedValues` 内，服务端不接受写 |
+| `TRAN` 事务码 | 可读写（ABAP `/tran/*` GET + POST） | [tcode](commands/tcode.md) 解析；写路径见 [create](commands/create.md) / [push](commands/push.md)；pull 仍是最完整的读取入口 |
 | `ENHO` 增强 | 不支持 | — |
 
-> 注：原 0.2.x 文档中曾把 `TTYP`/`DDLS` 列为"显式 deferred"或"无实现"。实际 036 演进后两者已完整支持（`pull` + `create` + `create local`），类型码也已加入 `allowedValues`。以本节为准。
+> 注：原 0.2.x 文档中曾把 `TTYP`/`DDLS` 列为"显式 deferred"或"无实现"。实际 036 演进后两者已完整支持 `pull` + `create`（`--file`）；但 **`create local` 从未支持过它们**（早前矩阵误标 ✅，已修正）——`create local` 仅 `CLAS` / `INTF` / `PROG` / `FUGR`。
 
 ## 常见误判
 

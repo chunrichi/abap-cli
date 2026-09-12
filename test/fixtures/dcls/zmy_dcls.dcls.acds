@@ -1,0 +1,4 @@
+define own data authorization context ZMY_DCLS for ZMY_VIEW
+{
+  ...
+};

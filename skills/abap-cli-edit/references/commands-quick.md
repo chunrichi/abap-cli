@@ -43,16 +43,17 @@ abap pull --tr DEVK900001                            # T4.2: 拉请求下全部�
 abap push src/zcl_foo/zcl_foo.clas.abap --tr DEVK900001 --yes
 abap push src/zcl_foo/zcl_foo.clas.abap --yes          # 已绑定 / $TMP 无需 --tr；非 TTY 需 --yes
 abap push --all --yes                                   # 全部 .abap（遵循 .abapignore）
-abap push <file> --check-only                           # 仅语法检查
+abap push <file> --check-only                           # 仅语法检查（ICF JSON 不支持）
 abap push <file> --no-activate                          # lock + write + skip
 abap push <files...> --atomic --yes                     # 全量校验后写
 abap push <files...> --fail-fast --yes                  # 失败即停
 abap push <file> --dry-run                              # 计划模式（零 SAP 调用）
-abap push src/zmy_table.tabl.json --tr DEVK900001 --yes # DDIC JSON
+abap push src/zmy_table.tabl.json --tr DEVK900001 --yes # ICF JSON（DDIC / HTTP / TRAN）
 abap push src/zprog/zprog.prog.texts.en.properties      # textpool
 ```
 
 > 写操作：非 TTY 必须 `--yes` 或 `--dry-run`（`core/confirmation.ts` 统一守卫，exit 7）。
+> **ICF JSON（DDIC / HTTP / TRAN）不支持 `--check-only`**（`VALIDATION_ERROR`；这类文件在 push 时校验）；`--dry-run` 对它们同样只做计划、零 ICF 调用。
 
 ### 按对象 transport 解析（核心）
 
@@ -69,7 +70,10 @@ abap push src/zprog/zprog.prog.texts.en.properties      # textpool
 | `*.clas.abap` / `*.clas.<subtype>.abap` | adt（按 subtype 精确匹配 include） |
 | `*.prog.abap` / `*.intf.abap` | adt |
 | `*.fugr.abap` / `*.fugr.<fm>.func.abap` / `*.fugr.sapl*.reps.abap` | adt（FUGR 子对象独立锁） |
-| `<name>.<type>.json`（DOMA/DTEL/TABL/STRU） | icf（`/ddic/<type>`） |
+| `<name>.<type>.json`（DDIC DOMA/DTEL/TABL/STRU） | icf（`POST /ddic/<type>`，push 前 GET 探测存在性） |
+| `<name>.http.json` | icf（`POST /http/<name>`，**不探测存在性**：push 即创建/更新 SICF 节点） |
+| `<name>.tran.json` | icf（`POST /tran/<code>`，push 前 GET 探测存在性） |
+| `<name>.ttyp.json` / `.msag.json` / `.ddls.json` | 通道路由（ADT 分支）：`channel-detect` 决定 ADT / ICF |
 | `<name>.<type>.texts|selections|headings.<lang>.properties` | textpool（混合模式） |
 
 ## `abap check`
@@ -110,12 +114,12 @@ abap create <type> <name> --json
 | `<type>` | 对象类型（13 类：`CLAS / INTF / PROG / FUGR / TABL / STRU / DOMA / DTEL / TTYP / MSAG / DDLS / HTTP / TRAN`；`SRVB` 仅 pull；CDS/RAP 5 类支持完整 create） | 必填 |
 | `<name>` | 对象名（命名空间 `Z` / `Y` / `/`） | 必填 |
 | `--package <pkg>` | 目标包；默认 `$TMP` | `$TMP` |
-| `--description <text>` | 对象描述（`TRAN` 等 ICF 类型走 `.http.json::generalInformation.description`） | — |
+| `--description <text>` | 对象描述（ICF 类型从各自的 `<name>.http.json` / `<name>.tran.json` 读 `generalInformation.description`） | — |
 | `--tr <transport>` | transport 请求；非 `$TMP` 必填（除非对象已绑定） | — |
 | `--template <name>` | 骨架模板（仅 ADT 源对象）：`empty` / `default` | `default` |
 | `--no-activate` | 建完不激活（仅写 + 锁，不 activateAll） | false |
 | `--no-pull` | 建完不拉完整源（用于 `create local` 离线草稿后导入） | false |
-| `--file <path>` | DDIC / FUGR / HTTP 等 wire 源文件路径；TABL/STRU 三件套时指向 main `.tabl.json` | 必填（DDIC + HTTP） |
+| `--file <path>` | abap-file-format JSON 输入（`TABL`/`STRU`/`DOMA`/`DTEL`/`HTTP`/`TRAN`/`TTYP`/`MSAG`/`DDLS`；`FUGR` 不需要）；TABL/STRU 三件套时指向 main `.tabl.json` | 必填（`TABL`/`STRU`/`DOMA`/`DTEL`/`HTTP`/`TRAN`/`TTYP`/`MSAG`/`DDLS`） |
 | `--dir <path>` | `create local` 输出目录 | `./src/` |
 | `--yes` | 跳过提示；非交互必填 | — |
 
@@ -167,7 +171,7 @@ abap mime --schema
 
 ## `abap validate:aff`
 
-校验本地 JSON 是否满足 **官方 abap-file-format** 规范。10 个支持类型（CLAS / INTF / PROG / FUGR / TABL / STRU / DOMA / DTEL / HTTP / TRAN）共享同一套 ajv@^8 + Draft 2020-12；schema 来自 `src/abap_cli/schema/<type>-v1.json`（STRU 共享 `tabl-v1.json`；TABL/STRU `.settings.json` 走 `tabt-v1.json`）。
+校验本地 JSON 是否满足 **官方 abap-file-format** 规范。13 个写路径类型（CLAS / INTF / PROG / FUGR / TABL / STRU / DOMA / DTEL / HTTP / TRAN / TTYP / MSAG / DDLS）共享同一套 ajv@^8 + Draft 2020-12；schema 来自 `src/abap_cli/schema/<type>-v1.json`（STRU 共享 `tabl-v1.json`；TABL/STRU `.settings.json` 走 `tabt-v1.json`）。
 
 **纯本地，不进 SAP**；CI / pretest gate。`pretest` 默认扫 `test/fixtures/`。
 

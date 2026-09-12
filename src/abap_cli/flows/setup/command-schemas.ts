@@ -166,7 +166,7 @@ function pushSchema(): CommandSchema {
     options: [
       { name: '--all', type: 'boolean', description: 'Push all .abap files under the scan root (sourceDir or current dir; honours .abapignore).' },
       { name: '--tr', type: 'string', valuePlaceholder: '<transport>', description: 'Transport number override for unbound objects.' },
-      { name: '--check-only', type: 'boolean', description: 'Syntax check only; do not activate.' },
+      { name: '--check-only', type: 'boolean', description: 'Syntax check only; do not activate. Not supported for ICF-routed or channel-routed JSON files (DDIC / HTTP / TRAN / TTYP / MSAG / DDLS) — those are validated during push.' },
       { name: '--no-activate', type: 'boolean', description: 'Lock + write + skip check + skip activate + unlock.' },
       { name: '--dry-run', type: 'boolean', description: 'Plan only — no mutating ADT calls.' },
       { name: '--fail-fast', type: 'boolean', description: 'Stop at the first failing file (default: --keep-going).' },

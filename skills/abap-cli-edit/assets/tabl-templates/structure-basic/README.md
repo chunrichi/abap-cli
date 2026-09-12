@@ -21,7 +21,7 @@
 | 字段前 `key` | 业务主键 | 不需要 |
 | `@Semantics.*` | 适用 | 适用（语义注解同样有效） |
 
-CLI 解析器（[tabl-artifact.ts:parseTablDdic](https://github.com/chunrichi/abap-cli/blob/main/src/abap_cli/dictionary/tabl-artifact.ts)）根据 `define table` vs `define structure` 自动分流。
+CLI 解析器（[tabl-artifact.ts:parseTablDdic](https://github.com/chunrichi/abap-cli/blob/main/src/abap_cli/formats/ddic/tabl-artifact.ts)）根据 `define table` vs `define structure` 自动分流。
 
 ## 使用
 

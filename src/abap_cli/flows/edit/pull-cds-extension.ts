@@ -12,6 +12,7 @@
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { pullObject } from './pull-source.js';
 import { folderFor } from '../../formats/type-folder.js';
+import { registerPullHandler, type PullHandlerArgs } from '../../types/registry.js';
 
 export type CdsExtensionType = 'DCLS' | 'DDLX' | 'DDLA';
 
@@ -100,3 +101,12 @@ export function isCdsExtensionType(t: string): t is CdsExtensionType {
   const u = t.toUpperCase();
   return u === 'DCLS' || u === 'DDLX' || u === 'DDLA';
 }
+
+// Module-load side effect: register all three CDS extension types. Decision 2A.
+const cdsExtensionHandler = (extType: CdsExtensionType) => async ({ objectName, opts }: PullHandlerArgs) => {
+  const r = await runPullCdsExtension(extType, objectName, opts as Parameters<typeof runPullCdsExtension>[2]);
+  return { object: r.object, files: r.files, channel: 'adt' as const };
+};
+registerPullHandler('DCLS', cdsExtensionHandler('DCLS'));
+registerPullHandler('DDLX', cdsExtensionHandler('DDLX'));
+registerPullHandler('DDLA', cdsExtensionHandler('DDLA'));

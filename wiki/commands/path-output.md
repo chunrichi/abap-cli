@@ -111,7 +111,7 @@ DDIC `abap create TABL/STRU` 走 ICF POST `/ddic/<type>`，data envelope 不展�
 }
 ```
 
-如果 agent 需要明确三件套全部路径，自己用 `tablArtifactPaths(file)`（[`src/abap_cli/dictionary/tabl-artifact.ts`](https://github.com/chunrichi/abap-cli/blob/main/src/abap_cli/dictionary/tabl-artifact.ts)）算即可。CLI 内部创建路径已探测同目录 `.tabl.ddic` / `.tabl.settings.json`（`readDdicObjectForCreate`），所以三件套"在源端一致"是先决条件，不需要在 output 里重复。
+如果 agent 需要明确三件套全部路径，自己用 `tablArtifactPaths(file)`（[`src/abap_cli/formats/ddic/tabl-artifact.ts`](https://github.com/chunrichi/abap-cli/blob/main/src/abap_cli/formats/ddic/tabl-artifact.ts)）算即可。CLI 内部创建路径已探测同目录 `.tabl.ddic` / `.tabl.settings.json`（`readDdicObjectForCreate`），所以三件套"在源端一致"是先决条件，不需要在 output 里重复。
 
 ## Examples
 

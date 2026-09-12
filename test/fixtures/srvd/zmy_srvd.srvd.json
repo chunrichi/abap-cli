@@ -1,0 +1,9 @@
+{
+  "formatVersion": "1",
+  "header": {
+    "description": "Sample service definition for CLI tests",
+    "originalLanguage": "EN"
+  },
+  "sourceOrigin": "abapDevelopmentTools",
+  "sourceType": "serviceDefinition"
+}

@@ -4,6 +4,34 @@
 `Added` / `Changed` / `Removed` / `Fixed` / `Security` 按版本分组。Breaking 变更在 `Removed` 标记并附 Migration。
 更老的展开内容归档于 `docs/CHANGELOG-history.md`。
 
+## [Unreleased]
+
+### Changed
+- **`create` / `pull` / `push` 的类型分派改为数据驱动（registry handler 表）**：`flows/edit/create.ts` 从 1014 行单体拆成 ≤330 行 dispatcher + 7 个 per-type 模块（`create-{ddic,http,tran,ttyp,msag,ddls}.ts`）+ `create-local.ts` / `create-fugr-func.ts`；`pull.ts` 的 6 份重复 envelope 收敛为 `pull-shared.ts#wrapPullResult`；`push.ts` 的 ICF 分支收敛为 `ICF_PUSH_HANDLERS` 表（DDIC 四类由 `DDIC_TYPES` 派生，另有 HTTP / TRAN），`pushOne` 只做一次 `icfPushHandlerFor(objectType)` 查表。`types/registry.ts` 新增 `registerCreateHandler` / `createHandlerFor` / `registerPullHandler` / `pullHandlerFor`（含测试用 `clearHandlersForTesting` / `restoreHandlersForTesting`）。新增类型现在只需改 registry + 一个 per-type 文件。
+- **`--file` 要求数据化**：`ObjectTypeEntry.requiresFile` 成为单一事实源，同时驱动 `create` 的 fail-fast（在写确认提示之前）与 `create --schema` 的契约。覆盖 TABL/STRU/DOMA/DTEL/HTTP/TRAN/TTYP/MSAG/DDLS。
+- **ICF push 的 `--check-only` / `--dry-run` 统一闸门**：原先只有 DDIC 路径显式拒绝 `--check-only`，HTTP / TRAN 靠各自的早返回"碰巧"挡住；现在 `pushOne` 的 `route === 'icf'` 分支统一处理，DDIC / HTTP / TRAN 行为一致（`--check-only` → `VALIDATION_ERROR`，`--dry-run` → `status: dry-run` 零 ICF 调用）。
+- **`create --schema` 修正 TTYP / MSAG / DDLS**：三者此前仍报 `supported: false` + `DDIC_NOT_SUPPORTED`（deferred per Q2），与已实现的 create handler 不符；现在正确报 `supported: true` 并声明 `--file` 必填。
+- **`abap push --check-only` 的 schema 描述**补充"ICF JSON（DDIC / HTTP / TRAN）不支持"（`docs/commands.md` 随 `npm run build-docs` 重新生成）。
+
+### Removed
+- **HTTP create 的自动骨架路径（breaking）**：`abap create HTTP <name>` 不再在缺少 `--file` 时落本地骨架（旧行为：写 `src/http/<name>/<name>.http.json`、返回 `action: 'local'`、已有同名文件报 `OVERWRITE_REQUIRED`）。现在必须 `--file <abap-file-format JSON>`，与 DDIC / DDLS 对齐；SICF 节点的另一条建法是直接 `abap push <file>.http.json`（push 即创建，未变）。**Migration**：手写或 `abap pull` 得到 `.http.json` 后传 `--file`；`abap create local HTTP` 不支持 HTTP（返回 `TYPE_NOT_SUPPORTED`）。
+- **`flows/edit/create-types.ts`**：DDIC / HTTP / TRAN 类型判定已由 `types/registry.ts` 提供，删除该壳文件。
+- **push 中不可达的 `ADT_ROUTED_TYPES` 拦截分支**：registry 里 TTYP / MSAG / DDLS 是 `source: 'ADT'`，`resolveFile` 对其 `.json` 从不返回 `route: 'icf'`，因此 `pushOne` 与 `--atomic` 里的那两处拦截永远不命中（真正生效的同名 Set 在 `core/resolve.ts`）。删除后 `push.ts` 不再导入 `runPush{Ttyp,Msag,Ddls}`。
+
+### Fixed
+- **TTYP / MSAG / DDLS 的 push 无法从 CLI 到达自己的流程（回归修复）**：这三类的 `.json` 在 registry 里是 `source: 'ADT'`，`resolveFile` 给出 `route: 'adt'`，但旧代码只在 `route === 'icf'` 分支里拦截它们，因此 `abap push src/x.ttyp.json` 实际会掉进通用 ADT 源码分支（`readAbapFile` 读 JSON 文本 → `resolveObject` 报错），永远到不了 `runPush{Ttyp,Msag,Ddls}`。现在 `pushOne` 通过 `CHANNEL_ROUTED_PUSH` 表在源码分支**之前**拦截这三类（含 `--atomic` 阶段的 AFF 校验），`--check-only` 拒绝、`--dry-run` 零 SAP 调用的语义与 ICF JSON 对齐。新增 `push-dispatch.test.ts` 回归用例（TTYP/MSAG 走到 `getTtyp`/`updateTtyp` 等 ADT 调用、stage `channel-adt`）。
+- **`create local` 的拒绝语义**：`resolveType` 只服务 `create local`，现在明确只支持 `CLAS` / `INTF` / `PROG` / `FUGR`，其余类型统一报 `TYPE_NOT_SUPPORTED`（此前 DDIC 走 `DDIC_NOT_SUPPORTED` 分支，且消息文案过时）。顺带删除该函数里不可达的 DDIC 分支。
+- **`create HTTP` / `create TTYP|MSAG|DDLS` 的错误指引**：HTTP 缺 `--file` 时不再把用户导向不存在的 `create local HTTP`，改为指向 `abap create --schema HTTP`；各 ICF 类型的 USAGE 文案统一为 `Type <T> requires --file <path> with an abap-file-format JSON`。
+- **`--atomic` 与真实 push 的校验重复实现**：抽出 `readValidatedDdic` / `readValidatedHttp` / `readValidatedTran`，两条路径共用同一校验与错误码（`TABL_DDL_INVALID` / `TABT_VALIDATION_FAILED` / `VALIDATION_ERROR`）。
+- **`opts` 传参的双重断言**：`CreateHandlerArgs.opts` / `PullHandlerArgs.opts` 从 `Record<string, unknown>` 改为 `unknown`，删掉 6 处 `as unknown as CreateOptions` 与 `pull.ts` 的 `opts as unknown as Record<string, unknown>`。
+- **`clearHandlersForTesting` 只清空不还原**会让同一 module graph 内的后续 dispatcher 测试静默落到 source-object 路径；补 `restoreHandlersForTesting()`，测试改为 `beforeEach` 清 + `afterEach` 还原。
+- **文档漂移**：`TRAN` 在 skill 类型矩阵里被误标"只读 / push ❌"（实际 push 走 `ICF_PUSH_HANDLERS.TRAN` → `POST /tran/<code>`）；TTYP / MSAG / DDLS 与 CDS/RAP 五类的 `create local` 被误标 ✅（实际 `TYPE_NOT_SUPPORTED`）；`ddic-icf` stage 被描述为"DDIC 专用写阶段"（实际是所有 ICF/通道 JSON 的统一 stage，`--dry-run` plan 也含）；`create` 的 `--file` 必填清单漏 TRAN / TTYP / MSAG / DDLS 且误含 FUGR。已同步 `wiki/object-types.md`、`wiki/commands/push.md`、`skills/abap-cli-edit/*`；顺手修掉 6 处指向已迁移目录的失效链接（`src/abap_cli/dictionary/` → `formats/ddic/`）。
+- **registry 快照失效**：`clearHandlersForTesting` / `restoreHandlersForTesting` 在 top-level 求值时拍快照，那时 per-type handler 还没注册（走模块顶层 side-effect import），所以 `restoreHandlersForTesting()` 实际什么都不恢复。改成每次 `clear` 重拍当前状态、`restore` 后清掉快照——回归测试覆盖"`clear → register → clear → restore`"回到 register 后的状态。
+- **registry dead exports**：`ADT_ROUTED_TYPES` 与 `ADT_ROUTED_TYPES_LEGACY` 自 `pull.ts`/`push.ts` 迁移到 registry 后无人引用，删除。
+- **registry createObjtype 与 abap-adt-api 不一致**：SRVB / SRVD / BDEF / DCLS / DDLA 的旧值（`SRVB/SB` / `SRVD/SD` / `BDEF/BD` / `DCLS/DC` / `DDLA/AE`）不是 `NonGroupTypeIds` 的合法成员，会被 typed `createObject` 拒。改成 abap-adt-api 的真实 ID；BDEF 在 `CreatableTypeIds` 里根本没有，从 registry 拿掉 `createObjtype` 字段、文档/SKILL.md 标为 pull-only。
+- **`create` 文档与代码不一致（CRD/SRVD/BDEF/DCLS/DDLX/DDLA）**：`wiki/object-types.md` 与 SKILL.md 把 SRVD / DCLS / DDLX / DDLA 标为 `create: ✅ --file`，但代码没有 create handler，注册表也没把它们标为 `requiresFile`，dispatcher 会落到 typed `createObject({objtype: 'DCLS/DC'})`（错的 objtype，运行时才报错）。补 `flows/edit/create-cds-extension.ts`（DCLS / DDLX / DDLA 共用 `runCreateCdsExtension`）与 `flows/edit/create-srvd.ts`：调 `createObject({objtype: 'DCLS/DL' / 'DDLX/EX' / 'DDLA/ADF' / 'SRVD/SRV'})` 注册 metadata，source 留给 `abap push`（已有的 `pushSourceObjectOne` 路径）。四类同源设计：metadata + companion `.acds` 双文件必填，缺 sidecar 报 `VALIDATION_ERROR`。新增 `test/unit/create-cds-extension-srvd.test.ts` 覆盖 requiresFile fail-fast + happy path + sidecar 缺失 + BDEF pull-only 不变。
+- **`abap push --check-only` 的 schema 描述**遗漏 TTYP / MSAG / DDLS（CHANGELOG 自称已统一，但描述只提 DDIC / HTTP / TRAN）；push.ts 里 channel-routed 分支的报错文案也是 "ICF-routed JSON files"，与 TTYP/MSAG/DDLS 不符。统一改为"ICF-routed or channel-routed JSON files (DDIC / HTTP / TRAN / TTYP / MSAG /DDLS)"。
+
 ## [0.2.6] - 2026-09-06
 
 ### Added

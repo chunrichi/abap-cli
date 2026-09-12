@@ -35,7 +35,7 @@ abap create TABL ZTODO --file src/tabl/ztodo.tabl.json --package $TMP --yes
 
 ## 跟 abap-file-format / DDL 解析器对齐
 
-- 骨架里的 `@AbapCatalog.*` / `@EndUserText.label` / `@Semantics.*` 都用 SAP 标准语法；CLI 解析器（[src/abap_cli/dictionary/tabl-artifact.ts](https://github.com/chunrichi/abap-cli/blob/main/src/abap_cli/dictionary/tabl-artifact.ts)）按 DDL 行序匹配注释到下一字段的元数据
+- 骨架里的 `@AbapCatalog.*` / `@EndUserText.label` / `@Semantics.*` 都用 SAP 标准语法；CLI 解析器（[src/abap_cli/formats/ddic/tabl-artifact.ts](https://github.com/chunrichi/abap-cli/blob/main/src/abap_cli/formats/ddic/tabl-artifact.ts)）按 DDL 行序匹配注释到下一字段的元数据
 - 关键类型（`abap.clnt` / `abap.curr(N,M)` / `abap.cuky` / `abap.quan(N,M)` / `abap.unit`）在 DDL 解析器白名单内；不在白名单的类型会抛 `TABL_DDL_INVALID`（exit 7）
 - 命名空间 Z/Y/`/` 在 `validateDdicObject` 强校验；骨架默认用 `zsample`，重命名时记得大写
 - 严格字段校验：用 [`schemas/tabl-v1.json`](schemas/tabl-v1.json) + [`schemas/tabt-v1.json`](schemas/tabt-v1.json)（官方 abap-file-format JSON Schema）跑 ajv（详见 [schemas/README.md](schemas/README.md)）；CLI 客户端校验是子集，ajv 是全字段校验

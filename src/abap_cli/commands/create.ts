@@ -1,8 +1,10 @@
 import { Command } from 'commander';
 import { printError, printSchema, jsonFromCommand, type OutputMode } from '../output/json.js';
-import { runCreate, runCreateLocal, type CreateOptions, type CreateLocalOptions } from '../flows/edit/create.js';
+import { runCreate, type CreateOptions, type CreateLocalOptions } from '../flows/edit/create.js';
+import { runCreateLocal } from '../flows/edit/create-local.js';
 import { createSchema } from '../flows/edit/create-schema.js';
 import { normalizeTypeInput } from '../cli/type-alias.js';
+import { typesRequiringFile } from '../types/registry.js';
 
 export function registerCreateCommand(program: Command): void {
   const createCmd = program
@@ -23,7 +25,9 @@ export function registerCreateCommand(program: Command): void {
       '  DTEL  Data element       (ICF /ddic/dtel — requires --file)',
       '  TABL  Database table     (ICF /ddic/tabl — requires --file)',
       '  STRU  Structure          (ICF /ddic/stru — requires --file)',
-      '  HTTP  SICF service node  (ICF /http/<name> — auto-skeleton if --file absent; alias: SICF, deprecated)',
+      '  HTTP  SICF service node  (ICF /http/<name> — requires --file; alias: SICF, deprecated)',
+      '  TRAN  Transaction code   (ICF /tran/<code> — requires --file)',
+      '  TTYP / MSAG / DDLS       (requires --file; ADT, ICF fallback on ECC for TTYP/MSAG)',
       '',
       'Run `abap create <type> --schema` for the machine-readable contract of a specific type.',
       '',
@@ -41,7 +45,7 @@ export function registerCreateCommand(program: Command): void {
     .option('--no-pull', 'Skip the create-then-pull local copy (default: pull after create)')
     .option('--check-only', 'Validate without creating')
     .option('--audit', 'Include the before-checksum (extra SAP round-trip, off by default)')
-    .option('--file <path>', 'abap-file-format JSON input (required for DOMA/DTEL/TABL/STRU/HTTP)')
+    .option('--file <path>', `abap-file-format JSON input (required for ${typesRequiringFile().join('/')})`)
     .option('--func <name>', 'With FUGR: create a function module (FUGR/FF) inside the existing function group <name>')
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .option('--yes', 'Confirm in non-interactive mode')
@@ -77,7 +81,10 @@ function registerCreateLocalCommand(createCmd: Command): void {
     .addHelpText('after', [
       '',
       'This command is experimental and creates a local draft only — nothing is sent to SAP.',
-      'To land the draft in SAP, run:',
+      'It supports the source-object types (CLAS, INTF, PROG, FUGR) and their CDS/RAP',
+      'companions; DDIC / HTTP / TRAN types have no local skeleton path and require',
+      '`abap create <type> <name> --file <path>` with an abap-file-format JSON instead.',
+      'To land a draft in SAP, run:',
       '  abap create <type> <name> --package <pkg> --description <desc> --no-pull',
       '  abap push src/<obj>/<obj>.<type>.abap --tr <transport>',
       '',

@@ -193,6 +193,6 @@ abap pull --tr NDK123456
 
 # references
 
-- 实现：`src/abap_cli/commands/pull.ts`、`src/abap_cli/flows/pull-flow.ts`、`src/abap_cli/formats/pull-strategy.ts`、`pull-fugr.ts`、`fugr-layout.ts`、`src/abap_cli/clients/icf-client.ts`
+- 实现：`src/abap_cli/commands/pull.ts`、`src/abap_cli/flows/edit/pull.ts`、`src/abap_cli/formats/pull-strategy.ts`、`pull-fugr.ts`、`fugr-layout.ts`、`src/abap_cli/clients/icf-client.ts`
 - SAP 后端：`abap/src/clas/zcl_abap_vibe_icf.clas.abap`（`dispatch_ddic` / `dispatch_textpool` / `dispatch_version_management`）
 - 文档：`docs/commands.md`（`abap pull` 一节）；规范参考：`tmp/abap-file-formats/file-formats/{clas,prog,intf,fugr,doma,dtel,tabl}/`

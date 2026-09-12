@@ -10,7 +10,7 @@ import { resolveObject, getObjectParts, validateLocalFile, type ResolvedObject }
 import { resolveTransport } from '../../core/transport.js';
 import { resolveLocalTargets } from '../../core/local-targets.js';
 import { requireWriteConfirmation } from '../../core/confirmation.js';
-import { readDdicJson, readDdicObjectForCreate, localToWire, validateDdicObject, validateTabtPayload, type DdicSupportedType } from '../../formats/ddic/json.js';
+import { readDdicObjectForCreate, localToWire, validateDdicObject, validateTabtPayload, type DdicObject, type DdicSupportedType, type DdicWirePayload } from '../../formats/ddic/json.js';
 import { readHttpJson, localToWire as httpLocalToWire, validateHttpObject } from '../../formats/http/json.js';
 import { readTranJson, localToWire as tranLocalToWire, validateTranObject } from '../../formats/transport/json.js';
 import { pushObject, type PushStage } from './push-object.js';
@@ -22,7 +22,7 @@ import { runPushDdls } from './push-ddls.js';
 import { readTtypJson, validateTtypObject } from '../../formats/ttyp/json.js';
 import { readMsagJson, validateMsagObject } from '../../formats/msag/json.js';
 import { readDdlsJson, validateDdlsObject } from '../../formats/ddls/json.js';
-import { ADT_ROUTED_TYPES } from '../../types/registry.js';
+import { DDIC_TYPES } from '../../types/registry.js';
 import { getExtensionRegistry } from '../../extensions/registry.js';
 import { toRelativeOutputPath } from '../../core/path-output.js';
 
@@ -67,6 +67,123 @@ interface PushOneResult {
   status?: PushFileResult['status'];
 }
 
+/**
+ * A concrete ICF-routed push target: which ICF call powers it, how to validate
+ * its `.json` locally, and whether it carries a DDL sidecar.
+ *
+ * `push`/`validate` are closures bound to the concrete type so the routing
+ * layer never has to branch on type codes — adding an ICF-routed type means
+ * adding one table entry (and its handler), not another `else if`.
+ */
+interface IcfPushHandler {
+  /** Push the file and return the outcome. */
+  push: (client: AdtClientWrapper, resolved: IcfPushTarget, file: string, opts: PushFileOptions) => Promise<PushOneResult>;
+  /** Local validation used by `--atomic` phase 1 (throws VALIDATION_ERROR). */
+  validate: (file: string, type: string) => Promise<void>;
+  /**
+   * Whether the abap-file-format layout carries a sibling DDL sidecar
+   * (`.tabl.ddic` / `.stru.ddic`). Drives the TABL_DDL_INVALID error mapping
+   * and the TABT settings gate without a `type === 'TABL' || ...` test.
+   */
+  usesDdlSidecar: boolean;
+}
+
+/** Minimal shape the ICF push handlers need from `resolveFile`. */
+interface IcfPushTarget {
+  objectName: string;
+  objectType: string;
+}
+
+/**
+ * Phase 4: the ICF push table. Every `.json` file that resolves to the `icf`
+ * route lands here, so `pushOne` is a single table lookup. DDIC types are
+ * enumerated from `DDIC_TYPES` so a 5th DDIC type fails to compile until it is
+ * routed.
+ */
+const ICF_PUSH_HANDLERS: Record<string, IcfPushHandler> = {
+  HTTP: {
+    push: (client, resolved, file, opts) => pushHttpFile(client, resolved, file, opts),
+    validate: (file) => validateHttpFile(file),
+    usesDdlSidecar: false,
+  },
+  TRAN: {
+    push: (client, resolved, file, opts) => pushTranFile(client, resolved, file, opts),
+    validate: (file) => validateTranFile(file),
+    usesDdlSidecar: false,
+  },
+  ...Object.fromEntries(
+    DDIC_TYPES.map((t) => [
+      t,
+      {
+        push: (client: AdtClientWrapper, resolved: IcfPushTarget, file: string, opts: PushFileOptions) =>
+          pushDdicFile(client, resolved, file, opts, t),
+        validate: (file: string) => validateDdicFile(file, t),
+        usesDdlSidecar: t === 'TABL' || t === 'STRU',
+      } satisfies IcfPushHandler,
+    ]),
+  ),
+};
+
+/**
+ * Resolve the ICF push handler for an object type. Throws `TYPE_NOT_SUPPORTED`
+ * for a type that resolves to the ICF route but has no handler — better than
+ * silently posting it to `/ddic/<unknown>`.
+ */
+function icfPushHandlerFor(objectType: string): IcfPushHandler {
+  const handler = ICF_PUSH_HANDLERS[objectType.toUpperCase()];
+  if (!handler) {
+    throw new CliError('TYPE_NOT_SUPPORTED', `Object type ${objectType} has no ICF push route`, {
+      type: objectType,
+      nextSteps: [`ICF-routed push types: ${Object.keys(ICF_PUSH_HANDLERS).join(', ')}.`],
+    });
+  }
+  return handler;
+}
+
+/**
+ * 036: TTYP / MSAG / DDLS push through their own dual-channel flows. Each flow
+ * runs `channel-detect` itself (ADT primary, ICF fallback for TTYP/MSAG; DDLS
+ * hard-errors on ECC rather than falling back) and reports which channel it used.
+ *
+ * These do NOT live in `ICF_PUSH_HANDLERS`: the registry marks all three
+ * `source: 'ADT'`, so `resolveFile` gives them `route: 'adt'` and they never
+ * reach the `icf` branch — but their files are still AFF `.json`, not ABAP
+ * source, so `pushOne` must intercept them before the generic ADT source path.
+ */
+interface ChannelRoutedPushHandler {
+  /** Push the file; returns the channel actually used. */
+  push: (file: string, opts: PushFileOptions) => Promise<{ channel: 'adt' | 'icf' }>;
+  /** Local AFF validation used by `--atomic` phase 1 (throws VALIDATION_ERROR). */
+  validate: (file: string, objectType: string) => Promise<void>;
+}
+
+/** AFF validator for one channel-routed type (mirrors the create/pull sides). */
+async function validateChannelRoutedFile(objectType: string, file: string): Promise<void> {
+  const abs = path.resolve(process.cwd(), file);
+  const errors =
+    objectType === 'TTYP'
+      ? await validateTtypObject(await readTtypJson(abs))
+      : objectType === 'MSAG'
+        ? await validateMsagObject(await readMsagJson(abs))
+        : await validateDdlsObject(await readDdlsJson(abs));
+  if (errors.length > 0) throw new CliError('VALIDATION_ERROR', errors.join('; '));
+}
+
+const CHANNEL_ROUTED_PUSH: Record<string, ChannelRoutedPushHandler> = {
+  TTYP: {
+    push: (file, opts) => runPushTtyp(file, { transport: opts.tr }),
+    validate: (file, type) => validateChannelRoutedFile(type, file),
+  },
+  MSAG: {
+    push: (file, opts) => runPushMsag(file, { transport: opts.tr }),
+    validate: (file, type) => validateChannelRoutedFile(type, file),
+  },
+  DDLS: {
+    push: (file, opts) => runPushDdls(file, { transport: opts.tr }),
+    validate: (file, type) => validateChannelRoutedFile(type, file),
+  },
+};
+
 /** Orchestrate `abap push` across files: validate targets, resolve transport, push each file. */
 export async function runPush(files: string[], opts: PushFileOptions): Promise<PushResult> {
   if (opts.checkOnly && opts.activate === false) {
@@ -102,24 +219,15 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
         const resolved = resolveFile(file);
         validateLocalFile(resolved);
         if (resolved.route === 'icf') {
-          // 036: TTYP/MSAG/DDLS validate through their own format modules —
-          // readDdicJson would reject their AFF-nested shape.
-          if (ADT_ROUTED_TYPES.has(resolved.objectType)) {
-            await validateChannelRoutedFile(resolved.objectType, file);
-          } else if (resolved.objectType === 'HTTP') {
-            const local = await readHttpJson(path.resolve(process.cwd(), file));
-            const errors = validateHttpObject(local);
-            if (errors.length > 0) throw new CliError('VALIDATION_ERROR', errors.join('; '));
-          } else if (resolved.objectType === 'TRAN') {
-            const local = await readTranJson(path.resolve(process.cwd(), file));
-            const errors = validateTranObject(local);
-            if (errors.length > 0) throw new CliError('VALIDATION_ERROR', errors.join('; '));
-          } else {
-            // DDIC: structurally validate the JSON (readAbapFile only reads text).
-            const local = await readDdicJson(path.resolve(process.cwd(), file));
-            const errors = validateDdicObject(local, resolved.objectType);
-            if (errors.length > 0) throw new CliError('VALIDATION_ERROR', errors.join('; '));
-          }
+          // Data-driven: each ICF-routed type owns its validator (DDIC / HTTP /
+          // TRAN have distinct file shapes, so a single readDdicJson would
+          // reject the others).
+          await icfPushHandlerFor(resolved.objectType).validate(file, resolved.objectType);
+        } else if (CHANNEL_ROUTED_PUSH[resolved.objectType]) {
+          // TTYP / MSAG / DDLS resolve to the `adt` route but are AFF `.json`
+          // files, so they own their validators too (readAbapFile would be
+          // meaningless for them).
+          await CHANNEL_ROUTED_PUSH[resolved.objectType]!.validate(file, resolved.objectType);
         } else {
           await readAbapFile(file);
         }
@@ -222,8 +330,8 @@ function normalizePushResult(r: PushFileResult): PushFileResult {
  * 035: push updates existing objects only. Probe DDIC/TRAN targets over the
  * same ICF GET pull uses, so a missing object surfaces as OBJECT_NOT_FOUND
  * (with a `create` pointer) instead of the ICF POST silently creating one.
- * HTTP is exempt — its SICF nodes ARE created by push (`create HTTP` without
- * --file writes a local skeleton first; see wiki/objects/http.md).
+ * HTTP is exempt — pushing a `.http.json` creates/updates the SICF node, so a
+ * user can author the JSON by hand and `abap push` it without a prior create.
  */
 async function requirePushTargetExists(
   icf: IcfClient,
@@ -324,92 +432,18 @@ async function resolveObjectTransport(
  */
 async function pushDdicFile(
   client: AdtClientWrapper,
-  resolved: { objectName: string; objectType: string },
+  resolved: IcfPushTarget,
   file: string,
   opts: PushFileOptions,
-  onStage: (s: PushStage) => void,
+  type: DdicSupportedType,
 ): Promise<PushOneResult> {
-  if (opts.checkOnly) {
-    throw new CliError('VALIDATION_ERROR', '--check-only is not supported for ICF-routed JSON files', {
-      nextSteps: ['DDIC/HTTP files are validated during push; drop --check-only.'],
-    });
-  }
-  onStage('ddic-icf');
-  if (opts.dryRun) {
-    return { transport: opts.tr ?? client.getConfig().transport ?? 'DRY_RUN', status: 'dry-run' };
-  }
+  // DDIC abap-file-format JSON, read + validated by the shared helper. For
+  // TABL/STRU the helper honors sibling `.tabl.ddic` / `.tabl.settings.json`
+  // (spec 032 US5) and maps a malformed DDL to TABL_DDL_INVALID. The caller
+  // (`pushOne`) already rejected --check-only and handled --dry-run.
+  const { local, wire } = await readValidatedDdic(file, type, resolved.objectName);
 
-  // HTTP service has its own wire format; route via the dedicated helper.
-  if (resolved.objectType === 'HTTP') {
-    return pushHttpFile(client, resolved, file, opts);
-  }
-  // Transaction code has its own wire format; route via the dedicated helper.
-  if (resolved.objectType === 'TRAN') {
-    return pushTranFile(client, resolved, file, opts);
-  }
-
-  let local: { name: string; package?: string; transportRequest?: string; [key: string]: unknown };
-  let type = resolved.objectType as DdicSupportedType;
-  try {
-    // abap-file-format three-piece: TABL/STRU honor sibling .tabl.ddic / .tabl.settings.json
-    // when present (spec 032 US5). Falls back to legacy single JSON for DOMA/DTEL or
-    // when no sidecar exists. readTablArtifact throws on malformed DDL — map to TABL_DDL_INVALID.
-    local = await readDdicObjectForCreate(path.resolve(process.cwd(), file), type);
-  } catch (error: unknown) {
-    const m = error instanceof Error ? error.message : String(error);
-    const outFile = toRelativeOutputPath(file);
-    const isTablDdlError = (type === 'TABL' || type === 'STRU') && /Invalid Table and Structure DDL/i.test(m);
-    const code: ErrorCode = isTablDdlError ? 'TABL_DDL_INVALID' : 'INVALID_ARGUMENT';
-    throw new CliError(code, `Cannot read ${type} file ${outFile}: ${m}`, {
-      file: outFile,
-      type,
-      object: resolved.objectName,
-      nextSteps: isTablDdlError
-        ? [
-            `Inspect the .${type.toLowerCase()}.ddic sidecar: it must start with \`define table|structure ${resolved.objectName} {\` and end with \`}\`.`,
-            `For TABL/STRU, see the abap-file-format three-piece layout (.${type.toLowerCase()}.json + .${type.toLowerCase()}.ddic + .${type.toLowerCase()}.settings.json).`,
-          ]
-        : ['Verify the file exists, is readable, and contains valid JSON.'],
-    });
-  }
-  const errors = validateDdicObject(local, type);
-  if (errors.length > 0) {
-    const outFile = toRelativeOutputPath(file);
-    throw new CliError('VALIDATION_ERROR', `Invalid ${type} definition in ${outFile}: ${errors.join('; ')}`, {
-      file: outFile,
-      type,
-      object: resolved.objectName,
-      details: errors,
-    });
-  }
-
-  const wire = localToWire(type, local);
   // Transport: --tr > config > file's recorded request > ($TMP → none) > user's open request.
-
-  // P3.1: TABT schema validation - gate the wire payload against tabt-v1.json
-  // enum values so the CLI rejects invalid buffering/state/storageType before
-  // posting to SAP (where apply_ddic_table_settings would raise
-  // DDIC_FIELD_UNSUPPORTED instead).
-  if (type === 'TABL' || type === 'STRU') {
-    const settingsWire = (local as Record<string, unknown>).generalInformation;
-    if (settingsWire) {
-      const tabtErrors = validateTabtPayload(settingsWire);
-      if (tabtErrors) {
-        const outFile = toRelativeOutputPath(file);
-        throw new CliError('TABT_VALIDATION_FAILED', `Invalid TABT settings in ${outFile}: ${tabtErrors.join('; ')}`, {
-          file: outFile,
-          type,
-          object: resolved.objectName,
-          details: { schemaFile: 'tabt-v1.json', errors: tabtErrors },
-          nextSteps: [
-            'Inspect the .tabl.settings.json (or .tabl.json embedded generalInformation).',
-            `Run \`abap pull ${resolved.objectName} --type ${type}\` to refresh the file with current SAP-side values.`,
-          ],
-        });
-      }
-    }
-  }
-
   const packageName = (wire.package ?? '').toUpperCase();
   let transport = opts.tr ?? client.getConfig().transport ?? local.transportRequest ?? '';
   if (!transport && packageName !== '$TMP') {
@@ -442,38 +476,172 @@ async function pushDdicFile(
   return { transport, status: 'written' };
 }
 
+/** Result of a local ICF-file validation: the parsed local doc (+ wire for DDIC). */
+interface ValidatedDdicFile {
+  /** The abap-file-format local shape (settings live under `generalInformation`). */
+  local: DdicObject;
+  /** Wire payload built by `localToWire` (carries `package` / `transportRequest`). */
+  wire: DdicWirePayload;
+}
+
 /**
- * Push a HTTP service .json file via ICF POST /http/<name>.
- * The SAP-side handler creates/updates a SICF node with the given handler class + URL.
- *
- * 035 exception: HTTP push KEEPS create-on-push. `create HTTP` without --file
- * writes a local skeleton and `abap push` creates the SICF node, so no
- * existence probe here (unlike DDIC/TRAN).
+ * Read + validate a DDIC `.json` file. Shared by the real push path and the
+ * `--atomic` phase-1 validator, so both agree on error codes:
+ *   - malformed TABL/STRU DDL sidecar            → TABL_DDL_INVALID
+ *   - other read failures                        → INVALID_ARGUMENT
+ *   - schema validation errors                   → VALIDATION_ERROR
+ *   - invalid TABT settings (TABL/STRU only)     → TABT_VALIDATION_FAILED
  */
-async function pushHttpFile(
-  client: AdtClientWrapper,
-  resolved: { objectName: string; objectType: string },
+async function readValidatedDdic(
   file: string,
-  opts: PushFileOptions,
-): Promise<PushOneResult> {
-  let local: { name?: string; package?: string; transportRequest?: string; [key: string]: unknown };
+  type: DdicSupportedType,
+  objectName: string,
+): Promise<ValidatedDdicFile> {
+  const outFile = toRelativeOutputPath(file);
+  const usesDdlSidecar = type === 'TABL' || type === 'STRU';
+  let local: DdicObject;
+  try {
+    // abap-file-format three-piece: TABL/STRU honor sibling .tabl.ddic /
+    // .tabl.settings.json when present. Falls back to the legacy single JSON
+    // for DOMA/DTEL (or when no sidecar exists). readTablArtifact throws on
+    // malformed DDL — mapped to TABL_DDL_INVALID below.
+    local = await readDdicObjectForCreate(path.resolve(process.cwd(), file), type);
+  } catch (error: unknown) {
+    const m = error instanceof Error ? error.message : String(error);
+    const isTablDdlError = usesDdlSidecar && /Invalid Table and Structure DDL/i.test(m);
+    const code: ErrorCode = isTablDdlError ? 'TABL_DDL_INVALID' : 'INVALID_ARGUMENT';
+    throw new CliError(code, `Cannot read ${type} file ${outFile}: ${m}`, {
+      file: outFile,
+      type,
+      object: objectName,
+      nextSteps: isTablDdlError
+        ? [
+            `Inspect the .${type.toLowerCase()}.ddic sidecar: it must start with \`define table|structure ${objectName} {\` and end with \`}\`.`,
+            `For TABL/STRU, see the abap-file-format three-piece layout (.${type.toLowerCase()}.json + .${type.toLowerCase()}.ddic + .${type.toLowerCase()}.settings.json).`,
+          ]
+        : ['Verify the file exists, is readable, and contains valid JSON.'],
+    });
+  }
+
+  const errors = validateDdicObject(local, type);
+  if (errors.length > 0) {
+    throw new CliError('VALIDATION_ERROR', `Invalid ${type} definition in ${outFile}: ${errors.join('; ')}`, {
+      file: outFile,
+      type,
+      object: objectName,
+      details: errors,
+    });
+  }
+
+  const wire = localToWire(type, local);
+
+  // P3.1: TABT schema validation — gate the wire payload against tabt-v1.json
+  // enum values so the CLI rejects invalid buffering/state/storageType before
+  // posting to SAP (where apply_ddic_table_settings would raise
+  // DDIC_FIELD_UNSUPPORTED instead).
+  if (usesDdlSidecar) {
+    const settingsWire = (local as Record<string, unknown>).generalInformation;
+    if (settingsWire) {
+      const tabtErrors = validateTabtPayload(settingsWire);
+      if (tabtErrors) {
+        throw new CliError('TABT_VALIDATION_FAILED', `Invalid TABT settings in ${outFile}: ${tabtErrors.join('; ')}`, {
+          file: outFile,
+          type,
+          object: objectName,
+          details: { schemaFile: 'tabt-v1.json', errors: tabtErrors },
+          nextSteps: [
+            'Inspect the .tabl.settings.json (or .tabl.json embedded generalInformation).',
+            `Run \`abap pull ${objectName} --type ${type}\` to refresh the file with current SAP-side values.`,
+          ],
+        });
+      }
+    }
+  }
+
+  return { local, wire };
+}
+
+/** `--atomic` phase-1 wrapper: validate only, discard the parsed payload. */
+async function validateDdicFile(file: string, type: string): Promise<void> {
+  // objectName is only used to enrich error messages; --atomic re-resolves it
+  // from the file, so pass the resolved name through when available.
+  await readValidatedDdic(file, type as DdicSupportedType, resolveFile(file).objectName);
+}
+
+/**
+ * Read + validate a HTTP service `.json` file (shared by the push path and the
+ * `--atomic` phase-1 validator).
+ */
+async function readValidatedHttp(file: string, objectName: string) {
+  const outFile = toRelativeOutputPath(file);
+  let local: Awaited<ReturnType<typeof readHttpJson>>;
   try {
     local = await readHttpJson(path.resolve(process.cwd(), file));
   } catch (error: unknown) {
     const m = error instanceof Error ? error.message : String(error);
-    const outFile = toRelativeOutputPath(file);
     throw new CliError('INVALID_ARGUMENT', `Cannot read HTTP service file ${outFile}: ${m}`, { file: outFile });
   }
   const errors = validateHttpObject(local);
   if (errors.length > 0) {
-    const outFile = toRelativeOutputPath(file);
     throw new CliError('VALIDATION_ERROR', `Invalid HTTP service definition in ${outFile}: ${errors.join('; ')}`, {
       file: outFile,
       type: 'HTTP',
-      object: resolved.objectName,
+      object: objectName,
       details: errors,
     });
   }
+  return local;
+}
+
+async function validateHttpFile(file: string): Promise<void> {
+  await readValidatedHttp(file, resolveFile(file).objectName);
+}
+
+/**
+ * Read + validate a Transaction `.json` file (shared by the push path and the
+ * `--atomic` phase-1 validator).
+ */
+async function readValidatedTran(file: string, objectName: string) {
+  const outFile = toRelativeOutputPath(file);
+  let local: Awaited<ReturnType<typeof readTranJson>>;
+  try {
+    local = await readTranJson(path.resolve(process.cwd(), file));
+  } catch (error: unknown) {
+    const m = error instanceof Error ? error.message : String(error);
+    throw new CliError('INVALID_ARGUMENT', `Cannot read Transaction file ${outFile}: ${m}`, { file: outFile });
+  }
+  const errors = validateTranObject(local as Parameters<typeof validateTranObject>[0]);
+  if (errors.length > 0) {
+    throw new CliError('VALIDATION_ERROR', `Invalid TRAN definition in ${outFile}: ${errors.join('; ')}`, {
+      file: outFile,
+      type: 'TRAN',
+      object: objectName,
+      details: errors,
+    });
+  }
+  return local;
+}
+
+async function validateTranFile(file: string): Promise<void> {
+  await readValidatedTran(file, resolveFile(file).objectName);
+}
+
+/**
+ * Push a HTTP service .json file via ICF POST /http/<name>.
+ * The SAP-side handler creates/updates a SICF node with the given handler class + URL.
+ *
+ * 035 exception: HTTP push KEEPS create-on-push — the SAP-side handler
+ * creates/updates the SICF node, so no existence probe here (unlike DDIC/TRAN).
+ * `abap create HTTP` requires `--file`; push remains the create path when the
+ * JSON was authored by hand or produced by `abap pull`.
+ */
+async function pushHttpFile(
+  client: AdtClientWrapper,
+  resolved: IcfPushTarget,
+  file: string,
+  opts: PushFileOptions,
+): Promise<PushOneResult> {
+  const local = await readValidatedHttp(file, resolved.objectName);
 
   const wire = httpLocalToWire(local);
   // Transport: --tr > config > file's recorded request > ($TMP → none) > user's open request.
@@ -508,28 +676,11 @@ async function pushHttpFile(
  */
 async function pushTranFile(
   client: AdtClientWrapper,
-  resolved: { objectName: string; objectType: string },
+  resolved: IcfPushTarget,
   file: string,
   opts: PushFileOptions,
 ): Promise<PushOneResult> {
-  let local: { name: string; package?: string; transportRequest?: string; [key: string]: unknown };
-  try {
-    local = await readTranJson(path.resolve(process.cwd(), file));
-  } catch (error: unknown) {
-    const m = error instanceof Error ? error.message : String(error);
-    const outFile = toRelativeOutputPath(file);
-    throw new CliError('INVALID_ARGUMENT', `Cannot read Transaction file ${outFile}: ${m}`, { file: outFile });
-  }
-  const errors = validateTranObject(local as Parameters<typeof validateTranObject>[0]);
-  if (errors.length > 0) {
-    const outFile = toRelativeOutputPath(file);
-    throw new CliError('VALIDATION_ERROR', `Invalid TRAN definition in ${outFile}: ${errors.join('; ')}`, {
-      file: outFile,
-      type: 'TRAN',
-      object: resolved.objectName,
-      details: errors,
-    });
-  }
+  const local = await readValidatedTran(file, resolved.objectName);
 
   const wire = tranLocalToWire(local as Parameters<typeof tranLocalToWire>[0]);
   const packageName = (wire.package ?? '').toUpperCase();
@@ -565,36 +716,9 @@ async function pushTranFile(
 }
 
 /**
- * 036: TTYP / MSAG / DDLS push through the dual-channel flows. Each one runs
- * channel-detect itself; DDLS hard-errors on ECC rather than falling back.
+ * Dispatch one file: textpool → ICF JSON table → channel-routed AFF JSON
+ * (TTYP / MSAG / DDLS) → FUGR → generic ADT source object.
  */
-async function validateChannelRoutedFile(objectType: string, file: string): Promise<void> {
-  const abs = path.resolve(process.cwd(), file);
-  const errors =
-    objectType === 'TTYP'
-      ? await validateTtypObject(await readTtypJson(abs))
-      : objectType === 'MSAG'
-        ? await validateMsagObject(await readMsagJson(abs))
-        : await validateDdlsObject(await readDdlsJson(abs));
-  if (errors.length > 0) throw new CliError('VALIDATION_ERROR', errors.join('; '));
-}
-
-async function pushChannelRoutedFile(
-  objectType: string,
-  file: string,
-  opts: PushFileOptions,
-  onStage: (s: PushStage) => void,
-): Promise<PushOneResult> {
-  const result =
-    objectType === 'TTYP'
-      ? await runPushTtyp(file, { transport: opts.tr })
-      : objectType === 'MSAG'
-        ? await runPushMsag(file, { transport: opts.tr })
-        : await runPushDdls(file, { transport: opts.tr });
-  onStage(result.channel === 'adt' ? 'channel-adt' : 'channel-icf');
-  return { transport: opts.tr ?? '', status: 'written' };
-}
-
 async function pushOne(
   client: AdtClientWrapper,
   file: string,
@@ -617,14 +741,44 @@ async function pushOne(
     return { transport: opts.tr ?? client.getConfig().transport ?? '' };
   }
 
-  // DDIC .json files (DOMA/DTEL/TABL/STRU) push via ICF /ddic/<type>.
+  // ICF .json files (DDIC / HTTP / TRAN) push through the registry table.
+  // Phase 4: no per-type branching here — `icfPushHandlerFor` owns the routes.
   if (resolved.route === 'icf') {
-    // 036: TTYP/MSAG/DDLS share the .json extension but route through
-    // channel-detect (ADT primary), so they must be intercepted first.
-    if (ADT_ROUTED_TYPES.has(resolved.objectType)) {
-      return pushChannelRoutedFile(resolved.objectType, file, opts, onStage);
+    // Guard once for every ICF type instead of inside each handler. Both flags
+    // are meaningless before the POST (validation is part of the push).
+    if (opts.checkOnly) {
+      throw new CliError('VALIDATION_ERROR', '--check-only is not supported for ICF-routed JSON files', {
+        nextSteps: ['DDIC/HTTP/TRAN files are validated during push; drop --check-only.'],
+      });
     }
-    return pushDdicFile(client, resolved, file, opts, onStage);
+    onStage('ddic-icf');
+    if (opts.dryRun) {
+      return { transport: opts.tr ?? client.getConfig().transport ?? 'DRY_RUN', status: 'dry-run' };
+    }
+    const handler = icfPushHandlerFor(resolved.objectType);
+    return handler.push(client, resolved, file, opts);
+  }
+
+  // 036: TTYP / MSAG / DDLS are AFF `.json` files that resolve to the ADT route
+  // (registry `source: 'ADT'`), so they must be intercepted before the generic
+  // source path below reads them as ABAP text. Each flow runs channel-detect
+  // and reports the channel it used.
+  const channelRouted = CHANNEL_ROUTED_PUSH[resolved.objectType];
+  if (channelRouted) {
+    // Same contract as the ICF branch: check-only and dry-run are meaningless
+    // before the write, and the plan must be identical across ICF/ADT routes.
+    if (opts.checkOnly) {
+      throw new CliError('VALIDATION_ERROR', '--check-only is not supported for ICF-routed or channel-routed JSON files', {
+        nextSteps: ['DDIC/HTTP/TRAN/TTYP/MSAG/DDLS files are validated during push; drop --check-only.'],
+      });
+    }
+    if (opts.dryRun) {
+      onStage('ddic-icf');
+      return { transport: opts.tr ?? client.getConfig().transport ?? 'DRY_RUN', status: 'dry-run' };
+    }
+    const result = await channelRouted.push(file, opts);
+    onStage(result.channel === 'adt' ? 'channel-adt' : 'channel-icf');
+    return { transport: opts.tr ?? '', status: 'written' };
   }
 
   let content: string;

@@ -199,7 +199,7 @@ abap push [options] [files...]
 |--------|-------------|
 | `--all` | Push all .abap files under the scan root (sourceDir or current dir; honours .abapignore). |
 | `--tr=<transport>` | Transport number override for unbound objects. |
-| `--check-only` | Syntax check only; do not activate. |
+| `--check-only` | Syntax check only; do not activate. Not supported for ICF-routed JSON files (DDIC / HTTP / TRAN) — those are validated during push. |
 | `--no-activate` | Lock + write + skip check + skip activate + unlock. |
 | `--dry-run` | Plan only — no mutating ADT calls. |
 | `--fail-fast` | Stop at the first failing file (default: --keep-going). |
@@ -1067,7 +1067,7 @@ abap create <type> <name> [options]
 | `--no-pull` | Skip the create-then-pull local copy (default: pull after create) |
 | `--check-only` | Validate the proposed object without creating it |
 | `--audit` | Include the before-checksum (extra SAP round-trip, off by default) |
-| `--file=<path>` | abap-file-format DDIC JSON input (required for DOMA/DTEL/TABL/STRU) |
+| `--file=<path>` | abap-file-format JSON input (required for TABL/STRU/DOMA/DTEL/HTTP/TRAN/TTYP/MSAG/DDLS) |
 | `--func=<name>` | With FUGR: create a function module (FUGR/FF) inside the existing function group <name> |
 | `--schema` | Print the command parameter schema as JSON and exit (no SAP call). (default `false`) |
 | `--yes` | Confirm in non-interactive environments. (default `false`) |
@@ -1101,6 +1101,9 @@ Every error's `error.category` maps 1:1 to its exit code. `UNKNOWN` is the gener
 | `LOCKED` | `9` | Target object is locked by another user |
 | `DDLS_NOT_SUPPORTED` | `64` | — |
 | `CHANNEL_DETECT` | `65` | — |
+| `CONFLICT` | `66` | — |
+| `PERSISTENCE_ERROR` | `67` | — |
+| `HTTP_ERROR` | `68` | — |
 
 ### Per-command error code index
 

@@ -10,7 +10,7 @@
 
 ## 关键点
 
-- **`include <stru_name>;` 必须以分号结尾**。CLI 解析器（[tabl-artifact.ts:parseTablDdic](https://github.com/chunrichi/abap-cli/blob/main/src/abap_cli/dictionary/tabl-artifact.ts)）把它转成 `{ fieldName: '.INCLUDE', precField: 'ZSAMPLE_REUSE' }` 传给 SAP 端。
+- **`include <stru_name>;` 必须以分号结尾**。CLI 解析器（[tabl-artifact.ts:parseTablDdic](https://github.com/chunrichi/abap-cli/blob/main/src/abap_cli/formats/ddic/tabl-artifact.ts)）把它转成 `{ fieldName: '.INCLUDE', precField: 'ZSAMPLE_REUSE' }` 传给 SAP 端。
 - **被 include 的 STRU 必须先在 SAP 里存在**（建议先 `abap create STRU <stru_name>`）。
 - DDL 里 `include` 行**不**加缩进以外的特殊语法；不要写 `INCLU--AP` / `INCLUDE TYPE` 之类变体。
 - `include` 后面还能继续加字段（如同例 `status`），CLI 会按 DDL 顺序把 `precField` 插在对应位置。
