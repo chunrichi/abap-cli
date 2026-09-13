@@ -19,6 +19,8 @@ export interface SystemProfile {
   insecure?: boolean;
   /** Path to a CA certificate (PEM) used for SSL verification. */
   ca?: string;
+  /** ISO timestamp of when the PEM behind `ca` entered the cert store. */
+  caImportedAt?: string;
   /** Canonical auth config (v2 discriminated union). Replaces flat authMethod + blocks. */
   auth: AuthConfig;
   /** SAP release recorded at connect time (diagnostics). */
@@ -125,6 +127,7 @@ function normaliseStoredProfile(name: string, raw: unknown): SystemProfile {
     language: typeof r.language === 'string' ? r.language : 'EN',
     ...(typeof r.insecure === 'boolean' ? { insecure: r.insecure } : {}),
     ...(typeof r.ca === 'string' && r.ca ? { ca: r.ca } : {}),
+    ...(typeof r.caImportedAt === 'string' && r.caImportedAt ? { caImportedAt: r.caImportedAt } : {}),
     auth,
     ...(typeof r.systemVersion === 'string' ? { systemVersion: r.systemVersion } : {}),
     ...(r.adtTextpool && typeof r.adtTextpool === 'object' ? { adtTextpool: r.adtTextpool as SystemProfile['adtTextpool'] } : {}),

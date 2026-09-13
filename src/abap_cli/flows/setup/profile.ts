@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { text, password, confirm, isCancel } from '@clack/prompts';
-import { getSystem, upsertSystem, deleteSystem, listSystemNames, type SystemProfile } from '../../config/user-config.js';
+import { getSystem, loadUserConfig, upsertSystem, deleteSystem, listSystemNames, type SystemProfile } from '../../config/user-config.js';
 import { getPassword, storePassword, deletePassword, storeCertPassphrase, deleteCertPassphrase } from '../../config/secrets.js';
 import { clearCookieStore, defaultCookieFile } from '../../auth/sso-cookie.js';
 import { CliError, printResult, type OutputMode } from '../../output/json.js';
@@ -13,6 +13,8 @@ import { toOutputPath } from '../../core/path-output.js';
 import { probeTextpoolCapability, recordCapability } from '../../clients/textpool-capability.js';
 import { getOrProbeRuntime } from '../../config/runtime-cache.js';
 import { assertValidProfile } from '../../config/validation.js';
+import { fingerprint, collectOrphanPems } from '../../config/ca-store.js';
+import { applyPemsToProfileWithTimestamp, upsertProfileWithPems } from '../../config/profile-pems.js';
 import type { AuthConfig, AuthMethodV2 } from '../../auth/v2-types.js';
 import { defaultAuth, parseAuthMethodV2 } from '../../auth/v2-types.js';
 import { canonicalToV1Fields } from '../../auth/normalize.js';
@@ -107,10 +109,19 @@ async function applyProfileOptions(
   if (has('username')) updated.username = opts.username as string;
   if (has('language')) updated.language = opts.language as string;
   if (has('insecure')) updated.insecure = !!opts.insecure;
+  // `--ca` carries the user's source path here; `applyNormalizedPems` (called
+  // below, after auth resolution) imports every PEM the profile carries --
+  // CA, cert, key, cert-ca -- into the content-addressed store and rewrites
+  // `updated.ca` / `auth.cert.*` to canonical store paths. `caImportedAt` is
+  // set there too.
   if (has('ca')) updated.ca = opts.ca as string;
-  if (has('clearCa')) delete updated.ca;
+  if (has('clearCa')) {
+    delete updated.ca;
+    delete updated.caImportedAt;
+  }
 
   updated.auth = resolveAuthFromOpts(base, opts);
+  applyNormalizedPems(updated);
 
   // Side-effect: warn on every write that the oauth service-key secret lives
   // on disk (so users don't forget it).
@@ -154,6 +165,30 @@ async function applyProfileOptions(
   return { updated, passwordUpdated, passwordRemoved, certPassphraseUpdated, certPassphraseRemoved };
 }
 
+/**
+ * Import every local PEM path the profile carries (CA / client cert / key)
+ * into the content-addressed store and point the profile at the stored copy.
+ * Runs before keychain side effects so a bad PEM aborts the whole write.
+ * Also persists `caImportedAt` so `profile show` can surface when the CA
+ * entered the store.
+ */
+function applyNormalizedPems(profile: SystemProfile): void {
+  applyPemsToProfileWithTimestamp(profile);
+}
+
+/**
+ * Reclaim store PEMs the previous profile carried and the updated one dropped
+ * (replaced `--ca` / `--cert-path` / `--cert-key`, `--clear-ca`). PEMs still
+ * referenced by another profile are kept. Never throws.
+ */
+function reclaimReplacedPems(previous: SystemProfile | null, next: SystemProfile | undefined): number {
+  if (!previous) return 0;
+  try {
+    return collectOrphanPems(previous, next, loadUserConfig().systems);
+  } catch {
+    return 0;
+  }
+}
 /** Redact `clientSecret` for display (JSON + human). */
 function redactOAuth(auth: AuthConfig): AuthConfig {
   if (auth.method !== 'oauth_password') return auth;
@@ -186,6 +221,7 @@ export async function runShow(name: string, mode: OutputMode): Promise<void> {
   const password = (await getPassword(name)) ? 'stored' : 'not stored';
   // Redact the client secret so `profile show --json` never leaks it to agents.
   const auth = redactOAuth(profile.auth);
+  const shaMatch = profile.ca ? /\/([0-9a-f]{64})\.pem$/.exec(profile.ca) : null;
   const detail = {
     name,
     url: profile.url,
@@ -196,6 +232,8 @@ export async function runShow(name: string, mode: OutputMode): Promise<void> {
     auth,
     insecure: profile.insecure ?? false,
     ca: profile.ca || '',
+    ...(shaMatch ? { caFingerprint: fingerprint(shaMatch[1]) } : {}),
+    ...(profile.caImportedAt ? { caImportedAt: profile.caImportedAt } : {}),
   };
   const human = (() => {
     const lines = [
@@ -222,6 +260,12 @@ export async function runShow(name: string, mode: OutputMode): Promise<void> {
     }
     lines.push(`  insecure:      ${detail.insecure}`);
     lines.push(`  ca:            ${detail.ca || '(none)'}`);
+    if (detail.caFingerprint) {
+      lines.push(`  ca sha256:     ${detail.caFingerprint}`);
+    }
+    if (detail.caImportedAt) {
+      lines.push(`  ca imported:   ${detail.caImportedAt}`);
+    }
     return lines.join('\n');
   })();
   printResult(mode, { system: detail }, human);
@@ -336,7 +380,12 @@ export async function runDelete(name: string, yes: boolean, mode: OutputMode): P
     collectWarning('PROFILE_MISMATCH', `${warning}. Update it with 'abap init --profile <name>' if needed.`);
   }
 
-  const data: Record<string, unknown> = { deleted: name, passwordCleaned, certPassphraseCleaned, cookieJarCleaned };
+  // Report success first: the profile is already gone, so a *cleanup* failure
+  // (or an unreadable systems.json) must never turn this into a reported error.
+  // The sweep covers every PEM the deleted profile carried (CA / cert / key);
+  // files another profile still references are kept.
+  const caOrphanRemoved = reclaimReplacedPems(profileBeforeDelete, undefined) > 0;
+  const data: Record<string, unknown> = { deleted: name, passwordCleaned, certPassphraseCleaned, cookieJarCleaned, caOrphanRemoved };
   printResult(mode, data, `Connection profile '${name}' deleted.`);
 }
 
@@ -367,7 +416,9 @@ export async function runAdd(
 
   const { updated, passwordUpdated, passwordRemoved, certPassphraseUpdated, certPassphraseRemoved } =
     await applyProfileOptions({ url: '', client: '100', username: '', language: 'EN', auth: defaultAuth() }, name, opts);
-  upsertSystem(name, updated);
+  // Funnel through the same PEM-aware writer as `set` / `delete` so a future
+  // PEM field only needs to land in `profile-pems.ts`.
+  upsertProfileWithPems(name, null, updated);
   await recordTextpoolCapabilityIfPossible(name);
 
   printResult(
@@ -405,7 +456,9 @@ export async function runSet(
   }
 
   const { updated, passwordUpdated, passwordRemoved, certPassphraseUpdated, certPassphraseRemoved } = await applyProfileOptions(profile, name, opts);
-  upsertSystem(name, updated);
+  // Import the PEMs before the write (a bad PEM aborts without touching
+  // systems.json) and reclaim replaced ones after it.
+  upsertProfileWithPems(name, profile, updated);
   await recordTextpoolCapabilityIfPossible(name);
 
   printResult(

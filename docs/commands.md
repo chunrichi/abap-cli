@@ -57,7 +57,7 @@ abap init [options]
 | `--password=<password>` | SAP password (stored in keychain). |
 | `--language=<language>` | SAP language. |
 | `--insecure` | Skip SSL certificate verification (development only). |
-| `--ca=<path>` | Path to a CA certificate (PEM) for SSL verification. |
+| `--ca=<path>` | PEM CA certificate to import into ~/.abap-cli/certificates/ and bind to this profile. |
 | `--auth-method=<method>` | Login strategy: basic | cert | browser_sso | oauth_password. |
 | `--auth-option=<kv>` | Generic auth option, repeatable as key=value. New auth methods add no Commander options — they read from this bag. |
 | `--cert-path=<path>` | X.509 client cert file (PEM) — used with --auth-method=cert. |
@@ -199,7 +199,7 @@ abap push [options] [files...]
 |--------|-------------|
 | `--all` | Push all .abap files under the scan root (sourceDir or current dir; honours .abapignore). |
 | `--tr=<transport>` | Transport number override for unbound objects. |
-| `--check-only` | Syntax check only; do not activate. Not supported for ICF-routed JSON files (DDIC / HTTP / TRAN) — those are validated during push. |
+| `--check-only` | Syntax check only; do not activate. Not supported for ICF-routed or channel-routed JSON files (DDIC / HTTP / TRAN / TTYP / MSAG / DDLS) — those are validated during push. |
 | `--no-activate` | Lock + write + skip check + skip activate + unlock. |
 | `--dry-run` | Plan only — no mutating ADT calls. |
 | `--fail-fast` | Stop at the first failing file (default: --keep-going). |
@@ -625,7 +625,7 @@ abap profile <command> [options]
 | `--password=<password>` | Password (stores credential in keychain). |
 | `--remove-password` | Drop the stored password from keychain. |
 | `--insecure` | Skip SSL certificate verification (development only). |
-| `--ca=<path>` | Path to a CA certificate (PEM) for SSL verification. |
+| `--ca=<path>` | PEM CA certificate to import into ~/.abap-cli/certificates/ and bind to this profile. |
 | `--clear-ca` | Remove the CA certificate setting. |
 | `--auth-method=<method>` | Login strategy: basic | cert | browser_sso | oauth_password. |
 | `--auth-option=<kv>` | Generic auth option, repeatable as key=value. |
@@ -1067,7 +1067,7 @@ abap create <type> <name> [options]
 | `--no-pull` | Skip the create-then-pull local copy (default: pull after create) |
 | `--check-only` | Validate the proposed object without creating it |
 | `--audit` | Include the before-checksum (extra SAP round-trip, off by default) |
-| `--file=<path>` | abap-file-format JSON input (required for TABL/STRU/DOMA/DTEL/HTTP/TRAN/TTYP/MSAG/DDLS) |
+| `--file=<path>` | abap-file-format JSON input (required for TABL/STRU/DOMA/DTEL/HTTP/TRAN/TTYP/MSAG/DDLS/SRVD/DCLS/DDLX/DDLA) |
 | `--func=<name>` | With FUGR: create a function module (FUGR/FF) inside the existing function group <name> |
 | `--schema` | Print the command parameter schema as JSON and exit (no SAP call). (default `false`) |
 | `--yes` | Confirm in non-interactive environments. (default `false`) |

@@ -91,6 +91,23 @@ function readSystems(configPath: string): { systems: Record<string, unknown>; er
 }
 
 /**
+ * True when the raw stored profile already points at a CA — either the
+ * profile-level `ca` field or the cert-auth `caPath` override. Accepts both
+ * the canonical `auth.cert` block and the legacy flat `certAuth` shape.
+ */
+function hasConfiguredCa(raw: unknown): boolean {
+  if (!raw || typeof raw !== 'object') return false;
+  const entry = raw as {
+    ca?: unknown;
+    auth?: { method?: string; cert?: { caPath?: unknown } };
+    certAuth?: { caPath?: unknown };
+  };
+  if (typeof entry.ca === 'string' && entry.ca) return true;
+  if (entry.auth?.method === 'cert' && typeof entry.auth.cert?.caPath === 'string' && entry.auth.cert.caPath) return true;
+  return typeof entry.certAuth?.caPath === 'string' && !!entry.certAuth.caPath;
+}
+
+/**
  * Run the three-section doctor check. Never throws for probe or
  * config failures — findings are items in the report.
  */
@@ -256,6 +273,15 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
               verbose ? layers.join(', ') : undefined,
             ),
           );
+          // TLS-layer failures with no CA configured are the most common
+          // self-signed / private-CA pitfall. Surface the import hint in
+          // `nextSteps` before users dig into certificates. The cert-auth
+          // override counts as a configured CA, and the string is unique per
+          // profile so the nextSteps list stays free of duplicates.
+          if (!probe.tls.ok && !hasConfiguredCa(sys.systems[name])) {
+            const caHint = `TLS to '${name}' failed and no CA is configured. Import one with: abap profile set ${name} --ca <pem>`;
+            if (!suggestions.includes(caHint)) suggestions.push(caHint);
+          }
         }
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
