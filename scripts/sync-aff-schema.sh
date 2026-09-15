@@ -50,6 +50,9 @@ FILES=(
   "tabl/tabt-v1.json"
   "doma/doma-v1.json"
   "dtel/dtel-v1.json"
+  # PR5: lock object + number range object.
+  "enqu/enqu-v1.json"
+  "nrob/nrob-v1.json"
   "http/http-v1.json"
   "tran/tran-v1.json"
   # Phase 3 type extensions (SRVB / SRVD / BDEF / DCLS / DDLX / DDLA).

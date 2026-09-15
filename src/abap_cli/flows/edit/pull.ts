@@ -40,6 +40,9 @@ import './pull-ddls.js';
 import './pull-srvd.js';
 import './pull-bdef.js';
 import './pull-cds-extension.js';
+// PR5: ENQU (ICF) and NROB (no ADT endpoint, always ICF).
+import './pull-enqu.js';
+import './pull-nrob.js';
 
 export type { PullOptions, PullEntry, PullResult } from './pull-shared.js';
 export { parsePositiveInt } from './pull-shared.js';

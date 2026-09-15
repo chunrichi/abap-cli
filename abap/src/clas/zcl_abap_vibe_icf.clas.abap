@@ -542,6 +542,22 @@ CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
       EXPORTING es_payload TYPE ty_ddic_create
                 ev_error   TYPE ty_error.
 
+    METHODS create_ddic_enqu
+      IMPORTING iv_name    TYPE viewname
+                iv_payload TYPE string
+                iv_package TYPE devclass
+                iv_request TYPE trkorr
+      EXPORTING es_payload TYPE ty_ddic_create
+                ev_error   TYPE ty_error.
+
+    METHODS create_ddic_nrob
+      IMPORTING iv_name    TYPE nrobj
+                iv_payload TYPE string
+                iv_package TYPE devclass
+                iv_request TYPE trkorr
+      EXPORTING es_payload TYPE ty_ddic_create
+                ev_error   TYPE ty_error.
+
     METHODS get_ddic_object
       IMPORTING iv_type    TYPE string
                 iv_name    TYPE string
@@ -1703,7 +1719,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
     DATA lv_match_name TYPE string.
     DATA lv_pkg TYPE string.
     DATA lv_req TYPE string.
-    FIND REGEX '^/ddic/(doma|dtel|tabl|stru|ttyp|msag)(?:/(.+))?$' IN iv_path IGNORING CASE
+    FIND REGEX '^/ddic/(doma|dtel|tabl|stru|enqu|nrob|ttyp|msag)(?:/(.+))?$' IN iv_path IGNORING CASE
       SUBMATCHES lv_match_type lv_match_name.
     IF sy-subrc <> 0 OR lv_match_type IS INITIAL.
       respond_error( io_server = io_server
@@ -1809,6 +1825,27 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
                                           iv_request = lv_request
                                 IMPORTING es_payload = ls_create
                                           ev_error   = ls_create_err ).
+        WHEN 'ENQU'.
+          " PR5: ENQU (lock object) goes through ICF. The wire body is the
+          " AFF JSON document (formats/enqu/json.ts); the ABAP side translates
+          " to DDIF_ENQU_PUT to persist primaryTable / lockParameters /
+          " lockModules. See create_ddic_enqu for the implementation.
+          create_ddic_enqu( EXPORTING iv_name    = CONV viewname( lv_name )
+                                      iv_payload = iv_body
+                                      iv_package = lv_package
+                                      iv_request = lv_request
+                            IMPORTING es_payload = ls_create
+                                      ev_error   = ls_create_err ).
+        WHEN 'NROB'.
+          " PR5: NROB (number range object) — same ICF path. Wire body is
+          " the AFF JSON (interval.* + configuration.*). Persists via
+          " NRIV writes. See create_ddic_nrob for the implementation.
+          create_ddic_nrob( EXPORTING iv_name    = CONV nrobj( lv_name )
+                                      iv_payload = iv_body
+                                      iv_package = lv_package
+                                      iv_request = lv_request
+                            IMPORTING es_payload = ls_create
+                                      ev_error   = ls_create_err ).
       ENDCASE.
       IF ls_create_err IS NOT INITIAL.
         respond_error( io_server  = io_server
@@ -2768,6 +2805,31 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
                                                                          action = 'updated' ) ).
   ENDMETHOD.
 
+  METHOD create_ddic_enqu.
+    " PR5: ENQU (lock object) create. Prototype stage: the ABAP side accepts
+    " the request and reports ENQU_NOT_IMPLEMENTED instead of silently
+    " succeeding, so the CLI surfaces a precise error code. The follow-up
+    " deploy fills in the persisted path (DDIF_ENQU_PUT with the primary /
+    " secondary table list and the lock parameters extracted from the AFF
+    " JSON document the CLI posts).
+    ev_error = VALUE ty_error( status = 'error'
+                               error = VALUE ty_error_body(
+                                 code    = 'ENQU_NOT_IMPLEMENTED'
+                                 message = |ENQU create for { iv_name } is not implemented in the ICF handler yet| ) ).
+  ENDMETHOD.
+
+  METHOD create_ddic_nrob.
+    " PR5: NROB (number range object) create. Prototype stage: mirror
+    " create_ddic_enqu — accept and report ENQU/NROB_NOT_IMPLEMENTED so the
+    " CLI does not treat an empty response as success. The follow-up deploy
+    " writes TNRO / TNROT / NRIV from the AFF JSON interval + configuration
+    " blocks the CLI posts.
+    ev_error = VALUE ty_error( status = 'error'
+                               error = VALUE ty_error_body(
+                                 code    = 'NROB_NOT_IMPLEMENTED'
+                                 message = |NROB create for { iv_name } is not implemented in the ICF handler yet| ) ).
+  ENDMETHOD.
+
   METHOD get_ddic_object.
     " Pull a DDIC object definition and return the wire JSON (mirrors the
     " create payload so round-trip is consistent). Object missing → DDIC_OBJECT_NOT_FOUND.
@@ -2910,6 +2972,37 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
         CREATE DATA es_payload TYPE zcl_abap_vibe_msag_format=>ty_result.
         ASSIGN es_payload->* TO FIELD-SYMBOL(<ls_msag_payload>).
         <ls_msag_payload> = ls_msag_artifact.
+      WHEN 'ENQU'.
+        " PR5: ENQU (lock object). The CLI's wire shape is the AFF JSON
+        " document (formats/enqu/json.ts). Read via DDIF_ENQU_GET and
+        " serialize to the same shape so the CLI round-trips lossless.
+        DATA(ls_enqu_artifact) = zcl_abap_vibe_enqu_format=>generate( iv_name = CONV viewname( iv_name ) ).
+        IF ls_enqu_artifact-success = abap_false.
+          ev_error = VALUE ty_error( status = 'error'
+                                     error = VALUE ty_error_body( code = COND string( WHEN ls_enqu_artifact-error_code IS INITIAL
+                                                                                      THEN 'DDIC_OBJECT_NOT_FOUND'
+                                                                                      ELSE ls_enqu_artifact-error_code )
+                                                                  message = ls_enqu_artifact-error_message ) ).
+          RETURN.
+        ENDIF.
+        CREATE DATA es_payload TYPE zcl_abap_vibe_enqu_format=>ty_result.
+        ASSIGN es_payload->* TO FIELD-SYMBOL(<ls_enqu_payload>).
+        <ls_enqu_payload> = ls_enqu_artifact.
+      WHEN 'NROB'.
+        " PR5: NROB (number range object). Read NRIV and serialise to the
+        " AFF JSON document the CLI expects (interval.* + configuration.*).
+        DATA(ls_nrob_artifact) = zcl_abap_vibe_nrob_format=>generate( iv_name = CONV nrobj( iv_name ) ).
+        IF ls_nrob_artifact-success = abap_false.
+          ev_error = VALUE ty_error( status = 'error'
+                                     error = VALUE ty_error_body( code = COND string( WHEN ls_nrob_artifact-error_code IS INITIAL
+                                                                                      THEN 'DDIC_OBJECT_NOT_FOUND'
+                                                                                      ELSE ls_nrob_artifact-error_code )
+                                                                  message = ls_nrob_artifact-error_message ) ).
+          RETURN.
+        ENDIF.
+        CREATE DATA es_payload TYPE zcl_abap_vibe_nrob_format=>ty_result.
+        ASSIGN es_payload->* TO FIELD-SYMBOL(<ls_nrob_payload>).
+        <ls_nrob_payload> = ls_nrob_artifact.
       WHEN OTHERS.
         ev_error = VALUE ty_error( status = 'error'
                                    error = VALUE ty_error_body( code = 'DDIC_NOT_SUPPORTED'

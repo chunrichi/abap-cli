@@ -110,6 +110,13 @@ export type ErrorCode =
   // 036-ttyp-msag-ddls: channel detection failure / DDLS not supported on ECC
   | 'CHANNEL_DETECTION_FAILED'   // system profile could not be parsed (CONFIG_ERROR/exit 3) → see spec 036 FR-008 / US1-AS5
   | 'DDLS_NOT_SUPPORTED_ON_ECC'  // DDLS has no ICF fallback; ECC releases before DDL sources cannot serve CDS (VALIDATION_ERROR/exit 64 per spec 036 FR-008 / US4-AS4)
+  // PR5: ENQU (lock object) / NROB (number range object) ICF routes
+  | 'ENQU_CREATE_FAILED'         // ICF /ddic/enqu POST failure (SAP_ERROR)
+  | 'ENQU_PUSH_FAILED'           // ICF /ddic/enqu POST failure during push (SAP_ERROR)
+  | 'NROB_CREATE_FAILED'         // ICF /ddic/nrob POST failure (SAP_ERROR)
+  | 'NROB_PUSH_FAILED'           // ICF /ddic/nrob POST failure during push (SAP_ERROR)
+  | 'ENQU_NOT_IMPLEMENTED'       // ICF handler accepts /ddic/enqu but the SAP-side read/write is not deployed yet (SAP_ERROR)
+  | 'NROB_NOT_IMPLEMENTED'       // ICF handler accepts /ddic/nrob but the SAP-side read/write is not deployed yet (SAP_ERROR)
   // P3.3: feedback service error codes
   | 'CONFLICT'                  // 409: idempotency key reused with different payload
   | 'PERSISTENCE_ERROR'         // 5xx: feedback service unavailable
@@ -170,6 +177,13 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   // 022-http mappings
   HTTP_CREATE_FAILED: 'SAP_ERROR',
   HTTP_OBJECT_NOT_FOUND: 'NOT_FOUND',
+  // PR5 — ENQU / NROB ICF routes
+  ENQU_CREATE_FAILED: 'SAP_ERROR',
+  ENQU_PUSH_FAILED: 'SAP_ERROR',
+  NROB_CREATE_FAILED: 'SAP_ERROR',
+  NROB_PUSH_FAILED: 'SAP_ERROR',
+  ENQU_NOT_IMPLEMENTED: 'SAP_ERROR',
+  NROB_NOT_IMPLEMENTED: 'SAP_ERROR',
   // 023-extension-mechanism
   EXTENSION_LOAD_FAILED: 'CONFIG_ERROR',
   EXTENSION_VALIDATION_FAILED: 'VALIDATION_ERROR',

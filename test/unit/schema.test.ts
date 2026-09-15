@@ -103,6 +103,7 @@ describe('abap create --schema (P0.1 introspection)', () => {
     expect(data.arguments[0].allowedValues).toEqual([
       'CLAS', 'INTF', 'PROG', 'FUGR',
       'TABL', 'STRU', 'DOMA', 'DTEL',
+      'ENQU', 'NROB',
       'HTTP', 'TRAN',
       'TTYP', 'MSAG', 'DDLS',
       'SRVB', 'SRVD', 'BDEF', 'DCLS', 'DDLX', 'DDLA',

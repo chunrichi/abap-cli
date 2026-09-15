@@ -33,6 +33,9 @@ import './create-msag.js';
 import './create-ddls.js';
 import './create-cds-extension.js';
 import './create-srvd.js';
+// PR5: ENQU (ICF) and NROB (ICF, no abap-adt-api endpoint).
+import './create-enqu.js';
+import './create-nrob.js';
 
 /** ADT objtype for source objects (e.g. 'CLAS/OC'); undefined for DDIC/HTTP/TRAN. */
 export interface CreateTypeSpec {
