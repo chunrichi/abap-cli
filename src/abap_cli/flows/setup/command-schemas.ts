@@ -137,6 +137,7 @@ function pullSchema(): CommandSchema {
       { name: '--textpool', type: 'boolean', description: 'Also pull textpool files (.texts/.selections/.headings.<lang>.properties).' },
       { name: '--remote', type: 'string', valuePlaceholder: '<remoteid>', description: 'Pull the object\'s active version source from a remote system (Version Management).' },
       { name: '--tr', type: 'string', valuePlaceholder: '<request>', description: 'Pull all objects bound to a transport request (mutually exclusive with object name and --package).' },
+      { name: '--user', type: 'string', valuePlaceholder: '<sap-user>', description: 'Filter --tr lookups by transport task owner (case-insensitive). Only valid with --tr.' },
       schemaOption(),
     ],
     exclusiveGroups: [['--tr', '<object-name>'], ['--tr', '--package']],

@@ -35,12 +35,14 @@ abap pull
 - `--textpool`: 同时拉取 textpool `.properties` 文件（`.texts`/`.selections`/`.headings.<lang>.properties`）
 - `--remote <remoteid>`: 拉取对象在远程系统的 active 版本源码（Version Management，`/version-source` 端点）
 - `--tr <request>`: T4.2 — 拉取 transport 请求内全部对象（直接对象 + 嵌套 task 对象，去重），与对象名/`--package` **互斥**；空字符串 → `INVALID_ARGUMENT`
+- `--user <sap-user>`: PR2 — 与 `--tr` 配合使用，按 transport task owner 过滤对象（不区分大小写）；无 `--tr` 时单独使用 → `INVALID_ARGUMENT`（exit 2）。直接对象继承 transport 顶层 owner；task 内对象继承 task 自身 owner；owner 缺失的对象保留（避免静默丢失）。
 - `--schema`: 打印本命令参数 schema（unified envelope，无 SAP 调用）
 
 ## 路由与布局
 
 按优先级分派五条路线：
 
+   - **PR2 `--user <sap-user>`**：可选过滤 — 仅保留 owner 匹配的对象（直接对象用 transport 顶层 owner；task 内对象用 task owner）。`TransportObjectInfo.owner` 字段在 `showTransport` 里填入；过滤在 `pull-tr.ts` dedup 之前进行，不匹配的对象静默丢弃，不影响其他对象的拉取。`--user` 单独使用 → `INVALID_ARGUMENT`（exit 2）。响应 `data` 增加 `filtered`（被过滤数）与 `user`（归一化后的大写用户名）字段，便于 agent 解释"为什么 N 个对象没出现"。
 1. **`--tr <request>`**（T4.2）— 调 `transportDetails` 取请求下**所有对象引用**：直接对象（`objects`）+ 嵌套 task 对象（`tasks[].objects`）；按 `type::name` 去重得到有序对象列表，再逐个走下面第 3-5 条路由。单对象失败不中断整体（记为 `failed`），部分失败时 `data.partial: true`；响应额外含 `transport` / `requested` / `deduplicated`（来自 transport `tasks` 的 `TransportRequestInfo.deduplicated`）。HTTP/DDIC 路由走 ICF、其余走 ADT。
 2. **`--package`** — `searchObject` 全量搜索 + 按 `adtcore:packageName` 过滤，分页（`limit × page`）逐对象拉取；单对象失败不中断整体（记为 `failed`），截断时提示 `--page N+1`。**分页的原因**：SAP quickSearch 端点的 `maxResults` 有上限（默认 `SEARCH_RESULT_LIMIT` = 20），一次请求拿不全整个包。实现上每次请求 `limit × page` 条结果、按包名过滤后取 `(page-1)*limit` 到 `page*limit` 的窗口——所以 `--limit` 越大单轮拉得越多，`--page` 递增继续拉下一批。单对象 pull（`abap pull ZCL_X`）无分页。
 3. **`--remote <id>`** — 走 ICF `/version-source`（TMS RFC destination `TMSADM@<id>.DOMAIN_<id>`）。CLI 类型 → VRSD 类型映射：`PROG → REPS`、`INTF → INTF`、`CLAS → CLSD`（类定义）。源码写入对象标准文件名 `src/<typeFolder>/<name>/<name>.<type>.abap`（顶层目录按类型分类，见下文）。对象从未传输到远端时后端返回空 `source`（成功）。
@@ -145,7 +147,7 @@ abap pull --tr NDK123456
 }
 ```
 
-`--package` 模式下 `data` 额外含 `package`/`page`/`limit`/`truncated`（截断时含 `hint`）；`--textpool` 模式含 `route`；单对象普通模式含 `object`/`type`/`entries`/`written`/`skipped`/`failed`；`--tr` 模式含 `transport` / `requested` / `pulled` / `failed` / `deduplicated` / `entries[]`（`{object, type, status, [code, detail]}`）/ `written[]` / `skipped[]`，部分失败时 `partial: true`。
+`--package` 模式下 `data` 额外含 `package`/`page`/`limit`/`truncated`（截断时含 `hint`）；`--textpool` 模式含 `route`；单对象普通模式含 `object`/`type`/`entries`/`written`/`skipped`/`failed`；`--tr` 模式含 `transport` / `requested` / `pulled` / `failed` / `deduplicated` / `entries[]`（`{object, type, status, [code, detail]}`）/ `written[]` / `skipped[]`，部分失败时 `partial: true`；`--user` 启用时额外含 `filtered` / `user`。
 
 `--tr` 模式输出示例：
 
