@@ -19,6 +19,7 @@ import { pushTextpoolFile } from './push-textpool.js';
 import { runPushTtyp } from './push-ttyp.js';
 import { runPushMsag } from './push-msag.js';
 import { runPushDdls } from './push-ddls.js';
+import { orderTargetsByDependency } from './push-order.js';
 import { readTtypJson, validateTtypObject } from '../../formats/ttyp/json.js';
 import { readMsagJson, validateMsagObject } from '../../formats/msag/json.js';
 import { readDdlsJson, validateDdlsObject } from '../../formats/ddls/json.js';
@@ -208,6 +209,9 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
       example: 'abap push src/foo.abap --tr NDK123456',
     });
   }
+  // PR1: dependency order so DDIC prerequisites push before the objects that
+  // reference them (DOMA → DTEL → TABL → ... → HTTP). Stable for same priority.
+  target.files = orderTargetsByDependency(target.files);
 
   // --atomic phase 1: structural validation of every file (NO content syntax
   // check — it establishes an SAP edit session that breaks the later activate,

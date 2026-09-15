@@ -32,6 +32,28 @@ abap push [options] [files...]
 
 无 `[files...]` 且无 `--all` 时抛 `USAGE`（exit 2）。`--check-only` 与 `--no-activate` 同时给时抛 `USAGE`（exit 2）。
 
+## 依赖顺序（`--all` 与多文件）
+
+`push --all` 与显式给出多个 `[files...]` 时，按对象类型依赖顺序推送，让 prerequisites 先激活：
+
+| 优先级 | 对象类型 | 说明 |
+|---|---|---|
+| 10 | `DOMA` | 域 |
+| 20 | `DTEL` | 数据元素 |
+| 30 | `TABL` / `STRU` | 表 / 结构（`.tabl.*` / `.stru.*` 三件套按整体 priority=30 排序） |
+| 40 | `ENQU` | 锁对象 |
+| 45 | `MSAG` / `NROB` | 消息类 / 编号范围对象 |
+| 50 | `INTF` | 接口 |
+| 60 | `CLAS` | 类 |
+| 70 | `FUGR` | 函数组（含 FM / include 子对象） |
+| 80 | `PROG` | 程序 |
+| 90 | `HTTP` | SICF 节点 |
+| 100 | （其它 / 解析失败） | 落到底，仍会推 |
+
+实现：[flows/edit/push-order.ts](../../src/abap_cli/flows/edit/push-order.ts) 提供 `orderTargetsByDependency(files: string[]): string[]`；`flows/edit/push.ts#runPush` 在 `resolveLocalTargets` 之后调用一次。同优先级保留输入顺序（稳定排序）。
+
+**未引入到 PR1**：`.tabl.json` / `.tabl.ddic` / `.tabl.settings.json` 三件套在同一 `--all` 里被去重的逻辑（PR3 范围），PR1 只做排序、不做去重。`.tabl.*` 全部以 priority=30 一起前移；当同一对象三件套都进 `--all` 时仍会各 push 一次，待 PR3 收敛。
+
 ## 按对象 transport 解析（核心设计）
 
 `runPush` **不再**在顶层统一解析一个 transport；改为 `pushOne` 拿到对象后逐对象解析（`resolveObjectTransport`）：
