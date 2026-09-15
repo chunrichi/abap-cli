@@ -72,6 +72,53 @@ src/enqu/ezmy_lock/
 - `EY*` — 客户命名空间
 - `/*` — 显式命名空间
 
+## `lockMode` ↔ SAP `ENQMODE`
+
+SAP stores the lock mode as a single character (`DD26E-ENQMODE`, one row per table). The AFF `lockMode` enum is derived from DDIC domain `ENQMODE`; its fixed values and English texts map 1:1, in the same order:
+
+| SAP | Domain text (DD07T, EN) | AFF `lockMode` |
+|---|---|---|
+| `E` | Write Lock | `exclusive` |
+| `S` | Shared Lock | `shared` |
+| `X` | Exclusive, not cumulative | `exclusiveNotCumulative` |
+| `O` | Set Optimistic Lock | `setOptimistic` |
+| `R` | Promote optimistic lock; transform from '0' to 'E' | `promoteOptimistic` |
+| `U` | Only conflict check extended exclusive lock, as with 'X' | `conflictCheckExtendedExcl` |
+| `V` | Only conflict check exclusive lock, as with 'E' | `conflictCheckExclusive` |
+| `W` | Conflict check for shared lock only, as with 'S' | `conflictCheckShared` |
+| `C` | Only promotion check optimized lock, as with 'R' | `promotionCheckOptimized` |
+| `T` | Reserved | `reserved1` |
+| `+` | Reserved | `reserved2` |
+| (initial) | — | `initial` |
+
+## SAP 侧读路径（已实现）
+
+`read_enqu` 走 `DDIF_ENQU_GET`（函数组 `SDIF`）：
+
+```
+CALL FUNCTION 'DDIF_ENQU_GET'
+  EXPORTING name = <lock object>  state = 'A'  langu = sy-langu
+  IMPORTING gotstate = <state>    dd25v_wa = <header>
+  TABLES    dd26e_tab = <lock modes>  dd27p_tab = <lock parameters>  ddena_tab = <>
+```
+
+- `DD25V-DDTEXT` → `header.description`；`DD25V-ROOTTAB` → `primaryTable.name`
+- `DD26E` 只有 `ENQMODE` 一个字段，按参与表的位置一一对应（主表在前，其余按 `DD27P-TABNAME` 首次出现的顺序）→ 每张表的 `lockMode`
+- `DD27P` 每行一个锁参数：`VIEWFIELD` → `name`，`TABNAME` → `table`，`FIELDNAME` → `field`
+
 ## 当前实现状态
 
-SAP 侧落库路径尚未实现：`zcl_abap_vibe_enqu_format#read_enqu` 与 `zcl_abap_vibe_icf#create_ddic_enqu` 直接返回 `ENQU_NOT_IMPLEMENTED`，CLI 会如实透传该错误码（category `SAP_ERROR`）。dispatch 已接通，因此错误是精确的"未实现"，而不是 `NOT_FOUND`。
+| 环节 | 状态 |
+|---|---|
+| `GET /ddic/enqu/<name>`（pull） | **已实现**（上面的 `DDIF_ENQU_GET` 读路径） |
+| `POST /ddic/enqu`（create / push） | 未实现，返回 `ENQU_NOT_IMPLEMENTED` |
+
+`create` 走 `DDIF_ENQU_PUT`（同样在函数组 `SDIF`，参数为 `name` + `dd25v_wa` + `dd26e_tab` + `dd27p_tab`），待补。
+
+两个字段尚未映射，均为 AFF 可选、CLI 读取时默认 `false`：
+
+- `lockModules.allowRfc` —— 对应哪个 SAP 标志位尚未确认（`DD25V` 上没有明显匹配的 flag）。
+- `lockParameters[].active` —— SAP 侧未找到对应标志，读取时固定为 `true`（AFF 默认值）。
+
+因此 `pull → push` 往返不会保留被设置的 "allow RFC"。
+
