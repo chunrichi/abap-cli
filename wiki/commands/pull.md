@@ -77,6 +77,18 @@ envelope 附加字段：
 
 源码对象（CLAS/PROG/INTF）布局：`<name>.<type>.json` 元数据 + 每个 include part 一个 `.abap`；`--include-all-parts` 控制是否包含 testclasses。FUGR 为多文件布局（`.fugr.json`、`sapl<name>.reps.*`、`l<name>top.reps.*`、每个 FM 一个 `.func.*`）。
 
+### Function modules（FUGR/FF）— PR4 归一化
+
+`abap pull <fm>` 时若 `<fm>` 解析为 `FUGR/FF`（function module），`runPull` 在 `resolveObject` 之后调用 [`normalizeFugrFunctionModule`](../../src/abap_cli/flows/edit/pull-fugr-ff.ts)：
+
+- FM 的 `objectUrl`（`.../fmodules/<fm>`）重写为父函数组（`.../groups/<group>`），name 也改为父组名（`FUGR/F`）；
+- 原 FM 身份以 `requestedFunctionModule` 传给 `pullObject`，fugr 策略据此只输出这一个 FM 的 `<group>/<group>.<fm>.func.abap` + `<group>/<group>.<fm>.func.json`，避免拉下整个组里所有 FM；
+- URL 解析复用 [`parentFunctionGroupFromUri`](../../src/abap_cli/formats/fugr-layout.ts)，与 push 侧同一份 parser；
+- `data.object` / `data.type` / human 摘要保持原 FM 名（用户请求的对象）；
+- 不在 FUGR/FF 路径上零开销直通。
+
+`abap pull <group>`（直接拉父组）走 `fugrStrategy` 的全量路径，与本节无关。
+
 ### 顶层分类子目录
 
 所有 pull 产物按对象类型落到 `src/<typeFolder>/` 下，`typeFolder` 由 `src/abap_cli/formats/type-folder.ts#folderFor(type)` 决定（小写：`clas` / `intf` / `prog` / `fugr` / `tabl` / `doma` / `stru` / `dtel` / `http` / `tran` / `ttyp` / `msag` / `ddls`；未识别类型 → `unknown/`）。这是本地约定（Q5=B），DDIC 原本在 abap-file-format 规范里要求扁平，本仓库统一改为带子目录以保持多类型对象工作目录整洁。**本仓库不实现 abapGit 序列化/反序列化，目录布局不保证与 abapGit 兼容**（见 constitution Principle III）。

@@ -30,6 +30,7 @@ import { runPullTextpool } from './pull-textpool.js';
 import { runPullRemote } from './pull-remote.js';
 import { runPackagePull } from './pull-package.js';
 import { runTransportPull } from './pull-tr.js';
+import { normalizeFugrFunctionModule } from './pull-fugr-ff.js';
 import { pullHandlerFor } from '../../types/registry.js';
 // Side-effect imports: each per-type module self-registers its pull handler
 // at load time. Decision 2A — module-load side effect (no explicit wiring).
@@ -107,10 +108,16 @@ export async function runPull(objectName: string, opts: PullOptions): Promise<Pu
     }
   }
 
-  const object = await resolveObject(client, objectName, opts.type);
-  const result = await pullObject(client, object, opts);
+  // PR4 (C3): a FUGR/FF (function module) is owned by a parent function
+  // group. Rewrite the resolved object to the parent so the fugr pull
+  // strategy writes the canonical `<group>/<group>.<fm>.func.abap` layout;
+  // `requestedFunctionModule` keeps the original FM identity so the
+  // strategy scopes its output to that one module.
+  const resolved = await resolveObject(client, objectName, opts.type);
+  const { object: pullTarget, requestedFunctionModule } = normalizeFugrFunctionModule(resolved);
+  const result = await pullObject(client, pullTarget, { ...opts, requestedFunctionModule });
   return {
-    data: normalizePullData({ object: object.name, type: object.type, entries: result.entries, written: result.written, skipped: result.skipped, failed: result.failed }),
-    human: humanSummary(object, result),
+    data: normalizePullData({ object: resolved.name, type: resolved.type, entries: result.entries, written: result.written, skipped: result.skipped, failed: result.failed }),
+    human: humanSummary(resolved, result),
   };
 }

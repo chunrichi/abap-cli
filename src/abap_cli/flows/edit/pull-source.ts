@@ -177,7 +177,18 @@ function affTypeFromFilename(fileName: string): string | undefined {
 export async function pullObject(
   client: AdtClientWrapper,
   object: { name: string; type: string; objectUrl: string },
-  opts: { dir: string; overwrite?: boolean; skipExisting?: boolean; includeTests?: boolean; includeAllParts?: boolean },
+  opts: {
+    dir: string;
+    overwrite?: boolean;
+    skipExisting?: boolean;
+    includeTests?: boolean;
+    includeAllParts?: boolean;
+    /** PR4: when pulling a function module (FUGR/FF) by name, the resolved
+     *  object is rewritten to the parent function group; this preserves
+     *  the original FM so the fugr strategy scopes its output to that
+     *  one module rather than dumping every FM in the group. */
+    requestedFunctionModule?: { name: string; objectUrl: string };
+  },
 ): Promise<{ entries: PullEntry[]; written: string[]; skipped: string[]; failed: string[] }> {
   const files = await strategyFor(object.type).files({ client, object, opts });
 
