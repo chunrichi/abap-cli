@@ -1,6 +1,12 @@
 import { ADTClient, session_types, type ClientOptions, type TextElement, type TextElementCategory, type DumpsFeed } from 'abap-adt-api';
 import type { BearerFetcher } from 'abap-adt-api/build/AdtHTTP.js';
 import { parseServiceBinding, type ServiceBinding } from 'abap-adt-api/build/api/tablecontents.js';
+import {
+  buildActivationRequest,
+  parseActivationResponse,
+  throwOnActivationFailure,
+  type ActivationItem,
+} from './activation.js';
 import { fetchDumpsFeed } from './dumps-feed.js';
 import {
   getTextElements as adtGetTextElements,
@@ -431,37 +437,38 @@ export class AdtClientWrapper {
 
   // --- Activation ---
 
-  activate(objectUrl: string, objectType: string, objectName: string, _mainInclude?: string) {
-    // Always use the array overload. The string overload appends ?context=main
-    // which real SAP rejects for both programs and classes here with
-    // "User X is currently editing Y".
-    return this._call(() =>
-      this.client.activate([
-        {
-          'adtcore:uri': objectUrl,
-          'adtcore:type': objectType,
-          'adtcore:name': objectName,
-          'adtcore:parentUri': objectUrl,
-        },
-      ]),
-    );
+  activate(objectUrl: string, _objectType: string, objectName: string, _mainInclude?: string) {
+    // Only uri + name are sent; see postActivation. Object type / main-include
+    // are accepted for call-site compatibility but deliberately not emitted.
+    return this.postActivation([{ uri: objectUrl, name: objectName }]);
   }
 
   /**
-   * Activate a full list of inactive items (method/OSI source level). The
-   * root-URI-only activate can silently no-op on real SAP (013 dogfooding).
+   * Activate a full list of inactive items (method/OSI source level).
    */
   activateAll(items: Array<{ uri: string; type: string; name: string; parentUri: string }>) {
-    return this._call(() =>
-      this.client.activate(
-        items.map((i) => ({
-          'adtcore:uri': i.uri,
-          'adtcore:type': i.type,
-          'adtcore:name': i.name,
-          'adtcore:parentUri': i.parentUri,
-        })),
-      ),
-    );
+    return this.postActivation(items.map((i) => ({ uri: i.uri, name: i.name })));
+  }
+
+  /**
+   * POST /sap/bc/adt/activation with the object-reference shape real SAP honours.
+   *
+   * See `clients/activation.ts` for why `abap-adt-api`'s own `activate()` cannot
+   * be used: it emits `adtcore:type` + `adtcore:parentUri`, which makes on-prem
+   * SAP answer `activationExecuted="false"` — a silent no-op that leaves the
+   * source written-but-inactive while callers see success.
+   */
+  private postActivation(items: ActivationItem[]) {
+    return this._call(async () => {
+      const response = await this.client.httpClient.request('/sap/bc/adt/activation', {
+        body: buildActivationRequest(items),
+        method: 'POST',
+        qs: { method: 'activate', preauditRequested: true },
+      });
+      const result = parseActivationResponse(String(response.body ?? ''));
+      throwOnActivationFailure(result, items.map((i) => i.name).join(', '));
+      return result;
+    });
   }
 
   /** List inactive objects (edit sessions awaiting activation). */
