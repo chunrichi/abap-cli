@@ -20,6 +20,7 @@ import { runPushTtyp } from './push-ttyp.js';
 import { runPushMsag } from './push-msag.js';
 import { runPushDdls } from './push-ddls.js';
 import { orderTargetsByDependency } from './push-order.js';
+import { deduplicateTablArtifactTargets } from './push-dedup.js';
 import { readTtypJson, validateTtypObject } from '../../formats/ttyp/json.js';
 import { readMsagJson, validateMsagObject } from '../../formats/msag/json.js';
 import { readDdlsJson, validateDdlsObject } from '../../formats/ddls/json.js';
@@ -209,6 +210,12 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
       example: 'abap push src/foo.abap --tr NDK123456',
     });
   }
+  // PR3: collapse TABL/STRU artifact groups (`.tabl.json` + `.tabl.ddic` [+
+  // `.tabl.settings.json`]) to a single canonical file so --all does not push
+  // the same object three times. Runs before the dependency sort so the
+  // canonical (priority 30) wins over the sidecar path.
+  target.files = deduplicateTablArtifactTargets(target.files);
+
   // PR1: dependency order so DDIC prerequisites push before the objects that
   // reference them (DOMA → DTEL → TABL → ... → HTTP). Stable for same priority.
   target.files = orderTargetsByDependency(target.files);
