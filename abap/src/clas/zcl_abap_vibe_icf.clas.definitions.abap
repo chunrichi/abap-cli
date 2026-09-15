@@ -716,6 +716,14 @@ CLASS lcl_ddic DEFINITION.
       EXPORTING es_payload TYPE ty_ddic_create
                 ev_error   TYPE ty_error.
 
+    CLASS-METHODS language_key_from_code
+      IMPORTING iv_code       TYPE string
+      RETURNING VALUE(rv_key) TYPE sy-langu.
+
+    CLASS-METHODS enqmode_from_lock_mode
+      IMPORTING iv_lock_mode      TYPE string
+      RETURNING VALUE(rv_enqmode) TYPE dd27p-enqmode.
+
     CLASS-METHODS create_ddic_nrob
       IMPORTING iv_name    TYPE nrobj
                 iv_payload TYPE string

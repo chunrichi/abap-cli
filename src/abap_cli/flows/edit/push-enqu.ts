@@ -11,6 +11,7 @@ import { IcfClient } from '../../clients/icf-client.js';
 import { CliError } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
 import { readEnquJson, localToWire, validateEnquObject } from '../../formats/enqu/json.js';
+import { resolveFile } from '../../formats/file-resolver.js';
 
 export interface RunPushEnquOptions {
   transport?: string;
@@ -40,30 +41,36 @@ export async function runPushEnqu(
     });
   }
 
+  // The lock object name comes from the file name (`<name>.enqu.json`), not
+  // from `primaryTable.name` — that is the table being locked, a different
+  // object entirely (lock object EAABVAR_ID locks table AAB_VAR_ID).
+  const objectName = resolveFile(file).objectName;
+
   const icf = await IcfClient.create();
   // Existence check first.
-  const head = await icf.getDdic<Record<string, unknown>>('enqu', local.primaryTable.name.toUpperCase());
+  const head = await icf.getDdic<Record<string, unknown>>('enqu', objectName);
   if (head.status !== 'success' || !head.data) {
     const code: ErrorCode = 'OBJECT_NOT_FOUND';
     throw new CliError(
       code,
-      `ENQU ${local.primaryTable.name} not found in system`,
+      `ENQU ${objectName} not found in system`,
       {
-        object: local.primaryTable.name,
+        object: objectName,
         type: 'ENQU',
         nextSteps: [
-          `Create the lock object first: \`abap create ENQU ${local.primaryTable.name} --file ${file} --package <pkg> --tr <tr> --yes\``,
+          `Create the lock object first: \`abap create ENQU ${objectName} --file ${file} --package <pkg> --tr <tr> --yes\``,
         ],
       },
     );
   }
 
   const wire = localToWire(local);
+  (wire as Record<string, unknown>).name = objectName;
   if (opts.transport) (wire as Record<string, unknown>).transportRequest = opts.transport;
   const resp = await icf.postDdic<unknown>('enqu', wire);
   if (resp.status !== 'success') {
     const code = (resp.error?.code ?? 'ENQU_PUSH_FAILED') as ErrorCode;
-    throw new CliError(code, resp.error?.message ?? `Failed to push ENQU ${local.primaryTable.name}`, {
+    throw new CliError(code, resp.error?.message ?? `Failed to push ENQU ${objectName}`, {
       object: local.primaryTable.name,
       type: 'ENQU',
       details: resp.error?.details,

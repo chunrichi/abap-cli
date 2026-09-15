@@ -1939,16 +1939,253 @@ CLASS lcl_ddic IMPLEMENTATION.
                                                                          action = 'created' ) ).
   ENDMETHOD.
   METHOD create_ddic_enqu.
-    " PR5: ENQU (lock object) create. Prototype stage: the ABAP side accepts
-    " the request and reports ENQU_NOT_IMPLEMENTED instead of silently
-    " succeeding, so the CLI surfaces a precise error code. The follow-up
-    " deploy fills in the persisted path (DDIF_ENQU_PUT with the primary /
-    " secondary table list and the lock parameters extracted from the AFF
-    " JSON document the CLI posts).
-    ev_error = VALUE ty_error( status = 'error'
-                               error = VALUE ty_error_body(
-                                 code    = 'ENQU_NOT_IMPLEMENTED'
-                                 message = |ENQU create for { iv_name } is not implemented in the ICF handler yet| ) ).
+    " PR5: ENQU create. The CLI posts the AFF enqu-v1 document (camelCase) plus
+    " the lock object name (which the document itself does not carry — its
+    " primaryTable.name is the table being locked, not the object).
+    "
+    " Persistence goes through DDIF_ENQU_PUT. There is no GOX_GEN_ENQU_STD, so
+    " the create_ddic_table / create_ddic_domain pattern (GOX_GEN_*_STD with
+    " iv_devclass + iv_request_wb) has no lock-object equivalent — and
+    " DDIF_ENQU_PUT itself takes no package parameter. Only $TMP (local) objects
+    " are supported for now; a transported lock object would additionally need
+    " a TADIR entry.
+    TYPES: BEGIN OF ty_request,
+             name             TYPE string,
+             format_version   TYPE string,
+             header           TYPE zcl_abap_vibe_enqu_format=>ty_header,
+             primary_table    TYPE zcl_abap_vibe_enqu_format=>ty_lock_table,
+             secondary_tables TYPE zcl_abap_vibe_enqu_format=>tt_lock_table,
+             lock_parameters  TYPE zcl_abap_vibe_enqu_format=>tt_lock_parameter,
+             lock_modules     TYPE zcl_abap_vibe_enqu_format=>ty_lock_modules,
+           END OF ty_request,
+           BEGIN OF ty_table_mode,
+             tabname TYPE tabname,
+             enqmode TYPE dd27p-enqmode,
+           END OF ty_table_mode,
+           tt_table_mode TYPE STANDARD TABLE OF ty_table_mode WITH EMPTY KEY.
+
+    DATA ls_request     TYPE ty_request.
+    DATA lv_name        TYPE viewname.
+    DATA lv_root        TYPE tabname.
+    DATA lv_package     TYPE devclass.
+    DATA ls_dd25v       TYPE dd25v.
+    DATA lt_dd26e       TYPE STANDARD TABLE OF dd26e WITH EMPTY KEY.
+    DATA lt_dd27p       TYPE STANDARD TABLE OF dd27p WITH EMPTY KEY.
+    DATA lt_table_modes TYPE tt_table_mode.
+    DATA ls_table_mode  TYPE ty_table_mode.
+    DATA ls_secondary   TYPE zcl_abap_vibe_enqu_format=>ty_lock_table.
+    DATA ls_param       TYPE zcl_abap_vibe_enqu_format=>ty_lock_parameter.
+    DATA ls_dfies       TYPE dfies.
+    DATA lv_pos         TYPE i.
+    DATA lv_rc          TYPE sy-subrc.
+    DATA lv_master      TYPE sy-langu.
+
+    CLEAR es_payload.
+    lv_package = to_upper( COND devclass( WHEN iv_package IS INITIAL THEN '$TMP' ELSE iv_package ) ).
+
+    /ui2/cl_json=>deserialize( EXPORTING json        = iv_payload
+                                         pretty_name = /ui2/cl_json=>pretty_mode-camel_case
+                               CHANGING  data        = ls_request ).
+
+    lv_name = iv_name.
+    IF ls_request-name IS NOT INITIAL.
+      lv_name = to_upper( ls_request-name ).
+    ENDIF.
+    lv_root = to_upper( ls_request-primary_table-name ).
+
+    IF lv_name IS INITIAL.
+      ev_error = VALUE ty_error( status = 'error'
+        error = VALUE ty_error_body( code    = 'INVALID_ARGUMENT'
+                                     message = 'lock object name is required (send it as "name" or in the URL)' ) ).
+      RETURN.
+    ENDIF.
+    IF lv_root IS INITIAL.
+      ev_error = VALUE ty_error( status = 'error'
+        error = VALUE ty_error_body( code    = 'INVALID_ARGUMENT'
+                                     message = 'primaryTable.name is required' ) ).
+      RETURN.
+    ENDIF.
+    IF lv_package <> '$TMP'.
+      ev_error = VALUE ty_error( status = 'error'
+        error = VALUE ty_error_body( code    = 'ENQU_PACKAGE_NOT_SUPPORTED'
+                                     message = |ENQU create supports package $TMP only (got { lv_package }); a transported lock object additionally needs a TADIR entry| ) ).
+      RETURN.
+    ENDIF.
+
+    " One lock mode per participating table, root table first. DD26E carries
+    " exactly that positional list (see read_enqu).
+    APPEND VALUE ty_table_mode( tabname = lv_root
+                                enqmode = enqmode_from_lock_mode( ls_request-primary_table-lock_mode ) ) TO lt_table_modes.
+    LOOP AT ls_request-secondary_tables INTO ls_secondary.
+      IF ls_secondary-name IS INITIAL.
+        CONTINUE.
+      ENDIF.
+      APPEND VALUE ty_table_mode( tabname = to_upper( ls_secondary-name )
+                                  enqmode = enqmode_from_lock_mode( ls_secondary-lock_mode ) ) TO lt_table_modes.
+    ENDLOOP.
+    LOOP AT lt_table_modes INTO ls_table_mode.
+      lv_pos = lv_pos + 1.
+      APPEND VALUE dd26e( viewname   = lv_name
+                          tabname    = ls_table_mode-tabname
+                          fortabname = lv_root
+                          enqmode    = ls_table_mode-enqmode
+                          tabpos     = lv_pos ) TO lt_dd26e.
+    ENDLOOP.
+    CLEAR lv_pos.
+
+    " Lock parameters, with field metadata taken from the base table so DD27P
+    " gets the same shape SE11 writes.
+    LOOP AT ls_request-lock_parameters INTO ls_param.
+      IF ls_param-active = abap_false.
+        CONTINUE.
+      ENDIF.
+      IF ls_param-field IS INITIAL OR ls_param-table IS INITIAL.
+        ev_error = VALUE ty_error( status = 'error'
+          error = VALUE ty_error_body( code    = 'INVALID_ARGUMENT'
+                                       message = 'every lockParameters entry needs table and field' ) ).
+        RETURN.
+      ENDIF.
+
+      CLEAR ls_dfies.
+      CALL FUNCTION 'DDIF_FIELDINFO_GET'
+        EXPORTING
+          tabname        = CONV ddobjname( to_upper( ls_param-table ) )
+          fieldname      = CONV dfies-fieldname( to_upper( ls_param-field ) )
+          langu          = sy-langu
+        IMPORTING
+          dfies_wa       = ls_dfies
+        EXCEPTIONS
+          not_found      = 1
+          internal_error = 2
+          OTHERS         = 3.
+      IF sy-subrc <> 0.
+        ev_error = VALUE ty_error( status = 'error'
+          error = VALUE ty_error_body( code    = 'INVALID_ARGUMENT'
+                                       message = |field { ls_param-field } of table { ls_param-table } does not exist| ) ).
+        RETURN.
+      ENDIF.
+
+      CLEAR ls_table_mode.
+      READ TABLE lt_table_modes INTO ls_table_mode WITH KEY tabname = to_upper( ls_param-table ).
+      lv_pos = lv_pos + 1.
+      APPEND VALUE dd27p(
+        viewname   = lv_name
+        objpos     = lv_pos
+        ddlanguage = sy-langu
+        viewfield  = to_upper( ls_param-field )
+        tabname    = to_upper( ls_param-table )
+        fieldname  = to_upper( ls_param-field )
+        keyflag    = ls_dfies-keyflag
+        rollname   = ls_dfies-rollname
+        rollnamevi = ls_dfies-rollname
+        domname    = ls_dfies-domname
+        datatype   = ls_dfies-datatype
+        flength    = ls_dfies-leng
+        inttype    = ls_dfies-inttype
+        intlen     = ls_dfies-intlen
+        decimals   = ls_dfies-decimals
+        headlen    = ls_dfies-headlen
+        outputlen  = ls_dfies-outputlen
+        ddtext     = ls_dfies-fieldtext
+        reptext    = ls_dfies-reptext
+        scrtext_s  = ls_dfies-scrtext_s
+        scrtext_m  = ls_dfies-scrtext_m
+        scrtext_l  = ls_dfies-scrtext_l
+        enqmode    = space ) TO lt_dd27p.
+    ENDLOOP.
+
+    ls_dd25v-viewname   = lv_name.
+    ls_dd25v-as4local   = 'A'.
+    ls_dd25v-aggtype    = 'E'.
+    ls_dd25v-roottab    = lv_root.
+    ls_dd25v-ddtext     = ls_request-header-description.
+    " Honour the document's original language (reverse of the two-letter code
+    " the read path emits); fall back to the session language.
+    lv_master = language_key_from_code( ls_request-header-original_language ).
+    IF lv_master IS INITIAL.
+      lv_master = sy-langu.
+    ENDIF.
+    ls_dd25v-ddlanguage = lv_master.
+    ls_dd25v-masterlang = lv_master.
+    ls_dd25v-as4user    = sy-uname.
+    ls_dd25v-as4date    = sy-datum.
+    ls_dd25v-as4time    = sy-uzeit.
+
+    CALL FUNCTION 'DDIF_ENQU_PUT'
+      EXPORTING
+        name              = lv_name
+        dd25v_wa          = ls_dd25v
+      TABLES
+        dd26e_tab         = lt_dd26e
+        dd27p_tab         = lt_dd27p
+      EXCEPTIONS
+        enqu_not_found    = 1
+        name_inconsistent = 2
+        enqu_inconsistent = 3
+        put_failure       = 4
+        put_refused       = 5
+        OTHERS            = 6.
+    IF sy-subrc <> 0.
+      ev_error = VALUE ty_error( status = 'error'
+        error = VALUE ty_error_body( code    = 'ENQU_CREATE_FAILED'
+                                     message = |DDIF_ENQU_PUT failed for { lv_name } (subrc={ sy-subrc })| ) ).
+      RETURN.
+    ENDIF.
+
+    CALL FUNCTION 'DDIF_ENQU_ACTIVATE'
+      EXPORTING
+        name        = lv_name
+        prid        = 0
+      IMPORTING
+        rc          = lv_rc
+      EXCEPTIONS
+        not_found   = 1
+        put_failure = 2
+        OTHERS      = 3.
+    IF sy-subrc <> 0.
+      ev_error = VALUE ty_error( status = 'error'
+        error = VALUE ty_error_body( code    = 'ENQU_CREATE_FAILED'
+                                     message = |DDIF_ENQU_ACTIVATE failed for { lv_name } (subrc={ sy-subrc })| ) ).
+      RETURN.
+    ENDIF.
+
+    es_payload = VALUE ty_ddic_create( status = 'success'
+                                       data   = VALUE ty_ddic_create_data( name   = lv_name
+                                                                           type   = 'ENQU'
+                                                                           action = 'created' ) ).
+  ENDMETHOD.
+
+  METHOD language_key_from_code.
+    " AFF two-letter language code -> SAP language key; the inverse of
+    " zcl_abap_vibe_enqu_format#language_code. Returns initial for anything
+    " unknown so callers can fall back to the session language.
+    CASE to_lower( iv_code ).
+      WHEN 'de'.  rv_key = 'D'.
+      WHEN 'en'.  rv_key = 'E'.
+      WHEN 'zh'.  rv_key = '1'.
+      WHEN 'fr'.  rv_key = 'F'.
+      WHEN 'es'.  rv_key = 'S'.
+      WHEN OTHERS. CLEAR rv_key.
+    ENDCASE.
+  ENDMETHOD.
+
+  METHOD enqmode_from_lock_mode.
+    " AFF lockMode -> DDIC domain ENQMODE. The eleven domain values and their
+    " texts line up 1:1 with the AFF enum (see read_enqu / wiki/objects/enqu.md).
+    CASE to_upper( iv_lock_mode ).
+      WHEN 'EXCLUSIVE'.                 rv_enqmode = 'E'.
+      WHEN 'SHARED'.                    rv_enqmode = 'S'.
+      WHEN 'EXCLUSIVENOTCUMULATIVE'.    rv_enqmode = 'X'.
+      WHEN 'SETOPTIMISTIC'.             rv_enqmode = 'O'.
+      WHEN 'PROMOTEOPTIMISTIC'.         rv_enqmode = 'R'.
+      WHEN 'CONFLICTCHECKEXTENDEDEXCL'. rv_enqmode = 'U'.
+      WHEN 'CONFLICTCHECKEXCLUSIVE'.    rv_enqmode = 'V'.
+      WHEN 'CONFLICTCHECKSHARED'.       rv_enqmode = 'W'.
+      WHEN 'PROMOTIONCHECKOPTIMIZED'.   rv_enqmode = 'C'.
+      WHEN 'RESERVED1'.                 rv_enqmode = 'T'.
+      WHEN 'RESERVED2'.                 rv_enqmode = '+'.
+      WHEN OTHERS.                      rv_enqmode = 'E'.
+    ENDCASE.
   ENDMETHOD.
   METHOD create_ddic_nrob.
     " PR5: NROB (number range object) create. Prototype stage: mirror

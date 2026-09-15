@@ -74,6 +74,11 @@ export async function runCreateEnqu(
   }
 
   const wire = localToWire(local);
+  // The AFF enqu document carries no lock-object name: `primaryTable.name` is
+  // the table being locked, which is a different thing. Send the object name
+  // on the wire (the ABAP side reads it from the payload and falls back to the
+  // URL path — the same convention create_ddic_table uses).
+  (wire as Record<string, unknown>).name = upper;
   if (opts.description) wire.header = { ...(wire.header as object), description: opts.description };
   if (opts.package) (wire as Record<string, unknown>).package = opts.package;
   if (opts.tr) (wire as Record<string, unknown>).transportRequest = opts.tr;

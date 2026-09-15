@@ -130,6 +130,7 @@ CLASS zcl_abap_vibe_enqu_format IMPLEMENTATION.
     DATA lv_index    TYPE i.
     DATA lv_mode     TYPE string.
     DATA lt_tables   TYPE STANDARD TABLE OF tabname WITH EMPTY KEY.
+    DATA lv_read_language TYPE sy-langu.
 
     CLEAR: ev_description, ev_master_language, es_primary, et_secondary, et_parameters, es_modules.
     ev_ok = abap_false.
@@ -156,8 +157,37 @@ CLASS zcl_abap_vibe_enqu_format IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    ev_description = ls_dd25v-ddtext.
+    " DDTEXT is language-dependent. The call above returns it in the session
+    " language; the header tells us the object's master language, which is the
+    " language create writes the description in. Re-read in that language (when
+    " it differs) so pull returns what was actually stored.
     ev_master_language = ls_dd25v-masterlang.
+    IF ls_dd25v-masterlang IS NOT INITIAL AND ls_dd25v-masterlang <> sy-langu.
+      CLEAR ls_dd25v.
+      lv_read_language = ev_master_language.
+      CALL FUNCTION 'DDIF_ENQU_GET'
+        EXPORTING
+          name          = iv_name
+          state         = 'A'
+          langu         = lv_read_language
+        IMPORTING
+          gotstate      = lv_gotstate
+          dd25v_wa      = ls_dd25v
+        TABLES
+          dd26e_tab     = lt_dd26e
+          dd27p_tab     = lt_dd27p
+          ddena_tab     = lt_ddena
+        EXCEPTIONS
+          illegal_input = 1
+          OTHERS        = 2.
+      IF sy-subrc <> 0 OR ls_dd25v-viewname IS INITIAL.
+        ev_error_code = 'ENQU_NOT_FOUND'.
+        ev_error_message = |lock object { iv_name } does not exist (master language read failed)|.
+        RETURN.
+      ENDIF.
+    ENDIF.
+
+    ev_description = ls_dd25v-ddtext.
 
     " Table order: the root table first (DD25V-ROOTTAB), then every further
     " table in the order its fields appear in DD27P. DD26E holds exactly one
