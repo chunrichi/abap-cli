@@ -7,17 +7,15 @@ interface DoctorOptions {
   verbose?: boolean;
   fix?: boolean;
   yes?: boolean;
-  system?: string;
 }
 
 export function registerDoctorCommand(program: Command): void {
   program
     .command('doctor')
-    .description('Diagnose CLI environment and configuration')
+    .description('Diagnose CLI environment and configuration (read-only)')
     .option('--verbose', 'Include detail (versions, paths, messages)')
     .option('--fix', 'Apply safe, reversible fixes (requires --yes)')
     .option('--yes', 'Confirm --fix without prompting')
-    .option('--system <name>', 'Scope to a named profile')
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action(async (opts: DoctorOptions, cmd) => {
       const mode = jsonFromCommand(cmd);
@@ -41,7 +39,7 @@ async function runDoctor(opts: DoctorOptions,mode: OutputMode): Promise<void> {
     });
   }
 
-  const report = await runDoctorChecks({ verbose: opts.verbose, system: opts.system });
+  const report = await runDoctorChecks({ verbose: opts.verbose });
 
   let human: string;
   if (opts.fix && opts.yes) {
@@ -57,12 +55,11 @@ async function runDoctor(opts: DoctorOptions,mode: OutputMode): Promise<void> {
   printResult(mode, report, human);
 }
 
-function humanize(report: { environment: { key: string; status: string; message: string }[]; config: { key: string; status: string; message: string }[]; connection: { key: string; status: string; message: string }[]; nextSteps: string[] }): string {
+function humanize(report: { environment: { key: string; status: string; message: string }[]; config: { key: string; status: string; message: string }[]; nextSteps: string[] }): string {
   const lines: string[] = [];
   for (const [label, section] of [
     ['environment', report.environment],
     ['config', report.config],
-    ['connection', report.connection],
   ] as const) {
     lines.push(`${label}:`);
     for (const item of section) {

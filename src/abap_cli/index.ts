@@ -84,7 +84,7 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
   {
     name: 'doctor',
     scope: 'local',
-    description: 'Diagnose CLI environment and configuration',
+    description: 'Diagnose CLI environment and configuration (read-only)',
     load: () => import('./commands/doctor.js').then((m) => ({ register: m.registerDoctorCommand })),
   },
   {

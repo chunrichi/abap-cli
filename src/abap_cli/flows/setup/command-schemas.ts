@@ -345,13 +345,12 @@ function statusSchema(): CommandSchema {
 // ---------- doctor ----------
 function doctorSchema(): CommandSchema {
   return {
-    ...base('doctor', 'Diagnose CLI environment, configuration, and connections.', 'abap doctor [options]', 'local'),
+    ...base('doctor', 'Diagnose CLI environment and configuration (read-only; no live SAP probes).', 'abap doctor [options]', 'local'),
     arguments: [],
     options: [
       { name: '--verbose', type: 'boolean', description: 'Include detail (versions, paths, underlying messages).' },
       { name: '--fix', type: 'boolean', description: 'Apply safe, reversible fixes (requires --yes).' },
       { name: '--yes', type: 'boolean', description: 'Confirm --fix without prompting.' },
-      { name: '--system', type: 'string', valuePlaceholder: '<name>', description: 'Scope the connection section to a named profile.' },
       schemaOption(),
     ],
     examples: [

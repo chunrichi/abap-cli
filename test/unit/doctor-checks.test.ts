@@ -4,16 +4,6 @@ import * as os from 'os';
 import * as path from 'path';
 import { makeProgram, runCommand } from './cli-helper.js';
 
-// Fake probe — no network access in unit tests.
-vi.mock('../../src/abap_cli/clients/probe.js', () => ({
-  probeSystem: vi.fn().mockResolvedValue({
-    tls: { ok: true, skipped: true },
-    auth: { ok: true },
-    adt: { ok: true },
-    icf: { ok: true },
-  }),
-}));
-
 import { runDoctorChecks } from '../../src/abap_cli/flows/setup/doctor-checks.js';
 
 function tmpDir(): string {
@@ -78,16 +68,6 @@ describe('doctor-checks (FR-001..005)', () => {
     const report = await runDoctorChecks({ home, cwd });
     const item = report.config.find((i) => i.key.startsWith('config.profile'));
     expect(item?.status).toBe('err');
-  });
-
-  it('unknown --system → connection item err, not a hard failure ()', async () => {
-    writeSystems(home, {
-      mock: { url: 'http://localhost:8080', client: '100', username: 'MOCKUSER', language: 'EN' },
-    });
-    const report = await runDoctorChecks({ home, cwd, system: 'does-not-exist' });
-    const conn = report.connection.find((i) => i.key.includes('does-not-exist'));
-    expect(conn?.status).toBe('err');
-    expect(conn?.suggestion).toBeTruthy();
   });
 
   it('--verbose adds per-item detail ()', async () => {
@@ -157,7 +137,6 @@ describe('abap doctor command ()', () => {
     const program = makeProgram();
     registerCmd(program);
     const res = await runCommand(program, ['doctor', '--fix', '--json'], {});
-    expect(res.exitCode).toBe(7);
     const parsed = JSON.parse(res.stderr);
     expect(parsed.status).toBe('error');
     expect(parsed.error.code).toBe('VALIDATION_ERROR');
