@@ -1,29 +1,50 @@
 /**
- * PR5 (B1): NROB (number range object) pull flow via the ICF `/ddic/nrob/<name>`
- * route. NROB has no abap-adt-api endpoint, so this is the only pull path
- * (no channel-detect — always ICF).
+ * PR5 (B1): NROB (number range object) pull flow.
+ *
+ * NROB is an ADT-managed repository object (`/sap/bc/adt/numberranges/objects`)
+ * whose *source is the abap-file-format `nrob-v1.json` document* — the system
+ * exposes the same schema at `numberranges/objects/$schema`. So the primary
+ * read path is a plain ADT source read and no system-side format helper is
+ * involved (unlike TABL/DOMA/DTEL, which are ICF-only).
+ *
+ * Not every release has the object type (the registry marks NROB with
+ * `channel.icfFallback`, `fallbackReason: ECC_EHP6_NO_ADT_NROB`), so when the
+ * ADT read does not yield a usable document we fall back to the bundled ICF
+ * `/ddic/nrob/<name>` route.
  */
 import * as path from 'node:path';
+import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { IcfClient } from '../../clients/icf-client.js';
 import { CliError } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
 import { buildFilename } from '../../formats/file-resolver.js';
 import { folderFor } from '../../formats/type-folder.js';
-import { fileExists } from '../../formats/abap-source.js';
-import { wireToLocal, writeNrobJson } from '../../formats/nrob/json.js';
-import { toOutputPath, normalizePullData } from '../../core/path-output.js';
-import type { PullOptions, PullResult } from './pull-shared.js';
+import { wireToLocal, writeNrobJson, validateNrobObject } from '../../formats/nrob/json.js';
+import { toOutputPath } from '../../core/path-output.js';
+import { type PullOptions } from './pull-shared.js';
 import { registerPullHandler } from '../../types/registry.js';
 
-export async function runPullNrob(objectName: string, opts: PullOptions): Promise<PullResult> {
-  const upper = objectName.trim().toUpperCase();
+/** Read the AFF document via ADT, or null when unavailable. */
+async function readViaAdt(name: string): Promise<Record<string, unknown> | null> {
+  try {
+    const client = await AdtClientWrapper.create();
+    const body = await client.readNrobSource(name);
+    const parsed = JSON.parse(body) as Record<string, unknown>;
+    return parsed && typeof parsed === 'object' && 'interval' in parsed ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Read the wire document via the ICF `/ddic/nrob/<name>` route. Throws when absent. */
+async function readViaIcf(name: string): Promise<Record<string, unknown>> {
   const icf = await IcfClient.create();
-  const resp = await icf.getDdic<Record<string, unknown>>('nrob', upper);
+  const resp = await icf.getDdic<Record<string, unknown>>('nrob', name);
   if (resp.status !== 'success' || !resp.data) {
     const rawCode = resp.error?.code ?? 'SAP_ERROR';
     const code: ErrorCode = rawCode === 'DDIC_OBJECT_NOT_FOUND' ? 'OBJECT_NOT_FOUND' : (rawCode as ErrorCode);
-    throw new CliError(code, resp.error?.message ?? `Failed to pull NROB ${upper}`, {
-      object: upper,
+    throw new CliError(code, resp.error?.message ?? `Failed to pull NROB ${name}`, {
+      object: name,
       type: 'NROB',
       nextSteps: [
         'Verify the object exists in the target system.',
@@ -31,44 +52,55 @@ export async function runPullNrob(objectName: string, opts: PullOptions): Promis
       ],
     });
   }
+  return resp.data;
+}
 
-  const local = wireToLocal(resp.data);
+interface PullNrobOptions { dir?: string; overwrite?: boolean; skipExisting?: boolean }
+
+export async function runPullNrob(name: string, opts: PullNrobOptions = {}): Promise<{
+  object: string;
+  channel: 'adt' | 'icf';
+  fallbackReason?: 'ECC_EHP6_NO_ADT_NROB';
+  files: string[];
+}> {
+  const upper = name.trim().toUpperCase();
+  const dir = opts.dir ?? '.';
   const filename = buildFilename(upper, 'NROB', 'main', '.json');
-  const relPath = path.join(opts.dir, folderFor('NROB'), filename);
+  const relPath = path.join(dir, folderFor('NROB'), filename);
   const targetPath = path.resolve(process.cwd(), relPath);
 
-  if (await fileExists(targetPath) && !opts.overwrite && !opts.skipExisting) {
-    const outPath = toOutputPath(relPath);
-    throw new CliError('OVERWRITE_REQUIRED', `${outPath} already exists; use --overwrite to replace it`, {
-      file: outPath,
-      nextSteps: ['Re-run with --overwrite to replace the existing file.'],
-      example: `abap pull ${upper} --type NROB --overwrite`,
-    });
+  let channel: 'adt' | 'icf' = 'adt';
+  let fallbackReason: 'ECC_EHP6_NO_ADT_NROB' | undefined;
+  let wire = await readViaAdt(upper);
+  if (wire === null) {
+    channel = 'icf';
+    fallbackReason = 'ECC_EHP6_NO_ADT_NROB';
+    wire = await readViaIcf(upper);
   }
-  if (await fileExists(targetPath) && opts.skipExisting) {
-    const outPath = toOutputPath(relPath);
-    return {
-      data: normalizePullData({ object: upper, type: 'NROB', entries: [{ file: outPath, status: 'skipped' }], written: [], skipped: [outPath], failed: [] }),
-      human: `Skipped NROB ${upper} (file already exists: ${outPath})`,
-    };
+
+  const local = wireToLocal(wire);
+  const errors = await validateNrobObject(local);
+  if (errors.length > 0) {
+    throw new CliError('AFF_FIXTURE_INVALID', `Pulled NROB ${upper} failed schema: ${errors.join('; ')}`, {
+      object: upper,
+      details: errors,
+    });
   }
 
   await writeNrobJson(targetPath, local);
   const outPath = toOutputPath(relPath);
   return {
-    data: normalizePullData({
-      object: upper,
-      type: 'NROB',
-      entries: [{ file: outPath, status: 'written' }],
-      written: [outPath],
-      skipped: [],
-      failed: [],
-    }),
-    human: `Pulled NROB ${upper} to ${outPath}`,
+    object: upper,
+    channel,
+    ...(fallbackReason ? { fallbackReason } : {}),
+    files: [outPath],
   };
 }
 
+// Register the NROB pull handler. Decision 2A: per-type results funnel through
+// `wrapPullResult` so the coordinator stays consistent with the other DDIC
+// dual-channel types (MSAG/TTYP/...).
 registerPullHandler('NROB', async ({ objectName, opts }) => {
-  const r = await runPullNrob(objectName, opts as PullOptions);
-  return { object: objectName.toUpperCase(), files: r.data.written as string[], channel: 'icf' };
+  const r = await runPullNrob(objectName, opts as PullNrobOptions);
+  return { object: r.object, files: r.files, channel: r.channel, ...(r.fallbackReason ? { fallbackReason: r.fallbackReason } : {}) };
 });

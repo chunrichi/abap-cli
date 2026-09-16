@@ -476,6 +476,32 @@ export class AdtClientWrapper {
     return this._call(() => this.client.inactiveObjects());
   }
 
+  // --- Number Range Objects (NROB) ---
+
+  /**
+   * Read a Number Range Object's source via the ADT `numberranges/objects`
+   * collection.
+   *
+   * `abap-adt-api` does not expose NROB, so this goes through the raw HTTP
+   * client (the same approach `clients/activation.ts` uses). The endpoint
+   * returns the abap-file-format `nrob-v1.json` document verbatim — the
+   * object's source *is* the AFF file, which is why no system-side format
+   * helper is involved (unlike TABL/DOMA/DTEL, which are ICF-only).
+   *
+   * Not every system has this object type (the registry marks NROB with an
+   * `icfFallback` for that reason), so callers should treat a failure here as
+   * "try the ICF channel" rather than a hard error.
+   */
+  readNrobSource(name: string) {
+    return this._call(async () => {
+      const response = await this.client.httpClient.request(
+        `/sap/bc/adt/numberranges/objects/${encodeURIComponent(name)}/source/main`,
+        { method: 'GET', headers: { Accept: '*/*' } },
+      );
+      return String(response.body ?? '');
+    });
+  }
+
   // --- Syntax check ---
 
   syntaxCheck(cdsUrl: string) {
