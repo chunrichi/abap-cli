@@ -7,10 +7,18 @@
  * read path is a plain ADT source read and no system-side format helper is
  * involved (unlike TABL/DOMA/DTEL, which are ICF-only).
  *
- * Not every release has the object type (the registry marks NROB with
- * `channel.icfFallback`, `fallbackReason: ECC_EHP6_NO_ADT_NROB`), so when the
- * ADT read does not yield a usable document we fall back to the bundled ICF
- * `/ddic/nrob/<name>` route.
+ * The ADT collection is read-only on NW 7.93 / S/4HANA (2026-09-16 real-SAP
+ * probe — see commits bb058bb / tmp/handoff/202609170032-...), so this ADT
+ * primary / ICF fallback pair is **only** used for reads. Create / push stays
+ * on the bundled ICF `/ddic/nrob` route, which writes the classic TNRO /
+ * TNROT tables (see flows/edit/{create,push}-nrob.ts and zcl_abap_vibe_icf
+ * .clas.implementations.abap#create_ddic_nrob).
+ *
+ * Not every release exposes the ADT endpoint, so when the ADT read does not
+ * yield a usable document we fall back to the ICF `/ddic/nrob/<name>` route.
+ * The fallback reason is hardcoded here (was previously also mirrored in the
+ * registry's `channel.fallbackReason` field, which had no consumer and was
+ * dropped on 2026-09-17).
  */
 import * as path from 'node:path';
 import { AdtClientWrapper } from '../../clients/adt-client.js';

@@ -46,7 +46,7 @@ export interface ChannelCapability {
   /** Whether ECC releases (EHP5+) carry the type at all. DDLS = no, full stop. */
   eccSupported: boolean;
   /** Human-readable reason for the fallback (consumed by `data.fallbackReason`). */
-  fallbackReason?: 'ECC_EHP6_NO_ADT_TABLETYPE' | 'ECC_EHP6_NO_ADT_MESSAGECLASS' | 'ECC_EHP6_NO_ADT_NROB';
+  fallbackReason?: 'ECC_EHP6_NO_ADT_TABLETYPE' | 'ECC_EHP6_NO_ADT_MESSAGECLASS';
 }
 
 /** Single registry; iterated in `allSupportedTypes()` for deterministic order. */
@@ -64,15 +64,13 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
   // PR5: ENQU (lock object) and NROB (number range object) — both DDIC,
   // routed through ICF (NROB has no abap-adt-api endpoint; ENQU is included
   // here so the SAP-side ICF dispatch has a single /ddic/* entry to extend).
+  // NROB keeps `source: 'ADT'` for the metadata (pull is ADT-primary with an
+  // ICF fallback — see flows/edit/pull-nrob.ts); the `channel.fallbackReason`
+  // block was previously declared but never read, so it was dropped on
+  // 2026-09-17 (handoff §4.2). pull-nrob.ts hardcodes the literal reason
+  // string, so the registry cleanup is safe.
   { type: 'ENQU', folder: 'enqu', source: 'ICF', affSchemaFile: 'enqu-v1.json', requiresFile: true },
-  {
-    type: 'NROB',
-    folder: 'nrob',
-    source: 'ADT',
-    affSchemaFile: 'nrob-v1.json',
-    requiresFile: true,
-    channel: { icfFallback: true, eccSupported: true, fallbackReason: 'ECC_EHP6_NO_ADT_NROB' },
-  },
+  { type: 'NROB', folder: 'nrob', source: 'ADT', affSchemaFile: 'nrob-v1.json', requiresFile: true },
   // HTTP service (SICF node) via ICF. 032 US10 originally wrote a local
   // skeleton when --file was absent; that path was removed (refactor decision
   // 1A) to match DDIC/DDLS, so HTTP now requires --file too.
