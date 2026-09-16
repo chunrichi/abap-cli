@@ -491,6 +491,16 @@ export class AdtClientWrapper {
    * Not every system has this object type (the registry marks NROB with an
    * `icfFallback` for that reason), so callers should treat a failure here as
    * "try the ICF channel" rather than a hard error.
+   *
+   * **Read-only on NW 7.93 / S/4HANA** (2026-09-16 real-SAP probe): the
+   * `numberranges/objects/{name}` collection accepts only GET. `POST` with
+   * `_action=create` returns "Resource controller does not support method
+   * create"; `PUT` returns "does not support method PUT". So the create /
+   * push side of NROB has to stay on the bundled ICF `/ddic/nrob` route
+   * (which writes the classic TNRO / TNROT / NRIV tables). Pull keeps the
+   * ADT path because that's the canonical mirror on S/4HANA. Discovery XML
+   * for the collection lives at `/sap/bc/adt/discovery` under the
+   * `nrobnro` category.
    */
   readNrobSource(name: string) {
     return this._call(async () => {
