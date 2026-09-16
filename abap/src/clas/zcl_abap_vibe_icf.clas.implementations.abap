@@ -2188,15 +2188,197 @@ CLASS lcl_ddic IMPLEMENTATION.
     ENDCASE.
   ENDMETHOD.
   METHOD create_ddic_nrob.
-    " PR5: NROB (number range object) create. Prototype stage: mirror
-    " create_ddic_enqu — accept and report ENQU/NROB_NOT_IMPLEMENTED so the
-    " CLI does not treat an empty response as success. The follow-up deploy
-    " writes TNRO / TNROT / NRIV from the AFF JSON interval + configuration
-    " blocks the CLI posts.
-    ev_error = VALUE ty_error( status = 'error'
-                               error = VALUE ty_error_body(
-                                 code    = 'NROB_NOT_IMPLEMENTED'
-                                 message = |NROB create for { iv_name } is not implemented in the ICF handler yet| ) ).
+    " PR5: NROB (number range object) create. Persists via the canonical
+    " NUMBER_RANGE_OBJECT_UPDATE FM with indicator='I' (insert). There is no
+    " GOX_GEN_NROB_STD, so transport binding has to be done by hand via
+    " TR_TADIR_INTERFACE after a successful insert. For now, mirrors ENQU:
+    " only $TMP is supported (a transported NROB additionally needs a TADIR
+    " entry which this code path does not yet write).
+    "
+    " AFF → TNRO mapping. The mapping below was reverse-engineered from the
+    " FM source (functions/groups/snr2/fmodules/number_range_object_update)
+    " and the DDIC source of TNRO / TNROT (DDL via /sap/bc/adt/ddic/tables/
+    " tnro/source/main). Entries marked [guess] are best-effort mappings that
+    " the next session should validate against a real SNRO + NUMBER_RANGE_
+    " OBJECT_UPDATE round-trip — they were not directly visible in either the
+    " FM or the DDL.
+    "
+    "   AFF header.description          → TNROT.txtshort (TNROT.txt is the
+    "                                       long description and is left to
+    "                                       the user via SE11 in this first
+    "                                       cut — keeping only the short
+    "                                       text matches the "Minimal Template"
+    "                                       pattern in wiki/objects/nrob.md)
+    "   AFF header.originalLanguage     → TNROT.langu (via the AFF two-letter
+    "                                       code, same helper ENQU uses)
+    "   AFF interval.numberLengthDomain → TNRO.domlen
+    "   AFF interval.percentWarning     → TNRO.percentage
+    "   AFF interval.subType            → TNRO.dtelsobj
+    "   AFF interval.untilYear          → TNRO.yearind (X if true)
+    "   AFF interval.rolling            → TNRO.nonrswap [guess, inverted:
+    "                                       "rolling" in AFF → "no swap" set
+    "                                       empty in TNRO]
+    "   AFF interval.prefix             → unmapped [guess: no obvious TNRO
+    "                                       column; SNRO stores prefix via
+    "                                       element group, not via TNRO]
+    "   AFF configuration.buffering     → TNRO.buffer (verified against
+    "                                       NRBUFFERTYPE fixed values via
+    "                                       ADT domain source: mainBuffer=X,
+    "                                       parallel=P, none=space)
+    "   AFF configuration.bufferedNumbers → TNRO.noivbuffer
+    "   AFF configuration.transactionId  → TNRO.rfcdest [guess: RFC dest is
+    "                                       the closest match, but SE38 may
+    "                                       prefer a dedicated field]
+    "
+    " TNRO / TNROT fields left at initial value: nrtab, nrintfld, nrextfld,
+    " nrfld, nrsobjfld, nrelefld, nreltxt*, code, textind, nrcheckascii,
+    " ignore_group, abap_language_version, status, changed_at/by, audit fields.
+    " These are filled by SAP with sensible defaults when FM runs dialog,
+    " and stay blank for the create-from-ICF path.
+    TYPES: BEGIN OF ty_request,
+             name          TYPE string,
+             format_version TYPE string,
+             header        TYPE zcl_abap_vibe_nrob_format=>ty_header,
+             interval      TYPE zcl_abap_vibe_nrob_format=>ty_interval,
+             configuration TYPE zcl_abap_vibe_nrob_format=>ty_configuration,
+           END OF ty_request.
+
+    DATA ls_request     TYPE ty_request.
+    DATA lv_name        TYPE nrobj.
+    DATA lv_package     TYPE devclass.
+    DATA lv_language    TYPE sy-langu.
+    DATA ls_tnro        TYPE tnro.
+    DATA ls_tnrot       TYPE tnrot.
+    DATA lt_errors      TYPE STANDARD TABLE OF inoer WITH EMPTY KEY.
+    DATA lv_returncode  TYPE char1.
+    DATA ls_error       TYPE inoer.
+    DATA lt_details     TYPE string_table.
+    DATA lv_msg         TYPE string.
+
+    CLEAR es_payload.
+    lv_package = to_upper( COND devclass( WHEN iv_package IS INITIAL THEN '$TMP' ELSE iv_package ) ).
+
+    /ui2/cl_json=>deserialize( EXPORTING json        = iv_payload
+                                         pretty_name = /ui2/cl_json=>pretty_mode-camel_case
+                               CHANGING  data        = ls_request ).
+
+    lv_name = iv_name.
+    IF ls_request-name IS NOT INITIAL.
+      lv_name = to_upper( ls_request-name ).
+    ENDIF.
+
+    " Required-field guard. AFF validation runs on the CLI side, so the body
+    " is normally well-formed; this catches hand-crafted payloads.
+    IF lv_name IS INITIAL.
+      ev_error = VALUE ty_error( status = 'error'
+        error = VALUE ty_error_body( code    = 'INVALID_ARGUMENT'
+                                     message = 'number range object name is required' ) ).
+      RETURN.
+    ENDIF.
+    IF ls_request-interval-number_length_domain IS INITIAL
+       OR ls_request-interval-sub_type IS INITIAL
+       OR ls_request-header-description IS INITIAL.
+      ev_error = VALUE ty_error( status = 'error'
+        error = VALUE ty_error_body( code    = 'INVALID_ARGUMENT'
+                                     message = 'NROB create needs header.description, interval.numberLengthDomain and interval.subType' ) ).
+      RETURN.
+    ENDIF.
+    IF lv_package <> '$TMP'.
+      ev_error = VALUE ty_error( status = 'error'
+        error = VALUE ty_error_body( code    = 'NROB_TRANSPORT_NOT_SUPPORTED'
+                                     message = |NROB create supports package $TMP only (got { lv_package }); a transported number range object additionally needs a TADIR entry| ) ).
+      RETURN.
+    ENDIF.
+
+    " Map AFF → TNRO row. See the comment block above for the column-by-column
+    " rationale; [guess] markers are the fields the next session must validate.
+    ls_tnro-object     = lv_name.
+    ls_tnro-domlen     = to_upper( ls_request-interval-number_length_domain ).
+    ls_tnro-percentage = CONV nrperc( ls_request-interval-percent_warning ).
+    ls_tnro-dtelsobj   = to_upper( ls_request-interval-sub_type ).
+    IF ls_request-interval-until_year = abap_true.
+      ls_tnro-yearind = 'X'.
+    ENDIF.
+    IF ls_request-interval-rolling = abap_false.
+      ls_tnro-nonrswap = 'X'.
+    ENDIF.
+    " buffering → TNRO.buffer. Confirmed against domain NRBUFFERTYPE
+    " (probed via /sap/bc/adt/ddic/domains/nrbuffertype/source/main, fixed
+    " values X=main memory / space=no buffering / P=parallel):
+    "   AFF mainBuffer -> 'X'
+    "   AFF parallel   -> 'P'
+    "   AFF none       -> ' '
+    CASE ls_request-configuration-buffering.
+      WHEN 'parallel'. ls_tnro-buffer = 'P'.
+      WHEN 'none'.     ls_tnro-buffer = ' '.
+      WHEN OTHERS.     ls_tnro-buffer = 'X'.
+    ENDCASE.
+    ls_tnro-noivbuffer = CONV nrivbuffer( ls_request-configuration-buffered_numbers ).
+    IF ls_request-configuration-transaction_id IS NOT INITIAL.
+      ls_tnro-rfcdest = to_upper( ls_request-configuration-transaction_id ).
+    ENDIF.
+
+    " Map AFF → TNROT row. The description carries both txt and txtshort —
+    " txt is the long form (60 chars), txtshort is the 30-char abbreviated
+    " form SE11 displays in lists. AFF caps description at 60 chars (see
+    " schema), so the same string fits both, with txtshort truncated.
+    lv_language = language_key_from_code( ls_request-header-original_language ).
+    IF lv_language IS INITIAL.
+      lv_language = sy-langu.
+    ENDIF.
+    ls_tnrot-object = lv_name.
+    ls_tnrot-langu  = lv_language.
+    ls_tnrot-txt    = ls_request-header-description.
+    ls_tnrot-txtshort = ls_request-header-description(30).
+
+    CALL FUNCTION 'NUMBER_RANGE_OBJECT_UPDATE'
+      EXPORTING
+        indicator         = 'I'
+        object_attributes = ls_tnro
+        object_text       = ls_tnrot
+      IMPORTING
+        returncode        = lv_returncode
+      TABLES
+        errors            = lt_errors
+      EXCEPTIONS
+        object_already_exists     = 1
+        object_attributes_missing = 2
+        object_not_found          = 3
+        object_text_missing       = 4
+        wrong_indicator           = 5
+        OTHERS                    = 6.
+    IF sy-subrc <> 0.
+      ev_error = VALUE ty_error( status = 'error'
+        error = VALUE ty_error_body( code    = 'NROB_CREATE_FAILED'
+                                     message = |NUMBER_RANGE_OBJECT_UPDATE failed for { lv_name } (subrc={ sy-subrc }) ) ).
+      RETURN.
+    ENDIF.
+
+    " Walk the errors table; returncode='E' is a hard failure, anything else
+    " with non-empty errors table is surfaced as details so the CLI keeps the
+    " payload but tells the operator something went sideways.
+    LOOP AT lt_errors INTO ls_error WHERE msgid IS NOT INITIAL OR msgnumber IS NOT INITIAL.
+      MESSAGE ID ls_error-msgid TYPE 'S' NUMBER ls_error-msgnumber
+        WITH ls_error-msgvar1 ls_error-msgvar2 ls_error-msgvar3 ls_error-msgvar4
+        INTO DATA(lv_err_text).
+      IF lv_err_text IS INITIAL.
+        lv_err_text = |{ ls_error-msgid }{ ls_error-msgnumber } { ls_error-msgvar1 }|.
+      ENDIF.
+      APPEND lv_err_text TO lt_details.
+      IF lv_msg IS INITIAL. lv_msg = lv_err_text. ELSE. lv_msg = lv_msg && |; { lv_err_text }|. ENDIF.
+    ENDLOOP.
+    IF lv_returncode CA 'EAX'.
+      ev_error = VALUE ty_error( status = 'error'
+        error = VALUE ty_error_body( code    = 'NROB_CREATE_FAILED'
+                                     message = lv_msg
+                                     details = lt_details ) ).
+      RETURN.
+    ENDIF.
+
+    es_payload = VALUE ty_ddic_create( status = 'success'
+                                       data   = VALUE ty_ddic_create_data( name   = lv_name
+                                                                           type   = 'NROB'
+                                                                           action = 'created' ) ).
   ENDMETHOD.
   METHOD get_ddic_object.
     " Pull a DDIC object definition and return the wire JSON (mirrors the
