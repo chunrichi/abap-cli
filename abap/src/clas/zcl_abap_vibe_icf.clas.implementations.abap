@@ -1050,7 +1050,7 @@ CLASS lcl_ddic IMPLEMENTATION.
     DATA lv_match_name TYPE string.
     DATA lv_pkg TYPE string.
     DATA lv_req TYPE string.
-    FIND REGEX '^/ddic/(doma|dtel|tabl|stru|enqu|ttyp|msag)(?:/(.+))?$' IN iv_path IGNORING CASE
+    FIND REGEX '^/ddic/(doma|dtel|tabl|stru|enqu|nrob|ttyp|msag)(?:/(.+))?$' IN iv_path IGNORING CASE
       SUBMATCHES lv_match_type lv_match_name.
     IF sy-subrc <> 0 OR lv_match_type IS INITIAL.
       lcl_response=>respond_error( io_server = io_server
@@ -1167,6 +1167,17 @@ CLASS lcl_ddic IMPLEMENTATION.
                                       iv_request = lv_request
                             IMPORTING es_payload = ls_create
                                       ev_error   = ls_create_err ).
+        WHEN 'NROB'.
+          " PR5: NROB (number range object) — same ICF path. Wire body is
+          " the AFF JSON (interval.* + configuration.*). Persists via
+          " NRIV writes. See create_ddic_nrob for the implementation.
+          create_ddic_nrob( EXPORTING iv_name    = CONV nrobj( lv_name )
+                                      iv_payload = iv_body
+                                      iv_package = lv_package
+                                      iv_request = lv_request
+                            IMPORTING es_payload = ls_create
+                                      ev_error   = ls_create_err ).
+      ENDCASE.
       IF ls_create_err IS NOT INITIAL.
         lcl_response=>respond_error( io_server  = io_server
                        iv_status  = 200
@@ -2176,6 +2187,17 @@ CLASS lcl_ddic IMPLEMENTATION.
       WHEN OTHERS.                      rv_enqmode = 'E'.
     ENDCASE.
   ENDMETHOD.
+  METHOD create_ddic_nrob.
+    " PR5: NROB (number range object) create. Prototype stage: mirror
+    " create_ddic_enqu — accept and report ENQU/NROB_NOT_IMPLEMENTED so the
+    " CLI does not treat an empty response as success. The follow-up deploy
+    " writes TNRO / TNROT / NRIV from the AFF JSON interval + configuration
+    " blocks the CLI posts.
+    ev_error = VALUE ty_error( status = 'error'
+                               error = VALUE ty_error_body(
+                                 code    = 'NROB_NOT_IMPLEMENTED'
+                                 message = |NROB create for { iv_name } is not implemented in the ICF handler yet| ) ).
+  ENDMETHOD.
   METHOD get_ddic_object.
     " Pull a DDIC object definition and return the wire JSON (mirrors the
     " create payload so round-trip is consistent). Object missing → DDIC_OBJECT_NOT_FOUND.
@@ -2334,6 +2356,21 @@ CLASS lcl_ddic IMPLEMENTATION.
         CREATE DATA es_payload TYPE zcl_abap_vibe_enqu_format=>ty_result.
         ASSIGN es_payload->* TO FIELD-SYMBOL(<ls_enqu_payload>).
         <ls_enqu_payload> = ls_enqu_artifact.
+      WHEN 'NROB'.
+        " PR5: NROB (number range object). Read NRIV and serialise to the
+        " AFF JSON document the CLI expects (interval.* + configuration.*).
+        DATA(ls_nrob_artifact) = zcl_abap_vibe_nrob_format=>generate( iv_name = CONV nrobj( iv_name ) ).
+        IF ls_nrob_artifact-success = abap_false.
+          ev_error = VALUE ty_error( status = 'error'
+                                     error = VALUE ty_error_body( code = COND string( WHEN ls_nrob_artifact-error_code IS INITIAL
+                                                                                      THEN 'DDIC_OBJECT_NOT_FOUND'
+                                                                                      ELSE ls_nrob_artifact-error_code )
+                                                                  message = ls_nrob_artifact-error_message ) ).
+          RETURN.
+        ENDIF.
+        CREATE DATA es_payload TYPE zcl_abap_vibe_nrob_format=>ty_result.
+        ASSIGN es_payload->* TO FIELD-SYMBOL(<ls_nrob_payload>).
+        <ls_nrob_payload> = ls_nrob_artifact.
       WHEN OTHERS.
         ev_error = VALUE ty_error( status = 'error'
                                    error = VALUE ty_error_body( code = 'DDIC_NOT_SUPPORTED'

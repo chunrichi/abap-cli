@@ -724,6 +724,14 @@ CLASS lcl_ddic DEFINITION.
       IMPORTING iv_lock_mode      TYPE string
       RETURNING VALUE(rv_enqmode) TYPE dd27p-enqmode.
 
+    CLASS-METHODS create_ddic_nrob
+      IMPORTING iv_name    TYPE nrobj
+                iv_payload TYPE string
+                iv_package TYPE devclass
+                iv_request TYPE trkorr
+      EXPORTING es_payload TYPE ty_ddic_create
+                ev_error   TYPE ty_error.
+
     CLASS-METHODS get_ddic_object
       IMPORTING iv_type    TYPE string
                 iv_name    TYPE string
