@@ -33,19 +33,10 @@ export interface SystemProfile {
 /** Decision returned by `detectChannel()`. */
 export type ChannelDecision =
   | { channel: 'adt' }
-  | {
-      channel: 'icf';
-      fallbackReason:
-        | 'ECC_EHP6_NO_ADT_TABLETYPE'
-        | 'ECC_EHP6_NO_ADT_MESSAGECLASS'
-        | 'ECC_EHP6_NO_ADT_NROB';
-    };
+  | { channel: 'icf'; fallbackReason: 'ECC_EHP6_NO_ADT_TABLETYPE' | 'ECC_EHP6_NO_ADT_MESSAGECLASS' };
 
-/** Subject types — DDLS triggers a hard exit on ECC, never falls back.
- *  NROB (number range object) follows the same ADT-primary / ECC-ICF-fallback
- *  shape as TTYP/MSAG; the registry marks it with `channel.icfFallback` so
- *  `create / pull / push` agree on the routing. */
-export type ChannelSubject = 'ttyp' | 'msag' | 'ddls' | 'nrob';
+/** Subject types — DDLS triggers a hard exit on ECC, never falls back. */
+export type ChannelSubject = 'ttyp' | 'msag' | 'ddls';
 
 /** In-process cache. Key = hash of the relevant profile fields + subject. */
 const cache = new Map<string, ChannelDecision>();
@@ -160,15 +151,13 @@ export function detectChannel(profile: SystemProfile, subject: ChannelSubject): 
     );
   }
 
-  // TTYP / MSAG / NROB: ADT primary, ICF fallback only when ECC is too old.
+  // TTYP / MSAG: ADT primary, ICF fallback only when ECC is too old.
   if (isEccOldRelease(profile.kernelRelease)) {
-    const fallbackReason =
-      subject === 'msag'
-        ? 'ECC_EHP6_NO_ADT_MESSAGECLASS'
-        : subject === 'nrob'
-          ? 'ECC_EHP6_NO_ADT_NROB'
-          : 'ECC_EHP6_NO_ADT_TABLETYPE';
-    const decision: ChannelDecision = { channel: 'icf', fallbackReason };
+    const decision: ChannelDecision = {
+      channel: 'icf',
+      fallbackReason:
+        subject === 'msag' ? 'ECC_EHP6_NO_ADT_MESSAGECLASS' : 'ECC_EHP6_NO_ADT_TABLETYPE',
+    };
     cache.set(key, decision);
     return decision;
   }

@@ -80,26 +80,6 @@ describe('detectChannel (12-cell decision matrix)', () => {
     expect(detectChannel({ kernelRelease: '793' }, 'msag')).toEqual({ channel: 'adt' });
   });
 
-  // --- NROB ---
-  it('NROB / ECC EHP6 → ICF + ECC_EHP6_NO_ADT_NROB', () => {
-    expect(detectChannel(ECC_EHP6, 'nrob')).toEqual({
-      channel: 'icf',
-      fallbackReason: 'ECC_EHP6_NO_ADT_NROB',
-    });
-  });
-
-  it('NROB / ECC EHP7 → ADT', () => {
-    expect(detectChannel(ECC_75, 'nrob')).toEqual({ channel: 'adt' });
-  });
-
-  it('NROB / S/4HANA → ADT', () => {
-    expect(detectChannel(S4, 'nrob')).toEqual({ channel: 'adt' });
-  });
-
-  it('NROB / NW 7.93 → ADT', () => {
-    expect(detectChannel({ kernelRelease: '793' }, 'nrob')).toEqual({ channel: 'adt' });
-  });
-
   // --- DDLS (no ICF fallback exists) ---
   it('DDLS / ECC EHP6 → throws DDLS_NOT_SUPPORTED_ON_ECC (exit 64)', () => {
     try {

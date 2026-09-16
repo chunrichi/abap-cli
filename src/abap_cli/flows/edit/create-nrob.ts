@@ -1,29 +1,19 @@
 /**
- * PR5 (B1): NROB (number range object) create flow.
+ * PR5 (B1): NROB (number range object) create flow via ICF `/ddic/nrob` route.
  *
- * NROB is exposed by S/4HANA as an ADT object type under
- * `/sap/bc/adt/numberranges/objects` (registry marks `source: 'ADT'`); on
- * older kernels (ECC EHP6) the same create/push path falls through to the
- * bundled ICF `/ddic/nrob` route — `channel-detect` decides at runtime, the
- * same way it does for MSAG / TTYP.
+ * NROB has no abap-adt-api endpoint, so this flow always goes through the
+ * self-built ICF service. The wire body is a JSON document that mirrors the
+ * AFF local shape — the ABAP side translates to `NRIV` rows.
  *
- * On the ADT path the request body is the AFF `nrob-v1.json` document itself
- * (no XML wrapping): NROB source *is* the AFF JSON (proven in the previous
- * session by `$schema` returning the same vendored schema). On the ICF
- * fallback the ABAP side persists the same JSON into the classic TNRO /
- * TNROT / NRIV tables.
- *
- * NROB names follow the standard DDIC namespace: `Z*` / `Y*` / `/*`. The
- * 3-character interval name is what `SNRO` binds to in SAP.
+ * NROB namespaces must start with `Z` / `Y` / `/` (general DDIC rule); the
+ * 3-character interval name is what the `SNRO` transaction binds to.
  */
 import * as path from 'node:path';
-import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { IcfClient } from '../../clients/icf-client.js';
 import { CliError, printResult, type OutputMode } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
 import { localToWire, loadAndValidate, type NrobLocal } from '../../formats/nrob/json.js';
 import { toOutputPath } from '../../core/path-output.js';
-import { detectChannel, loadChannelProfile, type SystemProfile } from './channel-detect.js';
 import type { CreateOptions } from './create.js';
 import { registerCreateHandler, type CreateHandler } from '../../types/registry.js';
 
@@ -33,7 +23,6 @@ export async function runCreateNrob(
   objectName: string,
   opts: CreateOptions,
   mode: OutputMode,
-  profile?: SystemProfile,
 ): Promise<void> {
   const upper = objectName.trim().toUpperCase();
   if (!NROB_NAME_PREFIX.test(upper)) {
@@ -83,24 +72,6 @@ export async function runCreateNrob(
     });
   }
 
-  const sysProfile = profile ?? (await loadChannelProfile());
-  const decision = detectChannel(sysProfile, 'nrob');
-
-  if (decision.channel === 'adt') {
-    const wire = localToWire(local);
-    const client = await AdtClientWrapper.create();
-    await client.createNrobSource(upper, JSON.stringify(wire), opts.package ?? '$TMP', opts.tr);
-    printResult(
-      mode,
-      { object: upper, type: 'NROB', action: 'created', channel: 'adt' },
-      `Created NROB ${upper} via ADT`,
-    );
-    return;
-  }
-
-  // ICF fallback (ECC EHP5/6): the body shape is the same AFF JSON document
-  // — the bundled `/ddic/nrob` ICF handler persists it via the classic
-  // TNRO / TNROT / NRIV path.
   const wire = localToWire(local);
   if (opts.description) wire.header = { ...(wire.header as object), description: opts.description };
   if (opts.package) (wire as Record<string, unknown>).package = opts.package;
@@ -117,14 +88,11 @@ export async function runCreateNrob(
     });
   }
 
-  printResult(
-    mode,
+  printResult(mode,
     {
       object: resp.data.name,
       type: 'NROB',
       action: resp.data.action,
-      channel: 'icf',
-      ...(decision.fallbackReason ? { fallbackReason: decision.fallbackReason } : {}),
       file: toOutputPath(opts.file),
     },
     `Created NROB ${resp.data.name} via ICF ${resp.data.action === 'created' ? '(new)' : '(overwritten)'}`,

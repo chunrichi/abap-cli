@@ -502,68 +502,6 @@ export class AdtClientWrapper {
     });
   }
 
-  /**
-   * Create a Number Range Object via ADT.
-   *
-   * Same shape as `createMsag` / `createDdls` — bypasses `abap-adt-api` (no
-   * NROB endpoint there) and POSTs to `/sap/bc/adt/numberranges/objects`
-   * with the canonical `?objtype=...&objname=...&corrNr=...` query string.
-   * The request body is the AFF `nrob-v1.json` document (`Content-Type:
-   * application/json`) because NROB's source *is* the AFF JSON, not ABAP
-   * source code.
-   *
-   * The exact `?_action=create` query param mirrors the DDIC atom collection
-   * (`/sap/bc/adt/ddic/tables`, `/sap/bc/adt/ddic/tabletypes`, …). The
-   * "previous session" handoff confirmed NROB is exposed as an ADT object
-   * type on S/4HANA on-prem (`/sap/bc/adt/numberranges/objects/$schema`
-   * returns 200 with the AFF schema body), so the URL family is in scope.
-   * The wire body + Accept header match what `readNrobSource` already issues
-   * on the GET side, so a working round-trip is enough evidence the create
-   * path is well-formed even when this session can't reach the live system.
-   */
-  createNrobSource(name: string, jsonBody: string, packageName: string, transport?: string): Promise<void> {
-    return this._call(async () => {
-      const url =
-        `/sap/bc/adt/numberranges/objects?_action=create` +
-        `&objtype=nrob` +
-        `&objname=${encodeURIComponent(name.toUpperCase())}` +
-        `&corrNr=${encodeURIComponent(transport ?? '')}`;
-      await this.client.httpClient.request(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: '*/*',
-          ...(packageName ? { 'X-CPACKAGE': packageName } : {}),
-          ...(transport ? { 'X-CORR-NR': transport } : {}),
-        },
-        body: jsonBody,
-      });
-    });
-  }
-
-  /**
-   * Update a Number Range Object via ADT.
-   *
-   * Mirrors `updateMsag` / `updateDdls`: lock the object, PUT the new source,
-   * unlock (the caller decides whether to keep the lock open for further
-   * edits). Body is the AFF JSON document; `X-LOCK` carries the lock handle.
-   */
-  updateNrobSource(name: string, jsonBody: string, lockHandle: string, transport?: string): Promise<void> {
-    return this._call(async () => {
-      const url = `/sap/bc/adt/numberranges/objects/${encodeURIComponent(name.toUpperCase())}`;
-      await this.client.httpClient.request(url, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: '*/*',
-          ...(lockHandle ? { 'X-LOCK': lockHandle } : {}),
-          ...(transport ? { 'X-CORR-NR': transport } : {}),
-        },
-        body: jsonBody,
-      });
-    });
-  }
-
   // --- Syntax check ---
 
   syntaxCheck(cdsUrl: string) {
