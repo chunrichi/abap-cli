@@ -204,16 +204,15 @@ const CHANNEL_ROUTED_PUSH: Record<string, ChannelRoutedPushHandler> = {
     push: (file, opts) => runPushDdls(file, { transport: opts.tr }),
     validate: (file, type) => validateChannelRoutedFile(type, file),
   },
-  // PR5: NROB (number range object) has no abap-adt-api endpoint, so its
-  // push is always ICF. The route comes out of `resolveFile` as 'adt' (the
-  // registry marks it `source: 'ADT'`), so it lands in CHANNEL_ROUTED_PUSH
-  // rather than ICF_PUSH_HANDLERS. ENQU is `source: 'ICF'` and lives in
-  // ICF_PUSH_HANDLERS above.
+  // PR5: NROB (number range object) is ADT-routed on S/4HANA (the
+  // `numberranges/objects` collection is exposed there) and falls back to
+  // ICF on ECC EHP5/6 — same dual-channel shape as MSAG/TTYP. The route
+  // comes out of `resolveFile` as 'adt' (the registry marks it
+  // `source: 'ADT'`), so it lands here rather than ICF_PUSH_HANDLERS.
+  // `runPushNrob` returns the channel it actually used so callers can see
+  // whether the request went over ADT or the ICF fallback.
   NROB: {
-    push: async (file, opts) => {
-      await runPushNrob(file, { transport: opts.tr });
-      return { channel: 'icf' as const };
-    },
+    push: (file, opts) => runPushNrob(file, { transport: opts.tr }),
     validate: (file, type) => validateChannelRoutedFile(type, file),
   },
 };
