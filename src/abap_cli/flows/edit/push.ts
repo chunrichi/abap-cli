@@ -19,9 +19,15 @@ import { pushTextpoolFile } from './push-textpool.js';
 import { runPushTtyp } from './push-ttyp.js';
 import { runPushMsag } from './push-msag.js';
 import { runPushDdls } from './push-ddls.js';
+import { runPushEnqu } from './push-enqu.js';
+import { runPushNrob } from './push-nrob.js';
+import { orderTargetsByDependency } from './push-order.js';
+import { deduplicateTablArtifactTargets } from './push-dedup.js';
 import { readTtypJson, validateTtypObject } from '../../formats/ttyp/json.js';
 import { readMsagJson, validateMsagObject } from '../../formats/msag/json.js';
 import { readDdlsJson, validateDdlsObject } from '../../formats/ddls/json.js';
+import { readEnquJson, validateEnquObject } from '../../formats/enqu/json.js';
+import { readNrobJson, validateNrobObject } from '../../formats/nrob/json.js';
 import { DDIC_TYPES } from '../../types/registry.js';
 import { getExtensionRegistry } from '../../extensions/registry.js';
 import { toRelativeOutputPath } from '../../core/path-output.js';
@@ -122,6 +128,18 @@ const ICF_PUSH_HANDLERS: Record<string, IcfPushHandler> = {
       } satisfies IcfPushHandler,
     ]),
   ),
+  // PR5: ENQU (lock object) goes through the same ICF route but its wire
+  // format is the AFF JSON document (see formats/enqu/json.ts) — it does
+  // not go through `pushDdicFile` (which would expect a DdicWirePayload).
+  // Routed here because `resolveFile` puts ENQU on `route: 'icf'`.
+  ENQU: {
+    push: async (_client, _resolved, file, opts) => {
+      await runPushEnqu(file, { transport: opts.tr });
+      return { transport: opts.tr ?? '' };
+    },
+    validate: (file) => validateChannelRoutedFile('ENQU', file),
+    usesDdlSidecar: false,
+  },
 };
 
 /**
@@ -165,7 +183,11 @@ async function validateChannelRoutedFile(objectType: string, file: string): Prom
       ? await validateTtypObject(await readTtypJson(abs))
       : objectType === 'MSAG'
         ? await validateMsagObject(await readMsagJson(abs))
-        : await validateDdlsObject(await readDdlsJson(abs));
+        : objectType === 'ENQU'
+          ? await validateEnquObject(await readEnquJson(abs))
+          : objectType === 'NROB'
+            ? await validateNrobObject(await readNrobJson(abs))
+            : await validateDdlsObject(await readDdlsJson(abs));
   if (errors.length > 0) throw new CliError('VALIDATION_ERROR', errors.join('; '));
 }
 
@@ -180,6 +202,18 @@ const CHANNEL_ROUTED_PUSH: Record<string, ChannelRoutedPushHandler> = {
   },
   DDLS: {
     push: (file, opts) => runPushDdls(file, { transport: opts.tr }),
+    validate: (file, type) => validateChannelRoutedFile(type, file),
+  },
+  // PR5: NROB (number range object) has no abap-adt-api endpoint, so its
+  // push is always ICF. The route comes out of `resolveFile` as 'adt' (the
+  // registry marks it `source: 'ADT'`), so it lands in CHANNEL_ROUTED_PUSH
+  // rather than ICF_PUSH_HANDLERS. ENQU is `source: 'ICF'` and lives in
+  // ICF_PUSH_HANDLERS above.
+  NROB: {
+    push: async (file, opts) => {
+      await runPushNrob(file, { transport: opts.tr });
+      return { channel: 'icf' as const };
+    },
     validate: (file, type) => validateChannelRoutedFile(type, file),
   },
 };
@@ -208,6 +242,15 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
       example: 'abap push src/foo.abap --tr NDK123456',
     });
   }
+  // PR3: collapse TABL/STRU artifact groups (`.tabl.json` + `.tabl.ddic` [+
+  // `.tabl.settings.json`]) to a single canonical file so --all does not push
+  // the same object three times. Runs before the dependency sort so the
+  // canonical (priority 30) wins over the sidecar path.
+  target.files = deduplicateTablArtifactTargets(target.files);
+
+  // PR1: dependency order so DDIC prerequisites push before the objects that
+  // reference them (DOMA → DTEL → TABL → ... → HTTP). Stable for same priority.
+  target.files = orderTargetsByDependency(target.files);
 
   // --atomic phase 1: structural validation of every file (NO content syntax
   // check — it establishes an SAP edit session that breaks the later activate,

@@ -2,9 +2,9 @@
 type: reference
 title: 对象类型详细文档索引
 description: 每个 SAP 对象类型的字段契约、命令路径、本地文件形态与示例
-tags: [abap-cli, object-types, reference, clas, intf, prog, fugr, tabl, stru, doma, dtel, http, tran, ttyp, msag, ddls]
+tags: [abap-cli, object-types, reference, clas, intf, prog, fugr, tabl, stru, doma, dtel, enqu, nrob, http, tran, ttyp, msag, ddls]
 created at: 2026-09-01 00:00:00
-changed at: 2026-09-04 00:00:00
+changed at: 2026-09-16 00:00:00
 ---
 
 # 对象类型详细文档
@@ -21,6 +21,8 @@ changed at: 2026-09-04 00:00:00
 | `STRU` | ICF | `stru/<name>/<name>.stru.{json,ddic,settings.json}` 三件套 | [stru.md](stru.md) |
 | `DOMA` | ICF | `doma/<name>/<name>.doma.json`（嵌套） | [doma.md](doma.md) |
 | `DTEL` | ICF | `dtel/<name>/<name>.dtel.json`（嵌套） | [dtel.md](dtel.md) |
+| `ENQU` | ICF | `enqu/<name>/<name>.enqu.json`（锁对象） | [enqu.md](enqu.md) |
+| `NROB` | ICF | `nrob/<name>/<name>.nrob.json`（编号范围对象） | [nrob.md](nrob.md) |
 | `HTTP` | ICF | `http/<name>/<name>.http.json`（SICF 节点） | [http.md](http.md) |
 | `TRAN` | ICF | `tran/<code>/<code>.tran.json`（SE93 事务码） | [tran.md](tran.md) |
 | `TTYP` | ADT + ICF 兜底 | `ttyp/<name>/<name>.ttyp.json` + 可选 `.type.abap` | [ttyp.md](ttyp.md) |

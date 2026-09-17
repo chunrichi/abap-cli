@@ -25,6 +25,8 @@ export function registerCreateCommand(program: Command): void {
       '  DTEL  Data element       (ICF /ddic/dtel — requires --file)',
       '  TABL  Database table     (ICF /ddic/tabl — requires --file)',
       '  STRU  Structure          (ICF /ddic/stru — requires --file)',
+      '  ENQU  Lock object        (ICF /ddic/enqu — requires --file)',
+      '  NROB  Number range obj.  (ICF /ddic/nrob — requires --file; no abap-adt-api endpoint)',
       '  HTTP  SICF service node  (ICF /http/<name> — requires --file; alias: SICF, deprecated)',
       '  TRAN  Transaction code   (ICF /tran/<code> — requires --file)',
       '  TTYP / MSAG / DDLS       (requires --file; ADT, ICF fallback on ECC for TTYP/MSAG)',

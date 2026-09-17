@@ -137,6 +137,7 @@ function pullSchema(): CommandSchema {
       { name: '--textpool', type: 'boolean', description: 'Also pull textpool files (.texts/.selections/.headings.<lang>.properties).' },
       { name: '--remote', type: 'string', valuePlaceholder: '<remoteid>', description: 'Pull the object\'s active version source from a remote system (Version Management).' },
       { name: '--tr', type: 'string', valuePlaceholder: '<request>', description: 'Pull all objects bound to a transport request (mutually exclusive with object name and --package).' },
+      { name: '--user', type: 'string', valuePlaceholder: '<sap-user>', description: 'Filter --tr lookups by transport task owner (case-insensitive). Only valid with --tr.' },
       schemaOption(),
     ],
     exclusiveGroups: [['--tr', '<object-name>'], ['--tr', '--package']],
@@ -344,13 +345,12 @@ function statusSchema(): CommandSchema {
 // ---------- doctor ----------
 function doctorSchema(): CommandSchema {
   return {
-    ...base('doctor', 'Diagnose CLI environment, configuration, and connections.', 'abap doctor [options]', 'local'),
+    ...base('doctor', 'Diagnose CLI environment and configuration (read-only; no live SAP probes).', 'abap doctor [options]', 'local'),
     arguments: [],
     options: [
       { name: '--verbose', type: 'boolean', description: 'Include detail (versions, paths, underlying messages).' },
       { name: '--fix', type: 'boolean', description: 'Apply safe, reversible fixes (requires --yes).' },
       { name: '--yes', type: 'boolean', description: 'Confirm --fix without prompting.' },
-      { name: '--system', type: 'string', valuePlaceholder: '<name>', description: 'Scope the connection section to a named profile.' },
       schemaOption(),
     ],
     examples: [

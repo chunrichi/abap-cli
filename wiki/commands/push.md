@@ -32,6 +32,35 @@ abap push [options] [files...]
 
 无 `[files...]` 且无 `--all` 时抛 `USAGE`（exit 2）。`--check-only` 与 `--no-activate` 同时给时抛 `USAGE`（exit 2）。
 
+## 依赖顺序（`--all` 与多文件）
+
+`push --all` 与显式给出多个 `[files...]` 时，按对象类型依赖顺序推送，让 prerequisites 先激活：
+
+| 优先级 | 对象类型 | 说明 |
+|---|---|---|
+| 10 | `DOMA` | 域 |
+| 20 | `DTEL` | 数据元素 |
+| 30 | `TABL` / `STRU` | 表 / 结构（`.tabl.*` / `.stru.*` 三件套按整体 priority=30 排序） |
+| 40 | `ENQU` | 锁对象 |
+| 45 | `MSAG` / `NROB` | 消息类 / 编号范围对象 |
+| 50 | `INTF` | 接口 |
+| 60 | `CLAS` | 类 |
+| 70 | `FUGR` | 函数组（含 FM / include 子对象） |
+| 80 | `PROG` | 程序 |
+| 90 | `HTTP` | SICF 节点 |
+| 100 | （其它 / 解析失败） | 落到底，仍会推 |
+
+实现：[flows/edit/push-order.ts](../../src/abap_cli/flows/edit/push-order.ts) 提供 `orderTargetsByDependency(files: string[]): string[]`；`flows/edit/push.ts#runPush` 在 `resolveLocalTargets` 之后调用一次。同优先级保留输入顺序（稳定排序）。
+
+## Tabl/Stru artifact 去重（`--all`）
+
+`abap push --all` 扫描会把 `.tabl.json` / `.tabl.ddic` / `.tabl.settings.json`（`.stru.*` 同理）三件套全部枚举出来，但它们描述**同一个 SAP 对象**——push 三次会写同一张表。PR3 引入去重：
+
+- [flows/edit/push-dedup.ts](../../src/abap_cli/flows/edit/push-dedup.ts) 提供 `deduplicateTablArtifactTargets(files: string[]): string[]`，在 `runPush` 的 `resolveLocalTargets` 之后、依赖排序之前接入；
+- 复用 [formats/ddic/tabl-artifact.ts](../../src/abap_cli/formats/ddic/tabl-artifact.ts) 的 `isTablArtifactFile` / `tablArtifactPaths` 判定 artifact 组与解析 main 路径；
+- key 以 main 路径的 `toLowerCase()` 计算（同组 `.JSON` / `.json` 等视为一组），迭代顺序中首次出现的文件保留；非 artifact 文件直通；
+- dedup 后再走 PR1 的依赖排序，所以 priority=30 的 canonical `.tabl.json`（保留者）会和其他 TABL 一起前移，但同表其它件套已经 drop 掉，不会重复写。
+
 ## 按对象 transport 解析（核心设计）
 
 `runPush` **不再**在顶层统一解析一个 transport；改为 `pushOne` 拿到对象后逐对象解析（`resolveObjectTransport`）：

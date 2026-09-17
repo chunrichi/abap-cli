@@ -61,6 +61,16 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
   { type: 'STRU', folder: 'stru', source: 'ICF', affSchemaFile: 'tabl-v1.json', requiresFile: true },
   { type: 'DOMA', folder: 'doma', source: 'ICF', affSchemaFile: 'doma-v1.json', requiresFile: true },
   { type: 'DTEL', folder: 'dtel', source: 'ICF', affSchemaFile: 'dtel-v1.json', requiresFile: true },
+  // PR5: ENQU (lock object) and NROB (number range object) — both DDIC,
+  // routed through ICF (NROB has no abap-adt-api endpoint; ENQU is included
+  // here so the SAP-side ICF dispatch has a single /ddic/* entry to extend).
+  // NROB keeps `source: 'ADT'` for the metadata (pull is ADT-primary with an
+  // ICF fallback — see flows/edit/pull-nrob.ts); the `channel.fallbackReason`
+  // block was previously declared but never read, so it was dropped on
+  // 2026-09-17 (handoff §4.2). pull-nrob.ts hardcodes the literal reason
+  // string, so the registry cleanup is safe.
+  { type: 'ENQU', folder: 'enqu', source: 'ICF', affSchemaFile: 'enqu-v1.json', requiresFile: true },
+  { type: 'NROB', folder: 'nrob', source: 'ADT', affSchemaFile: 'nrob-v1.json', requiresFile: true },
   // HTTP service (SICF node) via ICF. 032 US10 originally wrote a local
   // skeleton when --file was absent; that path was removed (refactor decision
   // 1A) to match DDIC/DDLS, so HTTP now requires --file too.
@@ -209,7 +219,11 @@ export function allSupportedTypes(): string[] {
   return TYPE_REGISTRY.map((e) => e.type);
 }
 
-/** DDIC types (TABL/STRU/DOMA/DTEL) subset — single source of truth (US11, T048). */
+/** DDIC types (TABL/STRU/DOMA/DTEL) subset — single source of truth (US11, T048).
+ *  ENQU is NOT in this set: its wire format is a JSON document, not the
+ *  DOMA / DTEL / TABL-shape payload produced by `localToWire<DdicSupportedType>`.
+ *  ENQU has its own format module (`formats/enqu/json.ts`) and goes through
+ *  `CHANNEL_ROUTED_PUSH` in push.ts (always ICF). */
 export const DDIC_TYPES = ['DOMA', 'DTEL', 'TABL', 'STRU'] as const;
 /** Legacy name retained for back-compat re-exports. */
 export const DDIC_SUPPORTED_TYPES = DDIC_TYPES;

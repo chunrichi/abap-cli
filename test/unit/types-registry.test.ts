@@ -22,12 +22,14 @@ import {
 } from '../../src/abap_cli/types/registry.js';
 
 describe('types/registry.ts (US11 — single source of truth)', () => {
-  it('contains exactly 19 supported types (4 source + 4 DDIC + HTTP + TRAN + 3 dual-channel + 6 Phase 3)', () => {
+  it('contains exactly 21 supported types (4 source + 4 DDIC + ENQU + NROB + HTTP + TRAN + 3 dual-channel + 6 Phase 3)', () => {
     // Phase 3 added: SRVB (metadata-only), SRVD, BDEF, DCLS, DDLX, DDLA.
-    expect(allSupportedTypes()).toHaveLength(19);
+    // PR5 added: ENQU (lock object, ICF) and NROB (number range object, ICF).
+    expect(allSupportedTypes()).toHaveLength(21);
     expect(allSupportedTypes()).toEqual([
       'CLAS', 'INTF', 'PROG', 'FUGR',         // ADT source
       'TABL', 'STRU', 'DOMA', 'DTEL',         // ICF DDIC
+      'ENQU', 'NROB',                          // PR5 — ICF DDIC family
       'HTTP', 'TRAN',                          // ICF
       'TTYP', 'MSAG', 'DDLS',                  // 036 dual-channel
       'SRVB', 'SRVD', 'BDEF',                  // T3.2 / T3.1 / T3.3

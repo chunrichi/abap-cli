@@ -38,6 +38,10 @@ const SCHEMA_FILE: Record<string, string> = {
   TABT: 'tabt-v1.json',
   DOMA: 'doma-v1.json',
   DTEL: 'dtel-v1.json',
+  // PR5: ENQU (lock object) + NROB (number range object) schemas vendored
+  // from the abap-file-format mirror.
+  ENQU: 'enqu-v1.json',
+  NROB: 'nrob-v1.json',
   HTTP: 'http-v1.json',
   TRAN: 'tran-v1.json',
   // 036-ttyp-msag-ddls: three new dual-channel types.

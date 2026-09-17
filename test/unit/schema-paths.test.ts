@@ -54,7 +54,7 @@ describe('schema-paths priority chain', () => {
     );
   });
 
-  it('affSupportedTypes matches the router table (16 + 6 Phase 3 types)', () => {
+  it('affSupportedTypes matches the router table (16 + 6 Phase 3 + 2 PR5 types)', () => {
     const types = affSupportedTypes();
     expect(types).toEqual(
       expect.arrayContaining([
@@ -65,12 +65,15 @@ describe('schema-paths priority chain', () => {
         'REPS', 'FUNC',
         // T3.x — Phase 3 type extensions.
         'SRVB', 'SRVD', 'BDEF', 'DCLS', 'DDLX', 'DDLA',
+        // PR5 — lock object + number range object.
+        'ENQU', 'NROB',
       ]),
     );
     // TABT is exposed as a schema key for the .settings.json override path.
     // REPS + FUNC added in T1.5 (FUGR pull) — 16 pre-Phase-3.
     // Phase 3 added SRVB / SRVD / BDEF / DCLS / DDLX / DDLA = 6 more = 22 total.
-    expect(types).toHaveLength(22);
+    // PR5 added ENQU / NROB = 24 total.
+    expect(types).toHaveLength(24);
   });
 
   it('bundled root contains every supported schema', () => {

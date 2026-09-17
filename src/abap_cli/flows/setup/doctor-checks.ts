@@ -1,16 +1,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { probeSystem } from '../../clients/probe.js';
 import { assertValidProfile } from '../../config/validation.js';
 import { findWorkspaceConfig } from '../../config/project-config.js';
 import { toOutputPath } from '../../core/path-output.js';
-import { computeSystemHash } from '../../session/jar.js';
-import { isCloudOrBtpProfile } from '../../session/policy.js';
 
 export type DoctorStatus = 'ok' | 'err';
 
-/** One checked item across environment / config / connection sections. */
+/** One checked item across environment / config sections. */
 export interface DoctorItem {
   key: string;
   status: DoctorStatus;
@@ -21,19 +18,16 @@ export interface DoctorItem {
   detail?: string;
 }
 
-/** The full doctor report. Sections never throw — connection issues are items. */
+/** The full doctor report. Sections never throw. */
 export interface DoctorReport {
   environment: DoctorItem[];
   config: DoctorItem[];
-  connection: DoctorItem[];
   nextSteps: string[];
   fixesApplied?: string[];
 }
 
 export interface DoctorOptions {
   verbose?: boolean;
-  /** Named system for the connection section; defaults to every configured profile. */
-  system?: string;
   /** Path to the user systems.json (injectable for tests). */
   configPath?: string;
   /** User home directory (injectable for tests; defaults to os.homedir()). */
@@ -91,25 +85,13 @@ function readSystems(configPath: string): { systems: Record<string, unknown>; er
 }
 
 /**
- * True when the raw stored profile already points at a CA — either the
- * profile-level `ca` field or the cert-auth `caPath` override. Accepts both
- * the canonical `auth.cert` block and the legacy flat `certAuth` shape.
- */
-function hasConfiguredCa(raw: unknown): boolean {
-  if (!raw || typeof raw !== 'object') return false;
-  const entry = raw as {
-    ca?: unknown;
-    auth?: { method?: string; cert?: { caPath?: unknown } };
-    certAuth?: { caPath?: unknown };
-  };
-  if (typeof entry.ca === 'string' && entry.ca) return true;
-  if (entry.auth?.method === 'cert' && typeof entry.auth.cert?.caPath === 'string' && entry.auth.cert.caPath) return true;
-  return typeof entry.certAuth?.caPath === 'string' && !!entry.certAuth.caPath;
-}
-
-/**
- * Run the three-section doctor check. Never throws for probe or
+ * Run the doctor check (environment + config). Never throws for probe or
  * config failures — findings are items in the report.
+ *
+ * Doctor is a read-only diagnostic — it intentionally does not probe live
+ * SAP systems. Use `abap profile test <name>` for connection diagnostics;
+ * probing here would risk triggering interactive credential prompts and
+ * muddying the env/config signal.
  */
 export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorReport> {
   const verbose = opts.verbose ?? false;
@@ -119,7 +101,6 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
 
   const environment: DoctorItem[] = [];
   const config: DoctorItem[] = [];
-  const connection: DoctorItem[] = [];
   const suggestions: string[] = [];
 
   const push = (section: DoctorItem[], item: DoctorItem) => {
@@ -236,101 +217,11 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
     );
   }
 
-  // --- connection ---
-  const systemsToProbe = opts.system ? [opts.system] : Object.keys(sys.systems);
-  if (systemsToProbe.length === 0) {
-    push(
-      connection,
-      errItem('conn.none', 'No systems configured.', 'Run "abap profile add <name> --url <url> --username <user>" to add a connection profile.'),
-    );
-  } else {
-    for (const name of systemsToProbe) {
-      if (!(name in sys.systems)) {
-        push(
-          connection,
-          errItem(
-            `conn.${name}`,
-            `System profile '${name}' not found.`,
-            `List profiles: abap profile list — create one: abap profile add ${name} --url <url> --username <user>`,
-          ),
-        );
-        continue;
-      }
-      try {
-        const probe = await probeSystem(name);
-        const layers = Object.entries(probe).map(([layer, r]) => `${layer}=${r.ok ? 'ok' : 'err'}`);
-        if (Object.values(probe).every((r) => r.ok)) {
-          push(connection, okItem(`conn.${name}`, verbose ? `all layers ok (${layers.join(', ')})` : undefined));
-        } else {
-          const failing = Object.entries(probe).filter(([, r]) => !r.ok && !r.skipped);
-          const layerMsg = failing.map(([layer, r]) => `${layer}: ${r.error?.message ?? 'failed'}`).join('; ');
-          push(
-            connection,
-            errItem(
-              `conn.${name}`,
-              `System '${name}' unreachable: ${layerMsg}`,
-              `Diagnose per layer: abap profile test ${name}`,
-              verbose ? layers.join(', ') : undefined,
-            ),
-          );
-          // TLS-layer failures with no CA configured are the most common
-          // self-signed / private-CA pitfall. Surface the import hint in
-          // `nextSteps` before users dig into certificates. The cert-auth
-          // override counts as a configured CA, and the string is unique per
-          // profile so the nextSteps list stays free of duplicates.
-          if (!probe.tls.ok && !hasConfiguredCa(sys.systems[name])) {
-            const caHint = `TLS to '${name}' failed and no CA is configured. Import one with: abap profile set ${name} --ca <pem>`;
-            if (!suggestions.includes(caHint)) suggestions.push(caHint);
-          }
-        }
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : String(error);
-        push(
-          connection,
-          errItem(`conn.${name}`, `Probe of '${name}' failed: ${message}`, `Diagnose per layer: abap profile test ${name}`),
-        );
-      }
+  // Connection probing intentionally lives outside doctor. Use
+  // `abap profile test <name>` for live connectivity diagnostics; doctor
+  // stays read-only and offline.
 
-      // 034-session-cookie-reuse: per-profile session reuse summary. Always
-      // emitted as `ok` (a warning code is just a string in the detail line)
-      // so the doctor exit code stays 0 — the cloud/BTP advisory is a
-      // heads-up, not a hard failure.
-      const profileRaw = sys.systems[name] as { url?: string; client?: string; username?: string; systemType?: 'on-prem' | 'cloud' | 'btp' | 'mock' } | undefined;
-      const profileLikeSap = {
-        url: profileRaw?.url ?? '',
-        client: profileRaw?.client ?? '',
-        username: profileRaw?.username ?? '',
-        password: '',
-        language: 'EN',
-        insecure: false,
-        caPath: '',
-        auth: { method: 'basic' as const },
-        sourceDir: process.cwd(),
-        systemType: profileRaw?.systemType,
-      };
-      if (isCloudOrBtpProfile(profileLikeSap)) {
-        push(
-          connection,
-          okItem(
-            `session.reuse.${name}`,
-            `[WARN] SESSION_REUSE_UNSUPPORTED — cookie reuse not applicable on cloud/BTP systems; commands will use fresh login per invocation`,
-          ),
-        );
-      } else {
-        const hash = computeSystemHash(profileLikeSap);
-        const jarPath = path.join(os.homedir(), '.abap-cli', 'sessions', `${hash}.json`);
-        push(
-          connection,
-          okItem(
-            `session.reuse.${name}`,
-            verbose ? `cookie jar path: ${jarPath} (encrypted)` : `cookie jar: ${hash}.json (encrypted)`,
-          ),
-        );
-      }
-    }
-  }
-
-  return { environment, config, connection, nextSteps: suggestions };
+  return { environment, config, nextSteps: suggestions };
 }
 
 /** Safe, reversible fixes for `doctor --fix`. Returns what was applied. */

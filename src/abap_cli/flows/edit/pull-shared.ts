@@ -22,6 +22,8 @@ export interface PullOptions {
   package?: string;
   /** Pull all objects bound to a transport request (mutually exclusive with object name and --package). */
   tr?: string;
+  /** PR2: filter --tr lookups by object owner (SAP `tm:owner`). Case-insensitive. Only valid with --tr. */
+  user?: string;
   dir: string;
   overwrite?: boolean;
   skipExisting?: boolean;
