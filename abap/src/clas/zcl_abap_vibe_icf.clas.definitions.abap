@@ -1,4 +1,7 @@
 *"* class-relevant local types for ZCL_ABAP_VIBE_ICF
+*"* type pools used by lcl_mime (skwf_io / skwf_url / wbmr_c_skwf_appl_name).
+TYPE-POOLS: skwf, wbmr.
+
 TYPES:
   BEGIN OF ty_root_data,
     service TYPE string,

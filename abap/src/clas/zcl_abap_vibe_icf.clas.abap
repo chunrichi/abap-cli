@@ -1,5 +1,4 @@
 CLASS zcl_abap_vibe_icf DEFINITION PUBLIC CREATE PUBLIC.
-  TYPE-POOLS: skwf, wbmr.
   PUBLIC SECTION.
     INTERFACES if_http_extension.
   PRIVATE SECTION.
