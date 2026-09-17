@@ -76,6 +76,10 @@ export async function runCreateNrob(
   if (opts.description) wire.header = { ...(wire.header as object), description: opts.description };
   if (opts.package) (wire as Record<string, unknown>).package = opts.package;
   if (opts.tr) (wire as Record<string, unknown>).transportRequest = opts.tr;
+  // Wire body must carry the name — the ABAP fallback path reads ls_request-name
+  // only when the URL segment is missing, and the CLI posts to /ddic/nrob (no
+  // name in path). Mirrors the ENQU pattern.
+  (wire as Record<string, unknown>).name = upper;
 
   const icf = await IcfClient.create();
   const resp = await icf.postDdic<{ name: string; type: string; action: 'created' | 'updated' }>('nrob', wire);

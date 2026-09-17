@@ -62,6 +62,7 @@ CLASS zcl_abap_vibe_nrob_format IMPLEMENTATION.
     DATA lv_ok TYPE abap_bool.
     DATA lv_error_code TYPE string.
     DATA lv_error_message TYPE string.
+    DATA lv_master_language TYPE string.
 
     rs_result-name = iv_name.
     rs_result-type = 'NROB'.
@@ -80,7 +81,8 @@ CLASS zcl_abap_vibe_nrob_format IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    rs_result-header-original_language = language_code( sy-langu ).
+    lv_master_language = sy-langu.
+    rs_result-header-original_language = language_code( lv_master_language ).
     rs_result-success = abap_true.
   ENDMETHOD.
 

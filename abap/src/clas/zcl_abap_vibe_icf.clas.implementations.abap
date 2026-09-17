@@ -2254,6 +2254,7 @@ CLASS lcl_ddic IMPLEMENTATION.
     DATA ls_error       TYPE inoer.
     DATA lt_details     TYPE string_table.
     DATA lv_msg         TYPE string.
+    DATA lv_desc_len    TYPE i.
 
     CLEAR es_payload.
     lv_package = to_upper( COND devclass( WHEN iv_package IS INITIAL THEN '$TMP' ELSE iv_package ) ).
@@ -2319,9 +2320,11 @@ CLASS lcl_ddic IMPLEMENTATION.
     ENDIF.
 
     " Map AFF → TNROT row. The description carries both txt and txtshort —
-    " txt is the long form (60 chars), txtshort is the 30-char abbreviated
-    " form SE11 displays in lists. AFF caps description at 60 chars (see
-    " schema), so the same string fits both, with txtshort truncated.
+    " txt is the long form (60 chars NROBJTXT), txtshort is the abbreviated
+    " form (20 chars NROBJSTXT) SE11 displays in lists. Both lengths verified
+    " against the data element ADT source. AFF caps description at 60 chars
+    " (see schema), so the same string fits txt; txtshort is truncated safely
+    " via substring to avoid a "length out of bounds" runtime on short input.
     lv_language = language_key_from_code( ls_request-header-original_language ).
     IF lv_language IS INITIAL.
       lv_language = sy-langu.
@@ -2329,8 +2332,20 @@ CLASS lcl_ddic IMPLEMENTATION.
     ls_tnrot-object = lv_name.
     ls_tnrot-langu  = lv_language.
     ls_tnrot-txt    = ls_request-header-description.
-    ls_tnrot-txtshort = ls_request-header-description(30).
+    " NROBJSTXT is CHAR 20 — take up to 20 chars, never more (would dump).
+    lv_desc_len = strlen( ls_request-header-description ).
+    IF lv_desc_len > 20.
+      ls_tnrot-txtshort = ls_request-header-description(20).
+    ELSE.
+      ls_tnrot-txtshort = ls_request-header-description.
+    ENDIF.
 
+    " NUMBER_RANGE_OBJECT_UPDATE in non-dialog mode loads g_tnro_act / xtnrot
+    " into memory but does NOT actually MODIFY TNRO / TNROT — the dialog
+    " driver (SAPMSNR2 / SAPMSNUM) does the INSERTs after the FM. In batch
+    " (ICF) mode, we have to write directly. The FM is still called first so
+    " its check_object validation runs against the user-supplied data; if the
+    " validation fails we never touch the DB.
     CALL FUNCTION 'NUMBER_RANGE_OBJECT_UPDATE'
       EXPORTING
         indicator         = 'I'
@@ -2350,7 +2365,7 @@ CLASS lcl_ddic IMPLEMENTATION.
     IF sy-subrc <> 0.
       ev_error = VALUE ty_error( status = 'error'
         error = VALUE ty_error_body( code    = 'NROB_CREATE_FAILED'
-                                     message = |NUMBER_RANGE_OBJECT_UPDATE failed for { lv_name } (subrc={ sy-subrc }) ) ).
+                                     message = |NUMBER_RANGE_OBJECT_UPDATE failed for { lv_name } (subrc={ sy-subrc })| ) ).
       RETURN.
     ENDIF.
 
@@ -2374,6 +2389,29 @@ CLASS lcl_ddic IMPLEMENTATION.
                                      details = lt_details ) ).
       RETURN.
     ENDIF.
+
+    " Validation passed — now INSERT directly. NUMBER_RANGE_OBJECT_UPDATE
+    " in batch (g_dialog = no) does NOT write TNRO / TNROT itself, the dialog
+    " flow does. On this system the FM returned returncode=space but no row
+    " appeared in TNRO (verified 2026-09-17: count(TNRO where object='ZNR_*')
+    " stayed at 0 after the FM said success). So we INSERT here.
+    INSERT tnro FROM ls_tnro.
+    IF sy-subrc <> 0.
+      ev_error = VALUE ty_error( status = 'error'
+        error = VALUE ty_error_body( code    = 'NROB_INSERT_FAILED'
+                                     message = |INSERT tnro failed for { lv_name } (subrc={ sy-subrc })| ) ).
+      ROLLBACK WORK.
+      RETURN.
+    ENDIF.
+    INSERT tnrot FROM ls_tnrot.
+    IF sy-subrc <> 0.
+      ev_error = VALUE ty_error( status = 'error'
+        error = VALUE ty_error_body( code    = 'NROB_INSERT_FAILED'
+                                     message = |INSERT tnrot failed for { lv_name } (subrc={ sy-subrc })| ) ).
+      ROLLBACK WORK.
+      RETURN.
+    ENDIF.
+    COMMIT WORK AND WAIT.
 
     es_payload = VALUE ty_ddic_create( status = 'success'
                                        data   = VALUE ty_ddic_create_data( name   = lv_name
