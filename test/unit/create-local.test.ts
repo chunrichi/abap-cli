@@ -133,13 +133,17 @@ describe('abap create local (US1, US2..003)', () => {
     expect(fs.readdirSync(cwd)).toHaveLength(0);
   });
 
-  it('DDIC_NOT_SUPPORTED: DDIC type, zero files, exit 7', async () => {
+  it('TYPE_NOT_SUPPORTED: DDIC type has no local skeleton, zero files, exit 7', async () => {
     const program = makeProgram();
     registerCreateCommand(program);
     const res = await runCommand(program, ['create', 'local', 'TABL', 'ZTAB', '--json'], { cwd });
     expect(res.exitCode).toBe(7);
     const err = parseError(res);
-    expect(err.code).toBe('DDIC_NOT_SUPPORTED');
+    // `create local` supports CLAS/INTF/PROG/FUGR only; every other registered
+    // type (DDIC / HTTP / TRAN / TTYP / MSAG / DDLS / …) reports
+    // TYPE_NOT_SUPPORTED from `resolveType`.
+    expect(err.code).toBe('TYPE_NOT_SUPPORTED');
+    expect(err.message).toMatch(/create local/);
     expect(fs.readdirSync(cwd)).toHaveLength(0);
   });
 

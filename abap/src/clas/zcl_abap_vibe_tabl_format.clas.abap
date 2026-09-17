@@ -110,6 +110,30 @@ CLASS zcl_abap_vibe_tabl_format DEFINITION PUBLIC FINAL CREATE PUBLIC.
                 it_fields    TYPE tt_field
       RETURNING VALUE(rv_json) TYPE string.
 
+
+    CLASS-METHODS settings_supported
+      IMPORTING is_technical TYPE dd09l
+      RETURNING VALUE(rv_ok) TYPE abap_bool.
+
+    CLASS-METHODS translation_value
+      IMPORTING iv_value TYPE dd09l-uebersetz
+      RETURNING VALUE(rv_value) TYPE string.
+
+    CLASS-METHODS buffering_state
+      IMPORTING iv_value TYPE dd09l-bufallow
+      RETURNING VALUE(rv_value) TYPE string.
+
+    CLASS-METHODS buffering_type
+      IMPORTING iv_value TYPE dd09l-pufferung
+      RETURNING VALUE(rv_value) TYPE string.
+
+    CLASS-METHODS storage_type
+      IMPORTING iv_value TYPE dd09l-roworcolst
+      RETURNING VALUE(rv_value) TYPE string.
+
+    CLASS-METHODS load_unit
+      IMPORTING iv_value TYPE dd09l-load_unit
+      RETURNING VALUE(rv_value) TYPE string.
     CLASS-METHODS field_type
       IMPORTING is_field TYPE ty_field
       RETURNING VALUE(rv_type) TYPE string.
@@ -187,6 +211,11 @@ CLASS zcl_abap_vibe_tabl_format IMPLEMENTATION.
     IF iv_object_type = 'TABL'.
       rs_result-client_dependent = COND abap_bool( WHEN line_exists( lt_fields[ fieldname = 'MANDT' ] )
                                                    THEN abap_true ELSE abap_false ).
+    ENDIF.
+    IF iv_object_type = 'TABL' AND settings_supported( ls_technical ) = abap_false.
+      rs_result-error_code = 'DDIC_TABT_FORMAT_UNSUPPORTED'.
+      rs_result-error_message = |TABL { iv_name } has technical settings that cannot be represented in AFF TABT|.
+      RETURN.
     ENDIF.
 
     LOOP AT lt_fields INTO DATA(ls_field).
@@ -459,23 +488,100 @@ CLASS zcl_abap_vibe_tabl_format IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD build_settings_json.
+
     DATA lt_lines TYPE STANDARD TABLE OF string WITH EMPTY KEY.
-    DATA lv_translation TYPE string VALUE 'noLanguageKey'.
-    IF line_exists( it_fields[ datatype = 'LANG' ] ).
-      lv_translation = 'standard'.
-    ENDIF.
+
+    DATA lv_translation TYPE string.
+    DATA lv_buffering_state TYPE string.
+    DATA lv_buffering_type TYPE string.
+    DATA lv_storage_type TYPE string.
+    DATA lv_load_unit TYPE string.
+    lv_translation = translation_value( is_technical-uebersetz ).
+    lv_buffering_state = buffering_state( is_technical-bufallow ).
+    lv_buffering_type = buffering_type( is_technical-pufferung ).
+    lv_storage_type = storage_type( is_technical-roworcolst ).
+    lv_load_unit = load_unit( is_technical-load_unit ).
     APPEND '{' TO lt_lines.
     APPEND '  "formatVersion": "1",' TO lt_lines.
     APPEND '  "generalInformation": {' TO lt_lines.
     APPEND |    "dataClassCategory": "{ json_escape( CONV string( is_technical-tabart ) ) }",| TO lt_lines.
-    APPEND |    "sizeCategory": "{ json_escape( CONV string( is_technical-tabkat ) ) }",| TO lt_lines.
-    APPEND '    "logChanges": false,' TO lt_lines.
-    APPEND '    "writableByAmdp": false,' TO lt_lines.
+    APPEND |    "sizeCategory": "{ COND string( WHEN is_technical-tabkat IS INITIAL THEN 'undefined' ELSE is_technical-tabkat ) }",| TO lt_lines.
+    APPEND |    "logChanges": { COND string( WHEN is_technical-protokoll = 'X' THEN 'true' ELSE 'false' ) },| TO lt_lines.
     APPEND |    "translation": "{ lv_translation }"| TO lt_lines.
+    APPEND '  }' TO lt_lines.
+    APPEND '  ,"buffering": {' TO lt_lines.
+    APPEND |    "state": "{ lv_buffering_state }",| TO lt_lines.
+    APPEND |    "type": "{ lv_buffering_type }",| TO lt_lines.
+    APPEND |    "nrOfKeyFlds4GenericBuff": { CONV i( is_technical-schfeldanz ) }| TO lt_lines.
+    APPEND '  }' TO lt_lines.
+    APPEND '  ,"dbSpecificSettings": {' TO lt_lines.
+    APPEND |    "storageType": "{ lv_storage_type }",| TO lt_lines.
+    APPEND |    "loadUnit": "{ lv_load_unit }"| TO lt_lines.
     APPEND '  }' TO lt_lines.
     APPEND '}' TO lt_lines.
     CONCATENATE LINES OF lt_lines INTO rv_json SEPARATED BY cl_abap_char_utilities=>newline.
     rv_json = rv_json && cl_abap_char_utilities=>newline.
+
+  ENDMETHOD.
+
+  METHOD settings_supported.
+    rv_ok = abap_true.
+    IF is_technical-tabkat IS NOT INITIAL AND is_technical-tabkat CA 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.
+      rv_ok = abap_false.
+    ELSEIF is_technical-tabkat IS NOT INITIAL AND CONV i( is_technical-tabkat ) > 9.
+      rv_ok = abap_false.
+    ENDIF.
+    IF translation_value( is_technical-uebersetz ) IS INITIAL
+       OR buffering_state( is_technical-bufallow ) IS INITIAL
+       OR buffering_type( is_technical-pufferung ) IS INITIAL
+       OR storage_type( is_technical-roworcolst ) IS INITIAL
+       OR load_unit( is_technical-load_unit ) IS INITIAL.
+      rv_ok = abap_false.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD translation_value.
+    rv_value = SWITCH string( iv_value
+      WHEN space THEN 'noLanguageKey'
+      WHEN 'X' THEN 'standard'
+      WHEN 'L' THEN 'loadTable'
+      WHEN 'T' THEN 'objectSpecific'
+      WHEN 'N' THEN 'notRelevant'
+      ELSE `` ).
+  ENDMETHOD.
+
+  METHOD buffering_state.
+    rv_value = SWITCH string( iv_value
+      WHEN 'N' THEN 'notAllowed'
+      WHEN 'X' THEN 'switchedOn'
+      WHEN 'A' THEN 'allowedButSwitchedOff'
+      ELSE `` ).
+  ENDMETHOD.
+
+  METHOD buffering_type.
+    rv_value = SWITCH string( iv_value
+      WHEN space THEN 'noBuffer'
+      WHEN 'P' THEN 'single'
+      WHEN 'G' THEN 'generic'
+      WHEN 'X' THEN 'full'
+      ELSE `` ).
+  ENDMETHOD.
+
+  METHOD storage_type.
+    rv_value = SWITCH string( iv_value
+      WHEN 'R' THEN 'rowStore'
+      WHEN 'C' THEN 'columnStore'
+      WHEN space THEN 'undefined'
+      ELSE `` ).
+  ENDMETHOD.
+
+  METHOD load_unit.
+    rv_value = SWITCH string( iv_value
+      WHEN space THEN 'columnPreferred'
+      WHEN 'P' THEN 'pagePreferred'
+      WHEN 'A' THEN 'columnEnforced'
+      WHEN 'Q' THEN 'pageEnforced'
+      ELSE `` ).
   ENDMETHOD.
 
   METHOD field_type.

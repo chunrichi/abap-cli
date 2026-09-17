@@ -73,10 +73,10 @@ abap transport list --json
 - `-l, --language <lang>`: SAP 语言
 - `-p, --password <password>`: 密码（写 keychain；add 时建议必给）
 - `--insecure`: 跳过 SSL 证书校验（开发环境）
-- `--ca <path>`: PEM CA 证书路径
+- `--ca <path>`: PEM CA 证书路径（被导入到 `~/.abap-cli/certificates/<sha256>.pem`，profile 只保留规范路径，详见下文）
 - `--auth-method <basic|cert|browser_sso>`: 登录方式（默认 `basic`）
-- `--cert-path <pem>` / `--cert-key <pem>`: X.509 客户端证书 / 私钥 PEM（`auth-method=cert` 时必给）
-- `--cert-ca <pem>`: 可选，覆盖 profile 级 CA，仅用于 mTLS 握手
+- `--cert-path <pem>` / `--cert-key <pem>`: X.509 客户端证书 / 私钥 PEM（`auth-method=cert` 时必给）；与 `--ca` 一样被导入 store
+- `--cert-ca <pem>`: 可选，覆盖 profile 级 CA，仅用于 mTLS 握手；同样被导入 store
 - `--cert-passphrase <pwd>`: .p12 / 加密私钥口令；写入 OS keychain（独立 account）
 - `--sso-cookie-file <path>`: SSO cookie jar 路径（`auth-method=browser_sso` 时可选，默认 `~/.abap-cli/<profile>.sso.cookies.json`，mode 0o600）
 - `--auth-option <key=value>`: 通用认证字段（可重复）。新认证方法的字段从 bag 读，无需新增 Commander option。示例：`--auth-option certPath=/abs/cert.pem --auth-option keyPath=/abs/key.pem`。legacy flag（`--cert-path` / `--cert-key` / `--cert-ca` / `--sso-cookie-file` / `--service-key`）会自动映射进 bag（`--auth-option` 同名 key 优先）。
@@ -102,6 +102,18 @@ abap transport list --json
 - **textpool 能力探测（014）**：add/set 时一次性非阻断探测 ADT text-elements 读写能力并缓存到 profile（`adtTextpool`）——textpool 操作据此选路由，无运行时回退
 - **ADT runtime cache（034）**：`profile test` 在 adt layer 成功时主动探测 ADT runtime tier + API capabilities 并缓存到 `systems[].runtime: { tier, icfSetupBlocked, source, apiCapabilities: { icf, httpService, steampunkMarkers? }, probedAt }`。`deploy` 优先读 cache，缺时再 `probeAdtRuntime`。trial 实测：cache 写入后 `deploy --dry-run` 直接命中，不重新探测 discovery。`profile test --json` 本身不变（runtime 仍只在 adt 路径内部缓存）。
 - **`use` 已移除**：绑定工作区用 `abap init --profile <name>`
+
+## PEM 证书生命周期（`--ca` / `--cert-path` / `--cert-key` / `--cert-ca`）
+
+所有 PEM 参数都触发"导入并绑定"：传入的文件被复制到 `~/.abap-cli/certificates/<sha256>.pem`（目录 0700、文件 0600，先建目录再写文件，写入走临时文件 + rename），profile 中只保存规范路径（CA 还额外记导入时间）。后续 SAP 命令（`profile test`、doctor、push/pull）读这份规范路径；删掉源文件不会让 profile 失效。`profile show` 会额外显示 `ca sha256`（前 16 位）与 `ca imported`。`abap init` 建/改 profile 时走同一套逻辑。
+
+- **幂等**：同一 PEM 从不同位置反复导入，hash 相同 → 不重写文件，时间戳保留首次导入；已指向 store 的路径直接复用。
+- **格式限制**：CA / 客户端证书必须是含 `-----BEGIN CERTIFICATE-----` 的 PEM；私钥必须是 `-----BEGIN … PRIVATE KEY-----`（含加密私钥），两者互不通用，不匹配即 `INVALID_ARGUMENT`。PKCS#12 / DER 需先转 PEM（`openssl pkcs12 -in a.p12 -nokeys -out a.ca.pem`）。
+- **清理**：三种时机回收 store 文件 —— `profile delete <name>`、`profile set` 替换了某个 PEM 字段、`--clear-ca`。回收前扫描所有 profile，sha256 仍被任何 profile 引用则保留；只有引用数归零才删。多 profile 共享同一份 PEM 时只删最后一个引用者。清理失败（例如 systems.json 不可读）不影响命令结果。
+- **store 路径覆盖**：`ABAP_CLI_CERT_DIR` 环境变量可改写 store 根目录（默认 `~/.abap-cli/certificates/`）；该变量同时决定本进程信任的 CA 来源，CI / 容器里请指向受控目录。
+- **回退**：profile 里旧版"绝对路径"形式的 `ca` / `certPath` / `keyPath` 仍可读（直接 `fs.readFileSync`），但建议重新 `profile set <name> --ca <原路径>`（或对应的 cert 参数）完成导入，让源文件移动不再影响后续连接。
+- **导出/导入**：`profile export` 只导出 store 路径，不打包 PEM 内容，所以跨机器导入后仍需在目标机重新 `profile set --ca/--cert-path`。
+- **诊断**：doctor 在 `tls` 失败 + profile 未配置 CA 时输出 `nextSteps: abap profile set <name> --ca <pem>`（cert auth 的 `--cert-ca` 也算已配置）；store 文件丢失时 `readCaCertificate` 抛 `CONFIG_ERROR` 并同样提示。
 
 ## Examples
 

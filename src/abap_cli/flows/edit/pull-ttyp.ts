@@ -27,6 +27,7 @@ import {
 } from '../../formats/ttyp/json.js';
 import { loadConfig, findWorkspaceConfig } from '../../config/project-config.js';
 import { folderFor } from '../../formats/type-folder.js';
+import { registerPullHandler } from '../../types/registry.js';
 
 export interface PullTtypOptions {
   /** Optional profile override (default: active profile). */
@@ -149,3 +150,9 @@ export async function runPullTtyp(name: string, opts: PullTtypOptions = {}): Pro
     doc,
   };
 }
+
+// Module-load side effect: register TTYP in the pull handler table. Decision 2A.
+registerPullHandler('TTYP', async ({ objectName, opts }) => {
+  const r = await runPullTtyp(objectName, opts as Parameters<typeof runPullTtyp>[1]);
+  return { object: r.object, files: r.files, channel: r.channel, ...(r.fallbackReason ? { fallbackReason: r.fallbackReason } : {}) };
+});

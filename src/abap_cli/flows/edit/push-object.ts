@@ -45,9 +45,13 @@ export interface PushOptions {
 }
 
 /**
- * Execute lock → set source → syntax check → (activate) → unlock for one object.
- * The lock is always released in a finally block; a failed unlock surfaces as
- * UNLOCK_WARNING on the success path.
+ * Execute lock → set source → (syntax check) → unlock → activate for one object.
+ *
+ * The lock must be released before activation: SAP's activation service rejects
+ * a locked object with HTTP 403 "currently editing". The lock is therefore
+ * released explicitly on the activation path and by the finally block on every
+ * early-return or failure path; a failed unlock surfaces as UNLOCK_WARNING on
+ * the success path.
  */
 export async function pushObject(
   client: AdtClientWrapper,
@@ -132,6 +136,30 @@ export async function pushObject(
     if (opts.activate === false) {
       return;
     }
+
+    // Release the edit lock BEFORE activating. SAP's activation service refuses
+    // to activate an object that is currently locked and answers HTTP 403
+    // "User X is currently editing Y" — even when we hold the lock ourselves.
+    // Holding the lock through activation was the real reason the previous
+    // implementation sent a request shape that silently no-ops, which left
+    // every push written-but-inactive while still reporting success.
+    opts.onStage?.('unlock');
+    try {
+      await client.unLock(object.objectUrl, lockHandle);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new CliError('SAP_ERROR', `Cannot activate ${object.name}: the edit lock could not be released`, {
+        object: object.name,
+        stage: 'unlock',
+        detail: message,
+        nextSteps: [
+          `Release the lock manually in SE03, then re-run the push.`,
+          `Check who holds the lock: abap inspect ${object.name} --locks`,
+        ],
+      });
+    }
+    locked = false;
+    lockHandle = undefined;
 
     // Activate — performs a complete syntax check server-side
     opts.onStage?.('activate');

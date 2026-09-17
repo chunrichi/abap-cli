@@ -10,6 +10,9 @@
  * Install once at startup; the returned uninstaller is used by tests and
  * by the top-level exit path when a command finished normally (in which
  * case `postAction` already drained).
+ *
+ * Per-client release uses the lifecycle module's 5s timeout — even on
+ * signal we cap the wait so a stuck logout can't keep the process alive.
  */
 
 import { drainClients } from './registry.js';

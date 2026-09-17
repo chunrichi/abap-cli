@@ -103,6 +103,7 @@ describe('abap create --schema (P0.1 introspection)', () => {
     expect(data.arguments[0].allowedValues).toEqual([
       'CLAS', 'INTF', 'PROG', 'FUGR',
       'TABL', 'STRU', 'DOMA', 'DTEL',
+      'ENQU', 'NROB',
       'HTTP', 'TRAN',
       'TTYP', 'MSAG', 'DDLS',
       'SRVB', 'SRVD', 'BDEF', 'DCLS', 'DDLX', 'DDLA',
@@ -163,13 +164,21 @@ describe('abap create --schema (P0.1 introspection)', () => {
     }
   });
 
-  it('reports TTYP as unsupported (DDIC_NOT_SUPPORTED, deferred per Q2)', async () => {
+  it('reports TTYP/MSAG/DDLS as supported with a required --file (they have create handlers)', async () => {
     const program = makeProgram();
     registerCreateCommand(program);
-    const res = await runCommand(program, ['create', '--schema', 'TTYP']);
-    expect(res.exitCode).toBeUndefined();
-    const { data } = parseStdout(res);
-    expect(data).toMatchObject({ type: 'TTYP', supported: false, reason: 'DDIC_NOT_SUPPORTED' });
+    for (const t of ['TTYP', 'MSAG', 'DDLS']) {
+      const res = await runCommand(program, ['create', '--schema', t]);
+      expect(res.exitCode).toBeUndefined();
+      const { data } = parseStdout(res);
+      expect(data, `expected ${t} to be supported`).toMatchObject({ type: t, supported: true });
+      // The type-specific branch re-declares --file with required:true on top of
+      // the general option list, so assert on the required declaration.
+      const requiredFile = data.options.find(
+        (o: { name: string; required?: boolean }) => o.name === '--file' && o.required === true,
+      );
+      expect(requiredFile, `expected ${t} --schema to declare a required --file`).toBeDefined();
+    }
   });
 
   it('reports unknown types as unsupported (TYPE_NOT_SUPPORTED)', async () => {

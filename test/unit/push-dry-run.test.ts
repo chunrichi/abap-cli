@@ -73,7 +73,7 @@ describe('push dry-run ', () => {
 
   // ----- T2.4 stage-order assertion -----
 
-  it('records all stages in lock → write → activate → unlock order (full push, no separate check)', async () => {
+  it('records all stages in lock → write → unlock → activate order (full push, no separate check)', async () => {
     const client = mockClient();
     (client.lock as ReturnType<typeof vi.fn>).mockResolvedValue({ LOCK_HANDLE: 'h1' });
     (client.setObjectSource as ReturnType<typeof vi.fn>).mockResolvedValue({});
@@ -89,15 +89,17 @@ describe('push dry-run ', () => {
       ],
       { transport: 'T1', checkOnly: false, onStage: (s) => stages.push(s) },
     );
-    // Full push: lock → 2× write → activate → unlock.
-    // No explicit 'check' stage in full mode — the activation itself runs
-    // the server-side syntax check (see push-object.ts:130 comment).
+    // Full push: lock → 2× write → unlock → activate.
+    // No explicit 'check' stage in full mode — the activation itself runs the
+    // server-side syntax check (see push-object.ts). The unlock must come
+    // BEFORE activate: SAP's activation service rejects a locked object with
+    // HTTP 403 "User X is currently editing Y", even for the lock we hold.
     expect(stages).toEqual([
       'lock',
       'write',
       'write',
-      'activate',
       'unlock',
+      'activate',
     ]);
   });
 

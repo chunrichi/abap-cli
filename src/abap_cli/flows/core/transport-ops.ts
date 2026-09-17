@@ -6,6 +6,13 @@ export interface TransportObjectInfo {
   name: string;
   type: string;
   status: string;
+  /**
+   * SAP user that owns this object's task — for direct objects this is the
+   * transport owner; for objects inside a task, the task owner. Optional
+   * because `transportDetails` only emits the field on tasks (the SAP XML
+   * schema has no per-object `tm:owner`); absent → caller cannot filter.
+   */
+  owner?: string;
 }
 
 export interface TransportTaskInfo {
@@ -60,28 +67,31 @@ interface RawTransportDetails {
   tasks?: RawTransportTask[];
 }
 
-function toObjectInfo(o: RawTransportObject): TransportObjectInfo {
+function toObjectInfo(o: RawTransportObject, owner: string): TransportObjectInfo {
   return {
     name: o['tm:name'],
     type: o['tm:type'],
     status: o['tm:obj_info'] ?? '',
+    owner: owner || undefined,
   };
 }
 
 function toTaskInfo(t: RawTransportTask): TransportTaskInfo {
+  const taskOwner = t['tm:owner'] ?? '';
   return {
     number: t['tm:number'] ?? '',
     description: t['tm:desc'] ?? '',
     status: t['tm:status'] ?? '',
-    owner: t['tm:owner'] ?? '',
-    objects: (t.objects ?? []).map(toObjectInfo),
+    owner: taskOwner,
+    objects: (t.objects ?? []).map((o) => toObjectInfo(o, taskOwner)),
   };
 }
 
 /** Collect every object reference across the request and its nested tasks. */
 function collectAllReferences(details: RawTransportDetails): TransportObjectInfo[] {
-  const direct = (details.objects ?? []).map(toObjectInfo);
-  const fromTasks = (details.tasks ?? []).flatMap((t) => (t.objects ?? []).map(toObjectInfo));
+  const transportOwner = details['tm:owner'] ?? '';
+  const direct = (details.objects ?? []).map((o) => toObjectInfo(o, transportOwner));
+  const fromTasks = (details.tasks ?? []).flatMap((t) => (t.objects ?? []).map((o) => toObjectInfo(o, t['tm:owner'] ?? transportOwner)));
   return [...direct, ...fromTasks];
 }
 
@@ -89,7 +99,8 @@ function collectAllReferences(details: RawTransportDetails): TransportObjectInfo
 export async function showTransport(client: AdtClientWrapper, number: string): Promise<TransportRequestInfo> {
   try {
     const details = (await client.transportDetails(number)) as RawTransportDetails;
-    const directObjects = (details.objects ?? []).map(toObjectInfo);
+    const transportOwner = details['tm:owner'] ?? '';
+    const directObjects = (details.objects ?? []).map((o) => toObjectInfo(o, transportOwner));
     const tasks = (details.tasks ?? []).map(toTaskInfo);
     const references = collectAllReferences(details);
     const deduplicated = references.length - directObjects.length;

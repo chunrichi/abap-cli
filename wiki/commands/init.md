@@ -43,7 +43,7 @@ abap init --agent copilot|claude|cursor|generic [--force]
 ## Options
 
 - `--profile <name>`: 引用已有全局 profile（`abap profile add` 创建）；非交互模式不创建 profile
-- `--url <url>` / `-c, --client <n>` / `-u, --username <u>` / `-p, --password <pwd>` / `-l, --language <lang>` / `--insecure` / `--ca <pem>`: 直连参数（仅 TTY 向导内使用；脚本里先 `abap profile add`）
+- `--url <url>` / `-c, --client <n>` / `-u, --username <u>` / `-p, --password <pwd>` / `-l, --language <lang>` / `--insecure` / `--ca <pem>`: 直连参数（仅 TTY 向导内使用；脚本里先 `abap profile add`）。`--ca` 与 `profile add --ca` 一样把 PEM 导入 `~/.abap-cli/certificates/` 后再绑定 profile
 - `--tr <transport>` / `--package <pkg>` / `--source-dir <path>`: 默认 transport / 包 / 源目录（写入 `.abap.json`）
 - `--show-config`: 打印当前 `.abap.json`（向上找最近的，git 边界停），只读
 - `--unset-package` / `--unset-tr` / `--unset-source-dir`: 移除对应顶层 key；非 TTY 需 `--yes`

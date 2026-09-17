@@ -262,6 +262,6 @@ abap create local CLAS ZCL_DRAFT --template public-method --dir src/
 
 # references
 
-- 实现：`src/abap_cli/commands/create.ts`、`src/abap_cli/flows/edit/create.ts`、`src/abap_cli/flows/edit/create-types.ts`、`src/abap_cli/formats/templates.ts`、`src/abap_cli/formats/ddic/json.ts`、`src/abap_cli/types/registry.ts`、`src/abap_cli/core/confirmation.ts`
+- 实现：`src/abap_cli/commands/create.ts`、`src/abap_cli/flows/edit/create.ts` + `create-{ddic,http,tran,ttyp,msag,ddls}.ts`（per-type handler）、`src/abap_cli/formats/templates.ts`、`src/abap_cli/formats/ddic/json.ts`、`src/abap_cli/types/registry.ts`、`src/abap_cli/core/confirmation.ts`
 - 文档：`docs/commands.md`（`## abap create` 章节）
 - 设计：见 wiki 顶层 `create-command` / `create-local` / `ddic-crud-textpool` 历史回顾

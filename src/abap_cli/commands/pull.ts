@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { runPull, type PullOptions } from '../flows/edit/pull.js';
-import { printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
+import { CliError, printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
 import { SEARCH_RESULT_LIMIT } from '../core/limits.js';
 import { commandSchemas } from '../flows/setup/command-schemas.js';
 import { normalizeTypeInput } from '../cli/type-alias.js';
@@ -22,12 +22,25 @@ export function registerPullCommand(program: Command): void {
     .option('--textpool', 'Also pull textpool files (.texts/.selections/.headings.<lang>.properties)')
     .option('--remote <remoteid>', 'Pull the object\'s active version source from a remote system (Version Management)')
     .option('--tr <request>', 'Pull all objects bound to a transport request (mutually exclusive with object name and --package)')
+    .option('--user <sap-user>', 'Filter --tr lookups by transport task owner (case-insensitive). Only valid with --tr.')
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action(async (objectName: string, opts: PullOptions, cmd) => {
       // --schema branch — emit machine-readable parameter schema (no SAP call).
       if (cmd.optsWithGlobals().schema) {
         printSchema(commandSchemas['pull']!, jsonFromCommand(cmd));
         return;
+      }
+      // PR2: --user only makes sense with --tr — reject before the bare-help short-circuit.
+      if (opts.user && !opts.tr) {
+        const mode = jsonFromCommand(cmd);
+        try {
+          throw new CliError('INVALID_ARGUMENT', '--user can only be used with --tr', {
+            nextSteps: ['Pass --tr <request> together with --user <sap-user>.'],
+            example: 'abap pull --tr NDK123456 --user SAPUSER',
+          });
+        } catch (error: unknown) {
+          printError(mode, error);
+        }
       }
       // Bare `abap pull` (no object, no --package, no --tr) prints the command help, like `abap pull --help`.
       if (!objectName && !opts.package && !opts.tr) {

@@ -35,7 +35,10 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "build-docs": "node scripts/build-commands-doc.mjs",
-    "verify": "npm run build && npm test"
+    "check-skills-drift": "node scripts/check-skills-drift.mjs",
+    "check-skills-drift:json": "node scripts/check-skills-drift.mjs --json",
+    "check-skills-drift:fix": "node scripts/check-skills-drift.mjs --fix",
+    "verify": "npm run build && npm test && npm run check-skills-drift"
   },
   "keywords": [
     "abap",

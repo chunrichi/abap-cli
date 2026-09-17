@@ -189,9 +189,18 @@ describe('skill bundle (019-cli-skill-agent-bundle) structural audit', () => {
     // 17 个顶层命令（0.2 — 合并 abap-object 后）：新增 where-used / tcode；
     // atc/sync/report-stuck 已移除，不纳入 skill 路由。
     const expected = [
-      'init', 'profile', 'doctor', 'transport', 'extension',
+      // 0.2.6 起，'extension' 改名 'deploy'（CHANGELOG breaking）；
+      // 此外新增：dumps / extensions / session / mime / validate:aff / feedback / report-stuck
+      'init', 'profile', 'doctor', 'transport', 'deploy',
       'search', 'where-used', 'pull', 'push', 'check', 'create', 'activate', 'inspect', 'diff', 'status',
       'select', 'run', 'tcode',
+      'dumps',
+      'extensions',
+      'session',
+      'mime',
+      'validate:aff',
+      'feedback',
+      'report-stuck',
     ];
     for (const cmd of expected) {
       expect(allCommands.has(cmd), `${cmd} 未被任何 skill 覆盖`).toBe(true);
@@ -256,12 +265,15 @@ describe('skill bundle — size constraints (025 SC-004 / FR3)', () => {
   const skills = getAllSkills();
   // 025 SC-004: 各领域 skill ≤ 旧对应 skill 行数；meta skill 无对应旧 skill 但保持精简
   const MAX_SKILL_LINES: Record<string, number> = {
-    'abap-cli': 120,
-    'abap-cli-setup': 140,
-    'abap-cli-search': 80,
-    'abap-cli-edit': 150,
-    'abap-cli-data': 110,
-  };
+      // 0.2.6 起：meta 多了 feedback / report-stuck（spec P3.3），edit 多了 mime / validate:aff / 19 类对象类型表 + 11 个 push stage，
+      // 阈值放宽以容纳新增内容；详细命令速查下沉到 references/commands-quick.md（self-contained 不变）。
+      'abap-cli': 180,
+      'abap-cli-setup': 140,
+      'abap-cli-search': 90,
+      'abap-cli-edit': 220,
+      'abap-cli-data': 110,
+      'abap-cli-performance': 140,
+    };
   const MAX_AGENT_LINES = 180;
 
   it.each(skills.map((s) => [s.dirName, s] as const))(

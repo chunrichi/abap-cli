@@ -69,10 +69,21 @@ export async function readTablArtifact(filePath: string): Promise<TablArtifact |
       && realFields.some(field => ['CLIENT', 'MANDT'].includes(field.fieldName.toUpperCase())))
   );
 
-// 033: AFF canonical — settings live under `generalInformation.*` and the
-  // table-level deliveryClass / dataClass / sizeCategory / clientDependent
+// 033 + P2.3: AFF canonical — settings live under `generalInformation.*`
+  // and the table-level deliveryClass / dataClass / sizeCategory / clientDependent
   // are nested there too. `formatVersion` lives at the top level.
+  // P2.3: TABT buffering + dbSpecificSettings also belong at the top level
+  // (per `schema/tabt-v1.json` + ABAP zcl_abap_vibe_tabl_format's
+  // build_settings_json output). Merge them into generalInformation so the
+  // localToWire<TABL> path forwards a single nested object to SAP's
+  // apply_ddic_table_settings substring checks.
   const localGeneral: Record<string, unknown> = { ...generalInformation };
+  if (settings && typeof settings.buffering === 'object' && settings.buffering) {
+    localGeneral.buffering = settings.buffering as Record<string, unknown>;
+  }
+  if (settings && typeof settings.dbSpecificSettings === 'object' && settings.dbSpecificSettings) {
+    localGeneral.dbSpecificSettings = settings.dbSpecificSettings as Record<string, unknown>;
+  }
   if (parsed.deliveryClass !== undefined) localGeneral.deliveryClass = parsed.deliveryClass;
   if (typeof generalInformation.dataClassCategory === 'string') {
     localGeneral.dataClassCategory = generalInformation.dataClassCategory;

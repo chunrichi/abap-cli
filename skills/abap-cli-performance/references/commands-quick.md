@@ -27,4 +27,4 @@
 | `OBJECT_NOT_FOUND` | `abap-cli-search` | `search <name>` 校对 |
 | `LOCK_FAILED` | `abap-cli-edit` | `inspect <obj> --locks` 查持有者；手动释放后重试 |
 | `SYNTAX_ERROR` / `ACTIVATION_FAILED` | `abap-cli-edit` | 读 `data.errors` 修复 |
-| `WRAPPER_NOT_DEPLOYED` | `abap-cli-data` | handoff 到 `abap-cli-setup` 跑 `extension deploy --yes` |
+| `WRAPPER_NOT_DEPLOYED` | `abap-cli-data` | handoff 到 `abap-cli-setup` 跑 `deploy --yes` |

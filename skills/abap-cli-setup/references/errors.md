@@ -19,7 +19,7 @@
 
 `error.category` 在 `--json` 信封中 1:1 对应退出码。≥10 保留。
 
-## 本 skill 错误码清单（4 命令范围）
+## 本 skill 错误码清单（7 命令范围）
 
 ### init / profile
 
@@ -59,7 +59,7 @@
 - **`--dry-run`**：返回 `{ dryRun: true, ... }` 不改 SAP
 - **`--yes`**：跳过确认
 
-### extension deploy / status
+### deploy / deploy status
 
 | code | cat/exit | 触发 | 修复 |
 |---|---|---|---|
@@ -68,14 +68,22 @@
 | `SAP_ERROR` | SAP_ERROR/6 | SAP 端 deploy 失败 | 看 `data.objects[]` 哪个失败 |
 | `ICF_CHECK_DEGRADED` | warning（meta.warnings） | ICF 部署健康探测不可达 | 不阻断；查 SAP 端 `/sap/zabap_vibe/` 是否可达 |
 
-### extension status 状态值
+### deploy status 状态值
 
 | `data.status` | 含义 | 推荐动作 |
 |---|---|---|
-| `not_deployed` | ICF 服务没装过 | `extension deploy --yes` |
+| `not_deployed` | ICF 服务没装过 | `deploy --yes` |
 | `current` | 安装且版本匹配 | 跳过 |
-| `outdated` | 安装但版本过期 | `extension deploy --yes` 升级 |
+| `outdated` | 安装但版本过期 | `deploy --yes` 升级 |
 | `unreachable` | 探测不可达 | 不阻断；查 `meta.warnings`（ICF_CHECK_DEGRADED） |
+
+### extensions / session
+
+| code | cat/exit | 触发 | 修复 |
+|---|---|---|---|
+| `EXTENSION_LOAD_FAILED` | CONFIG_ERROR/3 | `extensions list` 某 npm 扩展加载抛错 | 看 `data.extensions[].reason`；修 package.json 后 `extensions lock` 重钉 |
+| `EXTENSION_VALIDATION_FAILED` | VALIDATION_ERROR/7 | `extensions lock` 拒绝未签 npm 包 | `--allow-unsigned` 仅当确认来源可信 |
+| `SESSION_JAR_DECRYPT_FAILED` | VALIDATION_ERROR/7 | `session info` 解密失败 | keychain 缺 / 密钥错；删除 `~/.abap-cli/sessions/<hash>.json` 让下次 login 重建 |
 
 ## JSON 输出契约参考
 

@@ -20,8 +20,8 @@ import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError } from '../../output/json.js';
 import { resolveObject } from '../../core/resolve.js';
 import { normalizePullData } from '../../core/path-output.js';
-import { DDIC_SUPPORTED_TYPES } from '../../formats/ddic/json.js';
 import type { PullOptions, PullResult } from './pull-shared.js';
+import { wrapPullResult } from './pull-shared.js';
 import { pullObject, humanSummary } from './pull-source.js';
 import { runPullDdic, isDdicSupportedType } from './pull-ddic.js';
 import { runPullHttp } from './pull-http.js';
@@ -30,12 +30,19 @@ import { runPullTextpool } from './pull-textpool.js';
 import { runPullRemote } from './pull-remote.js';
 import { runPackagePull } from './pull-package.js';
 import { runTransportPull } from './pull-tr.js';
-import { runPullTtyp } from './pull-ttyp.js';
-import { runPullMsag } from './pull-msag.js';
-import { runPullDdls } from './pull-ddls.js';
-import { runPullSrvd } from './pull-srvd.js';
-import { runPullBdef } from './pull-bdef.js';
-import { runPullCdsExtension } from './pull-cds-extension.js';
+import { normalizeFugrFunctionModule } from './pull-fugr-ff.js';
+import { pullHandlerFor } from '../../types/registry.js';
+// Side-effect imports: each per-type module self-registers its pull handler
+// at load time. Decision 2A — module-load side effect (no explicit wiring).
+import './pull-ttyp.js';
+import './pull-msag.js';
+import './pull-ddls.js';
+import './pull-srvd.js';
+import './pull-bdef.js';
+import './pull-cds-extension.js';
+// PR5: ENQU (ICF) and NROB (no ADT endpoint, always ICF).
+import './pull-enqu.js';
+import './pull-nrob.js';
 
 export type { PullOptions, PullEntry, PullResult } from './pull-shared.js';
 export { parsePositiveInt } from './pull-shared.js';
@@ -93,123 +100,27 @@ export async function runPull(objectName: string, opts: PullOptions): Promise<Pu
   if (typeUpper && isDdicSupportedType(typeUpper)) {
     return runPullDdic(objectName, typeUpper, opts);
   }
-  // 036-ttyp-msag-ddls: dual-channel DDIC + CDS routing. ADT preferred,
-  // ICF fallback for TTYP/MSAG, hard-error for DDLS on ECC.
-  if (typeUpper === 'TTYP') {
-    const r = await runPullTtyp(objectName, opts);
-    return {
-      data: normalizePullData({
-        object: r.object,
-        type: 'TTYP',
-        entries: [{ object: r.object, type: 'TTYP', status: 'written', files: r.files }],
-        written: r.files.length,
-        skipped: 0,
-        failed: 0,
-        channel: r.channel,
-        ...(r.fallbackReason ? { fallbackReason: r.fallbackReason } : {}),
-      }),
-      human: `Pulled TTYP ${r.object} via ${r.channel}${r.fallbackReason ? ` (${r.fallbackReason})` : ''}; wrote ${r.files.length} file(s)`,
-    };
-  }
-  if (typeUpper === 'MSAG') {
-    const r = await runPullMsag(objectName, opts);
-    return {
-      data: normalizePullData({
-        object: r.object,
-        type: 'MSAG',
-        entries: [{ object: r.object, type: 'MSAG', status: 'written', files: r.files }],
-        written: r.files.length,
-        skipped: 0,
-        failed: 0,
-        channel: r.channel,
-        ...(r.fallbackReason ? { fallbackReason: r.fallbackReason } : {}),
-      }),
-      human: `Pulled MSAG ${r.object} via ${r.channel}${r.fallbackReason ? ` (${r.fallbackReason})` : ''}; wrote ${r.files.length} file(s)`,
-    };
-  }
-  if (typeUpper === 'DDLS') {
-    const r = await runPullDdls(objectName, opts);
-    return {
-      data: normalizePullData({
-        object: r.object,
-        type: 'DDLS',
-        entries: [{ object: r.object, type: 'DDLS', status: 'written', files: r.files }],
-        written: r.files.length,
-        skipped: 0,
-        failed: 0,
-        channel: r.channel,
-      }),
-      human: `Pulled DDLS ${r.object} via ${r.channel}; wrote ${r.files.length} file(s)`,
-    };
-  }
-  // T3.1 — SRVD pull. Routes through the sourceObjectStrategy in
-  // pull-strategy.ts (SRVD lives in SOURCE_OBJECT_TYPES), but the
-  // explicit dispatcher case is kept so callers can pass --type SRVD
-  // without going through the resolveObject default path.
-  if (typeUpper === 'SRVD') {
-    const r = await runPullSrvd(objectName, opts);
-    return {
-      data: normalizePullData({
-        object: r.object,
-        type: 'SRVD',
-        entries: [{ object: r.object, type: 'SRVD', status: 'written', files: r.files }],
-        written: r.files.length,
-        skipped: 0,
-        failed: 0,
-        channel: 'adt',
-      }),
-      human: `Pulled SRVD ${r.object} via adt; wrote ${r.files.length} file(s)`,
-    };
-  }
-  // T3.3 — BDEF pull. Routes through the sourceObjectStrategy in
-  // pull-strategy.ts with the `.abdl` extension (BDEF carries the
-  // ABAP Behavior Language, distinct from the `.acds` CDS family).
-  if (typeUpper === 'BDEF') {
-    const r = await runPullBdef(objectName, opts);
-    return {
-      data: normalizePullData({
-        object: r.object,
-        type: 'BDEF',
-        entries: [{ object: r.object, type: 'BDEF', status: 'written', files: r.files }],
-        written: r.files.length,
-        skipped: 0,
-        failed: 0,
-        channel: 'adt',
-      }),
-      human: `Pulled BDEF ${r.object} via adt; wrote ${r.files.length} file(s)`,
-    };
-  }
-  // T3.4 — DCLS / DDLX / DDLA. All three share the sourceObjectStrategy
-  // flow with the .acds extension; only the AFF folder and ADT endpoint
-  // differ (the helper handles that internally).
-  if (typeUpper === 'DCLS' || typeUpper === 'DDLX' || typeUpper === 'DDLA') {
-    const r = await runPullCdsExtension(typeUpper as 'DCLS' | 'DDLX' | 'DDLA', objectName, opts);
-    return {
-      data: normalizePullData({
-        object: r.object,
-        type: typeUpper,
-        entries: [{ object: r.object, type: typeUpper, status: 'written', files: r.files }],
-        written: r.files.length,
-        skipped: 0,
-        failed: 0,
-        channel: 'adt',
-      }),
-      human: `Pulled ${typeUpper} ${r.object} via adt; wrote ${r.files.length} file(s)`,
-    };
-  }
-  if (typeUpper && !isDdicSupportedType(typeUpper)) {
-    if (/^(DOMA|DTEL|TABL|STRU|TTYP)$/.test(typeUpper)) {
-      throw new CliError('DDIC_NOT_SUPPORTED', `Object type ${typeUpper} is not supported in this phase`, {
-        type: typeUpper,
-        nextSteps: [`Supported DDIC types: ${DDIC_SUPPORTED_TYPES.join(', ')}.`],
-      });
+  // 036-ttyp-msag-ddls + T3.x CDS extension family: consult the handler
+  // registry populated by per-type modules at load time. The explicit
+  // if-chain used to live here; Phase 3 collapses it into a single lookup.
+  if (typeUpper) {
+    const handler = pullHandlerFor(typeUpper);
+    if (handler) {
+      const r = await handler({ objectName, opts });
+      return wrapPullResult(typeUpper, r);
     }
   }
 
-  const object = await resolveObject(client, objectName, opts.type);
-  const result = await pullObject(client, object, opts);
+  // PR4 (C3): a FUGR/FF (function module) is owned by a parent function
+  // group. Rewrite the resolved object to the parent so the fugr pull
+  // strategy writes the canonical `<group>/<group>.<fm>.func.abap` layout;
+  // `requestedFunctionModule` keeps the original FM identity so the
+  // strategy scopes its output to that one module.
+  const resolved = await resolveObject(client, objectName, opts.type);
+  const { object: pullTarget, requestedFunctionModule } = normalizeFugrFunctionModule(resolved);
+  const result = await pullObject(client, pullTarget, { ...opts, requestedFunctionModule });
   return {
-    data: normalizePullData({ object: object.name, type: object.type, entries: result.entries, written: result.written, skipped: result.skipped, failed: result.failed }),
-    human: humanSummary(object, result),
+    data: normalizePullData({ object: resolved.name, type: resolved.type, entries: result.entries, written: result.written, skipped: result.skipped, failed: result.failed }),
+    human: humanSummary(resolved, result),
   };
 }

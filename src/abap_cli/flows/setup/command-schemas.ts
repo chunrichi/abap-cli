@@ -76,7 +76,7 @@ function initSchema(): CommandSchema {
       { name: '--password', type: 'string', valuePlaceholder: '<password>', description: 'SAP password (stored in keychain).' },
       { name: '--language', type: 'string', valuePlaceholder: '<language>', description: 'SAP language.' },
       { name: '--insecure', type: 'boolean', description: 'Skip SSL certificate verification (development only).' },
-      { name: '--ca', type: 'string', valuePlaceholder: '<path>', description: 'Path to a CA certificate (PEM) for SSL verification.' },
+      { name: '--ca', type: 'string', valuePlaceholder: '<path>', description: 'PEM CA certificate to import into ~/.abap-cli/certificates/ and bind to this profile.' },
       { name: '--auth-method', type: 'string', valuePlaceholder: '<method>', description: 'Login strategy: basic | cert | browser_sso | oauth_password.' },
       { name: '--auth-option', type: 'string', valuePlaceholder: '<kv>', description: 'Generic auth option, repeatable as key=value. New auth methods add no Commander options — they read from this bag.' },
       { name: '--cert-path', type: 'string', valuePlaceholder: '<path>', description: 'X.509 client cert file (PEM) — used with --auth-method=cert.' },
@@ -137,6 +137,7 @@ function pullSchema(): CommandSchema {
       { name: '--textpool', type: 'boolean', description: 'Also pull textpool files (.texts/.selections/.headings.<lang>.properties).' },
       { name: '--remote', type: 'string', valuePlaceholder: '<remoteid>', description: 'Pull the object\'s active version source from a remote system (Version Management).' },
       { name: '--tr', type: 'string', valuePlaceholder: '<request>', description: 'Pull all objects bound to a transport request (mutually exclusive with object name and --package).' },
+      { name: '--user', type: 'string', valuePlaceholder: '<sap-user>', description: 'Filter --tr lookups by transport task owner (case-insensitive). Only valid with --tr.' },
       schemaOption(),
     ],
     exclusiveGroups: [['--tr', '<object-name>'], ['--tr', '--package']],
@@ -166,7 +167,7 @@ function pushSchema(): CommandSchema {
     options: [
       { name: '--all', type: 'boolean', description: 'Push all .abap files under the scan root (sourceDir or current dir; honours .abapignore).' },
       { name: '--tr', type: 'string', valuePlaceholder: '<transport>', description: 'Transport number override for unbound objects.' },
-      { name: '--check-only', type: 'boolean', description: 'Syntax check only; do not activate.' },
+      { name: '--check-only', type: 'boolean', description: 'Syntax check only; do not activate. Not supported for ICF-routed or channel-routed JSON files (DDIC / HTTP / TRAN / TTYP / MSAG / DDLS) — those are validated during push.' },
       { name: '--no-activate', type: 'boolean', description: 'Lock + write + skip check + skip activate + unlock.' },
       { name: '--dry-run', type: 'boolean', description: 'Plan only — no mutating ADT calls.' },
       { name: '--fail-fast', type: 'boolean', description: 'Stop at the first failing file (default: --keep-going).' },
@@ -281,7 +282,7 @@ function profileSchema(): CommandSchema {
       { name: '--password', type: 'string', valuePlaceholder: '<password>', description: 'Password (stores credential in keychain).' },
       { name: '--remove-password', type: 'boolean', description: 'Drop the stored password from keychain.' },
       { name: '--insecure', type: 'boolean', description: 'Skip SSL certificate verification (development only).' },
-      { name: '--ca', type: 'string', valuePlaceholder: '<path>', description: 'Path to a CA certificate (PEM) for SSL verification.' },
+      { name: '--ca', type: 'string', valuePlaceholder: '<path>', description: 'PEM CA certificate to import into ~/.abap-cli/certificates/ and bind to this profile.' },
       { name: '--clear-ca', type: 'boolean', description: 'Remove the CA certificate setting.' },
       { name: '--auth-method', type: 'string', valuePlaceholder: '<method>', description: 'Login strategy: basic | cert | browser_sso | oauth_password.' },
       { name: '--auth-option', type: 'string', valuePlaceholder: '<kv>', description: 'Generic auth option, repeatable as key=value.' },
@@ -344,13 +345,12 @@ function statusSchema(): CommandSchema {
 // ---------- doctor ----------
 function doctorSchema(): CommandSchema {
   return {
-    ...base('doctor', 'Diagnose CLI environment, configuration, and connections.', 'abap doctor [options]', 'local'),
+    ...base('doctor', 'Diagnose CLI environment and configuration (read-only; no live SAP probes).', 'abap doctor [options]', 'local'),
     arguments: [],
     options: [
       { name: '--verbose', type: 'boolean', description: 'Include detail (versions, paths, underlying messages).' },
       { name: '--fix', type: 'boolean', description: 'Apply safe, reversible fixes (requires --yes).' },
       { name: '--yes', type: 'boolean', description: 'Confirm --fix without prompting.' },
-      { name: '--system', type: 'string', valuePlaceholder: '<name>', description: 'Scope the connection section to a named profile.' },
       schemaOption(),
     ],
     examples: [

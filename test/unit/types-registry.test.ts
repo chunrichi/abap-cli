@@ -22,12 +22,14 @@ import {
 } from '../../src/abap_cli/types/registry.js';
 
 describe('types/registry.ts (US11 — single source of truth)', () => {
-  it('contains exactly 19 supported types (4 source + 4 DDIC + HTTP + TRAN + 3 dual-channel + 6 Phase 3)', () => {
+  it('contains exactly 21 supported types (4 source + 4 DDIC + ENQU + NROB + HTTP + TRAN + 3 dual-channel + 6 Phase 3)', () => {
     // Phase 3 added: SRVB (metadata-only), SRVD, BDEF, DCLS, DDLX, DDLA.
-    expect(allSupportedTypes()).toHaveLength(19);
+    // PR5 added: ENQU (lock object, ICF) and NROB (number range object, ICF).
+    expect(allSupportedTypes()).toHaveLength(21);
     expect(allSupportedTypes()).toEqual([
       'CLAS', 'INTF', 'PROG', 'FUGR',         // ADT source
       'TABL', 'STRU', 'DOMA', 'DTEL',         // ICF DDIC
+      'ENQU', 'NROB',                          // PR5 — ICF DDIC family
       'HTTP', 'TRAN',                          // ICF
       'TTYP', 'MSAG', 'DDLS',                  // 036 dual-channel
       'SRVB', 'SRVD', 'BDEF',                  // T3.2 / T3.1 / T3.3
@@ -48,14 +50,16 @@ describe('types/registry.ts (US11 — single source of truth)', () => {
     expect(createObjtypeFor('TTYP')).toBeUndefined();
     expect(createObjtypeFor('MSAG')).toBeUndefined();
     expect(createObjtypeFor('DDLS')).toBeUndefined();
-    // Phase 3: SRVB / SRVD / BDEF / DCLS / DDLX / DDLA carry their own
-    // objtype string for create() (T3.x spec).
-    expect(createObjtypeFor('SRVB')).toBe('SRVB/SB');
-    expect(createObjtypeFor('SRVD')).toBe('SRVD/SD');
-    expect(createObjtypeFor('BDEF')).toBe('BDEF/BD');
-    expect(createObjtypeFor('DCLS')).toBe('DCLS/DC');
+    // Phase 3 (post-review): SRVD / DCLS / DDLX / DDLA carry their own
+    // objtype string for create(); SRVB / BDEF are pull-only because either
+    // `abap-adt-api`'s typed `createObject` doesn't accept them (BDEF) or
+    // SAP GUI owns the lifecycle (SRVB).
+    expect(createObjtypeFor('SRVB')).toBeUndefined();
+    expect(createObjtypeFor('SRVD')).toBe('SRVD/SRV');
+    expect(createObjtypeFor('BDEF')).toBeUndefined();
+    expect(createObjtypeFor('DCLS')).toBe('DCLS/DL');
     expect(createObjtypeFor('DDLX')).toBe('DDLX/EX');
-    expect(createObjtypeFor('DDLA')).toBe('DDLA/AE');
+    expect(createObjtypeFor('DDLA')).toBe('DDLA/ADF');
   });
 
   it('routes source objects (ADT) and TTYP/MSAG/DDLS dual-channel; TABL/HTTP/TRAN ICF only', () => {

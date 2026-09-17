@@ -14,11 +14,26 @@ abap pull ZFG --type FUGR
 #    ├── zfg.fugr.abap                          # main
 #    ├── zfg.fugr.saplzfg.reps.abap             # function-pool
 #    ├── zfg.fugr.lzfgtop.reps.abap             # TOP include
-#    └── zfg.fugr.<fm>.func.abap                # 每个 FM
+#    ├── zfg.fugr.lfzfgfXX.reps.abap            # 每个 FXX（function include）— 0.2.6+
+#    ├── zfg.fugr.lzfgOXX.reps.abap             # 每个 OXX（output include，按需）
+#    ├── zfg.fugr.lzfgIXX.reps.abap             # 每个 IXX（input include，按需）
+#    └── zfg.fugr.<fm>.func.abap                # 每个 FM；canonical pseudo syntax
+#    └── zfg.fugr.<fm>.func.json                # 每个 FM 的 parameters / exceptions / processingType
+```
 
+`.reps.json` 是 `.reps.abap` 的 AFF canonical 骨架，CLI 写盘前走 `assertAffMetadata` 校验（schema = `func-v1.json` / `reps-v1.json`）。
+
+**0.2.6 修复**：旧版 `enumerateFugr` 静默丢弃所有非 TOP、非 UXX include；新版 FXX / OXX / IXX 全部保留。push 时各 include 走 child lock（`fugrPushTargetFor` 解析 `FUGR/<sub>` 子目标），最后 `activateAll` 父 group；push 后比对 latest vs active source，不一致抛 `ACTIVATION_FAILED` 而非虚假 success。
+
+`readFuncIncludeNumbers` 支持 CRLF 双行 `INCLUDE L<group>U01.\r\n  "FM_NAME"` 形式（真实 SAP 行为）；单行老格式仍兼容。
+
+```bash
 # 改 + 推
 abap push src/zfg/zfg.fugr.<fm>.func.abap --tr DEVK900001
 # 每个文件锁自己的目标（group / include / FM），最后激活整个 group
+
+# 推 include（rarely needed，但 FXX/OXX/IXX 也是独立 lock target）
+abap push src/zfg/zfg.fugr.lfzfgf01.reps.abap --tr DEVK900001
 ```
 
 UXX include 由系统生成，**不**在 pull 范围内——`abap pull` 自动跳过。
@@ -243,7 +258,7 @@ abap select --table ZT_FOO --where "AMOUNT > 100" --count-only
 
 | | 含义 | 对应 |
 |---|---|---|
-| ICF 作为**通道** | 自建服务 `/sap/zabap_vibe` 旁路 ADT，承载 DDIC CRUD / textpool / `select` / `tcode` / `run` | `abap extension deploy` / `extension status` |
+| ICF 作为**通道** | 自建服务 `/sap/zabap_vibe` 旁路 ADT，承载 DDIC CRUD / textpool / `select` / `tcode` / `run` | `abap deploy` / `deploy status` |
 | ICF 作为**对象** | 被管理的 SICF 服务节点本身（handler class / URL / 父节点） | `--type HTTP` |
 
 即"用 ICF 通道管理 ICF 节点"——前者是后者的前提。

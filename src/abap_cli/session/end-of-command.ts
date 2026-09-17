@@ -8,6 +8,9 @@
  *
  * `runAlwaysLogoutIfNeeded` is called from the `postAction` hook (and from
  * the top-level exit path) and reads the resolved policy once per process.
+ *
+ * Per-client release now lives in `clients/client-lifecycle.ts` with a
+ * hard timeout, so a stuck SAP logout can't keep the agent loop blocked.
  */
 
 import { effectivePolicy, resolveSessionPolicy } from './policy.js';

@@ -4,14 +4,14 @@ title: 支持的对象类型
 description: abap CLI 支持的 ABAP 对象类型总览 — 类型码 × 命令 × 路由（ADT / ICF）
 tags: [abap-cli, object-types, ddic, http, sicf, reference]
 created at: 2026-08-29 10:00:00
-changed at: 2026-09-02 22:06:00
+changed at: 2026-09-06 02:00:00
 ---
 
 # 支持的对象类型
 
-abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`，commit `89b331f`）覆盖 **10 个对象类型**（4 源 + 4 DDIC + HTTP + TRAN），分两条路由：**ADT**（`abap-adt-api` 走标准 ADT REST API）与 **ICF**（自建服务 `/sap/zabap_vibe`，需先 `abap deploy`）。
+abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **19 个对象类型**（4 源 + 6 DDIC + HTTP + TRAN + 8 ADT 扩展），分两条路由：**ADT**（`abap-adt-api` 走标准 ADT REST API）与 **ICF**（自建服务 `/sap/zabap_vibe`，需先 `abap deploy`）。
 
-`create <type>` 的 `--schema` 参数 `allowedValues` 即这 10 个类型码：`CLAS, INTF, PROG, FUGR, TABL, STRU, DOMA, DTEL, HTTP, TRAN`。先查能力再动手：`abap create --schema <TYPE>` 会给出某个类型的字段契约。
+`create <type>` 的 `--schema` 参数 `allowedValues` 即这 19 个类型码：`CLAS, INTF, PROG, FUGR, TABL, STRU, DOMA, DTEL, HTTP, TRAN, TTYP, MSAG, DDLS, SRVB, SRVD, BDEF, DCLS, DDLX, DDLA`。先查能力再动手：`abap create --schema <TYPE>` 会给出某个类型的字段契约。
 
 ## 类型 × 命令矩阵
 
@@ -26,6 +26,19 @@ abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`，commit `89b331f
 | `DOMA` | 域 | ICF | ✅ | ✅ | ✅ | ❌ | `doma/*.doma.json` |
 | `DTEL` | 数据元素 | ICF | ✅ | ✅ | ✅ | ❌ | `dtel/*.dtel.json` |
 | `HTTP` | **ICF / SICF 节点** | ICF | ✅ | ✅ | ✅ | ❌ | `http/*.http.json` |
+| `TRAN` | 事务码 (SE93) | ICF | ✅（`--file`） | ✅ | ✅ | ❌ | `tran/*.tran.json` |
+| `TTYP` | 表类型 | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `ttyp/*.ttyp.json` |
+| `MSAG` | 消息类 | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `msag/*.msag.json` |
+| `DDLS` | CDS 源对象 | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `ddls/*.ddls.json` + `*.acds` |
+| `SRVB` | Service Binding (metadata only) | ADT | ❌ | ✅ | ❌ | ❌ | `srvb/*.srvb.json` |
+| `SRVD` | Service Definition | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `srvd/*.srvd.json` + `*.acds` |
+| `BDEF` | Behaviour Definition | ADT | ❌（pull-only：SAP 不接受 CLI 创建 BDEF） | ✅ | ✅ | ❌ | `bdef/*.bdef.json` + `*.abdl` |
+| `DCLS` | CDS Access Control | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `dcls/*.dcls.json` + `*.acds` |
+| `DDLX` | CDS Metadata Extension | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `ddlx/*.ddlx.json` + `*.acds` |
+| `DDLA` | CDS Annotation Definition | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `ddla/*.ddla.json` + `*.acds` |
+
+> **`create local` 只支持 `CLAS` / `INTF` / `PROG` / `FUGR`**（`formats/templates.ts` 只有这四类模板），其余类型一律 `TYPE_NOT_SUPPORTED`（exit 7）。
+> **`create` 的 `--file` 是数据驱动必填项**（`types/registry.ts` 的 `ObjectTypeEntry.requiresFile`）：`TABL` / `STRU` / `DOMA` / `DTEL` / `HTTP` / `TRAN` / `TTYP` / `MSAG` / `DDLS` / `SRVD` / `DCLS` / `DDLX` / `DDLA` 缺 `--file` 直接 `USAGE`（exit 2）。`BDEF` 是 pull-only（SAP 不接受 CLI 创建）；`SRVB` 仅 pull（SAP GUI 管理 binding）。
 
 DDIC 三件套（TABL / STRU）与 DOMA / DTEL 的详细字段契约见 [create](commands/create.md) 与 [pull](commands/pull.md)。
 
@@ -39,7 +52,7 @@ DDIC 三件套（TABL / STRU）与 DOMA / DTEL 的详细字段契约见 [create]
 # 拉一个已有 SICF 节点
 abap pull ZMY_SERVICE --type HTTP --json
 
-# 创建 / 更新（--file 走真实 SAP；无 --file 自动落最小骨架）
+# 创建（必须 --file，走真实 SAP）
 abap create HTTP ZMY_SERVICE --file src/http/zmy_service.http.json --package $TMP --description "My service"
 
 # 改完推回
@@ -62,7 +75,7 @@ abap push src/http/zmy_service.http.json --tr <TR>
 }
 ```
 
-`create HTTP` 无 `--file` 时自动落最小骨架（`src/http/<name>/<name>.http.json`，含 `name`，`action: local`，不调 SAP，commit `7fd13ec`）；有 `--file` 走真实 SAP create/push。`create local` 命令仍不支持 HTTP。
+`create HTTP` 必须带 `--file`（abap-file-format JSON）走真实 SAP create；032 US10 的"无 `--file` 自动落最小骨架（`action: local`）"路径已按重构决策 1A 删除，与 DDIC / DDLS 对齐。`abap create local HTTP` 不支持 HTTP；要手写 JSON 可参考 `abap create --schema HTTP` 的 `exampleJson`，或先 `abap pull` 一个同类节点。HTTP push 仍允许 create-on-push（见 [commands/push](commands/push.md)）。
 
 ## 两种 "ICF" 的区别
 
@@ -79,24 +92,25 @@ abap push src/http/zmy_service.http.json --tr <TR>
 
 | 类型 | 状态 | 替代 |
 |---|---|---|
-| `TTYP` 表类型 | 显式 deferred | — |
-| `DDLS` / CDS | 无 create / pull 策略（`.asddls` 等扩展名虽在解析表中，但无实现） | 用 ADT / Eclipse |
-| `TRAN` 事务码 | 只读（ABAP `/tran/*` GET-only） | [tcode](commands/tcode.md) 解析；虽在 `create` 的 `allowedValues` 内，服务端不接受写 |
+| `TRAN` 事务码 | 可读写（ABAP `/tran/*` GET + POST） | [tcode](commands/tcode.md) 解析；写路径见 [create](commands/create.md) / [push](commands/push.md)；pull 仍是最完整的读取入口 |
 | `ENHO` 增强 | 不支持 | — |
+
+> 注：原 0.2.x 文档中曾把 `TTYP`/`DDLS` 列为"显式 deferred"或"无实现"。实际 036 演进后两者已完整支持 `pull` + `create`（`--file`）；但 **`create local` 从未支持过它们**（早前矩阵误标 ✅，已修正）——`create local` 仅 `CLAS` / `INTF` / `PROG` / `FUGR`。
 
 ## 常见误判
 
 - `abap pull X --type SICF` / `abap create SICF ...` → 自动映射 `HTTP` + deprecation warning（commit `ad007c8`）；新脚本请直接写 `HTTP`。
-- `create <type>` 的 `--schema` `allowedValues` 已是全 10 类（commit `89b331f`）：`CLAS, INTF, PROG, FUGR, TABL, STRU, DOMA, DTEL, HTTP, TRAN`。
+- `create <type>` 的 `--schema` `allowedValues` 已是全 19 类：`CLAS, INTF, PROG, FUGR, TABL, STRU, DOMA, DTEL, HTTP, TRAN, TTYP, MSAG, DDLS, SRVB, SRVD, BDEF, DCLS, DDLX, DDLA`。
 - `DDIC_NOT_SUPPORTED` (exit 7) → 类型在 DOMA/DTEL/TABL/STRU 之外。
 - 所有 ICF 路由类型在扩展未部署时都会失败 → 先 `abap deploy status`。
+- CDS 家族（`DDLS`/`DCLS`/`DDLX`/`DDLA`）+ RAP 三件套（`SRVB`/`SRVD`/`BDEF`）走 ADT，**不**经 ICF。`SRVB` 仅 `pull`（SAP GUI 管理 binding），其余 7 类支持完整 create/push。
 
 # More
 
 ## todo
 
 - [x] `SICF` → `HTTP` 别名解析，避免降级为 `OBJECT_NOT_FOUND`（commit `ad007c8`）
-- [x] `create <type>` `--schema` 补全 `allowedValues` 全 10 类（commit `89b331f`）
+- [x] `create <type>` `--schema` 补全 `allowedValues` 全 19 类（`TTYP`/`MSAG`/`DDLS`/`SRVB`/`SRVD`/`BDEF`/`DCLS`/`DDLX`/`DDLA` 已加入 registry）
 - [ ] `create` 的 help/description 文案（"(CLAS, INTF, PROG, FUGR)"）随 registry 动态化
 
 # references

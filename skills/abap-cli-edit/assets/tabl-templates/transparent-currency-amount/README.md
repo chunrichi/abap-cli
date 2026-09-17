@@ -10,7 +10,7 @@
 
 ## 关键点
 
-- **`@Semantics.amount.currencyCode : '<table>.<currency_field>'`**：告诉 SAP「这个 curr 字段的币别从同一表的 `<currency_field>` 取」。CLI 解析器（[tabl-artifact.ts:parseTablDdic](https://github.com/chunrichi/abap-cli/blob/main/src/abap_cli/dictionary/tabl-artifact.ts)）把它转成 `{ refTable: 'ZSAMPLE', refField: 'CURRENCY' }` 给 SAP 端。
+- **`@Semantics.amount.currencyCode : '<table>.<currency_field>'`**：告诉 SAP「这个 curr 字段的币别从同一表的 `<currency_field>` 取」。CLI 解析器（[tabl-artifact.ts:parseTablDdic](https://github.com/chunrichi/abap-cli/blob/main/src/abap_cli/formats/ddic/tabl-artifact.ts)）把它转成 `{ refTable: 'ZSAMPLE', refField: 'CURRENCY' }` 给 SAP 端。
 - **缩进对齐注释行**：注释必须 `key client : abap.clnt not null;` 那种字段定义紧贴的**上一行**（同缩进或更左），用 `key client` 字段的列宽对齐，DDL 解析器按「注释 → 字段」配对。
 - `abap.curr(15, 2)` 两个参数：长度 15 + 小数 2 位（标准金额格式）。
 - `abap.cuky` 是币别码（currency key），3 字符 ISO 4217。

@@ -8,7 +8,7 @@ metadata:
 handoffs:
   - label: Diagnose environment
     agent: abap-cli-setup
-    prompt: 跑 doctor + profile test + extension status + transport list，输出诊断结果
+    prompt: 跑 doctor + profile test + deploy status + transport list，输出诊断结果
     send: false
   - label: Query object
     agent: abap-cli-search
@@ -41,7 +41,7 @@ handoffs:
 ```
 [Step 0]     需求理解 + 能力分解（[.github/skills/abap-code-writing]）—— 可选
 [1. 接入就绪]   handoff: Diagnose environment → 读结果
-[2. 部署 ICF]   必要时 extension deploy --yes（由 abap-cli-setup 负责）
+[2. 部署 ICF]   必要时 deploy --yes（由 abap-cli-setup 负责）
 [3. 创建/下载]  handoff: Query object → search / Edit object → pull / create
 [4. 编辑]       agent 内部（不在 skill 内，按用户规则）
 [Step 5.5]  推送前代码自审（[.github/skills/clean-abap]）—— 可选
@@ -60,7 +60,7 @@ handoffs:
 | `LOCK_FAILED` | Query object | `inspect <obj> --locks` 查持有者；SE03 手动释放 |
 | `OBJECT_NOT_ACTIVE` | Edit object | `activate <obj> --yes` |
 | `AUTH_ERROR` / `TLS_ERROR` / `CONFIG_ERROR` | Diagnose environment | `profile test`；`init` 重写 `.abap.json` |
-| `WRAPPER_NOT_DEPLOYED` | Diagnose environment | `extension deploy --yes` |
+| `WRAPPER_NOT_DEPLOYED` | Diagnose environment | `deploy --yes` |
 | `TABLE_NOT_FOUND` / `OBJECT_NOT_FOUND` | Query object | `search <name>` 校对 |
 | `SYNTAX_ERROR` / `ACTIVATION_FAILED` / `DDIC_NOT_SUPPORTED` | Edit object | 读 `data.errors` 修复；看 `abap create --schema` |
 | `QUERY_FAILED` | Edit object | `activate <table>` |
@@ -94,7 +94,7 @@ handoffs:
 [handoff: Diagnose environment]
 abap doctor --json
 abap transport list --open --json
-abap extension status --json
+abap deploy status --json
 
 # 2. 创建 + 拉取
 [handoff: Query object]  # search 确认不存在
@@ -124,7 +124,7 @@ abap select --table ZT_DEMO --count-only   # 跑完产生的数据可查表验�
 # 6. 出错时跨 skill handoff
 # NO_TRANSPORT → Diagnose environment
 # OBJECT_NOT_ACTIVE → Edit object
-# WRAPPER_NOT_DEPLOYED → Diagnose environment (extension deploy --yes)
+# WRAPPER_NOT_DEPLOYED → Diagnose environment (deploy --yes)
 # 模糊查询不知归哪类 → Route
 ```
 

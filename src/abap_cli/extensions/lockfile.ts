@@ -307,3 +307,51 @@ export function lockNextSteps(reason: string): string[] {
       return [];
   }
 }
+
+/** P3.2: aggregate verify result across every lockfile entry. */
+export interface LockfileVerifyResult {
+  /** True when the lockfile exists and every entry's integrity hash matches the on-disk package. */
+  ok: boolean;
+  /** Repo-relative path of the lockfile (or absolute path if no project root). */
+  lockfilePath: string;
+  /** Per-package verification outcomes (one entry per declared package). */
+  mismatches: Array<{ packageName: string; result: LockVerificationResult }>;
+  /** Total number of entries inspected (matches `mismatches.length + ok-count`). */
+  total: number;
+}
+
+/**
+ * P3.2: walk every entry in `extensions.lock.json` and verify its integrity
+ * hash against the on-disk package contents. Returns a structured aggregate
+ * suitable for `abap extensions verify --json` output.
+ */
+export async function verifyLockfile(projectRoot: string): Promise<LockfileVerifyResult> {
+  const lockfilePath = extensionsLockPath(projectRoot);
+  const lock = await readLockfile(projectRoot);
+  const mismatches: Array<{ packageName: string; result: LockVerificationResult }> = [];
+  if (!lock) {
+    return {
+      ok: false,
+      lockfilePath,
+      mismatches: [
+        {
+          packageName: '(lockfile)',
+          result: { ok: false, reason: 'LOCKFILE_MISSING_ENTRY', lockfilePath },
+        },
+      ],
+      total: 0,
+    };
+  }
+  for (const entry of lock.entries) {
+    const result = await verifyNpmPackage(entry.packageName, lock, lockfilePath);
+    if (!result.ok) {
+      mismatches.push({ packageName: entry.packageName, result });
+    }
+  }
+  return {
+    ok: mismatches.length === 0,
+    lockfilePath,
+    mismatches,
+    total: lock.entries.length,
+  };
+}

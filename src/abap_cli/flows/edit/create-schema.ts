@@ -1,8 +1,15 @@
 import type { CommandSchema } from '../../output/json.js';
 import { getDdicJsonExample, type DdicSupportedType } from '../../formats/ddic/json.js';
 import { listTemplates } from '../../formats/templates.js';
-import { isDdicSupportedType, isHttpSupportedType, isTranSupportedType } from './create-types.js';
-import { allSupportedTypes, createObjtypeFor, isSupportedType } from '../../types/registry.js';
+import {
+  isDdicSupportedType,
+  allSupportedTypes,
+  createObjtypeFor,
+  isSupportedType,
+  requiresFileFor,
+  sourceFor,
+  typesRequiringFile,
+} from '../../types/registry.js';
 
 /** `create --schema` 的返回类型：在通用 schema 上补充类型维度。 */
 export type CreateCommandSchema = CommandSchema & {
@@ -44,7 +51,7 @@ export function createSchema(type?: string): CreateCommandSchema {
       { name: '--no-pull', type: 'boolean', description: 'Skip the create-then-pull local copy (default: pull after create)' },
       { name: '--check-only', type: 'boolean', description: 'Validate the proposed object without creating it' },
       { name: '--audit', type: 'boolean', description: 'Include the before-checksum (extra SAP round-trip, off by default)' },
-      { name: '--file', type: 'string', valuePlaceholder: '<path>', description: 'abap-file-format DDIC JSON input (required for DOMA/DTEL/TABL/STRU)' },
+      { name: '--file', type: 'string', valuePlaceholder: '<path>', description: `abap-file-format JSON input (required for ${typesRequiringFile().join('/')})` },
       { name: '--func', type: 'string', valuePlaceholder: '<name>', description: 'With FUGR: create a function module (FUGR/FF) inside the existing function group <name>' },
       { name: '--schema', type: 'boolean', default: false, description: 'Print the command parameter schema as JSON and exit (no SAP call).' },
       { name: '--yes', type: 'boolean', default: false, description: 'Confirm in non-interactive environments.' },
@@ -55,56 +62,34 @@ export function createSchema(type?: string): CreateCommandSchema {
   };
 
   if (!t) return base;
-  // Supported DDIC types now report supported:true with the ICF route
-  // (TTYP and unknown types stay rejected).
-  if (isDdicSupportedType(t)) {
+  // Types whose `create` has no skeleton path require `--file`; the registry
+  // is the single source of truth (`requiresFile`), so this branch covers the
+  // former DDIC / HTTP / TRAN special cases plus TTYP / MSAG / DDLS.
+  if (requiresFileFor(t)) {
+    const route = sourceFor(t) === 'ICF' ? ('icf' as const) : undefined;
+    const isDdic = isDdicSupportedType(t);
+    const message = isDdic
+      ? `DDIC type ${t} created via the self-built ICF service. Requires --file <abap-file-format JSON> with top-level fields: name, description, fields[].`
+      : `Type ${t} requires --file <abap-file-format JSON>. No local skeleton path exists; write the JSON first, then create.`;
     return {
       ...base,
       type: t,
       supported: true,
-      route: 'icf',
-      message: `DDIC type ${t} created via the self-built ICF service. Requires --file <abap-file-format JSON> with top-level fields: name, description, fields[].`,
-      exampleJson: getDdicJsonExample(t as DdicSupportedType),
+      ...(route ? { route } : {}),
+      message,
+      ...(isDdic ? { exampleJson: getDdicJsonExample(t as DdicSupportedType) } : {}),
       options: [
         ...base.options,
-        { name: '--file', type: 'string', valuePlaceholder: '<path>', required: true, description: 'abap-file-format DDIC JSON input (top-level fields; see exampleJson)' },
+        {
+          name: '--file',
+          type: 'string',
+          valuePlaceholder: '<path>',
+          required: true,
+          description: isDdic
+            ? 'abap-file-format DDIC JSON input (top-level fields; see exampleJson)'
+            : `abap-file-format ${t} JSON input`,
+        },
       ],
-    };
-  }
-  // HTTP service routed via the self-built ICF service.
-  if (isHttpSupportedType(t)) {
-    return {
-      ...base,
-      type: t,
-      supported: true,
-      route: 'icf',
-      message: `HTTP service created via the self-built ICF service. Requires --file <abap-file-format JSON>.`,
-      options: [
-        ...base.options,
-        { name: '--file', type: 'string', valuePlaceholder: '<path>', required: true, description: 'abap-file-format HTTP service JSON input' },
-      ],
-    };
-  }
-  if (isTranSupportedType(t)) {
-    return {
-      ...base,
-      type: t,
-      supported: true,
-      route: 'icf',
-      message: `Transaction code created via the self-built ICF service. Requires --file <abap-file-format JSON>.`,
-      options: [
-        ...base.options,
-        { name: '--file', type: 'string', valuePlaceholder: '<path>', required: true, description: 'abap-file-format Transaction JSON input' },
-      ],
-    };
-  }
-  if (t === 'TTYP') {
-    return {
-      ...base,
-      type: t,
-      supported: false,
-      reason: 'DDIC_NOT_SUPPORTED',
-      message: `Object type ${t} is a DDIC object; deferred to a later phase (Q2).`,
     };
   }
   if (!isSupportedType(t) || !createObjtypeFor(t)) {

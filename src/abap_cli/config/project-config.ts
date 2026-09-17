@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { getPassword } from './secrets.js';
 import { getSystem } from './user-config.js';
+import { readCa } from './ca-store.js';
 import { CliError } from '../output/json.js';
 import type { ExtensionManifest } from '../extensions/types.js';
 import type { AuthConfig } from '../auth/v2-types.js';
@@ -230,16 +231,14 @@ async function loadFileConfig(configPath: string | null): Promise<LoadedConfig> 
 
 /**
  * Read a CA certificate (PEM) from disk. Returns undefined when no path is
- * configured; throws CONFIG_ERROR if the file cannot be read.
+ * configured; throws CONFIG_ERROR if the file cannot be read. Reads through
+ * the cert store so a missing file maps to a re-import hint rather than a
+ * raw ENOENT.
  */
 export function readCaCertificate(caPath: string): string | undefined {
   if (!caPath) return undefined;
-  try {
-    return fs.readFileSync(caPath, 'utf-8');
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new CliError('CONFIG_ERROR', `Cannot read CA certificate '${caPath}': ${message}`);
-  }
+  // Delegate to the store so error messages and permissions stay consistent.
+  return readCa(caPath);
 }
 
 /**

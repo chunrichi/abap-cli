@@ -9,7 +9,7 @@
 | `tabl-v1.json` | main `.tabl.json` / `.stru.json` 校验（`formatVersion` + `header`） | 1.8 KB |
 | `tabt-v1.json` | `.tabl.settings.json` 校验（`generalInformation` + 可选 `buffering` + `dbSpecificSettings`） | 6.6 KB |
 
-`.tabl.ddic` / `.stru.ddic` 是 ABAP DDL 源码，**没有** JSON schema（CLI 解析器 [src/abap_cli/dictionary/tabl-artifact.ts:parseTablDdic](https://github.com/chunrichi/abap-cli/blob/main/src/abap_cli/dictionary/tabl-artifact.ts) 是手写 lexer）。
+`.tabl.ddic` / `.stru.ddic` 是 ABAP DDL 源码，**没有** JSON schema（CLI 解析器 [src/abap_cli/formats/ddic/tabl-artifact.ts:parseTablDdic](https://github.com/chunrichi/abap-cli/blob/main/src/abap_cli/formats/ddic/tabl-artifact.ts) 是手写 lexer）。
 
 ## 用 ajv 在本地校验 main / settings
 
@@ -38,7 +38,7 @@ Agent 可以在写完三件套后跑这条命令自我验证 main / settings 合
 
 ## 与本仓库其它位置的关系
 
-- **CLI 客户端校验**：[`validateDdicObject()`](https://github.com/chunrichi/abap-cli/blob/main/src/abap_cli/dictionary/ddic-json.ts) 是 hand-rolled 的子集校验（`name` namespace + TABL `fields[]` / DOMA `dataType+length` / DTEL `description+domain`），只覆盖 abap-file-format 的「CLI 能用」子集，**不**做 schema-level 全字段校验。Agent 需要严格字段校验就上 ajv 跑这两个 schema。
+- **CLI 客户端校验**：[`validateDdicObject()`](https://github.com/chunrichi/abap-cli/blob/main/src/abap_cli/formats/ddic/json.ts) 是 hand-rolled 的子集校验（`name` namespace + TABL `fields[]` / DOMA `dataType+length` / DTEL `description+domain`），只覆盖 abap-file-format 的「CLI 能用」子集，**不**做 schema-level 全字段校验。Agent 需要严格字段校验就上 ajv 跑这两个 schema。
 - **SAP 端最终校验**：`zcl_abap_vibe_ddic` 会按 abap-file-format 规范完整校验（含 settings / buffering / dbSpecificSettings）；所以**通过了 ajv 不等于 SAP 一定接受**（SAP 还有 DDL-side、ABAP runtime-side 的检查），通过了 SAP 校验才是 ground truth。
 - **同步策略**：本目录下的 schema 是从官方仓库 copy，**手动**同步。当 `tmp/abap-file-formats/` 拉新版本时跑：
 

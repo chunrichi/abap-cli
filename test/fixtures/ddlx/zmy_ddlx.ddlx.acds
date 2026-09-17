@@ -1,0 +1,4 @@
+annotate entity ZMY_VIEW with
+{
+  ...
+};

@@ -18,6 +18,7 @@
 import { createHash } from 'node:crypto';
 import { CliError } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
+import { loadConfig } from '../../config/project-config.js';
 
 /** Subset of `SystemProfile` channel-detection actually reads. */
 export interface SystemProfile {
@@ -164,4 +165,15 @@ export function detectChannel(profile: SystemProfile, subject: ChannelSubject): 
   const decision: ChannelDecision = { channel: 'adt' };
   cache.set(key, decision);
   return decision;
+}
+
+/**
+ * Load the channel-relevant profile fields from the workspace config.
+ *
+ * Shared by every TTYP / MSAG / DDLS create flow (which used to carry three
+ * byte-identical private copies named `loadChannelProfile`).
+ */
+export async function loadChannelProfile(): Promise<SystemProfile> {
+  const cfg = await loadConfig();
+  return { kernelRelease: cfg.systemVersion };
 }

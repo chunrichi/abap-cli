@@ -84,7 +84,7 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
   {
     name: 'doctor',
     scope: 'local',
-    description: 'Diagnose CLI environment and configuration',
+    description: 'Diagnose CLI environment and configuration (read-only)',
     load: () => import('./commands/doctor.js').then((m) => ({ register: m.registerDoctorCommand })),
   },
   {
@@ -125,6 +125,18 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
     scope: 'local',
     description: 'Manage installed extensions',
     load: () => import('./commands/extensions.js').then((m) => ({ register: m.registerExtensionsCommand })),
+  },
+  {
+    // P3.3: feedback command
+    name: 'feedback',
+    description: 'Send CLI feedback to upstream tracker',
+    load: () => import('./commands/feedback.js').then((m) => ({ register: m.registerFeedbackCommand })),
+  },
+  {
+    // P3.3: report-stuck command
+    name: 'report-stuck',
+    description: 'Write a stuck-operation report for offline triage',
+    load: () => import('./commands/report-stuck.js').then((m) => ({ register: m.registerReportStuckCommand })),
   },
   {
     name: 'mime',
@@ -173,59 +185,86 @@ registerLazyCommands(program, COMMAND_SPECS);
 
 setProgram(program);
 
-// Load extensions lazily. The argv sniff registers only
-// `type:'command'` extensions whose name matches argv[2]; validation and
-// lifecycle extensions defer to the preAction hook so that
-// `--help` / `--version` / `doctor` / empty-argv invocations never
-// import any extension module.
-const config = await loadConfig();
-const registry = new ExtensionRegistry();
-let extensionsLockfile: Awaited<ReturnType<typeof import('./extensions/lockfile.js').readLockfile>> = null;
-let extensionsLockfilePath: string | undefined;
-try {
-  const { readLockfile, extensionsLockPath } = await import('./extensions/lockfile.js');
-  const configDir = await import('./config/project-config.js').then((m) => m.findWorkspaceConfig());
-  if (configDir) {
-    extensionsLockfilePath = extensionsLockPath(require('node:path').dirname(configDir));
-    extensionsLockfile = await readLockfile(require('node:path').dirname(configDir));
+// Workspace config + extension lockfile are resolved lazily on the first
+// dispatch. This keeps commands that don't need `.abap.json` (init, profile,
+// doctor, `--help`, `--version`) from being blocked by the CONFIG_ERROR
+// thrown when no profile is bound yet. The promise is shared so the
+// preAction and postAction hooks see the same resolved config.
+const configPromise = (async (): Promise<Awaited<ReturnType<typeof loadConfig>> | null> => {
+  try {
+    return await loadConfig();
+  } catch {
+    // Missing or invalid `.abap.json` — fall back to no config. Commands
+    // that need it (deploy, session, extensions-lock, …) re-call
+    // `loadConfig()` themselves and surface the same CliError to the user.
+    return null;
   }
-} catch {
-  // Lockfile unreadable — treat as absent; loader will surface per-entry failures.
-}
-const loadCtx = { lock: extensionsLockfile, lockfilePath: extensionsLockfilePath };
+})();
 
-try {
-  const { tryLoadCommandExtensionsForArgv, isMetaExtensionsCommand } = await import('./extensions/lazy.js');
-  if (isMetaExtensionsCommand(process.argv)) {
-    // Meta-commands need the full extension picture (per-entry conflicts,
-    // per-entry lockfile status, etc.).
-    await registry.loadAndRegisterExtensions(program, config.extensions ?? [], loadCtx);
-  } else {
-    await tryLoadCommandExtensionsForArgv(program, config.extensions ?? [], process.argv);
+const lockfilePromise = (async (): Promise<{
+  lock: Awaited<ReturnType<typeof import('./extensions/lockfile.js').readLockfile>>;
+  lockfilePath: string | undefined;
+}> => {
+  try {
+    const { readLockfile, extensionsLockPath } = await import('./extensions/lockfile.js');
+    const configDir = await import('./config/project-config.js').then((m) => m.findWorkspaceConfig());
+    if (!configDir) return { lock: null, lockfilePath: undefined };
+    const root = require('node:path').dirname(configDir);
+    return { lock: await readLockfile(root), lockfilePath: extensionsLockPath(root) };
+  } catch {
+    // Lockfile unreadable — treat as absent; loader will surface per-entry failures.
+    return { lock: null, lockfilePath: undefined };
   }
+})();
+
+const registry = new ExtensionRegistry();
+setExtensionRegistry(registry);
+setExtRegJson(registry);
+
+// Pre-parse sniff: register only `type:'command'` extensions whose name
+// matches argv[2] so commander can dispatch them. Waits on configPromise so
+// extension-contributed command names register before commander parses;
+// configPromise resolves to `null` when no `.abap.json` is present, which
+// means no extensions to load — and the sniff noops in that case.
+try {
+  const { tryLoadCommandExtensionsForArgv } = await import('./extensions/lazy.js');
+  const startupConfig = await configPromise;
+  await tryLoadCommandExtensionsForArgv(program, startupConfig?.extensions ?? [], process.argv);
 } catch (err) {
   if (err instanceof CliError && err.code === 'EXTENSION_LOAD_FAILED') {
     const out = renderError('json', err, buildMeta());
     for (const line of out.stderr) console.error(line);
     process.exit(out.exitCode ?? EXIT_GENERIC_FALLBACK);
   }
-  // Surface non-fatal load failures into registry.failed via loadRemainingExtensions.
-  await registry.loadRemainingExtensions(program, config.extensions ?? [], loadCtx);
+  throw err;
 }
-
-// Set singletons for json.ts and list-command.ts
-setExtensionRegistry(registry);
-setExtRegJson(registry);
 
 // Install lifecycle hooks globally once. Load the remaining (non-command)
 // extensions on each dispatch so the user's real command always sees a
-// fully-loaded validation + lifecycle set.
+// fully-loaded validation + lifecycle set. The config + lockfile are awaited
+// here so commands that need them (and the extension loader that uses
+// `config.extensions`) see the resolved values, while meta/help/version paths
+// never block on a missing profile.
 program.hook('preAction', async (_thisCmd, actionCmd) => {
   const argv = process.argv.slice(2);
   const cmdName = actionCmd.name();
+  const [config, lockCtx] = await Promise.all([configPromise, lockfilePromise]);
+  const loadCtx = { lock: lockCtx.lock, lockfilePath: lockCtx.lockfilePath };
+  const extensions = config?.extensions ?? [];
+
+  // Meta-commands (`extensions list` / `extensions lock`) need every
+  // `type:'command'` extension registered up front so conflicts and per-entry
+  // lockfile state surface in `extensions list --json`. Other commands rely
+  // on the startup sniff above to register only the matching command.
+  // `isMetaExtensionsCommand` reads `argv[2]/[3]` from the full `process.argv`.
+  const { isMetaExtensionsCommand } = await import('./extensions/lazy.js');
+  if (isMetaExtensionsCommand(process.argv)) {
+    await registry.loadCommandExtensions(program, extensions, loadCtx);
+  }
+
   // Strict-mode failures exit with a hardcoded JSON envelope (matches the
   // baseline behavior for `EXTENSION_LOAD_FAILED`); nothing further runs.
-  await registry.loadRemainingExtensions(program, config.extensions ?? [], loadCtx);
+  await registry.loadRemainingExtensions(program, extensions, loadCtx);
   await registry.dispatchBeforeCommand({
     command: cmdName,
     argv,
@@ -243,8 +282,12 @@ program.hook('postAction', async (_thisCmd, actionCmd) => {
   });
   // 034: release SAP sessions at command end when the policy demands it
   // (`always-logout`). The default `reuse` policy intentionally keeps the
-  // session alive so the next CLI process can reuse it.
-  await runAlwaysLogoutIfNeeded(config);
+  // session alive so the next CLI process can reuse it. Skipped when no
+  // config was resolved (e.g. `init` in an unconfigured workspace).
+  const config = await configPromise;
+  if (config) {
+    await runAlwaysLogoutIfNeeded(config);
+  }
 });
 
 // 034: SIGINT/SIGTERM best-effort release of any live SAP session.

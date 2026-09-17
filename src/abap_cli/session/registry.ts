@@ -10,65 +10,76 @@
  * `IcfClient.create()` register themselves; the `postAction` hook (and the
  * SIGINT/SIGTERM handlers) drain the registry and call `logout()` /
  * `cleanup()` on whatever is live. Draining is idempotent and never throws.
+ *
+ * The actual per-client shutdown lives in `clients/client-lifecycle.ts`
+ * (which applies a fixed timeout so a stuck SAP logout never blocks the
+ * agent loop). This file is the backwards-compatible facade that maps
+ * the ADT (async `logout`) and ICF (sync `cleanup`) shapes onto the
+ * shared `CloseableClient` contract.
  */
 
+import {
+  _resetLifecycle,
+  closeTrackedClients,
+  trackClient,
+  type CloseableClient,
+} from '../clients/client-lifecycle.js';
 import type { AdtClientWrapper } from '../clients/adt-client.js';
 import type { IcfClient } from '../clients/icf-client.js';
 
-const adtClients: AdtClientWrapper[] = [];
-const icfClients: IcfClient[] = [];
-let drained = false;
+/** ADT adapter: async logout, labelled "adt". */
+function toAdtCloseable(client: AdtClientWrapper): CloseableClient {
+  return {
+    label: 'adt',
+    close: async () => {
+      try {
+        await client.logout();
+      } catch {
+        // logout is best-effort per client
+      }
+    },
+  };
+}
+
+/** ICF adapter: sync cleanup wrapped in a resolved promise, labelled "icf". */
+function toIcfCloseable(client: IcfClient): CloseableClient {
+  return {
+    label: 'icf',
+    close: async () => {
+      try {
+        client.cleanup();
+      } catch {
+        // cleanup is best-effort per client
+      }
+    },
+  };
+}
 
 /** Register a live ADT client for end-of-command logout. */
 export function registerAdtClient(client: AdtClientWrapper): void {
-  adtClients.push(client);
+  trackClient(toAdtCloseable(client));
 }
 
 /** Register a live ICF client for end-of-command cleanup. */
 export function registerIcfClient(client: IcfClient): void {
-  icfClients.push(client);
+  trackClient(toIcfCloseable(client));
 }
 
 /**
  * Best-effort release of every live client. Idempotent — safe to call from
  * `postAction`, an error path, or a signal handler more than once.
+ *
+ * `opts` selects which kinds to release (`adt` / `icf`, both default on);
+ * clients of an excluded kind stay tracked for a later drain.
  */
 export async function drainClients(opts: { adt?: boolean; icf?: boolean } = {}): Promise<void> {
-  const doAdt = opts.adt ?? true;
-  const doIcf = opts.icf ?? true;
-  if (doAdt) {
-    const list = adtClients.splice(0);
-    await Promise.all(
-      list.map(async (c) => {
-        try {
-          await c.logout();
-        } catch {
-          // logout is best-effort per client
-        }
-      }),
-    );
-  }
-  if (doIcf) {
-    const list = icfClients.splice(0);
-    for (const c of list) {
-      try {
-        c.cleanup();
-      } catch {
-        // cleanup is best-effort per client
-      }
-    }
-  }
-  if (adtClients.length === 0 && icfClients.length === 0) drained = true;
-}
-
-/** True after every registered client has been drained once. */
-export function isDrained(): boolean {
-  return drained;
+  const labels = new Set<string>();
+  if (opts.adt ?? true) labels.add('adt');
+  if (opts.icf ?? true) labels.add('icf');
+  await closeTrackedClients(undefined, labels);
 }
 
 /** Test-only: reset the registry between cases. */
 export function resetRegistry(): void {
-  adtClients.length = 0;
-  icfClients.length = 0;
-  drained = false;
+  _resetLifecycle();
 }

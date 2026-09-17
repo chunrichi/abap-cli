@@ -17,8 +17,12 @@ export type ErrorCategory =
   // 036-ttyp-msag-ddls: reserved-range categories with explicit exit codes.
   // Split from VALIDATION_ERROR so the agent/exit-channel tells the user
   // *which* validation failure happened (capability gap vs. semantic rejection).
-  | 'DDLS_NOT_SUPPORTED' // exit 64 — DDLS requested on ECC release that lacks DDL sources
-  | 'CHANNEL_DETECT';    // exit 65 — channel-detect could not classify the system profile
+  | 'DDLS_NOT_SUPPORTED' // exit 64 - DDLS requested on ECC release that lacks DDL sources
+  | 'CHANNEL_DETECT'    // exit 65 - channel-detect could not classify the system profile
+  // P3.3: feedback service error categories
+  | 'CONFLICT'          // 409: idempotency key reused with different payload
+  | 'PERSISTENCE_ERROR' // 5xx: feedback service unavailable
+  | 'HTTP_ERROR';       // generic transport failure
 
 /**
  * Sub-codes are emitted as the `code` value to preserve backward compatibility
@@ -55,6 +59,7 @@ export type ErrorCode =
   | 'DDIC_OBJECT_NOT_FOUND' // ICF /ddic/<type>/<name> GET 404 (NOT_FOUND)
   | 'DDIC_TABL_FORMAT_UNSUPPORTED' // canonical TABL projection cannot represent the object (VALIDATION_ERROR)
   | 'DTEL_CATEGORY_UNSUPPORTED'    // DTEL dataTypeInformation.category not in {domain, predefinedType, typeRef} (VALIDATION_ERROR)
+  | 'TABT_VALIDATION_FAILED'       // P3.1: .tabl.settings.json failed tabt-v1.json enum validation (VALIDATION_ERROR)
   | 'TYPE_NOT_SUPPORTED'
   | 'OVERWRITE_REQUIRED'   // NEW
   | 'PUSH_FAILED'
@@ -105,6 +110,17 @@ export type ErrorCode =
   // 036-ttyp-msag-ddls: channel detection failure / DDLS not supported on ECC
   | 'CHANNEL_DETECTION_FAILED'   // system profile could not be parsed (CONFIG_ERROR/exit 3) → see spec 036 FR-008 / US1-AS5
   | 'DDLS_NOT_SUPPORTED_ON_ECC'  // DDLS has no ICF fallback; ECC releases before DDL sources cannot serve CDS (VALIDATION_ERROR/exit 64 per spec 036 FR-008 / US4-AS4)
+  // PR5: ENQU (lock object) / NROB (number range object) ICF routes
+  | 'ENQU_CREATE_FAILED'         // ICF /ddic/enqu POST failure (SAP_ERROR)
+  | 'ENQU_PUSH_FAILED'           // ICF /ddic/enqu POST failure during push (SAP_ERROR)
+  | 'NROB_CREATE_FAILED'         // ICF /ddic/nrob POST failure (SAP_ERROR)
+  | 'NROB_PUSH_FAILED'           // ICF /ddic/nrob POST failure during push (SAP_ERROR)
+  | 'ENQU_NOT_IMPLEMENTED'       // ICF handler accepts /ddic/enqu but the SAP-side read/write is not deployed yet (SAP_ERROR)
+  | 'NROB_NOT_IMPLEMENTED'       // ICF handler accepts /ddic/nrob but the SAP-side read/write is not deployed yet (SAP_ERROR)
+  // P3.3: feedback service error codes
+  | 'CONFLICT'                  // 409: idempotency key reused with different payload
+  | 'PERSISTENCE_ERROR'         // 5xx: feedback service unavailable
+  | 'HTTP_ERROR'                // generic transport failure
   ;
 
 const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
@@ -131,6 +147,7 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   DDIC_NOT_SUPPORTED: 'VALIDATION_ERROR',
   DDIC_TABL_FORMAT_UNSUPPORTED: 'VALIDATION_ERROR',
   DTEL_CATEGORY_UNSUPPORTED: 'VALIDATION_ERROR',
+  TABT_VALIDATION_FAILED: 'VALIDATION_ERROR',
   DDIC_CREATE_FAILED: 'SAP_ERROR',
   DDIC_OBJECT_NOT_FOUND: 'NOT_FOUND',
   TYPE_NOT_SUPPORTED: 'VALIDATION_ERROR',
@@ -160,6 +177,13 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   // 022-http mappings
   HTTP_CREATE_FAILED: 'SAP_ERROR',
   HTTP_OBJECT_NOT_FOUND: 'NOT_FOUND',
+  // PR5 — ENQU / NROB ICF routes
+  ENQU_CREATE_FAILED: 'SAP_ERROR',
+  ENQU_PUSH_FAILED: 'SAP_ERROR',
+  NROB_CREATE_FAILED: 'SAP_ERROR',
+  NROB_PUSH_FAILED: 'SAP_ERROR',
+  ENQU_NOT_IMPLEMENTED: 'SAP_ERROR',
+  NROB_NOT_IMPLEMENTED: 'SAP_ERROR',
   // 023-extension-mechanism
   EXTENSION_LOAD_FAILED: 'CONFIG_ERROR',
   EXTENSION_VALIDATION_FAILED: 'VALIDATION_ERROR',
@@ -183,6 +207,10 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   // 036-ttyp-msag-ddls: 2 reserved-range categories
   CHANNEL_DETECTION_FAILED: 'CHANNEL_DETECT',
   DDLS_NOT_SUPPORTED_ON_ECC: 'DDLS_NOT_SUPPORTED',
+  // P3.3: feedback service error codes
+  CONFLICT: 'CONFLICT',
+  PERSISTENCE_ERROR: 'PERSISTENCE_ERROR',
+  HTTP_ERROR: 'HTTP_ERROR',
 };
 
 export function categoryOf(code: ErrorCode): ErrorCategory {

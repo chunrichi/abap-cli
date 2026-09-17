@@ -35,12 +35,14 @@ abap pull
 - `--textpool`: 同时拉取 textpool `.properties` 文件（`.texts`/`.selections`/`.headings.<lang>.properties`）
 - `--remote <remoteid>`: 拉取对象在远程系统的 active 版本源码（Version Management，`/version-source` 端点）
 - `--tr <request>`: T4.2 — 拉取 transport 请求内全部对象（直接对象 + 嵌套 task 对象，去重），与对象名/`--package` **互斥**；空字符串 → `INVALID_ARGUMENT`
+- `--user <sap-user>`: PR2 — 与 `--tr` 配合使用，按 transport task owner 过滤对象（不区分大小写）；无 `--tr` 时单独使用 → `INVALID_ARGUMENT`（exit 2）。直接对象继承 transport 顶层 owner；task 内对象继承 task 自身 owner；owner 缺失的对象保留（避免静默丢失）。
 - `--schema`: 打印本命令参数 schema（unified envelope，无 SAP 调用）
 
 ## 路由与布局
 
 按优先级分派五条路线：
 
+   - **PR2 `--user <sap-user>`**：可选过滤 — 仅保留 owner 匹配的对象（直接对象用 transport 顶层 owner；task 内对象用 task owner）。`TransportObjectInfo.owner` 字段在 `showTransport` 里填入；过滤在 `pull-tr.ts` dedup 之前进行，不匹配的对象静默丢弃，不影响其他对象的拉取。`--user` 单独使用 → `INVALID_ARGUMENT`（exit 2）。响应 `data` 增加 `filtered`（被过滤数）与 `user`（归一化后的大写用户名）字段，便于 agent 解释"为什么 N 个对象没出现"。
 1. **`--tr <request>`**（T4.2）— 调 `transportDetails` 取请求下**所有对象引用**：直接对象（`objects`）+ 嵌套 task 对象（`tasks[].objects`）；按 `type::name` 去重得到有序对象列表，再逐个走下面第 3-5 条路由。单对象失败不中断整体（记为 `failed`），部分失败时 `data.partial: true`；响应额外含 `transport` / `requested` / `deduplicated`（来自 transport `tasks` 的 `TransportRequestInfo.deduplicated`）。HTTP/DDIC 路由走 ICF、其余走 ADT。
 2. **`--package`** — `searchObject` 全量搜索 + 按 `adtcore:packageName` 过滤，分页（`limit × page`）逐对象拉取；单对象失败不中断整体（记为 `failed`），截断时提示 `--page N+1`。**分页的原因**：SAP quickSearch 端点的 `maxResults` 有上限（默认 `SEARCH_RESULT_LIMIT` = 20），一次请求拿不全整个包。实现上每次请求 `limit × page` 条结果、按包名过滤后取 `(page-1)*limit` 到 `page*limit` 的窗口——所以 `--limit` 越大单轮拉得越多，`--page` 递增继续拉下一批。单对象 pull（`abap pull ZCL_X`）无分页。
 3. **`--remote <id>`** — 走 ICF `/version-source`（TMS RFC destination `TMSADM@<id>.DOMAIN_<id>`）。CLI 类型 → VRSD 类型映射：`PROG → REPS`、`INTF → INTF`、`CLAS → CLSD`（类定义）。源码写入对象标准文件名 `src/<typeFolder>/<name>/<name>.<type>.abap`（顶层目录按类型分类，见下文）。对象从未传输到远端时后端返回空 `source`（成功）。
@@ -74,6 +76,18 @@ envelope 附加字段：
 | `AFF_FIXTURE_INVALID` | 7 | 落盘前 / push 前 schema 校验失败 |
 
 源码对象（CLAS/PROG/INTF）布局：`<name>.<type>.json` 元数据 + 每个 include part 一个 `.abap`；`--include-all-parts` 控制是否包含 testclasses。FUGR 为多文件布局（`.fugr.json`、`sapl<name>.reps.*`、`l<name>top.reps.*`、每个 FM 一个 `.func.*`）。
+
+### Function modules（FUGR/FF）— PR4 归一化
+
+`abap pull <fm>` 时若 `<fm>` 解析为 `FUGR/FF`（function module），`runPull` 在 `resolveObject` 之后调用 [`normalizeFugrFunctionModule`](../../src/abap_cli/flows/edit/pull-fugr-ff.ts)：
+
+- FM 的 `objectUrl`（`.../fmodules/<fm>`）重写为父函数组（`.../groups/<group>`），name 也改为父组名（`FUGR/F`）；
+- 原 FM 身份以 `requestedFunctionModule` 传给 `pullObject`，fugr 策略据此只输出这一个 FM 的 `<group>/<group>.<fm>.func.abap` + `<group>/<group>.<fm>.func.json`，避免拉下整个组里所有 FM；
+- URL 解析复用 [`parentFunctionGroupFromUri`](../../src/abap_cli/formats/fugr-layout.ts)，与 push 侧同一份 parser；
+- `data.object` / `data.type` / human 摘要保持原 FM 名（用户请求的对象）；
+- 不在 FUGR/FF 路径上零开销直通。
+
+`abap pull <group>`（直接拉父组）走 `fugrStrategy` 的全量路径，与本节无关。
 
 ### 顶层分类子目录
 
@@ -145,7 +159,7 @@ abap pull --tr NDK123456
 }
 ```
 
-`--package` 模式下 `data` 额外含 `package`/`page`/`limit`/`truncated`（截断时含 `hint`）；`--textpool` 模式含 `route`；单对象普通模式含 `object`/`type`/`entries`/`written`/`skipped`/`failed`；`--tr` 模式含 `transport` / `requested` / `pulled` / `failed` / `deduplicated` / `entries[]`（`{object, type, status, [code, detail]}`）/ `written[]` / `skipped[]`，部分失败时 `partial: true`。
+`--package` 模式下 `data` 额外含 `package`/`page`/`limit`/`truncated`（截断时含 `hint`）；`--textpool` 模式含 `route`；单对象普通模式含 `object`/`type`/`entries`/`written`/`skipped`/`failed`；`--tr` 模式含 `transport` / `requested` / `pulled` / `failed` / `deduplicated` / `entries[]`（`{object, type, status, [code, detail]}`）/ `written[]` / `skipped[]`，部分失败时 `partial: true`；`--user` 启用时额外含 `filtered` / `user`。
 
 `--tr` 模式输出示例：
 
@@ -193,6 +207,6 @@ abap pull --tr NDK123456
 
 # references
 
-- 实现：`src/abap_cli/commands/pull.ts`、`src/abap_cli/flows/pull-flow.ts`、`src/abap_cli/formats/pull-strategy.ts`、`pull-fugr.ts`、`fugr-layout.ts`、`src/abap_cli/clients/icf-client.ts`
+- 实现：`src/abap_cli/commands/pull.ts`、`src/abap_cli/flows/edit/pull.ts`、`src/abap_cli/formats/pull-strategy.ts`、`pull-fugr.ts`、`fugr-layout.ts`、`src/abap_cli/clients/icf-client.ts`
 - SAP 后端：`abap/src/clas/zcl_abap_vibe_icf.clas.abap`（`dispatch_ddic` / `dispatch_textpool` / `dispatch_version_management`）
 - 文档：`docs/commands.md`（`abap pull` 一节）；规范参考：`tmp/abap-file-formats/file-formats/{clas,prog,intf,fugr,doma,dtel,tabl}/`

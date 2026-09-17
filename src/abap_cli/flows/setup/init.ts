@@ -4,6 +4,7 @@ import { confirm, isCancel, select, text, password } from '@clack/prompts';
 import { getPassword, storePassword, storeCertPassphrase } from '../../config/secrets.js';
 import { parseBtpServiceKey } from '../../auth/types.js';
 import { getSystem, listSystemNames, upsertSystem, type SystemProfile } from '../../config/user-config.js';
+import { upsertProfileWithPems } from '../../config/profile-pems.js';
 import { CliError, printResult, type OutputMode } from '../../output/json.js';
 import { collectWarning } from '../../output/meta.js';
 import { toOutputPath } from '../../core/path-output.js';
@@ -80,7 +81,11 @@ function validateTrialPackage(url: string, pkg: string, auth: AuthConfig): void 
 
 /** Save profile to user config + password to keychain. */
 export async function saveProfile(name: string, profile: SystemProfile, password: string, mode: OutputMode): Promise<void> {
-  upsertSystem(name, profile);
+  // Import any local PEM paths into the content-addressed store before the
+  // write, then reclaim whatever the previous profile version dropped. This is
+  // the single write path for `init`, so `--ca` / `--cert-path` / `--cert-key`
+  // behave the same here as in `profile add/set`.
+  upsertProfileWithPems(name, getSystem(name), profile);
   // Only persist the password when it's non-empty — an empty password (oauth_password
   // without --password) must NOT clobber whatever the wizard stored earlier.
   if (password.length > 0) {

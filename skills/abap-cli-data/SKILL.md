@@ -40,7 +40,7 @@ metadata:
 
 | 错误 | 动作 |
 |---|---|
-| `WRAPPER_NOT_DEPLOYED` (exit 8) | 跳 `abap-cli-setup`：`extension deploy --yes` 安装 `ZCL_ABAP_VIBE_RUNNER` |
+| `WRAPPER_NOT_DEPLOYED` (exit 8) | 跳 `abap-cli-setup`：`deploy --yes` 安装 `ZCL_ABAP_VIBE_RUNNER` |
 | `WRAPPER_INPUT_UNAVAILABLE` (exit 6) | ADT classrun 不注入 `--method` 入参；改用直接 classrun 路径 |
 | `METHOD_NOT_SUPPORTED` (exit 7) | 方法签名不可反射（CHANGING/TABLES/instance/private/deep）；改 wrapper 类签名 |
 | `METHOD_FAILED` (exit 7) | 目标方法抛 `cx_root`；读 `data.parsed` 看异常 |
@@ -61,7 +61,7 @@ metadata:
 | `OFFSET_EXCEEDED` (exit 7) | `--offset` ∈ `[0, 100000]` |
 | `QUERY_FAILED` (exit 6) | 本 skill 直接 `activate <table>`（[abap-cli-edit]） |
 | `AUTH_ERROR` (exit 5) | 跳 `abap-cli-setup`：`profile test`；检查 `S_TABU_DIS` |
-| `ICF_CHECK_DEGRADED` | warning（`meta.warnings`），不阻断 |
+| `WRAPPER_NOT_DEPLOYED` (deploy status 衍生) | `run --method` 报"wrapper 不可用"且 `deploy status` 同时报 `unreachable` | `deploy` 后重试；若 ICF 持续 unreachable 看 [abap-cli-setup] 的 `ICF_CHECK_DEGRADED` 双重语义 |
 
 ## 注入安全（`select` 三层防线，必须严守）
 
@@ -75,7 +75,7 @@ metadata:
 
 1. **永远 `--json`**：`status` / `error.code` 分支
 2. **`select` 完全可放心反复调用**：不修改表数据、不产生传输请求、不加锁
-3. **`run --method` 前先看 `extension status`**（[abap-cli-setup]）：若 `WRAPPER_NOT_DEPLOYED`，跳 `abap-cli-setup` 部署
+3. **`run --method` 前先看 `deploy status`**（[abap-cli-setup]）：若 `WRAPPER_NOT_DEPLOYED`，跳 `abap-cli-setup` 部署
 4. **`run` 业务退出码 vs CLI 退出码**：`data.exitCode` 是**业务退出码**（SAP 端写），CLI 退出码是命令本身状态——`jq '.data.exitCode'` 读业务码
 5. **`select --count-only` 比 `select --limit 99999` 快**：只取 `COUNT(*)`
 6. **跨 skill**：环境/连接/transport 切 `abap-cli-setup`；对象元数据切 `abap-cli-search`；对象修改切 `abap-cli-edit`
@@ -87,4 +87,3 @@ metadata:
 
 ## scripts
 
-- [scripts/pages-select.mjs](./scripts/pages-select.mjs) — 自动分页跑 `select`（>10000 行场景；Node 18+ 跨平台）
