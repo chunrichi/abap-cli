@@ -109,8 +109,12 @@ export async function runDeployStatusAction(
       collectWarning('ICF_CHECK_DEGRADED', `ICF status probe degraded: ${info.error?.message ?? 'unreachable'}`);
     }
     const data = {
-      installed: info.status !== 'not_deployed' && info.status !== 'unreachable',
+      // F-19: only a positively confirmed 404/not-found means the service is
+      // absent. A failed probe (timeout, connection error) leaves the install
+      // state unknown → null, instead of falsely claiming `installed:false`.
+      installed: info.status === 'unreachable' ? null : info.status !== 'not_deployed',
       status: info.status,
+      probeFailed: info.probeFailed === true,
       remoteVersion: info.remoteVersion ?? null,
       expectedVersion: info.expectedVersion,
       match: info.status === 'current',
@@ -144,7 +148,7 @@ export async function runDeployStatusAction(
       : info.status === 'outdated'
         ? `ICF service outdated (have ${info.remoteVersion}, need ${ICF_SERVICE_VERSION})${runtimeHint}. Run \`abap deploy\` to upgrade.`
         : info.status === 'unreachable'
-          ? `ICF unreachable: ${info.error?.message ?? 'unknown'}`
+          ? `ICF status probe failed: ${info.error?.message ?? 'unknown'}. This is a probe failure, NOT a confirmed absence — it does NOT mean the ICF service is uninstalled or that ADT is unavailable. Re-run \`abap deploy status\` to retry.`
           : `ICF service deployed and current (version ${info.remoteVersion}).`;
     printResult(mode, data, hint);
   } catch (error: unknown) {

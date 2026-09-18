@@ -17,9 +17,10 @@ function issuesFor(content: string) {
   return issues;
 }
 
-const searchObject = vi.fn(async (name: string) => [
+const defaultSearchObject = async (name: string) => [
   { 'adtcore:name': name.toUpperCase(), 'adtcore:type': 'CLAS/OC', 'adtcore:uri': `/sap/bc/adt/oo/classes/${name.toLowerCase()}` },
-]);
+];
+const searchObject = vi.fn(defaultSearchObject);
 const objectStructure = vi.fn(async (objectUrl: string) => ({
   objectUrl,
   'adtcore:changedAt': '2999-01-01T00:00:00Z',
@@ -80,6 +81,8 @@ vi.mock('../../src/abap_cli/clients/adt-client.js', () => ({
 let cwd: string;
 beforeEach(() => {
   vi.clearAllMocks();
+  // clearAllMocks keeps implementations, so restore the default explicitly.
+  searchObject.mockImplementation(defaultSearchObject);
   cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'chkmode-'));
   fs.mkdirSync(path.join(cwd, 'src'), { recursive: true });
   fs.writeFileSync(path.join(cwd, 'src/zcl_ok.clas.abap'), 'CLASS zcl_ok DEFINITION PUBLIC.\nENDCLASS.\nCLASS zcl_ok IMPLEMENTATION.\nENDCLASS.\n');
@@ -104,6 +107,59 @@ describe('abap check modes (021: subcommands — syntax / content / atc)', () =>
     expect(typeof json.error.details.issues[0].code).toBe('string');
     // P0: without --out, no `out` field is reported (nothing was persisted).
     expect(json.error.details.out).toBeUndefined();
+  });
+
+  it('annotates an unresolved name with its repository status (F-22 / F-23)', async () => {
+    // DEVCLASS exists as a data element, yet SAP rejects `FOR devclass` on this
+    // release. The hint must say the name is real, so the user stops looking for
+    // a typo. An unrelated object of the same name must not hide the type-like one.
+    searchObject.mockImplementation(async (query: string) => {
+      const name = query.replace(/\*$/, '').toUpperCase();
+      if (name === 'DEVCLASS') {
+        return [
+          { 'adtcore:name': 'DEVCLASS', 'adtcore:type': 'AUTH' },
+          { 'adtcore:name': 'DEVCLASS', 'adtcore:type': 'DTEL/DE' },
+        ];
+      }
+      return defaultSearchObject(name);
+    });
+    syntaxCheckContent.mockResolvedValueOnce([
+      { line: 3, offset: 1, severity: 'E', text: 'Field "DEVCLASS" is unknown.' },
+    ]);
+    const program = makeProgram();
+    registerCheckCommand(program);
+    const res = await runCommand(program, ['check', 'syntax', 'src/zcl_bad.clas.abap', '--json'], { cwd });
+    const { json } = parseError(res);
+    const message = json.error.details.issues[0].message as string;
+    expect(message).toContain('Field "DEVCLASS" is unknown.');
+    expect(message).toContain('DTEL/DE');
+    expect(message).toContain('release/kernel limitation');
+  });
+
+  it('annotates a name that does not exist anywhere as a typo', async () => {
+    searchObject.mockImplementation(async (query: string) => {
+      const name = query.replace(/\*$/, '').toUpperCase();
+      return name === 'NOSUCHTYPE' ? [] : defaultSearchObject(name);
+    });
+    syntaxCheckContent.mockResolvedValueOnce([
+      { line: 4, offset: 1, severity: 'E', text: 'Type "NOSUCHTYPE" is unknown.' },
+    ]);
+    const program = makeProgram();
+    registerCheckCommand(program);
+    const res = await runCommand(program, ['check', 'syntax', 'src/zcl_bad.clas.abap', '--json'], { cwd });
+    const { json } = parseError(res);
+    expect(json.error.details.issues[0].message).toContain('no object with this name exists');
+  });
+
+  it('points at the field inventory for a TABLE-FIELD token', async () => {
+    syntaxCheckContent.mockResolvedValueOnce([
+      { line: 5, offset: 1, severity: 'E', text: 'Field "TADIR-DEVCLASS" is unknown.' },
+    ]);
+    const program = makeProgram();
+    registerCheckCommand(program);
+    const res = await runCommand(program, ['check', 'syntax', 'src/zcl_bad.clas.abap', '--json'], { cwd });
+    const { json } = parseError(res);
+    expect(json.error.details.issues[0].message).toContain('abap fields TADIR');
   });
 
   it('`check --files <f>` is a shortcut for `check syntax <f>`', async () => {

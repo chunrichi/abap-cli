@@ -42,6 +42,28 @@ export function jarCookieHeader(jar: SessionJar): string {
  * hash) — each failure path logs a one-line `WARN session jar:` to stderr
  * so the caller can fall back to a fresh login without surprising the user.
  */
+/**
+ * Session-jar warnings are emitted at most once per process, per kind.
+ *
+ * These conditions (unwritable config dir, unreadable jar) are properties of the
+ * environment, not events of a single command, so warning on every invocation
+ * was pure noise — and it buried the real consequence, that session reuse stops
+ * working and every command performs a fresh login (feedback F-17). The first
+ * occurrence is reported with an actionable hint; later ones stay silent.
+ */
+const jarWarningsEmitted = new Set<'read' | 'decrypt' | 'write'>();
+
+function warnJarOnce(kind: 'read' | 'decrypt' | 'write', message: string): void {
+  if (jarWarningsEmitted.has(kind)) return;
+  jarWarningsEmitted.add(kind);
+  process.stderr.write(message);
+}
+
+/** Test seam: clear the one-shot warning guard. */
+export function resetJarWarnings(): void {
+  jarWarningsEmitted.clear();
+}
+
 export async function loadJarFromDisk(profile: SapConfig, key: Buffer): Promise<SessionJar | null> {
   const file = sessionJarPath(profile);
   if (!fs.existsSync(file)) return null;
@@ -50,14 +72,14 @@ export async function loadJarFromDisk(profile: SapConfig, key: Buffer): Promise<
     blob = fs.readFileSync(file);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`WARN session jar: cannot read ${file} (${msg}), re-logging in\n`);
+    warnJarOnce('read', `WARN session jar: cannot read ${file} (${msg}), re-logging in\n`);
     return null;
   }
   try {
     return decryptJar(blob, key, computeSystemHash(profile));
   } catch (error: unknown) {
     if (error instanceof CliError && error.code === 'SESSION_JAR_DECRYPT_FAILED') {
-      process.stderr.write(`WARN session jar: ${error.message}, re-logging in\n`);
+      warnJarOnce('decrypt', `WARN session jar: ${error.message}, re-logging in\n`);
       return null;
     }
     throw error;
@@ -72,7 +94,13 @@ export async function markJarPersisted(jar: SessionJar, profile: SapConfig, key:
     fs.writeFileSync(file, encryptJar(jar, key), { mode: 0o600 });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`WARN session jar: cannot write ${file} (${msg})\n`);
+    warnJarOnce(
+      'write',
+      `WARN session jar: cannot write ${file} (${msg}). ` +
+        'Session reuse is disabled for this run (every command will log in again); ' +
+        'make that directory writable, or point the CLI at a writable config dir. ' +
+        'Inspect the current state with `abap session`.\n',
+    );
   }
 }
 

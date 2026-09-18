@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import * as os from 'node:os';
+import { spawnSync } from 'node:child_process';
 import { FeedbackClient, type FeedbackCreateRequest, type FeedbackIssue } from '../clients/feedback-client.js';
 import { CliError } from '../output/json.js';
 
@@ -164,19 +166,67 @@ function validateLength(value: string, option: string, maxLength: number): void 
   }
 }
 
+/**
+ * Resolve the business username for a feedback submission.
+ *
+ * `--username` is documented as *optional* (see `commands/feedback.ts`), so the
+ * fallback chain must actually work on every platform. It used to read
+ * `USERNAME` only — a Windows/PowerShell variable that does not exist on macOS
+ * or Linux — and the guidance was PowerShell-only, so `abap feedback` failed out
+ * of the box for every POSIX user (feedback F-06).
+ *
+ * Order: explicit flag → `$USERNAME` (Windows) → `$USER` (POSIX) →
+ * `os.userInfo().username` → `git config user.name`.
+ */
 function resolveFeedbackUsername(explicitUsername?: string): string {
   if (explicitUsername !== undefined) return requiredText(explicitUsername, '--username', 80);
 
-  const username = process.env.USERNAME?.trim();
-  if (!username) {
-    throw new CliError('CONFIG_ERROR', 'The USERNAME environment variable is required for feedback.', {
-      details: { variable: 'USERNAME' },
-      nextSteps: ['Set $env:USERNAME in PowerShell, then retry without --username.'],
-      example: '$env:USERNAME = "agent-user"; abap feedback --feature-key "abap.cli" --title "..." --description "..." --json',
-    });
+  const candidates: Array<{ source: string; value: string | undefined }> = [
+    { source: 'USERNAME', value: process.env.USERNAME },
+    { source: 'USER', value: process.env.USER },
+    { source: 'os.userInfo().username', value: safeOsUsername() },
+    { source: 'git config user.name', value: gitConfigUserName() },
+  ];
+  for (const candidate of candidates) {
+    const value = candidate.value?.trim();
+    if (!value) continue;
+    validateLength(value, `$${candidate.source}`, 80);
+    return value;
   }
-  validateLength(username, '$env:USERNAME', 80);
-  return username;
+
+  const isWindows = process.platform === 'win32';
+  throw new CliError('CONFIG_ERROR', 'Could not determine a username for feedback.', {
+    details: { tried: candidates.map((c) => c.source) },
+    nextSteps: [
+      isWindows
+        ? 'Set $env:USERNAME in PowerShell, then retry without --username.'
+        : 'Set USER in your shell, then retry without --username.',
+      'Or pass --username <name> explicitly.',
+    ],
+    example: isWindows
+      ? '$env:USERNAME = "agent-user"; abap feedback --feature-key "abap.cli" --title "..." --description "..." --json'
+      : 'abap feedback --username "$(whoami)" --feature-key "abap.cli" --title "..." --description "..." --json',
+  });
+}
+
+/** `os.userInfo()` throws on some sandboxed/containerised environments. */
+function safeOsUsername(): string | undefined {
+  try {
+    return os.userInfo().username;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Best-effort `git config user.name`; never throws, never blocks for long. */
+function gitConfigUserName(): string | undefined {
+  try {
+    const result = spawnSync('git', ['config', 'user.name'], { encoding: 'utf8', timeout: 2000 });
+    if (result.status !== 0) return undefined;
+    return result.stdout?.trim() || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function generatedIdempotencyKey(payload: FeedbackCreateRequest): string {

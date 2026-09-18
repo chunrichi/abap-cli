@@ -12,7 +12,7 @@ export const SCHEMA = {
   schemaVersion: 1,
   command: 'run',
   description:
-    'Execute an ABAP class (classrun) or a static method via the bundled runner wrapper; returns stdout + exit code (read-only).',
+    'Execute an ABAP class (classrun) or a static method via the bundled runner wrapper; returns stdout + exit code (read-only). The wrapper route (--method) requires a system whose ADT classrun endpoint injects method arguments; otherwise it returns WRAPPER_INPUT_UNAVAILABLE.',
   usage: 'abap run [options] <class-name>',
   scope: 'sap',
   arguments: [
@@ -32,7 +32,7 @@ export const SCHEMA = {
       required: false,
       pattern: '^[A-Za-z_][A-Za-z0-9_]*$',
       description:
-        'PUBLIC STATIC method name to invoke via ZCL_ABAP_VIBE_RUNNER. When omitted, the class is run via ADT classrun (if_oo_adt_classrun~main).',
+        'PUBLIC STATIC method name to invoke via ZCL_ABAP_VIBE_RUNNER. When omitted, the class is run via ADT classrun (if_oo_adt_classrun~main). NOT available on systems whose ADT classrun endpoint does not inject method arguments: the call then fails with WRAPPER_INPUT_UNAVAILABLE — use the direct classrun path (`abap run <class>`) instead.',
     },
     {
       name: '--args',
@@ -109,7 +109,10 @@ export function registerRunCommand(program: Command): void {
       'Execute ABAP class (classrun) or PUBLIC STATIC method; returns stdout + exit code',
     )
     .argument('[class-name]', 'Class name (e.g. ZCL_MY_THING)')
-    .option('--method <name>', 'PUBLIC STATIC method to invoke via ZCL_ABAP_VIBE_RUNNER')
+    .option(
+      '--method <name>',
+      'PUBLIC STATIC method to invoke via ZCL_ABAP_VIBE_RUNNER (unsupported where ADT classrun does not inject arguments: WRAPPER_INPUT_UNAVAILABLE)',
+    )
     .option('--args <json>', 'Method arguments JSON', '{}')
     .option('--timeout <ms>', 'Execution timeout in ms (100–600000)', '30000')
     .option('--dry-run', 'Print the request envelope without invoking ADT classrun')
