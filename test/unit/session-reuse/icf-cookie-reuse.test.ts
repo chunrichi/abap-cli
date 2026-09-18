@@ -133,6 +133,50 @@ describe('IcfClient cookie reuse', () => {
     void client;
   });
 
+  // F-19 root cause: SAP's ICF layer reports an expired session as HTTP 400
+  // with a "Session Timed Out" body, not 401/403. Because only 401/403 were
+  // retried, a stale cookie jar broke every ICF command until the user forced a
+  // fresh login (ABAP_CLI_SESSION_POLICY=always-logout).
+  it('falls back on HTTP 400 + "Session Timed Out" (stale session, not a bad request)', async () => {
+    h.loadJarMock.mockResolvedValue(jarFixture as never);
+    const client = await IcfClient.create();
+    const http = (client as unknown as {
+      http: { defaults: Record<string, unknown>; get: ReturnType<typeof vi.fn> };
+    }).http;
+    const timedOut = Object.assign(new Error('Request failed with status code 400'), {
+      isAxiosError: true,
+      response: { status: 400, statusText: 'Session timed out', data: '400 Session Timed Out\r\n\r\n 2026-09-18' },
+    });
+    http.get = vi.fn()
+      .mockRejectedValueOnce(timedOut)
+      .mockResolvedValue({ data: { status: 'success', data: null, error: null } });
+
+    const resp = await client.get('/tcode/SE38');
+    expect(http.get).toHaveBeenCalledTimes(2);
+    const common = http.defaults.headers.common as Record<string, string>;
+    expect(common['Cookie']).toBeUndefined();
+    expect(resp.status).toBe('success');
+  });
+
+  it('does NOT retry a genuine HTTP 400 application error', async () => {
+    h.loadJarMock.mockResolvedValue(jarFixture as never);
+    const client = await IcfClient.create();
+    const http = (client as unknown as {
+      http: { defaults: Record<string, unknown>; get: ReturnType<typeof vi.fn> };
+    }).http;
+    const appError = Object.assign(new Error('Request failed with status code 400'), {
+      isAxiosError: true,
+      response: {
+        status: 400,
+        data: { status: 'error', data: null, error: { code: 'INVALID_WHERE', message: 'bad where clause' } },
+      },
+    });
+    http.get = vi.fn().mockRejectedValue(appError);
+
+    await expect(client.get('/tcode/SE38')).rejects.toMatchObject({ code: 'INVALID_WHERE' });
+    expect(http.get).toHaveBeenCalledTimes(1);
+  });
+
   it('does not touch the jar under always-logout', async () => {
     process.env.ABAP_CLI_SESSION_POLICY = 'always-logout';
     h.loadJarMock.mockClear();

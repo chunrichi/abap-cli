@@ -20,6 +20,27 @@ export interface IcfResponse<T = unknown> {
   } | null;
 }
 
+/**
+ * Whether a transport error looks like an expired/invalid SAP session, i.e. the
+ * session jar's cookie is no longer usable.
+ *
+ * The retry used to cover only HTTP 401/403, but SAP's ICF layer answers a
+ * timed-out session with **HTTP 400** and a body saying `Session Timed Out`
+ * (verified on vhcala4hci). Because that case was not retried, a stale cookie
+ * jar made every ICF command — `select`, `deploy status`, `--textpool`, TABL
+ * pulls — fail until the user forced a fresh login. See the F-19 investigation
+ * in docs/abap-cli-feedback-verification.md.
+ */
+function isStaleSessionError(error: unknown): boolean {
+  if (!axios.isAxiosError(error)) return false;
+  const status = error.response?.status;
+  if (status === 401 || status === 403) return true;
+  if (status !== 400) return false;
+  const data: unknown = error.response?.data;
+  const text = typeof data === 'string' ? data : JSON.stringify(data ?? '');
+  return /session (?:timed out|timeout|no longer|invalid|expired)|logon/i.test(text);
+}
+
 export class IcfClient {
   private http: AxiosInstance;
   private baseUrl: string;
@@ -175,14 +196,9 @@ export class IcfClient {
     try {
       resp = await this.send<T>(method, path, body);
     } catch (error: unknown) {
-      // Stale jar cookie (401/403) in reuse mode: drop the Cookie header and
-      // retry once with plain basic-auth before surfacing a transport error.
-      if (
-        this.jarCookie &&
-        !this.fallbackUsed &&
-        axios.isAxiosError(error) &&
-        (error.response?.status === 401 || error.response?.status === 403)
-      ) {
+      // Stale jar cookie: drop the Cookie header and retry once with plain
+      // basic-auth before surfacing a transport error.
+      if (this.jarCookie && !this.fallbackUsed && isStaleSessionError(error)) {
         this.fallbackUsed = true;
         delete this.http.defaults.headers.common['Cookie'];
         try {

@@ -267,6 +267,21 @@ function parseDdlType(value: string): Pick<DdicFieldLocal, 'rollname' | 'dataTyp
   return result;
 }
 
+/**
+ * Server DDL token (`abap.<token>` from `zcl_abap_vibe_tabl_format`) → DDIC data
+ * type name.
+ *
+ * The keys MUST match what the ICF ABAP handler actually emits for each DD03L
+ * `DATATYPE` (see `zcl_abap_vibe_tabl_format.clas.abap` `get_field_type`). The
+ * map previously held a mix of DDIC codes that the server never emits, so every
+ * table using one of those types failed with
+ * `TABL_DDL_INVALID: Unsupported ABAP built-in type ... abap.rawstring(000000)`
+ * (feedback F-14 / F-27: REPOSRC, REPOTEXT, and any table with a STRING, LRAW,
+ * decfloat or UTC-long column).
+ *
+ * The parsed fields are used to VALIDATE the DDL before it is written verbatim,
+ * so the mapped value only has to be a faithful DDIC type name.
+ */
 const BUILTIN_DATA_TYPES: Record<string, string> = {
   ACCP: 'ACCP',
   CHAR: 'CHAR',
@@ -275,33 +290,49 @@ const BUILTIN_DATA_TYPES: Record<string, string> = {
   CURR: 'CURR',
   DATS: 'DATS',
   DATN: 'DATN',
-  DEC: 'DEC',
-  D16D: 'D16D',
-  D16N: 'D16N',
-  D16R: 'D16R',
-  D16S: 'D16S',
-  D34D: 'D34D',
-  D34N: 'D34N',
-  D34R: 'D34R',
-  D34S: 'D34S',
   FLTP: 'FLTP',
   INT1: 'INT1',
   INT2: 'INT2',
   INT4: 'INT4',
   INT8: 'INT8',
   LANG: 'LANG',
+  LRAW: 'LRAW',
   NUMC: 'NUMC',
   PREC: 'PREC',
   QUAN: 'QUAN',
   RAW: 'RAW',
-  RSTR: 'RSTR',
-  SSTR: 'SSTR',
-  STRG: 'STRG',
+  RAWSTRING: 'RAWSTRING',
+  SSTRING: 'SSTRING',
+  STRING: 'STRING',
   TIMN: 'TIMN',
   TIMS: 'TIMS',
   UNIT: 'UNIT',
-  UTCL: 'UTCL',
+  UTCLONG: 'UTCLONG',
   VARC: 'VARC',
+  // Decfloat family: the server uses the ABAP spelling, DDIC uses the DF* names.
+  DF16_DEC: 'DF16_DEC',
+  DF16_RAW: 'DF16_RAW',
+  DF16_SCL: 'DF16_SCL',
+  DECFLOAT16: 'DECFLOAT16',
+  DF34_DEC: 'DF34_DEC',
+  DF34_RAW: 'DF34_RAW',
+  DF34_SCL: 'DF34_SCL',
+  DECFLOAT34: 'DECFLOAT34',
+  GEOM_EWKB: 'GEOM_EWKB',
+  // Legacy aliases: older/other wire producers used the DDIC codes directly.
+  DEC: 'DEC',
+  D16D: 'DF16_DEC',
+  D16N: 'DECFLOAT16',
+  D16R: 'DF16_RAW',
+  D16S: 'DF16_SCL',
+  D34D: 'DF34_DEC',
+  D34N: 'DECFLOAT34',
+  D34R: 'DF34_RAW',
+  D34S: 'DF34_SCL',
+  RSTR: 'RAWSTRING',
+  STRG: 'STRING',
+  UTCL: 'UTCLONG',
+  GGM1: 'GEOM_EWKB',
 };
 
 function unescapeDdlString(value: string): string {

@@ -3465,6 +3465,30 @@ CLASS lcl_data IMPLEMENTATION.
       ENDIF.
     ENDIF.
 
+    " 7b. Group-by aggregation path (F-12). Strictly additive: it is only taken
+    " when the request carries a groupBy field, so the plain select / count paths
+    " below are untouched.
+    IF ls_req-groupby IS NOT INITIAL.
+      DATA ls_grp     TYPE ty_select_group.
+      DATA ls_grp_err TYPE ty_error.
+      execute_group_by( EXPORTING is_meta     = ls_meta
+                                  iv_group_by = ls_req-groupby
+                                  it_where    = lt_where
+                                  iv_limit    = ls_req-limit
+                        IMPORTING es_payload  = ls_grp
+                                  ev_error    = ls_grp_err ).
+      IF ls_grp_err IS NOT INITIAL.
+        lcl_response=>respond_error( io_server = io_server
+                       iv_status = 200
+                       iv_reason = 'OK'
+                       iv_code   = ls_grp_err-error-code
+                       iv_msg    = ls_grp_err-error-message ).
+      ELSE.
+        lcl_response=>respond_json( io_server = io_server iv_status = 200 iv_reason = 'OK' is_payload = ls_grp ).
+      ENDIF.
+      RETURN.
+    ENDIF.
+
     " 8. Count-only path.
     IF ls_req-countonly = abap_true.
       DATA ls_count     TYPE ty_select_count.
@@ -3541,6 +3565,7 @@ CLASS lcl_data IMPLEMENTATION.
             offset   TYPE i,
             orderby  TYPE string_table,
             countonly TYPE abap_bool,
+            groupby  TYPE string,
           END OF ls_raw.
     TRY.
         /ui2/cl_json=>deserialize( EXPORTING json = lv_part
@@ -3562,6 +3587,7 @@ CLASS lcl_data IMPLEMENTATION.
     es_req-offset   = COND i( WHEN ls_raw-offset IS INITIAL THEN 0 ELSE ls_raw-offset ).
     es_req-orderby  = ls_raw-orderby.
     es_req-countonly = ls_raw-countonly.
+    es_req-groupby   = to_upper( condense( val = ls_raw-groupby del = ` ` ) ).
     ev_ok = abap_true.
   ENDMETHOD.
   METHOD read_table_metadata.
@@ -3685,6 +3711,25 @@ CLASS lcl_data IMPLEMENTATION.
       DATA(lv_op_ix) = -1.
       DATA(lv_op_len) = 0.
       DATA(lv_op) = VALUE string( ).
+      " LIKE is a KEYWORD operator, not a symbol. Scan for it as a standalone,
+      " whitespace-delimited word. The symbol scan below can never match it —
+      " which is why the error text advertised LIKE while every LIKE condition
+      " was rejected with "missing or invalid operator" (feedback F-11).
+      " Finding it first also lets an earlier symbol operator win, e.g.
+      " "F = 'LIKE'" keeps '='.
+      DATA(lv_like_ix) = find( val = lv_chunk sub = 'LIKE' case = abap_false ).
+      IF lv_like_ix >= 0.
+        DATA(lv_like_before) = COND string( WHEN lv_like_ix = 0 THEN ' '
+          ELSE substring( val = lv_chunk off = lv_like_ix - 1 len = 1 ) ).
+        DATA(lv_like_after) = COND string( WHEN lv_like_ix + 4 = strlen( lv_chunk ) THEN ' '
+          ELSE substring( val = lv_chunk off = lv_like_ix + 4 len = 1 ) ).
+        IF lv_like_before CA ' ' AND lv_like_after CA ' '.
+          lv_op_ix = lv_like_ix.
+          lv_op_len = 4.
+          lv_op = 'LIKE'.
+        ENDIF.
+      ENDIF.
+
       " Find the first operator in the chunk (longest-match order, manual loop
       " because inline struct construction is rejected by the SAP parser).
       DATA(lt_ops_op) = VALUE string_table( ).
@@ -3730,14 +3775,6 @@ CLASS lcl_data IMPLEMENTATION.
 
       DATA(lv_field) = condense( lv_chunk+0(lv_op_ix) ).
       DATA(lv_value) = condense( substring( val = lv_chunk off = lv_op_ix + lv_op_len ) ).
-
-      " LIKE keyword — check presence.
-      IF lv_op = '='.
-        " Distinguish = from LIKE if the chunk explicitly says LIKE.
-        IF lv_field CP '*LIKE*'.
-          lv_op = 'LIKE'.
-        ENDIF.
-      ENDIF.
 
       " Field validation: regex + uppercase + lookup.
       IF lv_field NA `ABCDEFGHIJKLMNOPQRSTUVWXYZ_` AND lv_field NA `abcdefghijklmnopqrstuvwxyz_`.
@@ -3883,24 +3920,71 @@ CLASS lcl_data IMPLEMENTATION.
     " IMPORTANT: do NOT use cl_abap_elemdescr=>describe_by_name( 'NUMC' | 'CLNT' ... )
     " — on vhcala4hci this raises a non-catchable short dump for built-in types.
     " Use the explicit type-factory methods instead (get_c/get_n/get_d/get_p).
-    DATA(lt_components) = VALUE abap_component_tab( ).
-    LOOP AT lv_meta-fields INTO DATA(ls_dd03l).
+    " Preferred: use the table's OWN DDIC row type. A hand-rolled component map
+    " cannot reproduce every DDIC type exactly, and ABAP SQL rejects a structure
+    " whose component type does not match the column (INT4 for an INT2 column,
+    " CHAR for a numeric one) with "not Unicode convertible" — which made whole
+    " tables unreadable, including DD03L itself (feedback F-10 / F-26).
+    " `lv_meta-name` is validated against DD02L above, so this is a real DDIC
+    " object and not one of the built-in type names that dump in describe_by_name.
+    DATA lo_row_type TYPE REF TO cl_abap_structdescr.
+    TRY.
+        DATA(lo_desc) = cl_abap_typedescr=>describe_by_name( lv_meta-name ).
+        CASE lo_desc->kind.
+          WHEN cl_abap_typedescr=>kind_table.
+            DATA(lo_td) = CAST cl_abap_tabledescr( lo_desc ).
+            lo_row_type ?= lo_td->get_table_line_type( ).
+          WHEN cl_abap_typedescr=>kind_struct.
+            DATA(lo_sd) = CAST cl_abap_structdescr( lo_desc ).
+            lo_row_type ?= lo_sd.
+          WHEN OTHERS.
+            CLEAR lo_row_type.
+        ENDCASE.
+      CATCH cx_root.
+        CLEAR lo_row_type.
+    ENDTRY.
+
+    IF lo_row_type IS NOT BOUND.
+      " Fallback: rebuild the row type from DD03L metadata.
+      DATA(lt_components) = VALUE abap_component_tab( ).
+      LOOP AT lv_meta-fields INTO DATA(ls_dd03l).
       DATA lo_elem TYPE REF TO cl_abap_elemdescr.
       DATA(lv_len) = ls_dd03l-length.
       IF lv_len <= 0. lv_len = 100. ENDIF.
       CASE ls_dd03l-dataType.
-        WHEN 'CLNT' OR 'CHAR' OR 'CUKY' OR 'UNIT' OR 'LANG' OR 'RAW'.
+        WHEN 'CLNT' OR 'CHAR' OR 'CUKY' OR 'UNIT' OR 'LANG' OR 'VARC'.
           lo_elem = cl_abap_elemdescr=>get_c( lv_len ).
         WHEN 'NUMC'.
           lo_elem = cl_abap_elemdescr=>get_n( lv_len ).
-        WHEN 'DATS'.
+        WHEN 'DATS' OR 'DATN'.
           lo_elem = cl_abap_elemdescr=>get_d( ).
-        WHEN 'TIMS'.
+        WHEN 'TIMS' OR 'TIMN' OR 'UTCLONG'.
           lo_elem = cl_abap_elemdescr=>get_t( ).
-        WHEN 'DEC' OR 'QUAN' OR 'CURR'.
+        WHEN 'DEC' OR 'QUAN' OR 'CURR' OR 'PREC' OR 'ACCP'.
           lo_elem = cl_abap_elemdescr=>get_p( p_length = lv_len p_decimals = ls_dd03l-decimals ).
+        WHEN 'INT1' OR 'INT2' OR 'INT4' OR 'INT8'.
+          " Numeric columns MUST be typed as numbers. Mapping them to CHAR made
+          " the dynamic SELECT fail with "the type of the database table and
+          " work area (or internal table) "<LT_ROWS>" are not Unicode
+          " convertible" for every table containing an INT or RAW column — DD03L
+          " (SRS_ID), VRSD (VERSTABLEN), TSTC (CINFO) — which is why field
+          " inventory was unreachable (feedback F-10 / F-26).
+          lo_elem = cl_abap_elemdescr=>get_i( ).
+        WHEN 'FLTP'.
+          lo_elem = cl_abap_elemdescr=>get_f( ).
+        WHEN 'RAW' OR 'LRAW'.
+          lo_elem = cl_abap_elemdescr=>get_x( lv_len ).
+        WHEN 'STRG' OR 'SSTR' OR 'LCHR'.
+          lo_elem = cl_abap_elemdescr=>get_string( ).
+        WHEN 'RSTR'.
+          lo_elem = cl_abap_elemdescr=>get_xstring( ).
+        WHEN 'DF16_DEC' OR 'DF16_RAW' OR 'DF16_SCL' OR 'DECFLOAT16'
+          OR 'DF34_DEC' OR 'DF34_RAW' OR 'DF34_SCL' OR 'DECFLOAT34' OR 'GEOM_EWKB'.
+          " No dedicated factory for the decfloat family; read as text. These
+          " columns are re-serialized as strings anyway.
+          lo_elem = cl_abap_elemdescr=>get_string( ).
         WHEN OTHERS.
-          " INT1/INT2/INT4/INT8/STRG/RSTR/unknown — CHAR fallback.
+          " Genuinely unknown type — CHAR is the last resort.
           lo_elem = cl_abap_elemdescr=>get_c( lv_len ).
       ENDCASE.
       IF lo_elem IS BOUND.
@@ -3908,7 +3992,9 @@ CLASS lcl_data IMPLEMENTATION.
                          type = CAST cl_abap_datadescr( lo_elem ) ) TO lt_components.
       ENDIF.
     ENDLOOP.
-    DATA(lo_row_type) = cl_abap_structdescr=>create( lt_components ).
+      lo_row_type = cl_abap_structdescr=>create( lt_components ).
+    ENDIF.
+
     DATA(lo_table_type) = cl_abap_tabledescr=>create( lo_row_type ).
     DATA lr_rows TYPE REF TO data.
     CREATE DATA lr_rows TYPE HANDLE lo_table_type.
@@ -4174,6 +4260,148 @@ CLASS lcl_data IMPLEMENTATION.
         count       = lv_count
         duration_ms = 1 ) ).
   ENDMETHOD.
+
+  METHOD execute_group_by.
+    " F-12: SELECT <field>, COUNT(*) FROM (table) [WHERE ...]
+    "         GROUP BY <field> ORDER BY COUNT(*) DESCENDING
+    "         INTO TABLE @<lt_rows> UP TO @limit ROWS.
+    " Values stay bound as host variables (same injection-safety contract as
+    " execute_select / execute_count): only validated identifiers are dynamic.
+    DATA(lv_meta) = is_meta.
+    DATA(lv_group) = to_upper( condense( val = iv_group_by del = ` ` ) ).
+
+    " The grouped column must exist and must be groupable.
+    DATA(ls_group_meta) = VALUE ty_query_field( ).
+    READ TABLE lv_meta-fields INTO ls_group_meta WITH KEY name = lv_group.
+    IF sy-subrc <> 0.
+      ev_error = VALUE ty_error( status = 'error'
+                                 error = VALUE ty_error_body(
+                                   code    = 'INVALID_FIELD'
+                                   message = |field { lv_group } is not in table { lv_meta-name }| ) ).
+      RETURN.
+    ENDIF.
+    IF ls_group_meta-dataType CP gc_large_object_types.
+      ev_error = VALUE ty_error( status = 'error'
+                                 error = VALUE ty_error_body(
+                                   code    = 'INVALID_FIELD'
+                                   message = |GROUP BY is not supported on large-object field { lv_group } ({ ls_group_meta-dataType })| ) ).
+      RETURN.
+    ENDIF.
+
+    " Host-variable WHERE table — same shape as execute_select.
+    DATA lt_where_tab TYPE string_table.
+    DATA: lv_g_v1    TYPE string,
+          lv_g_v2    TYPE string,
+          lv_g_v3    TYPE string,
+          lv_g_v4    TYPE string,
+          lv_g_v5    TYPE string,
+          lv_g_v_max TYPE string.
+    LOOP AT it_where INTO DATA(ls_where).
+      CASE sy-tabix.
+        WHEN 1.
+          lv_g_v1 = ls_where-value.
+          APPEND |{ ls_where-field } { ls_where-operator } @lv_g_v1| TO lt_where_tab.
+        WHEN 2.
+          lv_g_v2 = ls_where-value.
+          APPEND |{ ls_where-field } { ls_where-operator } @lv_g_v2| TO lt_where_tab.
+        WHEN 3.
+          lv_g_v3 = ls_where-value.
+          APPEND |{ ls_where-field } { ls_where-operator } @lv_g_v3| TO lt_where_tab.
+        WHEN 4.
+          lv_g_v4 = ls_where-value.
+          APPEND |{ ls_where-field } { ls_where-operator } @lv_g_v4| TO lt_where_tab.
+        WHEN 5.
+          lv_g_v5 = ls_where-value.
+          APPEND |{ ls_where-field } { ls_where-operator } @lv_g_v5| TO lt_where_tab.
+        WHEN OTHERS.
+          lv_g_v_max = ls_where-value.
+          APPEND |{ ls_where-field } { ls_where-operator } @lv_g_v_max| TO lt_where_tab.
+      ENDCASE.
+    ENDLOOP.
+
+    " Result type: the grouped column with its EXACT DDIC type plus an INT4
+    " count. The exact type matters — a CHAR stand-in for a numeric column makes
+    " the dynamic SELECT fail with "not Unicode convertible" (F-10 / F-26).
+    DATA lt_components TYPE abap_component_tab.
+    DATA lo_elem TYPE REF TO cl_abap_elemdescr.
+    DATA(lv_len) = COND i( WHEN ls_group_meta-length > 0 THEN ls_group_meta-length ELSE 100 ).
+    CASE ls_group_meta-dataType.
+      WHEN 'NUMC'.
+        lo_elem = cl_abap_elemdescr=>get_n( lv_len ).
+      WHEN 'DATS'.
+        lo_elem = cl_abap_elemdescr=>get_d( ).
+      WHEN 'TIMS'.
+        lo_elem = cl_abap_elemdescr=>get_t( ).
+      WHEN 'INT1' OR 'INT2' OR 'INT4' OR 'INT8'.
+        lo_elem = cl_abap_elemdescr=>get_i( ).
+      WHEN 'DEC' OR 'QUAN' OR 'CURR'.
+        lo_elem = cl_abap_elemdescr=>get_p( p_length = lv_len p_decimals = ls_group_meta-decimals ).
+      WHEN OTHERS.
+        lo_elem = cl_abap_elemdescr=>get_c( lv_len ).
+    ENDCASE.
+    IF lo_elem IS NOT BOUND.
+      lo_elem = cl_abap_elemdescr=>get_c( lv_len ).
+    ENDIF.
+    APPEND VALUE #( name = lv_group type = CAST cl_abap_datadescr( lo_elem ) ) TO lt_components.
+    APPEND VALUE #( name = 'CNT' type = CAST cl_abap_datadescr( cl_abap_elemdescr=>get_i( ) ) ) TO lt_components.
+    DATA(lo_row_type) = cl_abap_structdescr=>create( lt_components ).
+    DATA(lo_table_type) = cl_abap_tabledescr=>create( lo_row_type ).
+    DATA lr_rows TYPE REF TO data.
+    CREATE DATA lr_rows TYPE HANDLE lo_table_type.
+    FIELD-SYMBOLS <lt_rows> TYPE ANY TABLE.
+    ASSIGN lr_rows->* TO <lt_rows>.
+
+    " Dynamic column list: the grouped column plus the aggregate.
+    DATA(lv_cols) = |{ lv_group }, COUNT(*) AS CNT|.
+    DATA(lv_limit) = COND i( WHEN iv_limit > 0 THEN iv_limit ELSE gc_query_limit_def ).
+
+    " SAP NetWeaver constraint (same as execute_select): with dynamic Open SQL
+    " the UP TO clause must follow INTO TABLE; ORDER BY uses the full keyword.
+    TRY.
+        IF lt_where_tab IS INITIAL.
+          SELECT (lv_cols) FROM (lv_meta-name)
+            GROUP BY (lv_group)
+            ORDER BY COUNT(*) DESCENDING
+            INTO TABLE @<lt_rows>
+            UP TO @lv_limit ROWS.
+        ELSE.
+          SELECT (lv_cols) FROM (lv_meta-name)
+            WHERE (lt_where_tab)
+            GROUP BY (lv_group)
+            ORDER BY COUNT(*) DESCENDING
+            INTO TABLE @<lt_rows>
+            UP TO @lv_limit ROWS.
+        ENDIF.
+      CATCH cx_root INTO DATA(lx_grp).
+        ev_error = VALUE ty_error( status = 'error'
+                                   error = VALUE ty_error_body(
+                                     code    = 'QUERY_FAILED'
+                                     message = |execute_group_by: { lx_grp->get_text( ) }| ) ).
+        RETURN.
+    ENDTRY.
+
+    DATA(lv_groups_json) = VALUE string( ).
+    IF lines( <lt_rows> ) > 0.
+      IF lcl_response=>escape_probe_needed( ) = abap_true.
+        lcl_response=>escape_json_strings( CHANGING cv_data = <lt_rows> ).
+      ENDIF.
+      lv_groups_json = /ui2/cl_json=>serialize( data        = <lt_rows>
+                                                pretty_name = /ui2/cl_json=>pretty_mode-none ).
+    ELSE.
+      lv_groups_json = '[]'.
+    ENDIF.
+
+    DATA(lv_g_object_type) = COND string( WHEN lv_meta-tabclass = 'VIEW' THEN 'VIEW' ELSE 'TABL' ).
+    es_payload = VALUE ty_select_group(
+      status = 'success'
+      data = VALUE ty_select_group_data(
+        table       = lv_meta-name
+        object_type = lv_g_object_type
+        field       = lv_group
+        groups      = lv_groups_json
+        group_count = lines( <lt_rows> )
+        duration_ms = 1 ) ).
+  ENDMETHOD.
 ENDCLASS.
 
 CLASS lcl_version IMPLEMENTATION.
@@ -4312,5 +4540,191 @@ CLASS lcl_version IMPLEMENTATION.
                    iv_reason = 'Not Found'
                    iv_code = 'NOT_FOUND'
                    iv_msg = |unknown Version Management path: { iv_path }| ).
+  ENDMETHOD.
+ENDCLASS.
+
+CLASS lcl_run IMPLEMENTATION.
+  METHOD dispatch_run.
+    " POST /run/report { "report": "ZRPT", "variant": "VAR1"? }
+    IF iv_path <> '/run/report'.
+      lcl_response=>respond_error( io_server = io_server
+                     iv_status = 404
+                     iv_reason = 'Not Found'
+                     iv_code   = 'NOT_FOUND'
+                     iv_msg    = |unsupported run path: { iv_path }| ).
+      RETURN.
+    ENDIF.
+    IF iv_method <> 'POST'.
+      lcl_response=>respond_error( io_server = io_server
+                     iv_status = 405
+                     iv_reason = 'Method Not Allowed'
+                     iv_code   = 'METHOD_NOT_ALLOWED'
+                     iv_msg    = 'POST only on /run/report' ).
+      RETURN.
+    ENDIF.
+
+    DATA: BEGIN OF ls_raw,
+            report  TYPE string,
+            variant TYPE string,
+          END OF ls_raw.
+    IF iv_body IS NOT INITIAL.
+      TRY.
+          /ui2/cl_json=>deserialize( EXPORTING json = iv_body CHANGING data = ls_raw ).
+        CATCH cx_root INTO DATA(lx_parse).
+          lcl_response=>respond_error( io_server = io_server
+                         iv_status = 400
+                         iv_reason = 'Bad Request'
+                         iv_code   = 'INVALID_ARGUMENT'
+                         iv_msg    = |invalid JSON payload: { lx_parse->get_text( ) }| ).
+          RETURN.
+      ENDTRY.
+    ENDIF.
+
+    DATA(lv_report) = to_upper( condense( val = ls_raw-report del = ` ` ) ).
+    IF lv_report IS INITIAL.
+      lcl_response=>respond_error( io_server = io_server
+                     iv_status = 400
+                     iv_reason = 'Bad Request'
+                     iv_code   = 'INVALID_ARGUMENT'
+                     iv_msg    = 'report is required' ).
+      RETURN.
+    ENDIF.
+    " Only plain DDIC-style program names — the value is passed as a dynamic
+    " SUBMIT target, so it must not carry anything else.
+    FIND REGEX '^[A-Z][A-Z0-9_]{0,39}$' IN lv_report.
+    IF sy-subrc <> 0.
+      lcl_response=>respond_error( io_server = io_server
+                     iv_status = 400
+                     iv_reason = 'Bad Request'
+                     iv_code   = 'INVALID_ARGUMENT'
+                     iv_msg    = |'{ ls_raw-report }' is not a valid report name| ).
+      RETURN.
+    ENDIF.
+
+    DATA ls_payload TYPE ty_run_report.
+    DATA ls_error   TYPE ty_error.
+    execute_report( EXPORTING iv_report  = lv_report
+                              iv_variant = to_upper( condense( val = ls_raw-variant del = ` ` ) )
+                    IMPORTING es_payload = ls_payload
+                              ev_error   = ls_error ).
+    IF ls_error IS NOT INITIAL.
+      lcl_response=>respond_error( io_server = io_server
+                     iv_status = 200
+                     iv_reason = 'OK'
+                     iv_code   = ls_error-error-code
+                     iv_msg    = ls_error-error-message ).
+    ELSE.
+      lcl_response=>respond_json( io_server = io_server iv_status = 200 iv_reason = 'OK' is_payload = ls_payload ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD execute_report.
+    CLEAR: es_payload, ev_error.
+    DATA(lv_start) = sy-uzeit.
+
+    " The target must be an executable report (TRDIR-SUBC = 'R'). Includes,
+    " module pools and function groups cannot be SUBMITted with a list.
+    DATA(ls_trdir) = VALUE trdir( ).
+    SELECT SINGLE name, subc FROM trdir INTO CORRESPONDING FIELDS OF @ls_trdir
+      WHERE name = @iv_report.
+    IF sy-subrc <> 0.
+      ev_error = VALUE ty_error( status = 'error'
+                                 error = VALUE ty_error_body(
+                                   code    = 'REPORT_NOT_FOUND'
+                                   message = |report { iv_report } does not exist| ) ).
+      RETURN.
+    ENDIF.
+    " TRDIR-SUBC '1' is the executable-program (report) category. Verified on
+    " vhcala4hci for both a generated report and an SE38-created one; other values
+    " are includes ('I'), module pools ('M'), class pools ('K'), ... which cannot
+    " be SUBMITted with a list.
+    IF ls_trdir-subc <> '1'.
+      ev_error = VALUE ty_error( status = 'error'
+                                 error = VALUE ty_error_body(
+                                   code    = 'REPORT_NOT_EXECUTABLE'
+                                   message = |{ iv_report } is not an executable report (TRDIR-SUBC = '{ ls_trdir-subc }'; '1' means executable program)| ) ).
+      RETURN.
+    ENDIF.
+
+    " Run with default selection values and no screen; capture the list.
+    " NOTE: dynamic SUBMIT requires CHARACTER-LIKE operands — a `string` variable
+    " is rejected with "must be a character-like field (data type C, N, D, or T)".
+    DATA lv_prog    TYPE c LENGTH 40.
+    DATA lv_sel_set TYPE c LENGTH 14.
+    lv_prog = iv_report.
+    lv_sel_set = iv_variant.
+    TRY.
+        IF iv_variant IS NOT INITIAL.
+          SUBMIT (lv_prog) USING SELECTION-SET lv_sel_set
+            EXPORTING LIST TO MEMORY AND RETURN.
+        ELSE.
+          SUBMIT (lv_prog) EXPORTING LIST TO MEMORY AND RETURN.
+        ENDIF.
+      CATCH cx_root INTO DATA(lx_submit).
+        ev_error = VALUE ty_error( status = 'error'
+                                   error = VALUE ty_error_body(
+                                     code    = 'REPORT_RUN_FAILED'
+                                     message = |submit failed: { lx_submit->get_text( ) }| ) ).
+        RETURN.
+    ENDTRY.
+
+    " Convert the captured list to text.
+    DATA lt_listobject TYPE STANDARD TABLE OF abaplist.
+    CALL FUNCTION 'LIST_FROM_MEMORY'
+      TABLES
+        listobject = lt_listobject
+      EXCEPTIONS
+        not_found  = 1
+        OTHERS     = 2.
+    IF sy-subrc <> 0.
+      ev_error = VALUE ty_error( status = 'error'
+                                 error = VALUE ty_error_body(
+                                   code    = 'REPORT_NO_LIST_OUTPUT'
+                                   message = |{ iv_report } produced no capturable list output (it may use an ALV/container control or write no list)| ) ).
+      RETURN.
+    ENDIF.
+
+    TYPES ty_ascii_line TYPE c LENGTH 255.
+    DATA lt_ascii TYPE STANDARD TABLE OF ty_ascii_line.
+    CALL FUNCTION 'LIST_TO_ASCI'
+      TABLES
+        listasci   = lt_ascii
+        listobject = lt_listobject
+      EXCEPTIONS
+        OTHERS     = 1.
+    IF sy-subrc <> 0.
+      ev_error = VALUE ty_error( status = 'error'
+                                 error = VALUE ty_error_body(
+                                   code    = 'REPORT_RUN_FAILED'
+                                   message = 'list conversion failed (LIST_TO_ASCI)' ) ).
+      RETURN.
+    ENDIF.
+
+    " Bound the response: 5000 lines / 200k characters is plenty for agent use.
+    DATA lt_lines TYPE string_table.
+    DATA(lv_truncated) = abap_false.
+    DATA(lv_output) = VALUE string( ).
+    DATA lv_ascii_line TYPE ty_ascii_line.
+    LOOP AT lt_ascii INTO lv_ascii_line.
+      IF lines( lt_lines ) >= 5000 OR strlen( lv_output ) >= 200000.
+        lv_truncated = abap_true.
+        EXIT.
+      ENDIF.
+      DATA(lv_text) = |{ lv_ascii_line }|.
+      SHIFT lv_text RIGHT DELETING TRAILING space.
+      APPEND lv_text TO lt_lines.
+      lv_output = lv_output && lv_text && cl_abap_char_utilities=>newline.
+    ENDLOOP.
+
+    es_payload = VALUE ty_run_report(
+      status = 'success'
+      data = VALUE ty_run_report_data(
+        report      = iv_report
+        variant     = iv_variant
+        lines       = lt_lines
+        output      = lv_output
+        line_count  = lines( lt_lines )
+        truncated   = lv_truncated
+        duration_ms = 1 ) ).
   ENDMETHOD.
 ENDCLASS.

@@ -210,6 +210,9 @@ TYPES:
     offset   TYPE i,
     orderby  TYPE string_table,
     countonly TYPE abap_bool,
+    " Group-by aggregation: when set, the endpoint returns one row per distinct
+    " value of this field plus a COUNT(*) (feedback F-12).
+    groupby  TYPE string,
   END OF ty_query_request,
   BEGIN OF ty_query_orderby,
     field     TYPE string,
@@ -264,7 +267,21 @@ TYPES:
   BEGIN OF ty_select_count,
     status TYPE string,
     data   TYPE ty_select_count_data,
-  END OF ty_select_count.
+  END OF ty_select_count,
+  " F-12: grouped aggregation payload. `groups` is a partial-JSON piece holding
+  " one object per distinct value: { "<FIELD>": <value>, "CNT": <count> }.
+  BEGIN OF ty_select_group_data,
+    table       TYPE string,
+    object_type TYPE string,
+    field       TYPE string,
+    groups      TYPE /ui2/cl_json=>json,
+    group_count TYPE i,
+    duration_ms TYPE i,
+  END OF ty_select_group_data,
+  BEGIN OF ty_select_group,
+    status TYPE string,
+    data   TYPE ty_select_group_data,
+  END OF ty_select_group.
 
 " ----- DDIC operations (POST create/overwrite, GET pull) -----
 TYPES:
@@ -862,6 +879,15 @@ CLASS lcl_data DEFINITION.
                 it_where      TYPE tt_where_condition
       EXPORTING es_payload   TYPE ty_select_count
                 ev_error     TYPE ty_error.
+
+    " F-12: SELECT <field>, COUNT(*) ... GROUP BY <field> ORDER BY COUNT(*) DESC.
+    CLASS-METHODS execute_group_by
+      IMPORTING is_meta      TYPE ty_query_metadata
+                iv_group_by  TYPE string
+                it_where     TYPE tt_where_condition
+                iv_limit     TYPE i
+      EXPORTING es_payload   TYPE ty_select_group
+                ev_error     TYPE ty_error.
 ENDCLASS.
 
 CLASS lcl_version DEFINITION.
@@ -870,4 +896,41 @@ CLASS lcl_version DEFINITION.
       IMPORTING io_server TYPE REF TO if_http_server
                 iv_path   TYPE string
                 iv_method TYPE string.
+ENDCLASS.
+
+" F-16: run an activated REPORT and capture its list output.
+"
+" ADT has no classrun equivalent for reports, and the wrapper route
+" (`abap run --method`) is unavailable on systems whose classrun endpoint does
+" not inject arguments. The ICF service is reachable regardless, so the report is
+" submitted here with `EXPORTING LIST TO MEMORY AND RETURN` (default selection
+" values, no screen) and the captured list is converted to ASCII.
+CLASS lcl_run DEFINITION.
+  PUBLIC SECTION.
+    TYPES:
+      BEGIN OF ty_run_report_data,
+        report      TYPE string,
+        variant     TYPE string,
+        lines       TYPE string_table,
+        output      TYPE string,
+        line_count  TYPE i,
+        truncated   TYPE abap_bool,
+        duration_ms TYPE i,
+      END OF ty_run_report_data,
+      BEGIN OF ty_run_report,
+        status TYPE string,
+        data   TYPE ty_run_report_data,
+      END OF ty_run_report.
+
+    CLASS-METHODS dispatch_run
+      IMPORTING io_server TYPE REF TO if_http_server
+                iv_path   TYPE string
+                iv_method TYPE string
+                iv_body   TYPE string.
+
+    CLASS-METHODS execute_report
+      IMPORTING iv_report  TYPE string
+                iv_variant TYPE string
+      EXPORTING es_payload TYPE ty_run_report
+                ev_error   TYPE ty_error.
 ENDCLASS.
