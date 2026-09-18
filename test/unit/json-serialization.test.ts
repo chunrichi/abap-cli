@@ -42,7 +42,7 @@ describe('017 — ICF JSON wire contract (special-character lossless roundtrip)'
   beforeAll(async () => {
     const m = await startMock(PORT);
     proc = m.proc;
-    base = `http://localhost:${m.port}/sap/zabap_vibe/textpool`;
+    base = `http://localhost:${m.port}/sap/abap_cli/textpool`;
   });
 
   afterAll(() => {

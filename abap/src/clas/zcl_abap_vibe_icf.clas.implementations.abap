@@ -13,7 +13,7 @@ CLASS lcl_response IMPLEMENTATION.
                      iv_status = 405
                      iv_reason = 'Method Not Allowed'
                      iv_code = 'METHOD_NOT_ALLOWED'
-                     iv_msg = |GET only on /sap/zabap_vibe/| ).
+                     iv_msg = |GET only on /sap/abap_cli/| ).
     ENDIF.
   ENDMETHOD.
   METHOD handle_class_check.
@@ -244,7 +244,7 @@ CLASS lcl_mime IMPLEMENTATION.
                    iv_status = 404
                    iv_reason = 'Not Found'
                    iv_code   = 'NOT_FOUND'
-                   iv_msg    = |unsupported path: /sap/zabap_vibe{ iv_path }| ).
+                   iv_msg    = |unsupported path: /sap/abap_cli{ iv_path }| ).
   ENDMETHOD.
   METHOD respond_mime_error.
     DATA(lv_status) = COND i(
@@ -3281,7 +3281,7 @@ CLASS lcl_data IMPLEMENTATION.
                      iv_status = 404
                      iv_reason = 'Not Found'
                      iv_code   = 'NOT_FOUND'
-                     iv_msg    = |unsupported path: /sap/zabap_vibe{ iv_path }| ).
+                     iv_msg    = |unsupported path: /sap/abap_cli{ iv_path }| ).
       RETURN.
     ENDIF.
     IF iv_method <> 'POST'.

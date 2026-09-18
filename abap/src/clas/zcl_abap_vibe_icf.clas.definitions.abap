@@ -532,7 +532,7 @@ TYPES:
 
 CLASS lcl_response DEFINITION.
   PUBLIC SECTION.
-    CONSTANTS gc_service TYPE string VALUE 'zabap_vibe'.
+    CONSTANTS gc_service TYPE string VALUE 'abap_cli'.
     CONSTANTS gc_version TYPE string VALUE '0.6.0'.
 
     CLASS-METHODS handle_root

@@ -8,6 +8,7 @@ import { effectivePolicy, isUnsupportedInContext, resolveSessionPolicy } from '.
 import { loadJarFromDisk, icfCookieHeader } from '../session/reuse.js';
 import { loadOrCreateSessionKey } from '../session/key.js';
 import { registerIcfClient } from '../session/registry.js';
+import { ICF_BASE_PATH } from './icf-version.js';
 
 export interface IcfResponse<T = unknown> {
   status: 'success' | 'error';
@@ -26,7 +27,7 @@ export class IcfClient {
   private jarCookie: string | undefined;
   /** Whether this client attempted a stale-session 401 fallback already. */
   private fallbackUsed = false;  private constructor(config: ProjectConfig, authOpts: { passwordOrFetcher: string | (() => Promise<string>); options: import('abap-adt-api').ClientOptions }) {
-    this.baseUrl = `${config.sap.url}/sap/zabap_vibe`;
+    this.baseUrl = `${config.sap.url}${ICF_BASE_PATH}`;
 
     // Reuse the SAME artefacts `buildAuth()` produces for ADT — `httpsAgent`
     // (cert mTLS) and `headers.Cookie` (browser_sso) flow through verbatim,

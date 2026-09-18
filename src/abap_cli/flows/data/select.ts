@@ -2,7 +2,7 @@
  * `abap select` flow — read-only table data query.
  *
  * Consumes the `IcfClient.postDataQuery` HTTP method (which targets the
- * `/sap/zabap_vibe/data/query` endpoint on the deployed ICF service) and
+ * `/sap/abap_cli/data/query` endpoint on the deployed ICF service) and
  * shapes the response into a structured `SelectResult`. The SAP-side handler
  * owns query validation, where-clause parsing, and dynamic SQL execution; this
  * flow is responsible only for transport, error mapping, and CLI-friendly

@@ -2,7 +2,20 @@ import { IcfClient } from './icf-client.js';
 import { CliError } from '../output/json.js';
 import { probeAdtRuntime, type AdtRuntime } from '../adc/runtime-probe.js';
 
-/** Bundled expected version of the zabap_vibe ICF service.
+/**
+ * ICF service URL prefix. Historically `/sap/zabap_vibe`; renamed to
+ * `/sap/abap_cli` to align the deployed SICF node name with the package
+ * name (`abap-cli`) and CLI binary (`abap`).
+ *
+ * Existing deployments on `/sap/zabap_vibe` keep working because:
+ *   - The ABAP handler reads `gc_service` from its own constants and
+ *     dispatches regardless of the URL prefix.
+ *   - Users upgrading must `abap deploy --yes` once to recreate the SICF
+ *     node at the new path; old nodes stay visible until manually removed.
+ */
+export const ICF_BASE_PATH = '/sap/abap_cli';
+
+/** Bundled expected version of the abap_cli ICF service.
  *  Bumped 0.1.0 → 0.2.0 for DDIC CRUD + textpool support;
  *  bumped 0.2.0 → 0.3.0 for read-only table data query support;
  *  bumped 0.3.0 → 0.4.0 for select rows native-typed values;

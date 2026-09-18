@@ -9,6 +9,7 @@ import { classifyHttpError } from './http-error.js';
 import { buildAuth } from '../auth/adapter.js';
 import type { AuthConfig, AuthMethodV2 } from '../auth/v2-types.js';
 import { defaultCookieFile as defaultCookieFileFor, readCookieStore } from '../auth/sso-cookie.js';
+import { ICF_BASE_PATH } from './icf-version.js';
 
 /** Per-layer result of `profile test <name>`. */
 export interface ProbeLayerResult {
@@ -179,8 +180,8 @@ async function probeCapabilities(
     : { ttyp: 'absent' as const, msag: 'absent' as const, ddls: 'absent' as const };
   const icfProbe = state.icfOk
     ? {
-        ttyp: await probeUrl('/sap/zabap_vibe/ddic/ttyp/LVC_T_TABL'),
-        msag: await probeUrl('/sap/zabap_vibe/ddic/msag/SADT_TOOLS_CORE'),
+        ttyp: await probeUrl(`${ICF_BASE_PATH}/ddic/ttyp/LVC_T_TABL`),
+        msag: await probeUrl(`${ICF_BASE_PATH}/ddic/msag/SADT_TOOLS_CORE`),
         // DDLS has no ICF handler on purpose — always absent.
         ddls: 'absent' as const,
       }
@@ -406,5 +407,5 @@ function probeAdt(name: string, config: ProbeConfig): Promise<ProbeLayerResult> 
 
 /** ICF layer — reachability of the self-built ICF service root via ADTClient. */
 function probeIcf(name: string, config: ProbeConfig): Promise<ProbeLayerResult> {
-  return probeWithAdtClient(name, config, { path: '/sap/zabap_vibe/', accept: 'application/json' });
+  return probeWithAdtClient(name, config, { path: `${ICF_BASE_PATH}/`, accept: 'application/json' });
 }

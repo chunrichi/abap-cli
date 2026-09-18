@@ -309,13 +309,13 @@ export function steampunkDeployHint(systemUrl: string): string[] {
     `Expose ZCL_ABAP_VIBE_ICF via a Cloud Foundry destination:`,
     `  1. SAP BTP Cockpit → Cloud Foundry → your space → your ABAP trial`,
     `  2. Connectivity → Destinations → New Destination:`,
-    `       Name:           zabap_vibe`,
+    `       Name:           abap_cli`,
     `       Type:           HTTP`,
-    `       URL:            ${trimmed}/sap/zabap_vibe`,
+    `       URL:            ${trimmed}/sap/abap_cli`,
     `       ProxyType:      Internet`,
     `       Authentication: NoAuthentication (or per your security policy)`,
-    `  3. Verify:   curl ${trimmed}/sap/zabap_vibe/   → {"service":"zabap_vibe","version":"0.6.0",…}`,
-    `  4. (Optional) bind a route:  cf map-route <app> <domain> --path zabap_vibe`,
+    `  3. Verify:   curl ${trimmed}/sap/abap_cli/   → {"service":"abap_cli","version":"0.6.0",…}`,
+    `  4. (Optional) bind a route:  cf map-route <app> <domain> --path abap_cli`,
   ];
 }
 

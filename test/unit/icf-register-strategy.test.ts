@@ -11,10 +11,10 @@ import { SteampunkSwbStrategy } from '../../src/abap_cli/adc/strategies/steampun
 import type { RuntimeProbeResult } from '../../src/abap_cli/adc/runtime-probe.js';
 
 const SPEC = {
-  name: 'zabap_vibe',
-  description: 'ABAP Vibe - ICF Services',
+  name: 'abap_cli',
+  description: 'abap-cli ICF Services',
   handler: 'ZCL_ABAP_VIBE_ICF',
-  urlPath: '/sap/zabap_vibe',
+  urlPath: '/sap/abap_cli',
   state: 'active' as const,
 };
 

@@ -46,7 +46,7 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
                                    iv_status = 404
                                    iv_reason = 'Not Found'
                                    iv_code = 'NOT_FOUND'
-                                   iv_msg = |unknown path: /sap/zabap_vibe{ lv_path }| ).
+                                   iv_msg = |unknown path: /sap/abap_cli{ lv_path }| ).
     ENDIF.
   ENDMETHOD.
 ENDCLASS.

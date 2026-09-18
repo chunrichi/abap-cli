@@ -259,13 +259,13 @@ describe('probeAdtRuntime — 030 ADT runtime tier detection', () => {
 describe('steampunkDeployHint — 030 BTP Cockpit destination guide', () => {
   it('includes destination URL trimmed from trailing slashes', () => {
     const lines = steampunkDeployHint('https://btp-trial.hanatrial.ondemand.com/');
-    expect(lines.join('\n')).toContain('https://btp-trial.hanatrial.ondemand.com/sap/zabap_vibe');
+    expect(lines.join('\n')).toContain('https://btp-trial.hanatrial.ondemand.com/sap/abap_cli');
     expect(lines.join('\n')).toContain('Cloud Foundry');
     expect(lines.join('\n')).toContain('Connectivity → Destinations');
   });
 
-  it('includes curl verification step with /sap/zabap_vibe/ path', () => {
+  it('includes curl verification step with /sap/abap_cli/ path', () => {
     const lines = steampunkDeployHint('https://trial.example');
-    expect(lines.join('\n')).toContain('curl https://trial.example/sap/zabap_vibe/');
+    expect(lines.join('\n')).toContain('curl https://trial.example/sap/abap_cli/');
   });
 });
