@@ -6,6 +6,39 @@
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-09-19
+
+### Added
+- **`abap fields <table>`**：`abap fields <table>` 列出表字段清单（DD03L 驱动）——字段名 / 位置 / 主键 / 非空 / 数据元素 / 类型 / 长度 / 小数位。此前没有命令能列字段，直接导致选错数据源与整版重写。走既有 `/data/query` 通道，无需新增服务端端点。
+- **`abap run-report <report> [--variant <v>]`**：执行激活后的 REPORT 并返回捕获到的列表输出。ADT 没有 classrun 等价的 REPORT 端点，自带 ICF 服务新增 `POST /run/report`：服务端 `SUBMIT (<prog>) EXPORTING LIST TO MEMORY AND RETURN`（默认选择参数、不弹选择屏幕）+ `LIST_FROM_MEMORY` / `LIST_TO_ASCI` 转换（5000 行 / 200k 字符上限，`truncated` 标注）。限定 TRDIR-SUBC='1'，其它类型给 `REPORT_NOT_EXECUTABLE`；无列表输出给 `REPORT_NO_LIST_OUTPUT` 并提示改用 `abap run`。
+- **`abap select --group-by <field>`**：返回每个取值一行 + `CNT`（`COUNT(*)`），按 `CNT` 降序。ICF 侧新增 `execute_group_by`（动态列 + 动态 `GROUP BY` + 动态结构，值仍走宿主变量绑定），是一条**严格增量**的分支：请求不带 `groupBy` 时既有的 select / count 路径完全不变。与 `--fields` / `--order-by` / `--offset` / `--count-only` 互斥并明确报错。真机复现了原始诉求（`VRSD --group-by OBJTYPE`，`--where "AUTHOR = 'DEVELOPER'"` 得到 METH 543 / CINC 356）。
+
+### Fixed
+- **CLI 误导信号批量修正**：所有形态相同——CLI 自信地报错错的结论,而不是承认不知道。
+  - `search --exact` 之前把查询放宽成 `*NAME*` 只取一页（默认 20）就客户端精确过滤,导致窗口外的精确匹配被说成 "No matches"(`search TADIR --exact` 在 `search TADIR` 能找到时失败)。改成前缀放宽 `NAME*`(始终包含精确名)+ 大窗口兜底。
+  - `diff <object-name>` 之前报 `FILE_PARSE_ERROR: Cannot resolve object type from filename`,像文件名 bug。现在改为"看起来是对象名,先 pull 再 diff"的可操作指引。
+  - `deploy status` 之前对任何探测失败(含超时)都说 `installed:false`,而服务已部署。确认不存在现在要求 404 / not-found;其它失败返回 `installed: null` + `probeFailed: true`,人话提示"这是探测失败,不代表 ADT 不可用"。
+  - `feedback` 之前依赖 Windows-only 的 `$USERNAME`,而 `--help` 标 `--username` 为 Optional,`nextSteps` 只给 PowerShell 语法——macOS/Linux 开箱即失败。现在按 `$USERNAME → $USER → os.userInfo() → git config user.name` 回退,并按平台输出指引。
+  - session-jar 写入告警之前每条命令都打,把"会话复用静默失效→每次命令都重新登录"的真实后果淹没。改为每进程每类只告警一次,并把后果讲清楚。
+  - SAP 返回 HTML（ABAP dump / ICM 503）时整页被塞进 `error.message`(最多 9KB 标记 + 内联 CSS)。现在从 `errorTextHeader` / `msgText` 摘要（300 字符上限）+ 新增 `errorKind`,完整原文保留在 `details.sapErrorBody`。
+  - `check` 现在声明 `scope`（"通过语法检查不代表激活会通过"),并对 `Type "X" is unknown` / `Field "X" is unknown` 等消息回查对象仓库,追加结论：名字真实存在(并说明"这是 release/内核限制而非拼写错误")、或给出最近候选、或明确"系统中不存在该名字";`TABLE-FIELD` 形式提示 `abap fields <TABLE>`。查证失败绝不影响 check 结果。
+  - `abap run --help` 和 schema 现在说明 `--method` 在 ADT classrun 不注入方法参数的系统上返回 `WRAPPER_INPUT_UNAVAILABLE`,应使用直接 classrun 路径。
+- **`inspect --activation` 假阳性（最严重）**：OO 类只比较 `includes/*` 且**故意排除 `source/main`**,而失败的 `push` 留下的未激活版本恰恰只在 `source/main`——于是"激活失败"被报成 `"ok": true`。现在以 ADT inactive-objects 列表为权威信号（新增 `hasPendingInactiveVersion`），实现分部件比较仅作补充,并区分 `pending_inactive_version` / `stale_active`。
+- **`pull` 版本语义**:`pull` 取回 working-area（latest）版本,而 `run` 执行 active 版本,二者在存在未激活版本时不同,CLI 从未说明。新增 `data.versionKind`、`abap pull --active` 与 `PENDING_INACTIVE_VERSION` 警告。
+- **激活行号**:SAP 的 `line` 属性是相对**生成 include** 的（真实第 6 行报成 `line 1`），而准确位置在消息 `href` 片段（`#start=6,2`）。现在优先解析 href 的 `#start=<line>,<col>`,并新增 `lineScope` 说明行号语义;同时修掉重复的 `Activation failed for X: Activation failed for X:` 前缀。
+- **`push` 半写状态**:`ACTIVATION_FAILED` 现在携带 `written: true` / `activated: false`、`lineScope` 与 SAP 原始 messages,`push --json` 的 `results[]` 区分 `written` / `activated`,`nextSteps` 提示 `abap inspect <obj> --activation`。
+- **`create --file` description**:之前 `--file` 被允许替代 `--description`,但下游仍传 `undefined`,`encodeAttr` 抛裸 `TypeError` 被包装成 `CREATE_FAILED`。现在从 AFF `header.description`（或扁平 `description`）回填,`encodeAttr` 容忍 `null`/`undefined`,缺失时给 `USAGE` 而非 JS 异常。
+- **`create` 覆盖本地草稿 + 目录布局**:拉回本地前不再无条件覆盖(新增 `--overwrite` 与 `LOCAL_FILE_KEPT` 警告),并改用与 `abap pull` 完全一致的 `src/<typeFolder>/<object>/<file>` 布局。
+- **`create local` 模板**:新增 `report-alv` 与 `report-alv-selection` 骨架（`cl_salv_table` + `lvc_t_fcat` 字段目录 / 选择屏幕 + 过滤 + 行数限制）。
+- **`ajv` 运行时依赖**:`ajv` / `ajv-formats` 原在 `devDependencies`,却被发布产物 `dist` **静态 import**,导致 registry 安装后 `create` / `validate:aff` / `pull` / `push` 的 `--help` 全部崩溃（`Cannot find package 'ajv'`）。已移入 `dependencies`。顶层错误处理器对人类可读模式的纯文本 stderr 执行 `JSON.parse`,把真实原因替换成 `SyntaxError`——已改为安全解析,失败时降级为合成形状,绝不用新异常覆盖原异常。`doctor env.deps` 增加 ajv 探测。
+- **`doctor env.install` 项**:报告版本、安装路径与布局（npm install / source checkout / linked dev checkout）——同一次会话内版本"变化"实为安装 / 分支切换。
+- **`search --exact`**:`search --exact` 之前把查询放宽成 `*Q*` 只取一页再客户端精确过滤,导致 `search TADIR --exact` 之类同样返回空。已修正分页。
+- **表 pull 客户端 `BUILTIN_DATA_TYPES` token 不匹配**:缺 `rawstring` / `string` / `lraw` / `df16_dec` / `decfloat*` / `geomewkb` / `utclong` 等。补齐映射后 `REPOSRC` / `REPOTEXT` 等含 `RSTR` 的表可正常 pull。
+- **`select` 读特殊表**（服务端）:ICF handler 构建动态行类型时把 `INT1/INT2/INT4/INT8`（及 `RAW` 等）映射成 `CHAR`,SAP 报 `<LT_ROWS> are not Unicode convertible`,导致 `DD03L`、`VRSD` 等表完全不可读。现在优先使用表自身的 DDIC 行类型(`cl_abap_typedescr=>describe_by_name` + `get_table_line_type`),回退路径也按类型族正确映射。真机验证 DD03L / VRSD（INT2）/ TSTC（RAW）/ REPOSRC（RSTR）。
+- **`LIKE` 算子**（服务端）:where 解析器只在错误文本里列出 `LIKE`,实际从未把它识别为算子——之前唯一的 LIKE 分支是不可达的 dead code。已加入关键字算子扫描,`AUTHOR LIKE 'D%'` 真正可用。
+- **ICF 客户端过期 session 重试**:之前只对 401/403 重试,但 SAP 的 ICF 层对过期 session 返回 HTTP 400 + "Session Timed Out",导致 cookie jar 过期后所有 ICF 命令(`select` / `deploy status` / `--textpool` / TABL pulls)都坏掉,直到用户强制重新登录。现在这个 case 也触发重试。
+- **文档漂移**:textpool 之前被 `skills/abap-cli-edit/references/workflow.md`（"变体 8"）与 `docs/getting-started.md` 写成可读写,但 ICF POST 实际是 `TEXTPOOL_WRITE_UNSUPPORTED` stub。读可用;写按系统能力描述,给出可用性探测与变通做法。同时新增 `docs/abap-cli-feedback-verification.md`(F-01…F-30 哪些真机复现,文件:行号与运行时证据,以及定位到的层:client TS / bundled ICF / SAP 内核 / 本地 sandbox)与 `docs/abap-cli-feedback-fixes.md`(改了哪些、如何在 A4H 验证、哪些刻意不做)。`docs/commands.md` 随 `npm run build-docs` 重新生成,顺便补上 `fields` 和 `run-report`。
+
 ## [0.2.7] - 2026-09-17
 
 ### Added

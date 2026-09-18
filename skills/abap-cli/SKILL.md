@@ -2,7 +2,7 @@
 name: abap-cli
 description: abap-cli 用户的 agent 路由层 — 根据用户意图分发到 4 个领域 skill（abap-cli-setup / -search / -edit / -data）与 1 个方法论 skill（abap-cli-performance）；串联 .github/skills/ 两层通用 ABAP 方法论；并代理 2 个 agent 元命令（`feedback` 提交 issue / `report-stuck` 卡死本地 triage）。use when asking "这个查询该看哪个 skill" 或 agent 收到模糊意图需要先做路由决策；agent 自身做完一轮任务想提交反馈或遇到不可恢复卡死想留痕。
 metadata:
-  version: "0.2.7"
+  version: "0.2.8"
   scope: meta
   commands: [feedback, report-stuck]
 ---
