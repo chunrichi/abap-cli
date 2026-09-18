@@ -2,7 +2,7 @@
 name: abap-cli-setup
 description: abap-cli 接入、诊断与基础设施就绪 — 配置工作区（`abap init` / `profile`）、诊断环境（`abap doctor`）、管理传输请求（`abap transport`）、部署/探测自带 ICF 服务（`abap deploy` / `abap deploy status`）、管理第三方扩展（`abap extensions`）、探查 session cookie jar（`abap session info`）。use when asking how to connect to SAP / configure a workspace / add a system profile / diagnose the CLI environment / list / create / show / resolve / assign a transport request / install or upgrade the bundled ICF service / check whether the bundled ICF service is current / list or pin third-party extensions / inspect the SAP session cookie jar / debug a 400 "session timed out" auth error.
 metadata:
-  version: "0.2.6"
+  version: "0.2.7"
   scope: workspace-and-sap
   commands: [init, profile, doctor, transport, deploy, extensions, session]
 ---

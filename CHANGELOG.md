@@ -6,6 +6,8 @@
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-09-17
+
 ### Added
 - **原生 OS Keychain 替代 `keytar`**：新增 `src/abap_cli/config/secrets/{native,keytar}.ts` 与 `secrets-types.ts`，把 `keytar`（C++ 原生模块）替换为三平台原生调用。Windows 走 `cmdkey.exe` 写/删 + PowerShell `Add-Type` 调 `Advapi32.dll!CredReadW` 读（同时兼容 UTF-8 与 UTF-16LE 两种字节布局）；macOS 走 `/usr/bin/security` CLI；Linux 走 `secret-tool`（依赖 `libsecret-tools`）。默认 `keytar` 优先（向后兼容历史 keychain entry），可通过 `ABAP_CLI_KEYCHAIN_BACKEND=native` 强制走原生；`keytar` 移到 `optionalDependencies`。`doctor env.deps` 改为探测 OS Keychain 可用性。彻底告别 `node-gyp` / Python / VS C++ 编译依赖。
 - **`sso` 认证方法（Windows SSPI / Linux krb5 / macOS GSS）**：`AuthMethodV2` 联合类型新增 `sso` 字面量与 `SsoNegotiateBlock` 字段；新增 `auth/sso-negotiate.ts`（`deriveSpn` 按 RFC 4559 默认 `HTTP/<host>` + 三平台 SPNEGO token 获取）与 `auth/strategies/sso.ts`；`--auth-method sso` 与 `--spn <spn>` / `--reauth-on-expiry` 选项在 `profile add/set` 与 `init` 上生效；旧 profile 中 `authMethod: 'sso'` + `negotiate` block 自动归一化到 v2 canonical 形态。无需密码或 cookie —— 用户用 OS 登录态即可（Windows AD / `kinit <user>@<REALM>`）。
