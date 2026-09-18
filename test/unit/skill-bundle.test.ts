@@ -193,7 +193,7 @@ describe('skill bundle (019-cli-skill-agent-bundle) structural audit', () => {
       // 此外新增：dumps / extensions / session / mime / validate:aff / feedback / report-stuck
       'init', 'profile', 'doctor', 'transport', 'deploy',
       'search', 'where-used', 'pull', 'push', 'check', 'create', 'activate', 'inspect', 'diff', 'status',
-      'select', 'run', 'tcode',
+      'select', 'fields', 'run', 'run-report', 'tcode',
       'dumps',
       'extensions',
       'session',

@@ -41,6 +41,18 @@ const COMMAND_SPECS: LazyCommandSpec[] = [
     load: () => import('./commands/select.js').then((m) => ({ register: m.registerSelectCommand })),
   },
   {
+    name: 'fields',
+    scope: 'sap',
+    description: 'List the fields of a table or view (read-only, DD03L-backed)',
+    load: () => import('./commands/fields.js').then((m) => ({ register: m.registerFieldsCommand })),
+  },
+  {
+    name: 'run-report',
+    scope: 'sap',
+    description: 'Execute an activated REPORT and return its list output (read-only)',
+    load: () => import('./commands/run-report.js').then((m) => ({ register: m.registerRunReportCommand })),
+  },
+  {
     name: 'push',
     description: 'Push local ABAP files to SAP',
     load: () => import('./commands/push.js').then((m) => ({ register: m.registerPushCommand })),

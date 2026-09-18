@@ -4,18 +4,20 @@ description: abap-cli 对对象的运行时消费 — `select` 查表/视图数�
 metadata:
   version: "0.2.6"
   scope: sap
-  commands: [select, run]
+  commands: [select, fields, run, run-report]
   tags: [read-only, no-lock, no-transport, no-data-mutation]
 ---
 
 # abap-cli-data — 对象运行时消费
 
-`sap scope` — 2 个命令。**完全只读**：不修改表数据、不加锁、不写 transport。`tcode` 命令归 `abap-cli-search`（业务码是元数据而非运行时消费）。
+`sap scope` — 4 个命令。**完全只读**：不修改表数据、不加锁、不写 transport。`tcode` 命令归 `abap-cli-search`（业务码是元数据而非运行时消费）。
 
 ## 何时用
 
 - 看表数据：`select --table ZTAB`
+- 查表有哪些字段：`fields VRSD`（DD03L 字段清单，只读）
 - 跑类：`run ZCL_FOO`
+- 跑报表并取列表输出：`run-report ZR_MY_REPORT`（默认选择参数，只能取经典 list 输出）
 - 翻页 select（> 10000 行）：`scripts/pages-select.mjs` 自动分页
 - 写代码后跑结果：推送完 `ZCL_FOO` 后紧跟 `run ZCL_FOO`
 
@@ -23,6 +25,8 @@ metadata:
 
 ```
 对 SAP 对象做只读消费？
+├── 跑报表（要列表输出）→ run-report R
+├── 表结构（有哪些字段/类型/长度）→ fields T
 ├── 表/视图数据 → select --table T --where "..." --limit N
 │    ├── 部分列 → --fields
 │    ├── 仅计数 → --count-only

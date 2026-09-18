@@ -35,6 +35,17 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
                                        iv_code   = 'QUERY_FAILED'
                                        iv_msg    = |dispatch_data runtime error: { lx_top_dispatch->get_text( ) }| ).
       ENDTRY.
+    ELSEIF lv_path CP '/run/*'.
+      " F-16: execute an activated REPORT and capture its list output.
+      TRY.
+          lcl_run=>dispatch_run( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
+        CATCH cx_root INTO DATA(lx_run_dispatch).
+          lcl_response=>respond_error( io_server = server
+                                       iv_status = 500
+                                       iv_reason = 'Internal Server Error'
+                                       iv_code   = 'REPORT_RUN_FAILED'
+                                       iv_msg    = |dispatch_run runtime error: { lx_run_dispatch->get_text( ) }| ).
+      ENDTRY.
     ELSEIF lv_path CP '/mime/*'.
       lcl_mime=>dispatch_mime( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
     ELSEIF lv_path CP '/version-source*'.

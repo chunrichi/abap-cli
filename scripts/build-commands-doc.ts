@@ -75,6 +75,8 @@ async function loadConst(modPath: string, exportName: string): Promise<unknown> 
 }
 const RUN_SCHEMA = await loadConst(commands('run.js'), 'SCHEMA');
 const SELECT_SCHEMA = await loadConst(commands('select.js'), 'SCHEMA');
+const FIELDS_SCHEMA = await loadConst(commands('fields.js'), 'SCHEMA');
+const RUN_REPORT_SCHEMA = await loadConst(commands('run-report.js'), 'SCHEMA');
 const TCODE_SCHEMA = await loadConst(commands('tcode.js'), 'SCHEMA');
 const DUMPS_SCHEMA = await loadConst(commands('dumps.js'), 'DUMPS_SCHEMA');
 
@@ -145,6 +147,8 @@ const schemas: CommandSchemaDoc[] = [
   commandSchemas['doctor']!,
   commandSchemas['run'] ?? RUN_SCHEMA,
   commandSchemas['select'] ?? SELECT_SCHEMA,
+  commandSchemas['fields'] ?? FIELDS_SCHEMA,
+  commandSchemas['run-report'] ?? RUN_REPORT_SCHEMA,
   commandSchemas['where-used'] ?? whereUsedCommandSchema,
   commandSchemas['tcode'] ?? TCODE_SCHEMA,
   commandSchemas['extensions']!,
