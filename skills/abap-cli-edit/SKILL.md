@@ -177,6 +177,8 @@ CLI 解析器（[tabl-artifact.ts:parseTablDdic](https://github.com/chunrichi/ab
 | `channel-adt` / `channel-icf` | TTYP/MSAG/DDLS 通道检测（0.2.5+） | `CHANNEL_DETECTION_FAILED` / `DDLS_NOT_SUPPORTED_ON_ECC` |
 | `read` | textpool 读（混合模式 pre-stage） | 通常不报错 |
 
+> ⚠️ **textpool 写受 SAP release 限制**：只有 ADT text-elements 写端点可用的系统才能写文本元素；`adtTextpool.write: false` 的系统（vhcala4hci / A4H 实测）走 ICF POST，无条件报 `TEXTPOOL_WRITE_UNSUPPORTED`。textpool **读**始终可用；写不可用时选择屏幕标签改用 `SELECTION-SCREEN COMMENT <pos>(<len>) lbl_xxx` + `INITIALIZATION` 赋值。详见 [references/workflow.md 变体 8](./references/workflow.md)。
+
 ## 注入安全（DDIC）
 
 1. **DDIC JSON 结构校验**：客户端走 `validateDdicObject`；命名空间 `Z`/`Y` 开头

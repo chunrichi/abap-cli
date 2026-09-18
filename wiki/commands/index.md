@@ -4,7 +4,7 @@ title: Commands
 description: abap CLI 命令参考索引
 tags: [abap-cli, commands, index]
 created at: 2026-08-06 23:10:00
-changed at: 2026-09-03 17:00:00
+changed at: 2026-09-18 22:05:00
 ---
 
 # Commands
@@ -17,7 +17,7 @@ changed at: 2026-09-03 17:00:00
 - [profile](profile.md) — 管理全局连接 profiles（增删改查、测试、导入导出）
 - [doctor](doctor.md) — 诊断 CLI 环境（环境 / 配置 / 连接三段检查，支持 `--fix`）
 - [pull](pull.md) — 从 SAP 下载对象到本地（源码 / 包批量 / DDIC JSON / textpool / 远程版本）
-- [push](push.md) — 推送本地文件到 SAP（源码 / FUGR / textpool / DDIC JSON，按对象解析 transport）
+- [push](push.md) — 推送本地文件到 SAP（源码 / FUGR / textpool / DDIC JSON，按对象解析 transport；textpool 写受系统限制）
 - [run](run.md) — 在 SAP 端执行类（classrun / 静态方法反射），返回 stdout 与退出码（push → run → 验证闭环）
 - [activate](activate.md) — 激活对象的所有 inactive items（method/OSI 层级，规避 root-URI 静默 no-op）
 

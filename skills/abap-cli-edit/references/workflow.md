@@ -187,8 +187,10 @@ abap create local CLAS ZCL_NEW --dir ./src
 
 ## 变体 8 — textpool
 
+> ⚠️ **textpool 读可用，写受 SAP release 限制**：只有 ADT text-elements 写端点可用的系统才能 `push` 文本元素。在只提供非交互式 textpool API 的 release 上（vhcala4hci / A4H 实测），`push` **必然失败**并返回 `TEXTPOOL_WRITE_UNSUPPORTED`——下面的 push 示例在该类系统上不成立。
+
 ```bash
-# 拉
+# 拉（ADT / ICF 两种路由都可用）
 abap pull ZCL_FOO --textpool
 # → src/zcl_foo/zcl_foo.texts.en.properties
 # → src/zcl_foo/zcl_foo.selections.en.properties
@@ -197,11 +199,15 @@ abap pull ZCL_FOO --textpool
 # 改
 # 编辑 .properties
 
-# 推
+# 推（仅 ADT text-elements 写可用时；A4H 上 → TEXTPOOL_WRITE_UNSUPPORTED）
 abap push src/zcl_foo/zcl_foo.texts.en.properties
 ```
 
-混合模式：ADT 文本元素 API 可用时走 ADT，否则 ICF `/textpool/*`。能力在 `profile add/set` 时**一次探测**并缓存到 profile 的 `adtTextpool`，后续直接读缓存路由，无运行时回退。JSON 结果 `data.route: 'adt' | 'icf'`。
+**可用性检查**：`profile add/set` / `abap init` 时**一次探测**并缓存 textpool 读写能力到 profile 的 `adtTextpool`（`~/.abap-cli/systems.json`）；`adtTextpool.write: false` 表示写会路由到 ICF `/textpool/*`，而自带 ICF handler 对 textpool POST **无条件**返回 `TEXTPOOL_WRITE_UNSUPPORTED`（不是可重试的运行时故障）。
+
+**选择屏幕文本的变通做法（A4H 实测）**：`TEXT-xxx` / 选择文本无法通过 CLI 定义时，用 `SELECTION-SCREEN COMMENT <pos>(<len>) lbl_xxx` 声明字段标签，并在 `INITIALIZATION` 里给 `lbl_xxx` 赋值。
+
+混合模式：ADT 文本元素 API 可用时走 ADT，否则 ICF `/textpool/*`。能力**一次探测**并缓存到 profile，后续直接读缓存路由，无运行时回退。JSON 结果 `data.route: 'adt' | 'icf'`。
 
 ## 变体 9 — FUGR 包含错误
 

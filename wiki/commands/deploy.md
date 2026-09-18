@@ -4,12 +4,12 @@ title: abap deploy
 description: 部署内置 ICF ABAP 服务 — `abap deploy` 推送并激活 `abap/src` 捆绑源码 + SICF 节点；`abap deploy status` 只读探测 SAP 侧版本匹配
 tags: [abap-cli, command, deploy, icf, steampunk, btp]
 created at: 2026-09-05 00:00:00
-changed at: 2026-09-05 00:00:00
+changed at: 2026-09-18 22:05:00
 ---
 
 # abap deploy
 
-部署内置 ICF ABAP 服务（自建 `/sap/zabap_vibe`），承载 DDIC CRUD / textpool / `select` / `tcode` / `run` 等旁路 ADT 的能力。
+部署内置 ICF ABAP 服务（自建 `/sap/zabap_vibe`），承载 DDIC CRUD / textpool **读** / `select` / `tcode` / `run` 等旁路 ADT 的能力。
 
 ## Usage
 
