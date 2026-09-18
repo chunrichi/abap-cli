@@ -35,6 +35,13 @@ export interface PullOptions {
   textpool?: boolean;
   /** Pull the object's active version source from a remote system (Version Management). */
   remote?: string;
+  /**
+   * Which source version to fetch for ADT source objects (CLAS / INTF / PROG /
+   * FUGR). Defaults to `'latest'` — ADT's working-area version, which is what
+   * the user last pushed, activated or not. `'active'` fetches the version SAP
+   * actually executes, matching `abap run` (feedback F-02).
+   */
+  versionKind?: 'latest' | 'active';
 }
 
 export interface PullEntry {

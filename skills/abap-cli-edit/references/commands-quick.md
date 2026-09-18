@@ -49,11 +49,12 @@ abap push <files...> --atomic --yes                     # 全量校验后写
 abap push <files...> --fail-fast --yes                  # 失败即停
 abap push <file> --dry-run                              # 计划模式（零 SAP 调用）
 abap push src/zmy_table.tabl.json --tr DEVK900001 --yes # ICF JSON（DDIC / HTTP / TRAN）
-abap push src/zprog/zprog.prog.texts.en.properties      # textpool
+abap push src/zprog/zprog.prog.texts.en.properties      # textpool（写受系统限制，见下）
 ```
 
 > 写操作：非 TTY 必须 `--yes` 或 `--dry-run`（`core/confirmation.ts` 统一守卫，exit 7）。
 > **ICF JSON（DDIC / HTTP / TRAN）不支持 `--check-only`**（`VALIDATION_ERROR`；这类文件在 push 时校验）；`--dry-run` 对它们同样只做计划、零 ICF 调用。
+> **textpool 写受 SAP release 限制**：无 ADT text-elements 写端点时，ICF POST 无条件返回 `TEXTPOOL_WRITE_UNSUPPORTED`（vhcala4hci / A4H 实测）；textpool **读**不受影响。详见 [workflow.md 变体 8](workflow.md)。
 
 ### 按对象 transport 解析（核心）
 
@@ -74,7 +75,7 @@ abap push src/zprog/zprog.prog.texts.en.properties      # textpool
 | `<name>.http.json` | icf（`POST /http/<name>`，**不探测存在性**：push 即创建/更新 SICF 节点） |
 | `<name>.tran.json` | icf（`POST /tran/<code>`，push 前 GET 探测存在性） |
 | `<name>.ttyp.json` / `.msag.json` / `.ddls.json` | 通道路由（ADT 分支）：`channel-detect` 决定 ADT / ICF |
-| `<name>.<type>.texts|selections|headings.<lang>.properties` | textpool（混合模式） |
+| `<name>.<type>.texts|selections|headings.<lang>.properties` | textpool（混合模式；写受系统限制，见 [workflow.md 变体 8](workflow.md)） |
 
 ## `abap check`
 

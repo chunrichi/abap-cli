@@ -4,7 +4,7 @@ title: abap CLI Wiki
 description: abap CLI 知识库首页 — 命令参考、学习记录与路线图
 tags: [abap-cli, wiki, index]
 created at: 2026-08-06 23:10:00
-changed at: 2026-08-19 23:00:00
+changed at: 2026-09-18 22:05:00
 ---
 
 # abap CLI Wiki
@@ -27,7 +27,7 @@ changed at: 2026-08-19 23:00:00
 
 - [create](commands/create.md) — 在 SAP 创建新对象并激活（源对象走 ADT / DDIC 三件套走 ICF；`create local` 离线草稿）
 - [pull](commands/pull.md) — 从 SAP 下载对象到本地（源码 / 包批量 / DDIC JSON / textpool / 远程版本）
-- [push](commands/push.md) — 推送本地文件到 SAP（源码 / FUGR / textpool / DDIC JSON，按对象解析 transport）
+- [push](commands/push.md) — 推送本地文件到 SAP（源码 / FUGR / textpool / DDIC JSON，按对象解析 transport；textpool 写受系统限制）
 
 ### 校验
 

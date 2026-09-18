@@ -118,14 +118,19 @@ describe('abap deploy status', () => {
     ).toBe(true);
   });
 
-  it('returns installed=false on unreachable (non-blocking)', async () => {
+  it('returns installed=null + probeFailed on unreachable (F-19: absence not confirmed)', async () => {
     mockGet.mockReset();
     probeAdtRuntime.mockResolvedValueOnce({ runtime: 'unknown', source: 'none', icfSetupBlocked: false });
     mockGet.mockRejectedValueOnce(new Error('ECONNREFUSED'));
-    const { data } = await run(['deploy', 'status', '--json']);
-    const d = data as { installed: boolean; status: string };
-    expect(d.installed).toBe(false);
+    const { data, meta } = await runWithMeta(['deploy', 'status', '--json']);
+    const d = data as { installed: boolean | null; status: string; probeFailed: boolean };
+    // A connection error/timeout leaves the answer unknown: reporting
+    // `installed:false` would falsely claim the service is not installed.
+    expect(d.installed).toBeNull();
     expect(d.status).toBe('unreachable');
+    expect(d.probeFailed).toBe(true);
+    const warnings = (meta as { warnings?: { code: string }[] } | undefined)?.warnings ?? [];
+    expect(warnings.some((w) => w.code === 'ICF_CHECK_DEGRADED')).toBe(true);
   });
 
   it('030: surfaces Steampunk runtime + icfSetupBlocked=true on trial', async () => {

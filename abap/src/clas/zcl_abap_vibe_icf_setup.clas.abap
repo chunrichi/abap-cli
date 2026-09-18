@@ -4,9 +4,9 @@ CLASS zcl_abap_vibe_icf_setup DEFINITION PUBLIC CREATE PUBLIC.
   PROTECTED SECTION.
   PRIVATE SECTION.
     CONSTANTS:
-      gc_icf_url TYPE string VALUE '/sap/zabap_vibe',
+      gc_icf_url TYPE string VALUE '/sap/abap_cli',
       gc_parent  TYPE string VALUE '/sap',
-      gc_name    TYPE icfname VALUE 'zabap_vibe',
+      gc_name    TYPE icfname VALUE 'abap_cli',
       gc_handler TYPE icf_hand VALUE 'ZCL_ABAP_VIBE_ICF',
       gc_vhost   TYPE icfhostnum VALUE 0. " default_host
 

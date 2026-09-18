@@ -34,7 +34,7 @@
 | `activate` | 激活 | `ACTIVATION_FAILED` |
 | `unlock` | 释放锁 | `UNLOCK_WARNING`（仅 `meta.warnings`，exit 0） |
 | `ddic-icf` | 所有 ICF/通道 JSON 推送的统一进入 stage（DDIC / HTTP / TRAN / TTYP / MSAG / DDLS）；`--dry-run` 也记录 | 视类型而定（DDIC: `INVALID_FIELD` / `MISSING_FIELD`；HTTP: `HTTP_CREATE_FAILED`；TRAN: `TRAN_CREATE_FAILED`） |
-| `textpool-adt` / `textpool-icf` | textpool 写 | 视 mode 而定 |
+| `textpool-adt` / `textpool-icf` | textpool 写 | 视 mode 而定；ICF 写为 stub（无 ADT 写端点时 `TEXTPOOL_WRITE_UNSUPPORTED`，见 [workflow.md 变体 8](workflow.md)） |
 
 ## 写操作保护（P0.3）
 

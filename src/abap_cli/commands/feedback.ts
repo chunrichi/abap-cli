@@ -9,7 +9,7 @@ const SCHEMA = {
   usage: 'feedback [options]',
   arguments: [],
   options: [
-    { name: '--username', type: 'string', valuePlaceholder: '<name>', description: 'Optional business username override; defaults to the PowerShell $env:USERNAME value.' },
+    { name: '--username', type: 'string', valuePlaceholder: '<name>', description: 'Optional business username override; when omitted it is resolved from $USERNAME, $USER, the OS user info, or `git config user.name`.' },
     { name: '--email', type: 'string', valuePlaceholder: '<address>', description: 'Optional contact email.' },
     { name: '--feature-key', type: 'string', valuePlaceholder: '<key>', required: true, description: 'Stable feature or function identifier.' },
     { name: '--title', type: 'string', valuePlaceholder: '<text>', required: true, description: 'Short issue summary.' },
@@ -53,7 +53,7 @@ export function registerFeedbackCommand(program: Command): void {
   program
     .command('feedback')
     .description('Submit a completed-session feedback issue')
-    .option('--username <name>', 'Optional business username override; defaults to $env:USERNAME')
+    .option('--username <name>', 'Optional business username override; auto-detected from $USERNAME/$USER/OS user/git config when omitted')
     .option('--email <address>', 'Optional contact email')
     .option('--feature-key <key>', 'Stable feature or function identifier')
     .option('--title <text>', 'Short issue summary')

@@ -35,7 +35,7 @@ Exit codes (stable contract, only additive across versions): `0` success, `1` un
 
 ## Commands
 
-This generator emits **21** commands in a stable display order. New commands appear automatically once a schema is registered with `commandSchemas` (or a per-command `SCHEMA` constant) — see the generator source for the canonical list.
+This generator emits **23** commands in a stable display order. New commands appear automatically once a schema is registered with `commandSchemas` (or a per-command `SCHEMA` constant) — see the generator source for the canonical list.
 
 ## `abap init` _(local)_
 
@@ -142,6 +142,7 @@ abap pull [options] [object-name]
 | `--textpool` | Also pull textpool files (.texts/.selections/.headings.<lang>.properties). |
 | `--remote=<remoteid>` | Pull the object's active version source from a remote system (Version Management). |
 | `--tr=<request>` | Pull all objects bound to a transport request (mutually exclusive with object name and --package). |
+| `--user=<sap-user>` | Filter --tr lookups by transport task owner (case-insensitive). Only valid with --tr. |
 | `--schema` | Print the command parameter schema as JSON and exit (no SAP call). (default `false`) |
 
 ### Exclusive groups
@@ -675,7 +676,7 @@ abap profile export --file profiles.json
 
 ## `abap doctor` _(local)_
 
-Diagnose CLI environment, configuration, and connections.
+Diagnose CLI environment and configuration (read-only; no live SAP probes).
 
 ```bash
 abap doctor [options]
@@ -688,7 +689,6 @@ abap doctor [options]
 | `--verbose` | Include detail (versions, paths, underlying messages). |
 | `--fix` | Apply safe, reversible fixes (requires --yes). |
 | `--yes` | Confirm --fix without prompting. |
-| `--system=<name>` | Scope the connection section to a named profile. |
 | `--schema` | Print the command parameter schema as JSON and exit (no SAP call). (default `false`) |
 
 ### Global options
@@ -713,7 +713,7 @@ abap doctor --fix --yes
 
 ## `abap run` _(sap)_
 
-Execute an ABAP class (classrun) or a static method via the bundled runner wrapper; returns stdout + exit code (read-only).
+Execute an ABAP class (classrun) or a static method via the bundled runner wrapper; returns stdout + exit code (read-only). The wrapper route (--method) requires a system whose ADT classrun endpoint injects method arguments; otherwise it returns WRAPPER_INPUT_UNAVAILABLE.
 
 ```bash
 abap run [options] <class-name>
@@ -729,7 +729,7 @@ abap run [options] <class-name>
 
 | Option | Description |
 |--------|-------------|
-| `--method` | PUBLIC STATIC method name to invoke via ZCL_ABAP_VIBE_RUNNER. When omitted, the class is run via ADT classrun (if_oo_adt_classrun~main). — pattern: `^[A-Za-z_][A-Za-z0-9_]*$` |
+| `--method` | PUBLIC STATIC method name to invoke via ZCL_ABAP_VIBE_RUNNER. When omitted, the class is run via ADT classrun (if_oo_adt_classrun~main). NOT available on systems whose ADT classrun endpoint does not inject method arguments: the call then fails with WRAPPER_INPUT_UNAVAILABLE — use the direct classrun path (`abap run <class>`) instead. — pattern: `^[A-Za-z_][A-Za-z0-9_]*$` |
 | `--args` | JSON object of method arguments, mapped to IMPORTING parameters (case-insensitive). Must be a JSON object, not array/null. (default `"{}"`) |
 | `--timeout` | Maximum execution time in ms. Wrapper path enforces server-side via cl_abap_runtime; classrun path uses ADT endpoint timeout (~5min) plus CLI-side AbortController fallback. (default `30000`) — min: `100` · max: `600000` |
 | `--dry-run` | Plan only — print the request envelope without invoking ADT classrun. (default `false`) |
@@ -788,8 +788,10 @@ abap select --table <name> [options]
 | `--fields=<csv>` | Comma-separated field names to project. Omit for all fields (large-object fields STRG/RSTR/LCHR/LRAW excluded, listed in data.excludedFields). |
 | `--where=<clause>` | Filter clause: FIELD OP VALUE joined by AND. Ops: = <> > >= < <= LIKE. Strings in single quotes ('' for escape), numbers bare, dates 'YYYYMMDD'. MANDT filter rejected (implicit session client). |
 | `--limit=<n>` | Maximum rows returned. SAP fetches limit+1 to detect truncation (data.truncated). (default `100`) — min: `1` · max: `10000` |
+| `--max=<n>` | DEPRECATED alias for --limit (same 1–10000 bound). An explicit --limit wins when both are given. — **deprecated** |
 | `--offset=<n>` | Row offset for pagination. Deterministic pagination requires --order-by. (default `0`) — min: `0` · max: `100000` |
 | `--order-by=<csv>` | Comma-separated FIELD:ASC|DESC pairs, e.g. "ID:ASC,AMOUNT:DESC". |
+| `--group-by=<field>` | Aggregate: return one row per distinct value of <field> plus CNT (COUNT(*)), ordered by CNT descending. Mutually exclusive with --fields / --order-by / --offset / --count-only. |
 | `--count-only` | Return only the matching row count (data.count); rows/fields omitted. (default `false`) |
 | `--dry-run` | Plan only — print the query envelope without invoking the ICF endpoint. (default `false`) |
 | `--json` | Emit the unified JSON envelope on stdout; --pretty-json indents. (default `false`) — global |
@@ -825,6 +827,89 @@ abap select --table ZTAB_FIXTURE --where "STATUS = 'X'" --dry-run
 | `LIMIT_EXCEEDED` | VALIDATION_ERROR / 7 | (see docs/commands.md#error-codes) |
 | `OFFSET_EXCEEDED` | VALIDATION_ERROR / 7 | (see docs/commands.md#error-codes) |
 | `QUERY_FAILED` | SAP_ERROR / 6 | (see docs/commands.md#error-codes) |
+| `INVALID_ARGUMENT` | USAGE / 2 | (see docs/commands.md#error-codes) |
+
+
+## `abap fields` _(sap)_
+
+List the DDIC fields of a table or view (read-only): abap fields VRSD [--json]
+
+```bash
+abap fields <table> [--json]
+```
+
+### Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `<table>` | Table or view name (e.g. VRSD). Uppercased. |
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--json` | Emit a single JSON envelope (global flag). |
+
+### Examples
+
+```bash
+# Field inventory as JSON
+abap fields VRSD --json
+# Human-readable listing
+abap fields VRSD
+```
+
+### Error codes
+
+| Code | Category / exit | Description |
+|------|-----------------|-------------|
+| `OBJECT_NOT_FOUND` | NOT_FOUND / 8 | (see docs/commands.md#error-codes) |
+| `INVALID_ARGUMENT` | USAGE / 2 | (see docs/commands.md#error-codes) |
+| `QUERY_FAILED` | SAP_ERROR / 6 | (see docs/commands.md#error-codes) |
+
+
+## `abap run-report` _(sap)_
+
+Execute an activated REPORT and return its list output (read-only, via the bundled ICF /run/report endpoint). The report runs with DEFAULT selection values; only classic list output is captured.
+
+```bash
+abap run-report <report> [--variant <name>] [--json]
+```
+
+### Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `<report>` | Executable program name (TRDIR subc = 1), e.g. ZR_MY_REPORT. |
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--variant=<name>` | Selection variant to apply instead of the plain default values. |
+
+### Global options
+
+- `--json`
+- `--pretty-json`
+
+### Examples
+
+```bash
+# Run a report and print its list
+abap run-report ZR_MY_REPORT
+# Run with a selection variant, as JSON
+abap run-report ZR_MY_REPORT --variant VAR1 --json
+```
+
+### Error codes
+
+| Code | Category / exit | Description |
+|------|-----------------|-------------|
+| `REPORT_NOT_FOUND` | NOT_FOUND / 8 | (see docs/commands.md#error-codes) |
+| `REPORT_NOT_EXECUTABLE` | VALIDATION_ERROR / 7 | (see docs/commands.md#error-codes) |
+| `REPORT_RUN_FAILED` | SAP_ERROR / 6 | (see docs/commands.md#error-codes) |
+| `REPORT_NO_LIST_OUTPUT` | SAP_ERROR / 6 | (see docs/commands.md#error-codes) |
 | `INVALID_ARGUMENT` | USAGE / 2 | (see docs/commands.md#error-codes) |
 
 
@@ -1052,7 +1137,7 @@ abap create <type> <name> [options]
 
 | Argument | Description |
 |----------|-------------|
-| `<type>` | Object type — enum: `CLAS`, `INTF`, `PROG`, `FUGR`, `TABL`, `STRU`, `DOMA`, `DTEL`, `HTTP`, `TRAN`, `TTYP`, `MSAG`, `DDLS`, `SRVB`, `SRVD`, `BDEF`, `DCLS`, `DDLX`, `DDLA` |
+| `<type>` | Object type — enum: `CLAS`, `INTF`, `PROG`, `FUGR`, `TABL`, `STRU`, `DOMA`, `DTEL`, `ENQU`, `NROB`, `HTTP`, `TRAN`, `TTYP`, `MSAG`, `DDLS`, `SRVB`, `SRVD`, `BDEF`, `DCLS`, `DDLX`, `DDLA` |
 | `<name>` | Object name |
 
 ### Options
@@ -1067,7 +1152,7 @@ abap create <type> <name> [options]
 | `--no-pull` | Skip the create-then-pull local copy (default: pull after create) |
 | `--check-only` | Validate the proposed object without creating it |
 | `--audit` | Include the before-checksum (extra SAP round-trip, off by default) |
-| `--file=<path>` | abap-file-format JSON input (required for TABL/STRU/DOMA/DTEL/HTTP/TRAN/TTYP/MSAG/DDLS/SRVD/DCLS/DDLX/DDLA) |
+| `--file=<path>` | abap-file-format JSON input (required for TABL/STRU/DOMA/DTEL/ENQU/NROB/HTTP/TRAN/TTYP/MSAG/DDLS/SRVD/DCLS/DDLX/DDLA) |
 | `--func=<name>` | With FUGR: create a function module (FUGR/FF) inside the existing function group <name> |
 | `--schema` | Print the command parameter schema as JSON and exit (no SAP call). (default `false`) |
 | `--yes` | Confirm in non-interactive environments. (default `false`) |
@@ -1123,7 +1208,7 @@ Generated from the `errors` array of every command schema (single source of trut
 | `FILE_PARSE_ERROR` | USAGE / 2 | `abap push` |
 | `FORCE_BYPASSED` | VALIDATION_ERROR / 7 | `abap deploy` |
 | `ICF_CHECK_DEGRADED` | VALIDATION_ERROR / 7 | `abap deploy` |
-| `INVALID_ARGUMENT` | USAGE / 2 | `abap init`, `abap pull`, `abap check`, `abap search`, `abap status`, `abap diff`, `abap transport`, `abap profile`, `abap run`, `abap select`, `abap where-used`, `abap tcode`, `abap mime`, `abap dumps` |
+| `INVALID_ARGUMENT` | USAGE / 2 | `abap init`, `abap pull`, `abap check`, `abap search`, `abap status`, `abap diff`, `abap transport`, `abap profile`, `abap run`, `abap select`, `abap fields`, `abap run-report`, `abap where-used`, `abap tcode`, `abap mime`, `abap dumps` |
 | `INVALID_FIELD` | VALIDATION_ERROR / 7 | `abap select` |
 | `INVALID_WHERE` | VALIDATION_ERROR / 7 | `abap select` |
 | `LIMIT_EXCEEDED` | VALIDATION_ERROR / 7 | `abap select` |
@@ -1133,14 +1218,18 @@ Generated from the `errors` array of every command schema (single source of trut
 | `METHOD_NOT_SUPPORTED` | VALIDATION_ERROR / 7 | `abap run` |
 | `NO_TRANSPORT` | VALIDATION_ERROR / 7 | `abap push`, `abap deploy` |
 | `OBJECT_NOT_ACTIVE` | SAP_ERROR / 6 | `abap run` |
-| `OBJECT_NOT_FOUND` | NOT_FOUND / 8 | `abap pull`, `abap search`, `abap inspect`, `abap activate`, `abap run`, `abap where-used` |
+| `OBJECT_NOT_FOUND` | NOT_FOUND / 8 | `abap pull`, `abap search`, `abap inspect`, `abap activate`, `abap run`, `abap fields`, `abap where-used` |
 | `OFFSET_EXCEEDED` | VALIDATION_ERROR / 7 | `abap select` |
 | `OVERWRITE_REQUIRED` | USAGE / 2 | `abap pull` |
 | `PASSWORD_EXPORT` | VALIDATION_ERROR / 7 | `abap profile` |
 | `PROFILE_MISMATCH` | VALIDATION_ERROR / 7 | `abap profile` |
 | `PULL_PARTIAL_FAILURE` | VALIDATION_ERROR / 7 | `abap pull` |
 | `PUSH_FAILED` | VALIDATION_ERROR / 7 | `abap push` |
-| `QUERY_FAILED` | SAP_ERROR / 6 | `abap select` |
+| `QUERY_FAILED` | SAP_ERROR / 6 | `abap select`, `abap fields` |
+| `REPORT_NOT_EXECUTABLE` | VALIDATION_ERROR / 7 | `abap run-report` |
+| `REPORT_NOT_FOUND` | NOT_FOUND / 8 | `abap run-report` |
+| `REPORT_NO_LIST_OUTPUT` | SAP_ERROR / 6 | `abap run-report` |
+| `REPORT_RUN_FAILED` | SAP_ERROR / 6 | `abap run-report` |
 | `SAP_ERROR` | SAP_ERROR / 6 | `abap deploy`, `abap profile`, `abap mime`, `abap dumps` |
 | `STEAMPUNK_ICF_MANUAL` | VALIDATION_ERROR / 7 | `abap deploy` |
 | `SYNTAX_ERROR` | VALIDATION_ERROR / 7 | `abap push`, `abap check` |

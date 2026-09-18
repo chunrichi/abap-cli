@@ -14,6 +14,7 @@ import { executeIcfRegister } from '../../adc/icf-register-registry.js';
 import '../../adc/icf-bootstrap.js';
 import { collectWarning } from '../../output/meta.js';
 import { toOutputPath } from '../../core/path-output.js';
+import { ICF_BASE_PATH } from '../../clients/icf-version.js';
 
 export type DeployStatus = 'deployed' | 'skipped' | 'failed';
 
@@ -174,10 +175,10 @@ export async function deployBundled(client: AdtClientWrapper, opts: DeployOption
   // summary reports which strategy would have been selected.
   let icfNode: DeployIcfNode | undefined;
   const strategySpec = {
-    name: 'zabap_vibe',
-    description: 'ABAP Vibe - ICF Services',
+    name: 'abap_cli',
+    description: 'abap-cli ICF Services',
     handler: 'ZCL_ABAP_VIBE_ICF',
-    urlPath: '/sap/zabap_vibe',
+    urlPath: ICF_BASE_PATH,
     state: 'active' as const,
     ...(opts.transport ? { transport: opts.transport } : {}),
   };
@@ -215,7 +216,7 @@ export async function deployBundled(client: AdtClientWrapper, opts: DeployOption
     icfNode = {
       status: 'success',
       action: outcome.action,
-      url: '/sap/zabap_vibe',
+      url: ICF_BASE_PATH,
       active: outcome.active,
       handler: 'ZCL_ABAP_VIBE_ICF',
     };

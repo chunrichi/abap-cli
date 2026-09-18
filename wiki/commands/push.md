@@ -1,15 +1,17 @@
 ---
 type: command
 title: abap push
-description: 推送本地 ABAP 文件到 SAP — lock → set source → syntax check → activate → unlock，支持源码对象、FUGR、textpool 与 DDIC JSON，按对象解析 transport
+description: 推送本地 ABAP 文件到 SAP — lock → set source → syntax check → activate → unlock，支持源码对象、FUGR、textpool 与 DDIC JSON，按对象解析 transport（textpool 写受系统限制）
 tags: [abap-cli, command, push, upload, abap-file-format, ddic, textpool, transport]
 created at: 2026-08-07 00:11:03
-changed at: 2026-09-03 00:00:00
+changed at: 2026-09-18 22:05:00
 ---
 
 # abap push
 
 把本地 ABAP 文件推送到 SAP 系统，核心流程是 **lock → set source → syntax check → activate → unlock**。支持：普通源码对象（CLAS/PROG/INTF）、FUGR 子对象、textpool `.properties`，以及 ICF 路由的 `.json`（DDIC / HTTP / TRAN）与通道路由的 TTYP / MSAG / DDLS。文件级编排在 `flows/edit/push.ts`（`runPush` / `pushOne`），单对象核心在 `flows/edit/push-object.ts`（`pushObject`）。
+
+> ⚠️ **textpool 写限制**：textpool `.properties` 的**读**（`abap pull --textpool`）在 ADT / ICF 两种路由都可用；**写**需要 ADT text-elements 写端点。在只提供非交互式 textpool API 的 release 上（vhcala4hci / A4H 实测），profile 缓存 `adtTextpool.write: false` → 写路由到 ICF `/textpool/*`，而自带 ICF handler 对 POST **无条件**返回 `TEXTPOOL_WRITE_UNSUPPORTED`（SAP_ERROR / exit 6）。此时选择屏幕标签改用 `SELECTION-SCREEN COMMENT <pos>(<len>) lbl_xxx` + `INITIALIZATION` 赋值，不要依赖 `push` 文本元素。
 
 ## Usage
 
@@ -89,7 +91,7 @@ DDIC/TRAN 的探测在 `--dry-run` 之后（plan-only 不做多余 round-trip）
 |------|------|------|
 | 普通源码（adt） | `pushObject` | 锁对象 → 写每个 part 源码 → check/activate → 解锁（`finally` 保证） |
 | FUGR | `push-fugr.ts` | 子对象（FM/include）是独立 ADT 锁对象，逐文件锁自己的目标、写源，最后激活整个 function group |
-| Textpool | `push-textpool.ts` | 混合模式：profile 缓存能力决定走 ADT `setTextElements`（lock→write→unlock）还是 ICF `/textpool/*`；`--check-only` 不支持（`VALIDATION_ERROR`） |
+| Textpool | `push-textpool.ts` | 混合模式：profile 缓存能力决定走 ADT `setTextElements`（lock→write→unlock）还是 ICF `/textpool/*`；`--check-only` 不支持（`VALIDATION_ERROR`）。**ICF 写为 stub**——`adtTextpool.write: false` 的系统上 POST 无条件报 `TEXTPOOL_WRITE_UNSUPPORTED`（见上方限制说明） |
 | ICF JSON（`route: 'icf'`） | `ICF_PUSH_HANDLERS` 表 | DDIC（`.doma/.dtel/.tabl/.stru.json`）、HTTP（`.http.json`）、TRAN（`.tran.json`）。`pushOne` 查表 `icfPushHandlerFor(objectType)` 取到具体 handler，不再有 per-type `if` 分支 |
 | TTYP / MSAG / DDLS（`route: 'adt'`） | `CHANNEL_ROUTED_PUSH` 表 → `push-{ttyp,msag,ddls}.ts` | 注册表里这三类 `source: 'ADT'`，`resolveFile` 给的是 `route: 'adt'`，但文件是 AFF `.json` 而非 ABAP 源码，所以 `pushOne` 必须在通用源码分支**之前**拦截；每个 flow 自己跑 `channel-detect` |
 
@@ -139,7 +141,7 @@ DDIC 的存在性探测（`GET /ddic/<type>/<name>`）与 TRAN 的探测（`GET 
 | `zmy_service.http.json` | icf | HTTP 服务（SICF 节点），POST `/http/<name>`；**不探测存在性**（push 即创建/更新） |
 | `zmy_tran.tran.json` | icf | 事务码（SE93），POST `/tran/<code>`；push 前 GET 探测存在性 |
 | `zmy_ttyp.ttyp.json` / `zmy_msag.msag.json` / `zmy_view.ddls.json` | 通道路由（adt 分支） | 036 三类型，`channel-detect` 决定 ADT / ICF |
-| `zprog.prog.texts.en.properties`（`texts`/`selections`/`headings`） | textpool | 文本元素，混合模式路由 |
+| `zprog.prog.texts.en.properties`（`texts`/`selections`/`headings`） | textpool | 文本元素，混合模式路由；写仅在 ADT text-elements 写端点可用时成功 |
 
 **不支持的**：`.clas.json` 等源码对象的元数据 JSON — 被解析为 route `icf` 但对象类型既不在四种 DDIC 之内、也不是 036 的三类型，`validateLocalFile` 抛 `DDIC_NOT_SUPPORTED`（exit 7）。源码对象的创建/更新走 `abap create`，不是 push。
 
@@ -196,7 +198,7 @@ abap push src/tabl/ztest_e2e.tabl.json
 abap push src/tabl/zthree.tabl.json --tr NDK900001 --yes
 # 等价于：abap push src/tabl/zthree.tabl.json src/tabl/zthree.tabl.ddic src/tabl/zthree.tabl.settings.json --tr NDK900001 --yes
 
-# 推送 textpool
+# 推送 textpool（仅 ADT text-elements 写可用时；A4H 上报 TEXTPOOL_WRITE_UNSUPPORTED）
 abap push src/prog/zprog/zprog.prog.texts.en.properties
 ```
 
@@ -249,6 +251,7 @@ abap push src/prog/zprog/zprog.prog.texts.en.properties
 
 - [ ] **B** — `src/abap_cli/commands/push.ts` 的 `--tr` help 文案仍写 "required in non-TTY mode"，与新的按对象解析行为不符（已绑定请求或 `$TMP` 对象不再必输）。应改为描述解析规则。
 - [ ] **C** — textpool 的 ADT 路由在 lock 失败时走通用 HTTP 分类（`SAP_ERROR`），不是精确的 `LOCK_FAILED`（无 `inspect --locks` 指引）。与源码对象/FUGR 的锁错误体验不一致。
+- [ ] **D** — ICF `/textpool/*` 的 POST 是无条件 stub（`TEXTPOOL_WRITE_UNSUPPORTED`，非声明错误码）：应在 `pull --textpool --json` 暴露 `data.writable`（来自 profile 的 `adtTextpool.write`），让 agent 在编辑前就知道文本元素写不可用。
 
 ## todo
 

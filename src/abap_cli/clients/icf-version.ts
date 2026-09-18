@@ -2,7 +2,20 @@ import { IcfClient } from './icf-client.js';
 import { CliError } from '../output/json.js';
 import { probeAdtRuntime, type AdtRuntime } from '../adc/runtime-probe.js';
 
-/** Bundled expected version of the zabap_vibe ICF service.
+/**
+ * ICF service URL prefix. Historically `/sap/zabap_vibe`; renamed to
+ * `/sap/abap_cli` to align the deployed SICF node name with the package
+ * name (`abap-cli`) and CLI binary (`abap`).
+ *
+ * Existing deployments on `/sap/zabap_vibe` keep working because:
+ *   - The ABAP handler reads `gc_service` from its own constants and
+ *     dispatches regardless of the URL prefix.
+ *   - Users upgrading must `abap deploy --yes` once to recreate the SICF
+ *     node at the new path; old nodes stay visible until manually removed.
+ */
+export const ICF_BASE_PATH = '/sap/abap_cli';
+
+/** Bundled expected version of the abap_cli ICF service.
  *  Bumped 0.1.0 → 0.2.0 for DDIC CRUD + textpool support;
  *  bumped 0.2.0 → 0.3.0 for read-only table data query support;
  *  bumped 0.3.0 → 0.4.0 for select rows native-typed values;
@@ -20,6 +33,13 @@ export interface IcfDeploymentInfo {
   remoteVersion?: string;
   expectedVersion: string;
   error?: { code: string; message: string };
+  /**
+   * True when the probe itself failed (timeout, connection refusal, 5xx, stale
+   * session) instead of returning a definitive answer. Consumers must not
+   * treat `status:'unreachable'` as "not installed": absence is only confirmed
+   * by `status:'not_deployed'` (an explicit 404 / not-found).
+   */
+  probeFailed?: boolean;
   /** 030: detected ADT runtime tier (steampunk → icfSetupBlocked=true). */
   runtime?: AdtRuntime;
   /** 030: true when system blocks cl_icf_tree (Steampunk whitelist). */
@@ -45,6 +65,8 @@ export function compareVersions(remote: string, expected: string): 'current' | '
 /**
  * Probe ICF deployment state (four states).
  * Never throws: not_deployed / unreachable are reported, not raised.
+ * `unreachable` means the probe failed — not that the service is absent — and
+ * is tagged with `probeFailed: true` so callers can distinguish the two.
  *
  * When `profileName` is provided, also detects ADT runtime tier
  * (steampunk → icfSetupBlocked=true). The runtime probe runs in parallel
@@ -56,25 +78,30 @@ export async function checkIcfDeployment(profileName?: string): Promise<IcfDeplo
   try {
     remoteVersion = await readRemoteVersion();
   } catch (error) {
-    // 404 → not deployed; everything else → unreachable (degraded, non-blocking).
+    // A 404 (or an explicit not-found envelope) positively establishes "not
+    // deployed". Everything else — timeout, connection refused, 5xx, stale
+    // session — leaves the answer UNKNOWN, so it must not be reported as a
+    // confirmed absence (F-19: probe failure used to surface as
+    // `installed:false, status:'unreachable'`).
     const httpStatus =
       error instanceof CliError && error.details
         ? (error.details.httpStatus as number | undefined)
         : undefined;
+    const code = error instanceof CliError ? error.code : 'SAP_ERROR';
+    const message = error instanceof Error ? error.message : String(error);
     const runtime = await runtimeProbe;
-    if (httpStatus === 404) {
+    if (httpStatus === 404 || code === 'NOT_FOUND' || code === 'OBJECT_NOT_FOUND') {
       return {
         status: 'not_deployed',
         expectedVersion: ICF_SERVICE_VERSION,
         ...(runtime ? { runtime: runtime.runtime, icfSetupBlocked: runtime.icfSetupBlocked } : {}),
       };
     }
-    const code = error instanceof CliError ? error.code : 'SAP_ERROR';
-    const message = error instanceof Error ? error.message : String(error);
     return {
       status: 'unreachable',
       expectedVersion: ICF_SERVICE_VERSION,
       error: { code, message },
+      probeFailed: true,
       ...(runtime ? { runtime: runtime.runtime, icfSetupBlocked: runtime.icfSetupBlocked } : {}),
     };
   }

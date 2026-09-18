@@ -113,8 +113,8 @@ describe('025 routing coverage (SC-002: metadata.commands 互不相交)', () => 
       'search', 'where-used', 'inspect', 'diff', 'status', 'dumps',
       // abap-cli-edit（6 顶层 + mime）
       'pull', 'push', 'check', 'create', 'activate', 'mime',
-      // abap-cli-data（2）
-      'select', 'run',
+      // abap-cli-data（4）
+      'select', 'fields', 'run', 'run-report',
       // 公共
       'tcode',
       // 0.2.6 接入 setup：第三方扩展 + session 探查

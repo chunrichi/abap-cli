@@ -2,7 +2,7 @@
 name: abap-cli-edit
 description: abap-cli 写路径 — 拉（`pull`）/ 推（`push`）/ 语法检查（`check`）/ 创建（`create` / `create local`）/ 激活（`activate`）/ MIME Repository CRUD（`mime create` / `mime delete` / `mime push`）/ AFF 校验（`validate:aff`），含 DDIC CRUD（DOMA / DTEL / TABL / STRU）与 ICF/SICF 服务节点（类型码 `HTTP`），经 `pull --type` / `create --file` / `push *.json`。use when asking how to change a SAP object / download an ABAP class / push a local file / run syntax check / create a new object / activate inactive parts / edit a DDIC definition / create or edit an ICF SICF HTTP service node / upload or delete MIME resources in SE80 / validate an AFF canonical JSON before pushing / which object types the CLI supports.
 metadata:
-  version: "0.2.7"
+  version: "0.2.8"
   scope: sap
   commands: [pull, push, check, create, activate, "create local", mime, "validate:aff"]
   tags: [write, lock, transport, ddic, http, sicf, mime, aff]
@@ -176,6 +176,8 @@ CLI 解析器（[tabl-artifact.ts:parseTablDdic](https://github.com/chunrichi/ab
 | `textpool-adt` / `textpool-icf` | textpool 写（混合模式） | 视 mode 而定 |
 | `channel-adt` / `channel-icf` | TTYP/MSAG/DDLS 通道检测（0.2.5+） | `CHANNEL_DETECTION_FAILED` / `DDLS_NOT_SUPPORTED_ON_ECC` |
 | `read` | textpool 读（混合模式 pre-stage） | 通常不报错 |
+
+> ⚠️ **textpool 写受 SAP release 限制**：只有 ADT text-elements 写端点可用的系统才能写文本元素；`adtTextpool.write: false` 的系统（vhcala4hci / A4H 实测）走 ICF POST，无条件报 `TEXTPOOL_WRITE_UNSUPPORTED`。textpool **读**始终可用；写不可用时选择屏幕标签改用 `SELECTION-SCREEN COMMENT <pos>(<len>) lbl_xxx` + `INITIALIZATION` 赋值。详见 [references/workflow.md 变体 8](./references/workflow.md)。
 
 ## 注入安全（DDIC）
 

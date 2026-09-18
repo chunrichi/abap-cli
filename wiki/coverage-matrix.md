@@ -4,7 +4,7 @@ title: SAP 开发任务覆盖率矩阵
 description: abap-cli 当前能 / 不能完成的 SAP 开发任务全景 — 用于未来 spec 选题 + 用户预期管理
 tags: [abap-cli, coverage, roadmap, scope]
 created at: 2026-09-01 00:00:00
-changed at: 2026-09-01 00:00:00
+changed at: 2026-09-18 22:05:00
 ---
 
 # SAP 开发任务覆盖率矩阵
@@ -46,7 +46,7 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | Enhancement（ENHO / ENHS） | — | ❌ | |
 | BAdI 定义/实现 | — | ❌ | |
 | Package | `pull --package` 仅查 | ⚪ | 不能创建 package |
-| 文本元素（textpool） | `pull --textpool` | ✅ | 但不与 push 链路一体 |
+| 文本元素（textpool） | `pull --textpool` | ✅ | 读可用；**写**受系统限制（无 ADT text-elements 写端点时 `TEXTPOOL_WRITE_UNSUPPORTED`，A4H 实测） |
 | 消息类（MSAG） | `create / pull / push MSAG` | ✅ | ADT 主通道；ECC EHP5/6 自动 ICF 兜底 |
 | Lock Object | — | ❌ | |
 | Search Help | — | ❌ | |

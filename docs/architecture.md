@@ -68,7 +68,7 @@ Endpoints exposed under `/sap/zabap_vibe/` (current service version `0.5.0`):
 | `/` (root, version probe) | `abap deploy status`, `abap init` ICF check |
 | `/ddic/<type>` (POST/GET — `DOMA`/`DTEL`/`TABL`/`STRU`) | `abap create` / `abap push` / `abap pull` for DDIC |
 | `/http/<name>` (POST/GET — HTTP service) | `abap create HTTP` / `abap push <file>.http.json` / `abap pull --type HTTP` |
-| `/textpool/*` (POST/GET) | `abap pull --textpool` / `abap push <file>.texts/selections/headings.*.properties` on systems without ADT text-elements support |
+| `/textpool/*` (GET read; POST stub) | `abap pull --textpool` (read) on systems without ADT text-elements support. The POST branch unconditionally returns `TEXTPOOL_WRITE_UNSUPPORTED`: textpool write needs the ADT text-elements write endpoint and is unavailable on releases that only expose the non-interactive API (verified on A4H) |
 | `/tcode/<code>` (GET) | `abap tcode` (TSTC → TSTCT) |
 | `/version-source` (POST) | `abap pull --remote <system>` (TMS RFC destination) |
 | `/data/query` (POST) | `abap select --table <name>` (SE16N equivalent, read-only) |

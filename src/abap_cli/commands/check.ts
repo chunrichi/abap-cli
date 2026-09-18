@@ -163,13 +163,51 @@ async function runCheck(files: string[], opts: CheckOptions, checkMode: CheckMod
     : undefined;
 
   const failed = outIssues.some((i) => i.severity === 'error' || (opts.strict && i.severity === 'warning'));
+  // Feedback §6: `check syntax` passing while `push` fails activation is not a
+  // bug (activation runs generation steps the syntax check does not), but the
+  // CLI never said so. State the scope explicitly instead of leaving the user to
+  // infer it from two contradicting verdicts.
+  const scope = checkScope(checkMode);
   if (failed) {
     const code = checkMode === 'syntax' ? 'SYNTAX_ERROR' : 'VALIDATION_ERROR';
     throw new CliError(code, `${outIssues.length} issue(s) found across ${fileList.length} file(s)`, {
-      details: { issues: outIssues, files: fileList.length, ...(outValue !== undefined ? { out: outValue } : {}) },
+      details: { issues: outIssues, files: fileList.length, scope, ...(outValue !== undefined ? { out: outValue } : {}) },
     });
   }
-  printResult(outMode, { issues: outIssues, failure: false, ...(outValue !== undefined ? { out: outValue } : {}) }, humanSummary(outIssues));
+  printResult(outMode, { issues: outIssues, failure: false, scope, ...(outValue !== undefined ? { out: outValue } : {}) }, humanSummary(outIssues));
+}
+
+/**
+ * Describe what a `check` run actually validated, so callers do not read a
+ * passing syntax check as a guarantee that `abap push` will activate.
+ */
+function checkScope(mode: 'syntax' | 'content' | 'atc'): {
+  validated: string;
+  semantics: string;
+  activationStillRequired: boolean;
+} {
+  if (mode === 'content') {
+    return {
+      validated: 'local-content',
+      semantics: 'Offline structural validation of the local file only — no SAP round-trip, no syntax check.',
+      activationStillRequired: false,
+    };
+  }
+  if (mode === 'atc') {
+    return {
+      validated: 'atc',
+      semantics: 'ABAP Test Cockpit findings. A clean ATC run does not guarantee that activation succeeds.',
+      activationStillRequired: true,
+    };
+  }
+  return {
+    validated: 'syntax',
+    semantics:
+      'ADT syntax check of the local file content. Activation additionally generates artefacts ' +
+      '(selection screens, DDL, class includes), so a passing syntax check does NOT guarantee that ' +
+      '`abap push` will activate. Use `abap inspect <object> --activation` to verify the result.',
+    activationStillRequired: true,
+  };
 }
 
 /** Persist raw ATC worklists to `file` (resolved once by the caller). */
@@ -304,7 +342,108 @@ async function checkFile(
     return { issues: result.issues, worklist: { file, worklist: result.worklist } };
   }
 
-  return { issues: await syntaxIssues(adt, file, resolved, object, content) };
+  return { issues: await annotateUnknownNames(adt, await syntaxIssues(adt, file, resolved, object, content)) };
+}
+
+/** SAP phrasings that mean "this name could not be resolved". */
+const UNKNOWN_NAME_PATTERNS: RegExp[] = [
+  /Type "([A-Za-z0-9_/]+)" is unknown/i,
+  /Unable to interpret "([A-Za-z0-9_/]+)"/i,
+  /Field "([A-Za-z0-9_/-]+)" is unknown/i,
+  /Unknown identifier "([A-Za-z0-9_/]+)"/i,
+];
+
+/** Cap on repository lookups per check run — errors are the rare path. */
+const UNKNOWN_TOKEN_LOOKUP_CAP = 5;
+
+function extractUnknownToken(message: string): string | undefined {
+  for (const pattern of UNKNOWN_NAME_PATTERNS) {
+    const m = pattern.exec(message);
+    if (m?.[1]) return m[1].toUpperCase();
+  }
+  return undefined;
+}
+
+/**
+ * Feedback F-22 / F-23: `check syntax` relayed SAP's bare `Type "X" is unknown`
+ * / `Field "X" is unknown` with no way to tell a typo from an object that exists
+ * on the system but is not visible to this check (a release/kernel limitation).
+ * Resolve up to {@link UNKNOWN_TOKEN_LOOKUP_CAP} names against the object
+ * repository and append the outcome to the message.
+ *
+ * Best-effort by contract: a lookup failure leaves the original message intact
+ * and never fails the check.
+ */
+async function annotateUnknownNames(
+  client: AdtClientWrapper,
+  issues: CheckIssue[],
+): Promise<CheckIssue[]> {
+  let lookups = 0;
+  const cache = new Map<string, string | undefined>();
+  const out: CheckIssue[] = [];
+  for (const issue of issues) {
+    if (issue.severity !== 'error' || lookups >= UNKNOWN_TOKEN_LOOKUP_CAP) {
+      out.push(issue);
+      continue;
+    }
+    const token = extractUnknownToken(issue.message);
+    if (!token) {
+      out.push(issue);
+      continue;
+    }
+    // `TABLE-FIELD` cannot be searched directly — point at the field inventory.
+    if (token.includes('-')) {
+      const table = token.split('-')[0]!;
+      out.push({
+        ...issue,
+        message: `${issue.message} [check the field list: abap fields ${table}]`,
+      });
+      continue;
+    }
+    if (!cache.has(token)) {
+      lookups += 1;
+      cache.set(token, await describeRepositoryName(client, token));
+    }
+    const note = cache.get(token);
+    out.push(note ? { ...issue, message: `${issue.message} [${note}]` } : issue);
+  }
+  return out;
+}
+
+/** One repository lookup for an unresolved name. Returns `undefined` on error. */
+async function describeRepositoryName(
+  client: AdtClientWrapper,
+  token: string,
+): Promise<string | undefined> {
+  try {
+    // ADT quickSearch needs a wildcard; `NAME*` keeps the candidate set small.
+    // Fetch a few extra hits: one name can exist as several object kinds (e.g.
+    // DEVCLASS is both a data element and an authorization object), and the
+    // type-relevant ones must not be hidden behind an unrelated first hit.
+    const hits = await client.searchObject(`${token}*`, undefined, 20);
+    const exact = hits.filter((h) => String(h['adtcore:name'] ?? '').toUpperCase() === token);
+    if (exact.length > 0) {
+      const preferred = ['DTEL', 'TTYP', 'TABL', 'STRU', 'DOMA', 'VIEW', 'INTF', 'CLAS', 'PROG', 'FUGR'];
+      const rank = (type: string): number => {
+        const i = preferred.findIndex((p) => type.startsWith(p));
+        return i < 0 ? preferred.length : i;
+      };
+      const types = [...new Set(exact.map((h) => String(h['adtcore:type'] ?? '')))].sort(
+        (a, b) => rank(a) - rank(b) || a.localeCompare(b),
+      );
+      return `exists in this system as ${token} (${types.slice(0, 3).join(', ')}) — the rejection is a release/kernel limitation, not a typo`;
+    }
+    if (hits.length > 0) {
+      const nearest = hits
+        .slice(0, 3)
+        .map((h) => `${h['adtcore:name']} (${h['adtcore:type']})`)
+        .join(', ');
+      return `no exact match; nearest names: ${nearest}`;
+    }
+    return 'no object with this name exists in this system (check for a typo)';
+  } catch {
+    return undefined;
+  }
 }
 
 async function syntaxIssues(

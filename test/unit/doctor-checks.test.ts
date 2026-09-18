@@ -2,9 +2,14 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { createRequire } from 'module';
 import { makeProgram, runCommand } from './cli-helper.js';
 
 import { runDoctorChecks } from '../../src/abap_cli/flows/setup/doctor-checks.js';
+
+// The version env.install must report is the one statically read from the
+// package.json this test process is running against.
+const { version: pkgVersion } = createRequire(import.meta.url)('../../package.json') as { version: string };
 
 function tmpDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'doctor-'));
@@ -78,6 +83,33 @@ describe('doctor-checks (FR-001..005)', () => {
     const verbose = await runDoctorChecks({ home, cwd, verbose: true });
     expect(brief.environment.every((i) => i.detail === undefined)).toBe(true);
     expect(verbose.environment.some((i) => i.detail !== undefined)).toBe(true);
+  });
+
+  it('env.install reports the loaded CLI version and install path, and never fails the run (F-20)', async () => {
+    writeSystems(home, {
+      mock: { url: 'http://localhost:8080', client: '100', username: 'MOCKUSER', language: 'EN' },
+    });
+    fs.writeFileSync(path.join(cwd, '.abap.json'), JSON.stringify({ system: 'mock' }, null, 2) + '\n');
+
+    const brief = await runDoctorChecks({ home, cwd });
+    const verbose = await runDoctorChecks({ home, cwd, verbose: true });
+
+    for (const report of [brief, verbose]) {
+      const item = report.environment.find((i) => i.key === 'env.install');
+      expect(item).toBeDefined();
+      // Diagnostic only: always ok, no suggestion, no nextSteps contribution.
+      expect(item?.status).toBe('ok');
+      expect(item?.message).toContain(pkgVersion);
+      expect(item?.suggestion).toBeUndefined();
+      expect(report.nextSteps).toEqual([]);
+    }
+
+    // Verbose detail carries the provenance: version, package.json and layout.
+    const detail = verbose.environment.find((i) => i.key === 'env.install')?.detail ?? '';
+    expect(detail).toContain(pkgVersion);
+    expect(detail).toContain('package.json');
+    expect(detail).toContain('layout');
+    expect(brief.environment.find((i) => i.key === 'env.install')?.detail).toBeUndefined();
   });
 
   it('finds .abap.json in an ancestor directory when cwd has none', async () => {

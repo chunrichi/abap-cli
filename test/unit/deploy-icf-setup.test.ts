@@ -19,7 +19,7 @@ const objectStructure = vi.fn(async (objectUrl: string) => ({
 const getObjectSource = vi.fn(async (_url: string) => 'SAP VERSION');
 // Setup execution (ADT classrun) — T003 runClass on the wrapper.
 const runClass = vi.fn(async (_className: string) =>
-  JSON.stringify({ status: 'success', action: 'already_active', node: { vhost: 'default_host', url: '/sap/zabap_vibe', handler: 'ZCL_ABAP_VIBE_ICF', active: true } }),
+  JSON.stringify({ status: 'success', action: 'already_active', node: { vhost: 'default_host', url: '/sap/abap_cli', handler: 'ZCL_ABAP_VIBE_ICF', active: true } }),
 );
 const inactiveObjects = vi.fn(async () => []);
 const activateAll = vi.fn(async () => ({ messages: [] }));
@@ -40,7 +40,7 @@ describe('abap deploy — ICF setup trigger (US3..010)', () => {
   it('non-dry-run triggers setup and reports icfNode status', async () => {
     const summary = await deployBundled(client, { transport: 'TRN001', yes: true, sourceDir });
     expect(runClass).toHaveBeenCalledWith('ZCL_ABAP_VIBE_ICF_SETUP');
-    expect(summary.icfNode).toMatchObject({ status: 'success', active: true, url: '/sap/zabap_vibe' });
+    expect(summary.icfNode).toMatchObject({ status: 'success', active: true, url: '/sap/abap_cli' });
   });
 
   it('--dry-run plans the setup step without triggering it', async () => {

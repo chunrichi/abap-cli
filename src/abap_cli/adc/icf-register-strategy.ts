@@ -11,7 +11,7 @@ export interface IcfServiceSpec {
   description: string;
   /** Handler class implementing IF_HTTP_EXTENSION / IF_HTTP_SERVICE_EXTENSION. */
   handler: string;
-  /** Service URL path, e.g. `/sap/zabap_vibe`. */
+  /** Service URL path, e.g. `/sap/abap_cli`. */
   urlPath: string;
   /** Target state. Strategies may differ in what they actually do (see plan.md). */
   state: 'active' | 'inactive';

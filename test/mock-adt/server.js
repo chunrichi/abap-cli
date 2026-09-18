@@ -22,11 +22,11 @@ const NO_TRANSPORTS = process.env.MOCK_NO_TRANSPORTS === '1';
 const ATOMIC_FAIL = process.env.MOCK_ATOMIC_FAIL === '1';
 // MOCK_AUTH_FAIL=1 → compatibility graph returns 401 (auth layer failure for `profile test`).
 const AUTH_FAIL = process.env.MOCK_AUTH_FAIL === '1';
-// MOCK_ICF_FAIL=1 → /sap/zabap_vibe/ returns 500 (icf layer failure for `profile test`).
+// MOCK_ICF_FAIL=1 → /sap/abap_cli/ returns 500 (icf layer failure for `profile test`).
 const ICF_FAIL = process.env.MOCK_ICF_FAIL === '1';
 // MOCK_SETUP_FAIL=1 → classrun of the ICF setup class returns a failure envelope.
 const SETUP_FAIL = process.env.MOCK_SETUP_FAIL === '1';
-// MOCK_DDIC_FAIL=1 → /sap/zabap_vibe/ddic/<type> POST returns 500 (created objects still
+// MOCK_DDIC_FAIL=1 → /sap/abap_cli/ddic/<type> POST returns 500 (created objects still
 // occupy the fixture store but the wire response is the failure envelope).
 // MOCK_TEXTPOOL_WRITE_UNSUPPORTED=1 → /textpool/<category> POST reports write unsupported
 // (simulates ECC where the ADT text-elements write endpoint is absent).
@@ -35,7 +35,7 @@ const DDIC_FAIL = process.env.MOCK_DDIC_FAIL === '1';
 // MOCK_REMOTE_MISSING=1 → /version-source reports no transported versions (empty source),
 // mirroring the real backend's SVRS_GET_VERSIONS empty case.
 const REMOTE_MISSING = process.env.MOCK_REMOTE_MISSING === '1';
-// Deployed zabap_vibe version served by the mock root (mirrors CLI ICF_SERVICE_VERSION).
+// Deployed abap_cli version served by the mock root (mirrors CLI ICF_SERVICE_VERSION).
 const ICF_SERVICE_VERSION = process.env.MOCK_ICF_VERSION || '0.4.0';
 const NOW = '2026-08-01T00:00:00Z';
 const CURRENT_USER = 'MOCKUSER';
@@ -405,7 +405,7 @@ textpoolStore.set('STRU:ZST_DEMO:symbols', [
 // STRU has no selections/headings — exercises TEXTPOOL_CATEGORY_MISSING warning.
 
 // ICF service classes (013): handler + setup, targets for deploy enumeration / classrun.
-addObject('ZCL_ABAP_VIBE_ICF', 'CLAS', '/sap/bc/adt/oo/classes/zcl_abap_vibe_icf', 'ICF handler for zabap_vibe', [
+addObject('ZCL_ABAP_VIBE_ICF', 'CLAS', '/sap/bc/adt/oo/classes/zcl_abap_vibe_icf', 'ICF handler for abap_cli', [
   {
     subtype: 'main',
     sourceUrl: '/sap/bc/adt/oo/classes/zcl_abap_vibe_icf/source/main',
@@ -901,9 +901,9 @@ const server = http.createServer(async (req, res) => {
     }
 
     // self-built ICF service root (probeIcf target for `profile test` / `doctor`)
-    if (path === '/sap/zabap_vibe/') {
+    if (path === '/sap/abap_cli/') {
       if (ICF_FAIL) return adtError(res, 500, 'Simulated ICF failure (MOCK_ICF_FAIL=1)');
-      return ok(res, JSON.stringify({ status: 'success', data: { service: 'zabap_vibe', version: ICF_SERVICE_VERSION } }), 'application/json');
+      return ok(res, JSON.stringify({ status: 'success', data: { service: 'abap_cli', version: ICF_SERVICE_VERSION } }), 'application/json');
     }
 
     // ADT classrun (runClass) — simulates the remote ICF setup execution (013)
@@ -913,7 +913,7 @@ const server = http.createServer(async (req, res) => {
       const className = classrun[1].toUpperCase();
       if (className === 'ZCL_ABAP_VIBE_ICF_SETUP') {
         if (SETUP_FAIL) return ok(res, JSON.stringify({ status: 'error', error: { code: 'ICF_ADMIN_REQUIRED', message: 'Simulated setup failure (MOCK_SETUP_FAIL=1)' } }), 'application/json');
-        return ok(res, JSON.stringify({ status: 'success', action: 'already_active', node: { vhost: 'default_host', url: '/sap/zabap_vibe', handler: 'ZCL_ABAP_VIBE_ICF', active: true } }), 'application/json');
+        return ok(res, JSON.stringify({ status: 'success', action: 'already_active', node: { vhost: 'default_host', url: '/sap/abap_cli', handler: 'ZCL_ABAP_VIBE_ICF', active: true } }), 'application/json');
       }
       // 015: ZCL_ABAP_VIBE_RUNNER — read body params (IV_TARGET_CLASS /
       // IV_METHOD_NAME / IV_ARGS_JSON / IV_TIMEOUT_MS), dispatch fixtures.
@@ -1005,8 +1005,8 @@ const server = http.createServer(async (req, res) => {
       return ok(res, JSON.stringify({ status: 'success' }), 'application/json');
     }
 
-    // 014: /sap/zabap_vibe/ddic/<type> POST (create/overwrite) and GET /<name> (pull).
-    const ddic = /^\/sap\/zabap_vibe\/ddic\/(doma|dtel|tabl|stru)(?:\/(.+))?$/.exec(path);
+    // 014: /sap/abap_cli/ddic/<type> POST (create/overwrite) and GET /<name> (pull).
+    const ddic = /^\/sap\/abap_cli\/ddic\/(doma|dtel|tabl|stru)(?:\/(.+))?$/.exec(path);
     if (ddic) {
       const ddicType = ddic[1].toUpperCase();
       const name = ddic[2];
@@ -1068,8 +1068,8 @@ const server = http.createServer(async (req, res) => {
       return ok(res, JSON.stringify({ status: 'error', error: { code: 'METHOD_NOT_ALLOWED', message: `${req.method} not supported on /ddic/${ddicType}` } }), 'application/json');
     }
 
-    // 014: /sap/zabap_vibe/textpool/<category>?object=<name>&type=<type> (GET read / POST write).
-    const textpool = /^\/sap\/zabap_vibe\/textpool\/(texts|selections|headings)$/.exec(path);
+    // 014: /sap/abap_cli/textpool/<category>?object=<name>&type=<type> (GET read / POST write).
+    const textpool = /^\/sap\/abap_cli\/textpool\/(texts|selections|headings)$/.exec(path);
     if (textpool) {
       const category = textpool[1];
       const objName = (q.get('object') || '').toUpperCase();
@@ -1099,11 +1099,11 @@ const server = http.createServer(async (req, res) => {
       return ok(res, JSON.stringify({ status: 'error', error: { code: 'METHOD_NOT_ALLOWED', message: `${req.method} not supported on /textpool/${category}` } }), 'application/json');
     }
 
-    // 016: /sap/zabap_vibe/data/query POST — read-only table data query.
+    // 016: /sap/abap_cli/data/query POST — read-only table data query.
     // Implements the subset of the contract documented in
     // specs/016-abap-select/contracts/icf-data-service.md used by US1 unit tests.
     // US3 (T033) extends this with the full where grammar + safety injection.
-    if (path === '/sap/zabap_vibe/data/query') {
+    if (path === '/sap/abap_cli/data/query') {
       if (req.method !== 'POST') {
         return ok(res, JSON.stringify({ status: 'error', error: { code: 'METHOD_NOT_ALLOWED', message: 'POST only on /data/query' } }), 'application/json');
       }
@@ -1393,9 +1393,9 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
-    // 015: /sap/zabap_vibe/version-source?objectType=...&objectName=...&destination=...
+    // 015: /sap/abap_cli/version-source?objectType=...&objectName=...&destination=...
     // Mirrors the real Version Management dispatch (active version 00000 source only).
-    const versionSource = /^\/sap\/zabap_vibe\/version-source(?:\/.*)?$/.exec(path);
+    const versionSource = /^\/sap\/abap_cli\/version-source(?:\/.*)?$/.exec(path);
     if (versionSource) {
       if (req.method !== 'GET') {
         return ok(res, JSON.stringify({ status: 'error', error: { code: 'METHOD_NOT_ALLOWED', message: 'GET only on Version Management endpoints' } }), 'application/json');

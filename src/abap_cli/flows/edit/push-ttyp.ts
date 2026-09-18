@@ -5,7 +5,7 @@
  *   1. detectChannel() picks ADT or ICF.
  *   2. Validate the local doc against `ttyp-v1.json` (handcrafted).
  *   3. ADT: PUT `/sap/bc/adt/ddic/tabletypes/<name>` (lock-first).
- *      ICF: POST `/sap/zabap_vibe/ddic/ttyp/<name>`.
+ *      ICF: POST `/sap/abap_cli/ddic/ttyp/<name>`.
  *   4. Spec 035: missing object → OBJECT_NOT_FOUND; user must re-run as create.
  */
 import * as path from 'node:path';

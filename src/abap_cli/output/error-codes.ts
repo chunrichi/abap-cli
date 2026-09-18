@@ -79,6 +79,11 @@ export type ErrorCode =
   | 'WRAPPER_INPUT_UNAVAILABLE' // SAP classrun endpoint does not inject method args (SAP_ERROR)
   // read-only table data query error codes
   | 'TABLE_NOT_FOUND'          // ICF /data/query — table/view does not exist (NOT_FOUND)
+  // F-16 report runner (ICF /run/report)
+  | 'REPORT_NOT_FOUND'         // target program is not in TRDIR (NOT_FOUND)
+  | 'REPORT_NOT_EXECUTABLE'    // target exists but is not an executable report (VALIDATION_ERROR)
+  | 'REPORT_RUN_FAILED'        // SUBMIT failed or list conversion failed (SAP_ERROR)
+  | 'REPORT_NO_LIST_OUTPUT'    // report produced no capturable list (SAP_ERROR)
   | 'TABLE_TYPE_NOT_SUPPORTED' // ICF /data/query — pool/cluster/structure not queryable (VALIDATION_ERROR)
   | 'INVALID_FIELD'            // ICF /data/query — field not in table / explicit large-object projection (VALIDATION_ERROR)
   | 'INVALID_WHERE'            // ICF /data/query — where syntax/op/field/type/MANDT violation (VALIDATION_ERROR)
@@ -168,6 +173,10 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   WRAPPER_INPUT_UNAVAILABLE: 'SAP_ERROR',
   // 016-abap-select mappings
   TABLE_NOT_FOUND: 'NOT_FOUND',
+  REPORT_NOT_FOUND: 'NOT_FOUND',
+  REPORT_NOT_EXECUTABLE: 'VALIDATION_ERROR',
+  REPORT_RUN_FAILED: 'SAP_ERROR',
+  REPORT_NO_LIST_OUTPUT: 'SAP_ERROR',
   TABLE_TYPE_NOT_SUPPORTED: 'VALIDATION_ERROR',
   INVALID_FIELD: 'VALIDATION_ERROR',
   INVALID_WHERE: 'VALIDATION_ERROR',

@@ -103,9 +103,15 @@ export function getCreatableType(objtype: string): CreatableType | undefined {
   return byId ? byId[1] : undefined;
 }
 
-/** XML-attribute safe encoding. Mirrors `utilities.encodeEntity` upstream. */
-function encodeAttr(s: string): string {
-  return s
+/**
+ * XML-attribute safe encoding. Mirrors `utilities.encodeEntity` upstream.
+ *
+ * Tolerates `undefined`/`null`: a missing attribute (e.g. a description the
+ * caller never resolved) must produce an empty attribute, not a raw
+ * `Cannot read properties of undefined (reading 'replace')` (feedback F-03).
+ */
+function encodeAttr(s: string | undefined | null): string {
+  return String(s ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')

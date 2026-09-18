@@ -34,6 +34,7 @@ export interface V1AuthFields {
   certAuth?: { certPath: string; keyPath: string; caPath?: string };
   ssoCookieFile?: string;
   oauthPassword?: { uaaUrl: string; clientId: string; clientSecret: string; serviceKeyFile?: string };
+  negotiate?: { spn?: string; reauthOnExpiry?: boolean };
 }
 
 /** Raw v2 field as it may appear on a stored profile. */
@@ -61,23 +62,23 @@ export function normalizeAuth(raw: V1AuthFields & V2AuthFields): AuthConfig {
     return v2;
   }
 
-  return v1ToCanonical({ authMethod: v1Method, certAuth: raw.certAuth, ssoCookieFile: raw.ssoCookieFile, oauthPassword: raw.oauthPassword });
+  return v1ToCanonical({ authMethod: v1Method, certAuth: raw.certAuth, ssoCookieFile: raw.ssoCookieFile, oauthPassword: raw.oauthPassword, negotiate: raw.negotiate });
 }
 
 function parseV1Method(raw: string | undefined): AuthMethodV2 | undefined {
   if (raw === undefined || raw === null || raw === '') return undefined;
-  if (raw === 'basic' || raw === 'cert' || raw === 'browser_sso' || raw === 'oauth_password') return raw;
-  throw new CliError('INVALID_ARGUMENT', `Unknown authMethod '${raw}'. Supported: basic, cert, browser_sso, oauth_password.`);
+  if (raw === 'basic' || raw === 'cert' || raw === 'browser_sso' || raw === 'oauth_password' || raw === 'sso') return raw;
+  throw new CliError('INVALID_ARGUMENT', `Unknown authMethod '${raw}'. Supported: basic, cert, browser_sso, oauth_password, sso.`);
 }
 
 function v1ToCanonical(v1: V1AuthFields & { authMethod: AuthMethodV2 | undefined }): AuthConfig {
   const method: AuthMethodV2 = v1.authMethod ?? 'basic';
 
   if (method === 'basic') {
-    if (v1.certAuth || v1.ssoCookieFile || v1.oauthPassword) {
+    if (v1.certAuth || v1.ssoCookieFile || v1.oauthPassword || v1.negotiate) {
       throw new CliError(
         'CONFIG_ERROR',
-        'Profile has basic authMethod but non-empty cert/sso/oauth block. Re-run "abap profile set <name> --auth-method <type>" with the correct method, or remove the block.',
+        'Profile has basic authMethod but non-empty cert/sso/oauth/negotiate block. Re-run "abap profile set <name> --auth-method <type>" with the correct method, or remove the block.',
       );
     }
     return { method: 'basic' };
@@ -120,6 +121,13 @@ function v1ToCanonical(v1: V1AuthFields & { authMethod: AuthMethodV2 | undefined
     return { method: 'oauth_password', oauth };
   }
 
+  if (method === 'sso') {
+    const negotiate: { spn?: string; reauthOnExpiry?: boolean } = {};
+    if (v1.negotiate?.spn) negotiate.spn = v1.negotiate.spn;
+    if (v1.negotiate?.reauthOnExpiry !== undefined) negotiate.reauthOnExpiry = v1.negotiate.reauthOnExpiry;
+    return { method: 'sso', negotiate };
+  }
+
   throw new CliError('INVALID_ARGUMENT', `Unknown authMethod '${method}'.`);
 }
 
@@ -158,5 +166,7 @@ export function canonicalToV1Fields(auth: AuthConfig): V1AuthFields {
       return { authMethod: 'browser_sso', ...(auth.sso.cookieFile ? { ssoCookieFile: auth.sso.cookieFile } : {}) };
     case 'oauth_password':
       return { authMethod: 'oauth_password', oauthPassword: { ...auth.oauth } };
+    case 'sso':
+      return { authMethod: 'sso', negotiate: { ...auth.negotiate } };
   }
 }

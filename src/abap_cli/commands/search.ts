@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError, printError, printResult, jsonFromCommand, printSchema, type CommandSchema, type OutputMode } from '../output/json.js';
 import { collectWarning } from '../output/meta.js';
-import { SEARCH_RESULT_LIMIT, PAGE_ALL_DEFAULT_MAX } from '../core/limits.js';
+import { SEARCH_RESULT_LIMIT, PAGE_ALL_DEFAULT_MAX, SEARCH_EXACT_SCAN_LIMIT } from '../core/limits.js';
 import type { SearchResult } from 'abap-adt-api';
 
 interface SearchResultItem {
@@ -89,8 +89,12 @@ async function runSearch(query: string | undefined, opts: SearchOptions,mode: Ou
   const type = opts.type?.trim().toUpperCase() || undefined;
 
   // --exact on a bare name: real ADT quickSearch returns zero hits without `*`
-  // (resolve.ts has the same quirk), so widen to *NAME* and filter client-side.
-  const effectiveQuery = opts.exact && !query.includes('*') ? `*${query.trim()}*` : query;
+  // (resolve.ts has the same quirk), so widen and filter client-side. Widen with
+  // a PREFIX (`NAME*`), not `*NAME*`: an exact name always matches its own
+  // prefix, and a prefix keeps the candidate set small, whereas `*NAME*` can
+  // match thousands of unrelated objects and push the exact hit out of the
+  // fetched window (feedback F-13 / F-28).
+  const effectiveQuery = opts.exact && !query.includes('*') ? `${query.trim()}*` : query;
 
   const client = await AdtClientWrapper.create();
 
@@ -132,15 +136,19 @@ async function runSearch(query: string | undefined, opts: SearchOptions,mode: Ou
   // Single-page (default) path: keep the existing "fetch limit*page then slice"
   // behavior so back-compat with --page and --limit is unchanged.
   const page = parsePositiveInt(opts.page, '--page', 1);
-  // Fetch limit*page in one call, then slice client-side.
-  const results = await client.searchObject(effectiveQuery, type, limit * page);
+  // Fetch limit*page in one call, then slice client-side. `--exact` filters
+  // client-side too (see effectiveQuery), so its candidate window must be much
+  // larger than the returned page — otherwise an exact hit that sorts beyond the
+  // first `limit*page` results is reported as "no matches" (F-13 / F-28).
+  const requestMax = opts.exact ? Math.max(limit * page, SEARCH_EXACT_SCAN_LIMIT) : limit * page;
+  const results = await client.searchObject(effectiveQuery, type, requestMax);
 
   let mapped: SearchResultItem[] = results.map(toResultItem);
   mapped = applyFilters(mapped, opts, query);
 
   const start = (page - 1) * limit;
   const items = mapped.slice(start, start + limit);
-  const truncated = mapped.length >= limit * page;
+  const truncated = mapped.length >= requestMax;
 
   const hint = truncated
     ? `Result truncated. Narrow with --type/--package/--exact, or use --page ${page + 1}.`

@@ -2,7 +2,7 @@
  * `abap select` flow — read-only table data query.
  *
  * Consumes the `IcfClient.postDataQuery` HTTP method (which targets the
- * `/sap/zabap_vibe/data/query` endpoint on the deployed ICF service) and
+ * `/sap/abap_cli/data/query` endpoint on the deployed ICF service) and
  * shapes the response into a structured `SelectResult`. The SAP-side handler
  * owns query validation, where-clause parsing, and dynamic SQL execution; this
  * flow is responsible only for transport, error mapping, and CLI-friendly
@@ -47,6 +47,8 @@ export interface SelectRequest {
   orderBy?: { field: string; direction: 'ASC' | 'DESC' }[];
   countOnly: boolean;
   dryRun: boolean;
+  /** Field to aggregate by (COUNT(*) per distinct value). */
+  groupBy?: string;
 }
 
 /**
@@ -61,6 +63,8 @@ export interface SelectOptions {
   orderBy?: string;
   countOnly?: boolean;
   dryRun?: boolean;
+  /** Field to aggregate by (COUNT(*) per distinct value). */
+  groupBy?: string;
 }
 
 /** Rounded outcome from the SAP ICF `/data/query` endpoint. */
@@ -81,6 +85,13 @@ export interface SelectResult {
   dryRun: boolean;
   durationMs: number;
   wouldRun?: boolean;
+  /** Set when the request was an aggregation (`--group-by`). */
+  groupBy?: string;
+  /**
+   * One entry per distinct value of `groupBy`: the field's value under its DDIC
+   * name plus `CNT` (COUNT(*) for that value), ordered by count descending.
+   */
+  groups?: Record<string, unknown>[];
 }
 
 /** Wire shape that the ICF endpoint returns on success. */
@@ -94,6 +105,10 @@ interface DataQuerySuccess {
   count?: number;
   excludedFields?: string[];
   durationMs?: number;
+  /** Set on an aggregation response: the grouped field. */
+  groupBy?: string;
+  /** Aggregation rows: `{ <FIELD>: value, CNT: count }`, CNT descending. */
+  groups?: Record<string, unknown>[];
 }
 
 /** Wire shape that the ICF endpoint returns on failure. */
@@ -254,7 +269,40 @@ export function buildSelectRequest(opts: SelectOptions): SelectRequest {
   if (where) request.where = where;
   const orderBy = validateOrderBy(opts.orderBy);
   if (orderBy) request.orderBy = orderBy;
+  const groupBy = validateGroupBy(opts.groupBy);
+  if (groupBy) {
+    // Aggregation changes the shape of the result: the projection, the sort and
+    // paging no longer apply, so reject them instead of silently ignoring them.
+    const conflicts: string[] = [];
+    if (opts.fields) conflicts.push('--fields');
+    if (opts.orderBy) conflicts.push('--order-by');
+    if (opts.offset !== undefined && String(opts.offset).trim() !== '' && String(opts.offset) !== '0') {
+      conflicts.push('--offset');
+    }
+    if (opts.countOnly) conflicts.push('--count-only');
+    if (conflicts.length > 0) {
+      throw new CliError('INVALID_ARGUMENT', `${conflicts.join(', ')} cannot be combined with --group-by`, {
+        nextSteps: ['Use --group-by with --where and --limit (top N groups) only.'],
+        example: 'abap select --table VRSD --group-by OBJTYPE --limit 20',
+      });
+    }
+    request.groupBy = groupBy;
+  }
   return request;
+}
+
+/** Validate `--group-by`: a single DDIC field name. */
+export function validateGroupBy(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const text = value.trim();
+  if (text === '') return undefined;
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(text)) {
+    throw new CliError('INVALID_ARGUMENT', `--group-by must be a single field name, got '${value}'`, {
+      nextSteps: ['Pass exactly one field, e.g. --group-by OBJTYPE.'],
+      example: 'abap select --table VRSD --group-by OBJTYPE',
+    });
+  }
+  return text.toUpperCase();
 }
 
 /** Translate the SelectRequest into the wire payload (camelCase). */
@@ -266,6 +314,7 @@ export function buildDataQueryRequest(req: SelectRequest): Record<string, unknow
   if (req.where) payload.where = req.where;
   if (req.orderBy && req.orderBy.length > 0) payload.orderBy = req.orderBy;
   if (req.countOnly) payload.countOnly = true;
+  if (req.groupBy) payload.groupBy = req.groupBy;
   // limit and offset are always sent so the server doesn't have to default.
   payload.limit = req.limit;
   payload.offset = req.offset;
@@ -279,7 +328,7 @@ export function buildDryRun(table: string, opts: SelectOptions): SelectResult {
   return {
     table: req.table,
     objectType: 'TABL',
-    fields: req.fields ?? [],
+    fields: req.groupBy ? [req.groupBy, 'CNT'] : (req.fields ?? []),
     rows: [],
     rowCount: 0,
     truncated: false,
@@ -288,6 +337,7 @@ export function buildDryRun(table: string, opts: SelectOptions): SelectResult {
     offset: req.offset,
     limit: req.limit,
     countOnly: req.countOnly,
+    ...(req.groupBy ? { groupBy: req.groupBy, groups: [] } : {}),
     dryRun: true,
     durationMs: 0,
     wouldRun: true,
@@ -388,6 +438,28 @@ export function interpret(
     });
   }
   const data = wire.data;
+  if (req.groupBy) {
+    // Aggregation response: one entry per distinct value of the grouped field.
+    // `groups` is a partial-JSON piece on the wire, so it arrives already parsed
+    // as an array (same mechanism as `rows`).
+    const groups = (data.groups ?? []) as Record<string, unknown>[];
+    return {
+      table,
+      objectType: data.objectType ?? 'TABL',
+      fields: [req.groupBy, 'CNT'],
+      rows: groups,
+      rowCount: groups.length,
+      truncated: false,
+      excludedFields: [],
+      groupBy: data.groupBy ?? req.groupBy,
+      groups,
+      offset: 0,
+      limit: req.limit,
+      countOnly: false,
+      dryRun: false,
+      durationMs: Math.max(0, Math.round(durationMs)),
+    } as SelectResult;
+  }
   if (req.countOnly) {
     // Count-only responses carry only the count (plus
     // table echo) — no rows / fields / truncated.
@@ -455,6 +527,8 @@ export async function runSelect(
     count?: number;
     excludedFields?: string[];
     durationMs?: number;
+    groupBy?: string;
+    groups?: Record<string, unknown>[];
   }>(wire);
   const t1 = performance.now();
   return interpret(req.table, req, resp, t1 - t0);

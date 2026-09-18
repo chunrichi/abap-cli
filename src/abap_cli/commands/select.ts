@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import { printError, printResult, printSchema, jsonFromCommand, CliError } from '../output/json.js';
+import { collectWarning } from '../output/meta.js';
 import {
   buildDryRun,
   runSelect,
@@ -7,6 +8,7 @@ import {
   validateOffset,
   validateWhere,
   validateFields,
+  validateGroupBy,
   validateOrderBy,
   type SelectResult,
 } from '../flows/data/select.js';
@@ -57,6 +59,15 @@ export const SCHEMA = {
         'Maximum rows returned. SAP fetches limit+1 to detect truncation (data.truncated).',
     },
     {
+      name: '--max',
+      type: 'int',
+      required: false,
+      valuePlaceholder: '<n>',
+      deprecated: true,
+      description:
+        'DEPRECATED alias for --limit (same 1–10000 bound). An explicit --limit wins when both are given.',
+    },
+    {
       name: '--offset',
       type: 'int',
       required: false,
@@ -72,6 +83,14 @@ export const SCHEMA = {
       required: false,
       valuePlaceholder: '<csv>',
       description: 'Comma-separated FIELD:ASC|DESC pairs, e.g. "ID:ASC,AMOUNT:DESC".',
+    },
+    {
+      name: '--group-by',
+      type: 'string',
+      required: false,
+      valuePlaceholder: '<field>',
+      description:
+        'Aggregate: return one row per distinct value of <field> plus CNT (COUNT(*)), ordered by CNT descending. Mutually exclusive with --fields / --order-by / --offset / --count-only.',
     },
     {
       name: '--count-only',
@@ -149,8 +168,10 @@ export function registerSelectCommand(program: Command): void {
     .option('--fields <csv>', 'Comma-separated field names')
     .option('--where <clause>', 'Filter clause (FIELD OP VALUE joined by AND)')
     .option('--limit <n>', 'Max rows returned (1–10000, default 100)', '100')
+    .option('--max <n>', 'DEPRECATED: alias for --limit')
     .option('--offset <n>', 'Row offset for pagination (0–100000, default 0)', '0')
     .option('--order-by <csv>', 'Comma-separated FIELD:ASC|DESC pairs')
+    .option('--group-by <field>', 'Aggregate: one row per distinct value of <field> plus CNT (COUNT(*)), ordered by CNT')
     .option('--count-only', 'Return only the matching row count')
     .option('--dry-run', 'Print request envelope without invoking ICF endpoint')
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
@@ -161,10 +182,12 @@ export function registerSelectCommand(program: Command): void {
           fields?: string;
           where?: string;
           limit?: string;
+          max?: string;
           offset?: string;
           orderBy?: string;
           countOnly?: boolean;
           dryRun?: boolean;
+          groupBy?: string;
         },
         cmd: Command,
       ) => {
@@ -183,6 +206,17 @@ export function registerSelectCommand(program: Command): void {
               nextSteps: ['Specify a table or view name, e.g. --table ZTAB_FIXTURE'],
             });
           }
+          // --max is a deprecated alias for --limit. Precedence is deterministic:
+          // an explicitly passed --limit always wins over --max, regardless of
+          // argv order. `--limit` has a registered default ('100'), so a plain
+          // `opts.limit !== undefined` would always be true; commander's option
+          // source tells an explicit flag ('cli') from that default.
+          if (opts.max !== undefined) {
+            collectWarning('DEPRECATED_OPTION', '--max is deprecated; use --limit instead.', {
+              option: '--max',
+            });
+            if (cmd.getOptionValueSource('limit') !== 'cli') opts.limit = opts.max;
+          }
           // Pre-validate cheap CLI fields so that bad inputs surface before any
           // SAP call. The SAP-side handler re-validates authoritatively.
           validateLimit(opts.limit);
@@ -190,6 +224,7 @@ export function registerSelectCommand(program: Command): void {
           validateWhere(opts.where);
           validateFields(opts.fields);
           validateOrderBy(opts.orderBy);
+          validateGroupBy(opts.groupBy);
 
           if (opts.dryRun) {
             const dry = buildDryRun(table, {
@@ -199,6 +234,7 @@ export function registerSelectCommand(program: Command): void {
               offset: opts.offset,
               orderBy: opts.orderBy,
               countOnly: opts.countOnly,
+              groupBy: opts.groupBy,
               dryRun: true,
             });
             printResult(mode, dry, formatHuman(dry));
@@ -212,6 +248,7 @@ export function registerSelectCommand(program: Command): void {
             offset: opts.offset,
             orderBy: opts.orderBy,
             countOnly: opts.countOnly,
+            groupBy: opts.groupBy,
           });
           printResult(mode, result, formatHuman(result));
         } catch (error: unknown) {
@@ -254,6 +291,20 @@ export function formatHuman(result: SelectResult): string {
     lines.push(`table: ${result.table}`);
     lines.push(`count: ${result.count ?? 0}`);
     lines.push(`time:  ${result.durationMs}ms`);
+    return lines.join('\n');
+  }
+
+  // Aggregation (`--group-by`): <field> + CNT, already sorted by CNT desc.
+  if (result.groupBy) {
+    const groupField = result.groupBy;
+    const groups = result.groups ?? [];
+    const w1 = Math.max(groupField.length, ...groups.map((g) => String(g[groupField] ?? '').length), 1);
+    lines.push(`${groupField.padEnd(w1)}  CNT`);
+    lines.push(`${'-'.repeat(w1)}  ---`);
+    for (const g of groups) {
+      lines.push(`${String(g[groupField] ?? '').padEnd(w1)}  ${String(g['CNT'] ?? '')}`);
+    }
+    lines.push(`${groups.length} group(s)  (${result.durationMs}ms)`);
     return lines.join('\n');
   }
 

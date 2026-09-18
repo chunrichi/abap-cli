@@ -4,7 +4,7 @@ title: abap run
 description: 在 SAP 端执行 ABAP 类（classrun）或静态方法（runner wrapper），返回 stdout、业务退出码与耗时 — Agent 的 push → run → 验证闭环
 tags: [abap-cli, command, run, classrun, execute, verification, runner, agent-loop]
 created at: 2026-08-07 22:30:00
-changed at: 2026-08-07 22:44:00
+changed at: 2026-09-18 22:05:00
 ---
 
 # abap run
@@ -15,6 +15,8 @@ changed at: 2026-08-07 22:44:00
 2. **wrapper**（`--method <name>`）：运行 bundled 的 `ZCL_ABAP_VIBE_RUNNER`，经 RTTS 反射调用目标类的 PUBLIC STATIC 方法（IMPORTING + RETURNING），返回值经 `/ui2/cl_json` JSON 化输出。
 
 `abap run` 是**严格只读**命令——不获取锁、不触发 transport、不激活、不写文件。wrapper 类由 `abap deploy` 安装（缺失时报 `WRAPPER_NOT_DEPLOYED`）。
+
+> ⚠️ **`--method` 在 on-prem 上通常不可用**：ADT classrun 端点（实测 vhcala4hci / A4H）**不注入**请求体里的方法参数，`--method` 请求返回 `WRAPPER_INPUT_UNAVAILABLE`（exit 6）——改用无 `--method` 的直接 classrun 路径。**`abap deploy status` 报 wrapper `current` 只表示版本号匹配**，不代表参数注入可用（能力探测见下方 todo）。
 
 ## Usage
 
@@ -152,7 +154,7 @@ abap run --schema --json
 ## todo
 
 - [ ] **P2 — PROG（report）执行** — 通过 ADT SUBMIT 或独立入口支持 `abap run <prog> --type PROG`（roadmap 差异能力）；report 输出回 SP01 的捕获方式需先验证。
-- [ ] **`--method` 参数注入的跨版本探测** — 在 `profile add/set` 或 `abap init` 时一次性探测 SAP classrun 是否支持参数注入并持久化到 profile（类似 014 的 `adtTextpool` 能力探测），`--method` 在支持的系统上正常走 wrapper、不支持的直接提示，避免每次运行 `WRAPPER_INPUT_UNAVAILABLE`。
+- [ ] **`--method` 参数注入的跨版本探测** — 在 `profile add/set` 或 `abap init` 时一次性探测 SAP classrun 是否支持参数注入并持久化到 profile（类似 014 的 `adtTextpool` 能力探测），`--method` 在支持的系统上正常走 wrapper、不支持的直接提示，避免每次运行 `WRAPPER_INPUT_UNAVAILABLE`。**探测落地前，`abap deploy status` 的 `current` 不能作为 `--method` 可用性的判断依据**（它只比较 ICF 服务/类版本号）。
 - [ ] **`--no-wait` 异步执行** — 曾规划"只入队不等待返回"，v1 未实现（`--method` 参数注入可用后再评估）。
 - [ ] **真实 SAP 端到端 fixture** — `ZCL_ABAP_VIBE_RUNNER_FIXTURE_OK/BAD/FAIL` 测试类目前仅在 mock 覆盖；如需在真实 SAP 上回归 `--method` 反射，需先确认目标系统支持参数注入。
 

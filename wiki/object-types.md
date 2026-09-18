@@ -4,7 +4,7 @@ title: 支持的对象类型
 description: abap CLI 支持的 ABAP 对象类型总览 — 类型码 × 命令 × 路由（ADT / ICF）
 tags: [abap-cli, object-types, ddic, http, sicf, reference]
 created at: 2026-08-29 10:00:00
-changed at: 2026-09-06 02:00:00
+changed at: 2026-09-18 22:05:00
 ---
 
 # 支持的对象类型
@@ -83,7 +83,7 @@ abap push src/http/zmy_service.http.json --tr <TR>
 
 | | 含义 | 对应 |
 |---|---|---|
-| **ICF 作为通道** | 自建服务 `/sap/zabap_vibe` 旁路 ADT，承载 DDIC CRUD / textpool / `select` / `tcode` / `run` | `abap deploy` / `deploy status` |
+| **ICF 作为通道** | 自建服务 `/sap/zabap_vibe` 旁路 ADT，承载 DDIC CRUD / textpool **读** / `select` / `tcode` / `run` | `abap deploy` / `deploy status` |
 | **ICF 作为对象** | 被管理的 SICF 服务节点本身 | `--type HTTP` |
 
 也就是说：**用 ICF（通道）来管理 ICF（节点）**。前者是前提，后者是能力——`--type HTTP` 依赖扩展已部署。

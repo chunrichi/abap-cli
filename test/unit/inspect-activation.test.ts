@@ -89,6 +89,10 @@ const getActiveObjectSource = vi.fn(async (uri: string) => {
   return '';
 });
 
+// ADT inactive-objects list for the current user (F-02 fix). Default: empty,
+// i.e. the object has no unactivated version.
+const inactiveObjects = vi.fn(async () => [] as unknown[]);
+
 vi.mock('../../src/abap_cli/clients/adt-client.js', () => ({
   AdtClientWrapper: {
     create: async () => ({
@@ -96,6 +100,7 @@ vi.mock('../../src/abap_cli/clients/adt-client.js', () => ({
       objectStructure,
       getObjectSource,
       getActiveObjectSource,
+      inactiveObjects,
       raw,
       lock: vi.fn(),
     }),
@@ -103,7 +108,10 @@ vi.mock('../../src/abap_cli/clients/adt-client.js', () => ({
 }));
 
 describe('inspect --activation (#4)', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    inactiveObjects.mockImplementation(async () => [] as unknown[]);
+  });
 
   it('ok=true when implementations+definitions are active even if main INCLUDE reports false', async () => {
     const program = makeProgram();
@@ -169,5 +177,60 @@ describe('inspect --activation (#4)', () => {
     const data = JSON.parse(res.stdout).data;
     const main = data.activation.parts.find((p: { includeType: string }) => p.includeType === 'main');
     expect(main.note).toBeUndefined();
+  });
+
+  // F-02 regression: a failed push writes the new source but leaves it
+  // unactivated. The pending change lives in the system-managed `source/main`
+  // INCLUDE, while every implementation part still compares equal to its active
+  // version — the old implementation-parts-only rule reported `ok: true` and
+  // made a stale class look fully activated.
+  it('ok=false when ADT lists the object as having an unactivated version, even if all parts compare active', async () => {
+    inactiveObjects.mockImplementation(async () => [
+      {
+        object: {
+          deleted: false,
+          user: 'DEVELOPER',
+          'adtcore:uri': '/sap/bc/adt/oo/classes/zcl_multi',
+          'adtcore:type': 'CLAS/OC',
+          'adtcore:name': 'ZCL_MULTI',
+        },
+      },
+    ]);
+    const program = makeProgram();
+    registerInspectCommand(program);
+    const res = await runCommand(program, ['inspect', 'ZCL_MULTI', '--activation', '--json']);
+    const data = JSON.parse(res.stdout).data;
+    expect(data.activation.ok).toBe(false);
+    expect(data.activation.hasPendingInactiveVersion).toBe(true);
+    expect(data.activation.inactive).toContainEqual({
+      includeType: 'object',
+      reason: 'pending_inactive_version',
+    });
+  });
+
+  it('reports hasPendingInactiveVersion=true and annotates main when the pending version is real', async () => {
+    inactiveObjects.mockImplementation(async () => [
+      { object: { deleted: false, 'adtcore:uri': '/sap/bc/adt/oo/classes/zcl_multi' } },
+    ]);
+    const program = makeProgram();
+    registerInspectCommand(program);
+    const res = await runCommand(program, ['inspect', 'ZCL_MULTI', '--activation', '--json']);
+    const data = JSON.parse(res.stdout).data;
+    const main = data.activation.parts.find((p: { includeType: string }) => p.includeType === 'main');
+    expect(main.note).toMatch(/not activated|pending inactive/i);
+  });
+
+  it('tolerates an unavailable inactive-objects endpoint (falls back to part comparison)', async () => {
+    inactiveObjects.mockImplementation(async () => {
+      throw new Error('endpoint not available');
+    });
+    const program = makeProgram();
+    registerInspectCommand(program);
+    const res = await runCommand(program, ['inspect', 'ZCL_MULTI', '--activation', '--json']);
+    const data = JSON.parse(res.stdout).data;
+    // Parts are all active in the default mock, so ok stays true and the flag is
+    // omitted (unknown) rather than reported as a bogus false.
+    expect(data.activation.ok).toBe(true);
+    expect(data.activation.hasPendingInactiveVersion).toBeUndefined();
   });
 });
