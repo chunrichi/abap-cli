@@ -172,7 +172,7 @@ export function handleTopLevelError(
     registry.dispatchAll('onError', {
       command: deriveCommand(process.argv),
       argv: process.argv.slice(2),
-      error: out.stderr[0] ? JSON.parse(out.stderr[0])?.error ?? {} : {},
+      error: errorContextFromStderr(out.stderr[0]),
       ts: Date.now(),
     }).catch(() => {
       // Swallowed: onError hook failures are non-fatal
@@ -180,4 +180,43 @@ export function handleTopLevelError(
   }
 
   exit(out.exitCode ?? 1);
+}
+
+/**
+ * Derive the `onError` hook payload from the first rendered stderr line.
+ *
+ * `renderError` emits a serialized envelope in JSON mode but plain text
+ * (`Error: <message>`) in human mode. A bare `JSON.parse` here therefore threw
+ * a `SyntaxError` for every human-mode failure, replacing the real error with
+ * an unrelated one and hiding the actual cause (feedback F-01: a missing `ajv`
+ * dependency surfaced as `SyntaxError: Unexpected token 'E'`).
+ *
+ * Parsing is best-effort by contract: on any failure we synthesize a shape from
+ * the text. This function must never throw — the caller is already on the error
+ * path and must not be interrupted by hook bookkeeping.
+ */
+function errorContextFromStderr(firstLine: string | undefined): {
+  code: string;
+  message: string;
+  category: string;
+} {
+  if (!firstLine) return { code: 'UNKNOWN', message: 'Unknown error', category: 'UNKNOWN' };
+  try {
+    const parsed = JSON.parse(firstLine) as {
+      error?: { code?: unknown; message?: unknown; category?: unknown };
+    };
+    const err = parsed?.error;
+    if (err && typeof err === 'object') {
+      return {
+        code: typeof err.code === 'string' ? err.code : 'UNKNOWN',
+        message: typeof err.message === 'string' ? err.message : firstLine,
+        category: typeof err.category === 'string' ? err.category : 'UNKNOWN',
+      };
+    }
+  } catch {
+    // Human-mode stderr is not JSON — fall through to the synthesized shape.
+  }
+  // Human mode prefixes message lines with "Error: " (renderError); drop it so
+  // hooks receive the bare message, matching JSON-mode semantics.
+  return { code: 'UNKNOWN', message: firstLine.replace(/^Error:\s*/, ''), category: 'UNKNOWN' };
 }
