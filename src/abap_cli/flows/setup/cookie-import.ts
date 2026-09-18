@@ -3,8 +3,6 @@
  * or the SAP web-router response) into the CLI and persist it to the
  * browser_sso cookie jar.
  *
- * Joyabap equivalent: `joyabap profile cookie <name>`.
- *
  * Why a separate command from `profile login`:
  *   - `profile login` opens the user's browser at the SAP IdP redirect URL
  *     (BTP trial / SAML) and waits for the loopback listener. It needs an
