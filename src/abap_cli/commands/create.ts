@@ -43,8 +43,9 @@ export function registerCreateCommand(program: Command): void {
     .option('--description <desc>', 'Object description (required)')
     .option('--tr <transport>', 'Transport number')
     .option('--no-activate', 'Create without activating')
-    .option('--template <template>', 'Skeleton template (minimal, public-method, report, selection-screen, ...)')
+    .option('--template <template>', 'Skeleton template (minimal, public-method, report, selection-screen, report-alv, report-alv-selection, ...)')
     .option('--no-pull', 'Skip the create-then-pull local copy (default: pull after create)')
+    .option('--overwrite', 'When pulling the new object back, replace an existing local file (default: keep the local draft)')
     .option('--check-only', 'Validate without creating')
     .option('--audit', 'Include the before-checksum (extra SAP round-trip, off by default)')
     .option('--file <path>', `abap-file-format JSON input (required for ${typesRequiringFile().join('/')})`)
@@ -93,7 +94,7 @@ function registerCreateLocalCommand(createCmd: Command): void {
     ].join('\n'))
     .argument('<type>', 'Object type (CLAS, INTF, PROG, FUGR)')
     .argument('<name>', 'Object name')
-    .option('--template <template>', 'Skeleton template (minimal, public-method, report, selection-screen, ...)')
+    .option('--template <template>', 'Skeleton template (minimal, public-method, report, selection-screen, report-alv, report-alv-selection, ...)')
     .option('--dir <path>', 'Output directory', 'src/')
     .action(async (type, name, opts, cmd) => {
       const mode = jsonFromCommand(cmd);

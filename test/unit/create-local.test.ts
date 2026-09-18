@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { registerCreateCommand } from '../../src/abap_cli/commands/create.js';
+import { listTemplates } from '../../src/abap_cli/formats/templates.js';
 import { makeProgram, runCommand } from './cli-helper.js';
 
 let cwd: string;
@@ -112,6 +113,48 @@ describe('abap create local (US1, US2..003)', () => {
     const sel = await runCommand(program, ['create', 'local', 'PROG', 'ZPROG_S', '--template', 'selection-screen', '--json'], { cwd });
     expect(sel.exitCode).toBeUndefined();
     expect(fs.readFileSync(path.join(cwd, 'src/prog/zprog_s/zprog_s.prog.abap'), 'utf-8')).toContain('PARAMETERS: p_name TYPE string.');
+  });
+
+  it('exposes the ALV report templates in the registry (F-21)', () => {
+    const names = listTemplates('PROG').map((t) => t.name);
+    expect(names).toContain('report-alv');
+    expect(names).toContain('report-alv-selection');
+    // The registry drives the create-schema contract, so both names must be there too.
+    expect(listTemplates('prog').map((t) => t.name)).toEqual(names);
+  });
+
+  it('--template report-alv writes a cl_salv_table skeleton with a field catalog (F-21)', async () => {
+    const program = makeProgram();
+    registerCreateCommand(program);
+    const res = await runCommand(program, ['create', 'local', 'PROG', 'ZPROG_ALV', '--template', 'report-alv', '--json'], { cwd });
+    expect(res.exitCode).toBeUndefined();
+    expect(parseData(res).template).toBe('report-alv');
+    const content = fs.readFileSync(path.join(cwd, 'src/prog/zprog_alv/zprog_alv.prog.abap'), 'utf-8');
+    expect(content).toContain('REPORT ZPROG_ALV.');
+    expect(content).toContain('cl_salv_table=>factory(');
+    expect(content).toContain('set_table_for_first_display(');
+    // Explicit field catalog: lvc_t_fcat plus the fieldname/coltext rows.
+    expect(content).toContain('TYPE lvc_t_fcat');
+    expect(content).toContain('it_fieldcatalog = lt_fcat');
+    expect(content).toContain("fieldname = 'MATNR'");
+    // Runnable without a selection screen: plain START-OF-SELECTION flow.
+    expect(content).toContain('START-OF-SELECTION.');
+    expect(content).not.toContain('SELECT-OPTIONS');
+  });
+
+  it('--template report-alv-selection adds a selection screen and START-OF-SELECTION (F-21)', async () => {
+    const program = makeProgram();
+    registerCreateCommand(program);
+    const res = await runCommand(program, ['create', 'local', 'PROG', 'ZPROG_ALVS', '--template', 'report-alv-selection', '--json'], { cwd });
+    expect(res.exitCode).toBeUndefined();
+    expect(parseData(res).template).toBe('report-alv-selection');
+    const content = fs.readFileSync(path.join(cwd, 'src/prog/zprog_alvs/zprog_alvs.prog.abap'), 'utf-8');
+    expect(content).toContain('SELECTION-SCREEN BEGIN OF BLOCK');
+    expect(content).toContain('SELECT-OPTIONS: s_matnr');
+    expect(content).toContain('PARAMETERS:     p_max TYPE i');
+    expect(content).toContain('START-OF-SELECTION.');
+    expect(content).toContain('cl_salv_table=>factory(');
+    expect(content).toContain('it_fieldcatalog = lt_fcat');
   });
 
   it('--dir writes to a custom output directory', async () => {

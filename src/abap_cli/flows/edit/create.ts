@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import * as fs from 'node:fs/promises';
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError, printResult, printSchema, type OutputMode } from '../../output/json.js';
 import { resolveObject, getObjectParts, type ResolvedObject } from '../../core/resolve.js';
@@ -7,7 +8,9 @@ import { resolveTransport } from '../../core/transport.js';
 import { pushObject } from './push-object.js';
 import { requireWriteConfirmation } from '../../core/confirmation.js';
 import { buildFilename, objectDirName } from '../../formats/file-resolver.js';
-import { writeAbapFile } from '../../formats/abap-source.js';
+import { folderFor } from '../../formats/type-folder.js';
+import { fileExists, normalizeLineEndings, readAbapFile, writeAbapFile } from '../../formats/abap-source.js';
+import { collectWarning } from '../../output/meta.js';
 import { defaultSkeleton, getTemplate } from '../../formats/templates.js';
 import type { CreatableTypeIds } from 'abap-adt-api';
 import {
@@ -51,6 +54,8 @@ export interface CreateOptions {
   template?: string;
   /** false when --no-pull is passed (commander negated boolean) */
   pull?: boolean;
+  /** Replace an existing local file when pulling the new object back (default: keep it). */
+  overwrite?: boolean;
   checkOnly?: boolean;
   audit?: boolean;
   schema?: boolean;
@@ -140,13 +145,20 @@ export async function runCreate(type: string | undefined, name: string | undefin
   const spec = resolveType(type);
   const client = await AdtClientWrapper.create();
 
+  // F-03: `--file` is accepted as a substitute for `--description`, but the ADT
+  // path used to forward `opts.description` (undefined) into the create body,
+  // where `encodeAttr(undefined)` threw a raw
+  // `Cannot read properties of undefined (reading 'replace')`. Resolve the
+  // description from the AFF payload before touching SAP.
+  const description = await resolveCreateDescription(opts);
+
   // --check-only: validate the proposed object without creating it.
   if (opts.checkOnly) {
     const result = await client.validateNewObject({
       objtype: spec.objtype,
       objname: objectName,
       packagename: opts.package,
-      description: opts.description,
+      description,
     } as Parameters<AdtClientWrapper['validateNewObject']>[0]);
     printResult(mode,
       { object: objectName, type: type.toUpperCase(), checkOnly: true, valid: result.success, issues: result.success ? [] : [result.SHORT_TEXT] },
@@ -171,7 +183,7 @@ export async function runCreate(type: string | undefined, name: string | undefin
       objtype: spec.objtype,
       name: objectName,
       parentName: opts.package,
-      description: opts.description,
+      description,
       parentPath: `/sap/bc/adt/packages/${encodeURIComponent(opts.package)}`,
       transport,
     });
@@ -222,18 +234,41 @@ export async function runCreate(type: string | undefined, name: string | undefin
   if (opts.pull !== false) {
     if (type.toUpperCase() === 'FUGR') {
       const { pullObject } = await import('./pull-source.js');
+      // F-04: never clobber an existing local draft. `skipExisting` turns a
+      // conflicting file into a 'skipped' entry instead of OVERWRITE_REQUIRED,
+      // which would fail the command *after* the SAP object was created.
       const pulled = await pullObject(
         client,
         { name: object.name, type: object.type, objectUrl: object.objectUrl },
-        { dir: 'src', overwrite: true, skipExisting: false },
+        { dir: 'src', overwrite: opts.overwrite === true, skipExisting: opts.overwrite !== true },
       );
-      const written = pulled.written[0];
-      if (written) localFile = toOutputPath(written);
+      for (const skippedPath of pulled.skipped) {
+        collectWarning(
+          'LOCAL_FILE_KEPT',
+          `${toOutputPath(skippedPath)} already exists and was left untouched; the fresh SAP copy was not written. Re-run with --overwrite to replace it.`,
+          { file: toOutputPath(skippedPath) },
+        );
+      }
+      const kept = pulled.written[0] ?? pulled.skipped[0];
+      if (kept) localFile = toOutputPath(kept);
     } else {
       const content = await client.getObjectSource(mainPart.sourceUrl);
       const filename = buildFilename(object.name, object.type, mainPart.subtype, '.abap');
-      const relPath = path.join('src', objectDirName(object.name), filename);
-      await writeAbapFile(path.resolve(process.cwd(), relPath), content);
+      // F-04: use the exact layout `abap pull` writes
+      // (src/<typeFolder>/<object>/<file>) so create-then-pull and pull no
+      // longer fork the same object into two different paths.
+      const relPath = path.join('src', folderFor(object.type), objectDirName(object.name), filename);
+      const absPath = path.resolve(process.cwd(), relPath);
+      if (opts.overwrite !== true && (await hasLocalDraft(absPath, content))) {
+        // Keep the draft: it may be newer than what SAP just returned.
+        collectWarning(
+          'LOCAL_FILE_KEPT',
+          `${toOutputPath(relPath)} already exists and was left untouched; the fresh SAP copy was not written. Re-run with --overwrite to replace it.`,
+          { file: toOutputPath(relPath) },
+        );
+      } else {
+        await writeAbapFile(absPath, content);
+      }
       // Normalize to POSIX for the JSON output boundary (P0 — Windows path contract).
       localFile = toOutputPath(relPath);
     }
@@ -244,7 +279,7 @@ export async function runCreate(type: string | undefined, name: string | undefin
       object: objectName,
       type: type.toUpperCase(),
       package: opts.package,
-      description: opts.description,
+      description,
       transport,
       activated: skipActivate ? false : true,
       template: templateName,
@@ -253,6 +288,72 @@ export async function runCreate(type: string | undefined, name: string | undefin
     },
     `Created ${type.toUpperCase()} ${objectName} in ${opts.package}${skipActivate ? ' (not activated)' : ''} (${transport})`,
   );
+}
+
+/**
+ * Whether the target path holds a local draft worth preserving: it exists, has
+ * content, and differs from the freshly pulled SAP copy. A missing file, an
+ * empty placeholder, or byte-identical content is not a draft (feedback F-04:
+ * `create` used to reset a written implementation back to the 5-line skeleton).
+ */
+async function hasLocalDraft(absPath: string, freshContent: string): Promise<boolean> {
+  if (!(await fileExists(absPath))) return false;
+  try {
+    const existing = normalizeLineEndings(await readAbapFile(absPath));
+    if (existing.trim() === '') return false;
+    return existing !== normalizeLineEndings(freshContent);
+  } catch {
+    // Unreadable: keep the file rather than risk destroying it.
+    return true;
+  }
+}
+
+/**
+ * Resolve the object description for the ADT create path.
+ *
+ * `--file` is documented (and validated above) as an acceptable substitute for
+ * `--description`: AFF payloads carry the description in `header.description`.
+ * Before this fallback existed the value stayed `undefined` and the XML body
+ * builder threw `Cannot read properties of undefined (reading 'replace')`,
+ * surfaced as an opaque `CREATE_FAILED` (feedback F-03).
+ */
+async function resolveCreateDescription(opts: CreateOptions): Promise<string> {
+  const direct = opts.description?.trim();
+  if (direct) return direct;
+  if (opts.file) {
+    const fromFile = await descriptionFromAffFile(opts.file);
+    if (fromFile) return fromFile;
+  }
+  throw new CliError(
+    'USAGE',
+    'Missing object description: pass --description <desc> or set "header.description" in the --file payload',
+    {
+      nextSteps: ['Add --description "..." to the command, or add a description to the AFF JSON header.'],
+      example:
+        "abap create PROG ZREPORT --file src/zreport/zreport.prog.json --package '$TMP' --description \"My report\" --yes",
+    },
+  );
+}
+
+/**
+ * Read the description out of an AFF JSON payload: nested `header.description`
+ * (canonical AFF) or a flat top-level `description` (the wire-flat DDIC shape).
+ */
+async function descriptionFromAffFile(file: string): Promise<string | undefined> {
+  try {
+    // Resolve against the workspace root explicitly: the rest of the create
+    // flow treats paths as cwd-relative, and a bare `fs.readFile(relative)`
+    // would silently resolve against the process cwd instead.
+    const absPath = path.isAbsolute(file) ? file : path.resolve(process.cwd(), file);
+    const raw = await fs.readFile(absPath, 'utf8');
+    const doc = JSON.parse(raw) as { description?: unknown; header?: { description?: unknown } };
+    const candidate = doc?.header?.description ?? doc?.description;
+    if (typeof candidate === 'string' && candidate.trim() !== '') return candidate;
+  } catch {
+    // Unreadable/invalid JSON: fall through to the USAGE error, which is far
+    // more actionable than the former raw TypeError.
+  }
+  return undefined;
 }
 
 /**
