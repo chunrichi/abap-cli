@@ -164,6 +164,8 @@ export function legacyFlagsToBag(opts: Record<string, string | boolean | string[
   if (typeof opts.certCa === 'string') bag.caPath = opts.certCa;
   if (typeof opts.ssoCookieFile === 'string') bag.cookieFile = opts.ssoCookieFile;
   if (typeof opts.serviceKey === 'string') bag.serviceKey = opts.serviceKey;
+  if (typeof opts.spn === 'string') bag.spn = opts.spn;
+  if (typeof opts.reauthOnExpiry === 'string') bag.reauthOnExpiry = opts.reauthOnExpiry;
   return bag;
 }
 

@@ -7,6 +7,7 @@ import { exportProfiles, importProfiles, type ProfileBundle } from '../config/pr
 import { runList, runShow, runTest, runDelete } from '../flows/setup/profile.js';
 import { runAdd, runSet } from '../flows/setup/profile.js';
 import { runLogin } from '../flows/setup/sso.js';
+import { runCookieImport } from '../flows/setup/cookie-import.js';
 import { toOutputPath } from '../core/path-output.js';
 import { commandSchemas } from '../flows/setup/command-schemas.js';
 
@@ -52,13 +53,15 @@ export function registerProfileCommand(program: Command): void {
     .option('-p, --password <password>', 'Password (stores credential in keychain)')
     .option('--insecure', 'Skip SSL certificate verification (self-signed certs, development only)')
     .option('--ca <path>', 'PEM CA certificate to import into ~/.abap-cli/certificates/ and bind to this profile')
-    .option('--auth-method <method>', 'Login strategy: basic (default) | cert (X.509 client cert, 025) | browser_sso (BTP trial / SAML, 026) | oauth_password (BTP / CF service-key JWT, 027)')
+    .option('--auth-method <method>', 'Login strategy: basic (default) | cert (X.509 client cert, 025) | browser_sso (BTP trial / SAML, 026) | oauth_password (BTP / CF service-key JWT, 027) | sso (native SSO via Windows SSPI / Linux krb5 / macOS GSS)')
     .option('--auth-option <kv>', 'Generic auth option, repeatable as key=value (e.g. --auth-option certPath=/abs/cert.pem). New auth methods add no Commander options — they read from this bag.')
     .option('--cert-path <path>', 'X.509 client cert file (PEM) — used when --auth-method=cert')
     .option('--cert-key <path>', 'X.509 private key file (PEM) — used when --auth-method=cert')
     .option('--cert-ca <path>', 'Optional X.509 client CA override — used when --auth-method=cert')
     .option('--cert-passphrase <passphrase>', 'Passphrase for .p12 / encrypted key — written to keychain')
     .option('--sso-cookie-file <path>', 'SSO cookie jar path — used when --auth-method=browser_sso')
+    .option('--spn <spn>', 'Kerberos service principal name — used when --auth-method=sso (defaults to HTTP/<host>)')
+    .option('--reauth-on-expiry', 'Force re-acquisition of the Kerberos ticket when the cached one expires — used when --auth-method=sso')
     .option('--service-key <path>', 'BTP service key JSON — used when --auth-method=oauth_password (extracts uaa.url/clientid/clientsecret)')
     .action(async (name: string, opts, cmd) => {
       try {
@@ -80,7 +83,7 @@ export function registerProfileCommand(program: Command): void {
     .option('--insecure', 'Skip SSL certificate verification (self-signed certs, development only)')
     .option('--ca <path>', 'PEM CA certificate to import into ~/.abap-cli/certificates/ and bind to this profile')
     .option('--clear-ca', 'Remove the CA certificate setting')
-    .option('--auth-method <method>', 'Login strategy: basic | cert | browser_sso | oauth_password')
+    .option('--auth-method <method>', 'Login strategy: basic | cert | browser_sso | oauth_password | sso')
     .option('--auth-option <kv>', 'Generic auth option, repeatable as key=value (e.g. --auth-option certPath=/abs/cert.pem). New auth methods add no Commander options — they read from this bag.')
     .option('--cert-path <path>', 'X.509 client cert file (PEM)')
     .option('--cert-key <path>', 'X.509 private key file (PEM)')
@@ -90,6 +93,9 @@ export function registerProfileCommand(program: Command): void {
     .option('--clear-cert-auth', 'Reset to basic auth (drops authMethod and certAuth)')
     .option('--sso-cookie-file <path>', 'SSO cookie jar path — used when --auth-method=browser_sso')
     .option('--clear-sso-cookie-file', 'Reset SSO cookie file path to the default')
+    .option('--spn <spn>', 'Kerberos service principal name — used when --auth-method=sso (defaults to HTTP/<host>)')
+    .option('--reauth-on-expiry', 'Force re-acquisition of the Kerberos ticket when the cached one expires — used when --auth-method=sso')
+    .option('--clear-negotiate', 'Drop negotiate config (reset to authMethod)')
     .option('--service-key <path>', 'BTP service key JSON — used when --auth-method=oauth_password (extracts uaa.url/clientid/clientsecret)')
     .option('--clear-oauth-password', 'Drop oauthPassword config (reset to authMethod)')
     .action(async (name: string, opts, cmd) => {
@@ -119,6 +125,37 @@ export function registerProfileCommand(program: Command): void {
         await runLogin(name, jsonFromCommand(cmd));
       } catch (error: unknown) {
         handleError(jsonFromCommand(cmd), error);
+      }
+    });
+
+  profile
+    .command('cookie <name>')
+    .description('Import a raw Cookie: header for a browser_sso profile (alternative to `profile login`)')
+    .option('--header <cookie>', 'Raw Cookie header value (e.g. "SAP_SESSIONID_001_100=AbC; route=R/...")')
+    .option('--from-file <path>', 'Read the Cookie header from a text file (first non-empty line)')
+    .option('--cookie-file <path>', 'Override the cookie jar path (defaults to ~/.abap-cli/<name>.sso.cookies.json)')
+    .action(async (name: string, opts: { header?: string; fromFile?: string; cookieFile?: string }, cmd) => {
+      const mode = jsonFromCommand(cmd);
+      try {
+        let raw = opts.header;
+        if (!raw && opts.fromFile) {
+          const content = fs.readFileSync(path.resolve(opts.fromFile), 'utf-8');
+          raw = content.split(/\r?\n/).find((line) => line.trim().length > 0) ?? '';
+        }
+        if (!raw) {
+          await printError(mode, new CliError('USAGE',
+            'Provide --header "<cookie-string>" or --from-file <path>.',
+            {
+              nextSteps: [
+                'Open browser DevTools → Network → click any SAP request → Headers → Cookie.',
+              ],
+              example: `abap profile cookie ${name} --header "SAP_SESSIONID_001_100=AbCdEf; route=R/..."`,
+            }));
+          return;
+        }
+        await runCookieImport(name, raw, { cookieFile: opts.cookieFile }, mode);
+      } catch (error: unknown) {
+        handleError(mode, error);
       }
     });
 

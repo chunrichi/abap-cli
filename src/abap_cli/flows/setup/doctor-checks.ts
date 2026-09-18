@@ -133,24 +133,32 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
       : okItem('env.config', verbose ? configPath : undefined),
   );
 
-  // Dependency sanity: keytar must be importable (Constitution VI credential store).
-  let keytarOk = false;
-  let keytarDetail = '';
+  // Dependency sanity: a working OS keychain backend must be available.
+  // Native backend (cmdkey / security / secret-tool) is preferred; keytar is
+  // an optional fallback. The dispatcher resolves the active backend and we
+  // surface its `isAvailable()` probe result so users see a clear hint when
+  // their environment lacks the necessary tools (e.g. Linux without
+  // libsecret-tools AND without the optional keytar dependency).
+  let keychainOk = false;
+  let keychainDetail = '';
   try {
-    const mod = (await import('keytar')) as { default?: unknown; setPassword?: unknown };
-    // CJS namespace: the API may sit on `default` (esModuleInterop) or be
-    // re-exported as named exports — accept either shape.
-    const keytar = (mod.default ?? mod) as { setPassword?: unknown };
-    keytarOk = typeof keytar.setPassword === 'function';
-    keytarDetail = 'keytar (OS keychain) importable';
+    const { resolveBackend } = await import('../../config/secrets.js');
+    const backend = await resolveBackend();
+    if (await backend.isAvailable()) {
+      keychainOk = true;
+      keychainDetail = `keychain backend '${backend.name}' available`;
+    } else {
+      keychainDetail = `keychain backend '${backend.name}' reported unavailable`;
+    }
   } catch (error: unknown) {
-    keytarDetail = `keytar import failed: ${error instanceof Error ? error.message : String(error)}`;
+    keychainDetail = `no keychain backend available: ${error instanceof Error ? error.message : String(error)}`;
   }
   push(
     environment,
-    keytarOk
-      ? okItem('env.deps', verbose ? keytarDetail : undefined)
-      : errItem('env.deps', keytarDetail, 'Run "npm install" to restore the keytar dependency.'),
+    keychainOk
+      ? okItem('env.deps', verbose ? keychainDetail : undefined)
+      : errItem('env.deps', keychainDetail,
+          'Install libsecret-tools (Linux) or set ABAP_CLI_KEYCHAIN_BACKEND=keytar with the keytar dependency installed.'),
   );
 
   // --- config ---

@@ -39,7 +39,7 @@ async function recordTextpoolCapabilityIfPossible(name: string): Promise<void> {
   }
 }
 
-/** True when any profile field option (incl. password / cert / sso / oauth / authMethod / auth-option) is present. */
+/** True when any profile field option (incl. password / cert / sso / oauth / negotiate / authMethod / auth-option) is present. */
 function hasProfileOptions(opts: Record<string, string | boolean | string[]>): boolean {
   const has = (key: string) => opts[key] !== undefined;
   return has('url') || has('client') || has('username') || has('language') ||
@@ -48,6 +48,7 @@ function hasProfileOptions(opts: Record<string, string | boolean | string[]>): b
     has('certPath') || has('certKey') || has('certCa') || has('certPassphrase') ||
     !!opts.removeCertPassphrase || !!opts.clearCertAuth ||
     has('ssoCookieFile') || !!opts.clearSsoCookieFile ||
+    has('spn') || !!opts.reauthOnExpiry ||
     !!opts.serviceKey;
 }
 

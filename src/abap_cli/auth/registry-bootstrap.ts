@@ -14,3 +14,4 @@ import './strategies/basic.js';
 import './strategies/cert.js';
 import './strategies/browser-sso.js';
 import './strategies/oauth-password.js';
+import './strategies/sso.js';

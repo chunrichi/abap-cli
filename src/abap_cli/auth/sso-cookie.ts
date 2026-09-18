@@ -39,7 +39,9 @@ export function sanitizeCookieNameOrValue(raw: string): string {
  * (SAP sometimes sets multiple cookies with the same name across subdomains).
  */
 export function parseCookieHeader(header: string): SsoCookie[] {
-  const pairs = header.split(/;\s*/).filter(Boolean);
+  const trimmed = header.replace(/[\r\n\t]/g, '').trim();
+  if (trimmed === '') return [];
+  const pairs = trimmed.split(/;\s*/).filter((p) => p.length > 0);
   return pairs.map((p) => {
     const idx = p.indexOf('=');
     if (idx === -1) return { name: sanitizeCookieNameOrValue(p), value: '' };
@@ -47,7 +49,7 @@ export function parseCookieHeader(header: string): SsoCookie[] {
       name: sanitizeCookieNameOrValue(p.slice(0, idx)),
       value: sanitizeCookieNameOrValue(p.slice(idx + 1)),
     };
-  });
+  }).filter((c) => c.name.length > 0);
 }
 
 /** Reassemble a `Cookie:` header from a cookie list. */
