@@ -18,6 +18,7 @@
  */
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError } from '../../output/json.js';
+import { collectWarning } from '../../output/meta.js';
 import { resolveObject } from '../../core/resolve.js';
 import { normalizePullData } from '../../core/path-output.js';
 import type { PullOptions, PullResult } from './pull-shared.js';
@@ -117,10 +118,64 @@ export async function runPull(objectName: string, opts: PullOptions): Promise<Pu
   // `requestedFunctionModule` keeps the original FM identity so the
   // strategy scopes its output to that one module.
   const resolved = await resolveObject(client, objectName, opts.type);
+  const versionKind = opts.versionKind ?? 'latest';
+  // Warn before writing: the pulled source is the working-area version, which is
+  // not what `abap run` executes while an unactivated version exists (F-02).
+  if (versionKind === 'latest') {
+    await warnIfPendingInactive(client, resolved.objectUrl, resolved.name);
+  }
   const { object: pullTarget, requestedFunctionModule } = normalizeFugrFunctionModule(resolved);
   const result = await pullObject(client, pullTarget, { ...opts, requestedFunctionModule });
   return {
-    data: normalizePullData({ object: resolved.name, type: resolved.type, entries: result.entries, written: result.written, skipped: result.skipped, failed: result.failed }),
-    human: humanSummary(resolved, result),
+    data: normalizePullData({
+      object: resolved.name,
+      type: resolved.type,
+      entries: result.entries,
+      written: result.written,
+      skipped: result.skipped,
+      failed: result.failed,
+      versionKind,
+    }),
+    human:
+      humanSummary(resolved, result) +
+      (versionKind === 'active' ? ' [active version: matches `abap run`]' : ' [latest/working-area version]'),
   };
+}
+
+/**
+ * Warn when the object currently holds an unactivated version, i.e. the pulled
+ * source is NOT what `abap run` executes.
+ *
+ * `pull` fetches ADT's working-area (`latest`) version; `run` executes the
+ * active version. A failed `push` leaves exactly this split — new source stored
+ * inactive, active version unchanged — which is what made `run` look like it was
+ * returning stale output (feedback F-02 / F-08).
+ */
+async function warnIfPendingInactive(
+  client: AdtClientWrapper,
+  objectUrl: string,
+  name: string,
+): Promise<void> {
+  try {
+    const list = (await client.inactiveObjects()) as Array<{
+      object?: { 'adtcore:uri'?: string; deleted?: boolean };
+    }>;
+    const target = objectUrl.replace(/\/+$/, '').toLowerCase();
+    const pending = list.some((entry) => {
+      const obj = entry?.object;
+      if (!obj || obj.deleted === true || typeof obj['adtcore:uri'] !== 'string') return false;
+      return obj['adtcore:uri'].replace(/\/+$/, '').toLowerCase() === target;
+    });
+    if (pending) {
+      collectWarning(
+        'PENDING_INACTIVE_VERSION',
+        `${name} has an unactivated version: the pulled source is not what \`abap run\` executes. ` +
+          `Run \`abap activate ${name}\` to activate it, or \`abap pull ${name} --active\` to fetch the active version.`,
+        { object: name },
+      );
+    }
+  } catch {
+    // The inactive-objects endpoint is unavailable on some releases — skip the
+    // hint rather than failing an otherwise successful pull.
+  }
 }

@@ -166,11 +166,37 @@ export async function pushObject(
     try {
       await client.activate(object.objectUrl, object.type, object.name);
     } catch (error: unknown) {
+      // `clients/activation.ts` already raises a precise ACTIVATION_FAILED
+      // carrying SAP's messages, the `lineScope` note and actionable
+      // nextSteps. Re-wrapping it here duplicated the "Activation failed for X"
+      // prefix and dropped those details (feedback F-05 / F-08).
+      if (error instanceof CliError && error.code === 'ACTIVATION_FAILED') {
+        throw new CliError('ACTIVATION_FAILED', error.message, {
+          details: {
+            ...(error.details ?? {}),
+            object: object.name,
+            stage: 'activate',
+            written: true,
+            activated: false,
+          },
+          nextSteps: error.nextSteps ?? [
+            `${object.name} was written to SAP but NOT activated — the active version is unchanged.`,
+            `Inspect the pending state: abap inspect ${object.name} --activation`,
+            `Get line numbers relative to your local file: abap check syntax <file>`,
+          ],
+        });
+      }
       const message = error instanceof Error ? error.message : String(error);
       throw new CliError('ACTIVATION_FAILED', `Activation failed for ${object.name}: ${message}`, {
         object: object.name,
         stage: 'activate',
         detail: message,
+        written: true,
+        activated: false,
+        nextSteps: [
+          `${object.name} was written to SAP but NOT activated — the active version is unchanged.`,
+          `Inspect the pending state: abap inspect ${object.name} --activation`,
+        ],
       });
     }
   } finally {

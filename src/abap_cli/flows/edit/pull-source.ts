@@ -188,6 +188,8 @@ export async function pullObject(
      *  the original FM so the fugr strategy scopes its output to that
      *  one module rather than dumping every FM in the group. */
     requestedFunctionModule?: { name: string; objectUrl: string };
+    /** `'active'` fetches the version SAP executes; default `'latest'`. */
+    versionKind?: 'latest' | 'active';
   },
 ): Promise<{ entries: PullEntry[]; written: string[]; skipped: string[]; failed: string[] }> {
   const files = await strategyFor(object.type).files({ client, object, opts });

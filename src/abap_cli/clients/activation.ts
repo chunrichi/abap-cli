@@ -30,9 +30,41 @@ export interface ActivationMessage {
   /** SAP message type: 'E' (error), 'A' (abort), 'X' (exit), 'W' (warning), 'I' (info). */
   type: string;
   text: string;
-  /** Source location SAP pointed at, when the message carries one. */
+  /**
+   * SAP's `line` attribute. For OO classes this is relative to the *generated*
+   * include and does not address the local file (feedback F-05: a real line 6
+   * came back as `line 1`). Prefer {@link startLine} when present.
+   */
   line?: number;
   href?: string;
+  /**
+   * Line parsed from the message's `href` fragment (`...#start=6,2`). This is
+   * the position inside the referenced source URI and is the accurate one.
+   */
+  startLine?: number;
+  /** Column parsed from the `href` fragment, when present. */
+  startColumn?: number;
+  /** Source URI the message points at (href without the fragment). */
+  sourceUri?: string;
+}
+
+/** Parse `#start=<line>,<col>` out of an ADT message href. */
+function parseHrefPosition(href: string | undefined): {
+  startLine?: number;
+  startColumn?: number;
+  sourceUri?: string;
+} {
+  if (!href) return {};
+  const [sourceUri, fragment] = href.split('#');
+  const m = /start=(\d+)(?:,(\d+))?/.exec(fragment ?? '');
+  if (!m) return { sourceUri };
+  const line = Number(m[1]);
+  const column = m[2] !== undefined ? Number(m[2]) : undefined;
+  return {
+    ...(Number.isFinite(line) && line > 0 ? { startLine: line } : {}),
+    ...(column !== undefined && Number.isFinite(column) && column > 0 ? { startColumn: column } : {}),
+    ...(sourceUri ? { sourceUri } : {}),
+  };
 }
 
 export interface ActivationResult {
@@ -114,11 +146,15 @@ export function parseActivationResponse(body: string): ActivationResult {
   const messages: ActivationMessage[] = asArray(root['msg'] as unknown).map((m) => {
     const node = m as Record<string, unknown>;
     const line = node['@_line'];
+    const href = node['@_href'] ? String(node['@_href']) : undefined;
     return {
       type: String(node['@_type'] ?? ''),
       text: shortTextOf(node) || 'Activation message',
       ...(line !== undefined && Number.isFinite(Number(line)) ? { line: Number(line) } : {}),
-      ...(node['@_href'] ? { href: String(node['@_href']) } : {}),
+      ...(href ? { href } : {}),
+      // The href fragment carries the accurate position; SAP's `line` attribute
+      // is include-relative and misleading (F-05).
+      ...parseHrefPosition(href),
     };
   });
 
@@ -146,18 +182,45 @@ export function parseActivationResponse(body: string): ActivationResult {
 /**
  * Turn a failed activation result into a CliError. Returns normally when SAP
  * reported no errors, so callers can inspect warnings/execution flags.
+ *
+ * Position handling (feedback F-05): SAP's `line` attribute is relative to the
+ * *generated* include — a failure on local line 6 came back as `line 1`. The
+ * accurate position rides in the message `href` fragment (`#start=6,2`), so we
+ * prefer that and record `lineScope` to say which kind of number the message
+ * contains. `nextSteps` point at `abap check syntax`, which always reports
+ * local-file lines.
  */
 export function throwOnActivationFailure(result: ActivationResult, label: string): void {
   const errors = result.messages.filter((m) => FAILING_TYPES.has(m.type));
   if (errors.length === 0 && result.inactive.length === 0) return;
+  const positionOf = (m: ActivationMessage): number | undefined => m.startLine ?? m.line;
   const detail = errors
-    .map((m) => `${m.line !== undefined ? `line ${m.line}: ` : ''}${m.text}`)
+    .map((m) => {
+      const position = positionOf(m);
+      return `${position !== undefined ? `line ${position}: ` : ''}${m.text}`;
+    })
     .join('; ');
-  throw new CliError('ACTIVATION_FAILED', `Activation failed for ${label}: ${detail || 'object left inactive'}`, {
-    details: {
-      messages: result.messages,
-      inactive: result.inactive,
-      activationExecuted: result.activationExecuted,
+  const hasPrecisePosition = errors.some((m) => m.startLine !== undefined);
+  throw new CliError(
+    'ACTIVATION_FAILED',
+    `Activation failed for ${label}: ${detail || 'object left inactive'}`,
+    {
+      details: {
+        messages: result.messages,
+        inactive: result.inactive,
+        activationExecuted: result.activationExecuted,
+        // 'source-uri' → the line addresses the referenced source (use it);
+        // 'generated-include' → include-relative, does not address the local file.
+        lineScope: hasPrecisePosition ? 'source-uri' : 'generated-include',
+        // The source WAS written before activation was attempted (F-08).
+        written: true,
+        activated: false,
+      },
+      nextSteps: [
+        `${label} was written to SAP but NOT activated — the active version is unchanged.`,
+        `Inspect the pending state: abap inspect ${label} --activation`,
+        `Get line numbers relative to your local file: abap check syntax <file>`,
+      ],
     },
-  });
+  );
 }

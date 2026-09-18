@@ -20,11 +20,15 @@ export function registerPullCommand(program: Command): void {
     .option('--include-tests', 'Include testclasses source part')
     .option('--include-all-parts', 'Include every source-code part')
     .option('--textpool', 'Also pull textpool files (.texts/.selections/.headings.<lang>.properties)')
+    .option(
+      '--active',
+      'Pull the active (activated) version — the source `abap run` executes. Default: the working-area/latest version.',
+    )
     .option('--remote <remoteid>', 'Pull the object\'s active version source from a remote system (Version Management)')
     .option('--tr <request>', 'Pull all objects bound to a transport request (mutually exclusive with object name and --package)')
     .option('--user <sap-user>', 'Filter --tr lookups by transport task owner (case-insensitive). Only valid with --tr.')
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
-    .action(async (objectName: string, opts: PullOptions, cmd) => {
+    .action(async (objectName: string, opts: PullOptions & { active?: boolean }, cmd) => {
       // --schema branch — emit machine-readable parameter schema (no SAP call).
       if (cmd.optsWithGlobals().schema) {
         printSchema(commandSchemas['pull']!, jsonFromCommand(cmd));
@@ -50,6 +54,34 @@ export function registerPullCommand(program: Command): void {
       const mode = jsonFromCommand(cmd);
       try {
         if (opts.type) opts.type = normalizeTypeInput(opts.type).type;
+        if (opts.active) {
+          // --active selects the version SAP executes; only ADT source objects
+          // have two versions to choose from.
+          const sourceTypes = new Set(['CLAS', 'INTF', 'PROG', 'FUGR']);
+          if (opts.package || opts.tr || opts.textpool || opts.remote) {
+            throw new CliError(
+              'INVALID_ARGUMENT',
+              '--active cannot be combined with --package, --tr, --textpool or --remote',
+              {
+                nextSteps: ['Use --active with a single ADT source object.'],
+                example: 'abap pull ZCL_MY_CLASS --type CLAS --active',
+              },
+            );
+          }
+          if (!objectName) {
+            throw new CliError('USAGE', '--active requires an object name', {
+              example: 'abap pull ZCL_MY_CLASS --type CLAS --active',
+            });
+          }
+          if (opts.type && !sourceTypes.has(opts.type.toUpperCase())) {
+            throw new CliError(
+              'INVALID_ARGUMENT',
+              `--active is not supported for type ${opts.type}: only CLAS / INTF / PROG / FUGR have an active vs working-area source`,
+              { nextSteps: ['Drop --active, or pull a source object.'] },
+            );
+          }
+          opts.versionKind = 'active';
+        }
         const result = await runPull(objectName, opts);
         printResult(mode, result.data, result.human);
       } catch (error: unknown) {

@@ -58,6 +58,20 @@ export interface PushFileResult {
   /** Original failure nextSteps (aggregate reuses them for single-file runs). */
   nextSteps?: string[];
   plan?: string[];
+  /**
+   * Whether the source reached SAP. `true` even when activation later failed —
+   * a failed activation leaves the new source stored but inactive (F-08).
+   */
+  written?: boolean;
+  /** Whether the active version now matches what was pushed. */
+  activated?: boolean;
+  /**
+   * Scope of the line numbers in SAP's activation messages. `'generated-include'`
+   * means they do NOT address the local file (F-05).
+   */
+  lineScope?: string;
+  /** Raw SAP activation messages (`{type,text,line?}`), when activation ran. */
+  messages?: unknown[];
 }
 
 /** Flow outcome: JSON envelope data + human summary, printed by the command layer. */
@@ -303,19 +317,24 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
         files: [file],
       });      const { transport, status } = await pushOne(client, file, opts, onStage, onWarning);
       if (opts.dryRun) {
-        results.push({ file, status: 'dry-run', plan: stages });
+        results.push({ file, status: 'dry-run', plan: stages, written: false, activated: false });
       } else {
+        const resolvedStatus =
+          status ?? (opts.checkOnly ? 'checked-only' : (opts.activate === false ? 'written' : 'activated'));
         results.push({
           file,
-          status: status ?? (opts.checkOnly ? 'checked-only' : (opts.activate === false ? 'written' : 'activated')),
+          status: resolvedStatus,
           transport,
           stage: stages[stages.length - 1],
+          written: !opts.checkOnly,
+          activated: resolvedStatus === 'activated',
         });
       }
       if (opts.failFast && failed > 0) break;
     } catch (error: unknown) {
       failed++;
       const err = toErrorShape(error);
+      const details = (err.details ?? {}) as Record<string, unknown>;
       results.push({
         file,
         status: 'failed',
@@ -326,6 +345,11 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
         errors: Array.isArray(err.errors) ? err.errors : undefined,
         unlock: typeof err.unlock === 'string' ? err.unlock : undefined,
         detail: typeof err.detail === 'string' ? err.detail : undefined,
+        // Distinguish "never reached SAP" from "written but left inactive".
+        written: typeof details.written === 'boolean' ? details.written : err.code === 'ACTIVATION_FAILED',
+        activated: false,
+        lineScope: typeof details.lineScope === 'string' ? details.lineScope : undefined,
+        messages: Array.isArray(details.messages) ? details.messages : undefined,
       });
       if (opts.failFast) break;
     }
@@ -344,7 +368,16 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
     const message = single && firstFailed?.message ? firstFailed.message : `${failed} of ${target.files.length} file(s) failed`;
     const nextSteps = single && firstFailed?.nextSteps ? firstFailed.nextSteps : undefined;
     throw new CliError(aggregateCode, message, {
-      details: { results: results.map(normalizePushResult), failed },
+      details: {
+        results: results.map(normalizePushResult),
+        failed,
+        // Lift the per-file activation context so single-file consumers do not
+        // have to unwrap `details.results` (F-05 / F-08).
+        ...(firstFailed?.written !== undefined ? { written: firstFailed.written } : {}),
+        ...(firstFailed?.activated !== undefined ? { activated: firstFailed.activated } : {}),
+        ...(firstFailed?.lineScope ? { lineScope: firstFailed.lineScope } : {}),
+        ...(firstFailed?.messages ? { messages: firstFailed.messages } : {}),
+      },
       nextSteps: nextSteps ?? [
         "Inspect the failing file's `code` and `stage` fields.",
         'Fix the issue and re-run with --keep-going (default) or --fail-fast to stop earlier.',

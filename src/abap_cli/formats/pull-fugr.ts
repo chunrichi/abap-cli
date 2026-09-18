@@ -13,7 +13,7 @@ import {
   toCanonicalFuncSource,
   type FuncComponent,
 } from './func-pseudo.js';
-import type { OutputFile, PullContext, PullStrategy } from './pull-strategy.js';
+import { fetchPullSource, type OutputFile, type PullContext, type PullStrategy } from './pull-strategy.js';
 
 /**
  * FUGR pull strategy (abap-file-format fugr/README.md).
@@ -173,7 +173,7 @@ export function fugrStrategy(): PullStrategy {
       // sapl<name>.reps.abap + .json (function-pool main program)
       files.push({
         filename: `${groupFile}.fugr.sapl${groupFile}.reps.abap`,
-        content: () => client.getObjectSource(layout.saplUrl),
+        content: () => fetchPullSource(client, layout.saplUrl, opts.versionKind),
       });
       files.push({
         filename: `${groupFile}.fugr.sapl${groupFile}.reps.json`,
@@ -188,7 +188,7 @@ export function fugrStrategy(): PullStrategy {
       if (topInclude) {
         files.push({
           filename: `${groupFile}.fugr.l${groupFile}top.reps.abap`,
-          content: () => client.getObjectSource(topInclude.sourceUrl),
+          content: () => fetchPullSource(client, topInclude.sourceUrl, opts.versionKind),
         });
         files.push({
           filename: `${groupFile}.fugr.l${groupFile}top.reps.json`,
@@ -205,7 +205,7 @@ export function fugrStrategy(): PullStrategy {
         const includeFile = fugrFileToken(include.name);
         files.push({
           filename: `${groupFile}.fugr.${includeFile}.reps.abap`,
-          content: () => client.getObjectSource(include.sourceUrl),
+          content: () => fetchPullSource(client, include.sourceUrl, opts.versionKind),
         });
         files.push({
           filename: `${groupFile}.fugr.${includeFile}.reps.json`,
@@ -234,7 +234,7 @@ export function fugrStrategy(): PullStrategy {
       const sourceFor = (sourceUrl: string, fallbackName: string) => {
         const cached = sourceCache.get(sourceUrl);
         if (cached) return cached;
-        const pending = client.getObjectSource(sourceUrl).then((raw) => ({
+        const pending = fetchPullSource(client, sourceUrl, opts.versionKind).then((raw) => ({
           raw,
           canonical: toCanonicalFuncSource(raw, fallbackName),
           components: interfaceComponents(raw),

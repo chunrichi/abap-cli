@@ -17,7 +17,30 @@ export interface OutputFile {
 export interface PullContext {
   client: AdtClientWrapper;
   object: { name: string; type: string; objectUrl: string };
-  opts: { includeTests?: boolean; includeAllParts?: boolean };
+  opts: {
+    includeTests?: boolean;
+    includeAllParts?: boolean;
+    /** Which source version to fetch; defaults to the working-area (`latest`). */
+    versionKind?: 'latest' | 'active';
+  };
+}
+
+/**
+ * Fetch one source part, honoring the caller's requested version.
+ *
+ * ADT's default (`latest`) is the working-area version — the one a user last
+ * pushed, whether or not it was activated. `run` executes the *active* version,
+ * so `--active` is what callers need to see what will actually execute
+ * (feedback F-02).
+ */
+export async function fetchPullSource(
+  client: AdtClientWrapper,
+  sourceUrl: string,
+  versionKind: 'latest' | 'active' | undefined,
+): Promise<string> {
+  return versionKind === 'active'
+    ? client.getActiveObjectSource(sourceUrl)
+    : client.getObjectSource(sourceUrl);
 }
 
 /**
@@ -90,7 +113,7 @@ function sourceObjectStrategy(): PullStrategy {
         },
         ...remapped.map((p) => ({
           filename: buildFilename(object.name, object.type, p.subtype, sourceExt),
-          content: async () => client.getObjectSource(p.sourceUrl),
+          content: async () => fetchPullSource(client, p.sourceUrl, opts.versionKind),
         })),
       ];
     },

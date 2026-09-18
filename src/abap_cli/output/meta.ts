@@ -31,6 +31,12 @@ import { createRequire } from 'node:module';
 export type WarningCode =
   | 'UNLOCK_WARNING'        // push succeeded but the edit lock could not be released
   | 'DEPRECATED_OPTION'     // deprecated option used (e.g. --max in search)
+  // F-02: `pull` returns the working-area (latest) version by default, which is
+  // NOT what `abap run` executes while the object has an unactivated version.
+  | 'PENDING_INACTIVE_VERSION'
+  // F-04: `create` pulls the new skeleton back locally; an existing local draft
+  // was kept instead of being silently overwritten.
+  | 'LOCAL_FILE_KEPT'
   | 'PASSWORD_EXPORT'       // connection export includes passwords
   | 'KEYCHAIN_WARNING'      // OS keychain store/cleanup failed (degraded continue)
   | 'FORCE_BYPASSED'        // deploy --force bypassed safety guards
