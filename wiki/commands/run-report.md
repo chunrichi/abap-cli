@@ -2,7 +2,7 @@
 type: command
 title: abap run-report
 description: "Execute an activated REPORT and return its list output (read-only, via the bundled ICF /run/report endpoint). The report runs with DEFAULT selection values; only classic list output is captured. S-4 adds --format (raw|tsv|csv) and --param NAME=VALUE pass-through."
-tags: [command, run-report]
+tags: [abap-cli, command, run-report]
 created at: 2026-10-29 14:30:14
 changed at: 2026-10-29 14:30:14
 ---

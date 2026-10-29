@@ -28,6 +28,8 @@ abap init [options]
 | `--cert-passphrase <pwd>` | Passphrase for .p12 / encrypted key — written to keychain. |
 | `--sso-cookie-file <path>` | SSO cookie jar path — used with --auth-method=browser_sso. |
 | `--service-key <path>` | BTP service key JSON — used with --auth-method=oauth_password. |
+| `--spn <spn>` | Kerberos service principal name — used with --auth-method=sso (defaults to HTTP/<host>). |
+| `--reauth-on-expiry` | Force re-acquisition of the Kerberos ticket when the cached one expires — used with --auth-method=sso. |
 | `--tr <transport>` | Default transport number (written to .abap.json). |
 | `--package <package>` | Default SAP package (written to .abap.json). |
 | `--source-dir <path>` | Base directory for `push --all` / `check --all` (written to .abap.json). |

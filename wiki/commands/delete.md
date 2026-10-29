@@ -2,7 +2,7 @@
 type: command
 title: abap delete
 description: "Delete an ABAP object from SAP (lock → delete → unlock). Type is required to avoid ambiguity; --yes is required for non-interactive confirmation; a transport request is required for non-$TMP objects (matching `abap push` semantics)."
-tags: [command, delete]
+tags: [abap-cli, command, delete]
 created at: 2026-10-29 14:30:14
 changed at: 2026-10-29 14:30:14
 ---
