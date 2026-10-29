@@ -164,5 +164,5 @@ abap run --schema --json
 - 客户端：`src/abap_cli/clients/adt-client.ts`（`runClass(name, params?)`，params 经 `AdtHTTP.request` JSON body 传递）
 - SAP 后端：`abap/src/clas/zcl_abap_vibe_runner.clas.abap`（IF_OO_ADT_CLASSRUN + 动态调用 + 超时检查）
 - 错误码：`src/abap_cli/output/error-codes.ts`（8 个 015 新错码 + `WRAPPER_INPUT_UNAVAILABLE`）
-- 测试：`test/unit/run-*.test.ts`（26 文件 83 用例）、`test/mock-adt/server.js`（`ZCL_ABAP_VIBE_RUNNER` fixture）
+- 测试：`test/unit/run-*.test.ts`（26 文件 83 用例）、`test/integration/mock-adt/server.js`（`ZCL_ABAP_VIBE_RUNNER` fixture）
 - 文档：`docs/commands.md`（`abap run` 一节）、`CHANGELOG.md`（[Unreleased] ### Added 015-abap-run）

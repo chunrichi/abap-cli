@@ -5,11 +5,7 @@ import * as path from 'node:path';
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { IcfClient } from '../../clients/icf-client.js';
 import { CliError, printResult, type OutputMode } from '../../output/json.js';
-import {
-  readMsagJson,
-  validateMsagObject,
-  localToWire as msagLocalToWire,
-} from '../../formats/msag/json.js';
+import { msagArtifact, type MsagLocal } from '../../formats/msag/json.js';
 import { toOutputPath } from '../../core/path-output.js';
 import { detectChannel, loadChannelProfile } from './channel-detect.js';
 import type { CreateOptions } from './create.js';
@@ -26,15 +22,15 @@ export async function runCreateMsag(
     });
   }
   const filePath = path.resolve(process.cwd(), opts.file);
-  let doc: Awaited<ReturnType<typeof readMsagJson>>;
+  let doc: MsagLocal;
   try {
-    doc = await readMsagJson(filePath);
+    doc = await msagArtifact.read(filePath);
   } catch (error: unknown) {
     throw new CliError('FILE_PARSE_ERROR', `Cannot read MSAG file ${toOutputPath(opts.file)}: ${error instanceof Error ? error.message : String(error)}`, {
       file: toOutputPath(opts.file),
     });
   }
-  const errors = await validateMsagObject(doc);
+  const errors = await msagArtifact.validate(doc);
   if (errors.length > 0) {
     throw new CliError('VALIDATION_ERROR', `Invalid MSAG definition in ${toOutputPath(opts.file)}: ${errors.join('; ')}`, {
       file: toOutputPath(opts.file),
@@ -43,7 +39,7 @@ export async function runCreateMsag(
   }
   const profile = await loadChannelProfile();
   const decision = detectChannel(profile, 'msag');
-  const wire = msagLocalToWire(doc);
+  const wire = msagArtifact.toWire(doc);
   if (decision.channel === 'adt') {
     const client = await AdtClientWrapper.create();
     await client.createMsag(name, wire, opts.package, opts.tr);

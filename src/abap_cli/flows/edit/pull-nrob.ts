@@ -27,7 +27,7 @@ import { CliError } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
 import { buildFilename } from '../../formats/file-resolver.js';
 import { folderFor } from '../../formats/type-folder.js';
-import { wireToLocal, writeNrobJson, validateNrobObject } from '../../formats/nrob/json.js';
+import { nrobArtifact } from '../../formats/nrob/json.js';
 import { toOutputPath } from '../../core/path-output.js';
 import type { PullHandler } from './routing.js';
 
@@ -85,8 +85,8 @@ export async function runPullNrob(name: string, opts: PullNrobOptions = {}): Pro
     wire = await readViaIcf(upper);
   }
 
-  const local = wireToLocal(wire);
-  const errors = await validateNrobObject(local);
+  const local = nrobArtifact.fromWire(wire);
+  const errors = await nrobArtifact.validate(local);
   if (errors.length > 0) {
     throw new CliError('AFF_FIXTURE_INVALID', `Pulled NROB ${upper} failed schema: ${errors.join('; ')}`, {
       object: upper,
@@ -94,7 +94,7 @@ export async function runPullNrob(name: string, opts: PullNrobOptions = {}): Pro
     });
   }
 
-  await writeNrobJson(targetPath, local);
+  await nrobArtifact.write(targetPath, local);
   const outPath = toOutputPath(relPath);
   return {
     object: upper,

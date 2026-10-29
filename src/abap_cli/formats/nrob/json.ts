@@ -16,10 +16,7 @@
  * to translate to NRIV. Validation runs against the upstream schema; tests
  * construct documents that match the required-field set.
  */
-import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
-import { CliError } from '../../output/json.js';
-import { validateAff } from '../../aff/schema-validator.js';
+import { defineWireArtifact } from '../artifact.js';
 
 export interface NrobIntervalLocal {
   /** Number length domain (e.g. ZNR_DOC_ID). Required by the AFF schema. */
@@ -45,16 +42,6 @@ export interface NrobLocal {
   header: { description: string; originalLanguage: string };
   interval: NrobIntervalLocal;
   configuration: NrobConfigurationLocal;
-}
-
-export async function readNrobJson(filePath: string): Promise<NrobLocal> {
-  const raw = await fs.readFile(filePath, 'utf8');
-  return JSON.parse(raw) as NrobLocal;
-}
-
-export async function writeNrobJson(filePath: string, doc: NrobLocal): Promise<void> {
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, JSON.stringify(doc, null, 2) + '\n', 'utf8');
 }
 
 export function wireToLocal(wire: Record<string, unknown>): NrobLocal {
@@ -95,21 +82,9 @@ export function localToWire(local: NrobLocal): Record<string, unknown> {
   };
 }
 
-export async function validateNrobObject(doc: unknown): Promise<string[]> {
-  const result = await validateAff('NROB', doc);
-  if (result.status === 'pass' || result.status === 'warn') return [];
-  return result.errors.map((e) => `${e.instancePath || '/'}: ${e.message ?? ''}`);
-}
-
-export async function loadAndValidate(filePath: string): Promise<NrobLocal> {
-  const doc = await readNrobJson(filePath);
-  const errors = await validateNrobObject(doc);
-  if (errors.length > 0) {
-    throw new CliError('AFF_FIXTURE_INVALID', `Invalid NROB definition in ${path.basename(filePath)}: ${errors.join('; ')}`, {
-      file: filePath,
-      type: 'NROB',
-      details: errors,
-    });
-  }
-  return doc;
-}
+/** NROB AFF artifact: file/schema plumbing + JSON wire mapping. */
+export const nrobArtifact = defineWireArtifact<NrobLocal, Record<string, unknown>>({
+  type: 'NROB',
+  toWire: (local) => localToWire(local),
+  fromWire: (wire) => wireToLocal(wire),
+});

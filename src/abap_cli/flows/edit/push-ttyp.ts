@@ -14,11 +14,7 @@ import { IcfClient } from '../../clients/icf-client.js';
 import { CliError } from '../../output/json.js';
 import { detectChannel } from './channel-detect.js';
 import type { SystemProfile } from './channel-detect.js';
-import {
-  readTtypJson,
-  localToWire,
-  validateTtypObject,
-} from '../../formats/ttyp/json.js';
+import { ttypArtifact } from '../../formats/ttyp/json.js';
 import { loadConfig } from '../../config/project-config.js';
 
 export interface PushTtypOptions {
@@ -86,15 +82,15 @@ export async function runPushTtyp(file: string, opts: PushTtypOptions = {}): Pro
   const decision = detectChannel(profile, 'ttyp');
   const name = deriveNameFromPath(file);
 
-  const doc = await readTtypJson(path.resolve(process.cwd(), file));
-  const errors = await validateTtypObject(doc);
+  const doc = await ttypArtifact.read(path.resolve(process.cwd(), file));
+  const errors = await ttypArtifact.validate(doc);
   if (errors.length > 0) {
     throw new CliError('AFF_FIXTURE_INVALID', `TTYP file ${file} failed schema validation: ${errors.join('; ')}`, {
       file,
       details: errors,
     });
   }
-  const wire = localToWire(doc);
+  const wire = ttypArtifact.toWire(doc);
   if (decision.channel === 'adt') {
     await pushAdt(name, wire, opts.transport);
   } else {
