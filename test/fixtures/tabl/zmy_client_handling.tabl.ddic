@@ -1,0 +1,11 @@
+@EndUserText.label : 'Client-handled table'
+@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+@AbapCatalog.tableCategory : #TRANSPARENT
+@AbapCatalog.deliveryClass : #A
+@AbapCatalog.dataMaintenance : #RESTRICTED
+@ClientHandling.type : #CLIENT_DEPENDENT
+define table zmy_client_handling {
+  key client : abap.clnt not null;
+  key id     : abap.char(10) not null;
+  payload    : abap.string;
+}

@@ -1,0 +1,16 @@
+{
+  "formatVersion": "1",
+  "header": {
+    "description": "Decimal domain (CURR / QUAN analogue)",
+    "originalLanguage": "EN"
+  },
+  "format": {
+    "dataType": "DEC",
+    "length": 15,
+    "decimals": 2
+  },
+  "outputCharacteristics": {
+    "style": "signRight",
+    "length": 17
+  }
+}

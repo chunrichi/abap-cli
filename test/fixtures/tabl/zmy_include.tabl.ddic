@@ -1,0 +1,11 @@
+@EndUserText.label : 'Table with .INCLUDE'
+@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+@AbapCatalog.tableCategory : #TRANSPARENT
+@AbapCatalog.deliveryClass : #A
+@AbapCatalog.dataMaintenance : #RESTRICTED
+define table zmy_include {
+  key client : abap.clnt not null;
+  key id     : abap.char(10) not null;
+  include ZMY_BASE_STRU;
+  note       : abap.char(60);
+}

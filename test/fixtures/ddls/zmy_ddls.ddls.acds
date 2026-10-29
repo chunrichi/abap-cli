@@ -1,0 +1,6 @@
+define view entity ZMY_DDLS
+  as select from t000
+{
+  key mandt as Client,
+      ctext as Description
+}

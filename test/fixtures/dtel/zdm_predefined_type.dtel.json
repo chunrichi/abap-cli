@@ -1,0 +1,14 @@
+{
+  "formatVersion": "1",
+  "header": {
+    "description": "Data element with predefined type",
+    "originalLanguage": "EN"
+  },
+  "dataTypeInformation": {
+    "category": "predefinedType",
+    "predefinedType": {
+      "dataType": "CHAR",
+      "length": 10
+    }
+  }
+}

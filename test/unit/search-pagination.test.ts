@@ -1,0 +1,112 @@
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { registerSearchCommand } from '../../src/abap_cli/commands/search.js';
+import { SEARCH_EXACT_SCAN_LIMIT } from '../../src/abap_cli/core/limits.js';
+import { makeProgram, runCommand } from './cli-helper.js';
+
+// 25 synthetic matches so SC-001 (page 1 = 20, page 2 = 5) holds exactly.
+const NAMES = [
+  ...Array.from({ length: 24 }, (_, i) => `ZPAGE_${String(i + 1).padStart(2, '0')}`),
+  'ZPAGE',
+];
+
+const searchObject = vi.fn(async (query: string, _type?: string, maxResults = 100) => {
+  // Real ADT: `*` wildcards are stripped server-side for substring matching.
+  const q = (query || '').replace(/\*/g, '').toUpperCase();
+  let matches = NAMES.filter((n) => n.includes(q));
+  if (q.startsWith('EXACT:')) matches = NAMES.filter((n) => n === q.slice(6));
+  return matches.slice(0, maxResults).map((name, i) => ({
+    'adtcore:name': name,
+    'adtcore:type': 'PROG/P',
+    'adtcore:uri': `/sap/bc/adt/programs/programs/${name.toLowerCase()}`,
+    'adtcore:description': `Object ${i}`,
+    'adtcore:packageName': i % 3 === 0 ? 'ZPKG' : '$TMP',
+  }));
+});
+
+vi.mock('../../src/abap_cli/clients/adt-client.js', () => ({
+  AdtClientWrapper: { create: async () => ({ searchObject }) },
+}));
+
+function parseJsonOutput(res: { stdout: string; stderr: string; exitCode?: number }) {
+  const json = JSON.parse(res.stdout || res.stderr);
+  return { json, exitCode: res.exitCode };
+}
+
+describe('abap search pagination (US1/SC-002)', () => {
+  beforeEach(() => searchObject.mockClear());
+
+  it('default --limit 20 returns 20 items with truncated:true and a hint', async () => {
+    const program = makeProgram();
+    registerSearchCommand(program);
+    const res = await runCommand(program, ['search', 'ZPAGE', '--json']);
+    const { json, exitCode } = parseJsonOutput(res);
+    expect(exitCode).toBeUndefined();
+    expect(json.status).toBe('success');
+    expect(json.data.items).toHaveLength(20);
+    expect(json.data.page).toBe(1);
+    expect(json.data.limit).toBe(20);
+    expect(json.data.truncated).toBe(true);
+    expect(typeof json.data.hint).toBe('string');
+    expect(json.data.hint.length).toBeGreaterThan(0);
+  });
+
+  it('--page 2 returns the remaining 5 with truncated:false', async () => {
+    const program = makeProgram();
+    registerSearchCommand(program);
+    const res = await runCommand(program, ['search', 'ZPAGE', '--page', '2', '--json']);
+    const { json, exitCode } = parseJsonOutput(res);
+    expect(exitCode).toBeUndefined();
+    expect(json.data.items).toHaveLength(5);
+    expect(json.data.page).toBe(2);
+    expect(json.data.truncated).toBe(false);
+    expect(json.data.items[0].name).toBe('ZPAGE_21');
+  });
+
+  it('--exact and --fuzzy are mutually exclusive (exit 2 INVALID_ARGUMENT)', async () => {
+    const program = makeProgram();
+    registerSearchCommand(program);
+    const res = await runCommand(program, ['search', 'ZPAGE', '--exact', '--fuzzy', '--json']);
+    expect(res.exitCode).toBe(2);
+    const json = JSON.parse(res.stderr);
+    expect(json.status).toBe('error');
+    expect(json.error.code).toBe('INVALID_ARGUMENT');
+  });
+
+  it('--package filters results by packageName', async () => {
+    const program = makeProgram();
+    registerSearchCommand(program);
+    const res = await runCommand(program, ['search', 'ZPAGE', '--package', 'ZPKG', '--json']);
+    const { json, exitCode } = parseJsonOutput(res);
+    expect(exitCode).toBeUndefined();
+    expect(json.data.items.length).toBeGreaterThan(0);
+    for (const item of json.data.items) expect(item.packageName).toBe('ZPKG');
+  });
+
+  it('--exact on a bare name widens with a PREFIX and returns only the exact object', async () => {
+    const program = makeProgram();
+    registerSearchCommand(program);
+    // --page-all so the widened set covers all 25 matches (ZPAGE is the 25th),
+    // then the exact filter keeps only ZPAGE.
+    const res = await runCommand(program, ['search', 'ZPAGE', '--exact', '--page-all', '--json']);
+    const { json, exitCode } = parseJsonOutput(res);
+    expect(exitCode).toBeUndefined();
+    // Real ADT needs a wildcard, but the widening must be a PREFIX: `*ZPAGE*`
+    // can match thousands of unrelated objects and push the exact hit out of the
+    // fetched window (F-13 / F-28).
+    expect(searchObject).toHaveBeenCalledWith('ZPAGE*', undefined, 1000);
+    expect(json.data.items.map((i: { name: string }) => i.name)).toEqual(['ZPAGE']);
+  });
+
+  it('--exact strips * from wildcard queries so *ZPAGE* matches exactly ZPAGE', async () => {
+    const program = makeProgram();
+    registerSearchCommand(program);
+    // --limit 30 covers the full 25-match set on the single-page path.
+    const res = await runCommand(program, ['search', '*ZPAGE*', '--exact', '--limit', '30', '--json']);
+    const { json, exitCode } = parseJsonOutput(res);
+    expect(exitCode).toBeUndefined();
+    // Wildcard already present → query passed through untouched, but the
+    // candidate window is widened for --exact (client-side exact filtering).
+    expect(searchObject).toHaveBeenCalledWith('*ZPAGE*', undefined, SEARCH_EXACT_SCAN_LIMIT);
+    expect(json.data.items.map((i: { name: string }) => i.name)).toEqual(['ZPAGE']);
+  });
+});

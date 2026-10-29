@@ -1,0 +1,5 @@
+@EndUserText.label : 'Basic structure'
+define structure zmy_stru {
+  field1 : abap.char(20);
+  field2 : abap.numc(6);
+}

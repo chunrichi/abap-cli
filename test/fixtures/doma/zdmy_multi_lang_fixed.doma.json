@@ -1,0 +1,18 @@
+{
+  "formatVersion": "1",
+  "header": {
+    "description": "Multi fixed value domain",
+    "originalLanguage": "EN"
+  },
+  "format": {
+    "dataType": "CHAR",
+    "length": 1
+  },
+  "outputCharacteristics": {
+    "length": 10
+  },
+  "fixedValues": [
+    { "fixedValue": "A", "description": "Active" },
+    { "fixedValue": "I", "description": "Inactive" }
+  ]
+}

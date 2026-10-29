@@ -1,0 +1,10 @@
+{
+  "formatVersion": "1",
+  "generalInformation": {
+    "dataClassCategory": "APPL0",
+    "sizeCategory": "1",
+    "logChanges": false,
+    "writableByAmdp": false,
+    "translation": "standard"
+  }
+}
