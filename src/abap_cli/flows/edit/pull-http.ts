@@ -7,7 +7,7 @@ import { IcfClient } from '../../clients/icf-client.js';
 import { buildFilename } from '../../formats/file-resolver.js';
 import { folderFor } from '../../formats/type-folder.js';
 import { fileExists } from '../../formats/abap-source.js';
-import { writeHttpJson, wireToLocal as httpWireToLocal, type HttpWirePayload } from '../../formats/http/json.js';
+import { httpArtifact, type HttpWirePayload } from '../../formats/http/json.js';
 import { CliError } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
 import { toOutputPath, normalizePullData } from '../../core/path-output.js';
@@ -31,7 +31,7 @@ export async function runPullHttp(objectName: string, opts: PullOptions): Promis
 
   // GET data is the nested abap-file-format payload but carries no `name`
   // (not a member of the ABAP structure) — inject it from the request.
-  const local = httpWireToLocal(resp.data);
+  const local = httpArtifact.fromWire(resp.data);
   local.name = objectName;
   const filename = buildFilename(objectName, 'HTTP', 'main', '.json');
   const relPath = path.join(opts.dir, folderFor('HTTP'), filename);
@@ -53,7 +53,7 @@ export async function runPullHttp(objectName: string, opts: PullOptions): Promis
     };
   }
 
-  await writeHttpJson(targetPath, local);
+  await httpArtifact.write(targetPath, local);
   const outPath = toOutputPath(relPath);
 
   return {

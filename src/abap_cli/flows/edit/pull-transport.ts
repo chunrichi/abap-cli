@@ -7,7 +7,7 @@ import { IcfClient } from '../../clients/icf-client.js';
 import { buildFilename } from '../../formats/file-resolver.js';
 import { folderFor } from '../../formats/type-folder.js';
 import { fileExists } from '../../formats/abap-source.js';
-import { writeTranJson, wireToLocal as tranWireToLocal, type TranWirePayload } from '../../formats/transport/json.js';
+import { tranArtifact, type TranWirePayload } from '../../formats/transport/json.js';
 import { CliError } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
 import { toOutputPath, normalizePullData } from '../../core/path-output.js';
@@ -29,7 +29,7 @@ export async function runPullTran(objectName: string, opts: PullOptions): Promis
     });
   }
 
-  const local = tranWireToLocal(resp.data);
+  const local = tranArtifact.fromWire(resp.data);
   const filename = buildFilename(objectName, 'TRAN', 'main', '.json');
   const relPath = path.join(opts.dir, folderFor('TRAN'), filename);
   const targetPath = path.resolve(process.cwd(), relPath);
@@ -50,7 +50,7 @@ export async function runPullTran(objectName: string, opts: PullOptions): Promis
     };
   }
 
-  await writeTranJson(targetPath, local);
+  await tranArtifact.write(targetPath, local);
   const outPath = toOutputPath(relPath);
 
   return {

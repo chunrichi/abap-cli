@@ -30,7 +30,7 @@ afterEach(() => {
 
 describe('defineJsonArtifact', () => {
   it('round-trips a document through write + read with a trailing newline', async () => {
-    const artifact = defineJsonArtifact<TtypLocal>('TTYP');
+    const artifact = defineJsonArtifact<TtypLocal>({ type: 'TTYP' });
     const file = path.join(dir, 'nested', 'zmy.ttyp.json');
     await artifact.write(file, VALID_TTYP);
     expect(fs.readFileSync(file, 'utf8').endsWith('\n')).toBe(true);
@@ -38,14 +38,14 @@ describe('defineJsonArtifact', () => {
   });
 
   it('validate maps AFF schema errors to `<path>: <message>` strings', async () => {
-    const artifact = defineJsonArtifact<unknown>('TTYP');
+    const artifact = defineJsonArtifact<unknown>({ type: 'TTYP' });
     const errors = await artifact.validate({ formatVersion: '1' });
     expect(errors.length).toBeGreaterThan(0);
     expect(errors.every((e) => e.includes(': '))).toBe(true);
   });
 
   it('load returns a valid document and throws AFF_FIXTURE_INVALID otherwise', async () => {
-    const artifact = defineJsonArtifact<TtypLocal>('TTYP');
+    const artifact = defineJsonArtifact<TtypLocal>({ type: 'TTYP' });
     const good = path.join(dir, 'zmy.ttyp.json');
     await artifact.write(good, VALID_TTYP);
     await expect(artifact.load(good)).resolves.toEqual(VALID_TTYP);
@@ -55,6 +55,47 @@ describe('defineJsonArtifact', () => {
     await expect(artifact.load(bad)).rejects.toMatchObject({
       code: 'AFF_FIXTURE_INVALID',
       details: expect.any(Array),
+    });
+  });
+
+  it('runs beforeWrite before the document hits disk', async () => {
+    const seen: TtypLocal[] = [];
+    const artifact = defineJsonArtifact<TtypLocal>({
+      type: 'TTYP',
+      beforeWrite: (doc) => {
+        seen.push(doc);
+      },
+    });
+    const file = path.join(dir, 'zmy.ttyp.json');
+    await artifact.write(file, VALID_TTYP);
+    expect(seen).toEqual([VALID_TTYP]);
+    expect(fs.existsSync(file)).toBe(true);
+  });
+
+  it('aborts the write when beforeWrite throws', async () => {
+    const artifact = defineJsonArtifact<TtypLocal>({
+      type: 'TTYP',
+      beforeWrite: () => {
+        throw new Error('pre-write rejected');
+      },
+    });
+    const file = path.join(dir, 'zmy.ttyp.json');
+    await expect(artifact.write(file, VALID_TTYP)).rejects.toThrow('pre-write rejected');
+    expect(fs.existsSync(file)).toBe(false);
+  });
+
+  it('uses a validate override for both validate and load', async () => {
+    const artifact = defineJsonArtifact<TtypLocal>({
+      type: 'TTYP',
+      validate: () => ['synthetic error'],
+    });
+    await expect(artifact.validate({})).resolves.toEqual(['synthetic error']);
+
+    const file = path.join(dir, 'zmy.ttyp.json');
+    fs.writeFileSync(file, JSON.stringify(VALID_TTYP));
+    await expect(artifact.load(file)).rejects.toMatchObject({
+      code: 'AFF_FIXTURE_INVALID',
+      details: ['synthetic error'],
     });
   });
 });
