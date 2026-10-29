@@ -12,7 +12,7 @@ import * as path from 'node:path';
 import { IcfClient } from '../../clients/icf-client.js';
 import { CliError, printResult, type OutputMode } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
-import { localToWire, loadAndValidate, type NrobLocal } from '../../formats/nrob/json.js';
+import { nrobArtifact, type NrobLocal } from '../../formats/nrob/json.js';
 import { toOutputPath } from '../../core/path-output.js';
 import type { CreateOptions } from './create.js';
 import type { CreateHandler } from './routing.js';
@@ -54,7 +54,7 @@ export async function runCreateNrob(
   const filePath = path.resolve(process.cwd(), opts.file);
   let local: NrobLocal;
   try {
-    local = await loadAndValidate(filePath);
+    local = await nrobArtifact.load(filePath);
   } catch (error: unknown) {
     if (error instanceof CliError) throw error;
     throw new CliError('VALIDATION_ERROR', `Cannot read NROB file: ${error instanceof Error ? error.message : String(error)}`, {
@@ -72,7 +72,7 @@ export async function runCreateNrob(
     });
   }
 
-  const wire = localToWire(local);
+  const wire = nrobArtifact.toWire(local);
   if (opts.description) wire.header = { ...(wire.header as object), description: opts.description };
   if (opts.package) (wire as Record<string, unknown>).package = opts.package;
   if (opts.tr) (wire as Record<string, unknown>).transportRequest = opts.tr;

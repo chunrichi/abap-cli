@@ -7,7 +7,7 @@ import { IcfClient } from '../../clients/icf-client.js';
 import { CliError } from '../../output/json.js';
 import { detectChannel } from './channel-detect.js';
 import type { SystemProfile } from './channel-detect.js';
-import { readMsagJson, localToWire, validateMsagObject } from '../../formats/msag/json.js';
+import { msagArtifact } from '../../formats/msag/json.js';
 import { loadConfig } from '../../config/project-config.js';
 
 export interface PushMsagOptions { profile?: SystemProfile; transport?: string }
@@ -66,15 +66,15 @@ export async function runPushMsag(file: string, opts: PushMsagOptions = {}): Pro
   const profile = await loadProfile(opts);
   const decision = detectChannel(profile, 'msag');
   const name = nameFromFile(file);
-  const doc = await readMsagJson(path.resolve(process.cwd(), file));
-  const errors = await validateMsagObject(doc);
+  const doc = await msagArtifact.read(path.resolve(process.cwd(), file));
+  const errors = await msagArtifact.validate(doc);
   if (errors.length > 0) {
     throw new CliError('AFF_FIXTURE_INVALID', `MSAG file ${file} failed schema validation: ${errors.join('; ')}`, {
       file,
       details: errors,
     });
   }
-  const wire = localToWire(doc);
+  const wire = msagArtifact.toWire(doc);
   if (decision.channel === 'adt') {
     await pushAdt(name, wire, opts.transport);
   } else {

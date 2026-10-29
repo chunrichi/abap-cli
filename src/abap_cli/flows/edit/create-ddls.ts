@@ -9,11 +9,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError, printResult, type OutputMode } from '../../output/json.js';
-import {
-  readDdlsJson,
-  validateDdlsObject,
-  localToWire as ddlsLocalToWire,
-} from '../../formats/ddls/json.js';
+import { ddlsArtifact, localToWire as ddlsLocalToWire, type DdlsLocal } from '../../formats/ddls/json.js';
 import { toOutputPath } from '../../core/path-output.js';
 import { detectChannel, loadChannelProfile } from './channel-detect.js';
 import type { CreateOptions } from './create.js';
@@ -30,15 +26,15 @@ export async function runCreateDdls(
     });
   }
   const filePath = path.resolve(process.cwd(), opts.file);
-  let doc: Awaited<ReturnType<typeof readDdlsJson>>;
+  let doc: DdlsLocal;
   try {
-    doc = await readDdlsJson(filePath);
+    doc = await ddlsArtifact.read(filePath);
   } catch (error: unknown) {
     throw new CliError('FILE_PARSE_ERROR', `Cannot read DDLS file ${toOutputPath(opts.file)}: ${error instanceof Error ? error.message : String(error)}`, {
       file: toOutputPath(opts.file),
     });
   }
-  const errors = await validateDdlsObject(doc);
+  const errors = await ddlsArtifact.validate(doc);
   if (errors.length > 0) {
     throw new CliError('VALIDATION_ERROR', `Invalid DDLS definition in ${toOutputPath(opts.file)}: ${errors.join('; ')}`, {
       file: toOutputPath(opts.file),

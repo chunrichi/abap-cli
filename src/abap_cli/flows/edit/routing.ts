@@ -23,11 +23,12 @@ import * as path from 'node:path';
 import type { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError, type OutputMode } from '../../output/json.js';
 import type { DdicSupportedType } from '../../types/registry.js';
-import { readTtypJson, validateTtypObject } from '../../formats/ttyp/json.js';
-import { readMsagJson, validateMsagObject } from '../../formats/msag/json.js';
-import { readDdlsJson, validateDdlsObject } from '../../formats/ddls/json.js';
-import { readEnquJson, validateEnquObject } from '../../formats/enqu/json.js';
-import { readNrobJson, validateNrobObject } from '../../formats/nrob/json.js';
+import { ttypArtifact } from '../../formats/ttyp/json.js';
+import { msagArtifact } from '../../formats/msag/json.js';
+import { ddlsArtifact } from '../../formats/ddls/json.js';
+import { enquArtifact } from '../../formats/enqu/json.js';
+import { nrobArtifact } from '../../formats/nrob/json.js';
+import type { JsonArtifact } from '../../formats/artifact.js';
 import type { CreateOptions } from './create.js';
 import type { PullOptions, PullResult, TypePullResult } from './pull-shared.js';
 import type { JsonPushTarget, PushFileOptions, PushOneResult } from './push-types.js';
@@ -163,19 +164,22 @@ function affPushRoute(
   };
 }
 
+/** AFF artifacts behind the channel-routed `aff-json` push kinds. */
+const AFF_ARTIFACTS: Readonly<Record<string, JsonArtifact<unknown>>> = {
+  TTYP: ttypArtifact,
+  MSAG: msagArtifact,
+  DDLS: ddlsArtifact,
+  ENQU: enquArtifact,
+  NROB: nrobArtifact,
+};
+
 /** AFF validator for one channel-routed type (mirrors the create/pull sides). */
 async function validateAffFile(objectType: string, file: string): Promise<void> {
-  const abs = path.resolve(process.cwd(), file);
-  const errors =
-    objectType === 'TTYP'
-      ? await validateTtypObject(await readTtypJson(abs))
-      : objectType === 'MSAG'
-        ? await validateMsagObject(await readMsagJson(abs))
-        : objectType === 'ENQU'
-          ? await validateEnquObject(await readEnquJson(abs))
-          : objectType === 'NROB'
-            ? await validateNrobObject(await readNrobJson(abs))
-            : await validateDdlsObject(await readDdlsJson(abs));
+  const artifact = AFF_ARTIFACTS[objectType];
+  if (!artifact) {
+    throw new CliError('TYPE_NOT_SUPPORTED', `No AFF artifact validator for ${objectType}`, { type: objectType });
+  }
+  const errors = await artifact.validate(await artifact.read(path.resolve(process.cwd(), file)));
   if (errors.length > 0) throw new CliError('VALIDATION_ERROR', errors.join('; '));
 }
 

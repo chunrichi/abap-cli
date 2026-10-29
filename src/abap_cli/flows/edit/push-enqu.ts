@@ -10,7 +10,7 @@
 import { IcfClient } from '../../clients/icf-client.js';
 import { CliError } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
-import { readEnquJson, localToWire, validateEnquObject } from '../../formats/enqu/json.js';
+import { enquArtifact } from '../../formats/enqu/json.js';
 import { resolveFile } from '../../formats/file-resolver.js';
 
 export interface RunPushEnquOptions {
@@ -31,8 +31,8 @@ export async function runPushEnqu(
   file: string,
   opts: RunPushEnquOptions = {},
 ): Promise<{ channel: 'adt' | 'icf' }> {
-  const local = await readEnquJson(file);
-  const errors = await validateEnquObject(local);
+  const local = await enquArtifact.read(file);
+  const errors = await enquArtifact.validate(local);
   if (errors.length > 0) {
     throw new CliError('VALIDATION_ERROR', `Invalid ENQU file: ${errors.join('; ')}`, {
       file,
@@ -64,7 +64,7 @@ export async function runPushEnqu(
     );
   }
 
-  const wire = localToWire(local);
+  const wire = enquArtifact.toWire(local);
   (wire as Record<string, unknown>).name = objectName;
   if (opts.transport) (wire as Record<string, unknown>).transportRequest = opts.transport;
   const resp = await icf.postDdic<unknown>('enqu', wire);
