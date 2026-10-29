@@ -13,7 +13,7 @@ import {
 import { toOutputPath } from '../../core/path-output.js';
 import { detectChannel, loadChannelProfile } from './channel-detect.js';
 import type { CreateOptions } from './create.js';
-import { registerCreateHandler, type CreateHandler } from '../../types/registry.js';
+import type { CreateHandler } from './routing.js';
 
 export async function runCreateMsag(
   name: string,
@@ -58,8 +58,6 @@ export async function runCreateMsag(
   }
 }
 
-// Module-load side effect: register MSAG. Decision 2A.
-const msagHandler: CreateHandler = async ({ name, opts, mode }) => {
-  await runCreateMsag(name, opts as CreateOptions, mode);
+export const createMsagHandler: CreateHandler = async ({ name, opts, mode }) => {
+  await runCreateMsag(name, opts, mode);
 };
-registerCreateHandler('MSAG', msagHandler);

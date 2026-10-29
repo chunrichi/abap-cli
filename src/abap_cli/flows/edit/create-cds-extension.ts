@@ -13,7 +13,7 @@ import { resolveTransport } from '../../core/transport.js';
 import { resolveObject } from '../../core/resolve.js';
 import { toOutputPath } from '../../core/path-output.js';
 import type { CreateOptions } from './create.js';
-import { registerCreateHandler, type CreateHandler } from '../../types/registry.js';
+import type { CreateHandler } from './routing.js';
 
 type CdsExtensionType = 'DCLS' | 'DDLX' | 'DDLA';
 
@@ -106,13 +106,9 @@ function sidecarExists(jsonPath: string, sourceFile: string): boolean {
   }
 }
 
-function handlerFor(type: CdsExtensionType): CreateHandler {
+/** Create handler for one CDS companion type (DCLS / DDLX / DDLA). */
+export function createCdsExtensionHandler(type: CdsExtensionType): CreateHandler {
   return async ({ name, opts, mode }) => {
-    await runCreateCdsExtension(type, name, opts as CreateOptions, mode);
+    await runCreateCdsExtension(type, name, opts, mode);
   };
 }
-
-// Module-load side effect: register all three CDS extension types. Decision 2A.
-registerCreateHandler('DCLS', handlerFor('DCLS'));
-registerCreateHandler('DDLX', handlerFor('DDLX'));
-registerCreateHandler('DDLA', handlerFor('DDLA'));

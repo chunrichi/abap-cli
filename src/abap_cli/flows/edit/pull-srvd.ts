@@ -16,7 +16,7 @@
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { pullObject } from './pull-source.js';
 import { folderFor } from '../../formats/type-folder.js';
-import { registerPullHandler } from '../../types/registry.js';
+import type { PullHandler } from './routing.js';
 
 export interface PullSrvdOptions {
   profile?: { kernelRelease?: string };
@@ -70,8 +70,7 @@ export async function runPullSrvd(name: string, opts: PullSrvdOptions = {}): Pro
   };
 }
 
-// Module-load side effect: register SRVD in the pull handler table. Decision 2A.
-registerPullHandler('SRVD', async ({ objectName, opts }) => {
+export const pullSrvdHandler: PullHandler = async ({ objectName, opts }) => {
   const r = await runPullSrvd(objectName, opts as Parameters<typeof runPullSrvd>[1]);
   return { object: r.object, files: r.files, channel: 'adt' as const };
-});
+};

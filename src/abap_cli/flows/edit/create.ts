@@ -19,26 +19,13 @@ import {
   isHttpSupportedType,
   isTranSupportedType,
   allSupportedTypes,
-  createHandlerFor,
   requiresFileFor,
 } from '../../types/registry.js';
 import { runCreateFugrFunc } from './create-fugr-func.js';
 import { createSchema } from './create-schema.js';
+import { createRouteFor } from './routing.js';
 import { toOutputPath } from '../../core/path-output.js';
 import { normalizeName, validateObjectName } from './object-name.js';
-// Side-effect imports: each per-type module self-registers its create handler.
-// Decision 2A — module-load side effect (no explicit wiring table).
-import './create-ddic.js';
-import './create-http.js';
-import './create-tran.js';
-import './create-ttyp.js';
-import './create-msag.js';
-import './create-ddls.js';
-import './create-cds-extension.js';
-import './create-srvd.js';
-// PR5: ENQU (ICF) and NROB (ICF, no abap-adt-api endpoint).
-import './create-enqu.js';
-import './create-nrob.js';
 
 /** ADT objtype for source objects (e.g. 'CLAS/OC'); undefined for DDIC/HTTP/TRAN. */
 export interface CreateTypeSpec {
@@ -119,11 +106,11 @@ export async function runCreate(type: string | undefined, name: string | undefin
   // illegal name must not reach SAP as a misleading OBJECT_NOT_FOUND.
   validateObjectName(objectName);
 
-  // Phase 3: type-specific create handlers (DDIC / HTTP / TRAN / TTYP / MSAG / DDLS)
-  // are looked up in the registry populated by per-type modules at load time.
-  const handler = createHandlerFor(typeUpper);
-  if (handler) {
-    await handler({ type: typeUpper, name: objectName, opts, mode });
+  // Per-type create handlers (DDIC / HTTP / TRAN / TTYP / MSAG / DDLS / CDS
+  // companions / ENQU / NROB) come from the explicit routing table.
+  const route = createRouteFor(typeUpper);
+  if (route?.kind === 'handler') {
+    await route.run({ type: typeUpper, name: objectName, opts, mode });
     return;
   }
 
