@@ -1,5 +1,6 @@
 import { Command } from 'commander';
-import { runPush, type PushFileOptions } from '../flows/edit/push.js';
+import { runPush } from '../flows/edit/push.js';
+import type { PushFileOptions } from '../flows/edit/push-types.js';
 import { printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
 import { commandSchemas } from '../flows/setup/command-schemas.js';
 

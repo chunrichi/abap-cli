@@ -14,7 +14,7 @@
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { pullObject } from './pull-source.js';
 import { folderFor } from '../../formats/type-folder.js';
-import { registerPullHandler } from '../../types/registry.js';
+import type { PullHandler } from './routing.js';
 
 export interface PullBdefOptions {
   profile?: { kernelRelease?: string };
@@ -63,8 +63,7 @@ export async function runPullBdef(name: string, opts: PullBdefOptions = {}): Pro
   };
 }
 
-// Module-load side effect: register BDEF in the pull handler table. Decision 2A.
-registerPullHandler('BDEF', async ({ objectName, opts }) => {
+export const pullBdefHandler: PullHandler = async ({ objectName, opts }) => {
   const r = await runPullBdef(objectName, opts as Parameters<typeof runPullBdef>[1]);
   return { object: r.object, files: r.files, channel: 'adt' as const };
-});
+};

@@ -17,7 +17,7 @@ import {
 import { toOutputPath } from '../../core/path-output.js';
 import { detectChannel, loadChannelProfile } from './channel-detect.js';
 import type { CreateOptions } from './create.js';
-import { registerCreateHandler, type CreateHandler } from '../../types/registry.js';
+import type { CreateHandler } from './routing.js';
 
 export async function runCreateDdls(
   name: string,
@@ -66,8 +66,6 @@ export async function runCreateDdls(
   printResult(mode, { object: name, type: 'DDLS', action: 'created', channel: 'adt' }, `Created DDLS ${name} via ADT`);
 }
 
-// Module-load side effect: register DDLS. Decision 2A.
-const ddlsHandler: CreateHandler = async ({ name, opts, mode }) => {
-  await runCreateDdls(name, opts as CreateOptions, mode);
+export const createDdlsHandler: CreateHandler = async ({ name, opts, mode }) => {
+  await runCreateDdls(name, opts, mode);
 };
-registerCreateHandler('DDLS', ddlsHandler);

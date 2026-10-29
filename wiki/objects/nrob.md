@@ -17,7 +17,7 @@ changed at: 2026-09-17 02:00:00
 | pull | `GET /sap/abap_cli/ddic/nrob/<name>` |
 | push | `GET`（存在性探测）→ `POST /sap/abap_cli/ddic/nrob` |
 
-`abap-adt-api` 没有 NROB 端点（NW 7.93 / S/4HANA 上的 ADT collection 是只读，2026-09-16 实测），ICF 是唯一读写路径。registry 里标 `source: 'ADT'` 只是因为 NROB 不属于 `DDIC_TYPES`（后者驱动 `ICF_PUSH_HANDLERS` 的自动展开）；`resolveFile` 因此给出 `route: 'adt'`，`pushOne` 用 `CHANNEL_ROUTED_PUSH.NROB` 在通用源码分支**之前**拦截，实际通道固定为 `icf`。pull 路径有 ADT 优先 + ICF fallback（`fallbackReason: 'ECC_EHP6_NO_ADT_NROB'`，2026-09-17 之前是硬编码在 `pull-nrob.ts` 里的字面量；registry 字段已删）。
+`abap-adt-api` 没有 NROB 端点（NW 7.93 / S/4HANA 上的 ADT collection 是只读，2026-09-16 实测），ICF 是唯一读写路径。registry 里标 `source: 'ADT'` 并不代表 NROB 有 ADT 写通道：`routing.ts` 里 NROB 的 create / push 固定 `icf`，pull 是 `auto`（ADT 优先 + ICF fallback）。`resolveFile` 给出 `route: 'adt'`，但 `pushOne` 用 `PUSH_ROUTES.NROB`（`aff-json`）在通用源码分支**之前**拦截。pull 路径有 ADT 优先 + ICF fallback（`fallbackReason: 'ECC_EHP6_NO_ADT_NROB'`，2026-09-17 之前是硬编码在 `pull-nrob.ts` 里的字面量；registry 字段已删）。
 
 ICF handler 由 `zcl_abap_vibe_icf` 的 `/ddic/nrob` 分支 + `zcl_abap_vibe_nrob_format` 提供。
 

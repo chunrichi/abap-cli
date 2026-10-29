@@ -3,9 +3,9 @@
  *
  * The per-type pull flows (`runPullTtyp`, `runPullMsag`, ...) are covered by
  * their own tests, but those import the per-type function directly and never
- * exercise the coordinator: the `pullHandlerFor` lookup and the shared
- * `wrapPullResult` envelope. These tests drive `runPull` so a regression in
- * the dispatch table or the envelope shape is caught.
+ * exercise the coordinator: the `pullRouteFor` lookup in `routing.ts` and the
+ * shared `wrapPullResult` envelope. These tests drive `runPull` so a
+ * regression in the dispatch table or the envelope shape is caught.
  */
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';

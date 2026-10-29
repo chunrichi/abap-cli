@@ -22,7 +22,7 @@ import {
 } from '../../formats/http/json.js';
 import { toOutputPath } from '../../core/path-output.js';
 import type { CreateOptions } from './create.js';
-import { registerCreateHandler, type CreateHandler } from '../../types/registry.js';
+import type { CreateHandler } from './routing.js';
 
 export async function runCreateHttp(
   objectName: string,
@@ -107,8 +107,6 @@ export async function runCreateHttp(
   );
 }
 
-// Module-load side effect: register HTTP. Decision 2A.
-const httpHandler: CreateHandler = async ({ name, opts, mode }) => {
-  await runCreateHttp(name, opts as CreateOptions, mode);
+export const createHttpHandler: CreateHandler = async ({ name, opts, mode }) => {
+  await runCreateHttp(name, opts, mode);
 };
-registerCreateHandler('HTTP', httpHandler);

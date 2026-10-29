@@ -17,7 +17,7 @@ import {
 import { toOutputPath } from '../../core/path-output.js';
 import { detectChannel, loadChannelProfile } from './channel-detect.js';
 import type { CreateOptions } from './create.js';
-import { registerCreateHandler, type CreateHandler } from '../../types/registry.js';
+import type { CreateHandler } from './routing.js';
 
 export async function runCreateTtyp(
   name: string,
@@ -62,8 +62,6 @@ export async function runCreateTtyp(
   }
 }
 
-// Module-load side effect: register TTYP. Decision 2A.
-const ttypHandler: CreateHandler = async ({ name, opts, mode }) => {
-  await runCreateTtyp(name, opts as CreateOptions, mode);
+export const createTtypHandler: CreateHandler = async ({ name, opts, mode }) => {
+  await runCreateTtyp(name, opts, mode);
 };
-registerCreateHandler('TTYP', ttypHandler);

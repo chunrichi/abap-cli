@@ -28,7 +28,7 @@ import {
 } from '../../formats/ddic/json.js';
 import { toOutputPath } from '../../core/path-output.js';
 import type { CreateOptions } from './create.js';
-import { registerCreateHandler, DDIC_TYPES, type CreateHandler } from '../../types/registry.js';
+import type { CreateHandler } from './routing.js';
 
 export async function runCreateDdic(
   type: DdicSupportedType,
@@ -120,10 +120,12 @@ export async function runCreateDdic(
   );
 }
 
-// Module-load side effect: register all 4 DDIC types. Decision 2A.
-// The dispatcher already enforces `requiresFile` for these types; the
-// `--file` guard below is the defensive copy for direct callers.
-const ddicHandler: CreateHandler = async ({ type, name, opts, mode }) => {
-  await runCreateDdic(type as DdicSupportedType, name, opts as CreateOptions, mode);
+/**
+ * Create handler for the four DDIC types. One handler serves TABL / STRU /
+ * DOMA / DTEL — the concrete type travels in the handler args. The dispatcher
+ * enforces `requiresFile` before reaching it; `runCreateDdic` keeps its own
+ * defensive `--file` guard for direct callers.
+ */
+export const createDdicHandler: CreateHandler = async ({ type, name, opts, mode }) => {
+  await runCreateDdic(type as DdicSupportedType, name, opts, mode);
 };
-for (const t of DDIC_TYPES) registerCreateHandler(t, ddicHandler);

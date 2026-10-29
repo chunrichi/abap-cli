@@ -15,7 +15,7 @@ import { resolveTransport } from '../../core/transport.js';
 import { resolveObject } from '../../core/resolve.js';
 import { toOutputPath } from '../../core/path-output.js';
 import type { CreateOptions } from './create.js';
-import { registerCreateHandler, type CreateHandler } from '../../types/registry.js';
+import type { CreateHandler } from './routing.js';
 
 /** Companion source sidecar path: `<file-without-.json>.acds`. */
 function sidecarPath(jsonPath: string): string {
@@ -100,8 +100,6 @@ function sidecarExists(jsonPath: string, sourceFile: string): boolean {
   }
 }
 
-// Module-load side effect: register SRVD in the create handler table. Decision 2A.
-const srvdHandler: CreateHandler = async ({ name, opts, mode }) => {
-  await runCreateSrvd(name, opts as CreateOptions, mode);
+export const createSrvdHandler: CreateHandler = async ({ name, opts, mode }) => {
+  await runCreateSrvd(name, opts, mode);
 };
-registerCreateHandler('SRVD', srvdHandler);

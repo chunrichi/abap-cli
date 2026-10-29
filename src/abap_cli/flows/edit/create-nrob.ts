@@ -15,7 +15,7 @@ import type { ErrorCode } from '../../output/error-codes.js';
 import { localToWire, loadAndValidate, type NrobLocal } from '../../formats/nrob/json.js';
 import { toOutputPath } from '../../core/path-output.js';
 import type { CreateOptions } from './create.js';
-import { registerCreateHandler, type CreateHandler } from '../../types/registry.js';
+import type { CreateHandler } from './routing.js';
 
 const NROB_NAME_PREFIX = /^(Z|Y|\/)/i;
 
@@ -103,7 +103,6 @@ export async function runCreateNrob(
   );
 }
 
-const nrobHandler: CreateHandler = async ({ name, opts, mode }) => {
-  await runCreateNrob(name, opts as CreateOptions, mode);
+export const createNrobHandler: CreateHandler = async ({ name, opts, mode }) => {
+  await runCreateNrob(name, opts, mode);
 };
-registerCreateHandler('NROB', nrobHandler);

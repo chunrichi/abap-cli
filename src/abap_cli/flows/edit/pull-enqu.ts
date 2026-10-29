@@ -15,7 +15,7 @@ import { fileExists } from '../../formats/abap-source.js';
 import { wireToLocal, writeEnquJson } from '../../formats/enqu/json.js';
 import { toOutputPath, normalizePullData } from '../../core/path-output.js';
 import type { PullOptions, PullResult } from './pull-shared.js';
-import { registerPullHandler } from '../../types/registry.js';
+import type { PullHandler } from './routing.js';
 
 export async function runPullEnqu(objectName: string, opts: PullOptions): Promise<PullResult> {
   const upper = objectName.trim().toUpperCase();
@@ -70,7 +70,7 @@ export async function runPullEnqu(objectName: string, opts: PullOptions): Promis
   };
 }
 
-registerPullHandler('ENQU', async ({ objectName, opts }) => {
-  const r = await runPullEnqu(objectName, opts as PullOptions);
+export const pullEnquHandler: PullHandler = async ({ objectName, opts }) => {
+  const r = await runPullEnqu(objectName, opts);
   return { object: objectName.toUpperCase(), files: r.data.written as string[], channel: 'icf' };
-});
+};

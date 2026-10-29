@@ -29,8 +29,7 @@ import { buildFilename } from '../../formats/file-resolver.js';
 import { folderFor } from '../../formats/type-folder.js';
 import { wireToLocal, writeNrobJson, validateNrobObject } from '../../formats/nrob/json.js';
 import { toOutputPath } from '../../core/path-output.js';
-import { type PullOptions } from './pull-shared.js';
-import { registerPullHandler } from '../../types/registry.js';
+import type { PullHandler } from './routing.js';
 
 /** Read the AFF document via ADT, or null when unavailable. */
 async function readViaAdt(name: string): Promise<Record<string, unknown> | null> {
@@ -105,10 +104,7 @@ export async function runPullNrob(name: string, opts: PullNrobOptions = {}): Pro
   };
 }
 
-// Register the NROB pull handler. Decision 2A: per-type results funnel through
-// `wrapPullResult` so the coordinator stays consistent with the other DDIC
-// dual-channel types (MSAG/TTYP/...).
-registerPullHandler('NROB', async ({ objectName, opts }) => {
+export const pullNrobHandler: PullHandler = async ({ objectName, opts }) => {
   const r = await runPullNrob(objectName, opts as PullNrobOptions);
   return { object: r.object, files: r.files, channel: r.channel, ...(r.fallbackReason ? { fallbackReason: r.fallbackReason } : {}) };
-});
+};

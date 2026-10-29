@@ -14,7 +14,9 @@
  *   pull-package     --package selector (search + per-object)
  *   pull-tr          --tr selector (transport contents)
  *
- * Add new pull paths by adding a sibling module + a route in `runPull`.
+ * Type routes come from `routing.ts`; selectors (--tr / --package / --remote /
+ * --textpool) are resolved here before the type lookup. Add a new pull path by
+ * adding its handler module + the table row in `routing.ts`.
  */
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError } from '../../output/json.js';
@@ -24,26 +26,12 @@ import { normalizePullData } from '../../core/path-output.js';
 import type { PullOptions, PullResult } from './pull-shared.js';
 import { wrapPullResult } from './pull-shared.js';
 import { pullObject, humanSummary } from './pull-source.js';
-import { runPullDdic, isDdicSupportedType } from './pull-ddic.js';
-import { runPullHttp } from './pull-http.js';
-import { runPullTran } from './pull-transport.js';
 import { runPullTextpool } from './pull-textpool.js';
 import { runPullRemote } from './pull-remote.js';
 import { runPackagePull } from './pull-package.js';
 import { runTransportPull } from './pull-tr.js';
 import { normalizeFugrFunctionModule } from './pull-fugr-ff.js';
-import { pullHandlerFor } from '../../types/registry.js';
-// Side-effect imports: each per-type module self-registers its pull handler
-// at load time. Decision 2A — module-load side effect (no explicit wiring).
-import './pull-ttyp.js';
-import './pull-msag.js';
-import './pull-ddls.js';
-import './pull-srvd.js';
-import './pull-bdef.js';
-import './pull-cds-extension.js';
-// PR5: ENQU (ICF) and NROB (no ADT endpoint, always ICF).
-import './pull-enqu.js';
-import './pull-nrob.js';
+import { pullRouteFor } from './routing.js';
 
 export type { PullOptions, PullEntry, PullResult } from './pull-shared.js';
 export { parsePositiveInt } from './pull-shared.js';
@@ -91,25 +79,15 @@ export async function runPull(objectName: string, opts: PullOptions): Promise<Pu
     return runPullTextpool(objectName, opts.type, opts);
   }
 
+  // Type-specific pull routes come from the explicit routing table: DDIC /
+  // HTTP / TRAN (ICF), TTYP / MSAG / DDLS / NROB (channel detection) and the
+  // RAP / CDS companion family (ADT). Types without a handler row fall through
+  // to the generic ADT source pull below.
   const typeUpper = opts.type?.toUpperCase();
-  if (typeUpper === 'HTTP') {
-    return runPullHttp(objectName, opts);
-  }
-  if (typeUpper === 'TRAN') {
-    return runPullTran(objectName, opts);
-  }
-  if (typeUpper && isDdicSupportedType(typeUpper)) {
-    return runPullDdic(objectName, typeUpper, opts);
-  }
-  // 036-ttyp-msag-ddls + T3.x CDS extension family: consult the handler
-  // registry populated by per-type modules at load time. The explicit
-  // if-chain used to live here; Phase 3 collapses it into a single lookup.
-  if (typeUpper) {
-    const handler = pullHandlerFor(typeUpper);
-    if (handler) {
-      const r = await handler({ objectName, opts });
-      return wrapPullResult(typeUpper, r);
-    }
+  const route = pullRouteFor(typeUpper);
+  if (route?.kind === 'handler') {
+    const result = await route.run({ objectName, opts });
+    return 'data' in result ? result : wrapPullResult(typeUpper!, result);
   }
 
   // PR4 (C3): a FUGR/FF (function module) is owned by a parent function
