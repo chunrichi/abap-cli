@@ -79,6 +79,7 @@ abap pull [options] [object-name]
 | `--include-tests` | Include testclasses source part. |
 | `--include-all-parts` | Include every source-code part. |
 | `--textpool` | Also pull textpool files (.texts/.selections/.headings.<lang>.properties). |
+| `--active` | Pull the active (activated) version — the source `abap run` executes. Default: the working-area/latest version. |
 | `--remote <remoteid>` | Pull the object's active version source from a remote system (Version Management). |
 | `--tr <request>` | Pull all objects bound to a transport request (mutually exclusive with object name and --package). |
 | `--user <sap-user>` | Filter --tr lookups by transport task owner (case-insensitive). Only valid with --tr. |

@@ -30,7 +30,7 @@ Verification is done via:
 5. **`skill-bundle.test.ts`** — automated check that the shipped skill prompts cover every CLI command and respect frontmatter/path/length constraints
 6. **Local mock ADT server** — offline end-to-end checks (no SAP needed)
 7. **Real SAP integration** — protocol-level verification against a live system (`tests/<run-id>-*` directories)
-8. **`npm run docs:check`** — 生成物（`docs/commands.md`、skill quick refs、命令索引）与命令 schema 一致（已并入 `npm run verify`）
+8. **`npm run docs:check`** — 生成物（`docs/commands.md`、skill quick refs、命令索引）与命令 schema 一致，并跑 `scripts/check-docs.mjs`：wiki 命令页 frontmatter / 章节契约、相对链接死链、命令 `--help` 选项 ⊆ `--schema` 契约（已并入 `npm run verify`）
 
 ## Test Layout
 

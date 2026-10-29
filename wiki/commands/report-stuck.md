@@ -2,7 +2,7 @@
 type: command
 title: abap report-stuck
 description: "Record a stuck-agent report locally (feedback loop)"
-tags: [command, report-stuck]
+tags: [abap-cli, command, report-stuck]
 created at: 2026-10-29 14:30:14
 changed at: 2026-10-29 14:30:14
 ---
