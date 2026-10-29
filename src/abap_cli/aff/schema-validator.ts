@@ -353,8 +353,8 @@ export function resetSchemaCache(): void {
  *
  * Returns a flat array of human-readable error strings (empty when valid).
  * HTTP/TRAN metadata callers can use the validator from sync hot paths
- * (e.g. `writeHttpService` before writing to disk) without going through
- * `validateAff`'s async / result-object shape.
+ * (e.g. an artifact `beforeWrite` hook ahead of the disk write) without going
+ * through `validateAff`'s async / result-object shape.
  *
  * Lazy-compiles the schema on first call via synchronous `fs.readFileSync` +
  * `ajv.compile`, then caches in the same single Map used by `validateAff`.

@@ -11,8 +11,7 @@ import {
   wireToLocal,
   validateTranObject,
   validateTranJson,
-  readTranJson,
-  writeTranJson,
+  tranArtifact,
   type TranObjectLocal,
   type TranWirePayload,
 } from '../../src/abap_cli/formats/transport/json.js';
@@ -365,7 +364,7 @@ describe('TRAN JSON helpers', () => {
     });
   });
 
-  describe('writeTranJson (AFF schema pre-write)', () => {
+  describe('tranArtifact.write (AFF schema pre-write)', () => {
     let tmpDir: string;
     beforeEach(async () => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'abap-cli-tran-test-'));
@@ -382,8 +381,8 @@ describe('TRAN JSON helpers', () => {
         header: { description: 'round-trip', originalLanguage: 'EN' },
         generalInformation: { transactionType: 'dialogTransaction' },
       };
-      await writeTranJson(filePath, doc);
-      const back = await readTranJson(filePath);
+      await tranArtifact.write(filePath, doc);
+      const back = await tranArtifact.read(filePath);
       expect(back).toEqual(doc);
     });
 
@@ -395,7 +394,7 @@ describe('TRAN JSON helpers', () => {
         header: { description: 'x', originalLanguage: 'EN' },
         generalInformation: { transactionType: 'dialogTransaction' },
       };
-      await expect(writeTranJson(filePath, bad as TranObjectLocal)).rejects.toThrow(/AFF TRAN fixture invalid/);
+      await expect(tranArtifact.write(filePath, bad as TranObjectLocal)).rejects.toThrow(/AFF TRAN fixture invalid/);
       await expect(fs.stat(filePath)).rejects.toThrow();
     });
   });

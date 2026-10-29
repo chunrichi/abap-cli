@@ -17,8 +17,18 @@ import { readDdicObjectForCreate } from '../../formats/ddic/io.js';
 import { localToWire } from '../../formats/ddic/wire.js';
 import { validateDdicObject, validateTabtPayload } from '../../formats/ddic/validate.js';
 import { type DdicObject, type DdicSupportedType, type DdicWirePayload } from '../../formats/ddic/types.js';
-import { readHttpJson, localToWire as httpLocalToWire, validateHttpObject } from '../../formats/http/json.js';
-import { readTranJson, localToWire as tranLocalToWire, validateTranObject } from '../../formats/transport/json.js';
+import {
+  httpArtifact,
+  localToWire as httpLocalToWire,
+  validateHttpObject,
+  type HttpObjectLocal,
+} from '../../formats/http/json.js';
+import {
+  tranArtifact,
+  localToWire as tranLocalToWire,
+  validateTranObject,
+  type TranObjectLocal,
+} from '../../formats/transport/json.js';
 import { resolveFile } from '../../formats/file-resolver.js';
 import { toRelativeOutputPath } from '../../core/path-output.js';
 import type { JsonPushTarget, PushFileOptions, PushOneResult } from './push-types.js';
@@ -170,9 +180,9 @@ export async function validateDdicFile(file: string, type: string): Promise<void
  */
 async function readValidatedHttp(file: string, objectName: string) {
   const outFile = toRelativeOutputPath(file);
-  let local: Awaited<ReturnType<typeof readHttpJson>>;
+  let local: HttpObjectLocal;
   try {
-    local = await readHttpJson(path.resolve(process.cwd(), file));
+    local = await httpArtifact.read(path.resolve(process.cwd(), file));
   } catch (error: unknown) {
     const m = error instanceof Error ? error.message : String(error);
     throw new CliError('INVALID_ARGUMENT', `Cannot read HTTP service file ${outFile}: ${m}`, { file: outFile });
@@ -199,9 +209,9 @@ export async function validateHttpFile(file: string): Promise<void> {
  */
 async function readValidatedTran(file: string, objectName: string) {
   const outFile = toRelativeOutputPath(file);
-  let local: Awaited<ReturnType<typeof readTranJson>>;
+  let local: TranObjectLocal;
   try {
-    local = await readTranJson(path.resolve(process.cwd(), file));
+    local = await tranArtifact.read(path.resolve(process.cwd(), file));
   } catch (error: unknown) {
     const m = error instanceof Error ? error.message : String(error);
     throw new CliError('INVALID_ARGUMENT', `Cannot read Transaction file ${outFile}: ${m}`, { file: outFile });

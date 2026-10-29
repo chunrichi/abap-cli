@@ -11,8 +11,7 @@ import {
   wireToLocal,
   validateHttpObject,
   validateHttpService,
-  readHttpService,
-  writeHttpService,
+  httpArtifact,
   type HttpObjectLocal,
   type HttpWirePayload,
 } from '../../src/abap_cli/formats/http/json.js';
@@ -199,7 +198,7 @@ describe('022 HTTP JSON helpers', () => {
     });
   });
 
-  describe('writeHttpService (AFF schema pre-write)', () => {
+  describe('httpArtifact.write (AFF schema pre-write)', () => {
     let tmpDir: string;
     beforeEach(async () => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'abap-cli-http-test-'));
@@ -215,8 +214,8 @@ describe('022 HTTP JSON helpers', () => {
         header: { description: 'round-trip', originalLanguage: 'EN' },
         generalInformation: { handlerClass: 'ZCL_RT', url: '/sap/zrt' },
       };
-      await writeHttpService(filePath, doc);
-      const back = await readHttpService(filePath);
+      await httpArtifact.write(filePath, doc);
+      const back = await httpArtifact.read(filePath);
       expect(back).toEqual(doc);
     });
 
@@ -227,7 +226,7 @@ describe('022 HTTP JSON helpers', () => {
         header: { description: 'x', originalLanguage: 'EN' },
         generalInformation: {},
       };
-      await expect(writeHttpService(filePath, bad)).rejects.toThrow(/AFF HTTP fixture invalid/);
+      await expect(httpArtifact.write(filePath, bad)).rejects.toThrow(/AFF HTTP fixture invalid/);
       // The file must NOT have been written.
       await expect(fs.stat(filePath)).rejects.toThrow();
     });

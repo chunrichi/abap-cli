@@ -82,7 +82,7 @@ export function enumOrDefault(
 
 /** DDLS AFF artifact: file/schema plumbing only — the wire mapping is
  *  asymmetric (the source lives in the sibling `.acds` file). */
-export const ddlsArtifact = defineJsonArtifact<DdlsLocal>('DDLS');
+export const ddlsArtifact = defineJsonArtifact<DdlsLocal>({ type: 'DDLS' });
 
 /** Pull the DDL source out of the wire body and return both pieces. */
 export function wireToLocal(xml: string): { doc: DdlsLocal; source: string } {
