@@ -100,7 +100,7 @@ abap activate ZFOO --type CLAS --yes
 
 # references
 
-- 实现：`src/abap_cli/commands/activate.ts`（`inactiveObjects` 收集 + `activateAll`）、`src/abap_cli/clients/adt-client.ts`（`activateAll`/`inactiveObjects`）
+- 实现：`src/abap_cli/commands/activate.ts`（commander 声明 + 打印）、`src/abap_cli/flows/edit/activate.ts`（`inactiveObjects` 收集 + `activateAll`）、`src/abap_cli/clients/adt-client.ts`（`activateAll`/`inactiveObjects`）
 - 匹配规则：`uri.split('#')[0] === resolved.objectUrl`，避免同名前缀误伤（`ZCL_FOO` vs `ZCL_FOO_BAR`）
 - SAP 后端：`deploy-flow.ts` 的 `activateAllParts`（013 dogfooding，规避 root-URI activate 静默 no-op）
 - 文档：`docs/commands.md`（`abap activate` 一节）
