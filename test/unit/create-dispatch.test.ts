@@ -3,10 +3,10 @@
  *
  * The per-type create flows are exercised elsewhere (`http-create.test.ts`,
  * `create-fugr-func.test.ts`, `create-name-validation.test.ts`). What was NOT
- * covered is the registry dispatch layer itself: `createHandlerFor` lookup,
- * the data-driven `requiresFile` fail-fast, and the fact that TTYP / MSAG /
- * DDLS reach their handlers through the CLI. These tests drive the real
- * `abap create` command against mocked ADT / ICF clients.
+ * covered is the routing layer itself: the explicit `CREATE_ROUTES` lookup in
+ * `routing.ts`, the data-driven `requiresFile` fail-fast, and the fact that
+ * TTYP / MSAG / DDLS reach their handlers through the CLI. These tests drive
+ * the real `abap create` command against mocked ADT / ICF clients.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import * as fs from 'node:fs';

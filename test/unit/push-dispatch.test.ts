@@ -1,10 +1,10 @@
 /**
- * Phase 4 — ICF push routing table (`ICF_PUSH_HANDLERS`).
+ * Artifact push routing (`PUSH_ROUTES` in `routing.ts`).
  *
  * `push-ddic.test.ts` / `http-push.test.ts` cover each route's payload shape
- * individually. This file covers the routing layer Phase 4 introduced: one
- * table lookup per `.json` file plus the shared `--check-only` / `--dry-run`
- * guard that used to live inside `pushDdicFile`.
+ * individually. This file covers the routing layer: one table lookup per AFF
+ * `.json` file plus the shared `--check-only` / `--dry-run` guard that used to
+ * live inside `pushDdicFile`.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import * as fs from 'fs';

@@ -216,8 +216,8 @@ export function allSupportedTypes(): string[] {
 /** DDIC types (TABL/STRU/DOMA/DTEL) subset — single source of truth (US11, T048).
  *  ENQU is NOT in this set: its wire format is a JSON document, not the
  *  DOMA / DTEL / TABL-shape payload produced by `localToWire<DdicSupportedType>`.
- *  ENQU has its own format module (`formats/enqu/json.ts`) and goes through
- *  `CHANNEL_ROUTED_PUSH` in push.ts (always ICF). */
+ *  ENQU has its own format module (`formats/enqu/json.ts`) and a dedicated
+ *  routing-table row (`flows/edit/routing.ts`, always ICF). */
 export const DDIC_TYPES = ['DOMA', 'DTEL', 'TABL', 'STRU'] as const;
 export type DdicSupportedType = (typeof DDIC_TYPES)[number];
 
@@ -242,125 +242,4 @@ export function isHttpSupportedType(t: string): t is HttpSupportedType {
 /** Narrow an arbitrary type string to the supported Transaction types. */
 export function isTranSupportedType(t: string): t is TranSupportedType {
   return (TRAN_TYPES as readonly string[]).includes(t);
-}
-
-// ---------------------------------------------------------------------------
-// Handler registration (Phase 3)
-//
-// create / pull / push dispatchers used to be if-else chains over the type
-// code, hard-coded inside `flows/edit/{create,pull,push}.ts`. With this
-// registry dispatchers consult per-type handler tables instead. Handlers are
-// registered by side effect at module load (per-type module imports
-// `register*Handler` at the top level), keeping the import graph acyclic —
-// the registry never imports `flows/edit/*`.
-//
-// Tests use `clearHandlersForTesting()` / `restoreHandlersForTesting()` around
-// each case so registrations cannot leak between tests. Production code must
-// never call either.
-// ---------------------------------------------------------------------------
-
-/**
- * Common argument shape shared by every create handler. `opts` is `unknown`
- * on purpose: the registry must not import the create flow (the flow imports
- * the registry), so concrete per-type modules narrow it to `CreateOptions`
- * themselves. Callers pass a real `CreateOptions`, so the narrowing is a
- * single annotation, not a fight with the type system.
- */
-export interface CreateHandlerArgs {
-  type: string;
-  name: string;
-  opts: unknown;
-  mode: import('../output/json.js').OutputMode;
-}
-
-/** Per-type create handler signature. */
-export type CreateHandler = (args: CreateHandlerArgs) => Promise<void>;
-
-export interface PullHandlerResult {
-  object: string;
-  files: string[];
-  channel: 'adt' | 'icf';
-  fallbackReason?: string;
-}
-export interface PullHandlerArgs {
-  objectName: string;
-  /** Concrete per-type pull flows narrow this to their own options shape. */
-  opts: unknown;
-}
-export type PullHandler = (args: PullHandlerArgs) => Promise<PullHandlerResult>;
-
-const CREATE_HANDLERS: Record<string, CreateHandler> = {};
-const PULL_HANDLERS: Record<string, PullHandler> = {};
-
-/**
- * Snapshot taken the first time `clearHandlersForTesting` runs. Per-type
- * modules register via side-effect imports, so the registry is empty at
- * top-level — we must capture the post-import state, not the empty one.
- */
-let initialCreateSnapshot: Readonly<Record<string, CreateHandler>> | undefined;
-let initialPullSnapshot: Readonly<Record<string, PullHandler>> | undefined;
-let snapshotTaken = false;
-
-export function registerCreateHandler(type: string, handler: CreateHandler): void {
-  const t = type.toUpperCase();
-  if (CREATE_HANDLERS[t]) {
-    throw new Error(`Create handler for ${t} already registered`);
-  }
-  CREATE_HANDLERS[t] = handler;
-}
-
-export function createHandlerFor(type: string): CreateHandler | undefined {
-  return CREATE_HANDLERS[type.toUpperCase()];
-}
-
-export function registerPullHandler(type: string, handler: PullHandler): void {
-  const t = type.toUpperCase();
-  if (PULL_HANDLERS[t]) {
-    throw new Error(`Pull handler for ${t} already registered`);
-  }
-  PULL_HANDLERS[t] = handler;
-}
-
-export function pullHandlerFor(type: string): PullHandler | undefined {
-  return PULL_HANDLERS[type.toUpperCase()];
-}
-
-/**
- * Test-only: wipe all handler registrations. Captures the current
- * registrations on first call so `restoreHandlersForTesting()` can put them
- * back. Per-type modules register via module-load side effects, so a snapshot
- * taken at top-level would be empty — capturing lazily after imports finish is
- * what makes the restore actually do something.
- *
- * Production code must never call this. Tests must pair it with
- * `restoreHandlersForTesting()` (typically `beforeEach` clear +
- * `afterEach` restore) so a test file that wipes the tables cannot break a
- * later dispatcher-level test running in the same module graph — a plain wipe
- * leaves `createHandlerFor`/`pullHandlerFor` returning `undefined` and the
- * dispatchers then silently fall through to the source-object path.
- */
-export function clearHandlersForTesting(): void {
-  // Always re-snapshot: a test body that registered a handler between
-  // beforeEach and the next clear expects `restoreHandlersForTesting()` to
-  // bring that registration back, not the pre-test baseline.
-  initialCreateSnapshot = { ...CREATE_HANDLERS };
-  initialPullSnapshot = { ...PULL_HANDLERS };
-  snapshotTaken = true;
-  for (const k of Object.keys(CREATE_HANDLERS)) delete CREATE_HANDLERS[k];
-  for (const k of Object.keys(PULL_HANDLERS)) delete PULL_HANDLERS[k];
-}
-
-/** Test-only counterpart of `clearHandlersForTesting`: reinstate the captured registrations. */
-export function restoreHandlersForTesting(): void {
-  if (!snapshotTaken) return;
-  for (const k of Object.keys(CREATE_HANDLERS)) delete CREATE_HANDLERS[k];
-  for (const k of Object.keys(PULL_HANDLERS)) delete PULL_HANDLERS[k];
-  if (initialCreateSnapshot) Object.assign(CREATE_HANDLERS, initialCreateSnapshot);
-  if (initialPullSnapshot) Object.assign(PULL_HANDLERS, initialPullSnapshot);
-  // Reset the snapshot so the next clear re-captures whatever the new
-  // module-graph registered (a registry-handlers test may have side-effected
-  // a fake handler before the dispatcher tests run).
-  snapshotTaken = false;
-  initialCreateSnapshot = undefined;
-  initialPullSnapshot = undefined;
 }
