@@ -10,10 +10,7 @@
  * to know the AFF shape — it gets the same JSON and persists it via
  * `DDIF_ENQU_PUT` after extracting the parts it needs.
  */
-import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
-import { CliError } from '../../output/json.js';
-import { validateAff } from '../../aff/schema-validator.js';
+import { defineWireArtifact } from '../artifact.js';
 
 export type LockMode =
   | 'exclusive'
@@ -52,16 +49,6 @@ export interface EnquLocal {
   secondaryTables?: EnquLockTable[];
   lockParameters: EnquLockParameter[];
   lockModules: EnquLockModules;
-}
-
-export async function readEnquJson(filePath: string): Promise<EnquLocal> {
-  const raw = await fs.readFile(filePath, 'utf8');
-  return JSON.parse(raw) as EnquLocal;
-}
-
-export async function writeEnquJson(filePath: string, doc: EnquLocal): Promise<void> {
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, JSON.stringify(doc, null, 2) + '\n', 'utf8');
 }
 
 /**
@@ -116,23 +103,9 @@ export function localToWire(local: EnquLocal): Record<string, unknown> {
   };
 }
 
-/** Validate an ENQU document against the AFF schema. Returns error messages. */
-export async function validateEnquObject(doc: unknown): Promise<string[]> {
-  const result = await validateAff('ENQU', doc);
-  if (result.status === 'pass' || result.status === 'warn') return [];
-  return result.errors.map((e) => `${e.instancePath || '/'}: ${e.message ?? ''}`);
-}
-
-/** Read, parse, and validate an ENQU .json file in one step. */
-export async function loadAndValidate(filePath: string): Promise<EnquLocal> {
-  const doc = await readEnquJson(filePath);
-  const errors = await validateEnquObject(doc);
-  if (errors.length > 0) {
-    throw new CliError('AFF_FIXTURE_INVALID', `Invalid ENQU definition in ${path.basename(filePath)}: ${errors.join('; ')}`, {
-      file: filePath,
-      type: 'ENQU',
-      details: errors,
-    });
-  }
-  return doc;
-}
+/** ENQU AFF artifact: file/schema plumbing + JSON wire mapping. */
+export const enquArtifact = defineWireArtifact<EnquLocal, Record<string, unknown>>({
+  type: 'ENQU',
+  toWire: (local) => localToWire(local),
+  fromWire: (wire) => wireToLocal(wire),
+});

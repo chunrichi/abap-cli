@@ -7,16 +7,13 @@
  *
  * Wire: SAP ADT `ttyp:tableType` XML, parsed into a flat dict
  * (key → string). Mapped onto our local shape via `wireToLocal()`, then
- * schema-validated via spec 033's `aff/schema-validator.ts#loadValidator`.
+ * schema-validated through the shared AFF artifact contract (`artifact.ts`).
  *
  * Spec 036 Q1: upstream SAP `type-v1.json` is *type-pool*, not table-type —
  * our `ttyp-v1.json` is a deliberate handcrafted mirror, header-annotated
  * in `tmp/abap-file-formats/file-formats/ttyp/ttyp-v1.json`.
  */
-import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
-import { CliError } from '../../output/json.js';
-import { validateAff } from '../../aff/schema-validator.js';
+import { defineWireArtifact } from '../artifact.js';
 
 export interface TtypLocal {
   formatVersion: '1';
@@ -36,22 +33,6 @@ export interface TtypWireFields {
   keys?: Array<{ keyField: string; descending: boolean }>;
 }
 
-const TYPE_ABAP_HEAD = /^TYPES\s+(\w+)\s+TYPE\s+/i;
-const DDL_DEFINE_RE = /^\s*define\s+type\s+(\w+)\s*:\s*(.+?);?\s*$/ims;
-
-/** Read a `*.ttyp.json` document and return it typed. */
-export async function readTtypJson(filePath: string): Promise<TtypLocal> {
-  const raw = await fs.readFile(filePath, 'utf8');
-  const parsed = JSON.parse(raw) as TtypLocal;
-  return parsed;
-}
-
-/** Persist a local document to `filePath` (atomic-ish — single write). */
-export async function writeTtypJson(filePath: string, doc: TtypLocal): Promise<void> {
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, JSON.stringify(doc, null, 2) + '\n', 'utf8');
-}
-
 /**
  * Wire body schema for a SAP ADT `ttyp:tableType` GET response:
  *   <ttyp:tableType xmlns:ttyp="...">
@@ -67,7 +48,7 @@ export async function writeTtypJson(filePath: string, doc: TtypLocal): Promise<v
  * `ttyp:keyDefinition` or `ttyp:rowStructure` children, the regex list
  * below is the single edit point.
  */
-export function wireToLocal(name: string, xml: string): TtypLocal {
+export function wireToLocal(xml: string): TtypLocal {
   const tag = (re: RegExp): string => {
     const m = xml.match(re);
     return (m?.[1] ?? '').trim();
@@ -119,24 +100,12 @@ export function localToWire(local: TtypLocal): string {
   ].join('\n');
 }
 
-/** Validate a parsed local doc against the handcrafted `ttyp-v1.json` schema. */
-export async function validateTtypObject(doc: unknown): Promise<string[]> {
-  const result = await validateAff('TTYP', doc);
-  if (result.status === 'pass' || result.status === 'warn') {
-    return [];
-  }
-  return result.errors.map((e) => `${e.instancePath || '/'}: ${e.message ?? ''}`);
-}
-
-/** Sidecar `.type.abap` DDL companion → AST node used by push / dogfooding. */
-export function readTtypTypeSource(filePath: string): string | undefined {
-  try {
-    const raw = require('node:fs').readFileSync(filePath, 'utf8');
-    return raw;
-  } catch {
-    return undefined;
-  }
-}
+/** TTYP AFF artifact: file/schema plumbing + ADT wire mapping. */
+export const ttypArtifact = defineWireArtifact<TtypLocal, string>({
+  type: 'TTYP',
+  toWire: (local) => localToWire(local),
+  fromWire: (xml) => wireToLocal(xml),
+});
 
 /** Build the DDL `define type <name>: ...` from a local document. */
 export function buildTypeSource(name: string, local: TtypLocal): string {
@@ -152,20 +121,4 @@ export function buildTypeSource(name: string, local: TtypLocal): string {
     return `define type ${name.toLowerCase()}: ${local.accessType !== 'standard' ? ` ${local.accessType} ` : ''}table of begin of line, ${f.fieldName.toLowerCase()} type ${type}${len}, end of line.`;
   }
   return `define type ${name.toLowerCase()}: standard table of char1.`;
-}
-
-/**
- * Convenience: load + wire-validate in one step. Throws CliError on
- * schema failure so the caller can surface it inline in the pull envelope.
- */
-export async function loadAndValidate(filePath: string): Promise<TtypLocal> {
-  const doc = await readTtypJson(filePath);
-  const errors = await validateTtypObject(doc);
-  if (errors.length > 0) {
-    throw new CliError('AFF_FIXTURE_INVALID', `TTYP file ${filePath} failed schema validation: ${errors.join('; ')}`, {
-      file: filePath,
-      details: errors,
-    });
-  }
-  return doc;
 }

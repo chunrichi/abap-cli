@@ -12,7 +12,7 @@ import type { ErrorCode } from '../../output/error-codes.js';
 import { buildFilename } from '../../formats/file-resolver.js';
 import { folderFor } from '../../formats/type-folder.js';
 import { fileExists } from '../../formats/abap-source.js';
-import { wireToLocal, writeEnquJson } from '../../formats/enqu/json.js';
+import { enquArtifact } from '../../formats/enqu/json.js';
 import { toOutputPath, normalizePullData } from '../../core/path-output.js';
 import type { PullOptions, PullResult } from './pull-shared.js';
 import type { PullHandler } from './routing.js';
@@ -34,7 +34,7 @@ export async function runPullEnqu(objectName: string, opts: PullOptions): Promis
     });
   }
 
-  const local = wireToLocal(resp.data);
+  const local = enquArtifact.fromWire(resp.data);
   const filename = buildFilename(upper, 'ENQU', 'main', '.json');
   const relPath = path.join(opts.dir, folderFor('ENQU'), filename);
   const targetPath = path.resolve(process.cwd(), relPath);
@@ -55,7 +55,7 @@ export async function runPullEnqu(objectName: string, opts: PullOptions): Promis
     };
   }
 
-  await writeEnquJson(targetPath, local);
+  await enquArtifact.write(targetPath, local);
   const outPath = toOutputPath(relPath);
   return {
     data: normalizePullData({

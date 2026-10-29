@@ -7,7 +7,7 @@
  *   3. UTF-8 special chars in description.
  */
 import { describe, it, expect } from 'vitest';
-import { wireToLocal, localToWire, validateTtypObject } from '../../src/abap_cli/formats/ttyp/json.js';
+import { ttypArtifact } from '../../src/abap_cli/formats/ttyp/json.js';
 
 describe('TTYP round-trip (036)', () => {
   it('standard table type round-trips', () => {
@@ -18,12 +18,12 @@ describe('TTYP round-trip (036)', () => {
   <ttyp:accessType>STANDARD</ttyp:accessType>
   <ttyp:lineType>STRING</ttyp:lineType>
 </ttyp:tableType>`;
-    const local = wireToLocal('ZTT_STD', xml);
+    const local = ttypArtifact.fromWire(xml);
     expect(local.accessType).toBe('standard');
     expect(local.lineType.rowType).toBe('STRING');
     expect(local.header.description).toBe('Simple standard table');
     // localToWire emits an envelope; ensure it survives parse-without-loss.
-    const wire = localToWire(local);
+    const wire = ttypArtifact.toWire(local);
     expect(wire).toMatch(/accessType>STANDARD/);
     expect(wire).toMatch(/lineType>STRING/);
   });
@@ -38,7 +38,7 @@ describe('TTYP round-trip (036)', () => {
   <ttyp:key keyField="MANDT" descending="false"/>
   <ttyp:key keyField="ID" descending="true"/>
 </ttyp:tableType>`;
-    const local = wireToLocal('ZTT_HASH', xml);
+    const local = ttypArtifact.fromWire(xml);
     expect(local.accessType).toBe('hashed');
     expect(local.keyDefinition).toHaveLength(2);
     expect(local.keyDefinition![0]!.keyField).toBe('MANDT');
@@ -53,13 +53,13 @@ describe('TTYP round-trip (036)', () => {
   <ttyp:accessType>STANDARD</ttyp:accessType>
   <ttyp:lineType>STRING</ttyp:lineType>
 </ttyp:tableType>`;
-    const local = wireToLocal('ZTT_UNICODE', xml);
+    const local = ttypArtifact.fromWire(xml);
     expect(local.header.description).toMatch(/Müller/);
     expect(local.header.description).toMatch(/naïve/);
   });
 
   it('validateTtypObject passes for a well-formed local doc', async () => {
-    const errors = await validateTtypObject({
+    const errors = await ttypArtifact.validate({
       formatVersion: '1',
       header: { description: 'ok', originalLanguage: 'EN' },
       accessType: 'standard',

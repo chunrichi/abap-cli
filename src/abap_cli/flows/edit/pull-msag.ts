@@ -13,7 +13,7 @@ import { IcfClient } from '../../clients/icf-client.js';
 import { CliError } from '../../output/json.js';
 import { detectChannel } from './channel-detect.js';
 import type { SystemProfile } from './channel-detect.js';
-import { wireToLocal, writeMsagJson, validateMsagObject, type MsagLocal } from '../../formats/msag/json.js';
+import { msagArtifact, type MsagLocal } from '../../formats/msag/json.js';
 import { loadConfig, findWorkspaceConfig } from '../../config/project-config.js';
 import { folderFor } from '../../formats/type-folder.js';
 import type { PullHandler } from './routing.js';
@@ -43,7 +43,7 @@ async function resolveRoot(opts: { rootDir?: string; dir?: string }): Promise<st
 async function pullAdt(name: string): Promise<MsagLocal> {
   const client = await AdtClientWrapper.create();
   const xml = await client.getMsag(name);
-  return wireToLocal(xml);
+  return msagArtifact.fromWire(xml);
 }
 
 async function pullIcf(name: string): Promise<MsagLocal> {
@@ -78,14 +78,14 @@ export async function runPullMsag(name: string, opts: PullMsagOptions = {}): Pro
     doc = await pullIcf(upper);
   }
 
-  const errors = await validateMsagObject(doc);
+  const errors = await msagArtifact.validate(doc);
   if (errors.length > 0) {
     throw new CliError('AFF_FIXTURE_INVALID', `Pulled MSAG ${upper} failed schema: ${errors.join('; ')}`, {
       object: upper,
       details: errors,
     });
   }
-  await writeMsagJson(jsonPath, doc);
+  await msagArtifact.write(jsonPath, doc);
   return {
     object: upper,
     channel: decision.channel,

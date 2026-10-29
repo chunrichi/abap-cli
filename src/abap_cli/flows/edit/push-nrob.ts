@@ -7,7 +7,7 @@
 import { IcfClient } from '../../clients/icf-client.js';
 import { CliError } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
-import { readNrobJson, localToWire, validateNrobObject } from '../../formats/nrob/json.js';
+import { nrobArtifact } from '../../formats/nrob/json.js';
 
 export interface RunPushNrobOptions {
   transport?: string;
@@ -17,8 +17,8 @@ export async function runPushNrob(
   file: string,
   opts: RunPushNrobOptions = {},
 ): Promise<{ channel: 'adt' | 'icf' }> {
-  const local = await readNrobJson(file);
-  const errors = await validateNrobObject(local);
+  const local = await nrobArtifact.read(file);
+  const errors = await nrobArtifact.validate(local);
   if (errors.length > 0) {
     throw new CliError('VALIDATION_ERROR', `Invalid NROB file: ${errors.join('; ')}`, {
       file,
@@ -43,7 +43,7 @@ export async function runPushNrob(
     );
   }
 
-  const wire = localToWire(local);
+  const wire = nrobArtifact.toWire(local);
   if (opts.transport) (wire as Record<string, unknown>).transportRequest = opts.transport;
   const resp = await icf.postDdic<unknown>('nrob', wire);
   if (resp.status !== 'success') {

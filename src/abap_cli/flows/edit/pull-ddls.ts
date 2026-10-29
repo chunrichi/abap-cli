@@ -12,7 +12,7 @@ import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError } from '../../output/json.js';
 import { detectChannel } from './channel-detect.js';
 import type { SystemProfile } from './channel-detect.js';
-import { wireToLocal, writeDdlsJson, validateDdlsObject, type DdlsLocal } from '../../formats/ddls/json.js';
+import { ddlsArtifact, wireToLocal, type DdlsLocal } from '../../formats/ddls/json.js';
 import { loadConfig, findWorkspaceConfig } from '../../config/project-config.js';
 import { folderFor } from '../../formats/type-folder.js';
 import type { PullHandler } from './routing.js';
@@ -63,14 +63,14 @@ export async function runPullDdls(name: string, opts: PullDdlsOptions = {}): Pro
   // to a heuristic search of the full XML if the source element is empty.
   const finalSource = source || xml;
 
-  const errors = await validateDdlsObject(doc);
+  const errors = await ddlsArtifact.validate(doc);
   if (errors.length > 0) {
     throw new CliError('AFF_FIXTURE_INVALID', `Pulled DDLS ${upper} failed schema: ${errors.join('; ')}`, {
       object: upper,
       details: errors,
     });
   }
-  await writeDdlsJson(jsonPath, doc);
+  await ddlsArtifact.write(jsonPath, doc);
   await fs.writeFile(acdsPath, finalSource, 'utf8');
   return {
     object: upper,

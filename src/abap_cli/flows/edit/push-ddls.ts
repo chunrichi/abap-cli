@@ -13,7 +13,7 @@ import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError } from '../../output/json.js';
 import { detectChannel } from './channel-detect.js';
 import type { SystemProfile } from './channel-detect.js';
-import { readDdlsJson, localToWire, validateDdlsObject } from '../../formats/ddls/json.js';
+import { ddlsArtifact, localToWire } from '../../formats/ddls/json.js';
 import { parseAcds } from '../../formats/ddls/acds.js';
 import { loadConfig } from '../../config/project-config.js';
 
@@ -44,7 +44,7 @@ export async function runPushDdls(file: string, opts: PushDdlsOptions = {}): Pro
   const name = nameFromFile(file);
   const basePath = path.resolve(process.cwd(), file).replace(/\.ddls\.json$/, '');
   const acdsPath = `${basePath}.ddls.acds`;
-  const doc = await readDdlsJson(path.resolve(process.cwd(), file));
+  const doc = await ddlsArtifact.read(path.resolve(process.cwd(), file));
   let source = '';
   try {
     source = await fs.readFile(acdsPath, 'utf8');
@@ -61,7 +61,7 @@ export async function runPushDdls(file: string, opts: PushDdlsOptions = {}): Pro
       details: { jsonSourceType: doc.sourceType, acdsSourceType: shape.sourceType },
     });
   }
-  const errors = await validateDdlsObject(doc);
+  const errors = await ddlsArtifact.validate(doc);
   if (errors.length > 0) {
     throw new CliError('AFF_FIXTURE_INVALID', `DDLS file ${file} failed schema validation: ${errors.join('; ')}`, {
       file,

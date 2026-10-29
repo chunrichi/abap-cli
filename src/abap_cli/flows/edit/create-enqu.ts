@@ -11,7 +11,7 @@ import * as path from 'node:path';
 import { IcfClient } from '../../clients/icf-client.js';
 import { CliError, printResult, type OutputMode } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
-import { localToWire, loadAndValidate, type EnquLocal } from '../../formats/enqu/json.js';
+import { enquArtifact, type EnquLocal } from '../../formats/enqu/json.js';
 import { toOutputPath } from '../../core/path-output.js';
 import type { CreateOptions } from './create.js';
 import type { CreateHandler } from './routing.js';
@@ -55,7 +55,7 @@ export async function runCreateEnqu(
   const filePath = path.resolve(process.cwd(), opts.file);
   let local: EnquLocal;
   try {
-    local = await loadAndValidate(filePath);
+    local = await enquArtifact.load(filePath);
   } catch (error: unknown) {
     if (error instanceof CliError) throw error;
     throw new CliError('VALIDATION_ERROR', `Cannot read ENQU file: ${error instanceof Error ? error.message : String(error)}`, {
@@ -73,7 +73,7 @@ export async function runCreateEnqu(
     });
   }
 
-  const wire = localToWire(local);
+  const wire = enquArtifact.toWire(local);
   // The AFF enqu document carries no lock-object name: `primaryTable.name` is
   // the table being locked, which is a different thing. Send the object name
   // on the wire (the ABAP side reads it from the payload and falls back to the

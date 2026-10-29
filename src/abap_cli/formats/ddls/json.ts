@@ -14,10 +14,7 @@
  * wireToLocal pulls just the source string out (the rest of the metadata
  * round-trips via the JSON shape).
  */
-import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
-import { CliError } from '../../output/json.js';
-import { validateAff } from '../../aff/schema-validator.js';
+import { defineJsonArtifact } from '../artifact.js';
 import { detectSourceTypeFromDdl } from './acds.js';
 
 export interface DdlsLocal {
@@ -83,15 +80,9 @@ export function enumOrDefault(
   return value && allowed.has(value) ? value : fallback;
 }
 
-export async function readDdlsJson(filePath: string): Promise<DdlsLocal> {
-  const raw = await fs.readFile(filePath, 'utf8');
-  return JSON.parse(raw) as DdlsLocal;
-}
-
-export async function writeDdlsJson(filePath: string, doc: DdlsLocal): Promise<void> {
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, JSON.stringify(doc, null, 2) + '\n', 'utf8');
-}
+/** DDLS AFF artifact: file/schema plumbing only — the wire mapping is
+ *  asymmetric (the source lives in the sibling `.acds` file). */
+export const ddlsArtifact = defineJsonArtifact<DdlsLocal>('DDLS');
 
 /** Pull the DDL source out of the wire body and return both pieces. */
 export function wireToLocal(xml: string): { doc: DdlsLocal; source: string } {
@@ -150,22 +141,4 @@ export function localToWire(local: DdlsLocal, source: string): string {
     '  ]]></ddl:ddlSourceString>',
     '</ddl:ddlSource>',
   ].join('\n');
-}
-
-export async function validateDdlsObject(doc: unknown): Promise<string[]> {
-  const result = await validateAff('DDLS', doc);
-  if (result.status === 'pass' || result.status === 'warn') return [];
-  return result.errors.map((e) => `${e.instancePath || '/'}: ${e.message ?? ''}`);
-}
-
-export async function loadAndValidate(filePath: string): Promise<DdlsLocal> {
-  const doc = await readDdlsJson(filePath);
-  const errors = await validateDdlsObject(doc);
-  if (errors.length > 0) {
-    throw new CliError('AFF_FIXTURE_INVALID', `DDLS file ${filePath} failed schema validation: ${errors.join('; ')}`, {
-      file: filePath,
-      details: errors,
-    });
-  }
-  return doc;
 }

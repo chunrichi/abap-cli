@@ -9,11 +9,7 @@ import * as path from 'node:path';
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { IcfClient } from '../../clients/icf-client.js';
 import { CliError, printResult, type OutputMode } from '../../output/json.js';
-import {
-  readTtypJson,
-  validateTtypObject,
-  localToWire as ttypLocalToWire,
-} from '../../formats/ttyp/json.js';
+import { ttypArtifact, type TtypLocal } from '../../formats/ttyp/json.js';
 import { toOutputPath } from '../../core/path-output.js';
 import { detectChannel, loadChannelProfile } from './channel-detect.js';
 import type { CreateOptions } from './create.js';
@@ -30,15 +26,15 @@ export async function runCreateTtyp(
     });
   }
   const filePath = path.resolve(process.cwd(), opts.file);
-  let doc: Awaited<ReturnType<typeof readTtypJson>>;
+  let doc: TtypLocal;
   try {
-    doc = await readTtypJson(filePath);
+    doc = await ttypArtifact.read(filePath);
   } catch (error: unknown) {
     throw new CliError('FILE_PARSE_ERROR', `Cannot read TTYP file ${toOutputPath(opts.file)}: ${error instanceof Error ? error.message : String(error)}`, {
       file: toOutputPath(opts.file),
     });
   }
-  const errors = await validateTtypObject(doc);
+  const errors = await ttypArtifact.validate(doc);
   if (errors.length > 0) {
     throw new CliError('VALIDATION_ERROR', `Invalid TTYP definition in ${toOutputPath(opts.file)}: ${errors.join('; ')}`, {
       file: toOutputPath(opts.file),
@@ -47,7 +43,7 @@ export async function runCreateTtyp(
   }
   const profile = await loadChannelProfile();
   const decision = detectChannel(profile, 'ttyp');
-  const wire = ttypLocalToWire(doc);
+  const wire = ttypArtifact.toWire(doc);
   if (decision.channel === 'adt') {
     const client = await AdtClientWrapper.create();
     await client.createTtyp(name, wire, opts.package, opts.tr);
