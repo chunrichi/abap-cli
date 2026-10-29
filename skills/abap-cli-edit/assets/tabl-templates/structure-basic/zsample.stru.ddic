@@ -1,0 +1,6 @@
+@EndUserText.label : 'Sample reusable structure'
+define structure zsample {
+  field1 : abap.char(20);
+  field2 : abap.int4;
+  field3 : abap.dats;
+}

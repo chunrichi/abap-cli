@@ -1,0 +1,12 @@
+@EndUserText.label : 'Sample invoice with currency amount'
+@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+@AbapCatalog.tableCategory : #TRANSPARENT
+@AbapCatalog.deliveryClass : #A
+@AbapCatalog.dataMaintenance : #RESTRICTED
+define table zsample {
+  key client     : abap.clnt not null;
+  key invoice_id : abap.char(10) not null;
+  @Semantics.amount.currencyCode : 'zsample.currency'
+  amount        : abap.curr(15, 2);
+  currency      : abap.cuky;
+}
