@@ -1,6 +1,5 @@
 import { Command } from 'commander';
-import { printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
-import { commandSchemas } from '../flows/setup/command-schemas.js';
+import { printError, printResult, printSchema, jsonFromCommand, type CommandSchema } from '../output/json.js';
 import {
   runTransportAssign,
   runTransportCreate,
@@ -8,6 +7,24 @@ import {
   runTransportResolve,
   runTransportShow,
 } from '../flows/core/transport-ops.js';
+import { baseSchema, schemaOption } from './schema-helpers.js';
+
+export const SCHEMA: CommandSchema = {
+  ...baseSchema('transport', 'Manage SAP transport requests (list / create / show / resolve / assign).', 'abap transport <list|create|show|resolve|assign> [options]', 'sap'),
+  arguments: [],
+  options: [schemaOption()],
+  examples: [
+    { description: 'List transports', command: 'abap transport list' },
+    { description: 'Create a transport', command: 'abap transport create "my description" --yes' },
+    { description: 'Assign an object', command: 'abap transport assign ZCL_MY --tr DEVK900001 --yes' },
+  ],
+  errors: [
+    { code: 'TRANSPORT_CREATE_FAILED', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'TRANSPORT_NOT_FOUND', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'INVALID_ARGUMENT', category: 'USAGE', exitCode: 2 },
+    { code: 'VALIDATION_ERROR', category: 'VALIDATION_ERROR', exitCode: 7 },
+  ],
+};
 
 export function registerTransportCommand(program: Command): void {
   const transportCmd = program
@@ -16,7 +33,7 @@ export function registerTransportCommand(program: Command): void {
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action((_opts, cmd) => {
       if (cmd.optsWithGlobals().schema) {
-        printSchema(commandSchemas['transport']!, jsonFromCommand(cmd));
+        printSchema(SCHEMA, jsonFromCommand(cmd));
         return;
       }
       cmd.help();

@@ -58,7 +58,7 @@ test/
 
 ## 文档生成
 
-命令参考与 skill 速查不是手写的，由命令 schema（`src/abap_cli/flows/setup/command-schemas.ts` 与各命令的 `SCHEMA` 常量）生成：
+命令参考与 skill 速查不是手写的，由各命令模块自己的 schema 常量（`src/abap_cli/commands/<cmd>.ts#SCHEMA`；共享信封字段取 `commands/schema-helpers.ts`）生成：
 
 ```bash
 npm run build        # 先生成 dist（生成器从编译产物读取 schema）
@@ -114,7 +114,7 @@ src/abap_cli/
 ## Adding a New Command
 
 1. Put the business logic in `src/abap_cli/flows/<area>/` and return `{ data, human }` (throw `CliError` on failures). The command layer must not import `clients/` directly.
-2. Create `src/abap_cli/commands/<name>.ts` exporting `register<Name>Command(program: Command)`: commander declaration + `SCHEMA` (or a `command-schemas.ts` entry) + `printResult`/`printError`.
+2. Create `src/abap_cli/commands/<name>.ts` exporting `register<Name>Command(program: Command)`: commander declaration + that command's own `SCHEMA` + `printResult`/`printError`. Each command module is the only owner of its schema — there is no central schema table.
 3. Register it in `src/abap_cli/registry/commands.ts`: add a `COMMAND_SPECS` entry (command `name`, root-help `description`, `scope`, and a `load` that dynamically `import()`s the module). `registry/lazy.ts` turns each entry into a lazy stub; the stub's description must match the one the module registers.
 4. 在对应的领域 skill（`skills/abap-cli-<领域>/`）里补该命令的 references 条目，并更新 `metadata.commands`
 5. 运行 `npm run build && npm run docs:build` 重新生成 `docs/commands.md`、skills quick refs 与 wiki 命令索引 stub；手写 `wiki/commands/<cmd>.md` 叙述页并按 okf 契约补章节；最后 `npm run docs:check`（含 `scripts/check-docs.mjs` 的 wiki/死链/schema 漂移检查）
@@ -126,9 +126,20 @@ Follow the existing pattern (e.g. `commands/status.ts` — declaration + print o
 
 ```ts
 import { Command } from 'commander';
-import { printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
-import { commandSchemas } from '../flows/setup/command-schemas.js';
+import { printError, printResult, printSchema, jsonFromCommand, type CommandSchema } from '../output/json.js';
+import { baseSchema, schemaOption } from './schema-helpers.js';
 import { runMyFlow, type MyRunOptions } from '../flows/<area>/my-flow.js';
+
+// This command's machine contract — the only copy of it in the codebase.
+export const SCHEMA: CommandSchema = {
+  ...baseSchema('mycmd', 'One-line command description.', 'abap mycmd [target] [options]', 'sap'),
+  arguments: [{ name: 'target', type: 'string', required: false, description: '...' }],
+  options: [
+    { name: '--limit', type: 'int', valuePlaceholder: '<n>', default: 20, description: '...' },
+    schemaOption(),
+  ],
+  examples: [{ description: '...', command: 'abap mycmd ZTARGET --limit 50' }],
+};
 
 export function registerMyCommand(program: Command): void {
   program
@@ -139,7 +150,7 @@ export function registerMyCommand(program: Command): void {
     .action(async (target: string | undefined, opts: MyRunOptions, cmd) => {
       const mode = jsonFromCommand(cmd); // resolves the global --json / --pretty-json flags
       if (cmd.optsWithGlobals().schema) {
-        printSchema(commandSchemas['mycmd']!, mode);
+        printSchema(SCHEMA, mode);
         return;
       }
       try {

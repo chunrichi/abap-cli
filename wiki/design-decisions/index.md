@@ -34,5 +34,5 @@ changed at: 2026-09-01 00:00:00
 # references
 
 - 命令参考：[`docs/commands.md`](../../docs/commands.md)（生成物）；命令叙述页见 [`wiki/commands/`](../commands/)
-- 命令元数据源：`src/abap_cli/flows/setup/command-schemas.ts` 与各命令的 `SCHEMA`
+- 命令元数据源：各命令模块自己的 `SCHEMA`（`src/abap_cli/commands/<cmd>.ts`）
 - 仓库合约：根 [`AGENTS.md`](../../AGENTS.md)

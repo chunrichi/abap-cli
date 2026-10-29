@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
-import { printError, printResult, printSchema, jsonFromCommand, CliError, type OutputMode } from '../output/json.js';
+import { printError, printResult, printSchema, jsonFromCommand, CliError, type OutputMode, type CommandSchema } from '../output/json.js';
 import { collectWarning } from '../output/meta.js';
 import { exportProfiles, importProfiles, type ProfileBundle } from '../config/profiles.js';
 import { runList, runShow, runTest, runDelete } from '../flows/setup/profile.js';
@@ -9,7 +9,54 @@ import { runAdd, runSet } from '../flows/setup/profile.js';
 import { runLogin } from '../flows/setup/sso.js';
 import { runCookieImport } from '../flows/setup/cookie-import.js';
 import { toOutputPath } from '../core/path-output.js';
-import { commandSchemas } from '../flows/setup/command-schemas.js';
+import { baseSchema, schemaOption } from './schema-helpers.js';
+
+export const SCHEMA: CommandSchema = {
+  ...baseSchema('profile', 'Manage global connection profiles (list / show / add / set / test / login / delete / export / import).', 'abap profile <command> [options]', 'local'),
+  arguments: [],
+  options: [
+    { name: '--url', type: 'string', valuePlaceholder: '<url>', description: 'SAP system URL.' },
+    { name: '--client', type: 'string', valuePlaceholder: '<client>', description: 'SAP client number.' },
+    { name: '--username', type: 'string', valuePlaceholder: '<user>', description: 'SAP username.' },
+    { name: '--language', type: 'string', valuePlaceholder: '<lang>', description: 'SAP language.' },
+    { name: '--password', type: 'string', valuePlaceholder: '<password>', description: 'Password (stores credential in keychain).' },
+    { name: '--remove-password', type: 'boolean', description: 'Drop the stored password from keychain.' },
+    { name: '--insecure', type: 'boolean', description: 'Skip SSL certificate verification (development only).' },
+    { name: '--ca', type: 'string', valuePlaceholder: '<path>', description: 'PEM CA certificate to import into ~/.abap-cli/certificates/ and bind to this profile.' },
+    { name: '--clear-ca', type: 'boolean', description: 'Remove the CA certificate setting.' },
+    { name: '--auth-method', type: 'string', valuePlaceholder: '<method>', description: 'Login strategy: basic | cert | browser_sso | oauth_password.' },
+    { name: '--auth-option', type: 'string', valuePlaceholder: '<kv>', description: 'Generic auth option, repeatable as key=value.' },
+    { name: '--cert-path', type: 'string', valuePlaceholder: '<path>', description: 'X.509 client cert file (PEM).' },
+    { name: '--cert-key', type: 'string', valuePlaceholder: '<path>', description: 'X.509 private key file (PEM).' },
+    { name: '--cert-ca', type: 'string', valuePlaceholder: '<path>', description: 'Optional X.509 client CA override (PEM).' },
+    { name: '--cert-passphrase', type: 'string', valuePlaceholder: '<pwd>', description: 'Passphrase for .p12 / encrypted key — written to keychain.' },
+    { name: '--remove-cert-passphrase', type: 'boolean', description: 'Remove the stored cert passphrase from keychain.' },
+    { name: '--clear-cert-auth', type: 'boolean', description: 'Reset to basic auth (drops authMethod and certAuth).' },
+    { name: '--sso-cookie-file', type: 'string', valuePlaceholder: '<path>', description: 'SSO cookie jar path — used with --auth-method=browser_sso.' },
+    { name: '--clear-sso-cookie-file', type: 'boolean', description: 'Reset SSO cookie file path to the default.' },
+    { name: '--service-key', type: 'string', valuePlaceholder: '<path>', description: 'BTP service key JSON — used with --auth-method=oauth_password.' },
+    { name: '--clear-oauth-password', type: 'boolean', description: 'Drop oauthPassword config (reset to authMethod).' },
+    { name: '--file', type: 'string', valuePlaceholder: '<path>', description: 'Bundle file path for export / import.' },
+    { name: '--with-passwords', type: 'boolean', description: 'Include passwords in the export bundle (warned opt-in).' },
+    { name: '--overwrite', type: 'boolean', description: 'Update profiles that already exist on import.' },
+    { name: '--yes', type: 'boolean', description: 'Confirm in non-interactive mode.' },
+    schemaOption(),
+  ],
+  examples: [
+    { description: 'Add a profile', command: 'abap profile add DEV --url https://... --username DEV --password ***' },
+    { description: 'Test a profile', command: 'abap profile test DEV' },
+    { description: 'Export profiles', command: 'abap profile export --file profiles.json' },
+  ],
+  errors: [
+    { code: 'CONFIG_ERROR', category: 'CONFIG_ERROR', exitCode: 3 },
+    { code: 'PASSWORD_EXPORT', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'PROFILE_MISMATCH', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'TLS_ERROR', category: 'TLS_ERROR', exitCode: 4 },
+    { code: 'AUTH_ERROR', category: 'AUTH_ERROR', exitCode: 5 },
+    { code: 'SAP_ERROR', category: 'SAP_ERROR', exitCode: 6 },
+    { code: 'INVALID_ARGUMENT', category: 'USAGE', exitCode: 2 },
+  ],
+};
 
 export function registerProfileCommand(program: Command): void {
   const profile = program
@@ -18,7 +65,7 @@ export function registerProfileCommand(program: Command): void {
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action((_opts, cmd) => {
       if (cmd.optsWithGlobals().schema) {
-        printSchema(commandSchemas['profile']!, jsonFromCommand(cmd));
+        printSchema(SCHEMA, jsonFromCommand(cmd));
         return;
       }
       // Bare `abap profile` prints the subcommand help (exit 0), like bare `abap`.

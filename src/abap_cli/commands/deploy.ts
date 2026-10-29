@@ -6,9 +6,35 @@
  * `flows/edit/deploy-flow.ts`.
  */
 import { Command } from 'commander';
-import { printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
-import { commandSchemas } from '../flows/setup/command-schemas.js';
+import { printError, printResult, printSchema, jsonFromCommand, type CommandSchema } from '../output/json.js';
 import { runDeploy, runDeployStatus, type DeployRunOptions } from '../flows/edit/deploy-flow.js';
+import { baseSchema, schemaOption } from './schema-helpers.js';
+
+export const SCHEMA: CommandSchema = {
+  ...baseSchema('deploy', 'Deploy bundled ICF ABAP service to SAP.', 'abap deploy [options] | abap deploy status [options]', 'sap'),
+  arguments: [],
+  options: [
+    { name: '--tr', type: 'string', valuePlaceholder: '<transport>', description: 'Transport number (required when --package is not $TMP).' },
+    { name: '--package', type: 'string', valuePlaceholder: '<package>', default: '$TMP', description: 'Target SAP package (default $TMP — local, no transport needed).' },
+    { name: '--dry-run', type: 'boolean', description: 'Plan only — make no mutating SAP calls.' },
+    { name: '--diff', type: 'boolean', description: 'Report per-file source differences.' },
+    { name: '--force', type: 'boolean', description: 'Bypass safety guards (forced: true in the result).' },
+    { name: '--yes', type: 'boolean', description: 'Confirm in non-interactive mode.' },
+    schemaOption(),
+  ],
+  examples: [
+    { description: 'Deploy to $TMP (no transport)', command: 'abap deploy --yes' },
+    { description: 'Deploy to a custom package', command: 'abap deploy --package ZPKG --tr DEVK900001 --yes' },
+    { description: 'Read-only status probe', command: 'abap deploy status' },
+  ],
+  errors: [
+    { code: 'NO_TRANSPORT', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'SAP_ERROR', category: 'SAP_ERROR', exitCode: 6 },
+    { code: 'FORCE_BYPASSED', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'ICF_CHECK_DEGRADED', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'STEAMPUNK_ICF_MANUAL', category: 'VALIDATION_ERROR', exitCode: 7 },
+  ],
+};
 
 type DeployOptions = DeployRunOptions & { schema?: boolean };
 
@@ -34,7 +60,7 @@ export function registerDeployCommand(program: Command): void {
   deploy.action(async (opts: DeployOptions, cmd) => {
     const mode = jsonFromCommand(cmd);
     if (cmd.optsWithGlobals().schema || opts.schema) {
-      printSchema(commandSchemas['deploy']!, mode);
+      printSchema(SCHEMA, mode);
       return;
     }
     try {

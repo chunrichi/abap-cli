@@ -1,7 +1,31 @@
 import { Command } from 'commander';
-import { printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
-import { commandSchemas } from '../flows/setup/command-schemas.js';
+import { printError, printResult, printSchema, jsonFromCommand, type CommandSchema } from '../output/json.js';
 import { runCheck, type CheckMode, type CheckRunOptions } from '../flows/core/check.js';
+import { baseSchema, schemaOption } from './schema-helpers.js';
+
+export const SCHEMA: CommandSchema = {
+  ...baseSchema('check', 'Validate ABAP source code (syntax / content / atc).', 'abap check [syntax|content|atc] [options]', 'sap'),
+  arguments: [],
+  options: [
+    { name: '--variant', type: 'string', valuePlaceholder: '<variant>', description: 'ATC check variant (required with `check atc`).' },
+    { name: '--all', type: 'boolean', description: 'Check all .abap files under the scan root (sourceDir or current dir).' },
+    { name: '--changed', type: 'boolean', description: 'Check only files changed since the SAP version.' },
+    { name: '--strict', type: 'boolean', description: 'Treat warnings as failures.' },
+    { name: '--out', type: 'string', valuePlaceholder: '[file]', description: 'Persist raw ATC worklist to a file (only with `check atc`); defaults to .abap/atc/<variant>-<timestamp>.json.' },
+    { name: '--files', type: 'string', valuePlaceholder: '<files...>', description: 'Shortcut: run syntax mode on the given files (equivalent to `abap check syntax <files...>`).' },
+    schemaOption(),
+  ],
+  examples: [
+    { description: 'Syntax check', command: 'abap check syntax src/zcl_demo.clas.abap' },
+    { description: 'Local-only validation', command: 'abap check content src/zcl_demo.clas.abap' },
+    { description: 'ATC check with persisted worklist', command: 'abap check atc src/zcl_demo.clas.abap --variant Z_ATC_VAR --out' },
+  ],
+  errors: [
+    { code: 'SYNTAX_ERROR', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'VALIDATION_ERROR', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'INVALID_ARGUMENT', category: 'USAGE', exitCode: 2 },
+  ],
+};
 
 /** Run options plus the parent-only `--files` shortcut. */
 type CheckCommandOptions = CheckRunOptions & { files?: string[] };
@@ -20,7 +44,7 @@ export function registerCheckCommand(program: Command): void {
     .action(async (opts: CheckCommandOptions, cmd) => {
       // --schema branch — emit machine-readable parameter schema (no SAP call).
       if (cmd.optsWithGlobals().schema) {
-        printSchema(commandSchemas['check']!, jsonFromCommand(cmd));
+        printSchema(SCHEMA, jsonFromCommand(cmd));
         return;
       }
       // Bare `abap check` (no subcommand, no --files) prints subcommand help.

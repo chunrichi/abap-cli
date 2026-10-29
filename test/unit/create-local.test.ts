@@ -119,7 +119,7 @@ describe('abap create local (US1, US2..003)', () => {
     const names = listTemplates('PROG').map((t) => t.name);
     expect(names).toContain('report-alv');
     expect(names).toContain('report-alv-selection');
-    // The registry drives the create-schema contract, so both names must be there too.
+    // The registry drives the `create --schema` contract, so both names must be there too.
     expect(listTemplates('prog').map((t) => t.name)).toEqual(names);
   });
 

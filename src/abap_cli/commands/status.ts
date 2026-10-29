@@ -1,8 +1,28 @@
 import { Command } from 'commander';
-import { printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
+import { printError, printResult, printSchema, jsonFromCommand, type CommandSchema } from '../output/json.js';
 import { SEARCH_RESULT_LIMIT } from '../core/limits.js';
-import { commandSchemas } from '../flows/setup/command-schemas.js';
 import { runStatus, type StatusRunOptions } from '../flows/search/status.js';
+import { baseSchema, schemaOption } from './schema-helpers.js';
+
+export const SCHEMA: CommandSchema = {
+  ...baseSchema('status', 'Show local vs SAP sync status as a standardised changedParts list.', 'abap status [options]', 'sap'),
+  arguments: [],
+  options: [
+    { name: '--remote-only', type: 'boolean', description: 'Only remote-only differences.' },
+    { name: '--local-only', type: 'boolean', description: 'Only local-only differences.' },
+    { name: '--limit', type: 'int', valuePlaceholder: '<n>', default: SEARCH_RESULT_LIMIT, description: 'Bounds the result; truncated: true when capped.' },
+    { name: '--since', type: 'string', valuePlaceholder: '<iso-date>', description: 'Only files modified at or after the date (YYYY-MM-DD[THH:mm:ss]).' },
+    { name: '--all', type: 'boolean', description: 'Include unchanged entries.' },
+    schemaOption(),
+  ],
+  examples: [
+    { description: 'Default sync status', command: 'abap status' },
+    { description: 'Only remote-only', command: 'abap status --remote-only --limit 50' },
+  ],
+  errors: [
+    { code: 'INVALID_ARGUMENT', category: 'USAGE', exitCode: 2 },
+  ],
+};
 
 export function registerStatusCommand(program: Command): void {
   program
@@ -17,7 +37,7 @@ export function registerStatusCommand(program: Command): void {
     .action(async (opts: StatusRunOptions, cmd) => {
       const mode = jsonFromCommand(cmd);
       if (cmd.optsWithGlobals().schema) {
-        printSchema(commandSchemas['status']!, mode);
+        printSchema(SCHEMA, mode);
         return;
       }
       try {
