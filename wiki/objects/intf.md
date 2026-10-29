@@ -1,0 +1,55 @@
+---
+type: object-type
+title: INTF — ABAP OO 接口
+description: INTF 对象的字段契约、本地文件形态、abap-file-format 合规性
+tags: [abap-cli, object-type, intf, abap-file-format, adt]
+created at: 2026-09-01 00:00:00
+changed at: 2026-09-02 22:06:00
+---
+
+# INTF — ABAP OO 接口
+
+## 路由
+
+**ADT**（同 CLAS）。
+
+## 本地文件形态
+
+```
+src/intf/zif_my_iface/
+└── zif_my_iface.intf.abap   # main part（接口通常只有一个 part）
+```
+
+大部分接口只有一个 main part；包含 nested interface 定义的接口会附带 `*.intf.testclasses.abap`。
+
+## `<name>.intf.json` 形状
+
+```json
+{
+  "formatVersion": "1",
+  "header": {
+    "description": "My interface",
+    "originalLanguage": "en"
+  }
+}
+```
+
+## 命令示例
+
+```bash
+abap create INTF ZIF_MY_IFACE --package $TMP --description "iface" --tr $TMP --json
+abap pull ZIF_MY_IFACE --json
+abap push src/intf/zif_my_iface/ --tr DEVK900001 --json
+```
+
+## abap-file-format 合规性
+
+✅ 完全合规（interace 类型最简单，仅 main part）。
+
+## 已知坑
+
+- **`abapLanguageVersion` 已双向落盘**（commit `fe5d014`）：pull 读 ADT `adtcore:abapLanguageVersion` 写入 `header`，push 时回传；BTP trial 上 `cloudDevelopment` 仍可能被强制为 `standard`（与 CLAS 同）
+
+# references
+
+- 类型索引：[`wiki/objects/index.md`](index.md)

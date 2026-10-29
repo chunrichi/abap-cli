@@ -1,0 +1,267 @@
+---
+type: command
+title: abap push
+description: 推送本地 ABAP 文件到 SAP — lock → set source → syntax check → activate → unlock，支持源码对象、FUGR、textpool 与 DDIC JSON，按对象解析 transport（textpool 写受系统限制）
+tags: [abap-cli, command, push, upload, abap-file-format, ddic, textpool, transport]
+created at: 2026-08-07 00:11:03
+changed at: 2026-09-18 22:05:00
+---
+
+# abap push
+
+把本地 ABAP 文件推送到 SAP 系统，核心流程是 **lock → set source → syntax check → activate → unlock**。支持：普通源码对象（CLAS/PROG/INTF）、FUGR 子对象、textpool `.properties`，以及 ICF 路由的 `.json`（DDIC / HTTP / TRAN）与通道路由的 TTYP / MSAG / DDLS。文件级编排在 `flows/edit/push.ts`（`runPush` / `pushOne`），单对象核心在 `flows/edit/push-object.ts`（`pushObject`）。
+
+> ⚠️ **textpool 写限制**：textpool `.properties` 的**读**（`abap pull --textpool`）在 ADT / ICF 两种路由都可用；**写**需要 ADT text-elements 写端点。在只提供非交互式 textpool API 的 release 上（vhcala4hci / A4H 实测），profile 缓存 `adtTextpool.write: false` → 写路由到 ICF `/textpool/*`，而自带 ICF handler 对 POST **无条件**返回 `TEXTPOOL_WRITE_UNSUPPORTED`（SAP_ERROR / exit 6）。此时选择屏幕标签改用 `SELECTION-SCREEN COMMENT <pos>(<len>) lbl_xxx` + `INITIALIZATION` 赋值，不要依赖 `push` 文本元素。
+
+## Usage
+
+```bash
+abap push [options] [files...]
+```
+
+## Options
+
+- `[files...]`: 要推送的文件路径（一个或多个）
+- `--all`: 推送扫描根下所有 `.abap` 文件（遵循 `.abapignore`）——扫描根为 `.abap.json::sourceDir`（配置了时，相对配置文件所在目录解析），否则为当前工作目录；不遵循 `<name>.<type>.abap|xml` 布局的杂散文件会被跳过（显式 `[files...]` 路径永不跳过）
+- `--tr <transport>`: 传输请求号（按对象解析，见下文；多数场景不再必输）
+- `--check-only`: 只做语法检查不激活（与 `--no-activate` 互斥）
+- `--no-activate`: lock + write + 跳过 check + 跳过 activate + unlock
+- `--dry-run`: 只记录计划，零变更 ADT 调用
+- `--fail-fast`: 第一个失败文件即停（默认 keep-going）
+- `--schema`: 打印本命令参数 schema（unified envelope，无 SAP 调用；`data` 即 schema 对象）
+- `--atomic`: 先结构校验所有文件，任一失败则零写入（`VALIDATION_ERROR`）
+- `--yes`: 非交互确认写操作；非 TTY 且无 `--yes`/`--dry-run` → `VALIDATION_ERROR`（exit 7）
+
+无 `[files...]` 且无 `--all` 时抛 `USAGE`（exit 2）。`--check-only` 与 `--no-activate` 同时给时抛 `USAGE`（exit 2）。
+
+## 依赖顺序（`--all` 与多文件）
+
+`push --all` 与显式给出多个 `[files...]` 时，按对象类型依赖顺序推送，让 prerequisites 先激活：
+
+| 优先级 | 对象类型 | 说明 |
+|---|---|---|
+| 10 | `DOMA` | 域 |
+| 20 | `DTEL` | 数据元素 |
+| 30 | `TABL` / `STRU` | 表 / 结构（`.tabl.*` / `.stru.*` 三件套按整体 priority=30 排序） |
+| 40 | `ENQU` | 锁对象 |
+| 45 | `MSAG` / `NROB` | 消息类 / 编号范围对象 |
+| 50 | `INTF` | 接口 |
+| 60 | `CLAS` | 类 |
+| 70 | `FUGR` | 函数组（含 FM / include 子对象） |
+| 80 | `PROG` | 程序 |
+| 90 | `HTTP` | SICF 节点 |
+| 100 | （其它 / 解析失败） | 落到底，仍会推 |
+
+实现：[flows/edit/push-order.ts](../../src/abap_cli/flows/edit/push-order.ts) 提供 `orderTargetsByDependency(files: string[]): string[]`；`flows/edit/push.ts#runPush` 在 `resolveLocalTargets` 之后调用一次。同优先级保留输入顺序（稳定排序）。
+
+## Tabl/Stru artifact 去重（`--all`）
+
+`abap push --all` 扫描会把 `.tabl.json` / `.tabl.ddic` / `.tabl.settings.json`（`.stru.*` 同理）三件套全部枚举出来，但它们描述**同一个 SAP 对象**——push 三次会写同一张表。PR3 引入去重：
+
+- [flows/edit/push-dedup.ts](../../src/abap_cli/flows/edit/push-dedup.ts) 提供 `deduplicateTablArtifactTargets(files: string[]): string[]`，在 `runPush` 的 `resolveLocalTargets` 之后、依赖排序之前接入；
+- 复用 [formats/ddic/tabl-artifact.ts](../../src/abap_cli/formats/ddic/tabl-artifact.ts) 的 `isTablArtifactFile` / `tablArtifactPaths` 判定 artifact 组与解析 main 路径；
+- key 以 main 路径的 `toLowerCase()` 计算（同组 `.JSON` / `.json` 等视为一组），迭代顺序中首次出现的文件保留；非 artifact 文件直通；
+- dedup 后再走 PR1 的依赖排序，所以 priority=30 的 canonical `.tabl.json`（保留者）会和其他 TABL 一起前移，但同表其它件套已经 drop 掉，不会重复写。
+
+## 按对象 transport 解析（核心设计）
+
+`runPush` **不再**在顶层统一解析一个 transport；改为 `pushOne` 拿到对象后逐对象解析（`resolveObjectTransport`）：
+
+1. **对象已绑定请求**（`client.transportInfo(objectUrl)` → `TRANSPORTS[0].TRKORR`）— 直接复用该请求，**无需 `--tr`**；若显式传了不同的 `--tr` → 抛 `VALIDATION_ERROR`（exit 7），提示去掉 `--tr` 或先用 `abap transport assign` 换请求。push 不允许顺手改对象的请求归属。
+2. **`$TMP` 对象**（search 命中 `adtcore:packageName === '$TMP'`，经 `ResolvedObject.packageName` 携带）— transport-free，空 transport 推送，无需 `--tr`（与 `abap deploy` 的 `$TMP` 规则一致）。显式传了非空 `--tr` → **告警 + 忽略**（`meta.warnings` 的 `PUSH_TR_IGNORED_TMP`，exit 不变），不会真的绑定到任何请求。
+3. 其余未绑定非 `$TMP` 对象：`--tr` > 项目 config `transport` > 用户第一个可修改请求（`userTransports`）> `NO_TRANSPORT`（exit 7）。
+
+`--dry-run` 不查真实请求，用 `--tr` > config > `'DRY_RUN'` 占位。每文件 JSON 结果带该文件实际解析到的 `transport`。
+
+## push 只更新已存在对象（035 设计收敛）
+
+push 是「把本地文件写进 SAP 的**已存在**对象」，不是创建入口。创建走 `abap create`（`--package` + `--tr`），改归属走 `abap transport assign`（独立 link），push 不承担这两者：
+
+- **ADT 源对象**（CLAS/INTF/PROG/FUGR）：对象不存在 → `OBJECT_NOT_FOUND`，`nextSteps` 引导 `abap create`（不自动创建）。
+- **DDIC**（DOMA/DTEL/TABL/STRU）与 **TRAN**：push 前先 ICF GET 探测存在性（`GET /ddic/<type>/<name>` / `GET /tran/<code>`，与 pull 同一端点）。对象不存在 → `OBJECT_NOT_FOUND`（`nextSteps` 引导 `abap create <TYPE> <name> --file ...`），**不再**让 ICF POST 隐式 upsert 创建。
+- **HTTP**（SICF 节点）：**明确例外，保留 push 即创建**。`abap create HTTP` 现在也要求 `--file`（032 US10 的"无 `--file` 落本地骨架"路径已按重构决策 1A 删除），所以 SICF 节点的两条建法都保留：`abap create HTTP <name> --file <path>` 走真实 create，或直接 `abap push <file>.http.json` 由 ICF POST 创建；因此 HTTP 不做存在性探测。
+
+DDIC/TRAN 的探测在 `--dry-run` 之后（plan-only 不做多余 round-trip）；探测的 not-found 之外的错误（网络/权限）按原错误码传播。
+
+## 对象路由（`pushOne`）
+
+按 `resolveFile` 的 `route` 分派：
+
+| 路由 | 入口 | 行为 |
+|------|------|------|
+| 普通源码（adt） | `pushObject` | 锁对象 → 写每个 part 源码 → check/activate → 解锁（`finally` 保证） |
+| FUGR | `push-fugr.ts` | 子对象（FM/include）是独立 ADT 锁对象，逐文件锁自己的目标、写源，最后激活整个 function group |
+| Textpool | `push-textpool.ts` | 混合模式：profile 缓存能力决定走 ADT `setTextElements`（lock→write→unlock）还是 ICF `/textpool/*`；`--check-only` 不支持（`VALIDATION_ERROR`）。**ICF 写为 stub**——`adtTextpool.write: false` 的系统上 POST 无条件报 `TEXTPOOL_WRITE_UNSUPPORTED`（见上方限制说明） |
+| ICF JSON（`route: 'icf'`） | `ICF_PUSH_HANDLERS` 表 | DDIC（`.doma/.dtel/.tabl/.stru.json`）、HTTP（`.http.json`）、TRAN（`.tran.json`）。`pushOne` 查表 `icfPushHandlerFor(objectType)` 取到具体 handler，不再有 per-type `if` 分支 |
+| TTYP / MSAG / DDLS（`route: 'adt'`） | `CHANNEL_ROUTED_PUSH` 表 → `push-{ttyp,msag,ddls}.ts` | 注册表里这三类 `source: 'ADT'`，`resolveFile` 给的是 `route: 'adt'`，但文件是 AFF `.json` 而非 ABAP 源码，所以 `pushOne` 必须在通用源码分支**之前**拦截；每个 flow 自己跑 `channel-detect` |
+
+**JSON 文件的两类拦截**（都在 `route` 判定之后、`readAbapFile` 之前）：
+
+- **ICF JSON**（`.doma/.dtel/.tabl/.stru/.http/.tran.json`）：`resolveFile` 直接给 `route: 'icf'`。
+- **通道路由 JSON**（`.ttyp/.msag/.ddls.json`）：`route` 是 `'adt'`，靠 `CHANNEL_ROUTED_PUSH[objectType]` 命中。
+
+两类共用同一套闸门语义：`--check-only` 抛 `VALIDATION_ERROR`（`--check-only is not supported for ICF-routed JSON files`）；`--dry-run` 返回 `status: dry-run` / `stage: ddic-icf` 且**零 SAP 调用**（通道路由类同样不会去连 ADT/ICF，也不会记录 `channel-*`）。
+
+DDIC 的存在性探测（`GET /ddic/<type>/<name>`）与 TRAN 的探测（`GET /tran/<code>`）在各自 ICF handler 内；HTTP 不探测（push 即创建）。`--atomic` 阶段对 ICF JSON 走各自 format 模块的结构校验，对通道路由三类走 `validate{Ttyp,Msag,Ddls}Object`（AFF schema）——都不是只读文本。
+
+### TTYP / MSAG / DDLS（双通道）
+
+这三类先经 `flows/edit/channel-detect.ts` 判定通道，再走各自的 `push-{ttyp,msag,ddls}.ts`：
+
+| 类型 | 主通道（kernel ≥ 753） | 兜底（kernel < 753） | stage |
+|---|---|---|---|
+| TTYP | ADT PUT `/sap/bc/adt/ddic/tabletypes/<name>`（lock → PUT → unlock） | ICF PUT `/ddic/ttyp/<name>` | `channel-adt` / `channel-icf` |
+| MSAG | ADT PUT `/sap/bc/adt/messageclass/<name>`（lock → PUT → unlock） | ICF PUT `/ddic/msag/<name>` | `channel-adt` / `channel-icf` |
+| DDLS | ADT PUT `/sap/bc/adt/ddic/ddl/sources/<name>` | **无兜底** → 硬错 | `channel-adt` |
+
+沿用 035 语义：对象不存在时报 `OBJECT_NOT_FOUND` 并提示改用 `abap create`，push **绝不隐式创建**。
+
+错误码映射：
+
+| 错误码 | exit | 触发条件 |
+|---|---|---|
+| `DDLS_NOT_SUPPORTED_ON_ECC` | 64 | DDLS + 旧内核；不发起任何 SAP 调用 |
+| `CHANNEL_DETECTION_FAILED` | 65 | system profile 缺 `kernelRelease` 且缺 `ddlsSupported` |
+| `OBJECT_NOT_FOUND` | 8 | 对象不存在（引导 `abap create`） |
+| `LOCK_FAILED` | 9 | ICF 兜底写路径拿不到 enqueue 锁（ICF handler 的错误码原样透传） |
+| `VALIDATION_ERROR` | 7 | DDLS 缺 `.ddls.acds`，或 `sourceType` 与 `.acds` 顶部 `define` 不一致 |
+| `AFF_FIXTURE_INVALID` | 7 | push 前 AFF schema 校验失败 |
+
+### 支持的文件类型
+
+按 [file-resolver.ts](../../src/abap_cli/formats/file-resolver.ts) 的文件名解析规则，push 可处理的文件：
+
+| 文件 | 路由 | 说明 |
+|------|------|------|
+| `zcl_foo.clas.abap` / `.clas.definitions.abap` / `.clas.implementations.abap` / `.clas.macros.abap` / `.clas.testclasses.abap` | adt | 类及各类 include part，按 subtype 精确匹配对象的 include |
+| `zif_foo.intf.abap` / `.intf.definitions.abap` / `.intf.implementations.abap` | adt | 接口及各 part |
+| `zprog.prog.abap` | adt | 程序 main |
+| `zfg.fugr.abap` / `.fugr.sapl<name>.reps.abap` / `.fugr.l<name>top.reps.abap` / `.fugr.<fm>.func.abap` | adt | 函数组（含 include 与 FM 子对象，各自独立加锁） |
+| `zmy_table.tabl.json` / `.doma.json` / `.dtel.json` / `.stru.json` | icf | 四种 DDIC 对象（`ICF_PUSH_HANDLERS` 表，POST `/ddic/<type>`，push 前 GET 探测存在性） |
+| `zmy_service.http.json` | icf | HTTP 服务（SICF 节点），POST `/http/<name>`；**不探测存在性**（push 即创建/更新） |
+| `zmy_tran.tran.json` | icf | 事务码（SE93），POST `/tran/<code>`；push 前 GET 探测存在性 |
+| `zmy_ttyp.ttyp.json` / `zmy_msag.msag.json` / `zmy_view.ddls.json` | 通道路由（adt 分支） | 036 三类型，`channel-detect` 决定 ADT / ICF |
+| `zprog.prog.texts.en.properties`（`texts`/`selections`/`headings`） | textpool | 文本元素，混合模式路由；写仅在 ADT text-elements 写端点可用时成功 |
+
+**不支持的**：`.clas.json` 等源码对象的元数据 JSON — 被解析为 route `icf` 但对象类型既不在四种 DDIC 之内、也不是 036 的三类型，`validateLocalFile` 抛 `DDIC_NOT_SUPPORTED`（exit 7）。源码对象的创建/更新走 `abap create`，不是 push。
+
+**目录约定（与 pull / create local 对齐）**：push 路径上的目录层级（`src/<typeFolder>/<objectName>/...`）仅作约定，不影响路由与解析——`file-resolver.ts#resolveFile` 只看 `path.basename`。pull / create local 默认把产物放到对应类型的顶层子目录下（`src/clas/`、`src/prog/`、`src/intf/`、`src/fugr/`、`src/tabl/`、`src/doma/`、`src/stru/`、`src/dtel/`），push 沿用同一目录读 basename 即可；推老路径（裸 `src/<name>.<type>.abap`）也仍然能正常解析并推送。
+
+**part 精确匹配**：`.clas.macros.abap` 只有在对象确实有 `macros` include 时才推送；对象没有该 include 时**报错**（`SAP_ERROR`，exit 6，`nextSteps` 指引 `abap inspect <obj> --includes`），不会静默回退把 macros 内容写进 main。只有 `main` 文件映射到对象的 main part。
+
+## 失败处理
+
+| 场景 | 错误码 | 类别 / exit | 附带信息 |
+|------|--------|-------------|----------|
+| 对象被他人锁定 | `LOCK_FAILED` | LOCKED / 9 | `nextSteps`：`abap inspect <obj> --locks` 查锁 + SE03 手动释放；FUGR 额外带 `subtype` |
+| 对象不存在（ADT 源对象 / DDIC / TRAN） | `OBJECT_NOT_FOUND` | NOT_FOUND / 8 | `nextSteps`：`abap search <name>` 验证；**引导 `abap create <TYPE> <name> --file <path> --package ... --tr ...`**。push 不自动创建（创建走 `abap create`；HTTP 例外——push 会创建 SICF 节点） |
+| 命名的 include part 不存在（如 `.macros.abap` 而对象无 macros） | `SAP_ERROR` | SAP_ERROR / 6 | `subtype` + `nextSteps`：`abap inspect <obj> --includes` 列出可用 include |
+| 激活失败 | `ACTIVATION_FAILED` | VALIDATION_ERROR / 7 | `stage: 'activate'` + 原始 `detail` |
+| 写源码失败 | `SAP_ERROR` | SAP_ERROR / 6 | `stage: 'write'` + `subtype` |
+| 语法检查失败（`--check-only`） | `SYNTAX_ERROR` | VALIDATION_ERROR / 7 | `errors` 数组（`{line, offset, severity, text, uri}`，仅 `E`） |
+| 无可用 transport | `NO_TRANSPORT` | VALIDATION_ERROR / 7 | 提示 `--tr` 或 `abap transport create` |
+
+**收尾保证**：lock 在任何路径（成功 / check-only / write-only / 激活失败）都会在 `finally` 释放；释放失败不报错，降级为 `UNLOCK_WARNING`（`meta.warnings`，exit 不变）。
+
+**按文件隔离**：每个文件独立 try/catch，失败进 `results`（`status: 'failed'` + `code`/`stage`/`message`/`nextSteps`），不中断其他文件（默认 keep-going）；`--fail-fast` 可选提前停。聚合错误以首个失败文件的错误码作为聚合 `code`；**单文件失败时透出原始 `message` 与 `nextSteps`**（不再笼统 "N file(s) failed"），多文件时给通用指引。
+
+**写保护**：与 `create` / `transport create|assign` / `deploy` 共用 `core/confirmation.ts#requireWriteConfirmation`，非 TTY 必须 `--yes` 或 `--dry-run`，否则 `VALIDATION_ERROR`（exit 7）并附 `nextSteps` + `example`（如 `abap push <files...> --tr <transport> --yes`）。
+
+## Examples
+
+```bash
+# 推送单个文件（对象已绑定请求或 $TMP 时无需 --tr）
+abap push src/clas/zcl_my_class/zcl_my_class.clas.abap --yes
+
+# 显式指定 transport
+abap push src/prog/zprog/zprog.prog.abap --tr NDK123456 --yes
+
+# 只做语法检查
+abap push src/clas/zcl_foo/zcl_foo.clas.abap --tr NDK123456 --check-only
+
+# 只写不激活
+abap push src/clas/zcl_foo/zcl_foo.clas.abap --tr NDK123456 --no-activate
+
+# 推送整个目录（遵循 .abapignore）
+abap push --all --tr NDK123456
+
+# 计划模式（零变更）
+abap push src/clas/zcl_foo/zcl_foo.clas.abap --tr NDK123456 --dry-run
+
+# 原子推送：任一文件校验失败则零写入
+abap push src/clas/a.clas.abap src/clas/b.clas.abap --tr NDK123456 --atomic
+
+# 推送 DDIC 对象（$TMP 无需 --tr）
+abap push src/tabl/ztest_e2e.tabl.json
+
+# 推送 TABL 三件套：main 即可；同目录 .tabl.ddic / .tabl.settings.json 自动一起推
+abap push src/tabl/zthree.tabl.json --tr NDK900001 --yes
+# 等价于：abap push src/tabl/zthree.tabl.json src/tabl/zthree.tabl.ddic src/tabl/zthree.tabl.settings.json --tr NDK900001 --yes
+
+# 推送 textpool（仅 ADT text-elements 写可用时；A4H 上报 TEXTPOOL_WRITE_UNSUPPORTED）
+abap push src/prog/zprog/zprog.prog.texts.en.properties
+```
+
+## Expected Output
+
+```json
+{
+  "status": "success",
+  "meta": {
+    "command": "abap push",
+    "version": "0.2.0",
+    "timestamp": "2026-08-07T00:11:03.000Z",
+    "durationMs": 111,
+    "warnings": []
+  },
+  "data": {
+    "results": [
+      {
+        "file": "src/prog/zprog/zprog.prog.abap",
+        "status": "activated",
+        "transport": "NDK123456",
+        "stage": "unlock"
+      }
+    ],
+    "failed": 0
+  }
+}
+```
+
+每文件 `status`：`activated`（默认全流程）/ `checked-only`（`--check-only`，仅源码对象）/ `written`（`--no-activate` 或 ICF/通道 JSON）/ `dry-run`（`--dry-run`，含 `plan` 数组）/ `failed`。`stage` 取值：`lock`/`write`/`check`/`activate`/`unlock`/`read`/`textpool-adt`/`textpool-icf`/`ddic-icf`（ICF/通道 JSON 的进入 stage）/`channel-adt`/`channel-icf`（TTYP/MSAG/DDLS 实际落到的通道）。
+
+失败时错误 envelope（单文件透出原始 message）：
+
+```json
+{
+  "status": "error",
+  "meta": { "command": "abap push", "version": "0.2.0" },
+  "error": {
+    "code": "LOCK_FAILED",
+    "category": "LOCKED",
+    "message": "Cannot lock ZCL_TR: Object ZCL_TR is locked by user OTHER",
+    "details": { "results": [{ "file": "src/clas/zcl_tr.clas.abap", "status": "failed", "code": "LOCK_FAILED", "nextSteps": ["Check who holds the lock: abap inspect ZCL_TR --locks", "Wait for the lock to be released, or release it manually in SE03."] }] }
+  }
+}
+```
+
+# More
+
+## fixme
+
+- [ ] **B** — `src/abap_cli/commands/push.ts` 的 `--tr` help 文案仍写 "required in non-TTY mode"，与新的按对象解析行为不符（已绑定请求或 `$TMP` 对象不再必输）。应改为描述解析规则。
+- [ ] **C** — textpool 的 ADT 路由在 lock 失败时走通用 HTTP 分类（`SAP_ERROR`），不是精确的 `LOCK_FAILED`（无 `inspect --locks` 指引）。与源码对象/FUGR 的锁错误体验不一致。
+- [ ] **D** — ICF `/textpool/*` 的 POST 是无条件 stub（`TEXTPOOL_WRITE_UNSUPPORTED`，非声明错误码）：应在 `pull --textpool --json` 暴露 `data.writable`（来自 profile 的 `adtTextpool.write`），让 agent 在编辑前就知道文本元素写不可用。
+
+## todo
+
+- [x] **DDIC/TRAN push 前校验对象是否已存在** — 已实现（035）：DDIC / TRAN 的 ICF handler 在 POST 前 GET 探测，不存在 → `OBJECT_NOT_FOUND` 引导 `abap create`，不再让 ICF upsert 隐式创建；HTTP 例外保留 push 即创建（手写/拉取的 `.http.json` 直接推即可建 SICF 节点；`abap create HTTP` 也要求 `--file`，两侧都是显式创建）。
+- [ ] **多文件失败聚合的 `nextSteps`** — 多文件失败目前给通用指引（看 `code`/`stage`、keep-going/--fail-fast）；可考虑按失败类别（LOCK_FAILED / ACTIVATION_FAILED / NO_TRANSPORT）分组聚合更具体的下一步。
+- [ ] **不可编辑态分类** — 非 `$TMP` 对象因 tr 已 release（游离）而不可编辑时，lock/写失败的错误签名尚未与「他人持锁」区分（FR-2，需真实 SAP 验证）；目标：游离 → 引导 `abap transport assign <obj> --tr <new>`。
+
+# references
+
+- 实现：`src/abap_cli/commands/push.ts`、`src/abap_cli/flows/edit/push.ts`（`runPush`/`pushOne`/`resolveObjectTransport`/`ICF_PUSH_HANDLERS`/`pushDdicFile`/`pushHttpFile`/`pushTranFile`）、`push-object.ts`、`push-fugr.ts`、`push-textpool.ts`、`push-{ttyp,msag,ddls}.ts`、`src/abap_cli/core/confirmation.ts`
+- transport 解析：`src/abap_cli/core/transport.ts`（`resolveTransport`）、`src/abap_cli/core/resolve.ts`（`ResolvedObject.packageName`）
+- SAP 后端：`abap/src/clas/zcl_abap_vibe_icf.clas.abap`（`dispatch_ddic` / `dispatch_textpool`）
+- 文档：`docs/commands.md`（`abap push` 一节）、`docs/configuration.md`（Transport Resolution Order）

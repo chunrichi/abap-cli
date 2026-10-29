@@ -1,0 +1,46 @@
+---
+type: reference
+title: 对象类型详细文档索引
+description: 每个 SAP 对象类型的字段契约、命令路径、本地文件形态与示例
+tags: [abap-cli, object-types, reference, clas, intf, prog, fugr, tabl, stru, doma, dtel, enqu, nrob, http, tran, ttyp, msag, ddls]
+created at: 2026-09-01 00:00:00
+changed at: 2026-09-16 00:00:00
+---
+
+# 对象类型详细文档
+
+每个对象类型一篇：字段契约 / 命令路径 / 本地文件形态 / abap-file-format 合规性 / 已知坑。
+
+| 类型 | 路由 | 本地文件形态 | 文档 |
+|---|---|---|---|
+| `CLAS` | ADT | `clas/<name>/<name>.clas.json` + 各 include | [clas.md](clas.md) |
+| `INTF` | ADT | `intf/<name>/<name>.intf.json` + `*.intf.abap` | [intf.md](intf.md) |
+| `PROG` | ADT | `prog/<name>/<name>.prog.json` + `*.prog.abap` | [prog.md](prog.md) |
+| `FUGR` | ADT | `fugr/<group>/<group>.fugr.json` + `sapl<group>.reps.*` + `l<group>top.reps.*` + 每 FM `.func.*` | [fugr.md](fugr.md) |
+| `TABL` | ICF | `tabl/<name>/<name>.tabl.{json,ddic,settings.json}` 三件套 | [tabl.md](tabl.md) |
+| `STRU` | ICF | `stru/<name>/<name>.stru.{json,ddic,settings.json}` 三件套 | [stru.md](stru.md) |
+| `DOMA` | ICF | `doma/<name>/<name>.doma.json`（嵌套） | [doma.md](doma.md) |
+| `DTEL` | ICF | `dtel/<name>/<name>.dtel.json`（嵌套） | [dtel.md](dtel.md) |
+| `ENQU` | ICF | `enqu/<name>/<name>.enqu.json`（锁对象） | [enqu.md](enqu.md) |
+| `NROB` | ICF | `nrob/<name>/<name>.nrob.json`（编号范围对象） | [nrob.md](nrob.md) |
+| `HTTP` | ICF | `http/<name>/<name>.http.json`（SICF 节点） | [http.md](http.md) |
+| `TRAN` | ICF | `tran/<code>/<code>.tran.json`（SE93 事务码） | [tran.md](tran.md) |
+| `TTYP` | ADT + ICF 兜底 | `ttyp/<name>/<name>.ttyp.json` + 可选 `.type.abap` | [ttyp.md](ttyp.md) |
+| `MSAG` | ADT + ICF 兜底 | `msag/<name>/<name>.msag.json` | [msag.md](msag.md) |
+| `DDLS` | ADT（无兜底） | `ddls/<name>/<name>.ddls.{json,acds}` 两件套 | [ddls.md](ddls.md) |
+
+## 路由速查
+
+- **ADT**（源对象）：无需 ICF 部署；直接打 SAP ADT REST API；走 `abap-adt-api` 库
+- **ICF** 自建（DDIC/HTTP/TRAN）：需要先 `abap deploy`；走 `/sap/abap_cli/<domain>/<type>/<name>`
+- **ADT + ICF 兜底**（TTYP/MSAG）：优先 ADT；ECC EHP5/6 内核（< 753）自动切 ICF，envelope 写 `data.channel` + `data.fallbackReason`
+- **ADT 无兜底**（DDLS）：旧内核直接硬错 `DDLS_NOT_SUPPORTED_ON_ECC`（exit 64），不发起任何 SAP 调用
+
+## 详细决策
+
+类型子目录布局的「为什么」见 [design-decisions/003-typesubdir-layout.md](../design-decisions/003-typesubdir-layout.md)；DDIC 走 ICF 而非 ADT 的「为什么」见 [design-decisions/002-icf-bypass-ddic.md](../design-decisions/002-icf-bypass-ddic.md)。
+
+# references
+
+- 路由矩阵：[`wiki/object-types.md`](../object-types.md)
+- abap-file-format 规范来源（vendored schema）：[`src/abap_cli/schema/README.md`](../../src/abap_cli/schema/README.md)
