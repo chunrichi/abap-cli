@@ -13,7 +13,7 @@
  * on the wire and accepted on the wire-side read.
  */
 import { describe, it, expect } from 'vitest';
-import { localToWire, wireToLocal } from '../../src/abap_cli/formats/ddic/json.js';
+import { localToWire, wireToLocal } from '../../src/abap_cli/formats/ddic/wire.js';
 import { CliError } from '../../src/abap_cli/output/json.js';
 
 describe('033/dtel-dataTypeInformation', () => {
