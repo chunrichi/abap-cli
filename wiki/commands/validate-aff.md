@@ -1,10 +1,10 @@
 ---
 type: command
 title: abap validate:aff
-description: 用本地镜像的官方 abap-file-format JSON Schema 校验 10 个支持类型的 canonical JSON 形态；作为写盘的强制 gate（pretest + CI）
+description: 用本地镜像的官方 abap-file-format JSON Schema 校验 10 个支持类型的 canonical JSON 形态；作为 create / push --file 的写盘前 gate
 tags: [abap-cli, command, validate:aff, validate, abap-file-format, schema, validator, ajv, canonical, doma, dtel, tabl, stru, fugr, clas, intf, prog, http, tran]
 created at: 2026-09-03 00:00:00
-changed at: 2026-09-03 00:00:00
+changed at: 2026-10-30 01:14:53
 ---
 
 # abap validate:aff
@@ -19,7 +19,7 @@ abap validate:aff [file-or-dir] [--wire <wire-dir>] [--json] [--schema]
 
 ## Options
 
-- `[file-or-dir]`: 单个 JSON 文件或目录（递归扫 `.json`）。默认 `test/fixtures/`（用于 `pretest` gate）。
+- `[file-or-dir]`: 单个 JSON 文件或目录（递归扫 `.json`）。不传时收集到 0 个文件并以 `success` 退出，不会回退到 `test/fixtures/`。
 - `--wire <wire-dir>`: 额外递归扫一个 wire payload 目录（与 fixtures 路径并列校验）。
 - `--json`: 输出单条 JSON envelope（`{ status, summary: { pass, warn, fail }, files: [...] }`）；token-efficient 仅保留 Agent 必需字段。
 - `--schema`: 打印本命令参数 schema（unified envelope，无 SAP 调用）。
@@ -124,19 +124,80 @@ abap validate:aff --json test/fixtures/
 abap validate:aff --schema
 ```
 
-## 已知限制 /- 
+## Expected Output
+
+`--json` 输出不是统一 012 信封（没有 `meta` / `data`），而是单条报告对象；`status` 由退出码推导：
+
+```json
+{
+  "status": "success",
+  "summary": { "pass": 2, "warn": 0, "fail": 0 },
+  "files": [
+    { "status": "pass", "path": "/Users/lei/proj/test/fixtures/tabl/zmy_basic.tabl.json", "type": "TABL" },
+    { "status": "pass", "path": "/Users/lei/proj/test/fixtures/doma/zdmy_single_fixed.doma.json", "type": "DOMA" }
+  ]
+}
+```
+
+有 WARN（额外字段）时 `status` 仍为 `success`、退出码 0：
+
+```json
+{
+  "status": "success",
+  "summary": { "pass": 1, "warn": 1, "fail": 0 },
+  "files": [
+    { "status": "pass", "path": "/Users/lei/proj/test/fixtures/clas/z_aff_example_clas.clas.json", "type": "CLAS" },
+    { "status": "warn", "path": "/Users/lei/proj/test/fixtures/tabl/zmy_basic.tabl.settings.json", "type": "TABL", "extraFields": ["customKey"] }
+  ]
+}
+```
+
+有 FAIL（或 companion 缺失）时 `status: "error"`、退出码 1：
+
+```json
+{
+  "status": "error",
+  "summary": { "pass": 0, "warn": 0, "fail": 1 },
+  "files": [
+    {
+      "status": "fail",
+      "path": "/Users/lei/proj/test/fixtures/doma/zbroken.doma.json",
+      "type": "DOMA",
+      "errors": [
+        { "path": "/typeInformation/dataType", "keyword": "enum", "message": "must be equal to one of the allowed values" }
+      ]
+    }
+  ]
+}
+```
+
+## 已知限制
 
 - **PROG / HTTP fixture 是 handcrafted**：上游 AFF `prog/examples/` 与 `http/examples/` 缺失；fixture 为手写 minimal-but-valid 样本，`validate:aff` 校验通过。CI 注释提示「upstream example now available, consider replacing」。
 - **STRU `settings.json` optional**：schema 不强制；validator 只发 WARN（`optionalCompanions: [...]`）。SAP 透明表持久化 `.tabl.settings.json`，结构体则不。
 - **`additionalProperties: true` schema**：TABL `.tabl.settings.json` / CLAS 文本元素等多 key schema 对额外字段发 WARN 不阻断。
 - **wire ↔ local 双层**：本命令只校验 local canonical JSON（落盘形态）；ICF wire payload 由 mock + 真实 SAP 端到端 round-trip 单测覆盖（`test/unit/wire-aff-roundtrip.test.ts`）。
 
-## 相关文件
+# More
 
-- 校验层：`src/abap_cli/aff/schema-validator.ts`（ajv v8 + 缓存）
-- 路由：`src/abap_cli/aff/router.ts` + `schema-paths.ts`（type → schema 映射）
-- Companion 探测：`src/abap_cli/aff/companion-check.ts`
-- 命令实现：`src/abap_cli/commands/validate-aff.ts`
-- 命令 schema：`src/abap_cli/flows/setup/command-schemas.ts#validateAffSchema`
-- 套件：`test/unit/schema-compliance/<type>.test.ts`（10 个 type × ≥1 fixture）
-- 端到端 wire round-trip：`test/unit/wire-aff-roundtrip.test.ts`
+## fixme
+
+- [ ] 无位置参数时收集到 0 个文件并以 `status: "success"` 退出，不会回退到 `test/fixtures/`；Agent 误用会得到假绿
+- [ ] `--json` 不是统一信封：没有 `meta` / `data`，`status` 由退出码推导，与其他命令的 `--json` 形状不一致
+- [ ] WARN 只列出 `extraFields` 的键名，不解释这些字段为何出现（`additionalProperties: true` 的开放 schema 与真正未知键混在一起）
+
+## todo
+
+- [ ] 上游 AFF 发布 `prog/examples/` 与 `http/examples/` 后，替换 handcrafted fixture
+- [ ] 校验 `.tabl.ddic` / `.stru.ddic` DDL 源本身（当前只做 companion 存在性检查，DDL 走 `TABL_DDL_INVALID` 解析路径）
+- [ ] 真机证据待补：`--wire` 目录校验在真实 ICF payload 上的回归记录
+
+# references
+
+- 校验层: [src/abap_cli/aff/schema-validator.ts](../../src/abap_cli/aff/schema-validator.ts)（ajv v8 + 缓存）
+- 路由: [src/abap_cli/aff/router.ts](../../src/abap_cli/aff/router.ts) · [src/abap_cli/aff/schema-paths.ts](../../src/abap_cli/aff/schema-paths.ts)（type → schema 映射）
+- Companion 探测: [src/abap_cli/aff/companion-check.ts](../../src/abap_cli/aff/companion-check.ts)
+- 命令实现与 schema: [src/abap_cli/commands/validate-aff.ts](../../src/abap_cli/commands/validate-aff.ts)（命令模块自持 `--schema`）
+- 文档: [docs/commands.md](../../docs/commands.md)
+- 套件: `test/unit/schema-compliance/<type>.test.ts`（10 个 type × ≥1 fixture）
+- 端到端 wire round-trip: `test/unit/wire-aff-roundtrip.test.ts`、`test/unit/validate-aff-command.test.ts`

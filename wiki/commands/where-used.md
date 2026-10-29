@@ -4,7 +4,7 @@ title: abap where-used
 description: 只读查询对象的直接引用（where-used list）— 走 ADT usageReferences；agent 改动前的影响面评估
 tags: [abap-cli, command, where-used, references, impact-analysis, adt, read-only, agent-loop]
 created at: 2026-08-19 23:00:00
-changed at: 2026-08-19 23:00:00
+changed at: 2026-10-30 01:14:53
 ---
 
 # abap where-used
@@ -142,3 +142,24 @@ abap check syntax --files ...                     # 4. 改完校验
 
 - **CLI 版本**: 0.2.0（含 `where-used` 命令）。
 - **依赖**: ADT 标准端点 `usageReferences`（`abap-adt-api`），**无需部署 ICF 扩展**。
+
+# More
+
+## fixme
+
+- [ ] `--ref-type` / `--package` 是 ADT 全量返回后的 CLI 侧过滤（`--limit` 也作用在过滤之后）；引用很多时仍先全量传输再裁剪
+- [ ] 支持类型只有 CLAS / INTF / PROG / FUGR / TABL；DTEL / DOMA / CDS 等对象类型延后，传给 `--type` / `--ref-type` 会报 `TYPE_NOT_SUPPORTED`
+
+## todo
+
+- [ ] 接入 ADT `usageReferenceSnippets`，返回引用代码片段而不是仅位置的 URI
+- [ ] 递归 / 传递闭包（A 引用 B、B 引用 C）
+- [ ] 真机证据待补：`--ref-type` / `--package` 后置过滤在大结果集上的 on-prem 回归记录
+
+# references
+
+- 实现: [src/abap_cli/commands/where-used.ts](../../src/abap_cli/commands/where-used.ts) · [src/abap_cli/flows/search/where-used-ops.ts](../../src/abap_cli/flows/search/where-used-ops.ts)（`normalizeReferences` / `runWhereUsed`）
+- 客户端: `src/abap_cli/clients/adt-client.ts`（`usageReferences`）、`src/abap_cli/core/resolve.ts`
+- 文档: [docs/commands.md](../../docs/commands.md)
+- 相关命令页: [abap tcode](tcode.md)、[abap inspect](inspect.md)、[abap search](search.md)、[abap pull](pull.md)
+- 测试: `test/unit/where-used-ops.test.ts`

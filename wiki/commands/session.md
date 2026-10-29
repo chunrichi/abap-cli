@@ -4,7 +4,7 @@ title: abap session
 description: 查看 / 管理 SAP session cookie 复用状态 —— 会话 jar 路径、上次登录时间、cookie 数、CSRF 是否存在（只读，不发起 SAP 调用）
 tags: [abap-cli, command, session, cookie, csrf, reuse, keychain, sap-sessionid, logout]
 created at: 2026-09-03 00:00:00
-changed at: 2026-09-03 00:00:00
+changed at: 2026-10-30 01:14:53
 ---
 
 # abap session
@@ -90,7 +90,17 @@ cloud / btp profile **不支持** cookie 复用：不读、不写、不删 jar�
 
 # More
 
-## references
+## fixme
 
-- [`wiki/commands/doctor.md`](doctor.md) —— doctor 的 `SESSION_REUSE_UNSUPPORTED` warning
-- `.abap.json#sap.sessionPolicy` 配置说明见 [`docs/configuration.md`](../../docs/configuration.md)
+- [ ] keychain 不可用时退化为 PBKDF2 派生密钥，只在 stderr 打 WARN，不进入 `meta.warnings`；Agent 从 `--json` 无法感知降级
+
+## todo
+
+- [ ] 增加 orphan jar 清理能力：URL / username / client 任一变更新 jar，旧 jar 不主动回收
+- [ ] `always-logout` 只覆盖正常退出路径（SIGKILL 除外），异常终止后的残留会话清理策略待定
+
+# references
+
+- 实现: [src/abap_cli/commands/session.ts](../../src/abap_cli/commands/session.ts) · [src/abap_cli/session/jar.ts](../../src/abap_cli/session/jar.ts) · [src/abap_cli/session/reuse.ts](../../src/abap_cli/session/reuse.ts) · [src/abap_cli/session/policy.ts](../../src/abap_cli/session/policy.ts) · [src/abap_cli/session/key.ts](../../src/abap_cli/session/key.ts)
+- 配置说明: [docs/configuration.md](../../docs/configuration.md)
+- 相关命令页: [abap doctor](doctor.md)（`SESSION_REUSE_UNSUPPORTED` warning）

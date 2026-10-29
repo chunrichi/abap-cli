@@ -4,7 +4,7 @@ title: abap inspect
 description: 只读探测 SAP 对象元数据 — structure / includes / locks / activation / package，不获取锁、不修改 SAP
 tags: [abap-cli, command, inspect, metadata, read-only, agent-loop]
 created at: 2026-08-09 22:40:00
-changed at: 2026-09-03 17:00:00
+changed at: 2026-10-30 01:14:53
 ---
 
 # abap inspect
@@ -154,8 +154,24 @@ abap inspect ZCL_FOO --includes --locks --package --json
 - **`abap search`**：对象不存在时先 search 校对
 - **`abap pull`**：拉对象的本地副本（需要 lock；inspect 是只读）
 
-## references
+# More
 
-- 用户文档：[docs/commands.md#abap-inspect](../../docs/commands.md#abap-inspect)
-- 设计决策：见 wiki 顶层 `icf-interface-implementation` 历史回顾（设计文档不入 git）
-- 修复脚本：直接走 `abap inspect <obj> --activation --json` + `abap activate <obj> --yes --json`（agent 可按 SKILL.md 错误恢复表按需现写）
+## fixme
+
+- [ ] OO 类 `source/main` 的 `active` 由 SAP 服务端重生成，字节级比较永远不一致；只能靠 `hasPendingInactiveVersion` + 非 main part 判定（`note` 已随 part 返回，agent 不应据 `main.active` 触发 `abap activate`）
+- [ ] `--locks` 读的是 `transportInfo`（transport 归属），不是 ADT 编辑会话锁；他人持锁时它给不出当前锁持有者
+
+## todo
+
+- [ ] `--structure` 目前直接透传 ADT `objectStructureElements`，方法 / 属性 / 事件的嵌套语义还没在页面展开
+- [ ] `--activation` 对没有 include parts 的对象（如 FUGR）不返回 `activation` 键；这类对象的收敛验证仍靠 `status` / `diff`，待统一
+- [ ] 真机证据待补：旧 release 上 `hasPendingInactiveVersion` 不可查询时的 fallback 行为
+
+# references
+
+- 实现: [src/abap_cli/commands/inspect.ts](../../src/abap_cli/commands/inspect.ts) · [src/abap_cli/flows/search/inspect-ops.ts](../../src/abap_cli/flows/search/inspect-ops.ts)（`inspectObject` / `checkActivation`）
+- 对象解析: `src/abap_cli/core/resolve.ts`（`resolveObject` / `getObjectParts`）、`src/abap_cli/clients/adt-client.ts`（`objectStructure` / `transportInfo`）
+- 文档: [docs/commands.md#abap-inspect](../../docs/commands.md#abap-inspect)
+- 相关命令页: [abap activate](activate.md)、[abap diff](diff.md)、[abap status](status.md)、[abap pull](pull.md)
+- 测试: `test/unit/inspect.test.ts`、`test/unit/inspect-activation.test.ts`
+- 修复脚本：直接走 `abap inspect <obj> --activation --json` + `abap activate <obj> --yes --json`（agent 按 SKILL.md 错误恢复表现写）

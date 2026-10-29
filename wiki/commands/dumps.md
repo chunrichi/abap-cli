@@ -4,7 +4,7 @@ title: abap dumps
 description: 通过只读 ADT Atom feed 列出近期 ST22 ABAP runtime dump 的紧凑摘要
 tags: [abap-cli, command, dumps, st22, adt, read-only]
 created at: 2026-08-31 22:00:00
-changed at: 2026-09-02 23:40:00
+changed at: 2026-10-30 01:14:53
 ---
 
 # abap dumps
@@ -101,6 +101,18 @@ abap dumps --schema
 - 走 `AdtClientWrapper.dumps(limit?, user?)` → `clients/dumps-feed.ts`：以**直接 OData URL 参数**发送 `$top` + `$filter`，让 SAP 端一次裁剪；`abap-adt-api` 的 `dumps(h, query)` 把查询包成 `$query=...`，真实 SAP 以 HTTP 400（"Data is invalid and could not be converted"）拒绝该形态，故不走 library 的请求封装
 - `clients/dumps-feed.ts` 用 library 的 `fullParse`/`xmlArray` 镜像其 Atom 解析，`DumpsFeed` / `Dump` 类型仍复用 `abap-adt-api`
 - 真实 feed：`dumps[].id` 为 feed entry id URI（URL 编码，原样透传）；`summary` 为 dump 正文（HTML，空白合并 + 500 字符截断）
+
+# More
+
+## fixme
+
+- [ ] `summary` 是 dump 正文 HTML 去空白后的 500 字符截断，可能截在标签 / 句子中间，不是语义摘要
+- [ ] `dumps[].id` 原样透传 feed entry id URI（含 URL 编码），不是稳定的业务 ID，Agent 不应把它当主键
+
+## todo
+
+- [ ] BTP / Steampunk 与旧 release 上 `/sap/bc/adt/runtime/dumps` 的可用性真机验证
+- [ ] `total` 与 `returned` 目前恒相等（都受 `--limit` 约束），不是服务端全量 dump 数；SAP 分页能力明确后再区分
 
 # references
 
