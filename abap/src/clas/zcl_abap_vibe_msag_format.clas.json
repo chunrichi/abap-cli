@@ -1,0 +1,7 @@
+{
+    "class": {
+        "type": "CLAS",
+        "description": "Canonical ABAP file format generator for message classes.",
+        "final": true
+    }
+}

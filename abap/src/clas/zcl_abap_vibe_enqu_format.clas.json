@@ -1,0 +1,7 @@
+{
+    "class": {
+        "type": "CLAS",
+        "description": "ABAP file format generator for lock objects (ENQU).",
+        "final": true
+    }
+}
