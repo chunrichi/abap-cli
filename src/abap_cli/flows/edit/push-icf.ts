@@ -13,15 +13,10 @@ import { IcfClient, type IcfResponse } from '../../clients/icf-client.js';
 import { CliError } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
 import { resolveTransport } from '../../core/transport.js';
-import {
-  readDdicObjectForCreate,
-  localToWire,
-  validateDdicObject,
-  validateTabtPayload,
-  type DdicObject,
-  type DdicSupportedType,
-  type DdicWirePayload,
-} from '../../formats/ddic/json.js';
+import { readDdicObjectForCreate } from '../../formats/ddic/io.js';
+import { localToWire } from '../../formats/ddic/wire.js';
+import { validateDdicObject, validateTabtPayload } from '../../formats/ddic/validate.js';
+import { type DdicObject, type DdicSupportedType, type DdicWirePayload } from '../../formats/ddic/types.js';
 import { readHttpJson, localToWire as httpLocalToWire, validateHttpObject } from '../../formats/http/json.js';
 import { readTranJson, localToWire as tranLocalToWire, validateTranObject } from '../../formats/transport/json.js';
 import { resolveFile } from '../../formats/file-resolver.js';

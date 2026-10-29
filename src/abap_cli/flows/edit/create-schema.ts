@@ -1,5 +1,6 @@
 import type { CommandSchema } from '../../output/json.js';
-import { getDdicJsonExample, type DdicSupportedType } from '../../formats/ddic/json.js';
+import { getDdicJsonExample } from '../../formats/ddic/examples.js';
+import { type DdicSupportedType } from '../../formats/ddic/types.js';
 import { listTemplates } from '../../formats/templates.js';
 import {
   isDdicSupportedType,
