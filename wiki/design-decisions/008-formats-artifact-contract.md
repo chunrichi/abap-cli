@@ -4,7 +4,7 @@ title: AFF 格式层的 Artifact 契约与 ddic 拆分
 description: formats/ 下 7 个同构 json.ts 提取共享 artifact 契约，880 行 ddic/json.ts 按 wire / io / validate / examples 拆分 — 决策、被否决方案与当前代价
 tags: [abap-cli, design-decisions, formats, abap-file-format]
 created at: 2026-10-30 00:10:00
-changed at: 2026-10-30 00:10:00
+changed at: 2026-10-30 01:15:00
 ---
 
 # 008 — AFF 格式层的 Artifact 契约与 ddic 拆分
@@ -36,18 +36,19 @@ changed at: 2026-10-30 00:10:00
 
 ## 当前代价
 
-- 五个 artifact 模块多了一次 `defineWireArtifact` 声明；wire 函数仍留在模块里（这是类型特有部分，未抽走）。
+- 七个 artifact 模块多了一次 `defineWireArtifact` 声明；wire 函数仍留在模块里（这是类型特有部分，未抽走）。HTTP / TRAN 通过 `beforeWrite` / `validate` 覆写保留各自「先校验后落盘」的语义（CLI envelope 先 strip）。
 - `ddic` 拆成 5 个文件后 import 面变大（15 处调用点改为按职责 import）；`tabl-artifact.ts` 与 `io.ts`/`wire.ts` 之间靠类型与 lazy import 保持无环。
-- DDIC / HTTP / TRAN 的格式模块仍是各自实现（DDIC 有 sidecar 读取、HTTP/TRAN 有 ICF 专用 envelope），未纳入本次契约。
+- DDIC 仍是各自实现（TABL/STRU 的 sidecar 读取 + 专用 wire），未纳入契约；HTTP / TRAN 已在后续改动中接入（`httpArtifact` / `tranArtifact`）。
 
 ## 后果
 
 - 新增 AFF 类型 = 声明 artifact + 写 wire 映射；schema 校验/错误码/file I/O 行为统一。
 - `formats/ddic/*` 按职责可独立演进（例如 TABT 校验或示例文本），不再需要动同一个 880 行文件。
-- 下一步可把 DDIC / HTTP / TRAN 的 I/O 与校验接到同一契约，之后 ABAP ICF 端点族（ddic/http/tran）与 CLI 格式模块一一对齐。
+- 下一步只剩 DDIC 的 I/O 与校验是否接入契约（可选）；之后 ABAP ICF 端点族（ddic/http/tran）与 CLI 格式模块一一对齐。
 
 # references
 
 - 契约：`src/abap_cli/formats/artifact.ts`
 - 拆分：`src/abap_cli/formats/ddic/{types,io,wire,validate,examples}.ts`
 - 测试：`test/unit/artifact-contract.test.ts`、各 `*-roundtrip.test.ts`
+- 已接入：`src/abap_cli/formats/http/json.ts`、`src/abap_cli/formats/transport/json.ts`（`httpArtifact` / `tranArtifact`）

@@ -1,8 +1,63 @@
 import { Command } from 'commander';
-import { CliError, printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
+import { CliError, printError, printResult, printSchema, jsonFromCommand, type CommandSchema } from '../output/json.js';
 import { runInitFromOpts, runInitWizard, runInitShowConfig, runInitUnset } from '../flows/setup/init.js';
 import { scaffoldAgents, type AgentTarget } from '../flows/setup/init-agents.js';
-import { commandSchemas } from '../flows/setup/command-schemas.js';
+import { baseSchema, schemaOption } from './schema-helpers.js';
+
+export const SCHEMA: CommandSchema = {
+  ...baseSchema('init', 'Initialize the workspace (bind a profile, write .abap.json) and/or scaffold AI agent context.', 'abap init [options]', 'local'),
+  description: 'Initialize the workspace — bind a profile, write .abap.json, inspect, clear fields, or scaffold AI agent context.',
+  arguments: [],
+  options: [
+    { name: '--profile', type: 'string', valuePlaceholder: '<name>', description: 'Use an existing global profile (created with `abap profile add`).' },
+    { name: '--url', type: 'string', valuePlaceholder: '<url>', description: 'SAP system URL (TTY wizard only).' },
+    { name: '--client', type: 'string', valuePlaceholder: '<client>', description: 'SAP client number.' },
+    { name: '--username', type: 'string', valuePlaceholder: '<user>', description: 'SAP username.' },
+    { name: '--password', type: 'string', valuePlaceholder: '<password>', description: 'SAP password (stored in keychain).' },
+    { name: '--language', type: 'string', valuePlaceholder: '<language>', description: 'SAP language.' },
+    { name: '--insecure', type: 'boolean', description: 'Skip SSL certificate verification (development only).' },
+    { name: '--ca', type: 'string', valuePlaceholder: '<path>', description: 'PEM CA certificate to import into ~/.abap-cli/certificates/ and bind to this profile.' },
+    { name: '--auth-method', type: 'string', valuePlaceholder: '<method>', description: 'Login strategy: basic | cert | browser_sso | oauth_password.' },
+    { name: '--auth-option', type: 'string', valuePlaceholder: '<kv>', description: 'Generic auth option, repeatable as key=value. New auth methods add no Commander options — they read from this bag.' },
+    { name: '--cert-path', type: 'string', valuePlaceholder: '<path>', description: 'X.509 client cert file (PEM) — used with --auth-method=cert.' },
+    { name: '--cert-key', type: 'string', valuePlaceholder: '<path>', description: 'X.509 private key file (PEM) — used with --auth-method=cert.' },
+    { name: '--cert-ca', type: 'string', valuePlaceholder: '<path>', description: 'Optional X.509 client CA override — used with --auth-method=cert.' },
+    { name: '--cert-passphrase', type: 'string', valuePlaceholder: '<pwd>', description: 'Passphrase for .p12 / encrypted key — written to keychain.' },
+    { name: '--sso-cookie-file', type: 'string', valuePlaceholder: '<path>', description: 'SSO cookie jar path — used with --auth-method=browser_sso.' },
+    { name: '--service-key', type: 'string', valuePlaceholder: '<path>', description: 'BTP service key JSON — used with --auth-method=oauth_password.' },
+    { name: '--spn', type: 'string', valuePlaceholder: '<spn>', description: 'Kerberos service principal name — used with --auth-method=sso (defaults to HTTP/<host>).' },
+    { name: '--reauth-on-expiry', type: 'boolean', description: 'Force re-acquisition of the Kerberos ticket when the cached one expires — used with --auth-method=sso.' },
+    { name: '--tr', type: 'string', valuePlaceholder: '<transport>', description: 'Default transport number (written to .abap.json).' },
+    { name: '--package', type: 'string', valuePlaceholder: '<package>', description: 'Default SAP package (written to .abap.json).' },
+    { name: '--source-dir', type: 'string', valuePlaceholder: '<path>', description: 'Base directory for `push --all` / `check --all` (written to .abap.json).' },
+    { name: '--show-config', type: 'boolean', description: 'Print the current workspace config (.abap.json) as JSON and exit.' },
+    { name: '--unset-package', type: 'boolean', description: 'Remove the `package` key from .abap.json.' },
+    { name: '--unset-tr', type: 'boolean', description: 'Remove the `transport` key from .abap.json.' },
+    { name: '--unset-source-dir', type: 'boolean', description: 'Remove the `sourceDir` key from .abap.json.' },
+    { name: '--test-connection', type: 'boolean', description: 'Probe TLS + auth and report results (implies --test-tls --test-auth).' },
+    { name: '--test-tls', type: 'boolean', description: 'Probe the TLS handshake.' },
+    { name: '--test-auth', type: 'boolean', description: 'Probe authentication (after TLS).' },
+    { name: '--agent', type: 'string', valuePlaceholder: '<target>', description: 'Scaffold agent context files. One of: copilot | claude | cursor | generic.', allowedValues: ['generic', 'copilot', 'claude', 'cursor'] },
+    { name: '--force', type: 'boolean', description: 'Overwrite existing files when scaffolding --agent (default: skip).' },
+    { name: '--yes', type: 'boolean', description: 'Skip all prompts; fail if required input is missing.' },
+    { name: '--non-interactive', type: 'boolean', description: 'Alias of --yes.' },
+    schemaOption(),
+  ],
+  exclusiveGroups: [
+    ['--unset-package', '--unset-tr', '--unset-source-dir'],
+  ],
+  examples: [
+    { description: 'First-time bind', command: 'abap init --profile DEV --tr DEVK900001 --package Z_MY_PACKAGE --yes' },
+    { description: 'Inspect current config', command: 'abap init --show-config' },
+    { description: 'Scaffold agent context', command: 'abap init --agent copilot' },
+  ],
+  errors: [
+    { code: 'CONFIG_ERROR', category: 'CONFIG_ERROR', exitCode: 3 },
+    { code: 'FILE_EXISTS', category: 'USAGE', exitCode: 2 },
+    { code: 'USAGE', category: 'USAGE', exitCode: 2 },
+    { code: 'INVALID_ARGUMENT', category: 'USAGE', exitCode: 2 },
+  ],
+};
 
 /** `abap init` (parent) help: option groups, examples, profile references. */
 function initParamHelp(): string {
@@ -99,7 +154,7 @@ export function registerInitCommand(program: Command): void {
 
       // --schema branch — emit machine-readable parameter schema (no SAP call).
       if (cmd.optsWithGlobals().schema) {
-        printSchema(commandSchemas['init']!, mode);
+        printSchema(SCHEMA, mode);
         return;
       }
 

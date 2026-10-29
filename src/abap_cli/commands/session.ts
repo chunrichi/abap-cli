@@ -14,12 +14,34 @@ import { Command } from 'commander';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { CliError, printResult, jsonFromCommand, type OutputMode } from '../output/json.js';
+import { CliError, printResult, printSchema, jsonFromCommand, type OutputMode, type CommandSchema } from '../output/json.js';
 import { loadConfig, findWorkspaceConfig, type ProjectConfig } from '../config/project-config.js';
 import { getSystem } from '../config/user-config.js';
 import { computeSystemHash, decryptJar } from '../session/jar.js';
 import { resolveSessionPolicy, effectivePolicy } from '../session/policy.js';
 import { SESSION_KEYCHAIN_ACCOUNT } from '../config/secrets.js';
+import { schemaOption } from './schema-helpers.js';
+
+export const SCHEMA: CommandSchema = {
+  schemaVersion: 1,
+  command: 'session',
+  description: 'Inspect the session cookie reuse state for the active profile (no SAP call).',
+  usage: 'abap session info [--profile <name>]',
+  scope: 'local',
+  arguments: [],
+  options: [
+    { name: '--profile', type: 'string', valuePlaceholder: '<name>', description: 'Override the active profile (defaults to .abap.json#system).' },
+    schemaOption(),
+  ],
+  globalOptions: ['--json', '--pretty-json'],
+  examples: [
+    { description: 'Show session jar state for the active profile', command: 'abap session info --json' },
+  ],
+  errors: [
+    { code: 'CONFIG_ERROR', category: 'CONFIG_ERROR', exitCode: 3 },
+    { code: 'SESSION_JAR_DECRYPT_FAILED', category: 'VALIDATION_ERROR', exitCode: 7 },
+  ],
+};
 
 interface SessionInfoOptions {
   profile?: string;
@@ -43,9 +65,7 @@ export function registerSessionCommand(program: Command): void {
     .action(async (_opts, cmd) => {
       const mode = jsonFromCommand(cmd);
       if (cmd.optsWithGlobals().schema) {
-        const { commandSchemas } = await import('../flows/setup/command-schemas.js');
-        const { printSchema } = await import('../output/json.js');
-        printSchema(commandSchemas['session']!, mode);
+        printSchema(SCHEMA, mode);
         return;
       }
       // Bare `abap session` falls through to the subcommand help.
@@ -60,9 +80,7 @@ export function registerSessionCommand(program: Command): void {
     .action(async (opts: SessionInfoOptions, cmd) => {
       const mode = jsonFromCommand(cmd);
       if (cmd.optsWithGlobals().schema) {
-        const { commandSchemas } = await import('../flows/setup/command-schemas.js');
-        const { printSchema } = await import('../output/json.js');
-        printSchema(commandSchemas['session']!, mode);
+        printSchema(SCHEMA, mode);
         return;
       }
       try {
