@@ -4,7 +4,7 @@ title: abap profile
 description: 管理全局连接 profile — add / list / show / set / test / delete / export / import；绑定工作区用 abap init --profile
 tags: [abap-cli, command, profile, connection, keychain]
 created at: 2026-08-17 00:00:00
-changed at: 2026-09-18 22:05:00
+changed at: 2026-10-30 01:14:53
 ---
 
 # abap profile
@@ -183,7 +183,10 @@ abap profile import profiles.json
 - [abap doctor](doctor.md) — 本地环境诊断（含 profile 可达性）
 - [abap deploy](deploy.md) — `test` 的 icf 层失败时部署 ICF 服务
 
-## references
+# references
 
 - 实现: [src/abap_cli/commands/profile.ts](../../src/abap_cli/commands/profile.ts) · [src/abap_cli/flows/setup/profile.ts](../../src/abap_cli/flows/setup/profile.ts)
-- 文档: [docs/commands.md](../../docs/commands.md)
+- 认证策略: [src/abap_cli/auth/strategies/](../../src/abap_cli/auth/strategies/)
+- 配置与证书: `src/abap_cli/config/user-config.ts`、`src/abap_cli/config/secrets.ts`（keychain）、`src/abap_cli/config/ca-store.ts` + `src/abap_cli/config/profile-pems.ts`（PEM store）
+- 文档: [docs/commands.md](../../docs/commands.md)、[docs/configuration.md](../../docs/configuration.md)
+- 相关命令页: [abap init](init.md)、[abap doctor](doctor.md)、[abap deploy](deploy.md)

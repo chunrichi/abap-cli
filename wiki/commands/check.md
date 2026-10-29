@@ -4,7 +4,7 @@ title: abap check
 description: 校验本地 ABAP 文件 — 子命令 syntax（默认，SAP 语法检查）/ content（本地校验，零 SAP 调用）/ atc（ATC 检查）；--files 是 syntax 的父命令快捷方式；--out 可将原始 ATC worklist 持久化到本地
 tags: [abap-cli, command, check, syntax, atc, validation, worklist]
 created at: 2026-08-17 00:00:00
-changed at: 2026-09-02 00:00:00
+changed at: 2026-10-30 01:14:53
 ---
 
 # abap check
@@ -97,3 +97,16 @@ abap check syntax --all --strict
 # More
 
 ## fixme
+
+- [ ] 本页 Expected Output 只展示 `{ issues, failure }`，实际 envelope 还带 `data.scope`（`validated` / `semantics` / `activationStillRequired`），示例待补齐
+
+## todo
+
+- [ ] 真机证据待补：`check atc --out` 落盘的 raw worklist 与 SAP ATC 结果一致性
+
+# references
+
+- 实现: [src/abap_cli/commands/check.ts](../../src/abap_cli/commands/check.ts) · [src/abap_cli/flows/core/check.ts](../../src/abap_cli/flows/core/check.ts) · [src/abap_cli/flows/core/atc.ts](../../src/abap_cli/flows/core/atc.ts)
+- 共享契约: `src/abap_cli/output/issues.ts`（`CheckIssue`）、`src/abap_cli/core/local-targets.ts`（`--all` / `--changed` 扫描根）
+- 文档: [docs/commands.md](../../docs/commands.md)
+- 测试: `test/unit/check-modes.test.ts`

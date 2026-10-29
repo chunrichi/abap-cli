@@ -4,7 +4,7 @@ title: abap mime
 description: 创建、删除、上传 MIME Repository 资源（SAP SE80 MIME 存储库；走自建 ICF handler `dispatch_mime`）
 tags: [abap-cli, command, mime, mime-repository, icf, se80]
 created at: 2026-09-03 17:00:00
-changed at: 2026-09-03 17:00:00
+changed at: 2026-10-30 01:14:53
 ---
 
 # abap mime
@@ -164,6 +164,19 @@ abap mime --schema
   - create：`POST /mime/folder` body = `{path, package, description, transportRequest}` → `{path, kind, action}`
   - delete：`PUT /mime/folder?recursive=<bool>&transport=<tr>` body = `{path}` → `{path, action}`
   - push：`POST /mime/resources` body = `{path, contentBase64, transportRequest}` → `{path}`，每文件独立 POST
+
+# More
+
+## fixme
+
+- [ ] `mime push` 每个文件独立 POST，部分失败时已上传文件不会回滚（`data.details.succeeded` / `failed[]` 只报告结果）
+- [ ] `--dry-run` 的 plan 最多列 20 项（`mime push`），超出部分不展示
+
+## todo
+
+- [ ] 增加 `mime list` / 下载子命令（当前只有 create / delete / push）
+- [ ] MIME 根目录的 `--package` / `--tr` 绑定在多 transport 场景下的行为待真机确认
+- [ ] 真机证据待补：多文件部分失败路径的 on-prem 回归记录
 
 # references
 

@@ -4,7 +4,7 @@ title: abap init
 description: 工作区唯一入口 — 绑定/修改/自省 .abap.json、脚手架 AI agent 上下文；裸 abap init 进入交互向导
 tags: [abap-cli, command, init, workspace, profile, agent]
 created at: 2026-08-17 00:00:00
-changed at: 2026-08-20 00:00:00
+changed at: 2026-10-30 01:14:53
 ---
 
 # abap init
@@ -175,7 +175,9 @@ abap init --agent copilot --force
 - [abap doctor](doctor.md) — 本地环境诊断（与 init 的 ICF 检查互补）
 - [abap deploy](deploy.md) — `data.icf` 提示时部署 ICF 服务
 
-## references
+# references
 
 - 实现: [src/abap_cli/commands/init.ts](../../src/abap_cli/commands/init.ts) · [src/abap_cli/flows/setup/init.ts](../../src/abap_cli/flows/setup/init.ts) · [src/abap_cli/flows/setup/init-agents.ts](../../src/abap_cli/flows/setup/init-agents.ts)
-- 文档: [docs/commands.md](../../docs/commands.md)
+- 配置: `src/abap_cli/config/project-config.ts`（`.abap.json` 读写与向上查找）、`src/abap_cli/config/user-config.ts`（全局 profile）
+- 文档: [docs/commands.md](../../docs/commands.md)、[docs/configuration.md](../../docs/configuration.md)
+- 相关命令页: [abap profile](profile.md)、[abap doctor](doctor.md)、[abap deploy](deploy.md)

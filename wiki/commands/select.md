@@ -4,7 +4,7 @@ title: abap select
 description: 只读查询表数据 — 走 ICF /data/query 端点；Agent 的 SE16N 等价能力；覆盖"看这条记录"这一数据查询闭环
 tags: [abap-cli, command, select, se16n, data-query, icf, agent-loop, read-only]
 created at: 2026-08-07 23:50:00
-changed at: 2026-08-09 00:00:00
+changed at: 2026-10-30 01:14:53
 ---
 
 # abap select
@@ -38,21 +38,90 @@ abap select --schema [--json]
 ## Examples
 
 ```bash
-# 读取表数据（默认最多 ${SEARCH_RESULT_LIMIT} 行）
-abap select ZTABLE --where "FIELD = 'X'" --json
+# 读取表数据（默认最多 100 行）
+abap select --table ZTABLE --where "FIELD = 'X'" --json
 
 # 只取需要的列 + 排序
-abap select ZTABLE --fields FIELD1,FIELD2 --order-by FIELD1 --limit 50
+abap select --table ZTABLE --fields FIELD1,FIELD2 --order-by FIELD1 --limit 50
 
 # 预览 SQL 与参数，不访问 SAP
-abap select ZTABLE --where "FIELD = 'X'" --dry-run --json
+abap select --table ZTABLE --where "FIELD = 'X'" --dry-run --json
 ```
+
+## Expected Output
+
+成功（`--table` + `--where` + `--limit`）：
+
+```json
+{
+  "status": "success",
+  "meta": { "command": "abap select", "version": "1.0.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 42, "warnings": [] },
+  "data": {
+    "table": "ZTAB_FIXTURE",
+    "objectType": "TABL",
+    "fields": ["MANDT", "ID", "STATUS", "AMOUNT", "NAME", "CREATED"],
+    "rows": [
+      { "MANDT": "001", "ID": 1, "STATUS": "X", "AMOUNT": 1.25, "NAME": "Item 0000000001", "CREATED": "2026-02-01" }
+    ],
+    "rowCount": 1,
+    "truncated": false,
+    "excludedFields": ["NOTE"],
+    "offset": 0,
+    "limit": 50,
+    "countOnly": false,
+    "dryRun": false,
+    "durationMs": 42
+  }
+}
+```
+
+`--count-only` 时 `data` 只有 `table` / `objectType` / `count` / `countOnly` / `dryRun` / `durationMs`，不含 `rows` / `fields` / `truncated`：
+
+```json
+{
+  "status": "success",
+  "meta": { "command": "abap select", "version": "1.0.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 18, "warnings": [] },
+  "data": {
+    "table": "ZTAB_FIXTURE",
+    "objectType": "TABL",
+    "count": 37,
+    "countOnly": true,
+    "dryRun": false,
+    "durationMs": 18
+  }
+}
+```
+
+`--dry-run` 不调 SAP，返回计划 envelope（`wouldRun: true`；空的 `rows` / `fields` / `excludedFields` 被 token-efficient 清洗移除）：
+
+```json
+{
+  "status": "success",
+  "meta": { "command": "abap select", "version": "1.0.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 3, "warnings": [] },
+  "data": {
+    "table": "ZTAB_FIXTURE",
+    "objectType": "TABL",
+    "rowCount": 0,
+    "truncated": false,
+    "offset": 0,
+    "limit": 100,
+    "countOnly": false,
+    "dryRun": true,
+    "durationMs": 0,
+    "wouldRun": true
+  }
+}
+```
+
+> 017 起行值为**原生类型**（数字 / `YYYY-MM-DD` 日期 / 字符串），见下方 017 说明。
+
+人类模式（默认）：ASCII 表格（列宽自适应）+ 行数 + 截断提示 + 排除字段提示 + 耗时。
 
 ## 执行流程与数据流
 
 ```mermaid
 graph LR
-  A[CLI flows/select-flow.ts] -->|buildDataQueryRequest| B[IcfClient.postDataQuery]
+  A[CLI flows/data/select.ts] -->|buildDataQueryRequest| B[IcfClient.postDataQuery]
   B -->|POST /sap/abap_cli/data/query| C[ZCL_ABAP_VIBE_ICF.dispatch_data]
   C --> D[DD02L + DD03L 元数据校验]
   D -->|合法| E[where 语法解析 + 宿主变量绑定]
@@ -70,31 +139,6 @@ SAP 端单条 SELECT 由 5 个 helper 完成（research R1–R6）：
 4. `execute_select`: `SELECT (fields) FROM (table) WHERE (lt_where) [ORDER BY (lt_ob)] UP TO @lv_limit ROWS OFFSET @lv_offset`，where 值绑定为宿主变量（`@lv_where_v1`, `@lv_where_v2`, …）。行集用 `/ui2/cl_json` 原生序列化（`pretty_name = NONE` 保大写字段名 + 原生类型值），经 partial JSON 嵌入 camelCase 信封（017）。
 
 > ⚠️ **017（0.4.0）原生行值（Q1 B）**: `data.rows` 单元格值遵循 `/ui2/cl_json` 原生类型——NUMC/INT/DEC 为 JSON 数字（前导零丢失，`"0000000001"` → `1`）、DATS 为 `YYYY-MM-DD`、TIMS 为 `HH:MM:SS`、CHAR/CLNT 为字符串；字段名保持大写（与 `data.fields` 一致）。Agent 消费 `--json` 时每个单元格按 `string | number | boolean | null` 处理（CLI `SelectResult.rows` 类型为 `Record<string, unknown>[]`；人类模式自动 `String()`）。
-
-## 输出契约（012 unified）
-
-成功信封：
-
-```jsonc
-{
-  "status": "success",
-  "meta": { "command": "abap select", "version": "0.2.0", "timestamp": "...", "durationMs": 42, "warnings": [] },
-  "data": {
-    "table": "ZTAB_FIXTURE", "objectType": "TABL",
-    "fields": ["MANDT", "ID", "STATUS", "AMOUNT", "NAME", "CREATED"],
-    "rows": [ { "MANDT": "001", "ID": 1, "STATUS": "X", "AMOUNT": 1, "NAME": "Item 0000000001", "CREATED": "2026-02-01" } ],
-    "rowCount": 50, "truncated": true,
-    "excludedFields": ["NOTE"],
-    "offset": 0, "limit": 50, "countOnly": false, "dryRun": false, "durationMs": 42
-  }
-}
-```
-
-> 017 起行值为**原生类型**（数字 / `YYYY-MM-DD` 日期 / 字符串），见上方 017 说明。
-
-count-only 信封不含 `rows` / `fields` / `truncated`；dry-run 信封含 `wouldRun: true` 且无 SAP 调用。
-
-人类模式（默认）：ASCII 表格（列宽自适应）+ 行数 + 截断提示 + 排除字段提示 + 耗时。
 
 ## 注入安全与只读契约
 
@@ -164,6 +208,23 @@ QUERY_FAILED              runtime SQL failure             →  abap activate <ta
 - **`abap deploy`**: 部署 `ZCL_ABAP_VIBE_ICF`（含 `/data/query` 端点）。
 - **`abap search`**: 在 `TABLE_NOT_FOUND` 时定位对象名。
 
-## 引用
+# More
 
+## fixme
+
+- [ ] `--group-by` 聚合查询（`data.groupBy` / `data.groups`）已实现，但本页 Usage / Options / Examples 尚未覆盖
+- [ ] v1 不做 `AUTHORITY-CHECK`（如 `S_TABU_DIS`），连接用户的授权即信任边界
+
+## todo
+
+- [ ] where 语法仅 `AND` 链：OR / 括号 / 函数 / 子查询
+- [ ] CDS 视图、HANA 视图与 pool / cluster 表
+- [ ] 大对象字段（`STRG` / `RSTR` / `LCHR` / `LRAW`）投影（当前自动排除，显式投影报 `INVALID_FIELD`）
+
+# references
+
+- 实现: [src/abap_cli/commands/select.ts](../../src/abap_cli/commands/select.ts) · [src/abap_cli/flows/data/select.ts](../../src/abap_cli/flows/data/select.ts) · [src/abap_cli/clients/icf-client.ts](../../src/abap_cli/clients/icf-client.ts)
+- SAP 后端: `abap/src/clas/zcl_abap_vibe_icf.clas.abap`（`lcl_data=>dispatch_data`，`/data/query` 端点）
+- 文档: [docs/commands.md](../../docs/commands.md)
 - 设计回顾：见 wiki 顶层 `abap-select` 历史回顾（动态 SQL 注入安全 + DDIC 元数据 + 行类型构建）
+- 相关命令页: [abap deploy](deploy.md)、[abap search](search.md)

@@ -1,10 +1,10 @@
 ---
 type: command
 title: abap status
-description: 本地 vs SAP 同步状态 — 按 part 列出差异（local-new / local-changed / remote-new / remote-changed / unchanged）；可选 --remote-only / --local-only / --all / --since / --limit
+description: 本地 vs SAP 同步状态 — 按 part 列出差异（local-only / remote-only / divergent / unchanged）；可选 --remote-only / --local-only / --all / --since / --limit
 tags: [abap-cli, command, status, sync, diff, parts]
 created at: 2026-08-28 00:00:00
-changed at: 2026-09-02 00:00:00
+changed at: 2026-10-30 01:14:53
 ---
 
 # abap status
@@ -36,12 +36,11 @@ abap status --schema                                    # 参数自省
 | 字段 | 含义 |
 |---|---|
 | `object` | 对象名 |
-| `type` | CLAS / PROG / INTF / FUGR ... |
-| `part` | `main` / `testclasses` / `definitions` / `implementations` / `macros` |
-| `direction` | `local-new` / `local-changed` / `remote-new` / `remote-changed` / `unchanged`（仅 `--all` 时出现） |
-| `detail` | 路径或差异简述（POSIX 相对路径，022 契约） |
+| `part` | `main` / `testclasses` / `definitions` / `implementations` / `macros`；remote-only 条目固定为 `object` |
+| `direction` | `local-only` / `remote-only` / `divergent` / `unchanged`（仅 `--all` 时出现） |
+| `detail` | 本地文件路径（POSIX 相对路径，022 契约）；remote-only 条目没有该字段 |
 
-`--remote-only` 时只含 `remote-new` / `remote-changed`；`--local-only` 时只含 `local-new` / `local-changed`。两者同时给 → `INVALID_ARGUMENT`（exit 2）。
+`--remote-only` 时只含 `remote-only`；`--local-only` 时只含 `local-only`。
 
 ## Examples
 
@@ -62,34 +61,67 @@ abap status --since 2026-08-01 --all
 abap status --json
 ```
 
+## Expected Output
+
+```json
+{
+  "status": "success",
+  "meta": { "command": "abap status", "version": "1.0.0", "timestamp": "2026-08-28T00:00:00.000Z", "durationMs": 1800, "warnings": [] },
+  "data": {
+    "changedParts": [
+      { "object": "ZCL_DEMO", "part": "main", "direction": "divergent", "detail": "local file: src/clas/zcl_demo/zcl_demo.clas.abap" },
+      { "object": "ZLOCAL_ONLY", "part": "main", "direction": "local-only", "detail": "local file: src/prog/zlocal_only/zlocal_only.prog.abap" },
+      { "object": "ZREMOTE_ONLY", "part": "object", "direction": "remote-only" }
+    ],
+    "truncated": false,
+    "checked": 2
+  }
+}
+```
+
+无差异（或 `--remote-only` / `--local-only` 过滤后为空）时 `data.changedParts` 被 token-efficient 清洗移除，`data` 只剩 `truncated` 与 `checked`：
+
+```json
+{
+  "status": "success",
+  "meta": { "command": "abap status", "version": "1.0.0", "timestamp": "2026-08-28T00:00:00.000Z", "durationMs": 900, "warnings": [] },
+  "data": { "truncated": false, "checked": 5 }
+}
+```
+
 ## 与相邻命令的关系
 
 - **`abap diff [file]`**：精细按 part 对比（本地 ↔ SAP 源码内容）；用 `status` 找差异集，再用 `diff` 看细节
-- **`abap pull`**：拉 `remote-only` / `remote-changed` 同步到本地
-- **`abap push`**：推 `local-only` / `local-changed` 到 SAP
+- **`abap pull`**：拉 `remote-only` 同步到本地
+- **`abap push`**：推 `local-only` 到 SAP
 - 同步编排由 Agent 显式完成（无内置 `sync` 子命令）
 
 ## Error codes
 
 | Code | Category / exit | Trigger |
 |------|-----------------|---------|
-| `INVALID_ARGUMENT` | USAGE / 2 | `--remote-only` 与 `--local-only` 同时给 / `--limit` 非正整数 / `--since` 格式非法 |
-| `SAP_ERROR` | SAP_ERROR / 6 | ADT searchObject 失败 |
+| `INVALID_ARGUMENT` | USAGE / 2 | `--limit` 非正整数 |
+| `SAP_ERROR` | SAP_ERROR / 6 | ADT `searchObject` / `getObjectSource` 失败 |
 | `TLS_ERROR` / `AUTH_ERROR` | TLS_ERROR / 4 / AUTH_ERROR / 5 | 连接问题（先 `abap doctor`） |
 
-## More
+# More
 
-### fixme
+## fixme
 
-- [ ] (none)
+- [ ] `--remote-only` 与 `--local-only` 同时给不会报 `INVALID_ARGUMENT`，而是顺序过滤得到空结果；与 Error codes 描述不一致
+- [ ] `--since` 非法日期未做本地校验（`new Date()` 得到 `NaN`，比较恒 false 等于不过滤）；文档标称会报 `INVALID_ARGUMENT`
 
-### todo
+## todo
 
 - [ ] `--format json|paths` — paths 仅输出 `data.changedParts[].detail` 行集合（agent token-efficient）
 - [ ] 增量缓存（每次 `--since` 不重新扫整个工作区）
+- [ ] 真机证据待补：`divergent` / `remote-only` 方向判定的 on-prem 回归记录
 
-## references
+# references
 
-- 实现：`src/abap_cli/commands/status.ts`（commander 声明 + 打印）、`src/abap_cli/flows/search/status.ts`（`computeChangedParts` / `runStatus`）
+- 实现: [src/abap_cli/commands/status.ts](../../src/abap_cli/commands/status.ts) · [src/abap_cli/flows/search/status.ts](../../src/abap_cli/flows/search/status.ts)（`computeChangedParts` / `runStatus`）
+- 复用: `src/abap_cli/formats/file-resolver.ts`、`src/abap_cli/core/resolve.ts`、`src/abap_cli/core/local-targets.ts`
+- 文档: [docs/commands.md](../../docs/commands.md)
+- 相关命令页: [abap diff](diff.md)、[abap pull](pull.md)、[abap push](push.md)、[abap check](check.md)
 - 设计：见 wiki 顶层 `pull-push-check-loop` 历史回顾（设计文档不入 git，详见仓库 wiki）
-- 配合：`wiki/commands/diff.md`（精细按 part 比对）
+- 测试: `test/unit/status-changedparts.test.ts`
