@@ -1,0 +1,104 @@
+# Publish abap-cli to the official npm registry via npm Trusted Publishing (OIDC).
+#
+# Prereq: on npmjs.com → package Settings → "Trusted publishing", register this
+# repo's workflow file (publish.yml). No NODE_AUTH_TOKEN secret is needed.
+#
+# Triggers:
+#   - pushing a `v*` tag (e.g. `git tag v1.0.0 && git push origin v1.0.0`)
+#   - publishing a GitHub Release
+#   - manual workflow_dispatch (dry-run only: verify + npm view guard, no publish)
+#
+# This workflow runs `npm run verify` itself: a tag push is a release path that
+# must never bypass the tests, regardless of what the local pre-push hook did.
+# verify.yml additionally gates every push to main and every pull request.
+#
+# A pre-publish `npm view` guard makes the job idempotent: if the version is
+# already on npm, publish is skipped and the run stays green. A tag/version
+# guard fails fast when the tag does not match package.json.
+name: publish-to-npm
+
+on:
+  push:
+    tags:
+      - 'v*'
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run: verify + npm view guard only, no publish.'
+        type: boolean
+        default: true
+        required: true
+
+permissions:
+  contents: read
+  id-token: write # Required for npm Trusted Publishing (OIDC)
+
+# Serialize runs for the same tag so a tag push + Release double-trigger never
+# races; the second run sees the version already published and skips.
+concurrency:
+  group: npm-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org/
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify the tagged commit
+        run: npm run verify
+
+      - name: Resolve package version
+        id: version
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ -z "$version" ]; then
+            echo "::error::could not resolve version from package.json"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Verify tag matches package version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version="${{ steps.version.outputs.version }}"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package.json version $version"
+            exit 1
+          fi
+
+      - name: Check if version is already published
+        id: published
+        run: |
+          if npm view abap-cli@${{ steps.version.outputs.version }} version \
+            --registry=https://registry.npmjs.org >/dev/null 2>&1; then
+            echo "already=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::abap-cli@${{ steps.version.outputs.version }} already published on npm — skipping publish"
+          else
+            echo "already=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to npm
+        if: steps.published.outputs.already == 'false' && github.event_name != 'workflow_dispatch'
+        run: npm publish --registry=https://registry.npmjs.org
+
+      - name: Dry-run summary
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          echo "::notice::Dry run complete — verify and the npm view guard ran, publish was skipped."
