@@ -1,0 +1,100 @@
+{
+  "$comment": "handcrafted for spec 036 — upstream SAP abap-file-formats only ships a type-pool schema (type-v1.json), not a table-type. Mirrors the SAP ADT ttyp:tableType XML contract.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Table Type Properties",
+  "description": "ABAP table type (TYPE ... TABLE OF ...) properties",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "formatVersion",
+    "header",
+    "accessType",
+    "lineType"
+  ],
+  "properties": {
+    "formatVersion": {
+      "title": "ABAP File Format Version",
+      "type": "string",
+      "const": "1"
+    },
+    "header": {
+      "title": "Header",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "originalLanguage"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "originalLanguage": {
+          "type": "string",
+          "minLength": 2
+        },
+        "abapLanguageVersion": {
+          "type": "string",
+          "enum": ["standard", "keyUser", "cloudDevelopment"],
+          "default": "standard"
+        }
+      }
+    },
+    "accessType": {
+      "title": "Access Type",
+      "description": "Table type access kind: standard / sorted / hashed",
+      "type": "string",
+      "enum": ["standard", "sorted", "hashed"]
+    },
+    "lineType": {
+      "title": "Line Type",
+      "description": "Either rowType (refers to data-type/structure/table) or rowStructure (inline fields).",
+      "type": "object",
+      "additionalProperties": false,
+      "oneOf": [
+        { "required": ["rowType"] },
+        { "required": ["rowStructure"] }
+      ],
+      "properties": {
+        "rowType": {
+          "title": "Row Type Reference",
+          "type": "string",
+          "maxLength": 40
+        },
+        "rowStructure": {
+          "title": "Inline Row Structure",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fieldName"],
+          "properties": {
+            "fieldName": { "type": "string", "maxLength": 30 },
+            "dataType": { "type": "string" },
+            "length": { "type": "integer", "minimum": 0 },
+            "decimals": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "keyDefinition": {
+      "title": "Key Definition",
+      "description": "Keys (required only for sorted / hashed access types).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["keyField"],
+        "properties": {
+          "keyField": { "type": "string", "maxLength": 30 },
+          "descending": { "type": "boolean", "default": false }
+        }
+      }
+    },
+    "rows": {
+      "title": "Initial Rows",
+      "description": "Optional default rows (rare for table types).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    }
+  }
+}
