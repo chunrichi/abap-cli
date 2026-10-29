@@ -11,6 +11,11 @@
  * `defineJsonArtifact` covers artifacts without a symmetric wire mapping
  * (DDLS carries the source in a sibling `.acds` file); `defineWireArtifact`
  * additionally wires `toWire` / `fromWire`.
+ *
+ * Two optional hooks keep per-type behaviour without forking the contract:
+ * `beforeWrite` gates the write (HTTP/TRAN validate the AFF core after
+ * stripping the CLI envelope), `validate` overrides the schema check used by
+ * `validate()` and `load()`.
  */
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';

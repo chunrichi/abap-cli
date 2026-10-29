@@ -154,6 +154,18 @@ export function registerMyCommand(program: Command): void {
 
 `jsonFromCommand(cmd)` resolves the global output flags; the command itself only declares its own options and prints the flow's `{ data, human }`.
 
+## Delivery Workflow
+
+本仓库的分支 / PR / commit / 交接纪律。本机完整版见本地技能 `.agents/skills/repo-workflow/SKILL.md`（`.agents/` 为本地开发资产、不入库）；干净克隆按本节执行。
+
+- **一个 PR 一个交付单元**：短期分支 `feat|fix|refactor|docs|chore/<slug>`；PR 标题 = squash 后的 commit subject；合并即删分支。禁止直接 push main（ruleset 会拒）；分支落后 main 时用 `gh pr update-branch <pr>`（或本地 rebase）后再合并；required check `verify` 必须绿。
+- **Commit 消息**：Conventional Commits；subject 英文祈使句 ≤72 字符；body 用纯文本段落写 why / 影响面 / 验证（**不要**把 `## Why` / `## What` / `## Verification` 这类 PR 模板标题写进 commit body）；不写任务/spec/bug 编号（GitHub squash 自动追加的 `(#N)` 是平台行为，不要手动再写）；`Co-authored-by` / `Signed-off-by` 只用于真实协同，不要给自己伪造 trailer。breaking 用 `BREAKING CHANGE:` footer + `CHANGELOG.md` 的 `Removed (breaking)` + Migration。
+- **验证闸门**：源码/测试改动跑 `npm run verify`；命令 schema/命令面改动先 `npm run build && npm run docs:build` 并提交生成物；docs/wiki/脚本改动跑 `npm run docs:check`；`abap/**` / ICF 改动必须在 A4H 在线时走 `abap-testing` skill 的六阶段真机回归，离线就明确写「未跑真机」。
+- **文档同步**：结构性改动（新增/删除模块、契约或流程变化）必须同步 `docs/architecture.md`、相关 `wiki/design-decisions/00X-*.md`（推进/关闭某决策时更新「当前代价 / 后果」，删掉过时的「下一步」）、`docs/development.md` 与 `wiki/commands/`。只改 `src/` + `test/` 会让设计决策过期。
+- **会话交接**：结束前更新 `tmp/handoff/YYYYMMDD-HHMM-<status>-<topic>.md`，保证 HEAD hash、已完成、下一步、事实快照（npm 锁定期 / A4H / CI）互相一致，并附可直接粘贴的第一条命令。
+- **依赖升级**：patch/minor 以 `verify` 绿为准；major 单独 PR，失败则关闭并留下可复现证据（失败测试 + 错误信息），不要强行合并。
+- **交付前自检**：分支命名 + `git status` 干净；`verify` 绿；生成物已重建并提交；架构 / 设计决策 / 交接文档已同步；commit 格式合规；PR CI 绿后 squash merge。
+
 ## Conventions
 
 - **Reuse, don't duplicate** — config (`loadConfig`), transport resolution (`resolveTransport`), and output helpers are shared; do not re-implement them

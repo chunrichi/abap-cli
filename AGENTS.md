@@ -35,6 +35,7 @@
 - 倾向**重写**而非打补丁：不要叠加兼容层、deprecated 别名、wrapper；允许 breaking change。旧 extension 机制已整体移除，不要在没有新设计文档的情况下重新引入。
 - 每次 breaking 必须：在 `CHANGELOG.md` 顶部（按既有 `## [Unreleased]` 格式）记录，并在 commit / PR 描述中写明迁移路径或影响面。
 - 改动必须由 `test/` 覆盖；真实 SAP 端到端用例放 `tests/`（本地执行，不入库）。
+- 开发流程细则（会话接续、分支/PR/commit 格式、verify 闸门、文档与 handoff 同步、依赖升级、真机门禁、交付自检）：本机加载 `.agents/skills/repo-workflow/SKILL.md`（`.agents/` 为本地开发资产、不入库）；干净克隆以 `docs/development.md` 的 Delivery Workflow 一节为准。
 
 ## 验证
 
@@ -57,7 +58,7 @@
 ## Agent 上下文布局
 
 - 仓库合约：根 `AGENTS.md`（本文件）。
-- 本地技能：`.agents/skills/`（DSH 项目级技能根；启动只加载 name+description，正文按需）。
+- 本地技能：`.agents/skills/`（DSH 项目级技能根；启动只加载 name+description，正文按需）。当前含 `abap-style` / `abap-testing` / `okf` / `repo-workflow`（开发流程与交付纪律）。
 - 随包分发：`skills/`、`agents/abap-developer.agent.md`，由 `abap init --agent <copilot|claude|cursor|generic>` 拷入用户项目。
 - `.github/` 只承载 CI（`workflows/`、Dependabot）；Copilot 时代的 instructions 已删除，本文件是唯一指令源。
 
