@@ -7,7 +7,7 @@
  *   GET/PUT, lock/unlock, checkruns (content-based syntax check), activation,
  *   cts/transportrequests.
  *
- * Usage:  node test/mock-adt/server.js [port]
+ * Usage:  node test/integration/mock-adt/server.js [port]
  * Env:    MOCK_NO_TRANSPORTS=1  →  userTransports returns no requests (NO_TRANSPORT path)
  *
  * Validator rule: a source line containing "syntax_error" yields severity E at

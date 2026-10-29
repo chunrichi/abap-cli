@@ -13,8 +13,9 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { resolve } from 'node:path';
 
 const ROOT = resolve(__dirname, '../..');
-const MOCK = resolve(ROOT, 'test/mock-adt/server.js');
-// 8081 avoids clashing with select-safety.test.ts (mock on 8080) under parallel vitest.
+const MOCK = resolve(ROOT, 'test/integration/mock-adt/server.js');
+// Fixed port kept distinct from the other integration suites (which either use
+// their own fixed port or a kernel-assigned one) so parallel runs never clash.
 const PORT = 8081;
 
 function startMock(port: number): Promise<{ proc: ChildProcess; port: number }> {
