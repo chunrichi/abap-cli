@@ -19,11 +19,8 @@
  *   (2) localToWire<TABL> / wireToLocal<TABL> carries the typed value through.
  */
 import { describe, it, expect } from 'vitest';
-import {
-  localToWire,
-  wireToLocal,
-  type DdicTableSettingsWire,
-} from '../../src/abap_cli/formats/ddic/json.js';
+import { localToWire, wireToLocal } from '../../src/abap_cli/formats/ddic/wire.js';
+import { type DdicTableSettingsWire } from '../../src/abap_cli/formats/ddic/types.js';
 
 /** ABAP `iv_payload CS '"<key>"'` simulator — exact substring match (case-sensitive). */
 function payloadContains(payload: string, key: string): boolean {

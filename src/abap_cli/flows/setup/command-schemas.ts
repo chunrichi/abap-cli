@@ -9,8 +9,7 @@
  * import surface (`commandSchemas`) and the schema literal does not bloat
  * the small command files.
  */
-import { SEARCH_RESULT_LIMIT, PAGE_ALL_DEFAULT_MAX } from '../../core/limits.js';
-import { SUPPORTED_WHERE_USED_TYPES, DEFAULT_WHERE_USED_LIMIT, MAX_WHERE_USED_LIMIT } from '../search/where-used-ops.js';
+import { SEARCH_RESULT_LIMIT } from '../../core/limits.js';
 import type { CommandSchema } from '../../output/json.js';
 
 /** Single import surface for the doc generator (`scripts/gen-docs.mjs`).
@@ -83,6 +82,8 @@ function initSchema(): CommandSchema {
       { name: '--cert-passphrase', type: 'string', valuePlaceholder: '<pwd>', description: 'Passphrase for .p12 / encrypted key — written to keychain.' },
       { name: '--sso-cookie-file', type: 'string', valuePlaceholder: '<path>', description: 'SSO cookie jar path — used with --auth-method=browser_sso.' },
       { name: '--service-key', type: 'string', valuePlaceholder: '<path>', description: 'BTP service key JSON — used with --auth-method=oauth_password.' },
+      { name: '--spn', type: 'string', valuePlaceholder: '<spn>', description: 'Kerberos service principal name — used with --auth-method=sso (defaults to HTTP/<host>).' },
+      { name: '--reauth-on-expiry', type: 'boolean', description: 'Force re-acquisition of the Kerberos ticket when the cached one expires — used with --auth-method=sso.' },
       { name: '--tr', type: 'string', valuePlaceholder: '<transport>', description: 'Default transport number (written to .abap.json).' },
       { name: '--package', type: 'string', valuePlaceholder: '<package>', description: 'Default SAP package (written to .abap.json).' },
       { name: '--source-dir', type: 'string', valuePlaceholder: '<path>', description: 'Base directory for `push --all` / `check --all` (written to .abap.json).' },
@@ -132,6 +133,7 @@ function pullSchema(): CommandSchema {
       { name: '--include-tests', type: 'boolean', description: 'Include testclasses source part.' },
       { name: '--include-all-parts', type: 'boolean', description: 'Include every source-code part.' },
       { name: '--textpool', type: 'boolean', description: 'Also pull textpool files (.texts/.selections/.headings.<lang>.properties).' },
+      { name: '--active', type: 'boolean', description: 'Pull the active (activated) version — the source `abap run` executes. Default: the working-area/latest version.' },
       { name: '--remote', type: 'string', valuePlaceholder: '<remoteid>', description: 'Pull the object\'s active version source from a remote system (Version Management).' },
       { name: '--tr', type: 'string', valuePlaceholder: '<request>', description: 'Pull all objects bound to a transport request (mutually exclusive with object name and --package).' },
       { name: '--user', type: 'string', valuePlaceholder: '<sap-user>', description: 'Filter --tr lookups by transport task owner (case-insensitive). Only valid with --tr.' },
@@ -429,68 +431,6 @@ function diffSchema(): CommandSchema {
     ],
   };
 }
-
-// ---------- search (centralised here so it can be co-located with the other
-// command-level schemas; the SCHEMA in search.ts remains the live source) ----
-export const searchCommandSchema: CommandSchema = {
-  schemaVersion: 1,
-  command: 'search',
-  description: 'Search for ABAP objects in SAP system',
-  usage: 'abap search [options] <query>',
-  scope: 'sap',
-  arguments: [{ name: 'query', type: 'string', required: true, description: 'Search query (supports * wildcard).' }],
-  options: [
-    { name: '--type', type: 'string', valuePlaceholder: '<type>', description: 'Filter by object type.' },
-    { name: '--limit', type: 'int', valuePlaceholder: '<n>', default: SEARCH_RESULT_LIMIT, description: 'Maximum results per page.' },
-    { name: '--page', type: 'int', valuePlaceholder: '<n>', default: 1, description: 'Page number (1-based).' },
-    { name: '--exact', type: 'boolean', description: 'Exact name match (mutually exclusive with --fuzzy).' },
-    { name: '--fuzzy', type: 'boolean', description: 'Substring match (default).' },
-    { name: '--package', type: 'string', valuePlaceholder: '<package>', description: 'Filter by package.' },
-    { name: '--page-all', type: 'boolean', description: 'Fetch all results in one request (cap = --page-all-max × --limit; mutually exclusive with --page).' },
-    { name: '--page-all-max', type: 'int', valuePlaceholder: '<n>', default: PAGE_ALL_DEFAULT_MAX, description: 'Page-count cap that sizes the --page-all single request.' },
-    schemaOption(),
-  ],
-  exclusiveGroups: [['--exact', '--fuzzy'], ['--page', '--page-all']],
-  globalOptions: ['--json'],
-  examples: [
-    { description: 'Filter by type', command: 'abap search ZCL_* --type CLAS --limit 50' },
-    { description: 'Exact name match', command: 'abap search ZCL_DEMO --exact' },
-    { description: 'Fetch all in one request', command: 'abap search ZCL_* --page-all' },
-  ],
-  errors: [
-    { code: 'AMBIGUOUS_OBJECT', category: 'NOT_FOUND', exitCode: 8 },
-    { code: 'OBJECT_NOT_FOUND', category: 'NOT_FOUND', exitCode: 8 },
-    { code: 'INVALID_ARGUMENT', category: 'USAGE', exitCode: 2 },
-  ],
-};
-
-// ---------- where-used (mirror of whereUsedSchema in commands/where-used.ts) ----
-export const whereUsedCommandSchema: CommandSchema = {
-  schemaVersion: 1,
-  command: 'where-used',
-  description: 'Find direct SAP object references (read-only).',
-  usage: 'abap where-used [options] <object>',
-  scope: 'sap',
-  arguments: [{ name: 'object', type: 'string', required: true, description: 'SAP object name.' }],
-  options: [
-    { name: '--type', type: 'string', valuePlaceholder: '<type>', description: 'Target object type.', allowedValues: [...SUPPORTED_WHERE_USED_TYPES] },
-    { name: '--ref-type', type: 'string', valuePlaceholder: '<type>', description: 'Filter references by object type.', allowedValues: [...SUPPORTED_WHERE_USED_TYPES] },
-    { name: '--package', type: 'string', valuePlaceholder: '<package>', description: 'Case-insensitive reference package filter.' },
-    { name: '--limit', type: 'int', valuePlaceholder: '<n>', default: DEFAULT_WHERE_USED_LIMIT, description: `Maximum returned references (hard cap ${MAX_WHERE_USED_LIMIT}).` },
-    schemaOption(),
-  ],
-  globalOptions: ['--json'],
-  examples: [
-    { description: 'Find references to a class', command: 'abap where-used ZCL_TARGET --type CLAS' },
-    { description: 'JSON envelope via the references alias', command: 'abap references ZTAB_TARGET --type TABL --ref-type TABL --json' },
-  ],
-  errors: [
-    { code: 'OBJECT_NOT_FOUND', category: 'NOT_FOUND', exitCode: 8 },
-    { code: 'TYPE_NOT_SUPPORTED', category: 'VALIDATION_ERROR', exitCode: 7 },
-    { code: 'USAGE', category: 'USAGE', exitCode: 2 },
-    { code: 'INVALID_ARGUMENT', category: 'USAGE', exitCode: 2 },
-  ],
-};
 
 // ---------- mime (create / delete / push) ----------
 function mimeSchema(): CommandSchema {

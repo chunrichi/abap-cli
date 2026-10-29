@@ -13,29 +13,46 @@ import { describe, expect, it, afterAll } from 'vitest';
 import { spawn, type ChildProcess } from 'node:child_process';
 import * as net from 'node:net';
 import { resolve } from 'node:path';
-import { writeFileSync, copyFileSync, unlinkSync, existsSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { writeFileSync, existsSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import * as os from 'node:os';
 
 const ROOT = resolve(__dirname, '../..');
 const CLI = resolve(ROOT, 'dist/index.js');
 const hasBuiltCli = existsSync(CLI);
-const MOCK = resolve(ROOT, 'test/mock-adt/server.js');
-const ABAP_JSON = resolve(ROOT, '.abap.json');
-const ABAP_JSON_BAK = `${ABAP_JSON}.bak-select-test`;
+const MOCK = resolve(ROOT, 'test/integration/mock-adt/server.js');
 
 // Hermetic user-level config: the CLI must not depend on the developer's
 // ~/.abap-cli/systems.json or OS keychain (which can block on a macOS prompt).
 const TMP_HOME = mkdtempSync(join(os.tmpdir(), 'abap-select-home-'));
 mkdirSync(join(TMP_HOME, '.abap-cli'), { recursive: true });
+
+// Hermetic project workspace: every CLI child runs with cwd here, so the
+// checkout's own .abap.json / src/ are never read or written by this suite.
+const TMP_PROJECT = mkdtempSync(join(os.tmpdir(), 'abap-select-project-'));
 writeFileSync(
-  join(TMP_HOME, '.abap-cli', 'systems.json'),
-  JSON.stringify({
-    systems: {
-      mock: { url: 'http://localhost:8080', client: '100', username: 'MOCKUSER', language: 'EN', sessionPolicy: 'always-logout', auth: { method: 'basic' } },
-    },
-  }),
+  join(TMP_PROJECT, '.abap.json'),
+  JSON.stringify({ system: 'mock', transport: '', package: '$TMP' }, null, 2) + '\n',
 );
+
+/** Point the hermetic user profile at the mock instance for this test. */
+function writeSystemsConfig(port: number): void {
+  writeFileSync(
+    join(TMP_HOME, '.abap-cli', 'systems.json'),
+    JSON.stringify({
+      systems: {
+        mock: {
+          url: `http://localhost:${port}`,
+          client: '100',
+          username: 'MOCKUSER',
+          language: 'EN',
+          sessionPolicy: 'always-logout',
+          auth: { method: 'basic' },
+        },
+      },
+    }),
+  );
+}
 
 function getFreePort(): Promise<number> {
   return new Promise((resolveP, rejectP) => {
@@ -71,6 +88,7 @@ function startMock(port: number, env: Record<string, string> = {}): Promise<{ pr
 function runCli(args: string[], port: number): Promise<{ stdout: string; stderr: string; exit: number }> {
   return new Promise((resolveP, rejectP) => {
     const proc = spawn('node', [CLI, ...args], {
+      cwd: TMP_PROJECT,
       env: {
         ...process.env,
         HOME: TMP_HOME,
@@ -90,43 +108,20 @@ function runCli(args: string[], port: number): Promise<{ stdout: string; stderr:
 }
 
 async function withMock<T>(env: Record<string, string>, fn: (port: number) => Promise<T>): Promise<T> {
-  // Switch .abap.json to mock so IcfClient connects to local mock-adt.
-  if (existsSync(ABAP_JSON)) {
-    copyFileSync(ABAP_JSON, ABAP_JSON_BAK);
-  }
+  // Each test gets its own mock instance and points the profile at that port.
   const port = await getFreePort();
-  writeFileSync(
-    join(TMP_HOME, '.abap-cli', 'systems.json'),
-    JSON.stringify({
-      systems: {
-        mock: {
-          url: `http://localhost:${port}`,
-          client: '100',
-          username: 'MOCKUSER',
-          language: 'EN',
-          sessionPolicy: 'always-logout',
-          auth: { method: 'basic' },
-        },
-      },
-    }),
-  );
-  writeFileSync(ABAP_JSON, JSON.stringify({ system: 'mock', transport: '', package: '$TMP' }));
+  writeSystemsConfig(port);
   const { proc } = await startMock(port, env);
   try {
     return await fn(port);
   } finally {
     proc.kill('SIGTERM');
-    if (existsSync(ABAP_JSON_BAK)) {
-      copyFileSync(ABAP_JSON_BAK, ABAP_JSON);
-      unlinkSync(ABAP_JSON_BAK);
-    } else {
-      unlinkSync(ABAP_JSON);
-    }
   }
 }
 
 afterAll(() => {
   rmSync(TMP_HOME, { recursive: true, force: true });
+  rmSync(TMP_PROJECT, { recursive: true, force: true });
 });
 
 describe.skipIf(!hasBuiltCli)('US3 — read-only safety contract', () => {

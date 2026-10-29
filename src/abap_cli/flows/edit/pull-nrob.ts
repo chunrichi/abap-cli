@@ -27,10 +27,9 @@ import { CliError } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
 import { buildFilename } from '../../formats/file-resolver.js';
 import { folderFor } from '../../formats/type-folder.js';
-import { wireToLocal, writeNrobJson, validateNrobObject } from '../../formats/nrob/json.js';
+import { nrobArtifact } from '../../formats/nrob/json.js';
 import { toOutputPath } from '../../core/path-output.js';
-import { type PullOptions } from './pull-shared.js';
-import { registerPullHandler } from '../../types/registry.js';
+import type { PullHandler } from './routing.js';
 
 /** Read the AFF document via ADT, or null when unavailable. */
 async function readViaAdt(name: string): Promise<Record<string, unknown> | null> {
@@ -86,8 +85,8 @@ export async function runPullNrob(name: string, opts: PullNrobOptions = {}): Pro
     wire = await readViaIcf(upper);
   }
 
-  const local = wireToLocal(wire);
-  const errors = await validateNrobObject(local);
+  const local = nrobArtifact.fromWire(wire);
+  const errors = await nrobArtifact.validate(local);
   if (errors.length > 0) {
     throw new CliError('AFF_FIXTURE_INVALID', `Pulled NROB ${upper} failed schema: ${errors.join('; ')}`, {
       object: upper,
@@ -95,7 +94,7 @@ export async function runPullNrob(name: string, opts: PullNrobOptions = {}): Pro
     });
   }
 
-  await writeNrobJson(targetPath, local);
+  await nrobArtifact.write(targetPath, local);
   const outPath = toOutputPath(relPath);
   return {
     object: upper,
@@ -105,10 +104,7 @@ export async function runPullNrob(name: string, opts: PullNrobOptions = {}): Pro
   };
 }
 
-// Register the NROB pull handler. Decision 2A: per-type results funnel through
-// `wrapPullResult` so the coordinator stays consistent with the other DDIC
-// dual-channel types (MSAG/TTYP/...).
-registerPullHandler('NROB', async ({ objectName, opts }) => {
+export const pullNrobHandler: PullHandler = async ({ objectName, opts }) => {
   const r = await runPullNrob(objectName, opts as PullNrobOptions);
   return { object: r.object, files: r.files, channel: r.channel, ...(r.fallbackReason ? { fallbackReason: r.fallbackReason } : {}) };
-});
+};

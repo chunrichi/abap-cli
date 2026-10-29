@@ -18,16 +18,10 @@ import { IcfClient } from '../../clients/icf-client.js';
 import { CliError } from '../../output/json.js';
 import { detectChannel } from './channel-detect.js';
 import type { SystemProfile } from './channel-detect.js';
-import {
-  wireToLocal,
-  writeTtypJson,
-  buildTypeSource,
-  validateTtypObject,
-  type TtypLocal,
-} from '../../formats/ttyp/json.js';
+import { ttypArtifact, buildTypeSource, type TtypLocal } from '../../formats/ttyp/json.js';
 import { loadConfig, findWorkspaceConfig } from '../../config/project-config.js';
 import { folderFor } from '../../formats/type-folder.js';
-import { registerPullHandler } from '../../types/registry.js';
+import type { PullHandler } from './routing.js';
 
 export interface PullTtypOptions {
   /** Optional profile override (default: active profile). */
@@ -88,7 +82,7 @@ async function profileFromWorkspace(opts: PullTtypOptions): Promise<SystemProfil
 async function pullFromAdt(name: string): Promise<TtypLocal> {
   const client = await AdtClientWrapper.create();
   const xml = await client.getTtyp(name);
-  return wireToLocal(name.toUpperCase(), xml);
+  return ttypArtifact.fromWire(xml);
 }
 
 async function pullFromIcf(name: string): Promise<TtypLocal> {
@@ -126,7 +120,7 @@ export async function runPullTtyp(name: string, opts: PullTtypOptions = {}): Pro
     doc = await pullFromIcf(upper);
   }
 
-  const errors = await validateTtypObject(doc);
+  const errors = await ttypArtifact.validate(doc);
   if (errors.length > 0) {
     throw new CliError('AFF_FIXTURE_INVALID', `Pulled TTYP ${upper} failed AFF schema validation: ${errors.join('; ')}`, {
       object: upper,
@@ -135,7 +129,7 @@ export async function runPullTtyp(name: string, opts: PullTtypOptions = {}): Pro
   }
 
   const written: string[] = [jsonPath];
-  await writeTtypJson(jsonPath, doc);
+  await ttypArtifact.write(jsonPath, doc);
   if (!opts.skipTypeAbap) {
     const source = buildTypeSource(lower, doc);
     await import('node:fs/promises').then((m) => m.writeFile(abapPath, source, 'utf8'));
@@ -151,8 +145,7 @@ export async function runPullTtyp(name: string, opts: PullTtypOptions = {}): Pro
   };
 }
 
-// Module-load side effect: register TTYP in the pull handler table. Decision 2A.
-registerPullHandler('TTYP', async ({ objectName, opts }) => {
+export const pullTtypHandler: PullHandler = async ({ objectName, opts }) => {
   const r = await runPullTtyp(objectName, opts as Parameters<typeof runPullTtyp>[1]);
   return { object: r.object, files: r.files, channel: r.channel, ...(r.fallbackReason ? { fallbackReason: r.fallbackReason } : {}) };
-});
+};

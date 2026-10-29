@@ -7,12 +7,10 @@
  *
  * Wire body is SAP ADT `mc:messageClass` XML. Wire → local uses regex
  * extraction (msag XML is shallow); local → wire produces a small XML
- * payload accepted by ADT POST.
+ * payload accepted by ADT POST. File/schema plumbing comes from the shared
+ * AFF artifact contract (`artifact.ts`).
  */
-import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
-import { CliError } from '../../output/json.js';
-import { validateAff } from '../../aff/schema-validator.js';
+import { defineWireArtifact } from '../artifact.js';
 
 export interface MsagMessageLocal {
   number: string;
@@ -23,16 +21,6 @@ export interface MsagLocal {
   formatVersion: '1';
   header: { description: string; originalLanguage: string };
   messages: MsagMessageLocal[];
-}
-
-export async function readMsagJson(filePath: string): Promise<MsagLocal> {
-  const raw = await fs.readFile(filePath, 'utf8');
-  return JSON.parse(raw) as MsagLocal;
-}
-
-export async function writeMsagJson(filePath: string, doc: MsagLocal): Promise<void> {
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, JSON.stringify(doc, null, 2) + '\n', 'utf8');
 }
 
 /** Decode the five XML pre-defined entities back to their literal characters.
@@ -100,20 +88,9 @@ export function localToWire(local: MsagLocal): string {
   ].join('\n');
 }
 
-export async function validateMsagObject(doc: unknown): Promise<string[]> {
-  const result = await validateAff('MSAG', doc);
-  if (result.status === 'pass' || result.status === 'warn') return [];
-  return result.errors.map((e) => `${e.instancePath || '/'}: ${e.message ?? ''}`);
-}
-
-export async function loadAndValidate(filePath: string): Promise<MsagLocal> {
-  const doc = await readMsagJson(filePath);
-  const errors = await validateMsagObject(doc);
-  if (errors.length > 0) {
-    throw new CliError('AFF_FIXTURE_INVALID', `MSAG file ${filePath} failed schema validation: ${errors.join('; ')}`, {
-      file: filePath,
-      details: errors,
-    });
-  }
-  return doc;
-}
+/** MSAG AFF artifact: file/schema plumbing + ADT wire mapping. */
+export const msagArtifact = defineWireArtifact<MsagLocal, string>({
+  type: 'MSAG',
+  toWire: (local) => localToWire(local),
+  fromWire: (xml) => wireToLocal(xml),
+});

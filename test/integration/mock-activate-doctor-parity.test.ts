@@ -16,7 +16,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { resolve } from 'node:path';
 
 const ROOT = resolve(__dirname, '../..');
-const MOCK = resolve(ROOT, 'test/mock-adt/server.js');
+const MOCK = resolve(ROOT, 'test/integration/mock-adt/server.js');
 const PORT = 8090;
 
 let mockProc: ChildProcess;

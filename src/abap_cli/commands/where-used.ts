@@ -1,22 +1,33 @@
 import { Command } from 'commander';
-import { AdtClientWrapper } from '../clients/adt-client.js';
+import { printError, printResult, printSchema, jsonFromCommand, type CommandSchema } from '../output/json.js';
 import {
-  CliError,
-  jsonFromCommand,
-  printError,
-  printResult,
-  printSchema,
-  type CommandSchema,
-} from '../output/json.js';
-import {
-  runWhereUsed,
+  runWhereUsedCommand,
   SUPPORTED_WHERE_USED_TYPES,
-  validateWhereUsedType,
   DEFAULT_WHERE_USED_LIMIT,
   MAX_WHERE_USED_LIMIT,
-  type WhereUsedOptions,
-  type WhereUsedResult,
+  type WhereUsedRunOptions,
 } from '../flows/search/where-used-ops.js';
+
+/** Machine-readable parameter contract for `abap where-used --schema`. */
+export const SCHEMA: CommandSchema = {
+  schemaVersion: 1,
+  command: 'where-used',
+  description: 'Find direct SAP object references (read-only).',
+  usage: 'abap where-used <object> [options]',
+  arguments: [{ name: 'object', required: true, description: 'SAP object name.' }],
+  options: [
+    { name: '--type', type: 'string', valuePlaceholder: '<type>', description: 'Target object type.', allowedValues: [...SUPPORTED_WHERE_USED_TYPES] },
+    { name: '--ref-type', type: 'string', valuePlaceholder: '<type>', description: 'Filter references by object type.', allowedValues: [...SUPPORTED_WHERE_USED_TYPES] },
+    { name: '--package', type: 'string', valuePlaceholder: '<package>', description: 'Case-insensitive reference package filter.' },
+    { name: '--limit', type: 'int', valuePlaceholder: '<n>', description: 'Maximum returned references.', default: DEFAULT_WHERE_USED_LIMIT },
+    { name: '--schema', type: 'boolean', description: 'Print the command parameter schema as JSON and exit (no SAP call).', default: false },
+  ],
+  globalOptions: ['--json'],
+  examples: [
+    { description: 'Find references to a class', command: 'abap where-used ZCL_TARGET --type CLAS' },
+    { description: 'JSON envelope via the references alias', command: 'abap references ZTAB_TARGET --type TABL --ref-type TABL --json' },
+  ],
+};
 
 export function registerWhereUsedCommand(program: Command): void {
   program
@@ -29,99 +40,17 @@ export function registerWhereUsedCommand(program: Command): void {
     .option('--package <package>', 'Filter references by package')
     .option('--limit <n>', `Max returned references (default ${DEFAULT_WHERE_USED_LIMIT}, max ${MAX_WHERE_USED_LIMIT})`)
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
-    .action(async (object: string | undefined, opts: WhereUsedCliOptions, cmd: Command) => {
+    .action(async (object: string | undefined, opts: WhereUsedRunOptions, cmd: Command) => {
       const mode = jsonFromCommand(cmd);
+      if (cmd.optsWithGlobals().schema) {
+        printSchema(SCHEMA, mode);
+        return;
+      }
       try {
-        if (cmd.optsWithGlobals().schema) {
-          printSchema(whereUsedSchema(), mode);
-          return;
-        }
-        const target = requireObject(object);
-        validateWhereUsedType(opts.type, '--type');
-        validateWhereUsedType(opts.refType, '--ref-type');
-        const options: WhereUsedOptions = {
-          type: opts.type,
-          refType: opts.refType,
-          packageName: opts.package,
-          limit: parseLimit(opts.limit),
-        };
-        const client = await AdtClientWrapper.create();
-        const result = await runWhereUsed(client, target, options);
-        printResult(mode, result, formatHuman(result));
+        const result = await runWhereUsedCommand(object, opts);
+        printResult(mode, result.data, result.human);
       } catch (error: unknown) {
         printError(mode, error);
       }
     });
-}
-
-interface WhereUsedCliOptions {
-  type?: string;
-  refType?: string;
-  package?: string;
-  limit?: string;
-  schema?: boolean;
-}
-
-function requireObject(object: string | undefined): string {
-  if (!object?.trim()) {
-    throw new CliError('USAGE', 'where-used requires an object name.', {
-      nextSteps: ['Provide a supported SAP object name.'],
-      example: 'abap where-used ZCL_MY_CLASS --type CLAS',
-    });
-  }
-  return object.trim();
-}
-
-function parseLimit(value: string | undefined): number {
-  if (value === undefined || value === '') return DEFAULT_WHERE_USED_LIMIT;
-  const limit = Number(value);
-  if (!Number.isInteger(limit) || limit <= 0 || limit > MAX_WHERE_USED_LIMIT) {
-    throw new CliError('INVALID_ARGUMENT', `--limit must be an integer from 1 to ${MAX_WHERE_USED_LIMIT}`, {
-      nextSteps: [`Use --limit between 1 and ${MAX_WHERE_USED_LIMIT}.`],
-      example: 'abap where-used ZCL_MY_CLASS --limit 100',
-    });
-  }
-  return limit;
-}
-
-export function formatHuman(result: WhereUsedResult): string {
-  const lines = [
-    `${result.target.name} (${result.target.type})`,
-    `  uri: ${result.target.uri}`,
-    ...(result.target.packageName ? [`  package: ${result.target.packageName}`] : []),
-    result.queryStatus === 'empty'
-      ? 'No direct references found.'
-      : `References: ${result.count} returned of ${result.totalCount}`,
-  ];
-  for (const reference of result.references) {
-    const packageName = reference.packageName ? ` [${reference.packageName}]` : '';
-    const context = reference.usageInformation ? ` — ${reference.usageInformation}` : '';
-    lines.push(`  ${reference.name} (${reference.type})${packageName}${context}`);
-  }
-  if (result.truncated) {
-    lines.push(`  truncated: increase --limit up to ${MAX_WHERE_USED_LIMIT} or use --ref-type/--package`);
-  }
-  return lines.join('\n');
-}
-
-function whereUsedSchema(): CommandSchema {
-  return {
-    schemaVersion: 1,
-    command: 'where-used',
-    description: 'Find direct SAP object references (read-only).',
-    usage: 'abap where-used <object> [options]',
-    arguments: [{ name: 'object', required: true, description: 'SAP object name.' }],
-    options: [
-      { name: '--type', type: 'string', valuePlaceholder: '<type>', description: 'Target object type.', allowedValues: [...SUPPORTED_WHERE_USED_TYPES] },
-      { name: '--ref-type', type: 'string', valuePlaceholder: '<type>', description: 'Filter references by object type.', allowedValues: [...SUPPORTED_WHERE_USED_TYPES] },
-      { name: '--package', type: 'string', valuePlaceholder: '<package>', description: 'Case-insensitive reference package filter.' },
-      { name: '--limit', type: 'int', valuePlaceholder: '<n>', description: 'Maximum returned references.', default: DEFAULT_WHERE_USED_LIMIT },
-      { name: '--schema', type: 'boolean', description: 'Print the command parameter schema as JSON and exit (no SAP call).', default: false },
-    ],
-    globalOptions: ['--json'],
-    examples: [
-      { description: 'Find references to a class', command: 'abap where-used ZCL_TARGET --type CLAS' },
-      { description: 'JSON envelope via the references alias', command: 'abap references ZTAB_TARGET --type TABL --ref-type TABL --json' },
-    ],
-  };
 }

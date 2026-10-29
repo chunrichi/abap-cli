@@ -17,7 +17,7 @@ changed at: 2026-09-16 00:00:00
 | pull | `GET /sap/abap_cli/ddic/enqu/<name>` |
 | push | `GET`（存在性探测）→ `POST /sap/abap_cli/ddic/enqu` |
 
-ENQU 与 TABL / DOMA / DTEL 同走 ICF，没有 ADT 通道：`abap-adt-api` 不暴露锁对象端点，ICF 是唯一路径。registry 里 `source: 'ICF'`，`resolveFile` 直接给出 `route: 'icf'`，`pushOne` 走 `ICF_PUSH_HANDLERS.ENQU`。
+ENQU 与 TABL / DOMA / DTEL 同走 ICF，没有 ADT 通道：`abap-adt-api` 不暴露锁对象端点，ICF 是唯一路径。registry 里 `source: 'ICF'`，`resolveFile` 直接给出 `route: 'icf'`，`pushOne` 查 `routing.ts` 的 `PUSH_ROUTES.ENQU`（`icf-json`）。
 
 ICF handler 由 `zcl_abap_vibe_icf` 的 `/ddic/enqu` 分支 + `zcl_abap_vibe_enqu_format` 提供。
 

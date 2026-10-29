@@ -2,7 +2,7 @@
 type: command
 title: abap fields
 description: "List the DDIC fields of a table or view (read-only). Two modes: `abap fields <table>` enumerates the fields of one object; `abap fields --find <f1>,<f2>...` returns every table that contains those fields (S-2 reverse lookup)."
-tags: [command, fields]
+tags: [abap-cli, command, fields]
 created at: 2026-10-29 14:30:14
 changed at: 2026-10-29 14:30:14
 ---

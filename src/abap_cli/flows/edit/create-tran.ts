@@ -16,7 +16,7 @@ import {
 } from '../../formats/transport/json.js';
 import { toOutputPath } from '../../core/path-output.js';
 import type { CreateOptions } from './create.js';
-import { registerCreateHandler, type CreateHandler } from '../../types/registry.js';
+import type { CreateHandler } from './routing.js';
 
 export async function runCreateTran(
   objectName: string,
@@ -100,8 +100,6 @@ export async function runCreateTran(
   );
 }
 
-// Module-load side effect: register TRAN. Decision 2A.
-const tranHandler: CreateHandler = async ({ name, opts, mode }) => {
-  await runCreateTran(name, opts as CreateOptions, mode);
+export const createTranHandler: CreateHandler = async ({ name, opts, mode }) => {
+  await runCreateTran(name, opts, mode);
 };
-registerCreateHandler('TRAN', tranHandler);

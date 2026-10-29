@@ -15,14 +15,8 @@
  * by an end-to-end SAP test (see wiki/object-types.md).
  */
 import { describe, it, expect } from 'vitest';
-import {
-  localToWire,
-  wireToLocal,
-  type DdicTableSettingsWire,
-  type DdicTableGeneralInformationWire,
-  type DdicTableBufferingWire,
-  type DdicTableDbSpecificSettingsWire,
-} from '../../src/abap_cli/formats/ddic/json.js';
+import { localToWire, wireToLocal } from '../../src/abap_cli/formats/ddic/wire.js';
+import { type DdicTableSettingsWire, type DdicTableGeneralInformationWire, type DdicTableBufferingWire, type DdicTableDbSpecificSettingsWire } from '../../src/abap_cli/formats/ddic/types.js';
 
 describe('P1.1/P1.2 — TABT buffering + dbSpecificSettings round-trip', () => {
   it('DdicTableGeneralInformationWire compiles with nested buffering + dbSpecificSettings', () => {

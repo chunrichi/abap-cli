@@ -14,9 +14,10 @@ npm run build        # tsc → dist/
 ## Build & Verify
 
 ```bash
-npm run build        # TypeScript compile check
-npm test             # unit tests (vitest)
-npm run verify       # build + unit tests + docs:check + skills 漂移检查
+npm run build            # TypeScript compile check
+npm test                 # unit tests (vitest, test/unit/)
+npm run test:integration # integration tests (vitest, test/integration/; needs build)
+npm run verify           # build + unit + integration + docs:check + skills 漂移检查
 node dist/index.js --help
 ```
 
@@ -24,11 +25,36 @@ Verification is done via:
 
 1. **`npm run build`** — TypeScript compile gate
 2. **`npm test` (vitest)** — unit tests in `test/unit/` covering command option contracts, error codes, output envelope, config handling, and SAP wire mappings
-3. **`output-contract-audit.test.ts`** — automated check that all CLI errors carry the correct category/exit-code mapping and that every `--json` envelope has a stable `meta` block
-4. **`skill-bundle.test.ts`** — automated check that the shipped skill prompts cover every CLI command and respect frontmatter/path/length constraints
-5. **Local mock ADT server** — offline end-to-end checks (no SAP needed)
-6. **Real SAP integration** — protocol-level verification against a live system (`tests/<run-id>-*` directories)
-7. **`npm run docs:check`** — 生成物（`docs/commands.md`、skill quick refs、命令索引）与命令 schema 一致（已并入 `npm run verify`）
+3. **`npm run test:integration` (vitest)** — process-level tests in `test/integration/` that spawn the built CLI (`dist/index.js`) or drive the mock ADT server over real HTTP; run `npm run build` first
+4. **`output-contract-audit.test.ts`** — automated check that all CLI errors carry the correct category/exit-code mapping and that every `--json` envelope has a stable `meta` block
+5. **`skill-bundle.test.ts`** — automated check that the shipped skill prompts cover every CLI command and respect frontmatter/path/length constraints
+6. **Local mock ADT server** — offline end-to-end checks (no SAP needed)
+7. **Real SAP integration** — protocol-level verification against a live system (`tests/<run-id>-*` directories)
+8. **`npm run docs:check`** — 生成物（`docs/commands.md`、skill quick refs、命令索引）与命令 schema 一致，并跑 `scripts/check-docs.mjs`：wiki 命令页 frontmatter / 章节契约、相对链接死链、命令 `--help` 选项 ⊆ `--schema` 契约（已并入 `npm run verify`）
+
+## Test Layout
+
+```
+test/
+├── unit/                  # pure in-process tests: no dist/, no real HTTP
+│   ├── schema-compliance/
+│   └── session-reuse/
+├── integration/           # needs the built CLI and/or the mock ADT server
+│   ├── mock-adt/
+│   │   └── server.js
+│   ├── exit-codes-process.test.ts
+│   ├── json-serialization.test.ts
+│   ├── lazy-commands-cli.test.ts
+│   ├── mock-activate-doctor-parity.test.ts
+│   └── select-safety.test.ts
+├── fixtures/
+└── setup.ts
+```
+
+- `npm test` is the fast feedback loop and must pass on a clean checkout **without** running `npm run build`.
+- `npm run test:integration` exercises process boundaries: it spawns `dist/index.js` and/or starts `test/integration/mock-adt/server.js` on localhost. Build-dependent tests skip themselves when `dist/index.js` is missing, so build first when running the suite standalone.
+- Integration tests run with a hermetic `fs.mkdtemp` HOME and workspace: they never read or write the checkout's `.abap.json`, `src/`, or the developer's `~/.abap-cli`.
+- `npm run test:coverage` reports unit coverage only.
 
 ## 文档生成
 
@@ -44,7 +70,7 @@ npm run docs:check   # 只校验不写；已并入 npm run verify，CI / 发布�
 
 ## Local Mock ADT Server
 
-`test/mock-adt/server.js` implements a subset of the ADT REST API for offline verification:
+`test/integration/mock-adt/server.js` implements a subset of the ADT REST API for offline verification:
 
 - login (`compatibility/graph`), repository search, object structure, source GET/PUT
 - lock/unlock, content-based checkruns, activation
@@ -52,8 +78,8 @@ npm run docs:check   # 只校验不写；已并入 npm run verify，CI / 发布�
 - transport: `GET /sap/bc/adt/cts/transportrequests` and `POST /sap/bc/adt/cts/transports`
 
 ```bash
-node test/mock-adt/server.js [port]        # default 8080
-MOCK_NO_TRANSPORTS=1 node test/mock-adt/server.js  # simulate no open transports
+node test/integration/mock-adt/server.js [port]        # default 8080
+MOCK_NO_TRANSPORTS=1 node test/integration/mock-adt/server.js  # simulate no open transports
 ```
 
 Point a test workspace at it:
@@ -69,52 +95,64 @@ Then run the workflows from [Getting Started](getting-started.md) against the mo
 
 ```
 src/abap_cli/
-├── index.ts              # commander entry, lazy-registers all commands
+├── index.ts              # commander entry: global options + lifecycle hooks
 ├── top-error.ts          # top-level commander error routing (--json safe)
-├── clients/              # AdtClientWrapper, ICF client, probe
-├── commands/             # one file per command (init / profile / pull / push / check / create / search / status / diff / inspect / activate / run / select / where-used / tcode / transport / doctor / mime / session / types …)
+├── registry/             # commands.ts (single command list) + lazy.ts (lazy command stubs)
+├── commands/             # one file per command — thin: commander declaration + SCHEMA + print
+├── flows/                # business logic (edit / setup / search / data / mime / core)
+├── formats/              # AFF file resolver + pull strategies + artifact contract; ddic/{types,io,wire,validate,examples}
+├── types/                # TYPE_REGISTRY (object-type metadata single source of truth)
+├── clients/              # AdtClientWrapper, ICF client + version check, probe
 ├── config/               # project + user config, keychain (secrets.ts), profile export/import, validation
-├── core/                 # lazy registration, polyfill, object/transport resolution, limits
-├── dictionary/           # DDIC + HTTP domain logic (ddic-json.ts, http-json.ts, tabl-artifact.ts)
-├── clients/icf-version.ts # ICF service version + deployment check
-├── formats/              # file format + resolver + pull strategies + object-parts
-├── output/               # unified JSON output, error codes, meta, check-issue types — see output/README.md
-└── flows/                # init (bind/modify/inspect/clear), profile, create (+ schema/types), pull, push (object/fugr/textpool), run, select, tcode, where-used, status, diff, inspect, doctor, atc
+├── auth/ session/        # auth model + strategies; session reuse / cookie policy
+├── core/                 # cross-layer utilities: resolve/transport, limits, path output, confirmation
+├── aff/ adc/             # AFF schema validation; ADT Deployment Channel (probe + ICF register)
+├── schema/               # vendored abap-file-format JSON schemas
+└── output/               # unified JSON output, error codes, meta, check-issue types — see output/README.md
 ```
 
 ## Adding a New Command
 
-1. Create `src/abap_cli/commands/<name>.ts` exporting `register<Name>Command(program: Command)`
-2. Register it lazily in `src/abap_cli/index.ts`: add a `COMMAND_SPECS` entry (command `name`, root-help `description`, and a `load` that dynamically `import()`s the module — see `src/abap_cli/core/lazy.ts`). The stub's description must match the one the module registers.
-3. Use `output/json.ts` (`printResult` / `printError`) so `--json` behaves consistently
+1. Put the business logic in `src/abap_cli/flows/<area>/` and return `{ data, human }` (throw `CliError` on failures). The command layer must not import `clients/` directly.
+2. Create `src/abap_cli/commands/<name>.ts` exporting `register<Name>Command(program: Command)`: commander declaration + `SCHEMA` (or a `command-schemas.ts` entry) + `printResult`/`printError`.
+3. Register it in `src/abap_cli/registry/commands.ts`: add a `COMMAND_SPECS` entry (command `name`, root-help `description`, `scope`, and a `load` that dynamically `import()`s the module). `registry/lazy.ts` turns each entry into a lazy stub; the stub's description must match the one the module registers.
 4. 在对应的领域 skill（`skills/abap-cli-<领域>/`）里补该命令的 references 条目，并更新 `metadata.commands`
-5. Document it in [Commands](commands.md) and update the README command table
+5. 运行 `npm run build && npm run docs:build` 重新生成 `docs/commands.md`、skills quick refs 与 wiki 命令索引 stub；手写 `wiki/commands/<cmd>.md` 叙述页并按 okf 契约补章节；最后 `npm run docs:check`（含 `scripts/check-docs.mjs` 的 wiki/死链/schema 漂移检查）
+6. Add coverage under `test/unit/`（纯单测）或 `test/integration/`（需构建产物 / mock-ADT）
 
 ### Command Pattern
 
-Follow the existing pattern (e.g. `commands/transport.ts`):
+Follow the existing pattern (e.g. `commands/status.ts` — declaration + print only):
 
 ```ts
 import { Command } from 'commander';
-import { AdtClientWrapper } from '../clients/adt-client.js';
-import { printError, printResult } from '../output/json.js';
+import { printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
+import { commandSchemas } from '../flows/setup/command-schemas.js';
+import { runMyFlow, type MyRunOptions } from '../flows/<area>/my-flow.js';
 
 export function registerMyCommand(program: Command): void {
   program
-    .command('mycmd')
+    .command('mycmd [target]')
     .description('...')
-    .action(async (opts, cmd) => {
-      const json = jsonFrom(cmd); // walk to the root for the global --json flag
+    .option('--limit <n>', '...')
+    .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
+    .action(async (target: string | undefined, opts: MyRunOptions, cmd) => {
+      const mode = jsonFromCommand(cmd); // resolves the global --json / --pretty-json flags
+      if (cmd.optsWithGlobals().schema) {
+        printSchema(commandSchemas['mycmd']!, mode);
+        return;
+      }
       try {
-        await runMyCommand(opts, json);
-      } catch (error) {
-        printError(json, error);
+        const result = await runMyFlow(target, opts);
+        printResult(mode, result.data, result.human);
+      } catch (error: unknown) {
+        printError(mode, error);
       }
     });
 }
 ```
 
-Use the `jsonFrom(cmd)` helper (walk `cmd.parent` to the root) rather than `cmd.parent?.opts()?.json` when the command is nested under a subcommand.
+`jsonFromCommand(cmd)` resolves the global output flags; the command itself only declares its own options and prints the flow's `{ data, human }`.
 
 ## Conventions
 

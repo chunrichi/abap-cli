@@ -32,14 +32,15 @@
     "build-schema": "node scripts/build-cli-schema.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:coverage": "vitest run --coverage",
     "check-skills-drift": "node scripts/check-skills-drift.mjs",
     "check-skills-drift:json": "node scripts/check-skills-drift.mjs --json",
     "check-skills-drift:fix": "node scripts/check-skills-drift.mjs --fix",
-    "verify": "npm run build && npm test && npm run docs:check && npm run check-skills-drift",
+    "verify": "npm run build && npm test && npm run test:integration && npm run docs:check && npm run check-skills-drift",
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "docs:build": "node scripts/gen-docs.mjs --write",
-    "docs:check": "node scripts/gen-docs.mjs --check"
+    "docs:check": "node scripts/gen-docs.mjs --check && node scripts/check-docs.mjs"
   },
   "keywords": [
     "abap",

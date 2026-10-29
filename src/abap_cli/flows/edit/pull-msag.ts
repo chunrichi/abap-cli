@@ -13,10 +13,10 @@ import { IcfClient } from '../../clients/icf-client.js';
 import { CliError } from '../../output/json.js';
 import { detectChannel } from './channel-detect.js';
 import type { SystemProfile } from './channel-detect.js';
-import { wireToLocal, writeMsagJson, validateMsagObject, type MsagLocal } from '../../formats/msag/json.js';
+import { msagArtifact, type MsagLocal } from '../../formats/msag/json.js';
 import { loadConfig, findWorkspaceConfig } from '../../config/project-config.js';
 import { folderFor } from '../../formats/type-folder.js';
-import { registerPullHandler } from '../../types/registry.js';
+import type { PullHandler } from './routing.js';
 
 export interface PullMsagOptions { profile?: SystemProfile; rootDir?: string; type?: string; package?: string; tr?: string; dir?: string; overwrite?: boolean; skipExisting?: boolean; includeTests?: boolean; includeAllParts?: boolean; limit?: string; page?: string; textpool?: boolean; remote?: string }
 export interface PullMsagResult {
@@ -43,7 +43,7 @@ async function resolveRoot(opts: { rootDir?: string; dir?: string }): Promise<st
 async function pullAdt(name: string): Promise<MsagLocal> {
   const client = await AdtClientWrapper.create();
   const xml = await client.getMsag(name);
-  return wireToLocal(xml);
+  return msagArtifact.fromWire(xml);
 }
 
 async function pullIcf(name: string): Promise<MsagLocal> {
@@ -78,14 +78,14 @@ export async function runPullMsag(name: string, opts: PullMsagOptions = {}): Pro
     doc = await pullIcf(upper);
   }
 
-  const errors = await validateMsagObject(doc);
+  const errors = await msagArtifact.validate(doc);
   if (errors.length > 0) {
     throw new CliError('AFF_FIXTURE_INVALID', `Pulled MSAG ${upper} failed schema: ${errors.join('; ')}`, {
       object: upper,
       details: errors,
     });
   }
-  await writeMsagJson(jsonPath, doc);
+  await msagArtifact.write(jsonPath, doc);
   return {
     object: upper,
     channel: decision.channel,
@@ -95,8 +95,7 @@ export async function runPullMsag(name: string, opts: PullMsagOptions = {}): Pro
   };
 }
 
-// Module-load side effect: register MSAG in the pull handler table. Decision 2A.
-registerPullHandler('MSAG', async ({ objectName, opts }) => {
+export const pullMsagHandler: PullHandler = async ({ objectName, opts }) => {
   const r = await runPullMsag(objectName, opts as Parameters<typeof runPullMsag>[1]);
   return { object: r.object, files: r.files, channel: r.channel, ...(r.fallbackReason ? { fallbackReason: r.fallbackReason } : {}) };
-});
+};
