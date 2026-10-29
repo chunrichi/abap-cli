@@ -1,4 +1,4 @@
-import type { AdtClientWrapper } from '../../clients/adt-client.js';
+import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError } from '../../output/json.js';
 import { resolveObject, getObjectParts } from '../../core/resolve.js';
 
@@ -200,4 +200,186 @@ function mapAssignError(error: unknown, object: string, transport: string): neve
     });
   }
   throw error;
+}
+
+export interface TransportEntry {
+  number: string;
+  description: string;
+  status: string;
+  owner: string;
+}
+
+export interface TransportListData {
+  workbench: TransportEntry[];
+  customizing: TransportEntry[];
+}
+
+/** Flow outcome: JSON envelope data + human summary, printed by the command layer. */
+export interface TransportEnvelope<T> {
+  data: T;
+  human: string;
+}
+
+export interface TransportCreateResult {
+  transport: string | null;
+  description: string;
+  package: string;
+  dryRun?: boolean;
+  ref?: string;
+}
+
+export interface TransportCreateOptions {
+  package?: string;
+  dryRun?: boolean;
+  yes?: boolean;
+}
+
+export interface TransportAssignOptions {
+  tr: string;
+  dryRun?: boolean;
+  yes?: boolean;
+}
+
+export async function runTransportList(openOnly: boolean): Promise<TransportEnvelope<TransportListData>> {
+  const client = await AdtClientWrapper.create();
+  const user = client.getConfig().sap.username;
+  const result = await client.userTransports(user);
+
+  const toEntries = (requests: { 'tm:number': string; 'tm:desc': string; 'tm:status': string; 'tm:owner': string }[]) =>
+    requests.map((r) => ({
+      number: r['tm:number'],
+      description: r['tm:desc'],
+      status: r['tm:status'],
+      owner: r['tm:owner'],
+    }));
+
+  const collect = (targets: typeof result.workbench, open: boolean) => {
+    const out: TransportEntry[] = [];
+    for (const target of targets) {
+      out.push(...toEntries(open ? target.modifiable : [...target.modifiable, ...target.released]));
+    }
+    return out;
+  };
+
+  const data: TransportListData = {
+    workbench: collect(result.workbench, openOnly),
+    customizing: collect(result.customizing, openOnly),
+  };
+  return { data, human: formatList(data) };
+}
+
+export async function runTransportCreate(
+  description: string,
+  opts: TransportCreateOptions = {},
+): Promise<TransportEnvelope<TransportCreateResult>> {
+  if (!description.trim()) {
+    throw new CliError('INVALID_ARGUMENT', 'Transport description must not be empty');
+  }
+  if (!opts.dryRun && !opts.yes && !process.stdin.isTTY) {
+    throw new CliError('VALIDATION_ERROR', 'transport create is a write operation; confirm with --yes or pass --dry-run.', {
+      nextSteps: [
+        'Re-run with --yes to actually create the transport.',
+        'Or pass --dry-run to preview the request without creating it.',
+      ],
+      example: 'abap transport create "<description>" --yes',
+    });
+  }
+  const devClass = (opts.package || '$TMP').trim().toUpperCase();
+  // A standalone request (no object context) references a package URL as REF.
+  const ref = `/sap/bc/adt/packages/${encodeURIComponent(devClass)}`;
+
+  if (opts.dryRun) {
+    return {
+      data: { transport: null, description: description.trim(), package: devClass, dryRun: true, ref },
+      human: `Would create transport request in ${devClass} (dry-run)`,
+    };
+  }
+
+  const client = await AdtClientWrapper.create();
+  let transport: string;
+  try {
+    transport = await client.createTransport(ref, description.trim(), devClass);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new CliError('TRANSPORT_CREATE_FAILED', `Failed to create transport request: ${message}`);
+  }
+  return {
+    data: { transport, description: description.trim(), package: devClass },
+    human: `Created transport request ${transport} (${devClass})`,
+  };
+}
+
+export async function runTransportShow(req: string): Promise<TransportEnvelope<TransportRequestInfo>> {
+  const client = await AdtClientWrapper.create();
+  const data = await showTransport(client, req);
+  return { data, human: formatShow(data) };
+}
+
+export async function runTransportResolve(object: string): Promise<TransportEnvelope<TransportResolveResult>> {
+  const client = await AdtClientWrapper.create();
+  const data = await resolveObjectTransport(client, object);
+  return { data, human: formatResolve(data) };
+}
+
+export async function runTransportAssign(
+  object: string,
+  opts: TransportAssignOptions,
+): Promise<TransportEnvelope<TransportAssignResult & { dryRun?: boolean }>> {
+  if (!process.stdin.isTTY && !opts.dryRun && !opts.yes) {
+    throw new CliError('VALIDATION_ERROR', 'transport assign is a write operation; confirm with --yes or pass --dry-run.', {
+      nextSteps: [
+        'Re-run with --yes to actually attach the object to the transport.',
+        'Or pass --dry-run to preview the assign without writing.',
+      ],
+      example: 'abap transport assign <object> --tr <transport> --yes',
+    });
+  }
+
+  if (opts.dryRun) {
+    return {
+      data: { object, transport: opts.tr, assigned: false, dryRun: true },
+      human: `Would attach ${object} to transport ${opts.tr} (dry-run)`,
+    };
+  }
+
+  const client = await AdtClientWrapper.create();
+  const data = await assignObjectToTransport(client, object, opts.tr);
+  return { data, human: formatAssign(data) };
+}
+
+function formatList(data: TransportListData): string {
+  const rows: string[] = [];
+  for (const [target, entries] of [
+    ['Workbench', data.workbench],
+    ['Customizing', data.customizing],
+  ] as const) {
+    if (entries.length === 0) continue;
+    rows.push(`${target}:`);
+    for (const e of entries) {
+      rows.push(`  ${e.number}  ${e.status}  ${e.owner}  ${e.description}`);
+    }
+  }
+  return rows.length > 0 ? rows.join('\n') : 'No transport requests';
+}
+
+function formatShow(data: { number: string; description: string; status: string; owner: string; objects: { name: string; type: string; status: string }[] }): string {
+  const lines = [`Transport ${data.number}:`, `  description: ${data.description}`, `  status: ${data.status}`, `  owner: ${data.owner}`];
+  if (data.objects.length > 0) {
+    lines.push('  objects:');
+    for (const o of data.objects) lines.push(`    ${o.name} (${o.type}) — ${o.status}`);
+  }
+  return lines.join('\n');
+}
+
+function formatResolve(data: { object: string; transports: { number: string; status: string; owner: string; text: string }[] }): string {
+  if (data.transports.length === 0) return `${data.object} is not assigned to any transport request.`;
+  const lines = [`${data.object} belongs to:`];
+  for (const t of data.transports) lines.push(`  ${t.number}  ${t.status}  ${t.owner}  ${t.text}`);
+  return lines.join('\n');
+}
+
+function formatAssign(data: { object: string; transport: string; assigned: boolean }): string {
+  return data.assigned
+    ? `Assigned ${data.object} to transport ${data.transport}.`
+    : `${data.object} is already assigned to transport ${data.transport} (no-op).`;
 }

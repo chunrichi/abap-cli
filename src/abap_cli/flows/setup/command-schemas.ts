@@ -9,8 +9,7 @@
  * import surface (`commandSchemas`) and the schema literal does not bloat
  * the small command files.
  */
-import { SEARCH_RESULT_LIMIT, PAGE_ALL_DEFAULT_MAX } from '../../core/limits.js';
-import { SUPPORTED_WHERE_USED_TYPES, DEFAULT_WHERE_USED_LIMIT, MAX_WHERE_USED_LIMIT } from '../search/where-used-ops.js';
+import { SEARCH_RESULT_LIMIT } from '../../core/limits.js';
 import type { CommandSchema } from '../../output/json.js';
 
 /** Single import surface for the doc generator (`scripts/gen-docs.mjs`).
@@ -429,68 +428,6 @@ function diffSchema(): CommandSchema {
     ],
   };
 }
-
-// ---------- search (centralised here so it can be co-located with the other
-// command-level schemas; the SCHEMA in search.ts remains the live source) ----
-export const searchCommandSchema: CommandSchema = {
-  schemaVersion: 1,
-  command: 'search',
-  description: 'Search for ABAP objects in SAP system',
-  usage: 'abap search [options] <query>',
-  scope: 'sap',
-  arguments: [{ name: 'query', type: 'string', required: true, description: 'Search query (supports * wildcard).' }],
-  options: [
-    { name: '--type', type: 'string', valuePlaceholder: '<type>', description: 'Filter by object type.' },
-    { name: '--limit', type: 'int', valuePlaceholder: '<n>', default: SEARCH_RESULT_LIMIT, description: 'Maximum results per page.' },
-    { name: '--page', type: 'int', valuePlaceholder: '<n>', default: 1, description: 'Page number (1-based).' },
-    { name: '--exact', type: 'boolean', description: 'Exact name match (mutually exclusive with --fuzzy).' },
-    { name: '--fuzzy', type: 'boolean', description: 'Substring match (default).' },
-    { name: '--package', type: 'string', valuePlaceholder: '<package>', description: 'Filter by package.' },
-    { name: '--page-all', type: 'boolean', description: 'Fetch all results in one request (cap = --page-all-max × --limit; mutually exclusive with --page).' },
-    { name: '--page-all-max', type: 'int', valuePlaceholder: '<n>', default: PAGE_ALL_DEFAULT_MAX, description: 'Page-count cap that sizes the --page-all single request.' },
-    schemaOption(),
-  ],
-  exclusiveGroups: [['--exact', '--fuzzy'], ['--page', '--page-all']],
-  globalOptions: ['--json'],
-  examples: [
-    { description: 'Filter by type', command: 'abap search ZCL_* --type CLAS --limit 50' },
-    { description: 'Exact name match', command: 'abap search ZCL_DEMO --exact' },
-    { description: 'Fetch all in one request', command: 'abap search ZCL_* --page-all' },
-  ],
-  errors: [
-    { code: 'AMBIGUOUS_OBJECT', category: 'NOT_FOUND', exitCode: 8 },
-    { code: 'OBJECT_NOT_FOUND', category: 'NOT_FOUND', exitCode: 8 },
-    { code: 'INVALID_ARGUMENT', category: 'USAGE', exitCode: 2 },
-  ],
-};
-
-// ---------- where-used (mirror of whereUsedSchema in commands/where-used.ts) ----
-export const whereUsedCommandSchema: CommandSchema = {
-  schemaVersion: 1,
-  command: 'where-used',
-  description: 'Find direct SAP object references (read-only).',
-  usage: 'abap where-used [options] <object>',
-  scope: 'sap',
-  arguments: [{ name: 'object', type: 'string', required: true, description: 'SAP object name.' }],
-  options: [
-    { name: '--type', type: 'string', valuePlaceholder: '<type>', description: 'Target object type.', allowedValues: [...SUPPORTED_WHERE_USED_TYPES] },
-    { name: '--ref-type', type: 'string', valuePlaceholder: '<type>', description: 'Filter references by object type.', allowedValues: [...SUPPORTED_WHERE_USED_TYPES] },
-    { name: '--package', type: 'string', valuePlaceholder: '<package>', description: 'Case-insensitive reference package filter.' },
-    { name: '--limit', type: 'int', valuePlaceholder: '<n>', default: DEFAULT_WHERE_USED_LIMIT, description: `Maximum returned references (hard cap ${MAX_WHERE_USED_LIMIT}).` },
-    schemaOption(),
-  ],
-  globalOptions: ['--json'],
-  examples: [
-    { description: 'Find references to a class', command: 'abap where-used ZCL_TARGET --type CLAS' },
-    { description: 'JSON envelope via the references alias', command: 'abap references ZTAB_TARGET --type TABL --ref-type TABL --json' },
-  ],
-  errors: [
-    { code: 'OBJECT_NOT_FOUND', category: 'NOT_FOUND', exitCode: 8 },
-    { code: 'TYPE_NOT_SUPPORTED', category: 'VALIDATION_ERROR', exitCode: 7 },
-    { code: 'USAGE', category: 'USAGE', exitCode: 2 },
-    { code: 'INVALID_ARGUMENT', category: 'USAGE', exitCode: 2 },
-  ],
-};
 
 // ---------- mime (create / delete / push) ----------
 function mimeSchema(): CommandSchema {

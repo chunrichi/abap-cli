@@ -1,5 +1,5 @@
 import * as fs from 'fs/promises';
-import type { AdtClientWrapper } from '../../clients/adt-client.js';
+import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError } from '../../output/json.js';
 import { resolveFile } from '../../formats/file-resolver.js';
 import { readAbapFile, normalizeLineEndings } from '../../formats/abap-source.js';
@@ -95,4 +95,50 @@ export async function computeChangedParts(client: AdtClientWrapper, opts: Status
   filtered = filtered.slice(0, limit);
 
   return { changedParts: filtered, truncated, checked };
+}
+
+/** CLI-level options for `abap status` (`limit` stays a raw string for parsing). */
+export interface StatusRunOptions {
+  remoteOnly?: boolean;
+  localOnly?: boolean;
+  limit?: string;
+  since?: string;
+  all?: boolean;
+}
+
+/** Flow outcome: JSON envelope data + human summary, printed by the command layer. */
+export interface StatusEnvelope {
+  data: StatusResult;
+  human: string;
+}
+
+export async function runStatus(opts: StatusRunOptions = {}): Promise<StatusEnvelope> {
+  const client = await AdtClientWrapper.create();
+  const result = await computeChangedParts(client, {
+    remoteOnly: opts.remoteOnly,
+    localOnly: opts.localOnly,
+    limit: opts.limit !== undefined ? parseStatusLimit(opts.limit) : undefined,
+    since: opts.since,
+    all: opts.all,
+  });
+  return { data: result, human: humanSummary(result.changedParts) };
+}
+
+function parseStatusLimit(value: string): number {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n <= 0) {
+    throw new CliError('INVALID_ARGUMENT', '--limit must be a positive integer', {
+      example: 'abap status --limit 20',
+    });
+  }
+  return n;
+}
+
+function humanSummary(parts: ChangedPart[]): string {
+  if (parts.length === 0) return 'No differences between local files and SAP.';
+  const lines = [`${parts.length} difference(s):`];
+  for (const p of parts) {
+    lines.push(`  ${p.object} (${p.part}) — ${p.direction}${p.detail ? ` — ${p.detail}` : ''}`);
+  }
+  return lines.join('\n');
 }

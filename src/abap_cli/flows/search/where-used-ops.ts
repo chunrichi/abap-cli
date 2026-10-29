@@ -1,5 +1,5 @@
 import type { UsageReference } from 'abap-adt-api/build/api/syntax.js';
-import type { AdtClientWrapper } from '../../clients/adt-client.js';
+import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError } from '../../output/json.js';
 import { resolveObject, type ResolvedObject } from '../../core/resolve.js';
 
@@ -159,4 +159,77 @@ export async function runWhereUsed(
       ? { nextSteps: [`Increase --limit up to ${MAX_WHERE_USED_LIMIT} or narrow with --ref-type/--package.`] }
       : {}),
   };
+}
+
+/** CLI-level options for `abap where-used` (`limit` stays a raw string). */
+export interface WhereUsedRunOptions {
+  type?: string;
+  refType?: string;
+  package?: string;
+  limit?: string;
+}
+
+/** Flow outcome: JSON envelope data + human summary, printed by the command layer. */
+export interface WhereUsedEnvelope {
+  data: WhereUsedResult;
+  human: string;
+}
+
+export async function runWhereUsedCommand(
+  object: string | undefined,
+  opts: WhereUsedRunOptions = {},
+): Promise<WhereUsedEnvelope> {
+  const target = requireObjectName(object);
+  validateWhereUsedType(opts.type, '--type');
+  validateWhereUsedType(opts.refType, '--ref-type');
+  const client = await AdtClientWrapper.create();
+  const result = await runWhereUsed(client, target, {
+    type: opts.type,
+    refType: opts.refType,
+    packageName: opts.package,
+    limit: parseLimit(opts.limit),
+  });
+  return { data: result, human: formatHuman(result) };
+}
+
+function requireObjectName(object: string | undefined): string {
+  if (!object?.trim()) {
+    throw new CliError('USAGE', 'where-used requires an object name.', {
+      nextSteps: ['Provide a supported SAP object name.'],
+      example: 'abap where-used ZCL_MY_CLASS --type CLAS',
+    });
+  }
+  return object.trim();
+}
+
+function parseLimit(value: string | undefined): number {
+  if (value === undefined || value === '') return DEFAULT_WHERE_USED_LIMIT;
+  const limit = Number(value);
+  if (!Number.isInteger(limit) || limit <= 0 || limit > MAX_WHERE_USED_LIMIT) {
+    throw new CliError('INVALID_ARGUMENT', `--limit must be an integer from 1 to ${MAX_WHERE_USED_LIMIT}`, {
+      nextSteps: [`Use --limit between 1 and ${MAX_WHERE_USED_LIMIT}.`],
+      example: 'abap where-used ZCL_MY_CLASS --limit 100',
+    });
+  }
+  return limit;
+}
+
+function formatHuman(result: WhereUsedResult): string {
+  const lines = [
+    `${result.target.name} (${result.target.type})`,
+    `  uri: ${result.target.uri}`,
+    ...(result.target.packageName ? [`  package: ${result.target.packageName}`] : []),
+    result.queryStatus === 'empty'
+      ? 'No direct references found.'
+      : `References: ${result.count} returned of ${result.totalCount}`,
+  ];
+  for (const reference of result.references) {
+    const packageName = reference.packageName ? ` [${reference.packageName}]` : '';
+    const context = reference.usageInformation ? ` — ${reference.usageInformation}` : '';
+    lines.push(`  ${reference.name} (${reference.type})${packageName}${context}`);
+  }
+  if (result.truncated) {
+    lines.push(`  truncated: increase --limit up to ${MAX_WHERE_USED_LIMIT} or use --ref-type/--package`);
+  }
+  return lines.join('\n');
 }

@@ -90,6 +90,6 @@ abap status --json
 
 ## references
 
-- 实现：`src/abap_cli/commands/status.ts`、`src/abap_cli/flows/status.ts`（`computeChangedParts`）
+- 实现：`src/abap_cli/commands/status.ts`（commander 声明 + 打印）、`src/abap_cli/flows/search/status.ts`（`computeChangedParts` / `runStatus`）
 - 设计：见 wiki 顶层 `pull-push-check-loop` 历史回顾（设计文档不入 git，详见仓库 wiki）
 - 配合：`wiki/commands/diff.md`（精细按 part 比对）
