@@ -40,7 +40,7 @@
     "verify": "npm run build && npm test && npm run test:integration && npm run docs:check && npm run check-skills-drift",
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "docs:build": "node scripts/gen-docs.mjs --write",
-    "docs:check": "node scripts/gen-docs.mjs --check"
+    "docs:check": "node scripts/gen-docs.mjs --check && node scripts/check-docs.mjs"
   },
   "keywords": [
     "abap",

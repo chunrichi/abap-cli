@@ -2,7 +2,7 @@
 type: command
 title: abap validate:aff
 description: 用本地镜像的官方 abap-file-format JSON Schema 校验 10 个支持类型的 canonical JSON 形态；作为写盘的强制 gate（pretest + CI）
-tags: [abap-cli, command, validate, abap-file-format, schema, validator, ajv, canonical, doma, dtel, tabl, stru, fugr, clas, intf, prog, http, tran]
+tags: [abap-cli, command, validate:aff, validate, abap-file-format, schema, validator, ajv, canonical, doma, dtel, tabl, stru, fugr, clas, intf, prog, http, tran]
 created at: 2026-09-03 00:00:00
 changed at: 2026-09-03 00:00:00
 ---

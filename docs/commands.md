@@ -76,6 +76,8 @@ abap init [options]
 | `--cert-passphrase` `<pwd>` | no |  |  | Passphrase for .p12 / encrypted key — written to keychain. |
 | `--sso-cookie-file` `<path>` | no |  |  | SSO cookie jar path — used with --auth-method=browser_sso. |
 | `--service-key` `<path>` | no |  |  | BTP service key JSON — used with --auth-method=oauth_password. |
+| `--spn` `<spn>` | no |  |  | Kerberos service principal name — used with --auth-method=sso (defaults to HTTP/<host>). |
+| `--reauth-on-expiry` | no |  |  | Force re-acquisition of the Kerberos ticket when the cached one expires — used with --auth-method=sso. |
 | `--tr` `<transport>` | no |  |  | Default transport number (written to .abap.json). |
 | `--package` `<package>` | no |  |  | Default SAP package (written to .abap.json). |
 | `--source-dir` `<path>` | no |  |  | Base directory for `push --all` / `check --all` (written to .abap.json). |
@@ -137,6 +139,7 @@ abap pull [options] [object-name]
 | `--include-tests` | no |  |  | Include testclasses source part. |
 | `--include-all-parts` | no |  |  | Include every source-code part. |
 | `--textpool` | no |  |  | Also pull textpool files (.texts/.selections/.headings.<lang>.properties). |
+| `--active` | no |  |  | Pull the active (activated) version — the source `abap run` executes. Default: the working-area/latest version. |
 | `--remote` `<remoteid>` | no |  |  | Pull the object's active version source from a remote system (Version Management). |
 | `--tr` `<request>` | no |  |  | Pull all objects bound to a transport request (mutually exclusive with object name and --package). |
 | `--user` `<sap-user>` | no |  |  | Filter --tr lookups by transport task owner (case-insensitive). Only valid with --tr. |
@@ -579,6 +582,7 @@ abap create <type> <name> [options]
 | `--no-pull` | no |  |  | Skip the create-then-pull local copy (default: pull after create) |
 | `--check-only` | no |  |  | Validate the proposed object without creating it |
 | `--audit` | no |  |  | Include the before-checksum (extra SAP round-trip, off by default) |
+| `--overwrite` | no |  |  | When pulling the new object back, replace an existing local file (default: keep the local draft) |
 | `--file` `<path>` | no |  |  | abap-file-format JSON input (required for TABL/STRU/DOMA/DTEL/ENQU/NROB/HTTP/TRAN/TTYP/MSAG/DDLS/SRVD/DCLS/DDLX/DDLA) |
 | `--func` `<name>` | no |  |  | With FUGR: create a function module (FUGR/FF) inside the existing function group <name> |
 | `--yes` | no | `false` |  | Confirm in non-interactive environments. |

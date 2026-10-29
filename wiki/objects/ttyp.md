@@ -78,5 +78,5 @@ abap push src/ttyp/zmy_ttyp/zmy_ttyp.ttyp.json --tr DEVK900001 --json
 # references
 
 - 类型索引：[`wiki/objects/index.md`](index.md)
-- 真实 SAP 回归：[`tests/260904001-ttyp-real-sap/`](../../tests/260904001-ttyp-real-sap/)
+- 真实 SAP 回归：本地 `tests/260904001-ttyp-real-sap/`（gitignored，本地执行证据，不入库）
 - abap-file-format 规范来源（vendored schema）：[`src/abap_cli/schema/README.md`](../../src/abap_cli/schema/README.md)

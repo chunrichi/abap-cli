@@ -2,7 +2,7 @@
 type: command
 title: abap feedback
 description: "Submit one sanitized issue from a completed agent session."
-tags: [command, feedback]
+tags: [abap-cli, command, feedback]
 created at: 2026-10-29 14:30:14
 changed at: 2026-10-29 14:30:14
 ---

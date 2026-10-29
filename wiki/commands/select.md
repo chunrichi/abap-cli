@@ -35,6 +35,19 @@ abap select --schema [--json]
 - `--schema`: 打印机器可读命令 schema（options / examples / errors）为 JSON 并 exit 0。
 - `--json`: 全局 flag——输出 012 统一 JSON 信封；失败时 stdout 严格为空（P1.7）。
 
+## Examples
+
+```bash
+# 读取表数据（默认最多 ${SEARCH_RESULT_LIMIT} 行）
+abap select ZTABLE --where "FIELD = 'X'" --json
+
+# 只取需要的列 + 排序
+abap select ZTABLE --fields FIELD1,FIELD2 --order-by FIELD1 --limit 50
+
+# 预览 SQL 与参数，不访问 SAP
+abap select ZTABLE --where "FIELD = 'X'" --dry-run --json
+```
+
 ## 执行流程与数据流
 
 ```mermaid

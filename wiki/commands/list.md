@@ -2,7 +2,7 @@
 type: command
 title: abap list
 description: "List ABAP objects in a package (read-only, ADT quickSearch-backed). Useful for cleaning up scratch objects or auditing a package before mass pull/push."
-tags: [command, list]
+tags: [abap-cli, command, list]
 created at: 2026-10-29 14:30:14
 changed at: 2026-10-29 14:30:14
 ---

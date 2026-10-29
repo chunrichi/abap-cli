@@ -2,7 +2,7 @@
 type: command
 title: abap types
 description: "Print the canonical CLI type ↔ TADIR PGMID/OBJECT ↔ DDIC tabclass mapping. Pure local — no SAP call. Surfaces the non-obvious mappings that cost real time when joining CLI write paths to TADIR queries (CLI HTTP ↔ TADIR SICF, CLI STRU ↔ TADIR TABL + DD02L-TABCLASS=INTTAB, etc.)."
-tags: [command, types]
+tags: [abap-cli, command, types]
 created at: 2026-10-29 14:30:14
 changed at: 2026-10-29 14:30:14
 ---

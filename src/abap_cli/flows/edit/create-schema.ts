@@ -52,6 +52,7 @@ export function createSchema(type?: string): CreateCommandSchema {
       { name: '--no-pull', type: 'boolean', description: 'Skip the create-then-pull local copy (default: pull after create)' },
       { name: '--check-only', type: 'boolean', description: 'Validate the proposed object without creating it' },
       { name: '--audit', type: 'boolean', description: 'Include the before-checksum (extra SAP round-trip, off by default)' },
+      { name: '--overwrite', type: 'boolean', description: 'When pulling the new object back, replace an existing local file (default: keep the local draft)' },
       { name: '--file', type: 'string', valuePlaceholder: '<path>', description: `abap-file-format JSON input (required for ${typesRequiringFile().join('/')})` },
       { name: '--func', type: 'string', valuePlaceholder: '<name>', description: 'With FUGR: create a function module (FUGR/FF) inside the existing function group <name>' },
       { name: '--schema', type: 'boolean', default: false, description: 'Print the command parameter schema as JSON and exit (no SAP call).' },

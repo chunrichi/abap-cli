@@ -22,6 +22,7 @@ abap pull [options] [object-name]
 | `--include-tests` | Include testclasses source part. |
 | `--include-all-parts` | Include every source-code part. |
 | `--textpool` | Also pull textpool files (.texts/.selections/.headings.<lang>.properties). |
+| `--active` | Pull the active (activated) version — the source `abap run` executes. Default: the working-area/latest version. |
 | `--remote <remoteid>` | Pull the object's active version source from a remote system (Version Management). |
 | `--tr <request>` | Pull all objects bound to a transport request (mutually exclusive with object name and --package). |
 | `--user <sap-user>` | Filter --tr lookups by transport task owner (case-insensitive). Only valid with --tr. |
@@ -113,6 +114,7 @@ abap create <type> <name> [options]
 | `--no-pull` | Skip the create-then-pull local copy (default: pull after create) |
 | `--check-only` | Validate the proposed object without creating it |
 | `--audit` | Include the before-checksum (extra SAP round-trip, off by default) |
+| `--overwrite` | When pulling the new object back, replace an existing local file (default: keep the local draft) |
 | `--file <path>` | abap-file-format JSON input (required for TABL/STRU/DOMA/DTEL/ENQU/NROB/HTTP/TRAN/TTYP/MSAG/DDLS/SRVD/DCLS/DDLX/DDLA) |
 | `--func <name>` | With FUGR: create a function module (FUGR/FF) inside the existing function group <name> |
 | `--yes` | Confirm in non-interactive environments. |
