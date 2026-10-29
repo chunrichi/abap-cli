@@ -95,52 +95,64 @@ Then run the workflows from [Getting Started](getting-started.md) against the mo
 
 ```
 src/abap_cli/
-├── index.ts              # commander entry, lazy-registers all commands
+├── index.ts              # commander entry: global options + lifecycle hooks
 ├── top-error.ts          # top-level commander error routing (--json safe)
-├── clients/              # AdtClientWrapper, ICF client, probe
-├── commands/             # one file per command (init / profile / pull / push / check / create / search / status / diff / inspect / activate / run / select / where-used / tcode / transport / doctor / mime / session / types …)
+├── registry/             # commands.ts (single command list) + lazy.ts (lazy command stubs)
+├── commands/             # one file per command — thin: commander declaration + SCHEMA + print
+├── flows/                # business logic (edit / setup / search / data / mime / core)
+├── formats/              # AFF file resolver + pull strategies + artifact contract; ddic/{types,io,wire,validate,examples}
+├── types/                # TYPE_REGISTRY (object-type metadata single source of truth)
+├── clients/              # AdtClientWrapper, ICF client + version check, probe
 ├── config/               # project + user config, keychain (secrets.ts), profile export/import, validation
-├── core/                 # lazy registration, polyfill, object/transport resolution, limits
-├── dictionary/           # DDIC + HTTP domain logic (ddic-json.ts, http-json.ts, tabl-artifact.ts)
-├── clients/icf-version.ts # ICF service version + deployment check
-├── formats/              # file format + resolver + pull strategies + object-parts
-├── output/               # unified JSON output, error codes, meta, check-issue types — see output/README.md
-└── flows/                # init (bind/modify/inspect/clear), profile, create (+ schema/types), pull, push (object/fugr/textpool), run, select, tcode, where-used, status, diff, inspect, doctor, atc
+├── auth/ session/        # auth model + strategies; session reuse / cookie policy
+├── core/                 # cross-layer utilities: resolve/transport, limits, path output, confirmation
+├── aff/ adc/             # AFF schema validation; ADT Deployment Channel (probe + ICF register)
+├── schema/               # vendored abap-file-format JSON schemas
+└── output/               # unified JSON output, error codes, meta, check-issue types — see output/README.md
 ```
 
 ## Adding a New Command
 
-1. Create `src/abap_cli/commands/<name>.ts` exporting `register<Name>Command(program: Command)`
-2. Register it lazily in `src/abap_cli/index.ts`: add a `COMMAND_SPECS` entry (command `name`, root-help `description`, and a `load` that dynamically `import()`s the module — see `src/abap_cli/core/lazy.ts`). The stub's description must match the one the module registers.
-3. Use `output/json.ts` (`printResult` / `printError`) so `--json` behaves consistently
+1. Put the business logic in `src/abap_cli/flows/<area>/` and return `{ data, human }` (throw `CliError` on failures). The command layer must not import `clients/` directly.
+2. Create `src/abap_cli/commands/<name>.ts` exporting `register<Name>Command(program: Command)`: commander declaration + `SCHEMA` (or a `command-schemas.ts` entry) + `printResult`/`printError`.
+3. Register it in `src/abap_cli/registry/commands.ts`: add a `COMMAND_SPECS` entry (command `name`, root-help `description`, `scope`, and a `load` that dynamically `import()`s the module). `registry/lazy.ts` turns each entry into a lazy stub; the stub's description must match the one the module registers.
 4. 在对应的领域 skill（`skills/abap-cli-<领域>/`）里补该命令的 references 条目，并更新 `metadata.commands`
-5. Document it in [Commands](commands.md) and update the README command table
+5. 运行 `npm run build && npm run docs:build` 重新生成 `docs/commands.md`、skills quick refs 与 wiki 命令索引 stub；手写 `wiki/commands/<cmd>.md` 叙述页并按 okf 契约补章节；最后 `npm run docs:check`（含 `scripts/check-docs.mjs` 的 wiki/死链/schema 漂移检查）
+6. Add coverage under `test/unit/`（纯单测）或 `test/integration/`（需构建产物 / mock-ADT）
 
 ### Command Pattern
 
-Follow the existing pattern (e.g. `commands/transport.ts`):
+Follow the existing pattern (e.g. `commands/status.ts` — declaration + print only):
 
 ```ts
 import { Command } from 'commander';
-import { AdtClientWrapper } from '../clients/adt-client.js';
-import { printError, printResult } from '../output/json.js';
+import { printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
+import { commandSchemas } from '../flows/setup/command-schemas.js';
+import { runMyFlow, type MyRunOptions } from '../flows/<area>/my-flow.js';
 
 export function registerMyCommand(program: Command): void {
   program
-    .command('mycmd')
+    .command('mycmd [target]')
     .description('...')
-    .action(async (opts, cmd) => {
-      const json = jsonFrom(cmd); // walk to the root for the global --json flag
+    .option('--limit <n>', '...')
+    .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
+    .action(async (target: string | undefined, opts: MyRunOptions, cmd) => {
+      const mode = jsonFromCommand(cmd); // resolves the global --json / --pretty-json flags
+      if (cmd.optsWithGlobals().schema) {
+        printSchema(commandSchemas['mycmd']!, mode);
+        return;
+      }
       try {
-        await runMyCommand(opts, json);
-      } catch (error) {
-        printError(json, error);
+        const result = await runMyFlow(target, opts);
+        printResult(mode, result.data, result.human);
+      } catch (error: unknown) {
+        printError(mode, error);
       }
     });
 }
 ```
 
-Use the `jsonFrom(cmd)` helper (walk `cmd.parent` to the root) rather than `cmd.parent?.opts()?.json` when the command is nested under a subcommand.
+`jsonFromCommand(cmd)` resolves the global output flags; the command itself only declares its own options and prints the flow's `{ data, human }`.
 
 ## Conventions
 

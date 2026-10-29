@@ -151,7 +151,7 @@ abap push src/zcl_my_new_class/zcl_my_new_class.clas.abap --tr DEVK900001
 
 ## Deploy the Bundled ICF Service
 
-The bundled service (handler + setup classes in `abap/src/clas/`) provides the `/sap/abap_cli/` health/version endpoint and is the base for future DDIC CRUD.
+The bundled service (handler + setup classes in `abap/src/clas/`) exposes `/sap/abap_cli/`: service id/version plus DDIC, HTTP, transaction, table-data, report-run, MIME, textpool and version-source routes. It is versioned independently from the CLI (see `ICF_SERVICE_VERSION`), and `npm run check-skills-drift` fails when the CLI and skill metadata disagree on that version.
 
 ```bash
 # Deploy sources and trigger SICF node creation/activation (idempotent)

@@ -7,14 +7,14 @@ abap-cli follows a three-layer design with clear separation of responsibilities.
 | Layer | Directory | Language | Responsibility |
 |-------|-----------|----------|----------------|
 | **CLI** | `src/abap_cli/` | TypeScript | Thin client: HTTP calls to SAP, file I/O, result display |
-| **SAP** | `abap/` | ABAP | ICF service handlers (health/version endpoint now; DDIC CRUD next) |
+| **SAP** | `abap/` | ABAP | Bundled ICF service under `/sap/abap_cli`: DDIC + HTTP + TRAN CRUD, table data query, report runner, MIME repository, textpool read, version source, setup |
 | **Agent** | `skills/` + `agents/` | Markdown | Skill prompts and multi-step workflow orchestration |
 
 ```mermaid
 graph LR
     A[Agent / User] -->|CLI commands, --json| C[abap-cli CLI layer]
     C -->|ADT REST API| S1[SAP ADT]
-    C -->|RESTful JSON| S2[SAP ICF service /sap/abap_cli<br/>health/version + setup]
+    C -->|RESTful JSON| S2[SAP ICF service /sap/abap_cli<br/>DDIC · HTTP · TRAN · data · run · mime · textpool · version + setup]
     C <-->|local files| F[src/ abap-file-format]
 ```
 
@@ -22,24 +22,27 @@ graph LR
 
 ```
 src/abap_cli/
-├── index.ts              # commander entry point, registers all commands
-├── clients/
-│   ├── adt-client.ts     # AdtClientWrapper — thin wrapper over abap-adt-api
-│   ├── icf-client.ts     # ICF service client (DDIC, later phase)
-│   └── probe.ts          # layer-by-layer connection probe (tls → auth → adt → icf)
-├── commands/             # one file per CLI command — thin: parse args, delegate to flows/, print result
-├── config/               # .abap.json + user system profiles, keychain (secrets.ts), profile export/import
-├── core/                 # shared infrastructure: lazy registration, polyfill, object/transport resolution, limits
-├── dictionary/           # DDIC domain logic: ddic-json.ts (abap-file-format JSON ↔ wire mapping)
-├── formats/              # abap-file-format file resolution + pull strategies; shared AFF artifact contract; ddic/{types,io,wire,validate,examples}
-├── clients/icf-version.ts # ICF service version + deployment check
-├── textpool/             # textpool capability probe + mixed-mode route (ADT/ICF)
-├── output/               # unified JSON output (CliError/printResult/printError), error/exit codes, help text, check-issue types — see output/README.md
-└── flows/                # workflow orchestration, grouped by area
-    ├── edit/             # pull / push / create coordinators + per-type modules
-    ├── setup/            # init, profile, doctor, command-schemas, deploy helpers
-    ├── search/ data/ mime/   # search, SE16N-style data, MIME repository
-    └── …                 # config, connection, status/diff/inspect, atc, run, select
+├── index.ts              # commander entry point: global options + lifecycle hooks (lazy command registration)
+├── top-error.ts          # top-level commander error routing (--json safe)
+├── registry/             # commands.ts (single command list) + lazy.ts (lazy command stubs)
+├── commands/             # one file per CLI command — thin: commander declaration + SCHEMA + print
+├── flows/                # workflow orchestration, grouped by area
+│   ├── edit/             # create / pull / push / deploy / activate coordinators + per-type modules
+│   ├── setup/            # init, profile, doctor, command schemas, type catalog
+│   ├── search/ data/ mime/   # search, SE16N-style data, MIME repository
+│   └── core/             # cross-flow helpers: ATC, check, transport ops, stuck reports
+├── formats/              # abap-file-format: file resolver + pull strategies + shared AFF artifact contract
+│   └── ddic/             # DDIC wire / io / validate / examples (split from the former 880-line json.ts)
+├── types/                # TYPE_REGISTRY — object-type metadata single source of truth
+├── clients/              # AdtClientWrapper (abap-adt-api), ICF client + version check, connection probe
+├── config/               # .abap.json + user system profiles, keychain (secrets.ts), CA, profile export/import
+├── auth/                 # v2 auth model + strategies (basic / cert / browser_sso / oauth_password)
+├── session/              # session reuse, cookie / key policy
+├── core/                 # cross-layer utilities: object/transport resolution, limits, path output, confirmation
+├── aff/                  # vendored AFF schema resolution + validation
+├── adc/                  # ADT Deployment Channel runtime probe + ICF register strategies
+├── schema/               # vendored abap-file-format JSON schemas (copied into dist at build time)
+└── output/               # unified JSON envelope (CliError/printResult/printError), error/exit codes, meta
 ```
 
 ### Key decisions
@@ -62,18 +65,24 @@ The bundled ICF service lives under `abap/src/clas/` (the same lowercase-type la
 - **`ZCL_ABAP_VIBE_ICF_SETUP`** — `IF_OO_ADT_CLASSRUN` runner that idempotently creates/binds/activates the SICF node via the standard `CL_ICF_TREE` API (ADR gap: SICF config is not covered by ADT REST).
 - **`ZCL_ABAP_VIBE_RUNNER`** — reflection-based wrapper invoked by `abap run --method <name>` to call PUBLIC STATIC methods on arbitrary classes and serialise the `RETURNING` value.
 - **`ZCL_ABAP_VIBE_TABL_FORMAT`** — generates abap-file-format three-piece layouts for `TABL` (canonical `tabl.json` + `tabl.ddic` + `tabl.settings.json`); STRU emits the two-piece variant.
+- **`ZCL_ABAP_VIBE_{TTYP,MSAG,ENQU,NROB}_FORMAT`** — abap-file-format renderers for the ICF read paths of the dual-channel / DDIC types.
+- The handler itself is a thin front controller: `/ddic/*`, `/http/*`, `/tcode/*`, `/tran/*`, `/textpool/*`, `/data/*`, `/run/*`, `/mime/*`, `/version-source*`, `/_class-check*` dispatch into local classes.
 
 Endpoints exposed under `/sap/abap_cli/` (current service version `1.0.0`, see `src/abap_cli/clients/icf-version.ts`):
 
 | Endpoint | Used by |
 |---|---|
-| `/` (root, version probe) | `abap deploy status`, `abap init` ICF check |
-| `/ddic/<type>` (POST/GET — `DOMA`/`DTEL`/`TABL`/`STRU`) | `abap create` / `abap push` / `abap pull` for DDIC |
-| `/http/<name>` (POST/GET — HTTP service) | `abap create HTTP` / `abap push <file>.http.json` / `abap pull --type HTTP` |
-| `/textpool/*` (GET read; POST stub) | `abap pull --textpool` (read) on systems without ADT text-elements support. The POST branch unconditionally returns `TEXTPOOL_WRITE_UNSUPPORTED`: textpool write needs the ADT text-elements write endpoint and is unavailable on releases that only expose the non-interactive API (verified on A4H) |
+| `/` (root: service id + version) | `abap deploy status`, `abap init` (ICF check), `abap doctor` |
+| `/ddic/<type>` (GET/POST) | `DOMA` / `DTEL` / `TABL` / `STRU` + `ENQU` / `NROB`: `abap create` / `push` / `pull` |
+| `/http/<name>` (GET/POST) | HTTP service node: `abap create HTTP` / `abap push <file>.http.json` / `abap pull --type HTTP` |
+| `/tran/<code>` (GET/POST) | transaction code (SE93): `abap create TRAN` / `push` / `pull` |
 | `/tcode/<code>` (GET) | `abap tcode` (TSTC → TSTCT) |
-| `/version-source` (POST) | `abap pull --remote <system>` (TMS RFC destination) |
-| `/data/query` (POST) | `abap select --table <name>` (SE16N equivalent, read-only) |
+| `/textpool/<category>` (GET read; POST stub) | `abap pull --textpool` read. The POST branch returns `TEXTPOOL_WRITE_UNSUPPORTED`: textpool write needs the ADT text-elements write endpoint and is unavailable on releases that only expose the non-interactive API (verified on A4H) |
+| `/data/query`, `/data/find-tables-by-fields` (POST) | `abap select --table`, `abap fields --find` |
+| `/run/report` (POST) | `abap run-report` (report list output) |
+| `/mime/<resource>` (GET/POST/PUT/DELETE) | `abap mime create` / `delete` / `push` |
+| `/version-source` (GET) | `abap pull --remote <system>` (TMS RFC destination) |
+| `/_class-check` (GET) | diagnostic / activation probe (no CLI caller in this repo) |
 
 `abap deploy` pushes the bundled sources then triggers the setup class; `abap deploy status` / `abap init` check deployment state/version. JSON generation on the SAP side is unified on `/ui2/cl_json=>serialize` — about 74 handcrafted JSON concatenations across the ICF handler / runner / setup classes were replaced. Development of this layer follows the **Dogfooding** principle — it is itself developed via the CLI's create → pull → edit → push loop.
 
