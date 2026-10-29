@@ -14,9 +14,10 @@ npm run build        # tsc → dist/
 ## Build & Verify
 
 ```bash
-npm run build        # TypeScript compile check
-npm test             # unit tests (vitest)
-npm run verify       # build + unit tests + docs:check + skills 漂移检查
+npm run build            # TypeScript compile check
+npm test                 # unit tests (vitest, test/unit/)
+npm run test:integration # integration tests (vitest, test/integration/; needs build)
+npm run verify           # build + unit + integration + docs:check + skills 漂移检查
 node dist/index.js --help
 ```
 
@@ -24,11 +25,36 @@ Verification is done via:
 
 1. **`npm run build`** — TypeScript compile gate
 2. **`npm test` (vitest)** — unit tests in `test/unit/` covering command option contracts, error codes, output envelope, config handling, and SAP wire mappings
-3. **`output-contract-audit.test.ts`** — automated check that all CLI errors carry the correct category/exit-code mapping and that every `--json` envelope has a stable `meta` block
-4. **`skill-bundle.test.ts`** — automated check that the shipped skill prompts cover every CLI command and respect frontmatter/path/length constraints
-5. **Local mock ADT server** — offline end-to-end checks (no SAP needed)
-6. **Real SAP integration** — protocol-level verification against a live system (`tests/<run-id>-*` directories)
-7. **`npm run docs:check`** — 生成物（`docs/commands.md`、skill quick refs、命令索引）与命令 schema 一致（已并入 `npm run verify`）
+3. **`npm run test:integration` (vitest)** — process-level tests in `test/integration/` that spawn the built CLI (`dist/index.js`) or drive the mock ADT server over real HTTP; run `npm run build` first
+4. **`output-contract-audit.test.ts`** — automated check that all CLI errors carry the correct category/exit-code mapping and that every `--json` envelope has a stable `meta` block
+5. **`skill-bundle.test.ts`** — automated check that the shipped skill prompts cover every CLI command and respect frontmatter/path/length constraints
+6. **Local mock ADT server** — offline end-to-end checks (no SAP needed)
+7. **Real SAP integration** — protocol-level verification against a live system (`tests/<run-id>-*` directories)
+8. **`npm run docs:check`** — 生成物（`docs/commands.md`、skill quick refs、命令索引）与命令 schema 一致（已并入 `npm run verify`）
+
+## Test Layout
+
+```
+test/
+├── unit/                  # pure in-process tests: no dist/, no real HTTP
+│   ├── schema-compliance/
+│   └── session-reuse/
+├── integration/           # needs the built CLI and/or the mock ADT server
+│   ├── mock-adt/
+│   │   └── server.js
+│   ├── exit-codes-process.test.ts
+│   ├── json-serialization.test.ts
+│   ├── lazy-commands-cli.test.ts
+│   ├── mock-activate-doctor-parity.test.ts
+│   └── select-safety.test.ts
+├── fixtures/
+└── setup.ts
+```
+
+- `npm test` is the fast feedback loop and must pass on a clean checkout **without** running `npm run build`.
+- `npm run test:integration` exercises process boundaries: it spawns `dist/index.js` and/or starts `test/integration/mock-adt/server.js` on localhost. Build-dependent tests skip themselves when `dist/index.js` is missing, so build first when running the suite standalone.
+- Integration tests run with a hermetic `fs.mkdtemp` HOME and workspace: they never read or write the checkout's `.abap.json`, `src/`, or the developer's `~/.abap-cli`.
+- `npm run test:coverage` reports unit coverage only.
 
 ## 文档生成
 
@@ -44,7 +70,7 @@ npm run docs:check   # 只校验不写；已并入 npm run verify，CI / 发布�
 
 ## Local Mock ADT Server
 
-`test/mock-adt/server.js` implements a subset of the ADT REST API for offline verification:
+`test/integration/mock-adt/server.js` implements a subset of the ADT REST API for offline verification:
 
 - login (`compatibility/graph`), repository search, object structure, source GET/PUT
 - lock/unlock, content-based checkruns, activation
@@ -52,8 +78,8 @@ npm run docs:check   # 只校验不写；已并入 npm run verify，CI / 发布�
 - transport: `GET /sap/bc/adt/cts/transportrequests` and `POST /sap/bc/adt/cts/transports`
 
 ```bash
-node test/mock-adt/server.js [port]        # default 8080
-MOCK_NO_TRANSPORTS=1 node test/mock-adt/server.js  # simulate no open transports
+node test/integration/mock-adt/server.js [port]        # default 8080
+MOCK_NO_TRANSPORTS=1 node test/integration/mock-adt/server.js  # simulate no open transports
 ```
 
 Point a test workspace at it:
