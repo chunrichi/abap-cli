@@ -1,0 +1,928 @@
+import * as path from 'path';
+import { AdtClientWrapper } from '../../clients/adt-client.js';
+import { IcfClient, type IcfResponse } from '../../clients/icf-client.js';
+import { CliError, toErrorShape } from '../../output/json.js';
+import { collectWarning, type Warning } from '../../output/meta.js';
+import type { ErrorCode } from '../../output/error-codes.js';
+import { resolveFile } from '../../formats/file-resolver.js';
+import { readAbapFile } from '../../formats/abap-source.js';
+import { resolveObject, getObjectParts, validateLocalFile, type ResolvedObject } from '../../core/resolve.js';
+import { resolveTransport } from '../../core/transport.js';
+import { resolveLocalTargets } from '../../core/local-targets.js';
+import { requireWriteConfirmation } from '../../core/confirmation.js';
+import { readDdicObjectForCreate, localToWire, validateDdicObject, validateTabtPayload, type DdicObject, type DdicSupportedType, type DdicWirePayload } from '../../formats/ddic/json.js';
+import { readHttpJson, localToWire as httpLocalToWire, validateHttpObject } from '../../formats/http/json.js';
+import { readTranJson, localToWire as tranLocalToWire, validateTranObject } from '../../formats/transport/json.js';
+import { pushObject, type PushStage } from './push-object.js';
+import { pushFugrOne } from './push-fugr.js';
+import { pushTextpoolFile } from './push-textpool.js';
+import { runPushTtyp } from './push-ttyp.js';
+import { runPushMsag } from './push-msag.js';
+import { runPushDdls } from './push-ddls.js';
+import { runPushEnqu } from './push-enqu.js';
+import { runPushNrob } from './push-nrob.js';
+import { orderTargetsByDependency } from './push-order.js';
+import { deduplicateTablArtifactTargets } from './push-dedup.js';
+import { readTtypJson, validateTtypObject } from '../../formats/ttyp/json.js';
+import { readMsagJson, validateMsagObject } from '../../formats/msag/json.js';
+import { readDdlsJson, validateDdlsObject } from '../../formats/ddls/json.js';
+import { readEnquJson, validateEnquObject } from '../../formats/enqu/json.js';
+import { readNrobJson, validateNrobObject } from '../../formats/nrob/json.js';
+import { DDIC_TYPES } from '../../types/registry.js';
+import { toRelativeOutputPath } from '../../core/path-output.js';
+
+/** Options for the file-level `abap push` orchestration (distinct from pushObject's PushOptions). */
+export interface PushFileOptions {
+  all?: boolean;
+  tr?: string;
+  checkOnly?: boolean;
+  activate?: boolean;
+  dryRun?: boolean;
+  failFast?: boolean;
+  atomic?: boolean;
+  yes?: boolean;
+}
+
+export interface PushFileResult {
+  file: string;
+  status: 'activated' | 'checked-only' | 'written' | 'failed' | 'dry-run';
+  transport?: string;
+  code?: string;
+  stage?: PushStage;
+  errors?: unknown[];
+  unlock?: string;
+  detail?: string;
+  /** Original failure message (aggregate reuses it for single-file runs). */
+  message?: string;
+  /** Original failure nextSteps (aggregate reuses them for single-file runs). */
+  nextSteps?: string[];
+  plan?: string[];
+  /**
+   * Whether the source reached SAP. `true` even when activation later failed —
+   * a failed activation leaves the new source stored but inactive (F-08).
+   */
+  written?: boolean;
+  /** Whether the active version now matches what was pushed. */
+  activated?: boolean;
+  /**
+   * Scope of the line numbers in SAP's activation messages. `'generated-include'`
+   * means they do NOT address the local file (F-05).
+   */
+  lineScope?: string;
+  /** Raw SAP activation messages (`{type,text,line?}`), when activation ran. */
+  messages?: unknown[];
+}
+
+/** Flow outcome: JSON envelope data + human summary, printed by the command layer. */
+export interface PushResult {
+  data: Record<string, unknown>;
+  human: string;
+}
+
+interface PushOneResult {
+  /** Transport used for this file ('' when the object is transport-free). */
+  transport: string;
+  /** Status override for routes without the standard activate semantics (DDIC). */
+  status?: PushFileResult['status'];
+}
+
+/**
+ * A concrete ICF-routed push target: which ICF call powers it, how to validate
+ * its `.json` locally, and whether it carries a DDL sidecar.
+ *
+ * `push`/`validate` are closures bound to the concrete type so the routing
+ * layer never has to branch on type codes — adding an ICF-routed type means
+ * adding one table entry (and its handler), not another `else if`.
+ */
+interface IcfPushHandler {
+  /** Push the file and return the outcome. */
+  push: (client: AdtClientWrapper, resolved: IcfPushTarget, file: string, opts: PushFileOptions) => Promise<PushOneResult>;
+  /** Local validation used by `--atomic` phase 1 (throws VALIDATION_ERROR). */
+  validate: (file: string, type: string) => Promise<void>;
+  /**
+   * Whether the abap-file-format layout carries a sibling DDL sidecar
+   * (`.tabl.ddic` / `.stru.ddic`). Drives the TABL_DDL_INVALID error mapping
+   * and the TABT settings gate without a `type === 'TABL' || ...` test.
+   */
+  usesDdlSidecar: boolean;
+}
+
+/** Minimal shape the ICF push handlers need from `resolveFile`. */
+interface IcfPushTarget {
+  objectName: string;
+  objectType: string;
+}
+
+/**
+ * Phase 4: the ICF push table. Every `.json` file that resolves to the `icf`
+ * route lands here, so `pushOne` is a single table lookup. DDIC types are
+ * enumerated from `DDIC_TYPES` so a 5th DDIC type fails to compile until it is
+ * routed.
+ */
+const ICF_PUSH_HANDLERS: Record<string, IcfPushHandler> = {
+  HTTP: {
+    push: (client, resolved, file, opts) => pushHttpFile(client, resolved, file, opts),
+    validate: (file) => validateHttpFile(file),
+    usesDdlSidecar: false,
+  },
+  TRAN: {
+    push: (client, resolved, file, opts) => pushTranFile(client, resolved, file, opts),
+    validate: (file) => validateTranFile(file),
+    usesDdlSidecar: false,
+  },
+  ...Object.fromEntries(
+    DDIC_TYPES.map((t) => [
+      t,
+      {
+        push: (client: AdtClientWrapper, resolved: IcfPushTarget, file: string, opts: PushFileOptions) =>
+          pushDdicFile(client, resolved, file, opts, t),
+        validate: (file: string) => validateDdicFile(file, t),
+        usesDdlSidecar: t === 'TABL' || t === 'STRU',
+      } satisfies IcfPushHandler,
+    ]),
+  ),
+  // PR5: ENQU (lock object) goes through the same ICF route but its wire
+  // format is the AFF JSON document (see formats/enqu/json.ts) — it does
+  // not go through `pushDdicFile` (which would expect a DdicWirePayload).
+  // Routed here because `resolveFile` puts ENQU on `route: 'icf'`.
+  ENQU: {
+    push: async (_client, _resolved, file, opts) => {
+      await runPushEnqu(file, { transport: opts.tr });
+      return { transport: opts.tr ?? '' };
+    },
+    validate: (file) => validateChannelRoutedFile('ENQU', file),
+    usesDdlSidecar: false,
+  },
+};
+
+/**
+ * Resolve the ICF push handler for an object type. Throws `TYPE_NOT_SUPPORTED`
+ * for a type that resolves to the ICF route but has no handler — better than
+ * silently posting it to `/ddic/<unknown>`.
+ */
+function icfPushHandlerFor(objectType: string): IcfPushHandler {
+  const handler = ICF_PUSH_HANDLERS[objectType.toUpperCase()];
+  if (!handler) {
+    throw new CliError('TYPE_NOT_SUPPORTED', `Object type ${objectType} has no ICF push route`, {
+      type: objectType,
+      nextSteps: [`ICF-routed push types: ${Object.keys(ICF_PUSH_HANDLERS).join(', ')}.`],
+    });
+  }
+  return handler;
+}
+
+/**
+ * 036: TTYP / MSAG / DDLS push through their own dual-channel flows. Each flow
+ * runs `channel-detect` itself (ADT primary, ICF fallback for TTYP/MSAG; DDLS
+ * hard-errors on ECC rather than falling back) and reports which channel it used.
+ *
+ * These do NOT live in `ICF_PUSH_HANDLERS`: the registry marks all three
+ * `source: 'ADT'`, so `resolveFile` gives them `route: 'adt'` and they never
+ * reach the `icf` branch — but their files are still AFF `.json`, not ABAP
+ * source, so `pushOne` must intercept them before the generic ADT source path.
+ */
+interface ChannelRoutedPushHandler {
+  /** Push the file; returns the channel actually used. */
+  push: (file: string, opts: PushFileOptions) => Promise<{ channel: 'adt' | 'icf' }>;
+  /** Local AFF validation used by `--atomic` phase 1 (throws VALIDATION_ERROR). */
+  validate: (file: string, objectType: string) => Promise<void>;
+}
+
+/** AFF validator for one channel-routed type (mirrors the create/pull sides). */
+async function validateChannelRoutedFile(objectType: string, file: string): Promise<void> {
+  const abs = path.resolve(process.cwd(), file);
+  const errors =
+    objectType === 'TTYP'
+      ? await validateTtypObject(await readTtypJson(abs))
+      : objectType === 'MSAG'
+        ? await validateMsagObject(await readMsagJson(abs))
+        : objectType === 'ENQU'
+          ? await validateEnquObject(await readEnquJson(abs))
+          : objectType === 'NROB'
+            ? await validateNrobObject(await readNrobJson(abs))
+            : await validateDdlsObject(await readDdlsJson(abs));
+  if (errors.length > 0) throw new CliError('VALIDATION_ERROR', errors.join('; '));
+}
+
+const CHANNEL_ROUTED_PUSH: Record<string, ChannelRoutedPushHandler> = {
+  TTYP: {
+    push: (file, opts) => runPushTtyp(file, { transport: opts.tr }),
+    validate: (file, type) => validateChannelRoutedFile(type, file),
+  },
+  MSAG: {
+    push: (file, opts) => runPushMsag(file, { transport: opts.tr }),
+    validate: (file, type) => validateChannelRoutedFile(type, file),
+  },
+  DDLS: {
+    push: (file, opts) => runPushDdls(file, { transport: opts.tr }),
+    validate: (file, type) => validateChannelRoutedFile(type, file),
+  },
+  // PR5: NROB (number range object) has no abap-adt-api endpoint, so its
+  // push is always ICF. The route comes out of `resolveFile` as 'adt' (the
+  // registry marks it `source: 'ADT'`), so it lands in CHANNEL_ROUTED_PUSH
+  // rather than ICF_PUSH_HANDLERS. ENQU is `source: 'ICF'` and lives in
+  // ICF_PUSH_HANDLERS above.
+  NROB: {
+    push: async (file, opts) => {
+      await runPushNrob(file, { transport: opts.tr });
+      return { channel: 'icf' as const };
+    },
+    validate: (file, type) => validateChannelRoutedFile(type, file),
+  },
+};
+
+/** Orchestrate `abap push` across files: validate targets, resolve transport, push each file. */
+export async function runPush(files: string[], opts: PushFileOptions): Promise<PushResult> {
+  if (opts.checkOnly && opts.activate === false) {
+    throw new CliError(
+      'USAGE',
+      '--check-only and --no-activate are mutually exclusive',
+      {
+        nextSteps: ["Use --check-only to stop after the syntax check.", "Use --no-activate to skip the check and activation entirely."],
+        example: 'abap push file.abap --tr NDK123456 --check-only',
+      },
+    );
+  }
+  requireWriteConfirmation(
+    'abap push',
+    { ...opts, supportsDryRun: true },
+    'abap push <files...> --tr <transport> --yes',
+  );
+  const target = await resolveLocalTargets({ files: files.length > 0 ? files : undefined, all: opts.all });
+  if (target.files.length === 0) {
+    throw new CliError('USAGE', 'Specify files or use --all', {
+      nextSteps: ["Provide one or more file paths: abap push src/foo.abap src/bar.abap --tr NDK123456", "Or use --all with a .abapignore at the workspace root."],
+      example: 'abap push src/foo.abap --tr NDK123456',
+    });
+  }
+  // PR3: collapse TABL/STRU artifact groups (`.tabl.json` + `.tabl.ddic` [+
+  // `.tabl.settings.json`]) to a single canonical file so --all does not push
+  // the same object three times. Runs before the dependency sort so the
+  // canonical (priority 30) wins over the sidecar path.
+  target.files = deduplicateTablArtifactTargets(target.files);
+
+  // PR1: dependency order so DDIC prerequisites push before the objects that
+  // reference them (DOMA → DTEL → TABL → ... → HTTP). Stable for same priority.
+  target.files = orderTargetsByDependency(target.files);
+
+  // --atomic phase 1: structural validation of every file (NO content syntax
+  // check — it establishes an SAP edit session that breaks the later activate,
+  // per real-SAP findings). Any failure → zero writes.
+  if (opts.atomic) {
+    const validationFailures: { file: string; code?: string; message: string }[] = [];
+    for (const file of target.files) {
+      try {
+        const resolved = resolveFile(file);
+        validateLocalFile(resolved);
+        if (resolved.route === 'icf') {
+          // Data-driven: each ICF-routed type owns its validator (DDIC / HTTP /
+          // TRAN have distinct file shapes, so a single readDdicJson would
+          // reject the others).
+          await icfPushHandlerFor(resolved.objectType).validate(file, resolved.objectType);
+        } else if (CHANNEL_ROUTED_PUSH[resolved.objectType]) {
+          // TTYP / MSAG / DDLS resolve to the `adt` route but are AFF `.json`
+          // files, so they own their validators too (readAbapFile would be
+          // meaningless for them).
+          await CHANNEL_ROUTED_PUSH[resolved.objectType]!.validate(file, resolved.objectType);
+        } else {
+          await readAbapFile(file);
+        }
+      } catch (error: unknown) {
+        const err = toErrorShape(error);
+        validationFailures.push({ file: toRelativeOutputPath(file), code: err.code as string, message: err.message as string });
+      }
+    }
+    if (validationFailures.length > 0) {
+      throw new CliError('VALIDATION_ERROR', `${validationFailures.length} file(s) failed validation; nothing was written`, {
+        details: { failures: validationFailures, atomic: true },
+        nextSteps: ['Fix the failing files and re-run.', 'Or drop --atomic to push the valid files individually.'],
+        example: 'abap push src/foo.abap --tr NDK123456 --atomic',
+      });
+    }
+  }
+
+
+  const client = await AdtClientWrapper.create();
+  const results: PushFileResult[] = [];
+  let failed = 0;
+  const onWarning = (w: Warning) => collectWarning(w.code, w.message, w.details);
+  for (const file of target.files) {
+    const stages: PushStage[] = [];
+    const onStage = (s: PushStage) => stages.push(s);
+    try {
+      const { transport, status } = await pushOne(client, file, opts, onStage, onWarning);
+      if (opts.dryRun) {
+        results.push({ file, status: 'dry-run', plan: stages, written: false, activated: false });
+      } else {
+        const resolvedStatus =
+          status ?? (opts.checkOnly ? 'checked-only' : (opts.activate === false ? 'written' : 'activated'));
+        results.push({
+          file,
+          status: resolvedStatus,
+          transport,
+          stage: stages[stages.length - 1],
+          written: !opts.checkOnly,
+          activated: resolvedStatus === 'activated',
+        });
+      }
+      if (opts.failFast && failed > 0) break;
+    } catch (error: unknown) {
+      failed++;
+      const err = toErrorShape(error);
+      const details = (err.details ?? {}) as Record<string, unknown>;
+      results.push({
+        file,
+        status: 'failed',
+        code: err.code,
+        message: typeof err.message === 'string' ? err.message : undefined,
+        nextSteps: Array.isArray(err.nextSteps) ? (err.nextSteps as string[]) : undefined,
+        stage: (typeof err.stage === 'string' ? err.stage : stages[stages.length - 1]) as PushStage | undefined,
+        errors: Array.isArray(err.errors) ? err.errors : undefined,
+        unlock: typeof err.unlock === 'string' ? err.unlock : undefined,
+        detail: typeof err.detail === 'string' ? err.detail : undefined,
+        // Distinguish "never reached SAP" from "written but left inactive".
+        written: typeof details.written === 'boolean' ? details.written : err.code === 'ACTIVATION_FAILED',
+        activated: false,
+        lineScope: typeof details.lineScope === 'string' ? details.lineScope : undefined,
+        messages: Array.isArray(details.messages) ? details.messages : undefined,
+      });
+      if (opts.failFast) break;
+    }
+  }
+
+  if (failed > 0) {
+    // Aggregate exit code follows the category of the first failed file
+    // (or PUSH_FAILED fallback); thrown so the unified renderer in the action
+    // handles envelope + exit code.
+    const single = target.files.length === 1;
+    const code = (single ? (results[0]?.code ?? 'PUSH_FAILED') : 'PUSH_FAILED') as ErrorCode;
+    const firstFailed = results.find((r) => r.status === 'failed');
+    const aggregateCode = (firstFailed?.code ?? code) as ErrorCode;
+    // Single-file runs surface the original failure (message + nextSteps) so the
+    // cause is visible without unwrapping `details.results`.
+    const message = single && firstFailed?.message ? firstFailed.message : `${failed} of ${target.files.length} file(s) failed`;
+    const nextSteps = single && firstFailed?.nextSteps ? firstFailed.nextSteps : undefined;
+    throw new CliError(aggregateCode, message, {
+      details: {
+        results: results.map(normalizePushResult),
+        failed,
+        // Lift the per-file activation context so single-file consumers do not
+        // have to unwrap `details.results` (F-05 / F-08).
+        ...(firstFailed?.written !== undefined ? { written: firstFailed.written } : {}),
+        ...(firstFailed?.activated !== undefined ? { activated: firstFailed.activated } : {}),
+        ...(firstFailed?.lineScope ? { lineScope: firstFailed.lineScope } : {}),
+        ...(firstFailed?.messages ? { messages: firstFailed.messages } : {}),
+      },
+      nextSteps: nextSteps ?? [
+        "Inspect the failing file's `code` and `stage` fields.",
+        'Fix the issue and re-run with --keep-going (default) or --fail-fast to stop earlier.',
+      ],
+      example: 'abap push src/foo.abap --tr NDK123456',
+    });
+  }
+
+  return {
+    data: opts.dryRun
+      ? { dryRun: true, results: results.map(normalizePushResult) }
+      : { results: results.map(normalizePushResult), failed },
+    human: humanSummary(results),
+  };
+}
+
+/** Normalize a PushFileResult path to a cwd-relative POSIX form (P0).
+ *  `r.file` is an absolute host-native path from resolveLocalTargets; the
+ *  agent contract wants a stable relative path that reads the same on every
+ *  platform. */
+function normalizePushResult(r: PushFileResult): PushFileResult {
+  return { ...r, file: toRelativeOutputPath(r.file) };
+}
+
+/**
+ * 035: push updates existing objects only. Probe DDIC/TRAN targets over the
+ * same ICF GET pull uses, so a missing object surfaces as OBJECT_NOT_FOUND
+ * (with a `create` pointer) instead of the ICF POST silently creating one.
+ * HTTP is exempt — pushing a `.http.json` creates/updates the SICF node, so a
+ * user can author the JSON by hand and `abap push` it without a prior create.
+ */
+async function requirePushTargetExists(
+  icf: IcfClient,
+  notFoundCode: 'DDIC_OBJECT_NOT_FOUND' | 'TRAN_OBJECT_NOT_FOUND',
+  probe: () => Promise<IcfResponse<unknown>>,
+  object: { name: string; type: string },
+  file: string,
+): Promise<void> {
+  const resp = await probe();
+  if (resp.status === 'success' && resp.data) return;
+  const outFile = toRelativeOutputPath(file);
+  if (resp.error?.code === notFoundCode) {
+    throw new CliError('OBJECT_NOT_FOUND', `${object.type} ${object.name} does not exist; push updates existing objects only`, {
+      object: object.name,
+      type: object.type,
+      file: outFile,
+      nextSteps: [
+        `Create it first: abap create ${object.type} ${object.name} --file ${outFile} --package <package> --description "<desc>"`,
+        'Then push again to update the object.',
+      ],
+      example: `abap push ${outFile}`,
+    });
+  }
+  const rawCode = (resp.error?.code ?? 'SAP_ERROR') as ErrorCode;
+  throw new CliError(rawCode, resp.error?.message ?? `Failed to check whether ${object.type} ${object.name} exists`, {
+    object: object.name,
+    type: object.type,
+    file: outFile,
+    nextSteps: ['Re-run after fixing the cause above.'],
+  });
+}
+
+/**
+ * Resolve the transport for one object:
+ * - an object already assigned to a request reuses it — push must NOT change it
+ * - explicit --tr is honored only when it matches the binding or the object is unbound
+ * - $TMP objects are transport-free (no request needed)
+ * - otherwise: --tr > config > user's first modifiable request > NO_TRANSPORT
+ */
+async function resolveObjectTransport(
+  client: AdtClientWrapper,
+  opts: PushFileOptions,
+  object: ResolvedObject,
+): Promise<string> {
+  if (opts.dryRun) {
+    return opts.tr ?? client.getConfig().transport ?? 'DRY_RUN';
+  }
+
+  // 035 FR-1: $TMP objects are transport-free — an explicit --tr is ignored
+  // (warn instead of silently dropping, so agents don't assume it applied).
+  // Checked before transportInfo so $TMP objects skip the bound-request lookup.
+  if (object.packageName === '$TMP') {
+    if (opts.tr) {
+      collectWarning('PUSH_TR_IGNORED_TMP', `$TMP object ${object.name} is transport-free; ignoring --tr ${opts.tr}`, {
+        object: object.name,
+        tr: opts.tr,
+      });
+    }
+    return '';
+  }
+
+  // Which request already owns this object (read-only, best-effort)?
+  let bound: string | undefined;
+  try {
+    const info = await client.transportInfo(object.objectUrl);
+    bound = info.TRANSPORTS?.[0]?.TRKORR;
+  } catch {
+    // transportInfo is best-effort; fall through to normal resolution.
+  }
+
+  if (opts.tr) {
+    if (bound && bound !== opts.tr) {
+      throw new CliError(
+        'VALIDATION_ERROR',
+        `Object ${object.name} is already assigned to transport ${bound}; cannot push under ${opts.tr}`,
+        {
+          object: object.name,
+          bound,
+          requested: opts.tr,
+          nextSteps: [
+            `Re-run without --tr to push into the object's request (${bound}).`,
+            `Or move the object first: abap transport assign ${object.name} ${opts.tr}`,
+          ],
+          example: `abap push src/${object.name.toLowerCase()}.abap`,
+        },
+      );
+    }
+    return opts.tr;
+  }
+
+  if (bound) return bound;
+  return resolveTransport(client, opts.tr, client.getConfig().transport);
+}
+
+/** Push a .json file via the self-built ICF service.
+ *  DDIC types (DOMA/DTEL/TABL/STRU) → POST /ddic/<type>.
+ *  HTTP service                     → POST /http/<name>.
+ */
+async function pushDdicFile(
+  client: AdtClientWrapper,
+  resolved: IcfPushTarget,
+  file: string,
+  opts: PushFileOptions,
+  type: DdicSupportedType,
+): Promise<PushOneResult> {
+  // DDIC abap-file-format JSON, read + validated by the shared helper. For
+  // TABL/STRU the helper honors sibling `.tabl.ddic` / `.tabl.settings.json`
+  // (spec 032 US5) and maps a malformed DDL to TABL_DDL_INVALID. The caller
+  // (`pushOne`) already rejected --check-only and handled --dry-run.
+  const { local, wire } = await readValidatedDdic(file, type, resolved.objectName);
+
+  // Transport: --tr > config > file's recorded request > ($TMP → none) > user's open request.
+  const packageName = (wire.package ?? '').toUpperCase();
+  let transport = opts.tr ?? client.getConfig().transport ?? local.transportRequest ?? '';
+  if (!transport && packageName !== '$TMP') {
+    transport = await resolveTransport(client, opts.tr, client.getConfig().transport);
+  }
+  wire.transportRequest = transport || undefined;
+
+  const icf = await IcfClient.create();
+  // 035: push updates existing objects only — never let the ICF upsert create one.
+  await requirePushTargetExists(
+    icf,
+    'DDIC_OBJECT_NOT_FOUND',
+    () => icf.getDdic(type.toLowerCase(), resolved.objectName),
+    { name: resolved.objectName, type },
+    file,
+  );
+  const resp = await icf.postDdic<{ name: string; type: string; action: 'created' | 'updated' }>(type.toLowerCase(), wire);
+  if (resp.status !== 'success' || !resp.data) {
+    const code = (resp.error?.code ?? 'DDIC_CREATE_FAILED') as ErrorCode;
+    throw new CliError(code, resp.error?.message ?? `Failed to push ${type} ${resolved.objectName}`, {
+      object: resolved.objectName,
+      type,
+      details: resp.error?.details,
+      nextSteps: [
+        'Verify the file conforms to the abap-file-format JSON schema.',
+        'Re-run after fixing the cause above.',
+      ],
+    });
+  }
+  return { transport, status: 'written' };
+}
+
+/** Result of a local ICF-file validation: the parsed local doc (+ wire for DDIC). */
+interface ValidatedDdicFile {
+  /** The abap-file-format local shape (settings live under `generalInformation`). */
+  local: DdicObject;
+  /** Wire payload built by `localToWire` (carries `package` / `transportRequest`). */
+  wire: DdicWirePayload;
+}
+
+/**
+ * Read + validate a DDIC `.json` file. Shared by the real push path and the
+ * `--atomic` phase-1 validator, so both agree on error codes:
+ *   - malformed TABL/STRU DDL sidecar            → TABL_DDL_INVALID
+ *   - other read failures                        → INVALID_ARGUMENT
+ *   - schema validation errors                   → VALIDATION_ERROR
+ *   - invalid TABT settings (TABL/STRU only)     → TABT_VALIDATION_FAILED
+ */
+async function readValidatedDdic(
+  file: string,
+  type: DdicSupportedType,
+  objectName: string,
+): Promise<ValidatedDdicFile> {
+  const outFile = toRelativeOutputPath(file);
+  const usesDdlSidecar = type === 'TABL' || type === 'STRU';
+  let local: DdicObject;
+  try {
+    // abap-file-format three-piece: TABL/STRU honor sibling .tabl.ddic /
+    // .tabl.settings.json when present. Falls back to the legacy single JSON
+    // for DOMA/DTEL (or when no sidecar exists). readTablArtifact throws on
+    // malformed DDL — mapped to TABL_DDL_INVALID below.
+    local = await readDdicObjectForCreate(path.resolve(process.cwd(), file), type);
+  } catch (error: unknown) {
+    const m = error instanceof Error ? error.message : String(error);
+    const isTablDdlError = usesDdlSidecar && /Invalid Table and Structure DDL/i.test(m);
+    const code: ErrorCode = isTablDdlError ? 'TABL_DDL_INVALID' : 'INVALID_ARGUMENT';
+    throw new CliError(code, `Cannot read ${type} file ${outFile}: ${m}`, {
+      file: outFile,
+      type,
+      object: objectName,
+      nextSteps: isTablDdlError
+        ? [
+            `Inspect the .${type.toLowerCase()}.ddic sidecar: it must start with \`define table|structure ${objectName} {\` and end with \`}\`.`,
+            `For TABL/STRU, see the abap-file-format three-piece layout (.${type.toLowerCase()}.json + .${type.toLowerCase()}.ddic + .${type.toLowerCase()}.settings.json).`,
+          ]
+        : ['Verify the file exists, is readable, and contains valid JSON.'],
+    });
+  }
+
+  const errors = validateDdicObject(local, type);
+  if (errors.length > 0) {
+    throw new CliError('VALIDATION_ERROR', `Invalid ${type} definition in ${outFile}: ${errors.join('; ')}`, {
+      file: outFile,
+      type,
+      object: objectName,
+      details: errors,
+    });
+  }
+
+  const wire = localToWire(type, local);
+
+  // P3.1: TABT schema validation — gate the wire payload against tabt-v1.json
+  // enum values so the CLI rejects invalid buffering/state/storageType before
+  // posting to SAP (where apply_ddic_table_settings would raise
+  // DDIC_FIELD_UNSUPPORTED instead).
+  if (usesDdlSidecar) {
+    const settingsWire = (local as Record<string, unknown>).generalInformation;
+    if (settingsWire) {
+      const tabtErrors = validateTabtPayload(settingsWire);
+      if (tabtErrors) {
+        throw new CliError('TABT_VALIDATION_FAILED', `Invalid TABT settings in ${outFile}: ${tabtErrors.join('; ')}`, {
+          file: outFile,
+          type,
+          object: objectName,
+          details: { schemaFile: 'tabt-v1.json', errors: tabtErrors },
+          nextSteps: [
+            'Inspect the .tabl.settings.json (or .tabl.json embedded generalInformation).',
+            `Run \`abap pull ${objectName} --type ${type}\` to refresh the file with current SAP-side values.`,
+          ],
+        });
+      }
+    }
+  }
+
+  return { local, wire };
+}
+
+/** `--atomic` phase-1 wrapper: validate only, discard the parsed payload. */
+async function validateDdicFile(file: string, type: string): Promise<void> {
+  // objectName is only used to enrich error messages; --atomic re-resolves it
+  // from the file, so pass the resolved name through when available.
+  await readValidatedDdic(file, type as DdicSupportedType, resolveFile(file).objectName);
+}
+
+/**
+ * Read + validate a HTTP service `.json` file (shared by the push path and the
+ * `--atomic` phase-1 validator).
+ */
+async function readValidatedHttp(file: string, objectName: string) {
+  const outFile = toRelativeOutputPath(file);
+  let local: Awaited<ReturnType<typeof readHttpJson>>;
+  try {
+    local = await readHttpJson(path.resolve(process.cwd(), file));
+  } catch (error: unknown) {
+    const m = error instanceof Error ? error.message : String(error);
+    throw new CliError('INVALID_ARGUMENT', `Cannot read HTTP service file ${outFile}: ${m}`, { file: outFile });
+  }
+  const errors = validateHttpObject(local);
+  if (errors.length > 0) {
+    throw new CliError('VALIDATION_ERROR', `Invalid HTTP service definition in ${outFile}: ${errors.join('; ')}`, {
+      file: outFile,
+      type: 'HTTP',
+      object: objectName,
+      details: errors,
+    });
+  }
+  return local;
+}
+
+async function validateHttpFile(file: string): Promise<void> {
+  await readValidatedHttp(file, resolveFile(file).objectName);
+}
+
+/**
+ * Read + validate a Transaction `.json` file (shared by the push path and the
+ * `--atomic` phase-1 validator).
+ */
+async function readValidatedTran(file: string, objectName: string) {
+  const outFile = toRelativeOutputPath(file);
+  let local: Awaited<ReturnType<typeof readTranJson>>;
+  try {
+    local = await readTranJson(path.resolve(process.cwd(), file));
+  } catch (error: unknown) {
+    const m = error instanceof Error ? error.message : String(error);
+    throw new CliError('INVALID_ARGUMENT', `Cannot read Transaction file ${outFile}: ${m}`, { file: outFile });
+  }
+  const errors = validateTranObject(local as Parameters<typeof validateTranObject>[0]);
+  if (errors.length > 0) {
+    throw new CliError('VALIDATION_ERROR', `Invalid TRAN definition in ${outFile}: ${errors.join('; ')}`, {
+      file: outFile,
+      type: 'TRAN',
+      object: objectName,
+      details: errors,
+    });
+  }
+  return local;
+}
+
+async function validateTranFile(file: string): Promise<void> {
+  await readValidatedTran(file, resolveFile(file).objectName);
+}
+
+/**
+ * Push a HTTP service .json file via ICF POST /http/<name>.
+ * The SAP-side handler creates/updates a SICF node with the given handler class + URL.
+ *
+ * 035 exception: HTTP push KEEPS create-on-push — the SAP-side handler
+ * creates/updates the SICF node, so no existence probe here (unlike DDIC/TRAN).
+ * `abap create HTTP` requires `--file`; push remains the create path when the
+ * JSON was authored by hand or produced by `abap pull`.
+ */
+async function pushHttpFile(
+  client: AdtClientWrapper,
+  resolved: IcfPushTarget,
+  file: string,
+  opts: PushFileOptions,
+): Promise<PushOneResult> {
+  const local = await readValidatedHttp(file, resolved.objectName);
+
+  const wire = httpLocalToWire(local);
+  // Transport: --tr > config > file's recorded request > ($TMP → none) > user's open request.
+  const packageName = (wire.package ?? '').toUpperCase();
+  let transport = opts.tr ?? client.getConfig().transport ?? local.transportRequest ?? '';
+  if (!transport && packageName !== '$TMP') {
+    transport = await resolveTransport(client, opts.tr, client.getConfig().transport);
+  }
+  wire.transportRequest = transport || undefined;
+
+  const icf = await IcfClient.create();
+  const resp = await icf.postHttp<{ name: string; type: string; action: 'created' | 'updated' }>(resolved.objectName, wire);
+  if (resp.status !== 'success' || !resp.data) {
+    const code = (resp.error?.code ?? 'HTTP_CREATE_FAILED') as ErrorCode;
+    throw new CliError(code, resp.error?.message ?? `Failed to push HTTP service ${resolved.objectName}`, {
+      object: resolved.objectName,
+      type: 'HTTP',
+      details: resp.error?.details,
+      nextSteps: [
+        'Verify the file conforms to the abap-file-format HTTP service JSON schema.',
+        'Re-run after fixing the cause above.',
+      ],
+    });
+  }
+  return { transport, status: 'written' };
+}
+
+/**
+ * Push a Transaction (.tran.json) file via ICF POST /tran/<code>.
+ * The SAP-side handler routes to RPY_TRANSACTION_INSERT (or BDC for OO) and
+ * runs corr_insert + TADIR when a transport is given.
+ */
+async function pushTranFile(
+  client: AdtClientWrapper,
+  resolved: IcfPushTarget,
+  file: string,
+  opts: PushFileOptions,
+): Promise<PushOneResult> {
+  const local = await readValidatedTran(file, resolved.objectName);
+
+  const wire = tranLocalToWire(local as Parameters<typeof tranLocalToWire>[0]);
+  const packageName = (wire.package ?? '').toUpperCase();
+  let transport = opts.tr ?? client.getConfig().transport ?? local.transportRequest ?? '';
+  if (!transport && packageName !== '$TMP') {
+    transport = await resolveTransport(client, opts.tr, client.getConfig().transport);
+  }
+  wire.transportRequest = transport || undefined;
+
+  const icf = await IcfClient.create();
+  // 035: push updates existing objects only; a missing tcode goes through `create TRAN`.
+  await requirePushTargetExists(
+    icf,
+    'TRAN_OBJECT_NOT_FOUND',
+    () => icf.getTran(resolved.objectName),
+    { name: resolved.objectName, type: 'TRAN' },
+    file,
+  );
+  const resp = await icf.postTran<{ name: string; type: string; action: 'created' | 'updated' }>(resolved.objectName, wire);
+  if (resp.status !== 'success' || !resp.data) {
+    const code = (resp.error?.code ?? 'TRAN_CREATE_FAILED') as ErrorCode;
+    throw new CliError(code, resp.error?.message ?? `Failed to push TRAN ${resolved.objectName}`, {
+      object: resolved.objectName,
+      type: 'TRAN',
+      details: resp.error?.details,
+      nextSteps: [
+        'Verify the file conforms to the abap-file-format Transaction JSON schema.',
+        'Re-run after fixing the cause above.',
+      ],
+    });
+  }
+  return { transport, status: 'written' };
+}
+
+/**
+ * Dispatch one file: textpool → ICF JSON table → channel-routed AFF JSON
+ * (TTYP / MSAG / DDLS) → FUGR → generic ADT source object.
+ */
+async function pushOne(
+  client: AdtClientWrapper,
+  file: string,
+  opts: PushFileOptions,
+  onStage: (s: PushStage) => void,
+  onWarning: (w: Warning) => void,
+): Promise<PushOneResult> {
+  let resolved;
+  try {
+    resolved = resolveFile(file);
+  } catch (error: unknown) {
+    const outFile = toRelativeOutputPath(file);
+    throw new CliError('FILE_PARSE_ERROR', `Cannot parse ${outFile}: ${message(error)}`, { details: { file: outFile } });
+  }
+  validateLocalFile(resolved);
+
+  // Textpool .properties files route via ADT/ICF (mixed mode, cache-decided).
+  if (resolved.route === 'textpool') {
+    await pushTextpoolFile(client, resolved, file, opts, onStage);
+    return { transport: opts.tr ?? client.getConfig().transport ?? '' };
+  }
+
+  // ICF .json files (DDIC / HTTP / TRAN) push through the registry table.
+  // Phase 4: no per-type branching here — `icfPushHandlerFor` owns the routes.
+  if (resolved.route === 'icf') {
+    // Guard once for every ICF type instead of inside each handler. Both flags
+    // are meaningless before the POST (validation is part of the push).
+    if (opts.checkOnly) {
+      throw new CliError('VALIDATION_ERROR', '--check-only is not supported for ICF-routed JSON files', {
+        nextSteps: ['DDIC/HTTP/TRAN files are validated during push; drop --check-only.'],
+      });
+    }
+    onStage('ddic-icf');
+    if (opts.dryRun) {
+      return { transport: opts.tr ?? client.getConfig().transport ?? 'DRY_RUN', status: 'dry-run' };
+    }
+    const handler = icfPushHandlerFor(resolved.objectType);
+    return handler.push(client, resolved, file, opts);
+  }
+
+  // 036: TTYP / MSAG / DDLS are AFF `.json` files that resolve to the ADT route
+  // (registry `source: 'ADT'`), so they must be intercepted before the generic
+  // source path below reads them as ABAP text. Each flow runs channel-detect
+  // and reports the channel it used.
+  const channelRouted = CHANNEL_ROUTED_PUSH[resolved.objectType];
+  if (channelRouted) {
+    // Same contract as the ICF branch: check-only and dry-run are meaningless
+    // before the write, and the plan must be identical across ICF/ADT routes.
+    if (opts.checkOnly) {
+      throw new CliError('VALIDATION_ERROR', '--check-only is not supported for ICF-routed or channel-routed JSON files', {
+        nextSteps: ['DDIC/HTTP/TRAN/TTYP/MSAG/DDLS files are validated during push; drop --check-only.'],
+      });
+    }
+    if (opts.dryRun) {
+      onStage('ddic-icf');
+      return { transport: opts.tr ?? client.getConfig().transport ?? 'DRY_RUN', status: 'dry-run' };
+    }
+    const result = await channelRouted.push(file, opts);
+    onStage(result.channel === 'adt' ? 'channel-adt' : 'channel-icf');
+    return { transport: opts.tr ?? '', status: 'written' };
+  }
+
+  let content: string;
+  try {
+    content = await readAbapFile(file);
+  } catch (error: unknown) {
+    const outFile = toRelativeOutputPath(file);
+    throw new CliError('FILE_PARSE_ERROR', `Cannot read ${outFile}: ${message(error)}`, { details: { file: outFile } });
+  }
+
+  // 035: a missing ADT object must not silently fall through to a write that
+  // creates it — surface OBJECT_NOT_FOUND with a `create` pointer.
+  let object: ResolvedObject;
+  try {
+    object = await resolveObject(client, resolved.objectName, resolved.objectType);
+  } catch (error: unknown) {
+    if (error instanceof CliError && error.code === 'OBJECT_NOT_FOUND') {
+      throw new CliError('OBJECT_NOT_FOUND', error.message, {
+        object: resolved.objectName,
+        type: resolved.objectType,
+        nextSteps: [
+          ...(Array.isArray(error.nextSteps) ? (error.nextSteps as string[]) : []),
+          `Create it first: abap create ${resolved.objectType} ${resolved.objectName} --package <package> --description "<desc>"`,
+        ],
+        example: `abap create ${resolved.objectType} ${resolved.objectName} --package <package> --description "<desc>"`,
+      });
+    }
+    throw error;
+  }
+  const transport = await resolveObjectTransport(client, opts, object);
+
+  if (resolved.objectType === 'FUGR') {
+    await pushFugrOne(client, object, resolved, content, transport, opts, onStage, onWarning);
+    return { transport };
+  }
+
+  const parts = await getObjectParts(client, object);
+  // Only the object's main file may map to `main`; a named include (definitions,
+  // implementations, macros, …) must match exactly or the push fails instead of
+  // silently writing its content into the main source.
+  const part = resolved.subtype === 'main'
+    ? parts.find((p) => p.subtype === 'main')
+    : parts.find((p) => p.subtype === resolved.subtype);
+  if (!part) {
+    throw new CliError('SAP_ERROR', `No source part matches ${resolved.subtype} for ${object.name}`, {
+      details: { object: object.name, subtype: resolved.subtype },
+      nextSteps: [
+        `The object ${object.name} has no '${resolved.subtype}' include.`,
+        `List the available includes: abap inspect ${object.name} --includes`,
+      ],
+      example: `abap inspect ${object.name} --includes`,
+    });
+  }
+
+  await pushObject(
+    client,
+    object,
+    [{ subtype: part.subtype, sourceUrl: part.sourceUrl, content }],
+    { transport, checkOnly: opts.checkOnly ?? false, activate: opts.activate, dryRun: opts.dryRun, onStage, onWarning },
+  );
+  return { transport };
+}
+
+function humanSummary(results: PushFileResult[]): string {
+  const lines = [`Pushed ${results.length} file(s):`];
+  for (const r of results) {
+    const tr = r.transport ? ` (${r.transport})` : '';
+    const plan = r.plan ? ` [${r.plan.join(' → ')}]` : '';
+    lines.push(`  ${toRelativeOutputPath(r.file)} → ${r.status}${tr}${plan}`);
+  }
+  return lines.join('\n');
+}
+
+function message(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
