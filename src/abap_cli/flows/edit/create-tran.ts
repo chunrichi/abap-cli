@@ -10,9 +10,10 @@ import { IcfClient } from '../../clients/icf-client.js';
 import { CliError, printResult, type OutputMode } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
 import {
-  readTranJson,
+  tranArtifact,
   localToWire as tranLocalToWire,
   validateTranObject,
+  type TranObjectLocal,
 } from '../../formats/transport/json.js';
 import { toOutputPath } from '../../core/path-output.js';
 import type { CreateOptions } from './create.js';
@@ -29,9 +30,9 @@ export async function runCreateTran(
     });
   }
   const filePath = path.resolve(process.cwd(), opts.file);
-  let local: Awaited<ReturnType<typeof readTranJson>>;
+  let local: TranObjectLocal;
   try {
-    local = await readTranJson(filePath);
+    local = await tranArtifact.read(filePath);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     const outFile = toOutputPath(opts.file);

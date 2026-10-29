@@ -1,8 +1,7 @@
-import * as fs from 'fs/promises';
-import * as path from 'path';
 import { TRAN_TYPES, type TranSupportedType } from '../../types/registry.js';
 import { validateAffMetadata } from '../../aff/schema-validator.js';
 import { stripCliEnvelope } from '../../aff/assert-metadata.js';
+import { defineWireArtifact } from '../artifact.js';
 
 // Known Transaction Code object extension (abap-file-format).
 export const TRAN_EXTENSIONS = ['.tran.json'];
@@ -272,30 +271,25 @@ export interface TranWirePayload {
 }
 
 /**
- * Read a Transaction JSON file from disk.
- */
-export async function readTranJson(filePath: string): Promise<TranObjectLocal> {
-  const content = await fs.readFile(filePath, 'utf-8');
-  return JSON.parse(content) as TranObjectLocal;
-}
-
-/**
- * Write a Transaction JSON file to disk, validating against the AFF
- * `tran-v1.json` schema before writing. Throws on schema violation.
+ * AFF Transaction artifact: file plumbing plus the local↔wire mapping.
  *
- * The validator is applied to the AFF-shaped core (formatVersion / header /
- * generalInformation / …) so CLI-only transport fields (`name`, `package`,
- * `transportRequest`) — which the SAP schema explicitly rejects via
- * `additionalProperties:false` — do not block legitimate round-trips.
+ * The pre-write hook validates against `tran-v1.json` so CLI-only transport
+ * fields (`name`, `package`, `transportRequest`) — which the SAP schema
+ * explicitly rejects via `additionalProperties:false` — do not block
+ * legitimate round-trips.
  */
-export async function writeTranJson(filePath: string, data: TranObjectLocal): Promise<void> {
-  const errors = validateTranJson(data);
-  if (errors.length > 0) {
-    throw new Error(`AFF TRAN fixture invalid: ${errors.join('; ')}`);
-  }
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, JSON.stringify(data, null, 2) + '\n', 'utf-8');
-}
+export const tranArtifact = defineWireArtifact<TranObjectLocal, TranWirePayload>({
+  type: 'TRAN',
+  toWire: localToWire,
+  fromWire: wireToLocal,
+  validate: (doc) => validateTranJson(doc),
+  beforeWrite: (data) => {
+    const errors = validateTranJson(data);
+    if (errors.length > 0) {
+      throw new Error(`AFF TRAN fixture invalid: ${errors.join('; ')}`);
+    }
+  },
+});
 
 /** Convert a local Transaction object (read from .tran.json) to wire payload. */
 export function localToWire(local: TranObjectLocal): TranWirePayload {

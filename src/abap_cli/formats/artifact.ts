@@ -33,6 +33,22 @@ export interface WireArtifact<TLocal, TWire> extends JsonArtifact<TLocal> {
   fromWire(wire: TWire): TLocal;
 }
 
+export interface ArtifactSpec<TLocal> {
+  /** Registry type code used for the AFF schema lookup and error details. */
+  type: string;
+  /**
+   * Hook that runs before the document is written; throw to abort the write.
+   * Used by types whose file layout needs validation the vendored schema does
+   * not express on its own (e.g. HTTP/TRAN strip the CLI envelope first).
+   */
+  beforeWrite?: (doc: TLocal) => void | Promise<void>;
+  /**
+   * Validation override; defaults to the vendored AFF schema for `type`.
+   * Both `load` and `validate` go through it.
+   */
+  validate?: (doc: unknown) => string[] | Promise<string[]>;
+}
+
 async function readJson<TLocal>(filePath: string): Promise<TLocal> {
   return JSON.parse(await fs.readFile(filePath, 'utf8')) as TLocal;
 }
@@ -56,15 +72,20 @@ function invalidArtifactError(type: string, filePath: string, errors: string[]):
 }
 
 /** File/schema plumbing for an AFF JSON artifact. */
-export function defineJsonArtifact<TLocal>(type: string): JsonArtifact<TLocal> {
+export function defineJsonArtifact<TLocal>(spec: ArtifactSpec<TLocal>): JsonArtifact<TLocal> {
+  const { type, beforeWrite } = spec;
+  const validateDoc = spec.validate ?? ((doc: unknown) => validateAgainstSchema(type, doc));
   return {
     type,
     read: (filePath) => readJson<TLocal>(filePath),
-    write: (filePath, doc) => writeJson(filePath, doc),
-    validate: (doc) => validateAgainstSchema(type, doc),
+    write: async (filePath, doc) => {
+      await beforeWrite?.(doc);
+      await writeJson(filePath, doc);
+    },
+    validate: async (doc) => validateDoc(doc),
     load: async (filePath) => {
       const doc = await readJson<TLocal>(filePath);
-      const errors = await validateAgainstSchema(type, doc);
+      const errors = await validateDoc(doc);
       if (errors.length > 0) throw invalidArtifactError(type, filePath, errors);
       return doc;
     },
@@ -72,13 +93,14 @@ export function defineJsonArtifact<TLocal>(type: string): JsonArtifact<TLocal> {
 }
 
 /** File/schema plumbing plus a symmetric wire mapping. */
-export function defineWireArtifact<TLocal, TWire>(spec: {
-  type: string;
-  toWire: (local: TLocal) => TWire;
-  fromWire: (wire: TWire) => TLocal;
-}): WireArtifact<TLocal, TWire> {
+export function defineWireArtifact<TLocal, TWire>(
+  spec: ArtifactSpec<TLocal> & {
+    toWire: (local: TLocal) => TWire;
+    fromWire: (wire: TWire) => TLocal;
+  },
+): WireArtifact<TLocal, TWire> {
   return {
-    ...defineJsonArtifact<TLocal>(spec.type),
+    ...defineJsonArtifact<TLocal>(spec),
     toWire: spec.toWire,
     fromWire: spec.fromWire,
   };

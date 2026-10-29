@@ -1,8 +1,7 @@
-import * as fs from 'fs/promises';
-import * as path from 'path';
 import { HTTP_TYPES, type HttpSupportedType } from '../../types/registry.js';
 import { validateAffMetadata } from '../../aff/schema-validator.js';
 import { stripCliEnvelope } from '../../aff/assert-metadata.js';
+import { defineWireArtifact } from '../artifact.js';
 
 // Known HTTP Service object extension.
 export const HTTP_EXTENSIONS = ['.http.json'];
@@ -13,9 +12,9 @@ export { HTTP_TYPES, type HttpSupportedType };
 /**
  * T2.2: AFF-shaped HTTP service definition (matches `http-v1.json` schema).
  *
- * This is the canonical abap-file-format HTTP shape. The
- * `readHttpService` / `writeHttpService` / `validateHttpService` API
- * round-trips this shape and validates against the vendored SAP schema.
+ * This is the canonical abap-file-format HTTP shape. {@link httpArtifact}
+ * owns the file plumbing and validates against the vendored SAP schema;
+ * {@link validateHttpService} exposes that validation on its own.
  *
  * The richer {@link HttpObjectLocal} (carrying SICF extension fields like
  * `serviceId` / `descriptionByLang`) is preserved as a deprecated alias
@@ -86,44 +85,25 @@ export interface HttpObjectLocal {
 export type HttpWirePayload = HttpServiceDefinition;
 
 /**
- * Read a HTTP service JSON file from disk. Returns the permissive
- * {@link HttpObjectLocal} shape so callers can accept both nested
- * (AFF) and flat (CLI) layouts without runtime checks.
- */
-export async function readHttpService(filePath: string): Promise<HttpObjectLocal> {
-  const content = await fs.readFile(filePath, 'utf-8');
-  return JSON.parse(content) as HttpObjectLocal;
-}
-
-/**
- * Legacy alias for {@link readHttpService}.
- * @deprecated
- */
-export const readHttpJson = readHttpService;
-
-/**
- * Write a HTTP service JSON file to disk, validating against the AFF
- * `http-v1.json` schema before writing. Throws on schema violation.
+ * AFF HTTP service artifact: file plumbing plus the local↔wire mapping.
  *
- * The validator is applied to the AFF-shaped core (formatVersion / header /
+ * The pre-write hook validates the AFF-shaped core (formatVersion / header /
  * generalInformation) so CLI-only transport fields (`name`, `package`,
  * `transportRequest`) — which the SAP schema explicitly rejects via
  * `additionalProperties:false` — do not block legitimate round-trips.
  */
-export async function writeHttpService(filePath: string, data: HttpObjectLocal): Promise<void> {
-  const errors = validateHttpService(stripCliEnvelope(data));
-  if (errors.length > 0) {
-    throw new Error(`AFF HTTP fixture invalid: ${errors.join('; ')}`);
-  }
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, JSON.stringify(data, null, 2) + '\n', 'utf-8');
-}
-
-/**
- * Legacy alias for {@link writeHttpService}.
- * @deprecated
- */
-export const writeHttpJson = writeHttpService;
+export const httpArtifact = defineWireArtifact<HttpObjectLocal, HttpWirePayload>({
+  type: 'HTTP',
+  toWire: localToWire,
+  fromWire: wireToLocal,
+  validate: (doc) => validateHttpService(stripCliEnvelope(doc)),
+  beforeWrite: (data) => {
+    const errors = validateHttpService(stripCliEnvelope(data));
+    if (errors.length > 0) {
+      throw new Error(`AFF HTTP fixture invalid: ${errors.join('; ')}`);
+    }
+  },
+});
 
 /**
  * Validate an HTTP service document against the vendored AFF `http-v1.json`
