@@ -4,7 +4,7 @@ title: abap tcode
 description: 只读解析事务码到其配置的 ABAP 入口程序与屏幕 — 走 ICF /tcode/<code> 端点（TSTC → TSTCT）
 tags: [abap-cli, command, tcode, tstc, icf, read-only, agent-loop]
 created at: 2026-08-19 23:00:00
-changed at: 2026-08-19 23:00:00
+changed at: 2026-10-30 01:14:53
 ---
 
 # abap tcode
@@ -115,3 +115,24 @@ abap where-used ZPROG_FOO --json      # 谁引用了它（影响面）
 
 - **CLI 版本**: 0.2.0（含 `tcode` 命令）。
 - **ICF 服务**: `ZCL_ABAP_VIBE_ICF` 的 `dispatch_tcode` / `read_tcode`（GET only）。`abap deploy` 部署后可用；`abap doctor` 探测版本匹配。
+
+# More
+
+## fixme
+
+- [ ] `resolutionChain` 在 v1 恒为空数组：参数-事务 / 变式事务 / 报表事务只报 `resolutionState: "entry_only"`，不展开多跳链路
+- [ ] 命令 schema 只声明 `TCODE_NOT_FOUND` / `TCODE_NOT_AUTHORIZED` / `INVALID_ARGUMENT` 三个错码；ICF 不可达或版本过旧时统一落到 `SAP_ERROR`，恢复路径只能靠 `abap doctor` / `abap deploy status`
+
+## todo
+
+- [ ] 多跳解析：TSTC → 参数事务 / 变式事务 → 目标程序，填满 `resolutionChain`
+- [ ] 批量解析多个事务码（v1 一次一个）
+- [ ] 真机证据待补：`S_TCODE` 权限拒绝（`TCODE_NOT_AUTHORIZED`）的 on-prem 回归记录
+
+# references
+
+- 实现: [src/abap_cli/commands/tcode.ts](../../src/abap_cli/commands/tcode.ts) · [src/abap_cli/flows/search/tcode.ts](../../src/abap_cli/flows/search/tcode.ts)（`validateTcode` / `interpretTcode`）
+- SAP 后端: `abap/src/clas/zcl_abap_vibe_icf.clas.abap`（`lcl_tcode=>dispatch_tcode`，`GET /sap/abap_cli/tcode/<code>`）
+- 文档: [docs/commands.md](../../docs/commands.md)
+- 相关命令页: [abap pull](pull.md)、[abap where-used](where-used.md)、[abap inspect](inspect.md)、[abap deploy](deploy.md)
+- 测试: `test/unit/tcode-flow.test.ts`
