@@ -1,7 +1,8 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import type { AdtClientWrapper } from '../../clients/adt-client.js';
+import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError } from '../../output/json.js';
+import { SEARCH_RESULT_LIMIT } from '../../core/limits.js';
 import { resolveFile } from '../../formats/file-resolver.js';
 import { readAbapFile, normalizeLineEndings } from '../../formats/abap-source.js';
 import { resolveObject, getObjectParts } from '../../core/resolve.js';
@@ -175,4 +176,77 @@ async function divergentSummary(client: AdtClientWrapper, cp: ChangedPart, cwd: 
   const remote = part ? await client.getObjectSource(part.sourceUrl) : '';
   const local = await readAbapFile(absLocal);
   return lineDiffSummary(local, remote);
+}
+
+/** CLI-level options for `abap diff` (the pure engine takes `DiffOptions`). */
+export interface DiffRunOptions {
+  all?: boolean;
+  remote?: boolean;
+  localOnly?: boolean;
+  limit?: string;
+}
+
+/** Flow outcome: JSON envelope data + human summary, printed by the command layer. */
+export interface DiffEnvelope {
+  data: DiffResult;
+  human: string;
+}
+
+/**
+ * True when the positional argument is clearly an ABAP object name rather than
+ * a local file path — i.e. it carries neither a path separator nor a `.` file
+ * extension. F-18: `abap diff ZCL_ZR_T5` used to fall through to the filename
+ * parser and fail with `FILE_PARSE_ERROR "Cannot resolve object type from
+ * filename: ZCL_ZR_T5"`, which reads like a filename bug instead of "you
+ * passed an object name". Genuine bad filenames (with a separator or an
+ * extension) still reach that FILE_PARSE_ERROR path unchanged.
+ */
+function looksLikeObjectName(arg: string): boolean {
+  return !arg.includes('/') && !arg.includes('\\') && !arg.includes('.');
+}
+
+export async function runDiff(file: string | undefined, opts: DiffRunOptions = {}): Promise<DiffEnvelope> {
+  if (file && (opts.all || opts.remote || opts.localOnly)) {
+    throw new CliError('INVALID_ARGUMENT', 'A file argument cannot be combined with --all/--remote/--local-only.', {
+      nextSteps: ['Either diff a single file or scope the workspace; not both.'],
+      example: 'abap diff src/zcl_demo.clas.abap --json',
+    });
+  }
+  // Precedence: the scoping-conflict check above runs first (both problems are
+  // argument-shape bugs); then an object-name argument is rejected here before
+  // any client/SAP call, so the misleading FILE_PARSE_ERROR from the filename
+  // resolver is never reached for bare names.
+  if (file && looksLikeObjectName(file)) {
+    const name = file.toUpperCase();
+    throw new CliError(
+      'INVALID_ARGUMENT',
+      `'${file}' looks like an ABAP object name, not a file path. abap diff compares a local file against SAP and does not resolve object names.`,
+      {
+        nextSteps: [
+          `Pull the object first: abap pull ${name} --type <T> (e.g. --type CLAS)`,
+          `Then diff the pulled file: abap diff src/${file.toLowerCase()}.clas.abap`,
+        ],
+        example: `abap pull ${name} --type CLAS && abap diff src/${file.toLowerCase()}.clas.abap`,
+      },
+    );
+  }
+  const client = await AdtClientWrapper.create();
+  const limit = opts.limit ? Number(opts.limit) : SEARCH_RESULT_LIMIT;
+  const result = await computeDiff(client, {
+    file,
+    all: opts.all,
+    remote: opts.remote,
+    localOnly: opts.localOnly,
+    limit,
+  });
+  const human = [
+    ...(result.parts.length === 0
+      ? ['No differences.']
+      : result.parts.map((p) => {
+          const sum = p.summary ? ` (+${p.summary.added}/-${p.summary.removed})` : '';
+          return `  ${p.object} (${p.part}): ${p.direction}${sum}`;
+        })),
+    ...(result.truncated ? ['Result truncated — use --limit <n> or narrow with --remote/--local-only.'] : []),
+  ].join('\n');
+  return { data: result, human };
 }

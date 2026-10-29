@@ -1,17 +1,8 @@
 import { Command } from 'commander';
-import { AdtClientWrapper } from '../clients/adt-client.js';
-import { CliError, printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
-import { computeChangedParts, type ChangedPart } from '../flows/search/status.js';
+import { printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
 import { SEARCH_RESULT_LIMIT } from '../core/limits.js';
 import { commandSchemas } from '../flows/setup/command-schemas.js';
-
-interface StatusOptions {
-  remoteOnly?: boolean;
-  localOnly?: boolean;
-  limit?: string;
-  since?: string;
-  all?: boolean;
-}
+import { runStatus, type StatusRunOptions } from '../flows/search/status.js';
 
 export function registerStatusCommand(program: Command): void {
   program
@@ -23,43 +14,17 @@ export function registerStatusCommand(program: Command): void {
     .option('--since <iso-date>', 'Compare files modified since date (YYYY-MM-DD[THH:mm:ss])')
     .option('--all', 'Include unchanged objects')
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
-    .action(async (opts: StatusOptions, cmd) => {
+    .action(async (opts: StatusRunOptions, cmd) => {
       const mode = jsonFromCommand(cmd);
       if (cmd.optsWithGlobals().schema) {
         printSchema(commandSchemas['status']!, mode);
         return;
       }
       try {
-        const client = await AdtClientWrapper.create();
-        const result = await computeChangedParts(client, {
-          remoteOnly: opts.remoteOnly,
-          localOnly: opts.localOnly,
-          limit: opts.limit !== undefined ? parseLimit(opts.limit) : undefined,
-          since: opts.since,
-          all: opts.all,
-        });
-        printResult(mode, result, humanSummary(result.changedParts));
+        const result = await runStatus(opts);
+        printResult(mode, result.data, result.human);
       } catch (error: unknown) {
         printError(mode, error);
       }
     });
-}
-
-function parseLimit(value: string): number {
-  const n = Number(value);
-  if (!Number.isInteger(n) || n <= 0) {
-    throw new CliError('INVALID_ARGUMENT', '--limit must be a positive integer', {
-      example: 'abap status --limit 20',
-    });
-  }
-  return n;
-}
-
-function humanSummary(parts: ChangedPart[]): string {
-  if (parts.length === 0) return 'No differences between local files and SAP.';
-  const lines = [`${parts.length} difference(s):`];
-  for (const p of parts) {
-    lines.push(`  ${p.object} (${p.part}) — ${p.direction}${p.detail ? ` — ${p.detail}` : ''}`);
-  }
-  return lines.join('\n');
 }
