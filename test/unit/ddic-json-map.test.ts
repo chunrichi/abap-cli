@@ -7,17 +7,11 @@ import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import {
-  localToWire,
-  wireToLocal,
-  localFieldToWire,
-  wireFieldToLocal,
-  validateDdicObject,
-  DDIC_TYPES,
-  getDdicJsonExample,
-  getDdicFlatJsonExample,
-  readDdicObjectForCreate,
-} from '../../src/abap_cli/formats/ddic/json.js';
+import { localToWire, wireToLocal, localFieldToWire, wireFieldToLocal } from '../../src/abap_cli/formats/ddic/wire.js';
+import { validateDdicObject } from '../../src/abap_cli/formats/ddic/validate.js';
+import { DDIC_TYPES } from '../../src/abap_cli/formats/ddic/types.js';
+import { getDdicJsonExample, getDdicFlatJsonExample } from '../../src/abap_cli/formats/ddic/examples.js';
+import { readDdicObjectForCreate } from '../../src/abap_cli/formats/ddic/io.js';
 
 describe('014/ddic-json-map', () => {
   describe('supported types', () => {
@@ -567,13 +561,13 @@ describe('014/ddic-json-map', () => {
     });
 
     it('DdicWirePayload alias still accepts all three variants (backward compat)', () => {
-      const domaWire: import('../../src/abap_cli/formats/ddic/json.js').DdicWirePayload = {
+      const domaWire: import('../../src/abap_cli/formats/ddic/types.js').DdicWirePayload = {
         name: 'ZDOMA_BC', format: { dataType: 'CHAR', length: 3 },
       };
-      const dtelWire: import('../../src/abap_cli/formats/ddic/json.js').DdicWirePayload = {
+      const dtelWire: import('../../src/abap_cli/formats/ddic/types.js').DdicWirePayload = {
         name: 'ZDTEL_BC', dataTypeInformation: { category: 'domain', typeName: 'ZDOMA_BC' },
       };
-      const tablWire: import('../../src/abap_cli/formats/ddic/json.js').DdicWirePayload = {
+      const tablWire: import('../../src/abap_cli/formats/ddic/types.js').DdicWirePayload = {
         name: 'ZTAB_BC', fields: [], generalInformation: {},
       };
       expect(domaWire.name).toBe('ZDOMA_BC');

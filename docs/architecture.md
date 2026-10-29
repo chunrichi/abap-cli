@@ -31,7 +31,7 @@ src/abap_cli/
 ├── config/               # .abap.json + user system profiles, keychain (secrets.ts), profile export/import
 ├── core/                 # shared infrastructure: lazy registration, polyfill, object/transport resolution, limits
 ├── dictionary/           # DDIC domain logic: ddic-json.ts (abap-file-format JSON ↔ wire mapping)
-├── formats/              # abap-file-format file resolution + pull strategies
+├── formats/              # abap-file-format file resolution + pull strategies; shared AFF artifact contract; ddic/{types,io,wire,validate,examples}
 ├── clients/icf-version.ts # ICF service version + deployment check
 ├── textpool/             # textpool capability probe + mixed-mode route (ADT/ICF)
 ├── output/               # unified JSON output (CliError/printResult/printError), error/exit codes, help text, check-issue types — see output/README.md

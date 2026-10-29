@@ -89,7 +89,7 @@ abap push src/tabl/zmy_table/ --tr DEVK900001 --json
 
 ## abap-file-format 合规性
 
-✅ 三件套完全合规；嵌套结构由 CLI 在 `formats/ddic/json.ts` 内部做 wire ↔ local 双向映射。push 与 create 同走三件套探测（`.tabl.ddic` / `.settings.json`，commit `185252b`）。
+✅ 三件套完全合规；嵌套结构由 CLI 在 `formats/ddic/wire.ts` 内部做 wire ↔ local 双向映射。push 与 create 同走三件套探测（`.tabl.ddic` / `.settings.json`，commit `185252b`）。
 
 ## 已知坑
 
@@ -100,5 +100,5 @@ abap push src/tabl/zmy_table/ --tr DEVK900001 --json
 # references
 
 - abap-file-format TABL 规范：`https://github.com/SAP/abap-file-formats/tree/main/file-formats/tabl`
-- 实现：[`src/abap_cli/formats/ddic/tabl-artifact.ts`](../../src/abap_cli/formats/ddic/tabl-artifact.ts)、[`src/abap_cli/formats/ddic/json.ts`](../../src/abap_cli/formats/ddic/json.ts)
+- 实现：[`src/abap_cli/formats/ddic/tabl-artifact.ts`](../../src/abap_cli/formats/ddic/tabl-artifact.ts)、[`wire.ts`](../../src/abap_cli/formats/ddic/wire.ts)、[`io.ts`](../../src/abap_cli/formats/ddic/io.ts)、[`validate.ts`](../../src/abap_cli/formats/ddic/validate.ts)
 - 类型索引：[`wiki/objects/index.md`](index.md)

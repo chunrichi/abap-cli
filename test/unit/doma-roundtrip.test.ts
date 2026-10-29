@@ -10,8 +10,8 @@
  * Local shape mirrors AFF: nested `format` and `fixedValues` blocks.
  */
 import { describe, it, expect } from 'vitest';
-import { localToWire, wireToLocal } from '../../src/abap_cli/formats/ddic/json.js';
-import type { DdicObject } from '../../src/abap_cli/formats/ddic/json.js';
+import { localToWire, wireToLocal } from '../../src/abap_cli/formats/ddic/wire.js';
+import type { DdicObject } from '../../src/abap_cli/formats/ddic/types.js';
 
 describe('DOMA round-trip', () => {
   describe('fixedValues (032 P0)', () => {

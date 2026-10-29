@@ -1,7 +1,7 @@
 /**
  * P3.1: TABT settings payload enum validation tests.
  *
- * Validates that `validateTabtPayload` (synchronous, in `formats/ddic/json.ts`)
+ * Validates that `validateTabtPayload` (synchronous, in `formats/ddic/validate.ts`)
  * correctly enforces the enum values declared by `src/abap_cli/schema/tabt-v1.json`:
  *
  *   - generalInformation.translation: noLanguageKey|standard|loadTable|objectSpecific|notRelevant
@@ -12,7 +12,7 @@
  *   - generalInformation.dbSpecificSettings.loadUnit: columnPreferred|pagePreferred|columnEnforced|pageEnforced
  */
 import { describe, it, expect } from 'vitest';
-import { validateTabtPayload } from '../../src/abap_cli/formats/ddic/json.js';
+import { validateTabtPayload } from '../../src/abap_cli/formats/ddic/validate.js';
 
 describe('P3.1 — validateTabtPayload enum checks', () => {
   it('returns null (valid) for a complete payload', () => {

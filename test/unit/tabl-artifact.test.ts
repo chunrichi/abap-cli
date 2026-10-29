@@ -11,10 +11,8 @@ import {
   parseTablDdic,
   tablArtifactPaths,
 } from '../../src/abap_cli/formats/ddic/tabl-artifact.js';
-import {
-  extractTablArtifactWire,
-  type DdicWirePayload,
-} from '../../src/abap_cli/formats/ddic/json.js';
+import { extractTablArtifactWire } from '../../src/abap_cli/formats/ddic/wire.js';
+import { type DdicWirePayload } from '../../src/abap_cli/formats/ddic/types.js';
 
 const ZAFF = `@EndUserText.label : 'Example Customer Data Table Structure'
 @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE

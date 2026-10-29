@@ -1,6 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import type { DdicFieldLocal, DdicObject, DdicSupportedType } from './json.js';
+import type { DdicFieldLocal, DdicObject, DdicSupportedType } from './types.js';
 
 export interface TablArtifact {
   objectName: string;

@@ -19,13 +19,11 @@ import * as path from 'node:path';
 import { IcfClient } from '../../clients/icf-client.js';
 import { CliError, printResult, type OutputMode } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
-import {
-  readDdicObjectForCreate,
-  localToWire,
-  validateDdicObject,
-  getDdicFlatJsonExample,
-  type DdicSupportedType,
-} from '../../formats/ddic/json.js';
+import { readDdicObjectForCreate } from '../../formats/ddic/io.js';
+import { localToWire } from '../../formats/ddic/wire.js';
+import { validateDdicObject } from '../../formats/ddic/validate.js';
+import { getDdicFlatJsonExample } from '../../formats/ddic/examples.js';
+import { type DdicSupportedType } from '../../formats/ddic/types.js';
 import { toOutputPath } from '../../core/path-output.js';
 import type { CreateOptions } from './create.js';
 import type { CreateHandler } from './routing.js';

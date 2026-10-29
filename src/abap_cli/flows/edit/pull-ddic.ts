@@ -12,7 +12,9 @@ import { IcfClient } from '../../clients/icf-client.js';
 import { buildFilename } from '../../formats/file-resolver.js';
 import { folderFor } from '../../formats/type-folder.js';
 import { fileExists } from '../../formats/abap-source.js';
-import { writeDdicJson, wireToLocal, type DdicSupportedType } from '../../formats/ddic/json.js';
+import { writeDdicJson } from '../../formats/ddic/io.js';
+import { wireToLocal } from '../../formats/ddic/wire.js';
+import { type DdicSupportedType } from '../../formats/ddic/types.js';
 import { CliError } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
 import { toOutputPath, normalizePullData } from '../../core/path-output.js';
@@ -124,7 +126,7 @@ async function writePullDdicTabl(
   wire: Parameters<typeof wireToLocal>[1],
   opts: PullOptions,
 ): Promise<PullResult> {
-  const { extractTablArtifactWire } = await import('../../formats/ddic/json.js');
+  const { extractTablArtifactWire } = await import('../../formats/ddic/wire.js');
   const { parseTablDdic, tablArtifactPaths } = await import('../../formats/ddic/tabl-artifact.js');
   const pieces = extractTablArtifactWire(wire);
   if (!pieces) {

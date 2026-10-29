@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { expectSchemaPass, readJsonFixture } from './_helpers.js';
 import { validateAff } from '../../../src/abap_cli/aff/schema-validator.js';
-import { localToWire, wireToLocal } from '../../../src/abap_cli/formats/ddic/json.js';
+import { localToWire, wireToLocal } from '../../../src/abap_cli/formats/ddic/wire.js';
 
 const five = [
   'doma/zdmy_no_fixed.doma.json',

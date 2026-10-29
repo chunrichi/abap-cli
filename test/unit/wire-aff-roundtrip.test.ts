@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readJsonFixture } from './schema-compliance/_helpers.js';
-import { localToWire, wireToLocal } from '../../src/abap_cli/formats/ddic/json.js';
+import { localToWire, wireToLocal } from '../../src/abap_cli/formats/ddic/wire.js';
 import { localToWire as httpLocalToWire, wireToLocal as httpWireToLocal } from '../../src/abap_cli/formats/http/json.js';
 
 describe('wire ↔ local AFF round-trip (T033-038)', () => {

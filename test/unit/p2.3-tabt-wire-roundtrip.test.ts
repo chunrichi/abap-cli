@@ -22,13 +22,9 @@ import { describe, it, expect } from 'vitest';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
-import {
-  extractTablArtifactWire,
-  localToWire,
-  wireToLocal,
-  readDdicObjectForCreate,
-  type DdicTableSettingsWire,
-} from '../../src/abap_cli/formats/ddic/json.js';
+import { extractTablArtifactWire, localToWire, wireToLocal } from '../../src/abap_cli/formats/ddic/wire.js';
+import { readDdicObjectForCreate } from '../../src/abap_cli/formats/ddic/io.js';
+import { type DdicTableSettingsWire } from '../../src/abap_cli/formats/ddic/types.js';
 
 /** Simulate ABAP build_settings_json output (P1.1 reference). */
 const ABAP_SETTINGS_JSON = `{
