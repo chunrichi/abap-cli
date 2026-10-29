@@ -1,0 +1,163 @@
+/**
+ * Envelope meta + structured warnings.
+ *
+ * Public API:
+ *  - setProgram: register the commander program once (from index.ts) so
+ *    buildMeta can derive the canonical command name from argv + command tree.
+ *  - collectWarning / getWarnings / resetWarnings: structured non-fatal
+ *    warnings that only ever appear in meta.warnings, never in the error
+ *    envelope.
+ *  - buildMeta: snapshot of command, version, timestamp, durationMs, warnings.
+ *  - buildSchemaMeta: reduced metadata for deterministic schema introspection.
+ *  - getOriginalArgv: lazy snapshot of process.argv.slice(2) captured on first
+ *    call, before commander mutates process.argv. Used to detect flags that the
+ *    parser silently swallowed (e.g. unknown flags on a subcommand that doesn't
+ *    define them).
+ */
+
+let _originalArgv: string[] | undefined;
+
+/** Lazy snapshot of process.argv.slice(2) captured on first call, before
+ *  commander mutates process.argv. Replaces the module-top `originalArgv`
+ *  constant so we don't freeze argv at import time. */
+export function getOriginalArgv(): string[] {
+  if (!_originalArgv) _originalArgv = process.argv.slice(2);
+  return _originalArgv;
+}
+
+import type { Command } from 'commander';
+import { createRequire } from 'node:module';
+
+export type WarningCode =
+  | 'UNLOCK_WARNING'        // push succeeded but the edit lock could not be released
+  // F-02: `pull` returns the working-area (latest) version by default, which is
+  // NOT what `abap run` executes while the object has an unactivated version.
+  | 'PENDING_INACTIVE_VERSION'
+  // F-04: `create` pulls the new skeleton back locally; an existing local draft
+  // was kept instead of being silently overwritten.
+  | 'LOCAL_FILE_KEPT'
+  | 'PASSWORD_EXPORT'       // connection export includes passwords
+  | 'KEYCHAIN_WARNING'      // OS keychain store/cleanup failed (degraded continue)
+  | 'FORCE_BYPASSED'        // deploy --force bypassed safety guards
+  | 'PROFILE_MISMATCH'      // stored profile differs from current config
+  | 'PAGINATION_LIMITED'    // search --page-all hit the page cap; result truncated
+  | 'ICF_CHECK_DEGRADED'    // init ICF deployment check degraded (non-blocking)
+  | 'ICF_OUTDATED_DEADLOCK' // deploy status reports outdated gc_version (likely user transport holds the new source)
+  | 'OAUTH_CLIENT_SECRET_ON_DISK' // oauth_password profile: client_secret stored in systems.json
+  // 032 US12 textpool pull — per-category soft warning when object has no
+  // elements of that category (CLAS has no selections, FUGR has no headings, etc.)
+  | 'TEXTPOOL_CATEGORY_MISSING'
+  // 035 push — $TMP object is transport-free; an explicit --tr is ignored
+  | 'PUSH_TR_IGNORED_TMP'
+  // P3.3: stuck-reports writer
+  | 'STUCK_REPORT_DEGRADED' // writeStuckReport encountered non-fatal issues
+  // 030-runtime-deploy
+  | 'STEAMPUNK_ICF_MANUAL'  // deploy on Steampunk: ICF node must be wired via CF route
+  ;
+
+export interface Warning {
+  code: WarningCode;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
+export interface OutputMeta {
+  /** Canonical command name, e.g. 'abap pull', 'abap profile test'. */
+  command: string;
+  /** CLI version from package.json. */
+  version: string;
+  /** ISO 8601 (UTC) timestamp. */
+  timestamp: string;
+  /** Milliseconds since CLI start (non-negative integer). */
+  durationMs: number;
+  /** Structured warnings; always present, empty when none. */
+  warnings: Warning[];
+}
+
+const startTime = Date.now();
+
+let program: Command | undefined;
+const warnings: Warning[] = [];
+
+/** Register the commander program so buildMeta can derive the command name. */
+export function setProgram(cmd: Command): void {
+  program = cmd;
+}
+
+/** Record a non-fatal warning (only surfaces in meta.warnings). */
+export function collectWarning(
+  code: WarningCode,
+  message: string,
+  details?: Record<string, unknown>,
+): void {
+  warnings.push(details ? { code, message, details } : { code, message });
+}
+
+/** Snapshot of collected warnings (copy, so callers cannot mutate the store). */
+export { deriveCommand };
+
+export function getWarnings(): Warning[] {
+  return warnings.slice();
+}
+
+/** Clear collected warnings (test isolation). */
+export function resetWarnings(): void {
+  warnings.length = 0;
+}
+
+function deriveCommand(argv: string[]): string {
+  let cmd: Command | undefined = program;
+  const parts: string[] = [];
+  for (const token of argv.slice(2)) {
+    if (token.startsWith('-')) continue;
+    const sub = cmd?.commands.find((c) => c.name() === token);
+    if (sub) {
+      cmd = sub;
+      parts.push(sub.name());
+    } else {
+      break;
+    }
+  }
+  return ['abap', ...parts].join(' ');
+}
+
+function readVersion(): string {
+  const require = createRequire(import.meta.url);
+  // Works from both layouts: dist/output/ -> ../../package.json (dist/, miss)
+  // then ../../../package.json (repo root); src/abap_cli/output/ skips the
+  // first two and resolves the repo root as well.
+  for (const candidate of ['../../package.json', '../../../package.json']) {
+    try {
+      const { version } = require(candidate) as { version?: string };
+      if (version) return version;
+    } catch {
+      // try next candidate
+    }
+  }
+  return 'unknown';
+}
+
+/** Build the envelope meta block. */
+export function buildMeta(): OutputMeta {
+  return {
+    command: deriveCommand(process.argv),
+    version: readVersion(),
+    timestamp: new Date().toISOString(),
+    durationMs: Math.max(0, Date.now() - startTime),
+    warnings: getWarnings(),
+  };
+}
+
+/** Reduced metadata used by the agent-facing `--schema` response (025 US3):
+ *  excludes timestamp and warnings so the contract stays stable and minimal. */
+export type SchemaOutputMeta = Pick<OutputMeta, 'command' | 'version' | 'durationMs'>;
+
+/** Build the reduced meta block used by `--schema`. */
+export function buildSchemaMeta(): SchemaOutputMeta {
+  const meta = buildMeta();
+  return {
+    command: meta.command,
+    version: meta.version,
+    durationMs: meta.durationMs,
+  };
+}
