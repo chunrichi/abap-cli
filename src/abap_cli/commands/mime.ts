@@ -1,8 +1,30 @@
 import { Command } from 'commander';
 import { createMimeFolder, deleteMimeFolder, type CreateMimeFolderOptions, type DeleteMimeFolderOptions } from '../flows/mime/mime-flow.js';
 import { pushMimeResources, type PushMimeResourcesOptions } from '../flows/mime/mime-push.js';
-import { jsonFromCommand, printError, printResult, printSchema, type OutputMode } from '../output/json.js';
-import { commandSchemas } from '../flows/setup/command-schemas.js';
+import { jsonFromCommand, printError, printResult, printSchema, type OutputMode, type CommandSchema } from '../output/json.js';
+import { schemaOption } from './schema-helpers.js';
+
+export const SCHEMA: CommandSchema = {
+  schemaVersion: 1,
+  command: 'mime',
+  description: 'Create, delete, or upload MIME Repository resources (subcommands: create | delete | push).',
+  usage: 'abap mime create <path> [options]\nabap mime delete <path> [options]\nabap mime push <local> --root <path> [options]',
+  scope: 'sap',
+  arguments: [],
+  options: [schemaOption()],
+  globalOptions: ['--json', '--pretty-json'],
+  examples: [
+    { description: 'Create a MIME folder under $TMP', command: 'abap mime create /zntf_ui --package $TMP --yes' },
+    { description: 'Recursively delete a folder (with transport)', command: 'abap mime delete /zntf_ui --recursive --tr NDK123456 --yes' },
+    { description: 'Upload local assets into an existing folder', command: 'abap mime push ./out --root /zntf_ui/assets --tr NDK123456 --yes' },
+    { description: 'Dry-run (no SAP calls)', command: 'abap mime push ./out --root /zntf_ui/assets --dry-run' },
+  ],
+  errors: [
+    { code: 'INVALID_ARGUMENT', category: 'USAGE', exitCode: 2 },
+    { code: 'USAGE', category: 'USAGE', exitCode: 2 },
+    { code: 'SAP_ERROR', category: 'SAP_ERROR', exitCode: 1 },
+  ],
+};
 
 export function registerMimeCommand(program: Command): void {
   const mime = program
@@ -12,7 +34,7 @@ export function registerMimeCommand(program: Command): void {
     .showHelpAfterError()
     .action((_opts, cmd) => {
       if (cmd.optsWithGlobals().schema) {
-        printSchema(commandSchemas['mime']!, jsonFromCommand(cmd));
+        printSchema(SCHEMA, jsonFromCommand(cmd));
         return;
       }
       console.log(cmd.helpInformation());

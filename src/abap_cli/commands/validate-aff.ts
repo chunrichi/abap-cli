@@ -30,8 +30,32 @@ import {
 } from '../aff/schema-validator.js';
 import { routeAffSchema } from '../aff/router.js';
 import { checkCompanions } from '../aff/companion-check.js';
-import { printSchema, jsonFromCommand } from '../output/json.js';
-import { commandSchemas } from '../flows/setup/command-schemas.js';
+import { printSchema, jsonFromCommand, type CommandSchema } from '../output/json.js';
+import { schemaOption } from './schema-helpers.js';
+
+export const SCHEMA: CommandSchema = {
+  schemaVersion: 1,
+  command: 'validate:aff',
+  description: 'Validate JSON files against official abap-file-format (AFF) canonical schemas (Draft 2020-12).',
+  usage: 'abap validate:aff <file-or-dir> [--wire <wire-dir>]',
+  scope: 'local',
+  arguments: [{ name: 'file-or-dir', type: 'string', required: true, description: 'A JSON file or directory of JSON files to validate.' }],
+  options: [
+    { name: '--wire', type: 'string', valuePlaceholder: '<wire-dir>', description: 'Also recursively validate every JSON under a wire directory.' },
+    schemaOption(),
+  ],
+  globalOptions: ['--json', '--pretty-json'],
+  examples: [
+    { description: 'Validate a single fixture', command: 'abap validate:aff test/fixtures/tabl/zmy_basic.tabl.json' },
+    { description: 'Validate all fixtures', command: 'abap validate:aff test/fixtures/' },
+    { description: 'Validate a wire payload directory', command: 'abap validate:aff --wire tmp/s4h/wire/' },
+  ],
+  errors: [
+    { code: 'AFF_SCHEMA_MISSING', category: 'NOT_FOUND', exitCode: 2 },
+    { code: 'AFF_SCHEMA_INVALID', category: 'NOT_FOUND', exitCode: 2 },
+    { code: 'AFF_SCHEMA_COMPILE_ERROR', category: 'NOT_FOUND', exitCode: 2 },
+  ],
+};
 
 interface RunOptions {
   wire?: string;
@@ -214,7 +238,7 @@ export function registerValidateAffCommand(program: Command): void {
       // --schema: print the JSON parameter schema and exit (no validation, no SAP).
       const allOpts = cmd.optsWithGlobals();
       if (allOpts.schema) {
-        printSchema(commandSchemas['validate:aff']!, jsonFromCommand(cmd));
+        printSchema(SCHEMA, jsonFromCommand(cmd));
         return;
       }
       // The top-level --json / --pretty-json (added by index.ts) must also

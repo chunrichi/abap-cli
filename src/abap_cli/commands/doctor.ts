@@ -1,7 +1,25 @@
 import { Command } from 'commander';
-import { CliError, printError, printResult, printSchema, jsonFromCommand, type OutputMode } from '../output/json.js';
+import { CliError, printError, printResult, printSchema, jsonFromCommand, type OutputMode, type CommandSchema } from '../output/json.js';
 import { runDoctorChecks, applySafeFixes } from '../flows/setup/doctor-checks.js';
-import { commandSchemas } from '../flows/setup/command-schemas.js';
+import { baseSchema, schemaOption } from './schema-helpers.js';
+
+export const SCHEMA: CommandSchema = {
+  ...baseSchema('doctor', 'Diagnose CLI environment and configuration (read-only; no live SAP probes).', 'abap doctor [options]', 'local'),
+  arguments: [],
+  options: [
+    { name: '--verbose', type: 'boolean', description: 'Include detail (versions, paths, underlying messages).' },
+    { name: '--fix', type: 'boolean', description: 'Apply safe, reversible fixes (requires --yes).' },
+    { name: '--yes', type: 'boolean', description: 'Confirm --fix without prompting.' },
+    schemaOption(),
+  ],
+  examples: [
+    { description: 'Diagnose the environment', command: 'abap doctor' },
+    { description: 'Apply safe fixes', command: 'abap doctor --fix --yes' },
+  ],
+  errors: [
+    { code: 'VALIDATION_ERROR', category: 'VALIDATION_ERROR', exitCode: 7 },
+  ],
+};
 
 interface DoctorOptions {
   verbose?: boolean;
@@ -20,7 +38,7 @@ export function registerDoctorCommand(program: Command): void {
     .action(async (opts: DoctorOptions, cmd) => {
       const mode = jsonFromCommand(cmd);
       if (cmd.optsWithGlobals().schema) {
-        printSchema(commandSchemas['doctor']!, mode);
+        printSchema(SCHEMA, mode);
         return;
       }
       try {

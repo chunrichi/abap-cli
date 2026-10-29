@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { AdtClientWrapper } from '../../clients/adt-client.js';
-import { CliError, printResult, printSchema, type OutputMode } from '../../output/json.js';
+import { CliError, printResult, type OutputMode } from '../../output/json.js';
 import { resolveObject, getObjectParts, type ResolvedObject } from '../../core/resolve.js';
 import type { ObjectPart } from '../../formats/object-parts.js';
 import { resolveTransport } from '../../core/transport.js';
@@ -22,7 +22,6 @@ import {
   requiresFileFor,
 } from '../../types/registry.js';
 import { runCreateFugrFunc } from './create-fugr-func.js';
-import { createSchema } from './create-schema.js';
 import { createRouteFor } from './routing.js';
 import { toOutputPath } from '../../core/path-output.js';
 import { normalizeName, validateObjectName } from './object-name.js';
@@ -45,7 +44,6 @@ export interface CreateOptions {
   overwrite?: boolean;
   checkOnly?: boolean;
   audit?: boolean;
-  schema?: boolean;
   yes?: boolean;
   /** 014: DDIC abap-file-format JSON input path. */
   file?: string;
@@ -59,10 +57,6 @@ export interface CreateLocalOptions {
 }
 
 export async function runCreate(type: string | undefined, name: string | undefined, opts: CreateOptions, mode: OutputMode): Promise<void> {
-  if (opts.schema) {
-    printSchema(createSchema(type));
-    return;
-  }
   if (!type) {
     throw new CliError('USAGE', "Missing required argument 'type'", {
       example: 'abap create CLAS ZCL_MY_CLASS --package ZPKG --description "desc"',

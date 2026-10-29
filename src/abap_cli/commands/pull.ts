@@ -1,9 +1,47 @@
 import { Command } from 'commander';
 import { runPull, type PullOptions } from '../flows/edit/pull.js';
-import { CliError, printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
+import { CliError, printError, printResult, printSchema, jsonFromCommand, type CommandSchema } from '../output/json.js';
 import { SEARCH_RESULT_LIMIT } from '../core/limits.js';
-import { commandSchemas } from '../flows/setup/command-schemas.js';
 import { normalizeTypeInput } from '../cli/type-alias.js';
+import { baseSchema, schemaOption } from './schema-helpers.js';
+
+export const SCHEMA: CommandSchema = {
+  ...baseSchema('pull', 'Download ABAP objects from SAP to local files.', 'abap pull [options] [object-name]', 'sap'),
+  arguments: [{ name: 'object-name', type: 'string', required: false, description: 'Object name (e.g. ZCL_MY_CLASS).' }],
+  options: [
+    { name: '--type', type: 'string', valuePlaceholder: '<type>', description: 'Object type (CLAS, PROG, INTF, etc.).' },
+    { name: '--package', type: 'string', valuePlaceholder: '<package>', description: 'Download all objects in a package (bounded by --limit).' },
+    { name: '--limit', type: 'int', valuePlaceholder: '<n>', default: SEARCH_RESULT_LIMIT, description: 'Batch page size for --package.' },
+    { name: '--page', type: 'int', valuePlaceholder: '<n>', default: 1, description: 'Batch page number for --package (1-based).' },
+    { name: '--dir', type: 'string', valuePlaceholder: '<path>', default: 'src/', description: 'Output directory.' },
+    { name: '--overwrite', type: 'boolean', description: 'Replace local file with different content.' },
+    { name: '--skip-existing', type: 'boolean', description: 'Skip files that already exist.' },
+    { name: '--include-tests', type: 'boolean', description: 'Include testclasses source part.' },
+    { name: '--include-all-parts', type: 'boolean', description: 'Include every source-code part.' },
+    { name: '--textpool', type: 'boolean', description: 'Also pull textpool files (.texts/.selections/.headings.<lang>.properties).' },
+    { name: '--active', type: 'boolean', description: 'Pull the active (activated) version — the source `abap run` executes. Default: the working-area/latest version.' },
+    { name: '--remote', type: 'string', valuePlaceholder: '<remoteid>', description: 'Pull the object\'s active version source from a remote system (Version Management).' },
+    { name: '--tr', type: 'string', valuePlaceholder: '<request>', description: 'Pull all objects bound to a transport request (mutually exclusive with object name and --package).' },
+    { name: '--user', type: 'string', valuePlaceholder: '<sap-user>', description: 'Filter --tr lookups by transport task owner (case-insensitive). Only valid with --tr.' },
+    schemaOption(),
+  ],
+  exclusiveGroups: [['--tr', '<object-name>'], ['--tr', '--package']],
+  examples: [
+    { description: 'Pull a single class', command: 'abap pull ZCL_MY_CLASS --type CLAS' },
+    { description: 'Pull a whole package', command: 'abap pull --package ZPKG --limit 50' },
+    { description: 'Pull all objects bound to a transport', command: 'abap pull --tr DEVK900001' },
+    { description: 'Pull textpool files alongside the source', command: 'abap pull ZCL_MY_CLASS --textpool' },
+  ],
+  errors: [
+    { code: 'OBJECT_NOT_FOUND', category: 'NOT_FOUND', exitCode: 8 },
+    { code: 'TYPE_NOT_SUPPORTED', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'DDIC_NOT_SUPPORTED', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'OVERWRITE_REQUIRED', category: 'USAGE', exitCode: 2 },
+    { code: 'TRANSPORT_NOT_FOUND', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'PULL_PARTIAL_FAILURE', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'INVALID_ARGUMENT', category: 'USAGE', exitCode: 2 },
+  ],
+};
 
 export function registerPullCommand(program: Command): void {
   program
@@ -31,7 +69,7 @@ export function registerPullCommand(program: Command): void {
     .action(async (objectName: string, opts: PullOptions & { active?: boolean }, cmd) => {
       // --schema branch — emit machine-readable parameter schema (no SAP call).
       if (cmd.optsWithGlobals().schema) {
-        printSchema(commandSchemas['pull']!, jsonFromCommand(cmd));
+        printSchema(SCHEMA, jsonFromCommand(cmd));
         return;
       }
       // PR2: --user only makes sense with --tr — reject before the bare-help short-circuit.
