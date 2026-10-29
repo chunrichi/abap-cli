@@ -1,0 +1,74 @@
+import { Command } from 'commander';
+import { CliError, printError, printResult, printSchema, jsonFromCommand, type OutputMode } from '../output/json.js';
+import { runDoctorChecks, applySafeFixes } from '../flows/setup/doctor-checks.js';
+import { commandSchemas } from '../flows/setup/command-schemas.js';
+
+interface DoctorOptions {
+  verbose?: boolean;
+  fix?: boolean;
+  yes?: boolean;
+}
+
+export function registerDoctorCommand(program: Command): void {
+  program
+    .command('doctor')
+    .description('Diagnose CLI environment and configuration (read-only)')
+    .option('--verbose', 'Include detail (versions, paths, messages)')
+    .option('--fix', 'Apply safe, reversible fixes (requires --yes)')
+    .option('--yes', 'Confirm --fix without prompting')
+    .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
+    .action(async (opts: DoctorOptions, cmd) => {
+      const mode = jsonFromCommand(cmd);
+      if (cmd.optsWithGlobals().schema) {
+        printSchema(commandSchemas['doctor']!, mode);
+        return;
+      }
+      try {
+        await runDoctor(opts, mode);
+      } catch (error: unknown) {
+        printError(mode, error);
+      }
+    });
+}
+
+async function runDoctor(opts: DoctorOptions,mode: OutputMode): Promise<void> {
+  if (opts.fix && !opts.yes && !process.stdin.isTTY) {
+    throw new CliError('VALIDATION_ERROR', '--fix is a write operation; confirm with --yes.', {
+      nextSteps: ['Re-run with --yes to apply safe, reversible fixes.', 'Review the report first: abap doctor --json'],
+      example: 'abap doctor --fix --yes',
+    });
+  }
+
+  const report = await runDoctorChecks({ verbose: opts.verbose });
+
+  let human: string;
+  if (opts.fix && opts.yes) {
+    const fixesApplied = applySafeFixes();
+    report.fixesApplied = fixesApplied;
+    human =
+      `Doctor report (${fixesApplied.length > 0 ? 'fixes applied' : 'no fixes needed'}):\n` +
+      humanize(report);
+  } else {
+    human = humanize(report);
+  }
+
+  printResult(mode, report, human);
+}
+
+function humanize(report: { environment: { key: string; status: string; message: string }[]; config: { key: string; status: string; message: string }[]; nextSteps: string[] }): string {
+  const lines: string[] = [];
+  for (const [label, section] of [
+    ['environment', report.environment],
+    ['config', report.config],
+  ] as const) {
+    lines.push(`${label}:`);
+    for (const item of section) {
+      lines.push(`  ${item.key}: ${item.status}${item.message ? ` — ${item.message}` : ''}`);
+    }
+  }
+  if (report.nextSteps.length > 0) {
+    lines.push('nextSteps:');
+    for (const s of report.nextSteps) lines.push(`  - ${s}`);
+  }
+  return lines.join('\n');
+}

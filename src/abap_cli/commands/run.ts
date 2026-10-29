@@ -1,0 +1,204 @@
+import { Command } from 'commander';
+import { printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
+import {
+  buildDryRun,
+  runRun,
+  validateClassName,
+  validateMethodName,
+  validateTimeout,
+} from '../flows/data/run.js';
+
+export const SCHEMA = {
+  schemaVersion: 1,
+  command: 'run',
+  description:
+    'Execute an ABAP class (classrun) or a static method via the bundled runner wrapper; returns stdout + exit code (read-only). The wrapper route (--method) requires a system whose ADT classrun endpoint injects method arguments; otherwise it returns WRAPPER_INPUT_UNAVAILABLE.',
+  usage: 'abap run [options] <class-name>',
+  scope: 'sap',
+  arguments: [
+    {
+      name: 'class-name',
+      type: 'string',
+      required: true,
+      pattern: '^[A-Za-z][A-Za-z0-9_~]{0,29}$',
+      description:
+        'Target ABAP class name (e.g. ZCL_MY_THING). Local classes with `~` are rejected with LOCAL_CLASS_NOT_RUNNABLE.',
+    },
+  ],
+  options: [
+    {
+      name: '--method',
+      type: 'string',
+      required: false,
+      pattern: '^[A-Za-z_][A-Za-z0-9_]*$',
+      description:
+        'PUBLIC STATIC method name to invoke via ZCL_ABAP_VIBE_RUNNER. When omitted, the class is run via ADT classrun (if_oo_adt_classrun~main). NOT available on systems whose ADT classrun endpoint does not inject method arguments: the call then fails with WRAPPER_INPUT_UNAVAILABLE — use the direct classrun path (`abap run <class>`) instead.',
+    },
+    {
+      name: '--args',
+      type: 'json',
+      required: false,
+      default: '{}',
+      description:
+        'JSON object of method arguments, mapped to IMPORTING parameters (case-insensitive). Must be a JSON object, not array/null.',
+    },
+    {
+      name: '--timeout',
+      type: 'number',
+      required: false,
+      default: 30000,
+      minimum: 100,
+      maximum: 600000,
+      description:
+        'Maximum execution time in ms. Wrapper path enforces server-side via cl_abap_runtime; classrun path uses ADT endpoint timeout (~5min) plus CLI-side AbortController fallback.',
+    },
+    {
+      name: '--dry-run',
+      type: 'boolean',
+      required: false,
+      default: false,
+      description: 'Plan only — print the request envelope without invoking ADT classrun.',
+    },
+    {
+      name: '--json',
+      type: 'boolean',
+      required: false,
+      default: false,
+      global: true,
+      description: 'Emit the unified JSON envelope on stdout; --pretty-json indents.',
+    },
+    {
+      name: '--schema',
+      type: 'boolean',
+      required: false,
+      default: false,
+      description: 'Print the command parameter schema as JSON and exit (no SAP call).',
+    },
+  ],
+  exclusiveGroups: [['--schema', '<class-name>']],
+  globalOptions: ['--json'],
+  examples: [
+    { description: 'Trigger classrun (no --method)', command: 'abap run ZCL_MY_THING' },
+    {
+      description: 'Invoke a static method with arguments',
+      command: 'abap run ZCL_MY_HELPER --method compute --args \'{"x":3,"y":5}\'',
+    },
+    { description: 'Dry-run with timeout', command: 'abap run ZCL_LONG_RUN --timeout 60000 --dry-run' },
+    {
+      description: 'Agent integration: JSON envelope',
+      command: 'abap run ZCL_FOO --method bar --args \'{}\' --json',
+    },
+  ],
+  errors: [
+    { code: 'METHOD_FAILED', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'METHOD_NOT_SUPPORTED', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'CLASS_NOT_RUNNABLE', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'OBJECT_NOT_ACTIVE', category: 'SAP_ERROR', exitCode: 6 },
+    { code: 'LOCAL_CLASS_NOT_RUNNABLE', category: 'SAP_ERROR', exitCode: 6 },
+    { code: 'TIMEOUT', category: 'SAP_ERROR', exitCode: 6 },
+    { code: 'WRAPPER_NOT_DEPLOYED', category: 'NOT_FOUND', exitCode: 8 },
+    { code: 'OBJECT_NOT_FOUND', category: 'NOT_FOUND', exitCode: 8 },
+    { code: 'INVALID_ARGUMENT', category: 'USAGE', exitCode: 2 },
+  ],
+};
+
+export function registerRunCommand(program: Command): void {
+  program
+    .command('run')
+    .description(
+      'Execute ABAP class (classrun) or PUBLIC STATIC method; returns stdout + exit code',
+    )
+    .argument('[class-name]', 'Class name (e.g. ZCL_MY_THING)')
+    .option(
+      '--method <name>',
+      'PUBLIC STATIC method to invoke via ZCL_ABAP_VIBE_RUNNER (unsupported where ADT classrun does not inject arguments: WRAPPER_INPUT_UNAVAILABLE)',
+    )
+    .option('--args <json>', 'Method arguments JSON', '{}')
+    .option('--timeout <ms>', 'Execution timeout in ms (100–600000)', '30000')
+    .option('--dry-run', 'Print the request envelope without invoking ADT classrun')
+    .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
+    .action(
+      async (
+        className: string | undefined,
+        opts: {
+          method?: string;
+          args?: string;
+          timeout?: string;
+          dryRun?: boolean;
+        },
+        cmd: Command,
+      ) => {
+        const mode = jsonFromCommand(cmd);
+
+        // --schema branch — emit machine-readable parameter schema, no SAP call.
+        if (cmd.optsWithGlobals().schema) {
+          printSchema(SCHEMA, mode);
+          return;
+        }
+
+        if (!className) {
+          // Bare `abap run` — print command help (mirrors pull/config behaviour).
+          process.stdout.write(cmd.helpInformation());
+          return;
+        }
+
+        try {
+          // Pre-validate cheap fields so command-line errors surface before
+          // any flow / wrapper logic.
+          validateClassName(className);
+          if (opts.method) validateMethodName(opts.method);
+          validateTimeout(opts.timeout);
+
+          if (opts.dryRun) {
+            const dry = buildDryRun(className, {
+              method: opts.method,
+              args: opts.args,
+              timeout: opts.timeout,
+            });
+            printResult(mode, dry, formatHuman(dry));
+            return;
+          }
+
+          const result = await runRun(className, {
+            method: opts.method,
+            args: opts.args,
+            timeout: opts.timeout,
+          });
+          printResult(mode, result, formatHuman(result));
+        } catch (error: unknown) {
+          printError(mode, error);
+        }
+      },
+    );
+}
+
+function formatHuman(result: ReturnType<typeof buildDryRun>): string {
+  const lines: string[] = [];
+  lines.push(`route: ${result.route}`);
+  if (result.dryRun) {
+    lines.push(`(dry-run) would run classrun`);
+    lines.push(`className: ${result.className}`);
+    if (result.method) lines.push(`method:    ${result.method}`);
+    lines.push(`timeout:   ${result.timeout}ms`);
+    return lines.join('\n');
+  }
+  lines.push(`exit:    ${result.exitCode}`);
+  lines.push(`time:    ${result.durationMs}ms`);
+  if (result.method) lines.push(`method:  ${result.method}`);
+  // S-7: surface which version of the class SAP actually executed.
+  // `hasInactiveVersion: true` is the F-02 red flag — a `push` left an
+  // inactive copy that this `run` did NOT pick up.
+  const fp = (result as { sourceFingerprint?: { hasInactiveVersion: boolean; activeChangedAt: string | null; activeChangedBy: string | null; unavailable?: boolean } }).sourceFingerprint;
+  if (fp) {
+    if (fp.unavailable) {
+      lines.push('fingerprint: unavailable (release does not expose inactive-objects)');
+    } else {
+      const stamp = fp.activeChangedAt ? `${fp.activeChangedAt} by ${fp.activeChangedBy ?? '?'}` : 'unknown';
+      const flag = fp.hasInactiveVersion ? ' ⚠ inactive version exists' : '';
+      lines.push(`fingerprint: CLAS ${result.className} active=${stamp}${flag}`);
+    }
+  }
+  if (result.output) lines.push('--- stdout ---');
+  if (result.output) lines.push(result.output);
+  return lines.join('\n');
+}
