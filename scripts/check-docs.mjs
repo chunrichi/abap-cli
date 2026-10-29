@@ -111,6 +111,12 @@ function trackedMarkdownFiles() {
 }
 
 function checkLinks() {
+  const tracked = new Set(
+    execFileSync('git', ['ls-files'], { cwd: repoRoot, encoding: 'utf8' })
+      .trim()
+      .split('\n')
+      .filter(Boolean),
+  );
   for (const file of trackedMarkdownFiles()) {
     const abs = path.join(repoRoot, file);
     let text = fs.readFileSync(abs, 'utf8');
@@ -123,8 +129,15 @@ function checkLinks() {
       if (/^(https?:|mailto:|#)/.test(raw)) continue;
       const target = decodeURIComponent(raw.split('#')[0]);
       if (!target) continue;
-      if (!fs.existsSync(path.resolve(path.dirname(abs), target))) {
-        errors.push(`${file}: dead link -> ${raw}`);
+      const resolved = path.resolve(path.dirname(abs), target);
+      // The guard must behave like a clean clone: the target has to be a
+      // tracked file (or a directory containing tracked files), not merely
+      // present in the working tree (gitignored evidence dirs, dist/, …).
+      const rel = path.relative(repoRoot, resolved).split(path.sep).join('/');
+      const isTracked =
+        tracked.has(rel) || [...tracked].some((entry) => entry.startsWith(rel + '/')) || rel === '';
+      if (!isTracked) {
+        errors.push(`${file}: dead link -> ${raw} (target is not tracked)`);
       }
     }
   }
