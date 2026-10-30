@@ -45,6 +45,10 @@ export class AdtClientWrapper {
   private sessionReady = false;
   /** True once a 401 fallback re-login has been attempted. */
   private fallbackUsed = false;
+  /** True once this process opened a SAP session itself (fresh login). */
+  private freshLogin = false;
+  /** True when the live session is persisted for the next command to reuse. */
+  private sessionReusable = false;
 
   private constructor(config: ProjectConfig, auth: { password: string; options: ClientOptions }) {
     this.config = config;
@@ -72,10 +76,11 @@ export class AdtClientWrapper {
   private async _loginNow(): Promise<void> {
     try {
       await this.client.login();
+      this.freshLogin = true;
       this.sessionReady = true;
       if (this.jar && this.sessionKey) {
         captureSessionFromAdt(this.client, this.jar);
-        await markJarPersisted(this.jar, this.config.sap, this.sessionKey);
+        this.sessionReusable = await markJarPersisted(this.jar, this.config.sap, this.sessionKey);
       }
     } catch (error: unknown) {
       if (error instanceof CliError) throw error;
@@ -109,11 +114,23 @@ export class AdtClientWrapper {
   }
 
   /**
+   * True when this process opened a SAP session that the next command cannot
+   * reuse (non-durable key store, unwritable jar). The end-of-command hook
+   * releases such sessions so a degraded reuse path cannot leave one orphan
+   * session per command.
+   */
+  get sessionNeedsRelease(): boolean {
+    return this.freshLogin && !this.sessionReusable;
+  }
+
+  /**
    * Decide whether to reuse a persisted SAP session or fall back to a fresh
    * login on the first real request.
    *
    *  - cloud / btp: never touch the cookie jar (FR-005) — fresh login.
    *  - `always-logout`: fresh login every command; no jar read/write.
+   *  - non-durable key store (test/CI backends): no jar read/write — fresh
+   *    login, released again at command end.
    *  - `reuse` + valid jar: inject cookie + csrf so the first request skips
    *    the `ADTClient.login()` round-trip and reuses the SAP session.
    *  - `reuse` + no jar: lazily fresh-login on first `_call`, then capture
@@ -130,13 +147,21 @@ export class AdtClientWrapper {
       return;
     }
 
-    const { key } = await loadOrCreateSessionKey(this.config.sap);
+    const { key, mode } = await loadOrCreateSessionKey(this.config.sap);
     this.sessionKey = key;
+    if (mode === 'ephemeral') {
+      // The key store does not persist across processes, so a jar written now
+      // could never be decrypted by the next command. Skip the jar entirely
+      // and let the end-of-command hook release the fresh login.
+      this.sessionReady = false;
+      return;
+    }
     const jar = await loadJarFromDisk(this.config.sap, key);
     if (jar && jar.cookies.length > 0) {
       injectSessionIntoAdt(this.client, jar);
       this.jar = jar;
       this.sessionReady = true; // first request reuses the saved SAP session
+      this.sessionReusable = true;
     } else {
       this.jar =
         jar ??
@@ -153,10 +178,11 @@ export class AdtClientWrapper {
   private async ensureSession(): Promise<void> {
     if (this.sessionReady) return;
     await this.client.login();
+    this.freshLogin = true;
     this.sessionReady = true;
-    if (this.jar) {
+    if (this.jar && this.sessionKey) {
       captureSessionFromAdt(this.client, this.jar);
-      if (this.sessionKey) await markJarPersisted(this.jar, this.config.sap, this.sessionKey);
+      this.sessionReusable = await markJarPersisted(this.jar, this.config.sap, this.sessionKey);
     }
   }
 
@@ -172,6 +198,8 @@ export class AdtClientWrapper {
     try {
       await this.client.logout();
       this.sessionReady = false;
+      this.freshLogin = false;
+      this.sessionReusable = false;
       clearJarFromDisk(this.config.sap);
     } catch {
       // logout is best-effort — swallow transport/auth errors.
@@ -211,8 +239,11 @@ export class AdtClientWrapper {
         this.fallbackUsed = true;
         // Stale session: re-login, re-capture, persist, then retry the call.
         await this.client.login();
+        this.freshLogin = true;
         captureSessionFromAdt(this.client, this.jar);
-        if (this.sessionKey) await markJarPersisted(this.jar, this.config.sap, this.sessionKey);
+        if (this.sessionKey) {
+          this.sessionReusable = await markJarPersisted(this.jar, this.config.sap, this.sessionKey);
+        }
         try {
           return await attempt();
         } catch (retryError: unknown) {

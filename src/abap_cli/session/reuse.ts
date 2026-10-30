@@ -143,8 +143,15 @@ export async function loadJarFromDisk(profile: SapConfig, key: Buffer): Promise<
   return null;
 }
 
-/** Encrypt + write a jar to disk (mkdir -p, mode 0600). Non-fatal on error. */
-export async function markJarPersisted(jar: SessionJar, profile: SapConfig, key: Buffer): Promise<void> {
+/**
+ * Encrypt + write a jar to disk (mkdir -p, mode 0600). Non-fatal on error.
+ *
+ * Resolves `true` when a copy was written to either candidate path and
+ * `false` when both are unwritable — callers use that to decide whether the
+ * live SAP session can be handed off to the next command or must be released
+ * at command end instead of lingering as an orphan.
+ */
+export async function markJarPersisted(jar: SessionJar, profile: SapConfig, key: Buffer): Promise<boolean> {
   // S-8: if the home-dir write fails with a permission error, transparently
   // fall back to `$TMPDIR/abap-cli/sessions/<hash>.json` so session reuse
   // keeps working in sandboxed environments. The fallback path is cached
@@ -171,7 +178,7 @@ export async function markJarPersisted(jar: SessionJar, profile: SapConfig, key:
         );
         fallbackJarPaths.set(hash, file);
       }
-      return;
+      return true;
     } catch (error: unknown) {
       const code = isFsErrorCode(error);
       // Fall back when the primary path is structurally unwritable:
@@ -195,9 +202,10 @@ export async function markJarPersisted(jar: SessionJar, profile: SapConfig, key:
           'Session reuse is disabled for this run (every command will log in again); ' +
           'inspect the current state with `abap session`.\n',
       );
-      return;
+      return false;
     }
   }
+  return false;
 }
 
 /** Extract the `code` from an `Error` thrown by the `fs` module, when present. */

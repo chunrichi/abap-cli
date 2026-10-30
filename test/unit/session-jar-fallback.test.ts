@@ -12,15 +12,17 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-const h = vi.hoisted(() => ({ home: { value: '' } }));
+const h = vi.hoisted(() => ({ home: { value: '' }, tmp: { value: '' }, realTmp: '' }));
 
 vi.mock('os', async (importOriginal) => {
   const actual = await importOriginal<typeof import('os')>();
-  return { ...actual, homedir: () => h.home.value };
+  h.realTmp = actual.tmpdir();
+  return { ...actual, homedir: () => h.home.value, tmpdir: () => h.tmp.value };
 });
 vi.mock('node:os', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:os')>();
-  return { ...actual, homedir: () => h.home.value };
+  h.realTmp = actual.tmpdir();
+  return { ...actual, homedir: () => h.home.value, tmpdir: () => h.tmp.value };
 });
 
 import {
@@ -69,6 +71,7 @@ let fallbackDir: string;
 beforeEach(() => {
   resetJarWarnings();
   stderr = [];
+  h.tmp.value = h.realTmp;
   originalWrite = process.stderr.write.bind(process.stderr);
   // @ts-expect-error test stub
   process.stderr.write = (chunk: string) => {
@@ -98,7 +101,7 @@ afterEach(() => {
 describe('session jar fallback (S-8)', () => {
   it('writes to $TMPDIR/abap-cli/sessions/<hash>.json when the home-dir path is unwritable', async () => {
     const key = Buffer.alloc(32, 1);
-    await markJarPersisted(jar, profile, key);
+    await expect(markJarPersisted(jar, profile, key)).resolves.toBe(true);
 
     const fallbackPath = getFallbackJarPath(profile);
     expect(fallbackPath).toBeDefined();
@@ -183,5 +186,21 @@ describe('session jar fallback (S-8)', () => {
     const warnings = stderr.filter((line) => line.includes('WARN session jar'));
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain('re-logging in');
+  });
+
+  it('resolves false when neither the home dir nor the TMPDIR fallback can be written', async () => {
+    const key = Buffer.alloc(32, 1);
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jarunwritable-'));
+    const tmpFile = path.join(dir, 'tmp-not-a-dir');
+    fs.writeFileSync(tmpFile, 'x');
+    const homeFile = path.join(dir, 'home-not-a-dir');
+    fs.writeFileSync(homeFile, 'x');
+    h.home.value = homeFile;
+    h.tmp.value = tmpFile; // mkdir under TMPDIR fails with ENOTDIR
+
+    await expect(markJarPersisted(jar, profile, key)).resolves.toBe(false);
+
+    const warnings = stderr.filter((line) => line.includes('WARN session jar'));
+    expect(warnings.some((line) => line.includes('Session reuse is disabled'))).toBe(true);
   });
 });

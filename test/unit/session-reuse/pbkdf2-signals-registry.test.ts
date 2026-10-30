@@ -5,13 +5,16 @@
  * - PBKDF2 reference vector is stable across Node versions.
  * - `sessionKeyFromBase64` / `sessionKeyToBase64` round-trip.
  * - `registry` drain is idempotent and calls logout()/cleanup() once.
- * - `end-of-command` only drains under `always-logout`.
+ * - `end-of-command` drains everything under `always-logout` and, under
+ *   `reuse`, only the sessions this process could not persist for the next
+ *   command (safety net against orphan SAP sessions).
  * - signal handler drains clients and exits once.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { deriveSessionKey, sessionKeyFromBase64, sessionKeyToBase64 } from '../../../src/abap_cli/session/key.js';
+import { deriveSessionKey, loadOrCreateSessionKey, resetKeychainCache, sessionKeyFromBase64, sessionKeyToBase64 } from '../../../src/abap_cli/session/key.js';
+import { _resetBackendForTesting, isSecretStoreDurable } from '../../../src/abap_cli/config/secrets.js';
 import { drainClients, registerAdtClient, registerIcfClient, resetRegistry } from '../../../src/abap_cli/session/registry.js';
-import { _resetPolicyGuard, runAlwaysLogoutIfNeeded } from '../../../src/abap_cli/session/end-of-command.js';
+import { _resetPolicyGuard, runEndOfCommandCleanup } from '../../../src/abap_cli/session/end-of-command.js';
 import { _resetSignalState, handleSignal } from '../../../src/abap_cli/session/signals.js';
 import type { SapConfig } from '../../../src/abap_cli/config/project-config.js';
 
@@ -98,7 +101,7 @@ describe('registry drain', () => {
   });
 });
 
-describe('runAlwaysLogoutIfNeeded', () => {
+describe('runEndOfCommandCleanup', () => {
   beforeEach(() => {
     resetRegistry();
     _resetPolicyGuard();
@@ -119,7 +122,7 @@ describe('runAlwaysLogoutIfNeeded', () => {
       },
       transport: '', package: '', systemName: 'x',
     };
-    await runAlwaysLogoutIfNeeded(cfg as never);
+    await runEndOfCommandCleanup(cfg as never);
     expect(a.logout).toHaveBeenCalledTimes(1);
   });
 
@@ -133,7 +136,7 @@ describe('runAlwaysLogoutIfNeeded', () => {
       },
       transport: '', package: '', systemName: 'x',
     };
-    await runAlwaysLogoutIfNeeded(cfg as never);
+    await runEndOfCommandCleanup(cfg as never);
     expect(a.logout).not.toHaveBeenCalled();
   });
 
@@ -148,12 +151,29 @@ describe('runAlwaysLogoutIfNeeded', () => {
       },
       transport: '', package: '', systemName: 'x',
     };
-    await runAlwaysLogoutIfNeeded(cfg as never);
+    await runEndOfCommandCleanup(cfg as never);
     // A second registered client after the guard fired is not drained this run.
     const b = { logout: vi.fn().mockResolvedValue(undefined) };
     registerAdtClient(b as never);
-    await runAlwaysLogoutIfNeeded(cfg as never);
+    await runEndOfCommandCleanup(cfg as never);
     expect(b.logout).not.toHaveBeenCalled();
+  });
+
+  it('releases only the sessions that cannot be reused under the reuse policy', async () => {
+    const reusable = { logout: vi.fn().mockResolvedValue(undefined), sessionNeedsRelease: false };
+    const orphan = { logout: vi.fn().mockResolvedValue(undefined), sessionNeedsRelease: true };
+    registerAdtClient(reusable as never);
+    registerAdtClient(orphan as never);
+    const cfg = {
+      sap: {
+        url: 'http://x', client: '001', username: 'U', password: '', language: 'EN',
+        insecure: true, caPath: '', auth: { method: 'basic' as const }, sourceDir: '.',
+      },
+      transport: '', package: '', systemName: 'x',
+    };
+    await runEndOfCommandCleanup(cfg as never);
+    expect(orphan.logout).toHaveBeenCalledTimes(1);
+    expect(reusable.logout).not.toHaveBeenCalled();
   });
 });
 
@@ -199,5 +219,35 @@ describe('signal handler', () => {
     } finally {
       exitSpy.mockRestore();
     }
+  });
+});
+
+describe('session-key durability gate', () => {
+  const originalEnv = process.env.ABAP_CLI_KEYCHAIN_BACKEND;
+
+  afterEach(() => {
+    if (originalEnv === undefined) delete process.env.ABAP_CLI_KEYCHAIN_BACKEND;
+    else process.env.ABAP_CLI_KEYCHAIN_BACKEND = originalEnv;
+    _resetBackendForTesting();
+    resetKeychainCache();
+  });
+
+  it('treats the in-memory fixture backend as non-durable and disables reuse', async () => {
+    process.env.ABAP_CLI_KEYCHAIN_BACKEND = 'fixture';
+    _resetBackendForTesting();
+    resetKeychainCache();
+
+    await expect(isSecretStoreDurable()).resolves.toBe(false);
+    const result = await loadOrCreateSessionKey(profile());
+    expect(result.mode).toBe('ephemeral');
+    expect(result.key.length).toBe(32);
+    expect(result.key.equals(deriveSessionKey(profile()))).toBe(true);
+  });
+
+  it('treats the native OS backend as durable', async () => {
+    process.env.ABAP_CLI_KEYCHAIN_BACKEND = 'native';
+    _resetBackendForTesting();
+
+    await expect(isSecretStoreDurable()).resolves.toBe(true);
   });
 });

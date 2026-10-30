@@ -10,7 +10,7 @@
  */
 
 import { pbkdf2Sync, randomBytes } from 'node:crypto';
-import { SESSION_KEYCHAIN_ACCOUNT, getSessionKey, storeSessionKey, deleteSessionKey } from '../config/secrets.js';
+import { SESSION_KEYCHAIN_ACCOUNT, getSessionKey, storeSessionKey, deleteSessionKey, isSecretStoreDurable } from '../config/secrets.js';
 import { CliError } from '../output/json.js';
 import type { SapConfig } from '../config/project-config.js';
 
@@ -76,7 +76,11 @@ export function sessionKeyToBase64(key: Buffer): string {
 
 export interface SessionKeyLoadResult {
   key: Buffer;
-  mode: 'keychain' | 'derived';
+  /**
+   * `ephemeral`: the active secret store does not persist the key across
+   * processes (test/CI backends), so cookie-jar reuse is disabled.
+   */
+  mode: 'keychain' | 'derived' | 'ephemeral';
 }
 
 let _warnedAboutKeychain = false;
@@ -85,6 +89,9 @@ let _warnedAboutKeychain = false;
  * Resolve the encryption key for `~/.abap-cli/sessions/<hash>.json`.
  *
  * Order:
+ *   0. If the secret store is not durable (test/CI backends), return a
+ *      derived key in `ephemeral` mode — the jar could never be decrypted by
+ *      the next process, so callers disable reuse and log the session out.
  *   1. If keychain is available and an entry exists, use it.
  *   2. If keychain is available but no entry, generate a fresh 32-byte
  *      random key and store it.
@@ -93,6 +100,9 @@ let _warnedAboutKeychain = false;
  *      the user knows their jar is not as strongly protected.
  */
 export async function loadOrCreateSessionKey(profile: SapConfig): Promise<SessionKeyLoadResult> {
+  if (!(await isSecretStoreDurable())) {
+    return { key: deriveSessionKey(profile), mode: 'ephemeral' };
+  }
   const available = await detectKeychainAvailable();
   if (!available) {
     if (!_warnedAboutKeychain) {
