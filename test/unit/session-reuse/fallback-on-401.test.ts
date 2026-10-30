@@ -64,7 +64,9 @@ vi.mock('abap-adt-api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('abap-adt-api')>();
   return {
     ...actual,
-    ADTClient: vi.fn().mockImplementation(() => h.mockClient),
+    ADTClient: vi.fn().mockImplementation(function () {
+      return h.mockClient;
+    }),
     session_types: { stateful: 'stateful', stateless: 'stateless', keep: '' },
   };
 });
