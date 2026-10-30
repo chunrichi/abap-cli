@@ -1,5 +1,4 @@
 import { ADTClient, session_types, type ClientOptions, type TextElement, type TextElementCategory, type DumpsFeed } from 'abap-adt-api';
-import type { BearerFetcher } from 'abap-adt-api/build/AdtHTTP.js';
 import { parseServiceBinding, type ServiceBinding } from 'abap-adt-api/build/api/tablecontents.js';
 import {
   buildActivationRequest,
@@ -15,7 +14,7 @@ import {
 import { loadConfig, type ProjectConfig } from '../config/project-config.js';
 import { CliError } from '../output/json.js';
 import { classifyHttpError } from './http-error.js';
-import { buildAuth } from '../auth/adapter.js';
+import { buildBasicAuth } from './basic-auth.js';
 import { makeEmptyJar, type SessionJar } from '../session/jar.js';
 import { effectivePolicy, isUnsupportedInContext, resolveSessionPolicy } from '../session/policy.js';
 import { loadOrCreateSessionKey } from '../session/key.js';
@@ -26,10 +25,8 @@ import { registerAdtClient } from '../session/registry.js';
  * Thin wrapper around abap-adt-api ADTClient.
  * Initializes from project config and exposes the most common operations.
  *
- * Login strategy is selected by `config.sap.authMethod`: `basic` keeps
- * the original username/password behavior, `cert` injects an X.509
- * `https.Agent` via `buildAuth`. The chosen strategy is recorded on
- * `this.authLabel` so downstream code can surface it in doctor / probe output.
+ * Authentication is basic auth: username + the keychain password, with TLS
+ * trust options built by `buildBasicAuth`.
  *
  * Every method that round-trips to the ADT endpoint runs through `_call`,
  * which classifies TLS / AUTH / SAP errors via the shared HTTP classifier.
@@ -37,8 +34,6 @@ import { registerAdtClient } from '../session/registry.js';
 export class AdtClientWrapper {
   private client: ADTClient;
   private config: ProjectConfig;
-  /** Short label of the auth strategy actually used (e.g. "basic" / "cert"). */
-  private authLabel: string;
 
   /** Effective session policy (`reuse` / `always-logout`) after env/config resolution. */
   private policy: 'reuse' | 'always-logout' = 'reuse';
@@ -51,13 +46,12 @@ export class AdtClientWrapper {
   /** True once a 401 fallback re-login has been attempted. */
   private fallbackUsed = false;
 
-  private constructor(config: ProjectConfig, auth: { passwordOrFetcher: string | BearerFetcher; options: ClientOptions; label: string }) {
+  private constructor(config: ProjectConfig, auth: { password: string; options: ClientOptions }) {
     this.config = config;
-    this.authLabel = auth.label;
     this.client = new ADTClient(
       this.config.sap.url,
       this.config.sap.username,
-      auth.passwordOrFetcher,
+      auth.password,
       this.config.sap.client,
       this.config.sap.language,
       auth.options,
@@ -85,14 +79,14 @@ export class AdtClientWrapper {
       }
     } catch (error: unknown) {
       if (error instanceof CliError) throw error;
-      throw classifyHttpError(error, { name: this.config.systemName, authMethod: this.authLabel });
+      throw classifyHttpError(error, { name: this.config.systemName });
     }
   }
 
   static async create(): Promise<AdtClientWrapper> {
     try {
       const config = await loadConfig();
-      const auth = await buildAuth(config.sap, config.systemName);
+      const auth = buildBasicAuth(config.sap);
       const wrapper = new AdtClientWrapper(config, auth);
       await wrapper.initSession();
       registerAdtClient(wrapper);
@@ -192,11 +186,6 @@ export class AdtClientWrapper {
     return this.config;
   }
 
-  /** Short label of the auth strategy actually used ("basic" / "cert"). */
-  get authMethod(): string {
-    return this.authLabel;
-  }
-
   /**
    * Run an ADT call; if the underlying client throws, classify the error
    * (TLS / AUTH / SAP) and rethrow as a `CliError`. Existing CliError instances
@@ -217,7 +206,7 @@ export class AdtClientWrapper {
     try {
       return await attempt();
     } catch (error: unknown) {
-      const classified = error instanceof CliError ? error : classifyHttpError(error, { name: this.config.systemName, authMethod: this.authLabel });
+      const classified = error instanceof CliError ? error : classifyHttpError(error, { name: this.config.systemName });
       if (this.jar && !this.fallbackUsed && classified.code === 'AUTH_ERROR') {
         this.fallbackUsed = true;
         // Stale session: re-login, re-capture, persist, then retry the call.
@@ -228,7 +217,7 @@ export class AdtClientWrapper {
           return await attempt();
         } catch (retryError: unknown) {
           if (retryError instanceof CliError) throw retryError;
-          throw classifyHttpError(retryError, { name: this.config.systemName, authMethod: this.authLabel });
+          throw classifyHttpError(retryError, { name: this.config.systemName });
         }
       }
       throw classified;

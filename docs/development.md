@@ -102,9 +102,9 @@ src/abap_cli/
 ├── flows/                # business logic (edit / setup / search / data / mime / core)
 ├── formats/              # AFF file resolver + pull strategies + artifact contract; ddic/{types,io,wire,validate,examples}
 ├── types/                # TYPE_REGISTRY (object-type metadata single source of truth)
-├── clients/              # AdtClientWrapper, ICF client + version check, probe
+├── clients/              # AdtClientWrapper (abap-adt-api), ICF client + version check, probe, basic auth
 ├── config/               # project + user config, keychain (secrets.ts), profile export/import, validation
-├── auth/ session/        # auth model + strategies; session reuse / cookie policy
+├── session/              # session reuse / cookie policy
 ├── core/                 # cross-layer utilities: resolve/transport, limits, path output, confirmation
 ├── aff/ adc/             # AFF schema validation; ADT Deployment Channel (probe + ICF register)
 ├── schema/               # vendored abap-file-format JSON schemas

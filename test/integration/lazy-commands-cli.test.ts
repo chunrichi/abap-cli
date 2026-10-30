@@ -33,7 +33,6 @@ async function withFakeProject(args: string[]): Promise<{ stdout: string; stderr
           url: 'https://example.invalid',
           client: '001',
           username: 'fake',
-          authMethod: 'basic',
           password: '',
           language: 'EN',
           insecure: true,

@@ -34,7 +34,6 @@ function loadKeytar(): KeytarModule | null {
 }
 
 function accountKey(account: string, kind: SecretKind): string {
-  if (kind === 'cert-passphrase') return `${account}.cert-passphrase`;
   if (kind === 'session-key') return 'abap-cli/session-key';
   return account;
 }

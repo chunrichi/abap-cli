@@ -8,10 +8,10 @@
  *
  * Scope: this module is the **single source of truth** for the user-level
  * config directory + systems.json path. `config/project-config.ts` reads it;
- * other modules (`config/user-config.ts`, `session/reuse.ts`,
- * `auth/sso-cookie.ts`) still call `os.homedir()` directly — they don't
- * need an injection seam right now. When a test needs to redirect them too,
- * extend `paths.ts` and thread `home` through.
+ * other modules (`config/user-config.ts`, `session/reuse.ts`) still call
+ * `os.homedir()` directly — they don't need an injection seam right now. When
+ * a test needs to redirect them too, extend `paths.ts` and thread `home`
+ * through.
  */
 import * as os from 'node:os';
 import * as path from 'node:path';

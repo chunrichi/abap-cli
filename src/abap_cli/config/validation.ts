@@ -1,26 +1,18 @@
 /**
  * Profile validation.
  *
- * The auth sub-config pairing is enforced type-side by the canonical
- * `AuthConfig` discriminated union; this module validates the surrounding
- * fields (URL, client, language, ssl cookieFile path) and delegates the auth
- * shape to `normalizeAuth`.
+ * Basic auth is the only supported login method: username + a password stored
+ * in the OS keychain. This module validates the surrounding profile fields and
+ * rejects entries that still declare a removed auth method.
  */
 import { CliError } from '../output/json.js';
-import { normalizeAuth } from '../auth/normalize.js';
-
-/** Minimal shape required for auth validation. Accepts either the canonical
- *  `AuthConfig` (v2) or any v1 shape (authMethod + blocks). The normalizer
- *  is the runtime guard that catches drift between method and block. */
-type ProfileAuthShape = unknown;
+import type { SystemProfile } from './user-config.js';
 
 export function assertValidProfile(p: {
   url: string;
   client?: string;
   username: string;
   language?: string;
-  auth?: ProfileAuthShape;
-  ssoCookieFile?: string;
 }): void {
   if (!p.url) throw new CliError('INVALID_ARGUMENT', 'URL is required');
   if (!/^https?:\/\//i.test(p.url)) {
@@ -33,12 +25,28 @@ export function assertValidProfile(p: {
   if (p.language && !/^[a-zA-Z]{2}$/.test(p.language)) {
     throw new CliError('INVALID_ARGUMENT', 'Language must be a 2-character code');
   }
-  if (p.ssoCookieFile && !/^[/~]/.test(p.ssoCookieFile)) {
-    throw new CliError('INVALID_ARGUMENT', 'ssoCookieFile must be an absolute path (or start with ~).');
-  }
-  // The auth-shape pairing is enforced type-side by the canonical `AuthConfig`
-  // discriminated union. `profile-flow.applyProfileOptions` always rebuilds
-  // auth from scratch via `resolveAuthFromOpts`, so by the time we reach this
-  // point the v2 type system has already proved the shape is valid; the
-  // normalizer is only needed for legacy v1 stored profiles.
+}
+
+/**
+ * Refuse to connect with a profile that still declares a removed auth method.
+ * `unsupportedAuth` is populated by `loadUserConfig` from fields on disk; it
+ * never reaches a write, so one successful `profile set` (or a recreated
+ * profile) migrates the entry to basic auth.
+ */
+export function assertSupportedAuth(
+  name: string,
+  profile: Pick<SystemProfile, 'unsupportedAuth'>,
+): void {
+  if (!profile.unsupportedAuth) return;
+  throw new CliError(
+    'CONFIG_ERROR',
+    `Profile '${name}' uses the removed '${profile.unsupportedAuth}' auth method; only basic auth (username + password) is supported.`,
+    {
+      nextSteps: [
+        `Keep the profile and store a password: abap profile set ${name} --password <password>`,
+        `Or recreate it from scratch: abap profile delete ${name} && abap profile add ${name} --url <url> --username <user> --password <password>`,
+      ],
+      example: `abap profile set ${name} --password <password>`,
+    },
+  );
 }
