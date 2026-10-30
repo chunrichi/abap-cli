@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://github.com/chunrichi/abap-cli/actions/workflows/verify.yml"><img alt="verify" src="https://github.com/chunrichi/abap-cli/actions/workflows/verify.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
-  <img alt="Node >= 18" src="https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg">
+  <a href="https://nodejs.org"><img alt="Node.js 18+" src="https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg"></a>
 </p>
 
 `abap-cli` turns SAP's ADT REST API — plus a bundled ABAP service for the endpoints ADT does not cover — into one command chain: pull → edit → check → push → run → verify. Every command speaks `--json` and publishes a `--schema` contract, and the package ships skills plus an agent definition, so an AI agent can drive SAP end-to-end without the GUI.
