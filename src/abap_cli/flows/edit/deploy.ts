@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError, toErrorShape } from '../../output/json.js';
-import { resolveFile } from '../../formats/file-resolver.js';
+import { affObjectToken, resolveFile } from '../../formats/file-resolver.js';
 import { readAbapFile } from '../../formats/abap-source.js';
 import { resolveObject, getObjectParts, validateLocalFile } from '../../core/resolve.js';
 import { pushObject } from './push-object.js';
@@ -79,7 +79,7 @@ export interface DeployOptions {
  * a naive fixed-depth relative path silently misses on one of those.
  */
 export function bundledSourceDir(): string {
-  const marker = path.join('abap', 'src', 'clas', 'zcl_abap_vibe_icf.clas.abap');
+  const marker = path.join('abap', 'src', 'zcl_abap_vibe_icf.clas.abap');
   let dir = path.dirname(fileURLToPath(import.meta.url));
   for (;;) {
     if (existsSync(path.join(dir, marker))) {
@@ -488,11 +488,8 @@ async function readObjectMetadata(
   objectName: string,
   objectType: string,
 ): Promise<{ description: string; originalLanguage?: string }> {
-  const lowerType = objectType.toLowerCase();
-  const candidates = [
-    path.join(sourceDir, `${objectName.toLowerCase()}.${lowerType}.json`),
-    path.join(sourceDir, 'clas', `${objectName.toLowerCase()}.${lowerType}.json`),
-  ];
+  const lowerType = objectType.split('/')[0]!.toLowerCase();
+  const candidates = [path.join(sourceDir, `${affObjectToken(objectName)}.${lowerType}.json`)];
   for (const candidate of candidates) {
     try {
       const raw = await fs.readFile(candidate, 'utf-8');

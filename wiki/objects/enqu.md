@@ -4,7 +4,7 @@ title: ENQU — 锁对象（Lock Object）
 description: ENQU 对象的 ICF 路由、primaryTable / lockParameters / lockModules 字段契约、EZ/EY 命名规则
 tags: [abap-cli, object-type, enqu, icf, abap-file-format, lock-object]
 created at: 2026-09-16 00:00:00
-changed at: 2026-09-16 00:00:00
+changed at: 2026-10-30 20:00:00
 ---
 
 # ENQU — 锁对象（Lock Object）
@@ -24,7 +24,7 @@ ICF handler 由 `zcl_abap_vibe_icf` 的 `/ddic/enqu` 分支 + `zcl_abap_vibe_enq
 ## 本地文件形态
 
 ```
-src/enqu/ezmy_lock/
+src/
 └── ezmy_lock.enqu.json
 ```
 

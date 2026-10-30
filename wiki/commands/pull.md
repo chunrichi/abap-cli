@@ -4,12 +4,12 @@ title: abap pull
 description: 从 SAP 下载对象到本地文件 — 支持源码对象、包批量、DDIC JSON、textpool 与远程版本拉取
 tags: [abap-cli, command, pull, download, abap-file-format, ddic, textpool, version-management]
 created at: 2026-08-06 23:21:15
-changed at: 2026-09-02 22:06:00
+changed at: 2026-10-30 20:00:00
 ---
 
 # abap pull
 
-从 SAP 系统下载 ABAP 对象到本地文件，遵循 abap-file-format 布局。支持四类入口：单个源码对象（CLAS/PROG/INTF/FUGR）、包批量下载、DDIC 对象（DOMA/DTEL/TABL/STRU）、textpool 文本元素、以及远程系统版本源码。裸 `abap pull`（无对象名、无 `--package`）打印命令帮助（exit 0）。
+从 SAP 系统下载 ABAP 对象到本地文件，遵循 abap-file-format（AFF）原生扁平布局。支持四类入口：单个源码对象（CLAS/PROG/INTF/FUGR）、包批量下载、DDIC 对象（DOMA/DTEL/TABL/STRU）、textpool 文本元素、以及远程系统版本源码。裸 `abap pull`（无对象名、无 `--package`）打印命令帮助（exit 0）。
 
 ## Usage
 
@@ -45,9 +45,9 @@ abap pull
    - **PR2 `--user <sap-user>`**：可选过滤 — 仅保留 owner 匹配的对象（直接对象用 transport 顶层 owner；task 内对象用 task owner）。`TransportObjectInfo.owner` 字段在 `showTransport` 里填入；过滤在 `pull-tr.ts` dedup 之前进行，不匹配的对象静默丢弃，不影响其他对象的拉取。`--user` 单独使用 → `INVALID_ARGUMENT`（exit 2）。响应 `data` 增加 `filtered`（被过滤数）与 `user`（归一化后的大写用户名）字段，便于 agent 解释"为什么 N 个对象没出现"。
 1. **`--tr <request>`**（T4.2）— 调 `transportDetails` 取请求下**所有对象引用**：直接对象（`objects`）+ 嵌套 task 对象（`tasks[].objects`）；按 `type::name` 去重得到有序对象列表，再逐个走下面第 3-5 条路由。单对象失败不中断整体（记为 `failed`），部分失败时 `data.partial: true`；响应额外含 `transport` / `requested` / `deduplicated`（来自 transport `tasks` 的 `TransportRequestInfo.deduplicated`）。HTTP/DDIC 路由走 ICF、其余走 ADT。
 2. **`--package`** — `searchObject` 全量搜索 + 按 `adtcore:packageName` 过滤，分页（`limit × page`）逐对象拉取；单对象失败不中断整体（记为 `failed`），截断时提示 `--page N+1`。**分页的原因**：SAP quickSearch 端点的 `maxResults` 有上限（默认 `SEARCH_RESULT_LIMIT` = 20），一次请求拿不全整个包。实现上每次请求 `limit × page` 条结果、按包名过滤后取 `(page-1)*limit` 到 `page*limit` 的窗口——所以 `--limit` 越大单轮拉得越多，`--page` 递增继续拉下一批。单对象 pull（`abap pull ZCL_X`）无分页。
-3. **`--remote <id>`** — 走 ICF `/version-source`（TMS RFC destination `TMSADM@<id>.DOMAIN_<id>`）。CLI 类型 → VRSD 类型映射：`PROG → REPS`、`INTF → INTF`、`CLAS → CLSD`（类定义）。源码写入对象标准文件名 `src/<typeFolder>/<name>/<name>.<type>.abap`（顶层目录按类型分类，见下文）。对象从未传输到远端时后端返回空 `source`（成功）。
-4. **`--textpool`** — 拉取三个 `.properties` 文件，走混合模式路由（profile 缓存的能力决定走 ADT `getTextElements` 还是 ICF `/textpool/*`），JSON 结果带 `route` 字段（`adt`/`icf`）；文件落在 `src/<typeFolder>/<name>/<name>.<type>.<category>.<lang>.properties`。
-5. **DDIC 类型**（DOMA/DTEL/TABL/STRU）— 走 ICF `GET /ddic/<type>/<name>`，`wireToLocal` 转成本地 JSON，写为 `src/<typeFolder>/<name>.<type>.json`（顶层目录按类型分类）。
+3. **`--remote <id>`** — 走 ICF `/version-source`（TMS RFC destination `TMSADM@<id>.DOMAIN_<id>`）。CLI 类型 → VRSD 类型映射：`PROG → REPS`、`INTF → INTF`、`CLAS → CLSD`（类定义）。源码写入 AFF 标准文件名 `src/<name>.<type>.abap`（扁平布局，见下文）。对象从未传输到远端时后端返回空 `source`（成功）。
+4. **`--textpool`** — 拉取三个 `.properties` 文件，走混合模式路由（profile 缓存的能力决定走 ADT `getTextElements` 还是 ICF `/textpool/*`），JSON 结果带 `route` 字段（`adt`/`icf`）；文件落为 `src/<name>.<type>.<category>.<lang>.properties`。
+5. **DDIC 类型**（DOMA/DTEL/TABL/STRU）— 走 ICF `GET /ddic/<type>/<name>`，`wireToLocal` 转成本地 JSON，写为 `src/<name>.<type>.json`。
 6. **通道路由类型**（TTYP/MSAG/DDLS）— 见下节。
 
 ### 新增 TTYP / MSAG / DDLS（双通道）
@@ -75,23 +75,35 @@ envelope 附加字段：
 | `LOCK_FAILED` | 9 | ICF 兜底写路径拿不到 enqueue 锁 |
 | `AFF_FIXTURE_INVALID` | 7 | 落盘前 / push 前 schema 校验失败 |
 
-源码对象（CLAS/PROG/INTF）布局：`<name>.<type>.json` 元数据 + 每个 include part 一个 `.abap`；`--include-all-parts` 控制是否包含 testclasses。FUGR 为多文件布局（`.fugr.json`、`sapl<name>.reps.*`、`l<name>top.reps.*`、每个 FM 一个 `.func.*`）。
+源码对象（CLAS/PROG/INTF）布局：`<name>.<type>.json` 元数据 + 每个 include part 一个 `.abap`；`--include-all-parts` 控制是否包含 testclasses。FUGR 为多文件布局（`.fugr.json`、`sapl<name>.reps.*`、`l<name>top.reps.*`、每个 FM 一个 `.func.*`）。这些文件全部平铺在输出目录下，没有类型或对象子目录。
 
 ### Function modules（FUGR/FF）— PR4 归一化
 
 `abap pull <fm>` 时若 `<fm>` 解析为 `FUGR/FF`（function module），`runPull` 在 `resolveObject` 之后调用 [`normalizeFugrFunctionModule`](../../src/abap_cli/flows/edit/pull-fugr-ff.ts)：
 
 - FM 的 `objectUrl`（`.../fmodules/<fm>`）重写为父函数组（`.../groups/<group>`），name 也改为父组名（`FUGR/F`）；
-- 原 FM 身份以 `requestedFunctionModule` 传给 `pullObject`，fugr 策略据此只输出这一个 FM 的 `<group>/<group>.<fm>.func.abap` + `<group>/<group>.<fm>.func.json`，避免拉下整个组里所有 FM；
+- 原 FM 身份以 `requestedFunctionModule` 传给 `pullObject`，fugr 策略据此只输出这一个 FM 的 `<group>.<fm>.func.abap` + `<group>.<fm>.func.json`，避免拉下整个组里所有 FM；
 - URL 解析复用 [`parentFunctionGroupFromUri`](../../src/abap_cli/formats/fugr-layout.ts)，与 push 侧同一份 parser；
 - `data.object` / `data.type` / human 摘要保持原 FM 名（用户请求的对象）；
 - 不在 FUGR/FF 路径上零开销直通。
 
 `abap pull <group>`（直接拉父组）走 `fugrStrategy` 的全量路径，与本节无关。
 
-### 顶层分类子目录
+### 扁平写入 `src/`
 
-所有 pull 产物按对象类型落到 `src/<typeFolder>/` 下，`typeFolder` 由 `src/abap_cli/formats/type-folder.ts#folderFor(type)` 决定（小写：`clas` / `intf` / `prog` / `fugr` / `tabl` / `doma` / `stru` / `dtel` / `http` / `tran` / `ttyp` / `msag` / `ddls`；未识别类型 → `unknown/`）。这是本地约定（Q5=B），DDIC 原本在 abap-file-format 规范里要求扁平，本仓库统一改为带子目录以保持多类型对象工作目录整洁。**本仓库不实现 abapGit 序列化/反序列化，目录布局不保证与 abapGit 兼容**（见根 `AGENTS.md` 的 abap-file-format 约定）。
+所有 pull 产物直接写入输出目录（`--dir`，默认 `src/`）的**同一层**，没有类型目录、也没有对象目录。文件名遵循 abap-file-format 规范：
+
+```
+<name>.<type>[.<sub_type>][.<content_type>][.<language>].<ext>
+```
+
+- **源码对象（CLAS/INTF/PROG）**：`src/zcl_demo.clas.json` + `src/zcl_demo.clas.abap`；类 include 各一个文件（`src/zcl_demo.clas.definitions.abap` / `.clas.implementations.abap` / `.clas.macros.abap` / `.clas.testclasses.abap`）；include 程序落 `src/zinc.prog.include.abap`。
+- **FUGR**：`src/<group>.fugr.json` + `src/<group>.fugr.sapl<group>.reps.abap` + `src/<group>.fugr.l<group>top.reps.abap` + 每个 FM 的 `src/<group>.fugr.<fm>.func.abap`（元数据同名 `.json`）。
+- **DDIC**：TABL/STRU 三件套 `src/ztabl_demo.tabl.json` + `.tabl.ddic` + `.tabl.settings.json`（STRU 为 `.stru.*`）；DOMA/DTEL 单文件 `src/zmy_doma.doma.json` / `src/zmy_dtel.dtel.json`。
+- **textpool**：`src/zprog.prog.texts.en.properties`（另有 `.selections.<lang>.properties` / `.headings.<lang>.properties`）。
+- **命名空间**：AFF 规范把命名空间转为括号——`/UI2/CL_JSON` → `src/(ui2)cl_json.clas.abap`。旧 abapGit 风格 `#ui2#cl_json` 不再识别；旧文件需重新 `abap pull` 后才能 push。
+
+文件名由 `file-resolver.ts#buildFilename` 组装（`(nmspc)name` token + 小写 type + subtype + 扩展名）；pull 路径上不再有类型 → 子目录映射（`folderFor` 已删除）。目录层级与文件名分开：`--dir` 决定写到哪一层，文件名自身编码对象名/类型。这是 AFF 原生形态，与 abapGit / AFF examples 一致（见 [design-decisions/010](../design-decisions/010-aff-flat-layout.md)）。
 
 写文件前的冲突处理采用**保守拒绝**策略 —— `--overwrite` 与 `--skip-existing` **都不是默认**，默认遇到本地文件与 SAP 内容不同时报错，绝不静默覆盖或丢弃本地未推送的改动：
 
@@ -150,9 +162,9 @@ abap pull --tr NDK123456
     "remote": "PRD",
     "version": "00000",
     "entries": [
-      { "file": "src/prog/zprog/zprog.prog.abap", "status": "written" }
+      { "file": "src/zprog.prog.abap", "status": "written" }
     ],
-    "written": ["src/prog/zprog/zprog.prog.abap"],
+    "written": ["src/zprog.prog.abap"],
     "skipped": [],
     "failed": []
   }
@@ -178,7 +190,7 @@ abap pull --tr NDK123456
       { "object": "ZCL_B", "type": "CLAS", "status": "written" },
       { "object": "ZPROG", "type": "PROG", "status": "written" }
     ],
-    "written": ["src/clas/zcl_a/...", "src/clas/zcl_b/...", "src/prog/zprog/..."],
+    "written": ["src/zcl_a.clas.abap", "src/zcl_b.clas.abap", "src/zprog.prog.abap"],
     "skipped": [],
     "failed": []
   }
@@ -187,9 +199,9 @@ abap pull --tr NDK123456
 
 ## 与 abap-file-format 规范符合性
 
-对照 `tmp/abap-file-formats/`（官方规范 clone）的 README / json schema / 示例核验（2026-08-06）：
+对照官方规范 [docs/specification.md](https://github.com/SAP/abap-file-formats/blob/main/docs/specification.md) 的 README / json schema / 示例核验（2026-08-06）：
 
-**已符合**：CLAS/PROG/INTF 元数据（`formatVersion: "1"` + `header{description, originalLanguage}`，PROG 额外 `generalInformation.programType`）；文件命名与 subtype 用规范名（`definitions`/`implementations`/`macros`/`testclasses`/`main`）；FUGR `reps.json` 的 `includeType`；FUGR 布局（`sapl<name>.reps.*`、`l<name>top.reps.*`、每 FM 一个 `.func.*`，UXX include 正确跳过）；textpool `.properties` 命名。
+**已符合**：AFF 原生扁平目录（所有产物直接落输出目录，无类型/对象子目录）；CLAS/PROG/INTF 元数据（`formatVersion: "1"` + `header{description, originalLanguage}`，PROG 额外 `generalInformation.programType`）；文件命名与 subtype 用规范名（`definitions`/`implementations`/`macros`/`testclasses`/`main`）；命名空间括号 token（`(ui2)cl_json`）；FUGR `reps.json` 的 `includeType`；FUGR 布局（`sapl<name>.reps.*`、`l<name>top.reps.*`、每 FM 一个 `.func.*`，UXX include 正确跳过）；textpool `.properties` 命名（`<name>.<type>.<category>.<lang>.properties`）。
 
 **已修复（2026-08-06）**：`<name>.fugr.<fm>.func.json` 缺 `includeNumber`（fugr/func-v1.json required）。现在从 UXX include 源码解析（每行 `INCLUDE L<group>U01.  "<funcname>`），解析不到时回退到 FM 在组内序号（补零两位）。
 
@@ -198,7 +210,7 @@ abap pull --tr NDK123456
 ## fixme
 
 - [x] **B** — `<name>.fugr.json` 的 `fixPointArithmetic` 是条件写入（fugr-v1.json required）。真实 SAP 返回该字段，但 mock 等缺少该元数据的来源下 pull 出的 fugr.json 缺字段、过不了 schema 校验。已实现：缺失时默认 `false` 兜底（commit `185252b`）。
-- [x] **C** — TABL/STRU 现已遵循 abap-file-format 三件套（pull 路径原已就绪；create 路径 0.5.0 起通过 `readDdicObjectForCreate` 自动解析 `.tabl.ddic` + `.tabl.settings.json`）。DDIC JSON 仍为扁平自定义结构（DOMA/DTEL：`{name, description, dataType, …}`；TABL/STRU 走三件套，main JSON 仅含 `formatVersion` + `header.description`），与规范嵌套结构 `{formatVersion, header, format:{dataType,length}}` 不一致 — 这是配合自建 ICF round-trip 的设计决策，CLI 在 `formats/ddic/wire.ts` 内部做 wire ↔ local 双向映射。
+- [x] **C** — TABL/STRU 现已遵循 abap-file-format 三件套（pull 路径原已就绪；create 路径 0.5.0 起通过 `readDdicObjectForCreate` 自动解析 `.tabl.ddic` + `.tabl.settings.json`）。DDIC JSON 仍为自定义结构（DOMA/DTEL：`{name, description, dataType, …}`；TABL/STRU 走三件套，main JSON 仅含 `formatVersion` + `header.description`），与规范嵌套结构 `{formatVersion, header, format:{dataType,length}}` 不一致 — 这是配合自建 ICF round-trip 的设计决策，CLI 在 `formats/ddic/wire.ts` 内部做 wire ↔ local 双向映射。
 - [x] **D** — `abap create FUGR` 的 create-then-pull 骨架曾留一个 `<name>.fugr.abap`（规范无此文件，主程序应为 `sapl<name>.reps.abap`）。已修复：create 走 `pullObject()`，不再产生该残留文件（commit `ad007c8`）。
 
 ## todo
@@ -208,5 +220,6 @@ abap pull --tr NDK123456
 # references
 
 - 实现：`src/abap_cli/commands/pull.ts`、`src/abap_cli/flows/edit/pull.ts`、`src/abap_cli/flows/edit/routing.ts`（`TYPE_ROUTES` 单一路由表）、`src/abap_cli/formats/pull-strategy.ts`、`pull-fugr.ts`、`fugr-layout.ts`、`src/abap_cli/clients/icf-client.ts`
-- SAP 后端：`abap/src/clas/zcl_abap_vibe_icf.clas.abap`（`dispatch_ddic` / `dispatch_textpool` / `dispatch_version_management`）
-- 文档：`docs/commands.md`（`abap pull` 一节）；规范参考：`tmp/abap-file-formats/file-formats/{clas,prog,intf,fugr,doma,dtel,tabl}/`
+- SAP 后端：`abap/src/zcl_abap_vibe_icf.clas.abap`（`dispatch_ddic` / `dispatch_textpool` / `dispatch_version_management`）
+- 文档：`docs/commands.md`（`abap pull` 一节）；规范参考：[abap-file-formats specification](https://github.com/SAP/abap-file-formats/blob/main/docs/specification.md)
+- 设计决策：[010 — AFF 原生扁平布局](../design-decisions/010-aff-flat-layout.md)

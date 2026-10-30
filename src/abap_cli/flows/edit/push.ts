@@ -18,7 +18,7 @@ import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError, toErrorShape } from '../../output/json.js';
 import { collectWarning, type Warning } from '../../output/meta.js';
 import type { ErrorCode } from '../../output/error-codes.js';
-import { resolveFile, type ResolvedFile } from '../../formats/file-resolver.js';
+import { affObjectToken, resolveFile, type ResolvedFile } from '../../formats/file-resolver.js';
 import { readAbapFile } from '../../formats/abap-source.js';
 import { resolveObject, getObjectParts, validateLocalFile, type ResolvedObject } from '../../core/resolve.js';
 import { resolveTransport } from '../../core/transport.js';
@@ -251,7 +251,7 @@ async function resolveObjectTransport(
             `Re-run without --tr to push into the object's request (${bound}).`,
             `Or move the object first: abap transport assign ${object.name} ${opts.tr}`,
           ],
-          example: `abap push src/${object.name.toLowerCase()}.abap`,
+          example: `abap push src/${affObjectToken(object.name)}.${object.type.split('/')[0]!.toLowerCase()}.abap`,
         },
       );
     }

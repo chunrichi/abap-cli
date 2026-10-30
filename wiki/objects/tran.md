@@ -4,7 +4,7 @@ title: TRAN — 事务码（SE93 Transaction Code）
 description: TRAN 对象的字段契约、5 种 transactionType、嵌套结构
 tags: [abap-cli, object-type, tran, icf, abap-file-format, transaction, se93]
 created at: 2026-09-01 00:00:00
-changed at: 2026-09-01 00:00:00
+changed at: 2026-10-30 20:00:00
 ---
 
 # TRAN — 事务码（SE93 Transaction Code）
@@ -16,7 +16,7 @@ changed at: 2026-09-01 00:00:00
 ## 本地文件形态
 
 ```
-src/trans/<code>/
+src/
 └── <code>.tran.json
 ```
 
@@ -135,7 +135,7 @@ abap tcode SE93 --json
 abap pull SE93 --type TRAN --json
 
 # 创建
-abap create TRAN ZMY_TCODE --file src/trans/zmy_tcode/zmy_tcode.tran.json \
+abap create TRAN ZMY_TCODE --file src/zmy_tcode.tran.json \
   --package $TMP --description "demo" --tr $TMP --json
 ```
 

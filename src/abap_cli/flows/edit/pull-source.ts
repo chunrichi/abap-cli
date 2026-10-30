@@ -16,8 +16,6 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { AdtClientWrapper } from '../../clients/adt-client.js';
-import { objectDirName } from '../../formats/file-resolver.js';
-import { folderFor } from '../../formats/type-folder.js';
 import { fileExists, writeAbapFile } from '../../formats/abap-source.js';
 import { strategyFor, type OutputFile } from '../../formats/pull-strategy.js';
 import { CliError } from '../../output/json.js';
@@ -198,12 +196,10 @@ export async function pullObject(
   const written: string[] = [];
   const skipped: string[] = [];
 
-  // abap-file-format layout: one directory per object under <typeFolder>/<opts.dir>.
-  const objectDir = objectDirName(object.name);
-  const typeFolder = folderFor(object.type);
-
+  // abap-file-format layout: every artifact is written flat under <opts.dir>,
+  // the object name and type live in the filename only.
   for (const file of files) {
-    const result = await writeFile(file, objectDir, typeFolder);
+    const result = await writeFile(file);
     if (result.status === 'written') {
       entries.push({ object: object.name, type: object.type, status: 'written', files: [result.outPath] });
       written.push(result.outPath);
@@ -220,8 +216,8 @@ export async function pullObject(
   return { entries, written, skipped, failed: [] };
 
   /** Compose the file's target path and delegate to the generic writer. */
-  async function writeFile(file: OutputFile, dir: string, folder: string): Promise<WritePullFileResult> {
-    const filePath = path.join(opts.dir, folder, dir, file.filename);
+  async function writeFile(file: OutputFile): Promise<WritePullFileResult> {
+    const filePath = path.join(opts.dir, file.filename);
     const content = await file.content();
     return writePullFile({
       filePath,

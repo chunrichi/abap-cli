@@ -2,9 +2,9 @@
  * T3.4 — DCLS / DDLX / DDLA pull end-to-end.
  *
  * Each of the three CDS-extension types shares the same sourceObjectStrategy
- * layout; only the AFF folder + ADT endpoint differ. The tests exercise the
- * full file-write path (`runPullX` → `pullObject` → `writePullFile`) for all
- * three types against the same mock ADT client.
+ * layout; only the AFF type token + ADT endpoint differ. The tests exercise
+ * the full file-write path (`runPullX` → `pullObject` → `writePullFile`) for
+ * all three types against the same mock ADT client; every artifact lands flat.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
@@ -16,7 +16,6 @@ interface PullArgs {
   name: string;
   body: string;
   endpoint: string;
-  expectedFolder: string;
 }
 
 const PULL_ARGS: PullArgs[] = [
@@ -25,21 +24,18 @@ const PULL_ARGS: PullArgs[] = [
     name: 'zmy_dcls',
     body: '@MappingRole: true\ndefine role ZMY_DCLS { grant select on ZMY_VIEW; }',
     endpoint: '/sap/bc/adt/dcls/dc/zmy_dcls',
-    expectedFolder: 'dcls',
   },
   {
     type: 'DDLX',
     name: 'zmy_ddlx',
     body: 'define view ZMY_DDLX as select from ztable { key id as Id }',
     endpoint: '/sap/bc/adt/ddlx/extensions/zmy_ddlx',
-    expectedFolder: 'ddlx',
   },
   {
     type: 'DDLA',
     name: 'zmy_ddla',
     body: '@Metadata.layer: #CORE\ndefine annotation ZMY_DDLA { }',
     endpoint: '/sap/bc/adt/ddla/annotations/zmy_ddla',
-    expectedFolder: 'ddla',
   },
 ];
 
@@ -86,7 +82,7 @@ describe.each(PULL_ARGS)('T3.4 — pull $type', (args) => {
     expect(result.object).toBe(args.name.toUpperCase());
     expect(result.files).toHaveLength(2);
 
-    const dir = path.join(root, args.expectedFolder, args.name);
+    const dir = root;
     const jsonPath = path.join(dir, `${args.name}.${args.type.toLowerCase()}.json`);
     const acdsPath = path.join(dir, `${args.name}.${args.type.toLowerCase()}.acds`);
     expect(fs.existsSync(jsonPath)).toBe(true);

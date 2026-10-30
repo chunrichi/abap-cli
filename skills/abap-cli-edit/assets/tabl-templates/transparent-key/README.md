@@ -18,11 +18,12 @@
 ## 使用
 
 ```bash
-# 1. 复制整目录到目标 src/<typeFolder>/
-cp -r <skill-dir>/tabl-templates/transparent-key/* src/tabl/ztodo.tabl.{json,ddic,settings.json}
+# 1. 复制骨架到 src/（AFF 扁平布局）
+cp <skill-dir>/tabl-templates/transparent-key/zsample.tabl.{json,ddic,settings.json} src/
+for f in src/zsample.tabl.*; do mv "$f" "${f/zsample/ztodo}"; done
 # 2. 把所有 zsample 改成你的对象名（小写）
-sed -i '' 's/zsample/ztodo/g' src/tabl/ztodo.tabl.{json,ddic,settings.json}
+sed -i '' 's/zsample/ztodo/g' src/ztodo.tabl.{json,ddic,settings.json}
 # 3. 改 ztodo.tabl.ddic 里的字段定义 + ztodo.tabl.json 的 description
 # 4. 创建
-abap create TABL ZTODO --file src/tabl/ztodo.tabl.json --package $TMP --yes
+abap create TABL ZTODO --file src/ztodo.tabl.json --package $TMP --yes
 ```

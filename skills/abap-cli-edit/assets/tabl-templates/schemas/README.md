@@ -25,8 +25,8 @@ const ajv = new Ajv({ allErrors: true, strict: false });
 addFormats(ajv);
 const validateMain = ajv.compile(require("./tabl-v1.json"));
 const validateSettings = ajv.compile(require("./tabt-v1.json"));
-const main = require("./src/tabl/ztodo.tabl.json");
-const settings = require("./src/tabl/ztodo.tabl.settings.json");
+const main = require("./src/ztodo.tabl.json");
+const settings = require("./src/ztodo.tabl.settings.json");
 console.log(validateMain(main) ? "main OK" : "main INVALID: " + JSON.stringify(validateMain.errors, null, 2));
 console.log(validateSettings(settings) ? "settings OK" : "settings INVALID: " + JSON.stringify(validateSettings.errors, null, 2));
 '

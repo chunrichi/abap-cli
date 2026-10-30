@@ -4,7 +4,7 @@ title: DDLS — CDS 视图源（Data Definition Language Source）
 description: DDLS 对象的 ADT-only 路由、三件套形态、5 种 CDS 形态识别、ECC 硬错
 tags: [abap-cli, object-type, ddls, cds, adt, abap-file-format, view-entity]
 created at: 2026-09-04 00:00:00
-changed at: 2026-09-04 00:00:00
+changed at: 2026-10-30 20:00:00
 ---
 
 # DDLS — CDS 视图源（DDL Source）
@@ -33,7 +33,7 @@ DDL source 是 SAP 内核能力，**没有 ICF 兜底的可能**——旧内核�
 ## 本地文件形态（三件套）
 
 ```
-src/ddls/zmy_view/
+src/
 ├── zmy_view.ddls.json    # AFF 嵌套元数据
 └── zmy_view.ddls.acds    # CDS 源码（原文，不转义）
 ```
@@ -72,9 +72,9 @@ src/ddls/zmy_view/
 ## 命令示例
 
 ```bash
-abap create DDLS ZMY_VIEW --file src/ddls/zmy_view/zmy_view.ddls.json --package $TMP --json
+abap create DDLS ZMY_VIEW --file src/zmy_view.ddls.json --package $TMP --json
 abap pull I_ABAPAPPLICATIONCOMPONENT --type DDLS --json
-abap push src/ddls/zmy_view/zmy_view.ddls.json --tr DEVK900001 --json
+abap push src/zmy_view.ddls.json --tr DEVK900001 --json
 ```
 
 ## abap-file-format 合规性

@@ -4,7 +4,7 @@ title: TABL — 透明表（数据库表）
 description: TABL 对象的三件套文件格式（main + ddic + settings）、关键字段、已知坑
 tags: [abap-cli, object-type, tabl, ddic, icf, abap-file-format, transparent-table]
 created at: 2026-09-01 00:00:00
-changed at: 2026-09-02 22:06:00
+changed at: 2026-10-30 20:00:00
 ---
 
 # TABL — 透明表（数据库表）
@@ -16,7 +16,7 @@ changed at: 2026-09-02 22:06:00
 ## 本地文件形态（abap-file-format 三件套）
 
 ```
-src/tabl/zmy_table/
+src/
 ├── zmy_table.tabl.json         # main（header + formatVersion）
 ├── zmy_table.tabl.ddic         # DDL 源码（字段声明）
 └── zmy_table.tabl.settings.json  # generalInformation（deliveryClass / sizeCategory 等）
@@ -84,7 +84,7 @@ abap create TABL ZMY_TABLE --package $TMP --description "demo" --tr $TMP --json
 abap pull ZMY_TABLE --json
 
 # push（修改字段后）
-abap push src/tabl/zmy_table/ --tr DEVK900001 --json
+abap push src/zmy_table.tabl.json --tr DEVK900001 --json
 ```
 
 ## abap-file-format 合规性

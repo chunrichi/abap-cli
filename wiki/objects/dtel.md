@@ -4,7 +4,7 @@ title: DTEL — 数据元素（Data Element）
 description: DTEL 对象的字段契约、单 JSON 嵌套结构、与 DOMA 的关系
 tags: [abap-cli, object-type, dtel, ddic, icf, abap-file-format, data-element]
 created at: 2026-09-01 00:00:00
-changed at: 2026-09-02 22:06:00
+changed at: 2026-10-30 20:00:00
 ---
 
 # DTEL — 数据元素（Data Element）
@@ -28,7 +28,7 @@ DTEL 是「语义层」，DOMA 是「技术层」：
 ## 本地文件形态
 
 ```
-src/dtel/zmy_dtel/
+src/
 └── zmy_dtel.dtel.json
 ```
 
@@ -75,7 +75,7 @@ src/dtel/zmy_dtel/
 ```bash
 abap create DTEL ZMY_DTEL --package $TMP --description "data elem" --tr $TMP --json
 abap pull ZMY_DTEL --json
-abap push src/dtel/zmy_dtel/ --tr DEVK900001 --json
+abap push src/zmy_dtel.dtel.json --tr DEVK900001 --json
 ```
 
 ## abap-file-format 合规性

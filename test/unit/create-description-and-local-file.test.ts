@@ -146,12 +146,12 @@ describe('F-04 create local-draft safety + layout', () => {
   it('pulls the new object back with the same layout as `abap pull`', async () => {
     const res = await run(['PROG', 'ZNEW', '--description', 'd']);
     const parsed = JSON.parse(res.stdout);
-    expect(parsed.data.localFile).toBe('src/prog/znew/znew.prog.abap');
-    expect(fs.existsSync(path.join(cwd, 'src/prog/znew/znew.prog.abap'))).toBe(true);
+    expect(parsed.data.localFile).toBe('src/znew.prog.abap');
+    expect(fs.existsSync(path.join(cwd, 'src/znew.prog.abap'))).toBe(true);
   });
 
   it('keeps an existing non-empty local draft and warns instead of clobbering it', async () => {
-    const target = path.join(cwd, 'src/prog/znew/znew.prog.abap');
+    const target = path.join(cwd, 'src/znew.prog.abap');
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, 'REPORT znew.\n" my precious draft\n');
     const res = await run(['PROG', 'ZNEW', '--description', 'd']);
@@ -161,7 +161,7 @@ describe('F-04 create local-draft safety + layout', () => {
   });
 
   it('--overwrite replaces the local draft', async () => {
-    const target = path.join(cwd, 'src/prog/znew/znew.prog.abap');
+    const target = path.join(cwd, 'src/znew.prog.abap');
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, 'REPORT znew.\n" my precious draft\n');
     const res = await run(['PROG', 'ZNEW', '--description', 'd', '--overwrite']);
@@ -171,7 +171,7 @@ describe('F-04 create local-draft safety + layout', () => {
   });
 
   it('overwrites silently when the existing file already matches SAP', async () => {
-    const target = path.join(cwd, 'src/prog/znew/znew.prog.abap');
+    const target = path.join(cwd, 'src/znew.prog.abap');
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, 'CLASS ZCL_NEW DEFINITION.\nENDCLASS.\n');
     const res = await run(['PROG', 'ZNEW', '--description', 'd']);

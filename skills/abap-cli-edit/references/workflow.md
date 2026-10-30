@@ -7,18 +7,16 @@
 FUGR 子对象（FM、include）是独立 ADT 锁对象，**与 CLAS/PROG/INTF 的对象锁模型不同**。
 
 ```bash
-# 拉
+# 拉（所有文件平铺在 src/ 下）
 abap pull ZFG --type FUGR
-# → src/zfg/
-#    ├── zfg.fugr.json
-#    ├── zfg.fugr.abap                          # main
-#    ├── zfg.fugr.saplzfg.reps.abap             # function-pool
-#    ├── zfg.fugr.lzfgtop.reps.abap             # TOP include
-#    ├── zfg.fugr.lfzfgfXX.reps.abap            # 每个 FXX（function include）— 0.2.6+
-#    ├── zfg.fugr.lzfgOXX.reps.abap             # 每个 OXX（output include，按需）
-#    ├── zfg.fugr.lzfgIXX.reps.abap             # 每个 IXX（input include，按需）
-#    └── zfg.fugr.<fm>.func.abap                # 每个 FM；canonical pseudo syntax
-#    └── zfg.fugr.<fm>.func.json                # 每个 FM 的 parameters / exceptions / processingType
+# → src/zfg.fugr.json                         # 函数组元数据
+# → src/zfg.fugr.saplzfg.reps.abap            # function-pool main（+ .reps.json）
+# → src/zfg.fugr.lzfgtop.reps.abap            # TOP include（+ .reps.json）
+# → src/zfg.fugr.lfzfgfXX.reps.abap           # 每个 FXX（function include）— 0.2.6+
+# → src/zfg.fugr.lzfgOXX.reps.abap            # 每个 OXX（output include，按需）
+# → src/zfg.fugr.lzfgIXX.reps.abap            # 每个 IXX（input include，按需）
+# → src/zfg.fugr.<fm>.func.abap               # 每个 FM；canonical pseudo syntax
+# → src/zfg.fugr.<fm>.func.json               # 每个 FM 的 parameters / exceptions / processingType
 ```
 
 `.reps.json` 是 `.reps.abap` 的 AFF canonical 骨架，CLI 写盘前走 `assertAffMetadata` 校验（schema = `func-v1.json` / `reps-v1.json`）。
@@ -29,11 +27,11 @@ abap pull ZFG --type FUGR
 
 ```bash
 # 改 + 推
-abap push src/zfg/zfg.fugr.<fm>.func.abap --tr DEVK900001
+abap push src/zfg.fugr.<fm>.func.abap --tr DEVK900001
 # 每个文件锁自己的目标（group / include / FM），最后激活整个 group
 
 # 推 include（rarely needed，但 FXX/OXX/IXX 也是独立 lock target）
-abap push src/zfg/zfg.fugr.lfzfgf01.reps.abap --tr DEVK900001
+abap push src/zfg.fugr.lfzfgf01.reps.abap --tr DEVK900001
 ```
 
 UXX include 由系统生成，**不**在 pull 范围内——`abap pull` 自动跳过。
@@ -44,7 +42,7 @@ UXX include 由系统生成，**不**在 pull 范围内——`abap pull` 自动�
 
 ### TABL / STRU：abap-file-format 三件套（happy path）
 
-**LM Agent 写新表时**：直接 `cp` 一份 [assets/tabl-templates/](../assets/tabl-templates/) 里的骨架到 `src/<typeFolder>/`，sed 重命名 + 编辑字段即可。5 个场景覆盖 90% 需求（透明表 / include / 货币金额 / 数量单位 / STRU）。
+**LM Agent 写新表时**：直接 `cp` 一份 [assets/tabl-templates/](../assets/tabl-templates/) 里的骨架到 `src/`，sed 重命名 + 编辑字段即可。5 个场景覆盖 90% 需求（透明表 / include / 货币金额 / 数量单位 / STRU）。
 
 `--file` 指向 main JSON（`<name>.tabl.json`），CLI 自动读取同目录的同名 `<name>.tabl.ddic`（DDL 源）与 `<name>.tabl.settings.json`：
 
@@ -56,16 +54,16 @@ UXX include 由系统生成，**不**在 pull 范围内——`abap pull` 自动�
 
 ```bash
 # 拉 — SAP 端 zcl_abap_vibe_tabl_format 产生三件套，CLI 落盘
-abap pull ZT_X --type TABL --overwrite     # 落 src/tabl/zt_x.tabl.json + .tabl.ddic (+ .tabl.settings.json)
+abap pull ZT_X --type TABL --overwrite     # 落 src/zt_x.tabl.json + .tabl.ddic (+ .tabl.settings.json)
 
 # 建 — CLI 解析三件套，wire payload 推 /ddic/tabl
-cat > src/tabl/zt_x.tabl.json <<'EOF'
+cat > src/zt_x.tabl.json <<'EOF'
 {
   "formatVersion": "1",
   "header": { "description": "Example", "originalLanguage": "en" }
 }
 EOF
-cat > src/tabl/zt_x.tabl.ddic <<'EOF'
+cat > src/zt_x.tabl.ddic <<'EOF'
 @EndUserText.label : 'Example'
 @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
 @AbapCatalog.tableCategory : #TRANSPARENT
@@ -77,16 +75,16 @@ define table zt_x {
 }
 EOF
 # 可选
-cat > src/tabl/zt_x.tabl.settings.json <<'EOF'
+cat > src/zt_x.tabl.settings.json <<'EOF'
 {
   "formatVersion": "1",
   "generalInformation": { "dataClassCategory": "APPL0", "sizeCategory": "0" }
 }
 EOF
-abap create TABL ZT_X --file src/tabl/zt_x.tabl.json --package $TMP --yes
+abap create TABL ZT_X --file src/zt_x.tabl.json --package $TMP --yes
 
 # 推
-abap push src/tabl/zt_x.tabl.json --tr DEVK900001 --yes   # 也可 --all 推整个 src/
+abap push src/zt_x.tabl.json --tr DEVK900001 --yes   # DDIC 的 .json 必须显式给路径（--all 只扫 .abap/.xml）
 ```
 
 ### TABL/STRU 兼容：legacy wire-flat 单文件
@@ -96,10 +94,10 @@ abap push src/tabl/zt_x.tabl.json --tr DEVK900001 --yes   # 也可 --all 推整�
 ### DOMA / DTEL：单文件 wire-flat
 
 ```bash
-abap pull ZD_X --type DOMA                  # 落 src/doma/z_d_x.doma.json
-abap create DOMA ZD_X --file src/doma/z_d_x.doma.json --tr DEVK900001 --yes
-abap push src/doma/z_d_x.doma.json --tr DEVK900001 --yes
-abap push src/doma/z_d_x.doma.json               # $TMP 无需 --tr
+abap pull ZD_X --type DOMA                  # 落 src/z_d_x.doma.json
+abap create DOMA ZD_X --file src/z_d_x.doma.json --tr DEVK900001 --yes
+abap push src/z_d_x.doma.json --tr DEVK900001 --yes
+abap push src/z_d_x.doma.json               # $TMP 无需 --tr
 ```
 
 ### 客户端校验（`validateDdicObject`）
@@ -129,7 +127,7 @@ done < objects.txt
 
 ```bash
 abap pull ZCL_FOO --remote PRD
-# → src/zcl_foo/zcl_foo.clas.abap（active 00000）
+# → src/zcl_foo.clas.abap（active 00000）
 # → data.remote: 'PRD', data.version: '00000'
 ```
 
@@ -179,7 +177,7 @@ Agent 显式编排 `status → pull / push`，冲突保护机制一致：单边�
 
 ```bash
 abap create local CLAS ZCL_NEW --dir ./src
-# → src/zcl_new/zcl_new.clas.abap（默认骨架）
+# → src/zcl_new.clas.abap（默认骨架）
 # 零 SAP 调用，无凭证读取
 ```
 
@@ -192,15 +190,15 @@ abap create local CLAS ZCL_NEW --dir ./src
 ```bash
 # 拉（ADT / ICF 两种路由都可用）
 abap pull ZCL_FOO --textpool
-# → src/zcl_foo/zcl_foo.texts.en.properties
-# → src/zcl_foo/zcl_foo.selections.en.properties
-# → src/zcl_foo/zcl_foo.headings.en.properties
+# → src/zcl_foo.clas.texts.en.properties
+# → src/zcl_foo.clas.selections.en.properties
+# → src/zcl_foo.clas.headings.en.properties
 
 # 改
 # 编辑 .properties
 
 # 推（仅 ADT text-elements 写可用时；A4H 上 → TEXTPOOL_WRITE_UNSUPPORTED）
-abap push src/zcl_foo/zcl_foo.texts.en.properties
+abap push src/zcl_foo.clas.texts.en.properties
 ```
 
 **可用性检查**：`profile add/set` / `abap init` 时**一次探测**并缓存 textpool 读写能力到 profile 的 `adtTextpool`（`~/.abap-cli/systems.json`）；`adtTextpool.write: false` 表示写会路由到 ICF `/textpool/*`，而自带 ICF handler 对 textpool POST **无条件**返回 `TEXTPOOL_WRITE_UNSUPPORTED`（不是可重试的运行时故障）。
@@ -270,15 +268,15 @@ abap select --table ZT_FOO --where "AMOUNT > 100" --count-only
 即"用 ICF 通道管理 ICF 节点"——前者是后者的前提。
 
 ```bash
-# 拉 — 落 src/http/zmy_service.http.json
+# 拉 — 落 src/zmy_service.http.json
 abap pull ZMY_SERVICE --type HTTP --json
 
 # 建 — 必须 --file，无 create local 骨架（漏了报 USAGE）
-abap create HTTP ZMY_SERVICE --file src/http/zmy_service.http.json \
+abap create HTTP ZMY_SERVICE --file src/zmy_service.http.json \
   --package $TMP --description "My service"
 
 # 推
-abap push src/http/zmy_service.http.json --tr <TR>
+abap push src/zmy_service.http.json --tr <TR>
 ```
 
 `.http.json` 遵循 abap-file-format（`http-v1.json`）嵌套结构；CLI 同时接受扁平写法（`description` / `handlerClass` / `url` 提到顶层）：

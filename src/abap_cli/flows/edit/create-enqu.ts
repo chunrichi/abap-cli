@@ -13,6 +13,7 @@ import { CliError, printResult, type OutputMode } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
 import { enquArtifact, type EnquLocal } from '../../formats/enqu/json.js';
 import { toOutputPath } from '../../core/path-output.js';
+import { affObjectToken } from '../../formats/file-resolver.js';
 import type { CreateOptions } from './create.js';
 import type { CreateHandler } from './routing.js';
 
@@ -47,7 +48,7 @@ export async function runCreateEnqu(
         object: upper,
         type: 'ENQU',
         nextSteps: ['See `abap create --schema ENQU` for the contract.'],
-        example: `abap create ENQU ${upper} --file src/enqu/${upper.toLowerCase()}/${upper.toLowerCase()}.enqu.json --yes`,
+        example: `abap create ENQU ${upper} --file src/${affObjectToken(upper)}.enqu.json --yes`,
       },
     );
   }

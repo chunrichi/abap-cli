@@ -4,11 +4,11 @@ import { validateAff } from '../../../src/abap_cli/aff/schema-validator.js';
 import { localToWire, wireToLocal } from '../../../src/abap_cli/formats/ddic/wire.js';
 
 const five = [
-  'doma/zdmy_no_fixed.doma.json',
-  'doma/zdmy_single_fixed.doma.json',
-  'doma/zdmy_multi_lang_fixed.doma.json',
-  'doma/zdmy_sign_flag.doma.json',
-  'doma/zdmy_conv_exit.doma.json',
+  'zdmy_no_fixed.doma.json',
+  'zdmy_single_fixed.doma.json',
+  'zdmy_multi_lang_fixed.doma.json',
+  'zdmy_sign_flag.doma.json',
+  'zdmy_conv_exit.doma.json',
 ];
 
 describe('schema-compliance / doma (T033-020)', () => {
@@ -32,7 +32,7 @@ describe('schema-compliance / doma (T033-020)', () => {
   });
 
   it('DOMA wire carries `format.{dataType,length}` (nested) and `outputCharacteristics.{style,length,conversionRoutine}`', async () => {
-    const local = await readJsonFixture('doma/zdmy_sign_flag.doma.json');
+    const local = await readJsonFixture('zdmy_sign_flag.doma.json');
     const wire = localToWire('DOMA', local as any);
     // Sign-handling goes into outputCharacteristics.style in AFF (no signFlag at top or under format).
     expect((wire as any).signFlag).toBeUndefined();
@@ -44,7 +44,7 @@ describe('schema-compliance / doma (T033-020)', () => {
   });
 
   it('DOMA conversion routine round-trips through outputCharacteristics.conversionRoutine', async () => {
-    const local = await readJsonFixture('doma/zdmy_conv_exit.doma.json');
+    const local = await readJsonFixture('zdmy_conv_exit.doma.json');
     const wire = localToWire('DOMA', local as any);
     expect((wire as any).outputCharacteristics?.conversionRoutine).toBe('ALPHA');
     expect((wire as any).convExit).toBeUndefined();
@@ -53,7 +53,7 @@ describe('schema-compliance / doma (T033-020)', () => {
   });
 
   it('DOMA wire preserves fixedValues with plain string description', async () => {
-    const local = await readJsonFixture('doma/zdmy_multi_lang_fixed.doma.json');
+    const local = await readJsonFixture('zdmy_multi_lang_fixed.doma.json');
     const wire = localToWire('DOMA', local as any);
     expect((wire as any).fixedValues?.length).toBe(2);
     expect((wire as any).fixedValues[0].description).toBe('Active');
@@ -63,7 +63,7 @@ describe('schema-compliance / doma (T033-020)', () => {
   });
 
   it('DOMA wire has no top-level dataType after the rewrite (must be under format)', async () => {
-    const local = await readJsonFixture('doma/zdmy_no_fixed.doma.json');
+    const local = await readJsonFixture('zdmy_no_fixed.doma.json');
     const wire = localToWire('DOMA', local as any);
     expect((wire as any).dataType).toBeUndefined();
     expect((wire as any).format?.dataType).toBe('CHAR');

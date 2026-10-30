@@ -17,7 +17,7 @@ changed at: 2026-10-30 00:05:00
 - `kind: 'handler'` — 该操作走 per-type flow（`create-*` / `pull-*` / `push-*` / `push-icf.ts`）。
 - `channel` — 该操作实际使用的 SAP 通道：`adt`、`icf`，或 `auto`（flow 内部调 `channel-detect`，按内核版本决定 ADT 主路径 / ECC ICF fallback）。
 
-`types/registry.ts` 继续只负责本地布局与能力元数据（folder / `createObjtype` / AFF schema / `requiresFile`）。`test/unit/routing.test.ts` 断言两张表的类型集合与每操作通道完全一致。
+`types/registry.ts` 继续只负责对象类型的能力元数据（`createObjtype` / AFF schema / `requiresFile`）；本地路径不在这里注册——AFF 产物平铺为 `<rootDir>/<name>.<type>.<ext>`。`test/unit/routing.test.ts` 断言两张表的类型集合与每操作通道完全一致。
 
 ## 上下文
 

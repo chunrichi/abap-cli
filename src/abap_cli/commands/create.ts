@@ -97,7 +97,7 @@ function registerCreateLocalCommand(createCmd: Command): void {
       '`abap create <type> <name> --file <path>` with an abap-file-format JSON instead.',
       'To land a draft in SAP, run:',
       '  abap create <type> <name> --package <pkg> --description <desc> --no-pull',
-      '  abap push src/<obj>/<obj>.<type>.abap --tr <transport>',
+      '  abap push src/<obj>.<type>.abap --tr <transport>',
       '',
     ].join('\n'))
     .argument('<type>', 'Object type (CLAS, INTF, PROG, FUGR)')

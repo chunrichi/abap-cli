@@ -6,8 +6,7 @@
  */
 import * as path from 'path';
 import { IcfClient } from '../../clients/icf-client.js';
-import { buildFilename, objectDirName } from '../../formats/file-resolver.js';
-import { folderFor } from '../../formats/type-folder.js';
+import { buildFilename } from '../../formats/file-resolver.js';
 import { fileExists, writeAbapFile } from '../../formats/abap-source.js';
 import { CliError } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
@@ -60,7 +59,7 @@ export async function runPullRemote(objectName: string, type: string | undefined
 
   const { source, version } = resp.data;
   const filename = buildFilename(objectName, objType, undefined, '.abap');
-  const relPath = path.join(opts.dir, folderFor(objType), objectDirName(objectName), filename);
+  const relPath = path.join(opts.dir, filename);
   const targetPath = path.resolve(process.cwd(), relPath);
 
   if (await fileExists(targetPath) && !opts.overwrite && !opts.skipExisting) {

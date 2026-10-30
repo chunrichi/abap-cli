@@ -6,7 +6,6 @@ import { describe, it, expect } from 'vitest';
 import {
   TYPE_REGISTRY,
   allSupportedTypes,
-  folderFor,
   createObjtypeFor,
   sourceFor,
   isSupportedType,
@@ -73,21 +72,15 @@ describe('types/registry.ts (US11 — single source of truth)', () => {
     expect(sourceFor('DDLS')).toBe('ADT');
   });
 
-  it('resolves folders uniformly for all 13 types', () => {
-    expect(folderFor('CLAS')).toBe('clas');
-    expect(folderFor('INTF')).toBe('intf');
-    expect(folderFor('PROG')).toBe('prog');
-    expect(folderFor('FUGR')).toBe('fugr');
-    expect(folderFor('TABL')).toBe('tabl');
-    expect(folderFor('STRU')).toBe('stru');
-    expect(folderFor('DOMA')).toBe('doma');
-    expect(folderFor('DTEL')).toBe('dtel');
-    expect(folderFor('HTTP')).toBe('http');
-    expect(folderFor('TRAN')).toBe('tran');
-    // 036: dual-channel DDIC + CDS folders.
-    expect(folderFor('TTYP')).toBe('ttyp');
-    expect(folderFor('MSAG')).toBe('msag');
-    expect(folderFor('DDLS')).toBe('ddls');
+  it('has no type → folder mapping anymore (flat abap-file-format layout)', async () => {
+    // Artifacts are written flat (<dir>/<name>.<type>.<ext>), so the registry
+    // must not carry a per-type local folder or expose folderFor().
+    const mod = await import('../../src/abap_cli/types/registry.js');
+    expect('folderFor' in mod).toBe(false);
+    expect('DEFAULT_FOLDER' in mod).toBe(false);
+    for (const entry of TYPE_REGISTRY) {
+      expect('folder' in entry).toBe(false);
+    }
   });
 
   it('isSupportedType / subset helpers narrow correctly', () => {
@@ -103,16 +96,15 @@ describe('types/registry.ts (US11 — single source of truth)', () => {
   });
 
   it('case-insensitive: lowercase and subtype suffix resolve correctly', () => {
-    expect(folderFor('clas')).toBe('clas');
-    expect(folderFor('PROG/P')).toBe('prog');
-    expect(folderFor('CLAS/OC')).toBe('clas');
+    expect(createObjtypeFor('clas')).toBe('CLAS/OC');
+    expect(createObjtypeFor('PROG/P')).toBe('PROG/P');
+    expect(createObjtypeFor('CLAS/OC')).toBe('CLAS/OC');
     expect(isDdicSupportedType('TABL')).toBe(true);
     expect(isDdicSupportedType('tabl')).toBe(false); // guards expect uppercase
   });
 
   it('TYPE_REGISTRY entries match the public helpers (no duplication drift)', () => {
     for (const entry of TYPE_REGISTRY) {
-      expect(folderFor(entry.type)).toBe(entry.folder);
       expect(sourceFor(entry.type)).toBe(entry.source);
       expect(isSupportedType(entry.type)).toBe(true);
     }

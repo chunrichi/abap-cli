@@ -63,9 +63,9 @@ describe('022 pull HTTP service', () => {
     expect(out.data).toMatchObject({
       object: 'ZHTTP_TEST',
       type: 'HTTP',
-      entries: [{ file: 'src/http/zhttp_test.http.json', status: 'written' }],
+      entries: [{ file: 'src/zhttp_test.http.json', status: 'written' }],
     });
-    const written = fs.readFileSync(path.join(cwd, 'src/http/zhttp_test.http.json'), 'utf-8');
+    const written = fs.readFileSync(path.join(cwd, 'src/zhttp_test.http.json'), 'utf-8');
     const parsed = JSON.parse(written);
     // The local shape is the abap-file-format nested one (header + generalInformation).
     expect(parsed.name).toBe('ZHTTP_TEST');
@@ -77,13 +77,13 @@ describe('022 pull HTTP service', () => {
   });
 
   it('uses --overwrite to replace an existing file', async () => {
-    fs.mkdirSync(path.join(cwd, 'src/http'), { recursive: true });
-    fs.writeFileSync(path.join(cwd, 'src/http/zhttp_test.http.json'), '{"old":true}');
+    
+    fs.writeFileSync(path.join(cwd, 'src/zhttp_test.http.json'), '{"old":true}');
     const program = makeProgram();
     registerPullCommand(program);
     const res = await runCommand(program, ['pull', 'ZHTTP_TEST', '--type', 'HTTP', '--dir', 'src', '--overwrite', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
-    const written = JSON.parse(fs.readFileSync(path.join(cwd, 'src/http/zhttp_test.http.json'), 'utf-8'));
+    const written = JSON.parse(fs.readFileSync(path.join(cwd, 'src/zhttp_test.http.json'), 'utf-8'));
     expect(written.name).toBe('ZHTTP_TEST');
   });
 

@@ -26,7 +26,6 @@ import { IcfClient } from '../../clients/icf-client.js';
 import { CliError } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
 import { buildFilename } from '../../formats/file-resolver.js';
-import { folderFor } from '../../formats/type-folder.js';
 import { nrobArtifact } from '../../formats/nrob/json.js';
 import { toOutputPath } from '../../core/path-output.js';
 import type { PullHandler } from './routing.js';
@@ -73,7 +72,7 @@ export async function runPullNrob(name: string, opts: PullNrobOptions = {}): Pro
   const upper = name.trim().toUpperCase();
   const dir = opts.dir ?? '.';
   const filename = buildFilename(upper, 'NROB', 'main', '.json');
-  const relPath = path.join(dir, folderFor('NROB'), filename);
+  const relPath = path.join(dir, filename);
   const targetPath = path.resolve(process.cwd(), relPath);
 
   let channel: 'adt' | 'icf' = 'adt';

@@ -4,7 +4,7 @@ title: MSAG — 消息类（Message Class）
 description: MSAG 对象的双通道路由、messages[] 字段契约、占位符转义
 tags: [abap-cli, object-type, msag, adt, icf, abap-file-format, message-class]
 created at: 2026-09-04 00:00:00
-changed at: 2026-09-04 00:00:00
+changed at: 2026-10-30 20:00:00
 ---
 
 # MSAG — 消息类（Message Class）
@@ -23,7 +23,7 @@ ICF 兜底由 `zcl_abap_vibe_msag_format`（读，T100A 头 + T100 文本）与 
 ## 本地文件形态
 
 ```
-src/msag/zmy_msag/
+src/
 └── zmy_msag.msag.json
 ```
 
@@ -61,9 +61,9 @@ ADT 通道的 wire body 是 XML，`&1` 在传输中编码为 `&amp;1`。CLI 的 
 ## 命令示例
 
 ```bash
-abap create MSAG ZMY_MSAG --file src/msag/zmy_msag/zmy_msag.msag.json --package $TMP --json
+abap create MSAG ZMY_MSAG --file src/zmy_msag.msag.json --package $TMP --json
 abap pull SADT_TOOLS_CORE --type MSAG --json
-abap push src/msag/zmy_msag/zmy_msag.msag.json --tr DEVK900001 --json
+abap push src/zmy_msag.msag.json --tr DEVK900001 --json
 ```
 
 ## abap-file-format 合规性

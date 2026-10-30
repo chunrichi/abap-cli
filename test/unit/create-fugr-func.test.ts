@@ -151,10 +151,10 @@ describe('abap create FUGR <group> --func <module> (FUGR/FF child)', () => {
     expect(data.type).toBe('FUGR/FF');
     expect(data.group).toBe(GROUP_NAME);
     expect(data.activated).toBe(true);
-    expect(data.localFile).toMatch(/zfg_demo\/zfg_demo\.fugr\.zfg_demo_ff01\.func\.abap$/);
+    expect(data.localFile).toMatch(/^src\/zfg_demo\.fugr\.zfg_demo_ff01\.func\.abap$/);
 
     // Pull layout: .func.abap + .func.json with includeNumber from the U01 include.
-    const dir = path.join(cwd, 'src', 'fugr', 'zfg_demo');
+    const dir = path.join(cwd, 'src');
     const abap = path.join(dir, 'zfg_demo.fugr.zfg_demo_ff01.func.abap');
     const json = path.join(dir, 'zfg_demo.fugr.zfg_demo_ff01.func.json');
     expect(fs.existsSync(abap)).toBe(true);
@@ -180,7 +180,7 @@ describe('abap create FUGR <group> --func <module> (FUGR/FF child)', () => {
     const res = await runCommand(program, createFugrFuncArgs(['--no-pull']), { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(parseData(res).localFile).toBeUndefined();
-    expect(fs.existsSync(path.join(cwd, 'src', 'fugr', 'zfg_demo'))).toBe(false);
+    expect(fs.readdirSync(path.join(cwd, 'src'))).toEqual([]);
   });
 
   it('--func is rejected for non-FUGR types', async () => {

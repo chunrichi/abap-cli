@@ -4,7 +4,7 @@ title: FUGR — 函数组（Function Group）
 description: FUGR 对象的多文件布局、include 规则、function module 字段
 tags: [abap-cli, object-type, fugr, abap-file-format, adt, fmodule]
 created at: 2026-09-01 00:00:00
-changed at: 2026-09-02 22:06:00
+changed at: 2026-10-30 20:00:00
 ---
 
 # FUGR — 函数组（Function Group）
@@ -16,7 +16,7 @@ changed at: 2026-09-02 22:06:00
 ## 本地文件形态
 
 ```
-src/fugr/zfg_my_group/
+src/
 ├── zfg_my_group.fugr.json                       # 函数组元数据
 ├── zfg_my_group.fugr.saplzfg_my_group.reps.json # 函数池主程序元数据
 ├── zfg_my_group.fugr.saplzfg_my_group.reps.abap # 函数池主程序源码
@@ -76,7 +76,7 @@ src/fugr/zfg_my_group/
 ```bash
 abap create FUGR ZFG_MY_GROUP --package $TMP --description "group" --tr $TMP --json
 abap pull ZFG_MY_GROUP --json
-abap push src/fugr/zfg_my_group/ --tr DEVK900001 --json
+abap push src/zfg_my_group.fugr.saplzfg_my_group.reps.abap --tr DEVK900001 --json
 ```
 
 ## abap-file-format 合规性

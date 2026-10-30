@@ -88,7 +88,7 @@ abap feedback --feature-key abap.cli --title "Example" --description "..." --dry
 abap report-stuck \
     --goal "Create ZCL_ORDER class" \
     --tried "search ZCL_ORDER; pull ZCL_ORDER; check syntax; push --tr DEVK900001 --yes" \
-    --where "abap push src/clas/zcl_order/zcl_order.clas.abap" \
+    --where "abap push src/zcl_order.clas.abap" \
     --json
 ```
 

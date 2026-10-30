@@ -7,6 +7,7 @@ import {
   isFugrTopInclude,
   isFugrUxxInclude,
   readFuncIncludeNumbers,
+  requestedFunctionModuleFor,
   type FugrLayout,
 } from '../../src/abap_cli/formats/fugr-layout.js';
 
@@ -17,7 +18,7 @@ describe('fugrFileToken / isFugrTopInclude / isFugrUxxInclude (T1.3)', () => {
   });
 
   it('fugrFileToken encodes namespaced names with the AFF parentheses form', () => {
-    expect(fugrFileToken('/UI5/CL_FOO')).toBe('#ui5#cl_foo');
+    expect(fugrFileToken('/UI5/CL_FOO')).toBe('(ui5)cl_foo');
   });
 
   it('isFugrTopInclude matches TOP include (and only TOP)', () => {
@@ -205,5 +206,48 @@ describe('fugrPushTargetFor — FXX/OXX/IXX lock targets', () => {
     expect(fugrPushTargetFor(layout, 'lzfg_ghost.reps', GROUP)).toBeUndefined();
     expect(fugrPushTargetFor(layout, 'ghost.func', GROUP)).toBeUndefined();
     expect(fugrSourceUrlForSubtype(layout, 'saplzfg.reps')).toBe(`${GROUP}/source/main`);
+  });
+});
+
+describe('namespaced function modules (flat AFF tokens)', () => {
+  it('resolves (example)fm.func back to /EXAMPLE/FM and encodes the ADT URL', () => {
+    const target = requestedFunctionModuleFor(GROUP, '(example)fm.func');
+    expect(target?.name).toBe('/EXAMPLE/FM');
+    // encodeURIComponent lowercases the hex escapes for ADT compatibility.
+    expect(target?.objectUrl).toBe(`${GROUP}/fmodules/%2fexample%2ffm`);
+  });
+
+  it('keeps plain function-module tokens working', () => {
+    expect(requestedFunctionModuleFor(GROUP, 'zfn_one.func')).toEqual({
+      name: 'ZFN_ONE',
+      objectUrl: `${GROUP}/fmodules/zfn_one`,
+    });
+  });
+
+  it('rejects the retired # token with FILE_PARSE_ERROR', () => {
+    expect(() => requestedFunctionModuleFor(GROUP, '#example#fm.func')).toThrowError(
+      expect.objectContaining({ code: 'FILE_PARSE_ERROR' }),
+    );
+  });
+
+  it('matches a namespaced .func file to the enumerated function module', () => {
+    const layout: FugrLayout = {
+      group: '/EXAMPLE/FOO',
+      groupLow: '/example/foo',
+      groupFile: '(example)foo',
+      saplUrl: `${GROUP}/source/main`,
+      includes: [],
+      funcs: [
+        {
+          name: '/EXAMPLE/FM',
+          objectUrl: `${GROUP}/fmodules/%2fexample%2ffm`,
+          sourceUrl: `${GROUP}/fmodules/%2fexample%2ffm/source/main`,
+          description: 'namespaced FM',
+        },
+      ],
+    };
+    const target = fugrPushTargetFor(layout, '(example)fm.func', GROUP);
+    expect(target?.objectUrl).toBe(`${GROUP}/fmodules/%2fexample%2ffm`);
+    expect(target?.sourceUrl).toBe(`${GROUP}/fmodules/%2fexample%2ffm/source/main`);
   });
 });

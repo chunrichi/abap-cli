@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError } from '../../output/json.js';
+import { resolveFile } from '../../formats/file-resolver.js';
 import { detectChannel } from './channel-detect.js';
 import type { SystemProfile } from './channel-detect.js';
 import { ddlsArtifact, localToWire } from '../../formats/ddls/json.js';
@@ -31,7 +32,8 @@ async function loadProfile(opts: PushDdlsOptions): Promise<SystemProfile> {
 }
 
 function nameFromFile(file: string): string {
-  return path.basename(file).split('.')[0]!.toUpperCase();
+  // filename shape: <name>.ddls.json — AFF namespace token `(ns)name` → `/NS/NAME`.
+  return resolveFile(file).objectName;
 }
 
 export async function runPushDdls(file: string, opts: PushDdlsOptions = {}): Promise<PushDdlsResult> {

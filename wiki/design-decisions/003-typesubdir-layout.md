@@ -1,13 +1,15 @@
 ---
 type: reference
-title: 类型子目录布局（src/<type>//...）
-description: 所有 pull/create 产物落到 `src/<typeFolder>/<name>/` 下；偏离 abap-file-format 严格规范换取多类型共存整洁
+title: 类型子目录布局（src/<type>/...）
+description: 所有 pull/create 产物落到 `src/<typeFolder>/<name>/` 下；偏离 abap-file-format 严格规范换取多类型共存整洁（已被 010 取代，仅作历史记录）
 tags: [abap-cli, design-decisions, file-layout, abap-file-format]
 created at: 2026-09-01 00:00:00
-changed at: 2026-09-01 00:00:00
+changed at: 2026-10-30 20:00:00
 ---
 
 # 003 — 类型子目录布局（`src/<type>/...`）
+
+> **已被 [010 — AFF 原生扁平布局](010-aff-flat-layout.md) 取代（2026-10-30）**：本仓库已回退到 AFF 原生扁平布局——所有产物平铺在 `src/`，命名空间用括号 token（`(ui2)cl_json`）。本页保留为历史决策记录；文中提到的 `src/<type>/...` 路径、`type-folder.ts` 与 `folderFor` 均已删除。
 
 ## 决策
 
@@ -26,7 +28,7 @@ src/
 └── doma/zmy_dom.doma.json
 ```
 
-子目录名由 [`src/abap_cli/formats/type-folder.ts`](../../src/abap_cli/formats/type-folder.ts) 的 `folderFor(type)` 决定（小写：`clas` / `intf` / `prog` / `fugr` / `tabl` / `doma` / `stru` / `dtel` / `http` / `tran`；未识别类型 → `unknown/`）。
+子目录名由 `src/abap_cli/formats/type-folder.ts` 的 `folderFor(type)` 决定（小写：`clas` / `intf` / `prog` / `fugr` / `tabl` / `doma` / `stru` / `dtel` / `http` / `tran`；未识别类型 → `unknown/`）。
 
 ## 上下文
 
@@ -51,5 +53,5 @@ abap-file-format 官方规范（`https://github.com/SAP/abap-file-formats`）要
 # references
 
 - 规范来源：SAP abap-file-format（vendored 副本在 `src/abap_cli/schema/`，见 [`schema/README.md`](../../src/abap_cli/schema/README.md)）
-- 实现：[`src/abap_cli/formats/type-folder.ts`](../../src/abap_cli/formats/type-folder.ts)
+- 实现：`src/abap_cli/formats/type-folder.ts`（已随 010 删除）
 - 仓库合约：[`AGENTS.md`](../../AGENTS.md)

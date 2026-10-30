@@ -8,6 +8,7 @@ import { CliError, printResult, type OutputMode } from '../../output/json.js';
 import { msagArtifact, type MsagLocal } from '../../formats/msag/json.js';
 import { toOutputPath } from '../../core/path-output.js';
 import { detectChannel, loadChannelProfile } from './channel-detect.js';
+import { affObjectToken } from '../../formats/file-resolver.js';
 import type { CreateOptions } from './create.js';
 import type { CreateHandler } from './routing.js';
 
@@ -18,7 +19,7 @@ export async function runCreateMsag(
 ): Promise<void> {
   if (!opts.file) {
     throw new CliError('USAGE', `Type MSAG requires --file <path> with an abap-file-format JSON`, {
-      example: `abap create MSAG ${name} --file src/${name.toLowerCase()}/${name.toLowerCase()}.msag.json --package $TMP --yes`,
+      example: `abap create MSAG ${name} --file src/${affObjectToken(name)}.msag.json --package $TMP --yes`,
     });
   }
   const filePath = path.resolve(process.cwd(), opts.file);

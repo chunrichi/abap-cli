@@ -1,7 +1,7 @@
 /**
  * Pull DDIC objects (DOMA / DTEL / TABL / STRU) via the self-built ICF service.
  *
- * - DOMA / DTEL: single wire-flat `<name>.<type>.json` file under the type folder.
+ * - DOMA / DTEL: single wire-flat `<name>.<type>.json` file under the output dir.
  * - TABL / STRU: abap-file-format three-piece layout (`.json` + `.ddic` +
  *   optional `.settings.json`) when the ICF wire carries the canonical
  *   `mainJson` + `ddicSource` strings; otherwise the flat fallback.
@@ -9,8 +9,7 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { IcfClient } from '../../clients/icf-client.js';
-import { buildFilename } from '../../formats/file-resolver.js';
-import { folderFor } from '../../formats/type-folder.js';
+import { affObjectToken, buildFilename } from '../../formats/file-resolver.js';
 import { fileExists } from '../../formats/abap-source.js';
 import { writeDdicJson } from '../../formats/ddic/io.js';
 import { wireToLocal } from '../../formats/ddic/wire.js';
@@ -48,7 +47,7 @@ export async function runPullDdic(objectName: string, type: DdicSupportedType, o
             'Push the .tabl.json + .tabl.ddic sidecars with `abap push` — the create path uses the GOX_TABLE_STD API and does not re-parse the DDL.',
             'If the object is already in SAP, leave it; no round-trip is required.',
           ],
-          example: `abap push src/tabl/${objectName.toLowerCase()}/${objectName.toLowerCase()}.tabl.json`,
+          example: `abap push src/${affObjectToken(objectName)}.tabl.json`,
         },
       );
     }
@@ -84,7 +83,7 @@ export async function runPullDdic(objectName: string, type: DdicSupportedType, o
 
   const local = wireToLocal(type, resp.data as unknown as Parameters<typeof wireToLocal>[1]);
   const filename = buildFilename(objectName, type, 'main', '.json');
-  const relPath = path.join(opts.dir, folderFor(type), filename);
+  const relPath = path.join(opts.dir, filename);
   const targetPath = path.resolve(process.cwd(), relPath);
 
   if (await fileExists(targetPath) && !opts.overwrite && !opts.skipExisting) {
@@ -153,9 +152,8 @@ async function writePullDdicTabl(
     });
   }
 
-  const objectLower = objectName.toLowerCase();
-  const baseName = `${objectLower}.${type.toLowerCase()}`;
-  const folder = path.join(opts.dir, folderFor(type));
+  const baseName = `${affObjectToken(objectName)}.${type.toLowerCase()}`;
+  const folder = opts.dir;
   const mainRel = path.join(folder, `${baseName}.json`);
   const ddicRel = path.join(folder, `${baseName}.ddic`);
   const settingsRel = pieces.hasSettings && pieces.settingsJson !== undefined

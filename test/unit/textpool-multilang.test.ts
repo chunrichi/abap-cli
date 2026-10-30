@@ -112,7 +112,7 @@ describe('032/textpool-multilang', () => {
   it('CLAS pulls texts (.texts.en.properties) with content from mock', async () => {
     const { res } = await runTextpool('CLAS', 'ZCL_DEMO');
     expect(res.exitCode).toBeUndefined();
-    const path1 = path.join(cwd, 'src/clas/zcl_demo/zcl_demo.clas.texts.en.properties');
+    const path1 = path.join(cwd, 'src/zcl_demo.clas.texts.en.properties');
     expect(fs.existsSync(path1)).toBe(true);
     const content = fs.readFileSync(path1, 'utf-8');
     expect(content).toContain('001=Hello (en)');
@@ -121,7 +121,7 @@ describe('032/textpool-multilang', () => {
   it('CLAS pulls headings (.headings.en.properties) with COLUMNHEADER_1 entry', async () => {
     const { res } = await runTextpool('CLAS', 'ZCL_DEMO');
     expect(res.exitCode).toBeUndefined();
-    const path1 = path.join(cwd, 'src/clas/zcl_demo/zcl_demo.clas.headings.en.properties');
+    const path1 = path.join(cwd, 'src/zcl_demo.clas.headings.en.properties');
     expect(fs.existsSync(path1)).toBe(true);
     expect(fs.readFileSync(path1, 'utf-8')).toContain('COLUMNHEADER_1=Col 1 (en)');
   });
@@ -142,16 +142,16 @@ describe('032/textpool-multilang', () => {
   it('INTF pulls texts + headings', async () => {
     const { res } = await runTextpool('INTF', 'ZIF_DEMO');
     expect(res.exitCode).toBeUndefined();
-    expect(fs.existsSync(path.join(cwd, 'src/intf/zif_demo/zif_demo.intf.texts.en.properties'))).toBe(true);
-    expect(fs.existsSync(path.join(cwd, 'src/intf/zif_demo/zif_demo.intf.headings.en.properties'))).toBe(true);
+    expect(fs.existsSync(path.join(cwd, 'src/zif_demo.intf.texts.en.properties'))).toBe(true);
+    expect(fs.existsSync(path.join(cwd, 'src/zif_demo.intf.headings.en.properties'))).toBe(true);
   });
 
   it('FUGR pulls texts; selections + headings both missing → warnings', async () => {
     const { res } = await runTextpool('FUGR', 'ZFG_DEMO');
     expect(res.exitCode).toBeUndefined();
-    expect(fs.existsSync(path.join(cwd, 'src/fugr/zfg_demo/zfg_demo.fugr.texts.en.properties'))).toBe(true);
-    expect(fs.existsSync(path.join(cwd, 'src/fugr/zfg_demo/zfg_demo.fugr.headings.en.properties'))).toBe(false);
-    expect(fs.existsSync(path.join(cwd, 'src/fugr/zfg_demo/zfg_demo.fugr.selections.en.properties'))).toBe(false);
+    expect(fs.existsSync(path.join(cwd, 'src/zfg_demo.fugr.texts.en.properties'))).toBe(true);
+    expect(fs.existsSync(path.join(cwd, 'src/zfg_demo.fugr.headings.en.properties'))).toBe(false);
+    expect(fs.existsSync(path.join(cwd, 'src/zfg_demo.fugr.selections.en.properties'))).toBe(false);
     const { stdout } = readOutput(res);
     const warnings = (stdout?.meta?.warnings ?? []).filter((w: { code: string }) => w.code === 'TEXTPOOL_CATEGORY_MISSING');
     // FUGR mock has only `symbols`; both selections + headings missing
@@ -162,17 +162,17 @@ describe('032/textpool-multilang', () => {
   it('TABL pulls texts + headings + selections (all 3 categories)', async () => {
     const { res } = await runTextpool('TABL', 'ZTB_DEMO');
     expect(res.exitCode).toBeUndefined();
-    expect(fs.existsSync(path.join(cwd, 'src/tabl/ztb_demo/ztb_demo.tabl.texts.en.properties'))).toBe(true);
-    expect(fs.existsSync(path.join(cwd, 'src/tabl/ztb_demo/ztb_demo.tabl.headings.en.properties'))).toBe(true);
-    expect(fs.existsSync(path.join(cwd, 'src/tabl/ztb_demo/ztb_demo.tabl.selections.en.properties'))).toBe(true);
+    expect(fs.existsSync(path.join(cwd, 'src/ztb_demo.tabl.texts.en.properties'))).toBe(true);
+    expect(fs.existsSync(path.join(cwd, 'src/ztb_demo.tabl.headings.en.properties'))).toBe(true);
+    expect(fs.existsSync(path.join(cwd, 'src/ztb_demo.tabl.selections.en.properties'))).toBe(true);
   });
 
   it('STRU pulls texts; selections + headings both missing → 2 warnings', async () => {
     const { res } = await runTextpool('STRU', 'ZST_DEMO');
     expect(res.exitCode).toBeUndefined();
-    expect(fs.existsSync(path.join(cwd, 'src/stru/zst_demo/zst_demo.stru.texts.en.properties'))).toBe(true);
-    expect(fs.existsSync(path.join(cwd, 'src/stru/zst_demo/zst_demo.stru.headings.en.properties'))).toBe(false);
-    expect(fs.existsSync(path.join(cwd, 'src/stru/zst_demo/zst_demo.stru.selections.en.properties'))).toBe(false);
+    expect(fs.existsSync(path.join(cwd, 'src/zst_demo.stru.texts.en.properties'))).toBe(true);
+    expect(fs.existsSync(path.join(cwd, 'src/zst_demo.stru.headings.en.properties'))).toBe(false);
+    expect(fs.existsSync(path.join(cwd, 'src/zst_demo.stru.selections.en.properties'))).toBe(false);
     const { stdout } = readOutput(res);
     const warnings = (stdout?.meta?.warnings ?? []).filter((w: { code: string }) => w.code === 'TEXTPOOL_CATEGORY_MISSING');
     expect(warnings.length).toBe(2);
@@ -194,6 +194,6 @@ describe('032/textpool-multilang', () => {
     // succeeds; the test inclusion is exercised elsewhere in pull-layout.test.ts.
     const { res } = await runTextpool('CLAS', 'ZCL_DEMO', ['--include-tests']);
     expect(res.exitCode).toBeUndefined();
-    expect(fs.existsSync(path.join(cwd, 'src/clas/zcl_demo/zcl_demo.clas.texts.en.properties'))).toBe(true);
+    expect(fs.existsSync(path.join(cwd, 'src/zcl_demo.clas.texts.en.properties'))).toBe(true);
   });
 });

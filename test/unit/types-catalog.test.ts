@@ -13,6 +13,8 @@ import {
   ddicTabclassFor,
   tadirWhereFor,
 } from '../../src/abap_cli/flows/setup/types-catalog.js';
+import { registerTypesCommand } from '../../src/abap_cli/commands/types.js';
+import { makeProgram, runCommand } from './cli-helper.js';
 
 describe('types-catalog (S-5)', () => {
   it('contains every supported CLI type code from the registry', () => {
@@ -63,14 +65,42 @@ describe('types-catalog (S-5)', () => {
     expect(() => tadirWhereFor('NOT_A_TYPE')).toThrow(/Unknown CLI type code/);
   });
 
-  it('marks each row with channel + folder + AFF schema', () => {
+  it('marks each row with channel + AFF schema, and no local folder (flat layout)', () => {
     const clas = typeCatalog().find((r) => r.cliType === 'CLAS');
     expect(clas?.channel).toBe('ADT');
-    expect(clas?.folder).toBe('clas');
     expect(clas?.affSchema).toBe('clas-v1.json');
 
     const tabl = typeCatalog().find((r) => r.cliType === 'TABL');
     expect(tabl?.channel).toBe('ICF');
-    expect(tabl?.folder).toBe('tabl');
+
+    for (const row of typeCatalog()) {
+      expect('folder' in row).toBe(false);
+    }
+  });
+});
+
+describe('abap types CLI output (flat layout)', () => {
+  it('human table has no FOLDER column and no Local folder line', async () => {
+    const program = makeProgram();
+    registerTypesCommand(program);
+    const res = await runCommand(program, ['types']);
+    expect(res.exitCode).toBeUndefined();
+    expect(res.stdout).not.toContain('FOLDER');
+    expect(res.stdout).not.toContain('Local folder');
+    expect(res.stdout).toContain('AFF SCHEMA');
+  });
+
+  it('--json rows carry channel + affSchema but no folder field', async () => {
+    const program = makeProgram();
+    registerTypesCommand(program);
+    const res = await runCommand(program, ['types', '--json']);
+    expect(res.exitCode).toBeUndefined();
+    const rows = JSON.parse(res.stdout).data as Array<Record<string, unknown>>;
+    expect(rows.length).toBeGreaterThanOrEqual(20);
+    for (const row of rows) {
+      expect('folder' in row).toBe(false);
+      expect(typeof row.channel).toBe('string');
+      expect(typeof row.affSchema).toBe('string');
+    }
   });
 });

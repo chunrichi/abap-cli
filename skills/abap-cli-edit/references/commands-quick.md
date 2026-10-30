@@ -188,7 +188,7 @@ abap validate:aff <file-or-dir> [--wire <wire-dir>]
 - Validate a single fixture
 
   ```bash
-  abap validate:aff test/fixtures/tabl/zmy_basic.tabl.json
+  abap validate:aff test/fixtures/zmy_basic.tabl.json
   ```
 - Validate all fixtures
 

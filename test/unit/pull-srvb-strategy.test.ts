@@ -115,7 +115,7 @@ describe('strategyFor dispatch (T3.2)', () => {
 });
 
 describe('SRVB end-to-end pull (T3.2)', () => {
-  it('writes the <name>.srvb.json file under <rootDir>/srvb/<name>/', async () => {
+  it('writes the <name>.srvb.json file flat under <rootDir>/', async () => {
     const { pullObject } = await loadPullSource();
     const result = await pullObject(
       noopAdtClient as never,
@@ -123,7 +123,7 @@ describe('SRVB end-to-end pull (T3.2)', () => {
       { dir: root },
     );
     expect(result.written).toHaveLength(1);
-    const target = path.join(root, 'srvb', 'zmy_binding', 'zmy_binding.srvb.json');
+    const target = path.join(root, 'zmy_binding.srvb.json');
     expect(fs.existsSync(target)).toBe(true);
     const parsed = JSON.parse(fs.readFileSync(target, 'utf8'));
     expect(parsed).toMatchObject({

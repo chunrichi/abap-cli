@@ -129,7 +129,7 @@ abap search 'ZCL_*' --json
 ## todo
 
 - [ ] **本地结果缓存** — roadmap 建议加 `--stale N` 过期提示（高频 agent 调用提速）；缓存键为 `type + query + filters`，存 `~/.abap-cli/cache/`。
-- [ ] **结果结构稳定化** — 增加 `name` 归一化（namespaced `/UI2/CL_JSON` 与 `#ui2#cl_json` 归一）供 Agent 直接用于 `abap pull`。
+- [ ] **结果结构稳定化** — 增加 `name` 归一化（namespaced `/UI2/CL_JSON` 与 AFF 磁盘 token `(ui2)cl_json` 归一）供 Agent 直接用于 `abap pull`。
 
 # references
 

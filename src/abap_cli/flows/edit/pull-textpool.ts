@@ -8,9 +8,8 @@
 import * as path from 'path';
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { IcfClient } from '../../clients/icf-client.js';
-import { objectDirName } from '../../formats/file-resolver.js';
-import { folderFor } from '../../formats/type-folder.js';
 import { fileExists, writeAbapFile } from '../../formats/abap-source.js';
+import { affObjectToken } from '../../formats/file-resolver.js';
 import { serializeTextpoolProperties, type TextElementCategory } from '../../formats/textpool/properties.js';
 import { routeTextpool } from '../../clients/textpool-router.js';
 import { CliError } from '../../output/json.js';
@@ -50,8 +49,8 @@ export async function runPullTextpool(objectName: string, type: string | undefin
 
   for (const adtCat of categories) {
     const fileCat: 'texts' | 'selections' | 'headings' = adtCat === 'symbols' ? 'texts' : adtCat;
-    const filename = `${objectName.toLowerCase()}.${objType.toLowerCase()}.${fileCat}.en.properties`;
-    const relPath = path.join(opts.dir, folderFor(objType), objectDirName(objectName), filename);
+    const filename = `${affObjectToken(objectName)}.${objType.toLowerCase()}.${fileCat}.en.properties`;
+    const relPath = path.join(opts.dir, filename);
     const targetPath = path.resolve(process.cwd(), relPath);
 
     if (await fileExists(targetPath) && !opts.overwrite && !opts.skipExisting) {

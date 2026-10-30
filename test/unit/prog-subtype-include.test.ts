@@ -68,7 +68,7 @@ describe('032/prog-subtype-include', () => {
     const res = await runCommand(program, ['pull', 'ZPROG_TOP', '--type', 'PROG', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
 
-    const dir = path.join(cwd, 'src', 'prog', 'zprog_top');
+    const dir = path.join(cwd, 'src');
     expect(fs.existsSync(path.join(dir, 'zprog_top.prog.include.abap'))).toBe(true);
     // main path is NOT written for PROG/I
     expect(fs.existsSync(path.join(dir, 'zprog_top.prog.abap'))).toBe(false);
@@ -79,7 +79,7 @@ describe('032/prog-subtype-include', () => {
     registerPullCommand(program);
     await runCommand(program, ['pull', 'ZPROG_TOP', '--type', 'PROG', '--json'], { cwd });
 
-    const dir = path.join(cwd, 'src', 'prog', 'zprog_top');
+    const dir = path.join(cwd, 'src');
     const meta = JSON.parse(fs.readFileSync(path.join(dir, 'zprog_top.prog.json'), 'utf-8'));
     expect(meta.generalInformation.programType).toBe('include');
     expect(meta.formatVersion).toBe('1');
@@ -104,7 +104,7 @@ describe('032/prog-subtype-include', () => {
     const res = await runCommand(program, ['pull', 'ZPROG_REAL', '--type', 'PROG', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
 
-    const dir = path.join(cwd, 'src', 'prog', 'zprog_real');
+    const dir = path.join(cwd, 'src');
     expect(fs.existsSync(path.join(dir, 'zprog_real.prog.include.abap'))).toBe(true);
     expect(fs.existsSync(path.join(dir, 'zprog_real.prog.abap'))).toBe(false);
     const meta = JSON.parse(fs.readFileSync(path.join(dir, 'zprog_real.prog.json'), 'utf-8'));
@@ -135,7 +135,7 @@ describe('032/prog-subtype-include', () => {
     registerPullCommand(program);
     await runCommand(program, ['pull', 'ZPROG_EXEC', '--type', 'PROG', '--json'], { cwd });
 
-    const dir = path.join(cwd, 'src', 'prog', 'zprog_exec');
+    const dir = path.join(cwd, 'src');
     expect(fs.existsSync(path.join(dir, 'zprog_exec.prog.abap'))).toBe(true);
     expect(fs.existsSync(path.join(dir, 'zprog_exec.prog.include.abap'))).toBe(false);
     const meta = JSON.parse(fs.readFileSync(path.join(dir, 'zprog_exec.prog.json'), 'utf-8'));
@@ -170,7 +170,7 @@ describe('032/prog-subtype-include', () => {
       const program = makeProgram();
       registerPullCommand(program);
       await runCommand(program, ['pull', expectedName, '--type', 'PROG', '--json'], { cwd });
-      const dir = path.join(cwd, 'src', 'prog', lc);
+      const dir = path.join(cwd, 'src');
       expect(fs.existsSync(path.join(dir, `${lc}.prog.abap`))).toBe(true);
       expect(fs.existsSync(path.join(dir, `${lc}.prog.include.abap`))).toBe(false);
     }
@@ -204,7 +204,7 @@ describe('032/prog-subtype-include', () => {
     registerPullCommand(program);
     await runCommand(program, ['pull', 'ZCL_DEMO', '--type', 'CLAS', '--json'], { cwd });
 
-    const dir = path.join(cwd, 'src', 'clas', 'zcl_demo');
+    const dir = path.join(cwd, 'src');
     expect(fs.existsSync(path.join(dir, 'zcl_demo.clas.abap'))).toBe(true);
     expect(fs.existsSync(path.join(dir, 'zcl_demo.clas.implementations.abap'))).toBe(true);
     expect(fs.existsSync(path.join(dir, 'zcl_demo.clas.include.abap'))).toBe(false);

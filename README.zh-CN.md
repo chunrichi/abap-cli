@@ -16,8 +16,8 @@
 
 ```bash
 abap pull ZCL_MY_CLASS          # 下载类到本地（含所有 include）
-# 用你喜欢的编辑器改 zcl_my_class.clas.abap
-abap push src/zcl_my_class/ --tr DEVK900001   # 锁 → 写 → 激活 → 解锁
+# 用你喜欢的编辑器改 src/zcl_my_class.clas.abap
+abap push src/zcl_my_class.clas.abap --tr DEVK900001   # 锁 → 写 → 激活 → 解锁
 ```
 
 需要写新对象？`create` 一条命令起骨架。语法检查？`check syntax` 不激活、不留锁。需要查表数据？`select` 是 SE16N 的等价物。想知道改动会冲击哪些对象？`where-used` 直接给引用清单。
@@ -55,14 +55,16 @@ abap init                 # 交互向导：填 host / user / 密码 / package / 
 # 2. 拉一个对象到本地
 abap pull ZCL_MY_CLASS
 
-# 3. 编辑 src/zcl_my_class/zcl_my_class.clas.abap
+# 3. 编辑 src/zcl_my_class.clas.abap
 
 # 4. 写回 SAP
-abap push src/zcl_my_class/ --tr DEVK900001
+abap push src/zcl_my_class.clas.abap --tr DEVK900001
 
 # 5. 没 transport 的话现创一个
 abap transport create "Feature X" --json
 ```
+
+本地文件采用 SAP abap-file-formats（AFF）原生扁平布局：所有产物直接平铺在 `src/` 下，文件名形如 `<name>.<type>[.<sub_type>][.<content_type>][.<language>].<ext>`。一个类会拉到 `src/zcl_my_class.clas.json` + `src/zcl_my_class.clas.abap`（每个 include part 各一个文件）；命名空间对象用 AFF 括号形式——`/UI2/CL_JSON` → `src/(ui2)cl_json.clas.abap`。
 
 需要 agent 用？加 `--json` 或 `--pretty-json` 拿结构化输出。例：
 

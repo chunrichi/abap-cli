@@ -46,7 +46,7 @@ export const SCHEMA: CommandSchema = {
   ],
   globalOptions: ['--json', '--pretty-json'],
   examples: [
-    { description: 'Validate a single fixture', command: 'abap validate:aff test/fixtures/tabl/zmy_basic.tabl.json' },
+    { description: 'Validate a single fixture', command: 'abap validate:aff test/fixtures/zmy_basic.tabl.json' },
     { description: 'Validate all fixtures', command: 'abap validate:aff test/fixtures/' },
     { description: 'Validate a wire payload directory', command: 'abap validate:aff --wire tmp/s4h/wire/' },
   ],

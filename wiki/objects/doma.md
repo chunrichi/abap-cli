@@ -4,7 +4,7 @@ title: DOMA — 域（Domain）
 description: DOMA 对象的字段契约、单 JSON 嵌套结构、关键字段
 tags: [abap-cli, object-type, doma, ddic, icf, abap-file-format, domain]
 created at: 2026-09-01 00:00:00
-changed at: 2026-09-02 22:06:00
+changed at: 2026-10-30 20:00:00
 ---
 
 # DOMA — 域（Domain）
@@ -16,7 +16,7 @@ changed at: 2026-09-02 22:06:00
 ## 本地文件形态（嵌套结构）
 
 ```
-src/doma/zmy_doma/
+src/
 └── zmy_doma.doma.json
 ```
 
@@ -61,7 +61,7 @@ DOMA / DTEL 用**单文件 + 嵌套结构**（而非 TABL/STRU 的三件套）�
 ```bash
 abap create DOMA ZMY_DOMA --package $TMP --description "domain" --tr $TMP --json
 abap pull ZMY_DOMA --json
-abap push src/doma/zmy_doma/ --tr DEVK900001 --json
+abap push src/zmy_doma.doma.json --tr DEVK900001 --json
 ```
 
 ## abap-file-format 合规性

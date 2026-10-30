@@ -11,7 +11,7 @@
  *   DdicTableGeneralInformationWire passes validation.
  *
  * ABAP-side coverage of the 5 enum methods + settings_supported lives
- * in abap/src/clas/zcl_abap_vibe_tabl_format.clas.abap and is exercised
+ * in abap/src/zcl_abap_vibe_tabl_format.clas.abap and is exercised
  * by an end-to-end SAP test (see wiki/object-types.md).
  */
 import { describe, it, expect } from 'vitest';

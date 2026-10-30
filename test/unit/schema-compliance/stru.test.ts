@@ -4,19 +4,19 @@ import { validateAff } from '../../../src/abap_cli/aff/schema-validator.js';
 
 describe('schema-compliance / stru (T033-033)', () => {
   it('zmy_stru.stru.json passes tabl-v1.json (schema alias)', async () => {
-    const doc = await readJsonFixture('stru/zmy_stru.stru.json');
+    const doc = await readJsonFixture('zmy_stru.stru.json');
     const r = await validateAff('STRU', doc);
     expect(r.status, `errors: ${JSON.stringify(r.errors)}`).toBe('pass');
   });
 
   it('zmy_stru.stru.settings.json passes tabt-v1.json', async () => {
-    const doc = await readJsonFixture('stru/zmy_stru.stru.settings.json');
+    const doc = await readJsonFixture('zmy_stru.stru.settings.json');
     const r = await validateAff('STRU', doc, 'tabt-v1.json');
     expect(r.status, `errors: ${JSON.stringify(r.errors)}`).toBe('pass');
   });
 
   it('zmy_stru_no_settings.stru.json passes (settings optional)', async () => {
-    const doc = await readJsonFixture('stru/zmy_stru_no_settings.stru.json');
+    const doc = await readJsonFixture('zmy_stru_no_settings.stru.json');
     const r = await validateAff('STRU', doc);
     expect(r.status, `errors: ${JSON.stringify(r.errors)}`).toBe('pass');
   });

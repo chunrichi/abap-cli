@@ -5,7 +5,6 @@
 import * as path from 'path';
 import { IcfClient } from '../../clients/icf-client.js';
 import { buildFilename } from '../../formats/file-resolver.js';
-import { folderFor } from '../../formats/type-folder.js';
 import { fileExists } from '../../formats/abap-source.js';
 import { httpArtifact, type HttpWirePayload } from '../../formats/http/json.js';
 import { CliError } from '../../output/json.js';
@@ -34,7 +33,7 @@ export async function runPullHttp(objectName: string, opts: PullOptions): Promis
   const local = httpArtifact.fromWire(resp.data);
   local.name = objectName;
   const filename = buildFilename(objectName, 'HTTP', 'main', '.json');
-  const relPath = path.join(opts.dir, folderFor('HTTP'), filename);
+  const relPath = path.join(opts.dir, filename);
   const targetPath = path.resolve(process.cwd(), relPath);
 
   if (await fileExists(targetPath) && !opts.overwrite && !opts.skipExisting) {

@@ -4,7 +4,7 @@ title: INTF — ABAP OO 接口
 description: INTF 对象的字段契约、本地文件形态、abap-file-format 合规性
 tags: [abap-cli, object-type, intf, abap-file-format, adt]
 created at: 2026-09-01 00:00:00
-changed at: 2026-09-02 22:06:00
+changed at: 2026-10-30 20:00:00
 ---
 
 # INTF — ABAP OO 接口
@@ -16,7 +16,8 @@ changed at: 2026-09-02 22:06:00
 ## 本地文件形态
 
 ```
-src/intf/zif_my_iface/
+src/
+├── zif_my_iface.intf.json   # 元数据（abap-file-format）
 └── zif_my_iface.intf.abap   # main part（接口通常只有一个 part）
 ```
 
@@ -39,7 +40,7 @@ src/intf/zif_my_iface/
 ```bash
 abap create INTF ZIF_MY_IFACE --package $TMP --description "iface" --tr $TMP --json
 abap pull ZIF_MY_IFACE --json
-abap push src/intf/zif_my_iface/ --tr DEVK900001 --json
+abap push src/zif_my_iface.intf.abap --tr DEVK900001 --json
 ```
 
 ## abap-file-format 合规性

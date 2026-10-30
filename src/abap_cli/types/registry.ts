@@ -1,14 +1,13 @@
 /**
  * Single source of truth for supported object types.
  *
- * Replaces three legacy registries:
- *   - formats/type-folder.ts#TYPE_FOLDER (type → subdirectory)
+ * Replaces the legacy type registries:
  *   - flows/create-types.ts#TYPE_MAP (type → ADT objtype for source objects)
  *   - formats/{ddic,http,transport}/json.ts#*_SUPPORTED_TYPES (DDIC/ICF type sets)
  *
- * Principle V: Refactor Fearlessly — older modules are migrated to re-export
- * from this registry (T046-T050) before deletion, leaving no compatibility
- * wrapper behind.
+ * Local artifact paths are not registered here: abap-file-format artifacts are
+ * written flat (`<rootDir>/<name>.<type>.<ext>`), so there is no type →
+ * subdirectory mapping anymore.
  */
 
 export type ObjectSource = 'ADT' | 'ICF';
@@ -16,8 +15,6 @@ export type ObjectSource = 'ADT' | 'ICF';
 export interface ObjectTypeEntry {
   /** User-facing type code (uppercase, e.g. "CLAS", "TABL"). */
   type: string;
-  /** Subdirectory under rootDir for local artifacts. */
-  folder: string;
   /** Routing strategy for SAP communication. */
   source: ObjectSource;
   /** ADT objtype for source objects (CLAS/INTF/PROG/FUGR); undefined for DDIC/HTTP/TRAN. */
@@ -52,15 +49,15 @@ export interface ChannelCapability {
 /** Single registry; iterated in `allSupportedTypes()` for deterministic order. */
 export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
   // Source objects (ADT)
-  { type: 'CLAS', folder: 'clas', source: 'ADT', createObjtype: 'CLAS/OC', affSchemaFile: 'clas-v1.json' },
-  { type: 'INTF', folder: 'intf', source: 'ADT', createObjtype: 'INTF/OI', affSchemaFile: 'intf-v1.json' },
-  { type: 'PROG', folder: 'prog', source: 'ADT', createObjtype: 'PROG/P', affSchemaFile: 'prog-v1.json' },
-  { type: 'FUGR', folder: 'fugr', source: 'ADT', createObjtype: 'FUGR/F', affSchemaFile: 'fugr-v1.json' },
+  { type: 'CLAS', source: 'ADT', createObjtype: 'CLAS/OC', affSchemaFile: 'clas-v1.json' },
+  { type: 'INTF', source: 'ADT', createObjtype: 'INTF/OI', affSchemaFile: 'intf-v1.json' },
+  { type: 'PROG', source: 'ADT', createObjtype: 'PROG/P', affSchemaFile: 'prog-v1.json' },
+  { type: 'FUGR', source: 'ADT', createObjtype: 'FUGR/F', affSchemaFile: 'fugr-v1.json' },
   // DDIC objects (ICF) — STRU reuses TABL's schema (spec 018 / spec 033 US5).
-  { type: 'TABL', folder: 'tabl', source: 'ICF', affSchemaFile: 'tabl-v1.json', requiresFile: true },
-  { type: 'STRU', folder: 'stru', source: 'ICF', affSchemaFile: 'tabl-v1.json', requiresFile: true },
-  { type: 'DOMA', folder: 'doma', source: 'ICF', affSchemaFile: 'doma-v1.json', requiresFile: true },
-  { type: 'DTEL', folder: 'dtel', source: 'ICF', affSchemaFile: 'dtel-v1.json', requiresFile: true },
+  { type: 'TABL', source: 'ICF', affSchemaFile: 'tabl-v1.json', requiresFile: true },
+  { type: 'STRU', source: 'ICF', affSchemaFile: 'tabl-v1.json', requiresFile: true },
+  { type: 'DOMA', source: 'ICF', affSchemaFile: 'doma-v1.json', requiresFile: true },
+  { type: 'DTEL', source: 'ICF', affSchemaFile: 'dtel-v1.json', requiresFile: true },
   // PR5: ENQU (lock object) and NROB (number range object) — both DDIC,
   // routed through ICF (NROB has no abap-adt-api endpoint; ENQU is included
   // here so the SAP-side ICF dispatch has a single /ddic/* entry to extend).
@@ -69,19 +66,18 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
   // block was previously declared but never read, so it was dropped on
   // 2026-09-17 (handoff §4.2). pull-nrob.ts hardcodes the literal reason
   // string, so the registry cleanup is safe.
-  { type: 'ENQU', folder: 'enqu', source: 'ICF', affSchemaFile: 'enqu-v1.json', requiresFile: true },
-  { type: 'NROB', folder: 'nrob', source: 'ADT', affSchemaFile: 'nrob-v1.json', requiresFile: true },
+  { type: 'ENQU', source: 'ICF', affSchemaFile: 'enqu-v1.json', requiresFile: true },
+  { type: 'NROB', source: 'ADT', affSchemaFile: 'nrob-v1.json', requiresFile: true },
   // HTTP service (SICF node) via ICF. 032 US10 originally wrote a local
   // skeleton when --file was absent; that path was removed (refactor decision
   // 1A) to match DDIC/DDLS, so HTTP now requires --file too.
-  { type: 'HTTP', folder: 'http', source: 'ICF', affSchemaFile: 'http-v1.json', requiresFile: true },
+  { type: 'HTTP', source: 'ICF', affSchemaFile: 'http-v1.json', requiresFile: true },
   // Transaction code (SE93) via ICF
-  { type: 'TRAN', folder: 'tran', source: 'ICF', affSchemaFile: 'tran-v1.json', requiresFile: true },
+  { type: 'TRAN', source: 'ICF', affSchemaFile: 'tran-v1.json', requiresFile: true },
   // 036-ttyp-msag-ddls: dual-channel DDIC + CDS.
   // TTYP — handcrafted schema (upstream type-v1.json is type-pool, not table-type).
   {
     type: 'TTYP',
-    folder: 'ttyp',
     source: 'ADT',
     affSchemaFile: 'ttyp-v1.json',
     requiresFile: true,
@@ -90,7 +86,6 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
   // MSAG — upstream schema available at msag/msag-v1.json.
   {
     type: 'MSAG',
-    folder: 'msag',
     source: 'ADT',
     affSchemaFile: 'msag-v1.json',
     requiresFile: true,
@@ -101,7 +96,6 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
   // DDLS_NOT_SUPPORTED_ON_ECC (exit 64) instead of silently degrading.
   {
     type: 'DDLS',
-    folder: 'ddls',
     source: 'ADT',
     affSchemaFile: 'ddls-v1.json',
     requiresFile: true,
@@ -112,7 +106,6 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
   // managed in SAP GUI; the CLI does not create them.
   {
     type: 'SRVB',
-    folder: 'srvb',
     source: 'ADT',
     affSchemaFile: 'srvb-v1.json',
   },
@@ -120,7 +113,6 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
   // `<name>.srvd.json` + `<name>.srvd.acds`. Create requires `--file`.
   {
     type: 'SRVD',
-    folder: 'srvd',
     source: 'ADT',
     createObjtype: 'SRVD/SRV',
     affSchemaFile: 'srvd-v1.json',
@@ -131,7 +123,6 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
   // cannot create one. Pull writes `<name>.bdef.json` + `<name>.bdef.abdl`.
   {
     type: 'BDEF',
-    folder: 'bdef',
     source: 'ADT',
     affSchemaFile: 'bdef-v1.json',
   },
@@ -140,7 +131,6 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
   // Create requires `--file`.
   {
     type: 'DCLS',
-    folder: 'dcls',
     source: 'ADT',
     createObjtype: 'DCLS/DL',
     affSchemaFile: 'dcls-v1.json',
@@ -148,7 +138,6 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
   },
   {
     type: 'DDLX',
-    folder: 'ddlx',
     source: 'ADT',
     createObjtype: 'DDLX/EX',
     affSchemaFile: 'ddlx-v1.json',
@@ -156,7 +145,6 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
   },
   {
     type: 'DDLA',
-    folder: 'ddla',
     source: 'ADT',
     createObjtype: 'DDLA/ADF',
     affSchemaFile: 'ddla-v1.json',
@@ -165,16 +153,9 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
 ] as const;
 
 /** 036-ttyp-msag-ddls: sub-registry types for channel-detect / ICF fallback gating. */
-const DEFAULT_FOLDER = 'unknown';
 const INDEX: Record<string, ObjectTypeEntry> = Object.fromEntries(
   TYPE_REGISTRY.map((e) => [e.type, e]),
 );
-
-/** Resolve the subdirectory name for an object type. Case-insensitive. */
-export function folderFor(type: string): string {
-  const primary = type.split('/')[0]!.toUpperCase();
-  return INDEX[primary]?.folder ?? DEFAULT_FOLDER;
-}
 
 /** Resolve the ADT objtype for create (source objects only). */
 export function createObjtypeFor(type: string): string | undefined {

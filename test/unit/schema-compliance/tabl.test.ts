@@ -3,11 +3,11 @@ import { readJsonFixture } from './_helpers.js';
 import { validateAff } from '../../../src/abap_cli/aff/schema-validator.js';
 
 const fivePieces = [
-  'tabl/zmy_basic',
-  'tabl/zmy_key_compound',
-  'tabl/zmy_include',
-  'tabl/zmy_foreign_key',
-  'tabl/zmy_client_handling',
+  'zmy_basic',
+  'zmy_key_compound',
+  'zmy_include',
+  'zmy_foreign_key',
+  'zmy_client_handling',
 ];
 
 describe('schema-compliance / tabl (T033-029)', () => {

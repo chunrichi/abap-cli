@@ -84,10 +84,10 @@ describe('runPullTtyp — ADT channel (036 US2)', () => {
     expect(icfGet).not.toHaveBeenCalled();
     expect(result.files).toHaveLength(2);
 
-    const json = JSON.parse(fs.readFileSync(path.join(root, 'ttyp/zmy_ttyp/zmy_ttyp.ttyp.json'), 'utf8'));
+    const json = JSON.parse(fs.readFileSync(path.join(root, 'zmy_ttyp.ttyp.json'), 'utf8'));
     expect(json.accessType).toBe('standard');
     expect(json.lineType.rowType).toBe('STRING');
-    expect(fs.existsSync(path.join(root, 'ttyp/zmy_ttyp/zmy_ttyp.type.abap'))).toBe(true);
+    expect(fs.existsSync(path.join(root, 'zmy_ttyp.type.abap'))).toBe(true);
   });
 
   it('carries the keyDefinition array for hashed tables', async () => {
@@ -113,7 +113,7 @@ describe('runPullTtyp — ADT channel (036 US2)', () => {
     const result = await runPullTtyp('zmy_ttyp', { profile: ADT_PROFILE, rootDir: root, skipTypeAbap: true });
 
     expect(result.files).toHaveLength(1);
-    expect(fs.existsSync(path.join(root, 'ttyp/zmy_ttyp/zmy_ttyp.type.abap'))).toBe(false);
+    expect(fs.existsSync(path.join(root, 'zmy_ttyp.type.abap'))).toBe(false);
   });
 });
 

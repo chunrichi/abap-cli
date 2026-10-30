@@ -4,30 +4,30 @@ title: 对象类型详细文档索引
 description: 每个 SAP 对象类型的字段契约、命令路径、本地文件形态与示例
 tags: [abap-cli, object-types, reference, clas, intf, prog, fugr, tabl, stru, doma, dtel, enqu, nrob, http, tran, ttyp, msag, ddls]
 created at: 2026-09-01 00:00:00
-changed at: 2026-09-16 00:00:00
+changed at: 2026-10-30 20:00:00
 ---
 
 # 对象类型详细文档
 
 每个对象类型一篇：字段契约 / 命令路径 / 本地文件形态 / abap-file-format 合规性 / 已知坑。
 
-| 类型 | 路由 | 本地文件形态 | 文档 |
+| 类型 | 路由 | 本地文件形态（平铺 `src/`） | 文档 |
 |---|---|---|---|
-| `CLAS` | ADT | `clas/<name>/<name>.clas.json` + 各 include | [clas.md](clas.md) |
-| `INTF` | ADT | `intf/<name>/<name>.intf.json` + `*.intf.abap` | [intf.md](intf.md) |
-| `PROG` | ADT | `prog/<name>/<name>.prog.json` + `*.prog.abap` | [prog.md](prog.md) |
-| `FUGR` | ADT | `fugr/<group>/<group>.fugr.json` + `sapl<group>.reps.*` + `l<group>top.reps.*` + 每 FM `.func.*` | [fugr.md](fugr.md) |
-| `TABL` | ICF | `tabl/<name>/<name>.tabl.{json,ddic,settings.json}` 三件套 | [tabl.md](tabl.md) |
-| `STRU` | ICF | `stru/<name>/<name>.stru.{json,ddic,settings.json}` 三件套 | [stru.md](stru.md) |
-| `DOMA` | ICF | `doma/<name>/<name>.doma.json`（嵌套） | [doma.md](doma.md) |
-| `DTEL` | ICF | `dtel/<name>/<name>.dtel.json`（嵌套） | [dtel.md](dtel.md) |
-| `ENQU` | ICF | `enqu/<name>/<name>.enqu.json`（锁对象） | [enqu.md](enqu.md) |
-| `NROB` | ICF | `nrob/<name>/<name>.nrob.json`（编号范围对象） | [nrob.md](nrob.md) |
-| `HTTP` | ICF | `http/<name>/<name>.http.json`（SICF 节点） | [http.md](http.md) |
-| `TRAN` | ICF | `tran/<code>/<code>.tran.json`（SE93 事务码） | [tran.md](tran.md) |
-| `TTYP` | ADT + ICF 兜底 | `ttyp/<name>/<name>.ttyp.json` + 可选 `.type.abap` | [ttyp.md](ttyp.md) |
-| `MSAG` | ADT + ICF 兜底 | `msag/<name>/<name>.msag.json` | [msag.md](msag.md) |
-| `DDLS` | ADT（无兜底） | `ddls/<name>/<name>.ddls.{json,acds}` 两件套 | [ddls.md](ddls.md) |
+| `CLAS` | ADT | `src/<name>.clas.json` + 各 include `src/<name>.clas.<subtype>.abap` | [clas.md](clas.md) |
+| `INTF` | ADT | `src/<name>.intf.json` + `src/<name>.intf.abap` | [intf.md](intf.md) |
+| `PROG` | ADT | `src/<name>.prog.json` + `src/<name>.prog.abap` | [prog.md](prog.md) |
+| `FUGR` | ADT | `src/<group>.fugr.json` + `.fugr.sapl<group>.reps.*` + `.fugr.l<group>top.reps.*` + 每 FM `.fugr.<fm>.func.*` | [fugr.md](fugr.md) |
+| `TABL` | ICF | `src/<name>.tabl.{json,ddic,settings.json}` 三件套 | [tabl.md](tabl.md) |
+| `STRU` | ICF | `src/<name>.stru.{json,ddic,settings.json}` 三件套 | [stru.md](stru.md) |
+| `DOMA` | ICF | `src/<name>.doma.json`（嵌套） | [doma.md](doma.md) |
+| `DTEL` | ICF | `src/<name>.dtel.json`（嵌套） | [dtel.md](dtel.md) |
+| `ENQU` | ICF | `src/<name>.enqu.json`（锁对象） | [enqu.md](enqu.md) |
+| `NROB` | ICF | `src/<name>.nrob.json`（编号范围对象） | [nrob.md](nrob.md) |
+| `HTTP` | ICF | `src/<name>.http.json`（SICF 节点） | [http.md](http.md) |
+| `TRAN` | ICF | `src/<code>.tran.json`（SE93 事务码） | [tran.md](tran.md) |
+| `TTYP` | ADT + ICF 兜底 | `src/<name>.ttyp.json` + 可选 `src/<name>.type.abap` | [ttyp.md](ttyp.md) |
+| `MSAG` | ADT + ICF 兜底 | `src/<name>.msag.json` | [msag.md](msag.md) |
+| `DDLS` | ADT（无兜底） | `src/<name>.ddls.{json,acds}` 两件套 | [ddls.md](ddls.md) |
 
 ## 路由速查
 
@@ -38,7 +38,7 @@ changed at: 2026-09-16 00:00:00
 
 ## 详细决策
 
-类型子目录布局的「为什么」见 [design-decisions/003-typesubdir-layout.md](../design-decisions/003-typesubdir-layout.md)；DDIC 走 ICF 而非 ADT 的「为什么」见 [design-decisions/002-icf-bypass-ddic.md](../design-decisions/002-icf-bypass-ddic.md)。
+AFF 原生扁平布局的「为什么」见 [design-decisions/010-aff-flat-layout.md](../design-decisions/010-aff-flat-layout.md)（[003](../design-decisions/003-typesubdir-layout.md) 是已被取代的历史决策）；DDIC 走 ICF 而非 ADT 的「为什么」见 [design-decisions/002-icf-bypass-ddic.md](../design-decisions/002-icf-bypass-ddic.md)。
 
 # references
 

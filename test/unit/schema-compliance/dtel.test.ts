@@ -4,9 +4,9 @@ import { validateAff } from '../../../src/abap_cli/aff/schema-validator.js';
 import { localToWire, wireToLocal } from '../../../src/abap_cli/formats/ddic/wire.js';
 
 const three = [
-  'dtel/zdm_domain_ref.dtel.json',
-  'dtel/zdm_predefined_type.dtel.json',
-  'dtel/zdm_type_ref.dtel.json',
+  'zdm_domain_ref.dtel.json',
+  'zdm_predefined_type.dtel.json',
+  'zdm_type_ref.dtel.json',
 ];
 
 describe('schema-compliance / dtel (T033-025)', () => {

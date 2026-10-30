@@ -7,7 +7,7 @@
  *   correct for filesystem operations but inconsistent for **structured output**
  *   that agents parse. Agents expect a single canonical shape regardless of
  *   platform — the abap-file-format reference layout uses POSIX separators
- *   (`src/clas/zcl_demo/zcl_demo.clas.abap`).
+ *   (`src/zcl_demo.clas.abap`).
  *
  * Boundary:
  *   Internally the code may use `path.join` / `path.relative` freely — they are
@@ -57,8 +57,8 @@ export function toRelativeOutputPath(absFile: string, cwd: string = process.cwd(
  *   `path.relative`); `..` segments and `//` are preserved.
  *
  * @example
- *   toOutputPath('src/clas/zcl_demo/zcl_demo.clas.abap') // 'src/clas/zcl_demo/...'
- *   toOutputPath(path.join('src','clas','foo'))         // 'src/clas/foo' (Win: 'src\\clas\\foo' → 'src/clas/foo')
+ *   toOutputPath('src/zcl_demo.clas.abap')              // 'src/zcl_demo.clas.abap'
+ *   toOutputPath(path.join('src','zcl_demo.clas.abap')) // 'src/zcl_demo.clas.abap' (Win: 'src\\zcl_demo...' → 'src/zcl_demo...')
  *   toOutputPath('./src/foo.abap')                       // 'src/foo.abap'
  */
 export function toOutputPath(p: string | undefined | null): string {

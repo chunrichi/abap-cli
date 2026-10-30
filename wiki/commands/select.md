@@ -224,7 +224,7 @@ QUERY_FAILED              runtime SQL failure             →  abap activate <ta
 # references
 
 - 实现: [src/abap_cli/commands/select.ts](../../src/abap_cli/commands/select.ts) · [src/abap_cli/flows/data/select.ts](../../src/abap_cli/flows/data/select.ts) · [src/abap_cli/clients/icf-client.ts](../../src/abap_cli/clients/icf-client.ts)
-- SAP 后端: `abap/src/clas/zcl_abap_vibe_icf.clas.abap`（`lcl_data=>dispatch_data`，`/data/query` 端点）
+- SAP 后端: `abap/src/zcl_abap_vibe_icf.clas.abap`（`lcl_data=>dispatch_data`，`/data/query` 端点）
 - 文档: [docs/commands.md](../../docs/commands.md)
 - 设计回顾：见 wiki 顶层 `abap-select` 历史回顾（动态 SQL 注入安全 + DDIC 元数据 + 行类型构建）
 - 相关命令页: [abap deploy](deploy.md)、[abap search](search.md)

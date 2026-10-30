@@ -78,7 +78,7 @@ describe('032 US4: FUGR fixPointArithmetic fallback', () => {
     registerPullCommand(program);
     const res = await runCommand(program, ['pull', 'ZFG_FIXPOINT', '--type', 'FUGR', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
-    const fugr = JSON.parse(fs.readFileSync(path.join(cwd, 'src', 'fugr', 'zfg_fixpoint', 'zfg_fixpoint.fugr.json'), 'utf-8'));
+    const fugr = JSON.parse(fs.readFileSync(path.join(cwd, 'src', 'zfg_fixpoint.fugr.json'), 'utf-8'));
     expect(fugr.fixPointArithmetic).toBe(true);
   });
 
@@ -88,7 +88,7 @@ describe('032 US4: FUGR fixPointArithmetic fallback', () => {
     registerPullCommand(program);
     const res = await runCommand(program, ['pull', 'ZFG_FIXPOINT', '--type', 'FUGR', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
-    const fugr = JSON.parse(fs.readFileSync(path.join(cwd, 'src', 'fugr', 'zfg_fixpoint', 'zfg_fixpoint.fugr.json'), 'utf-8'));
+    const fugr = JSON.parse(fs.readFileSync(path.join(cwd, 'src', 'zfg_fixpoint.fugr.json'), 'utf-8'));
     expect(fugr.fixPointArithmetic).toBe(false);
   });
 
@@ -98,7 +98,7 @@ describe('032 US4: FUGR fixPointArithmetic fallback', () => {
     registerPullCommand(program);
     const res = await runCommand(program, ['pull', 'ZFG_FIXPOINT', '--type', 'FUGR', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
-    const fugr = JSON.parse(fs.readFileSync(path.join(cwd, 'src', 'fugr', 'zfg_fixpoint', 'zfg_fixpoint.fugr.json'), 'utf-8'));
+    const fugr = JSON.parse(fs.readFileSync(path.join(cwd, 'src', 'zfg_fixpoint.fugr.json'), 'utf-8'));
     expect(fugr.fixPointArithmetic).toBe(false);
   });
 });

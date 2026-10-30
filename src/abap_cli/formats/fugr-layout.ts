@@ -1,6 +1,6 @@
 import type { AdtClientWrapper } from '../clients/adt-client.js';
 import { CliError } from '../output/json.js';
-import { objectDirName } from './file-resolver.js';
+import { affObjectNameFromToken, affObjectToken } from './file-resolver.js';
 import type { FuncComponent } from './func-pseudo.js';
 
 /**
@@ -23,7 +23,7 @@ import type { FuncComponent } from './func-pseudo.js';
 
 /** Disk token for a FUGR object or sub-object name (`/EXAMPLE/FOO` → `(example)foo`). */
 export function fugrFileToken(name: string): string {
-  return objectDirName(name);
+  return affObjectToken(name);
 }
 
 /**
@@ -285,10 +285,10 @@ export function requestedFunctionModuleFor(
   subtype: string,
 ): { name: string; objectUrl: string } | undefined {
   if (!subtype.endsWith('.func')) return undefined;
-  // The disk token is the lower-case / # → / / form used by buildFilename.
-  // For the (very rare) namespaced FM this round-trips fine because the
-  // existing fixtures do not exercise namespaced function modules.
-  const name = subtype.slice(0, '.func'.length * -1).toUpperCase();
+  // The disk token is the AFF `(ns)name` / lower-case form written by
+  // buildFilename; restore the `/NS/NAME` form before building the ADT URL.
+  const token = subtype.slice(0, '.func'.length * -1);
+  const name = affObjectNameFromToken(token, `${token}.func`);
   const encodedName = encodeURIComponent(name.toLowerCase()).replace(
     /%[0-9A-F]{2}/g,
     (part) => part.toLowerCase(),
@@ -444,7 +444,8 @@ export function fugrPushTargetFor(
     return inc ? { objectUrl: inc.objectUrl, sourceUrl: inc.sourceUrl } : undefined;
   }
   if (subtype.endsWith('.func')) {
-    const fmName = subtype.slice(0, '.func'.length * -1).toUpperCase();
+    const token = subtype.slice(0, '.func'.length * -1);
+    const fmName = affObjectNameFromToken(token, `${token}.func`);
     const fm = layout.funcs.find((f) => f.name === fmName);
     return fm ? { objectUrl: fm.objectUrl, sourceUrl: fm.sourceUrl } : undefined;
   }

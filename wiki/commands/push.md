@@ -21,8 +21,8 @@ abap push [options] [files...]
 
 ## Options
 
-- `[files...]`: 要推送的文件路径（一个或多个）
-- `--all`: 推送扫描根下所有 `.abap` 文件（遵循 `.abapignore`）——扫描根为 `.abap.json::sourceDir`（配置了时，相对配置文件所在目录解析），否则为当前工作目录；不遵循 `<name>.<type>.abap|xml` 布局的杂散文件会被跳过（显式 `[files...]` 路径永不跳过）
+- `[files...]`: 要推送的**文件**路径（一个或多个）。参数不做目录展开——传目录会 `EISDIR`；批量推送用 `--all`
+- `--all`: 递归扫描并推送扫描根下的 `.abap` / `.xml` 文件（遵循 `.abapignore`）——扫描根为 `.abap.json::sourceDir`（配置了时，相对配置文件所在目录解析），否则为当前工作目录；不遵循 `<name>.<type>.abap|xml` 布局的杂散文件会被跳过（显式 `[files...]` 路径永不跳过）。**不含 DDIC 的 `.json` / `.ddic`**：DDIC 对象请显式给路径（如 `abap push src/ztabl_demo.tabl.json`）
 - `--tr <transport>`: 传输请求号（按对象解析，见下文；多数场景不再必输）
 - `--check-only`: 只做语法检查不激活（与 `--no-activate` 互斥）
 - `--no-activate`: lock + write + 跳过 check + 跳过 activate + unlock
@@ -136,7 +136,7 @@ DDIC 的存在性探测（`GET /ddic/<type>/<name>`）与 TRAN 的探测（`GET 
 | `zcl_foo.clas.abap` / `.clas.definitions.abap` / `.clas.implementations.abap` / `.clas.macros.abap` / `.clas.testclasses.abap` | adt | 类及各类 include part，按 subtype 精确匹配对象的 include |
 | `zif_foo.intf.abap` / `.intf.definitions.abap` / `.intf.implementations.abap` | adt | 接口及各 part |
 | `zprog.prog.abap` | adt | 程序 main |
-| `zfg.fugr.abap` / `.fugr.sapl<name>.reps.abap` / `.fugr.l<name>top.reps.abap` / `.fugr.<fm>.func.abap` | adt | 函数组（含 include 与 FM 子对象，各自独立加锁） |
+| `zfg.fugr.saplzfg.reps.abap` / `.fugr.lzfgtop.reps.abap` / `.fugr.<include>.reps.abap` / `.fugr.<fm>.func.abap` | adt | 函数组（含 include 与 FM 子对象，各自独立加锁） |
 | `zmy_table.tabl.json` / `.doma.json` / `.dtel.json` / `.stru.json` | icf | 四种 DDIC 对象（`PUSH_ROUTES` 的 `icf-json` 行，POST `/ddic/<type>`，push 前 GET 探测存在性） |
 | `zmy_service.http.json` | icf | HTTP 服务（SICF 节点），POST `/http/<name>`；**不探测存在性**（push 即创建/更新） |
 | `zmy_tran.tran.json` | icf | 事务码（SE93），POST `/tran/<code>`；push 前 GET 探测存在性 |
@@ -145,7 +145,9 @@ DDIC 的存在性探测（`GET /ddic/<type>/<name>`）与 TRAN 的探测（`GET 
 
 **不支持的**：`.clas.json` 等源码对象的元数据 JSON — 被解析为 route `icf` 但对象类型既不在四种 DDIC 之内、也不是 036 的三类型，`validateLocalFile` 抛 `DDIC_NOT_SUPPORTED`（exit 7）。源码对象的创建/更新走 `abap create`，不是 push。
 
-**目录约定（与 pull / create local 对齐）**：push 路径上的目录层级（`src/<typeFolder>/<objectName>/...`）仅作约定，不影响路由与解析——`file-resolver.ts#resolveFile` 只看 `path.basename`。pull / create local 默认把产物放到对应类型的顶层子目录下（`src/clas/`、`src/prog/`、`src/intf/`、`src/fugr/`、`src/tabl/`、`src/doma/`、`src/stru/`、`src/dtel/`），push 沿用同一目录读 basename 即可；推老路径（裸 `src/<name>.<type>.abap`）也仍然能正常解析并推送。
+**文件位置约定（与 pull / create local 对齐）**：`file-resolver.ts#resolveFile` 只看 `path.basename`，所以文件放在哪一层目录不影响路由与解析——push 可以推 `src/` 下的 AFF 文件名，也可以推子目录里的同名文件。pull / create local 默认把产物平铺写入 `src/`（`--dir` 只对这两条命令生效），push 直接读文件名即可。但文件名本身必须是 AFF 命名 `<name>.<type>[.<sub_type>].<ext>`：旧 `#ns#name` 命名空间 token 会被拒绝（`FILE_PARSE_ERROR`，提示重新 `abap pull`）。
+
+**目录不是参数**：`[files...]` 只接受文件；`resolveLocalTargets` 不做目录展开，传目录会报 `EISDIR`。批量推送用 `abap push --all`，它只递归收 `.abap` / `.xml`——DDIC 的 `.json` / `.tabl.ddic` / `.tabl.settings.json` 不在 `--all` 的扫描范围，必须显式给路径（如 `abap push src/ztabl_demo.tabl.json`）。
 
 **part 精确匹配**：`.clas.macros.abap` 只有在对象确实有 `macros` include 时才推送；对象没有该 include 时**报错**（`SAP_ERROR`，exit 6，`nextSteps` 指引 `abap inspect <obj> --includes`），不会静默回退把 macros 内容写进 main。只有 `main` 文件映射到对象的 main part。
 
@@ -171,35 +173,35 @@ DDIC 的存在性探测（`GET /ddic/<type>/<name>`）与 TRAN 的探测（`GET 
 
 ```bash
 # 推送单个文件（对象已绑定请求或 $TMP 时无需 --tr）
-abap push src/clas/zcl_my_class/zcl_my_class.clas.abap --yes
+abap push src/zcl_my_class.clas.abap --yes
 
 # 显式指定 transport
-abap push src/prog/zprog/zprog.prog.abap --tr NDK123456 --yes
+abap push src/zprog.prog.abap --tr NDK123456 --yes
 
 # 只做语法检查
-abap push src/clas/zcl_foo/zcl_foo.clas.abap --tr NDK123456 --check-only
+abap push src/zcl_foo.clas.abap --tr NDK123456 --check-only
 
 # 只写不激活
-abap push src/clas/zcl_foo/zcl_foo.clas.abap --tr NDK123456 --no-activate
+abap push src/zcl_foo.clas.abap --tr NDK123456 --no-activate
 
 # 推送整个目录（遵循 .abapignore）
 abap push --all --tr NDK123456
 
 # 计划模式（零变更）
-abap push src/clas/zcl_foo/zcl_foo.clas.abap --tr NDK123456 --dry-run
+abap push src/zcl_foo.clas.abap --tr NDK123456 --dry-run
 
 # 原子推送：任一文件校验失败则零写入
-abap push src/clas/a.clas.abap src/clas/b.clas.abap --tr NDK123456 --atomic
+abap push src/a.clas.abap src/b.clas.abap --tr NDK123456 --atomic
 
 # 推送 DDIC 对象（$TMP 无需 --tr）
-abap push src/tabl/ztest_e2e.tabl.json
+abap push src/ztest_e2e.tabl.json
 
 # 推送 TABL 三件套：main 即可；同目录 .tabl.ddic / .tabl.settings.json 自动一起推
-abap push src/tabl/zthree.tabl.json --tr NDK900001 --yes
-# 等价于：abap push src/tabl/zthree.tabl.json src/tabl/zthree.tabl.ddic src/tabl/zthree.tabl.settings.json --tr NDK900001 --yes
+abap push src/zthree.tabl.json --tr NDK900001 --yes
+# 等价于：abap push src/zthree.tabl.json src/zthree.tabl.ddic src/zthree.tabl.settings.json --tr NDK900001 --yes
 
 # 推送 textpool（仅 ADT text-elements 写可用时；A4H 上报 TEXTPOOL_WRITE_UNSUPPORTED）
-abap push src/prog/zprog/zprog.prog.texts.en.properties
+abap push src/zprog.prog.texts.en.properties
 ```
 
 ## Expected Output
@@ -217,7 +219,7 @@ abap push src/prog/zprog/zprog.prog.texts.en.properties
   "data": {
     "results": [
       {
-        "file": "src/prog/zprog/zprog.prog.abap",
+        "file": "src/zprog.prog.abap",
         "status": "activated",
         "transport": "NDK123456",
         "stage": "unlock"
@@ -240,7 +242,7 @@ abap push src/prog/zprog/zprog.prog.texts.en.properties
     "code": "LOCK_FAILED",
     "category": "LOCKED",
     "message": "Cannot lock ZCL_TR: Object ZCL_TR is locked by user OTHER",
-    "details": { "results": [{ "file": "src/clas/zcl_tr.clas.abap", "status": "failed", "code": "LOCK_FAILED", "nextSteps": ["Check who holds the lock: abap inspect ZCL_TR --locks", "Wait for the lock to be released, or release it manually in SE03."] }] }
+    "details": { "results": [{ "file": "src/zcl_tr.clas.abap", "status": "failed", "code": "LOCK_FAILED", "nextSteps": ["Check who holds the lock: abap inspect ZCL_TR --locks", "Wait for the lock to be released, or release it manually in SE03."] }] }
   }
 }
 ```
@@ -263,5 +265,6 @@ abap push src/prog/zprog/zprog.prog.texts.en.properties
 
 - 实现：`src/abap_cli/commands/push.ts`、`src/abap_cli/flows/edit/routing.ts`（`PUSH_ROUTES` 单一路由表）、`src/abap_cli/flows/edit/push.ts`（`runPush`/`pushOne`/`resolveObjectTransport`）、`push-icf.ts`（DDIC/HTTP/TRAN 的 ICF 写与校验）、`push-object.ts`、`push-fugr.ts`、`push-textpool.ts`、`push-{ttyp,msag,ddls}.ts`、`src/abap_cli/core/confirmation.ts`
 - transport 解析：`src/abap_cli/core/transport.ts`（`resolveTransport`）、`src/abap_cli/core/resolve.ts`（`ResolvedObject.packageName`）
-- SAP 后端：`abap/src/clas/zcl_abap_vibe_icf.clas.abap`（`dispatch_ddic` / `dispatch_textpool`）
+- SAP 后端：`abap/src/zcl_abap_vibe_icf.clas.abap`（`dispatch_ddic` / `dispatch_textpool`）
 - 文档：`docs/commands.md`（`abap push` 一节）、`docs/configuration.md`（Transport Resolution Order）
+- 设计决策：[010 — AFF 原生扁平布局](../design-decisions/010-aff-flat-layout.md)

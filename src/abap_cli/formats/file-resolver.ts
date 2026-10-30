@@ -73,7 +73,7 @@ export function resolveFile(filePath: string): ResolvedFile {
         nextSteps: ['Textpool files follow abap-file-format: <name>.<type>.texts|selections|headings.<lang>.properties.'],
       });
     }
-    const objectName = parts[0]!.toUpperCase().replace(/#/g, '/');
+    const objectName = affObjectNameFromToken(parts[0]!, basename);
     const objectType = parts[1]!.toUpperCase();
     const category = parts[2]!;
     if (!TEXTPOOL_EXTENSIONS.has(category)) {
@@ -107,8 +107,7 @@ export function resolveFile(filePath: string): ResolvedFile {
   }
 
   // parts.length >= 2 guaranteed by the check above
-  // Namespaced objects are stored as `#ns#name` on disk; restore the `/` form.
-  const objectName = parts[0]!.toUpperCase().replace(/#/g, '/');
+  const objectName = affObjectNameFromToken(parts[0]!, basename);
   const objectType = parts[1]!.toUpperCase();
   const subtype = parts.slice(2).join('.') || 'main';
   // 037 US3: type-based routing takes priority. ADT types (CLAS/INTF/PROG/FUGR
@@ -131,12 +130,48 @@ function getOuterExtension(filename: string): string {
 }
 
 /**
- * Namespaced names (e.g. /UI2/CL_JSON) must not create directory levels: / → #.
- * The hashed form (`#ui2#cl_json`) is both the object directory and the file
- * prefix. This is a local convention, not a guaranteed abapGit contract.
+ * AFF file-name token for an object name (the `<object_name>` element of
+ * `<object_name>.<object_type>.<file_extension>`).
+ *
+ * The ABAP file formats specify that namespaces become brackets:
+ * `/UI2/CL_JSON` → `(ui2)cl_json`. Artifacts are written flat — the token is
+ * only a filename prefix, it never creates directory levels.
  */
-export function objectDirName(objectName: string): string {
-  return objectName.toLowerCase().replace(/\//g, '#');
+export function affObjectToken(objectName: string): string {
+  const lower = objectName.toLowerCase();
+  const namespaced = /^\/([^/]+)\/([^/]+)$/.exec(lower);
+  // A well-formed namespaced name has exactly the /NAMESPACE/NAME shape.
+  // Anything else containing `/` is sanitized so it can never escape the
+  // output directory.
+  if (namespaced) return `(${namespaced[1]})${namespaced[2]}`;
+  return lower.replace(/\//g, '#');
+}
+
+/**
+ * Reverse of {@link affObjectToken}: read the object name back from the
+ * `<object_name>` filename element. `(ui2)cl_json` → `/UI2/CL_JSON`.
+ *
+ * Files produced by the retired abapGit-style `#ns#name` token are rejected
+ * with a migration hint instead of being silently pushed to a wrong object.
+ */
+export function affObjectNameFromToken(token: string, basename?: string): string {
+  if (token.startsWith('#')) {
+    throw new CliError(
+      'FILE_PARSE_ERROR',
+      `${basename ?? token} uses the retired '#' namespace token; abap-file-format names use '(...)'`,
+      {
+        file: basename ?? token,
+        nextSteps: [
+          'Re-run `abap pull` for the object to write it as `(namespace)name.<type>.<ext>`.',
+          'The flat abap-file-format layout has no per-object directory either — delete the old nested files afterwards.',
+        ],
+        example: 'abap pull /UI2/CL_JSON',
+      },
+    );
+  }
+  const namespaced = /^\(([^)]+)\)(.+)$/.exec(token);
+  if (namespaced) return `/${namespaced[1]}/${namespaced[2]}`.toUpperCase();
+  return token.toUpperCase();
 }
 
 /**
@@ -145,7 +180,7 @@ export function objectDirName(objectName: string): string {
  * primary type is used for the file extension (bcalv_grid_demo.prog.abap).
  */
 export function buildFilename(objectName: string, objectType: string, subtype?: string, ext = '.abap'): string {
-  const name = objectDirName(objectName);
+  const name = affObjectToken(objectName);
   const type = objectType.split('/')[0]!.toLowerCase();
   const sub = subtype && subtype !== 'main' ? `.${subtype}` : '';
   return `${name}.${type}${sub}${ext}`;

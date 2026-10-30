@@ -9,7 +9,7 @@ changed at: 2026-10-30 01:14:53
 
 # abap validate:aff
 
-校验一个或一组 JSON 文件是否满足 **官方 abap-file-format**（AFF）规范。10 个支持类型（CLAS / INTF / PROG / FUGR / TABL / STRU / DOMA / DTEL / HTTP / TRAN）共享同一套校验层（`ajv@^8`，Draft 2020-12）；schema 来自本地只读镜像 `tmp/abap-file-formats/file-formats/<type>/<type>-v1.json`（STRU 共享 `tabl-v1.json`，TABL/STRU `.settings.json` 走 `tabt-v1.json`），离线即可跑、不联网。
+校验一个或一组 JSON 文件是否满足 **官方 abap-file-format**（AFF）规范。10 个支持类型（CLAS / INTF / PROG / FUGR / TABL / STRU / DOMA / DTEL / HTTP / TRAN）共享同一套校验层（`ajv@^8`，Draft 2020-12）；schema 来自仓库内 vendored 只读副本 `src/abap_cli/schema/`（`<type>/<type>-v1.json`；STRU 共享 `tabl-v1.json`，TABL/STRU `.settings.json` 走 `tabt-v1.json`），离线即可跑、不联网。
 
 ## Usage
 
@@ -109,7 +109,7 @@ WARN 不影响退出码（exit 0 仍然视为通过）。`--json` 模式下 WARN
 
 ```bash
 # 校验一个 fixture
-abap validate:aff test/fixtures/tabl/zmy_basic.tabl.json
+abap validate:aff test/fixtures/zmy_basic.tabl.json
 
 # 校验整个 fixtures 目录（含 STRU/TABL settings.json 走 tabt-v1.json）
 abap validate:aff test/fixtures/
@@ -133,8 +133,8 @@ abap validate:aff --schema
   "status": "success",
   "summary": { "pass": 2, "warn": 0, "fail": 0 },
   "files": [
-    { "status": "pass", "path": "/Users/lei/proj/test/fixtures/tabl/zmy_basic.tabl.json", "type": "TABL" },
-    { "status": "pass", "path": "/Users/lei/proj/test/fixtures/doma/zdmy_single_fixed.doma.json", "type": "DOMA" }
+    { "status": "pass", "path": "/Users/lei/proj/test/fixtures/zmy_basic.tabl.json", "type": "TABL" },
+    { "status": "pass", "path": "/Users/lei/proj/test/fixtures/zdmy_single_fixed.doma.json", "type": "DOMA" }
   ]
 }
 ```
@@ -146,8 +146,8 @@ abap validate:aff --schema
   "status": "success",
   "summary": { "pass": 1, "warn": 1, "fail": 0 },
   "files": [
-    { "status": "pass", "path": "/Users/lei/proj/test/fixtures/clas/z_aff_example_clas.clas.json", "type": "CLAS" },
-    { "status": "warn", "path": "/Users/lei/proj/test/fixtures/tabl/zmy_basic.tabl.settings.json", "type": "TABL", "extraFields": ["customKey"] }
+    { "status": "pass", "path": "/Users/lei/proj/test/fixtures/z_aff_example_clas.clas.json", "type": "CLAS" },
+    { "status": "warn", "path": "/Users/lei/proj/test/fixtures/zmy_basic.tabl.settings.json", "type": "TABL", "extraFields": ["customKey"] }
   ]
 }
 ```
@@ -161,7 +161,7 @@ abap validate:aff --schema
   "files": [
     {
       "status": "fail",
-      "path": "/Users/lei/proj/test/fixtures/doma/zbroken.doma.json",
+      "path": "/Users/lei/proj/test/fixtures/zbroken.doma.json",
       "type": "DOMA",
       "errors": [
         { "path": "/typeInformation/dataType", "keyword": "enum", "message": "must be equal to one of the allowed values" }

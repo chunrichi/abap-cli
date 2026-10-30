@@ -137,15 +137,17 @@ describe('abap create name validation (fail-fast, zero SAP round-trip)', () => {
     const res = await runCommand(program, ['create', 'local', 'CLAS', TOO_LONG, '--json'], { cwd });
     expect(res.exitCode).toBe(7);
     expect(parseError(res).code).toBe('VALIDATION_ERROR');
-    expect(fs.existsSync(path.join(cwd, 'src/clas', TOO_LONG.toLowerCase(), `${TOO_LONG.toLowerCase()}.clas.abap`))).toBe(false);
+    expect(fs.readdirSync(path.join(cwd, 'src'))).toEqual([]);
   });
 
-  it('create local accepts a namespaced name (maps to # dir on disk)', async () => {
+  it('create local writes a namespaced name with the AFF parentheses token', async () => {
     const program = makeProgram();
     registerCreateCommand(program);
     const res = await runCommand(program, ['create', 'local', 'CLAS', '/UI2/CL_JSON', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
-    expect(JSON.parse(res.stdout).data.file).toBe('src/clas/#ui2#cl_json/#ui2#cl_json.clas.abap');
-    expect(fs.existsSync(path.join(cwd, 'src/clas/#ui2#cl_json/#ui2#cl_json.clas.abap'))).toBe(true);
+    expect(JSON.parse(res.stdout).data.file).toBe('src/(ui2)cl_json.clas.abap');
+    expect(fs.existsSync(path.join(cwd, 'src/(ui2)cl_json.clas.abap'))).toBe(true);
+    // The retired abapGit-style '#' token is never produced.
+    expect(fs.existsSync(path.join(cwd, 'src/#ui2#cl_json.clas.abap'))).toBe(false);
   });
 });

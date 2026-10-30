@@ -2,7 +2,7 @@
  * Spec 036 T036-017: TTYP schema-compliance tests.
  *
  * Two cases:
- *   1. `test/fixtures/ttyp/zmy_ttyp.ttyp.json` PASSes against the
+ *   1. `test/fixtures/zmy_ttyp.ttyp.json` PASSes against the
  *      handcrafted `ttyp-v1.json`.
  *   2. An in-memory mutation (`accessType: "invalid"`) FAILS.
  */
@@ -11,7 +11,7 @@ import { expectSchemaPass, expectSchemaFail } from './_helpers.js';
 
 describe('TTYP schema compliance (036)', () => {
   it('zmy_ttyp.ttyp.json PASSes ttyp-v1.json', async () => {
-    await expectSchemaPass('ttyp/zmy_ttyp.ttyp.json', 'TTYP');
+    await expectSchemaPass('zmy_ttyp.ttyp.json', 'TTYP');
   });
 
   it('invalid accessType fails ttyp-v1.json', async () => {

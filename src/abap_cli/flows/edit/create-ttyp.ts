@@ -12,6 +12,7 @@ import { CliError, printResult, type OutputMode } from '../../output/json.js';
 import { ttypArtifact, type TtypLocal } from '../../formats/ttyp/json.js';
 import { toOutputPath } from '../../core/path-output.js';
 import { detectChannel, loadChannelProfile } from './channel-detect.js';
+import { affObjectToken } from '../../formats/file-resolver.js';
 import type { CreateOptions } from './create.js';
 import type { CreateHandler } from './routing.js';
 
@@ -22,7 +23,7 @@ export async function runCreateTtyp(
 ): Promise<void> {
   if (!opts.file) {
     throw new CliError('USAGE', `Type TTYP requires --file <path> with an abap-file-format JSON`, {
-      example: `abap create TTYP ${name} --file src/${name.toLowerCase()}/${name.toLowerCase()}.ttyp.json --package $TMP --yes`,
+      example: `abap create TTYP ${name} --file src/${affObjectToken(name)}.ttyp.json --package $TMP --yes`,
     });
   }
   const filePath = path.resolve(process.cwd(), opts.file);

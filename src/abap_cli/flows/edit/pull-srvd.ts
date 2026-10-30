@@ -15,7 +15,7 @@
  */
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { pullObject } from './pull-source.js';
-import { folderFor } from '../../formats/type-folder.js';
+import { affObjectToken } from '../../formats/file-resolver.js';
 import type { PullHandler } from './routing.js';
 
 export interface PullSrvdOptions {
@@ -57,11 +57,10 @@ export async function runPullSrvd(name: string, opts: PullSrvdOptions = {}): Pro
     overwrite: opts.overwrite,
     skipExisting: opts.skipExisting,
   });
-  // Cross-check: every file should land under <root>/srvd/<lower>/.
-  const expectedFolder = folderFor('SRVD');
+  // Cross-check: every file lands flat as <lower>.srvd.{json,acds}.
   for (const f of result.written) {
-    if (!f.includes(`/${expectedFolder}/${lower}/`)) {
-      throw new Error(`SRVD file landed outside the expected folder: ${f}`);
+    if (!f.includes(`/${affObjectToken(name)}.srvd.`)) {
+      throw new Error(`SRVD file landed outside the expected flat layout: ${f}`);
     }
   }
   return {

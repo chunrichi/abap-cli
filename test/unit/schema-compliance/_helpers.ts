@@ -2,7 +2,7 @@
  * Schema-compliance test helpers shared by every per-type suite.
  *
  * The schemas are read from the local AFF mirror (read-only). Callers
- * supply a relative path under `test/fixtures/` and assert.
+ * Fixture files live flat under `test/fixtures/`; callers pass the bare filename.
  */
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';

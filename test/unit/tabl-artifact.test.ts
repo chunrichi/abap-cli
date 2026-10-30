@@ -100,6 +100,18 @@ define table zdemo {
     expect(parsed.fields[0]?.decimals).toBe(2);
   });
 
+  it('normalises namespaced DDL names — /NS/NAME and the AFF (ns)name token', () => {
+    const tokenDdl = `@EndUserText.label : 'namespaced'
+define table (ui2)cl_json {
+  key mandt : abap.clnt not null;
+}
+`;
+    expect(parseTablDdic(tokenDdl).objectName).toBe('/UI2/CL_JSON');
+    expect(parseTablDdic(tokenDdl.replace('(ui2)cl_json', '/UI2/CL_JSON')).objectName).toBe(
+      '/UI2/CL_JSON',
+    );
+  });
+
   it('rejects DDL without a define declaration', () => {
     expect(() => parseTablDdic('@AbapCatalog.deliveryClass : #L\n')).toThrow(/missing define declaration/i);
   });

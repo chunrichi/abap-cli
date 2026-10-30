@@ -12,6 +12,7 @@ import * as path from 'node:path';
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { IcfClient } from '../../clients/icf-client.js';
 import { CliError } from '../../output/json.js';
+import { resolveFile } from '../../formats/file-resolver.js';
 import { detectChannel } from './channel-detect.js';
 import type { SystemProfile } from './channel-detect.js';
 import { ttypArtifact } from '../../formats/ttyp/json.js';
@@ -36,9 +37,9 @@ async function loadProfile(opts: PushTtypOptions): Promise<SystemProfile> {
 }
 
 function deriveNameFromPath(file: string): string {
-  const base = path.basename(file);
-  // filename shape: <name>.ttyp.json
-  return base.split('.')[0]!.toUpperCase();
+  // filename shape: <name>.ttyp.json — resolveFile restores the AFF
+  // namespace token `(ns)name` back to `/NS/NAME`.
+  return resolveFile(file).objectName;
 }
 
 async function pushAdt(name: string, xml: string, transport: string | undefined): Promise<void> {

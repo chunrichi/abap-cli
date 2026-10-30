@@ -4,7 +4,7 @@ title: HTTP — SICF 服务节点（ICF Tree Node）
 description: HTTP 类型的 SICF 节点管理；走 ICF 自建通道
 tags: [abap-cli, object-type, http, sicf, icf, abap-file-format]
 created at: 2026-09-01 00:00:00
-changed at: 2026-09-02 22:06:00
+changed at: 2026-10-30 20:00:00
 ---
 
 # HTTP — SICF 服务节点（ICF Tree Node）
@@ -20,7 +20,7 @@ changed at: 2026-09-02 22:06:00
 ## 本地文件形态
 
 ```
-src/http/zmy_service/
+src/
 └── zmy_service.http.json
 ```
 
@@ -73,13 +73,13 @@ CLI 同时接受**扁平写法**（方便手写）：
 abap pull ZMY_SERVICE --type HTTP --json
 
 # 建 SICF 节点：必须带 --file（abap-file-format JSON，--package $TMP 无需 --tr）
-abap create HTTP ZMY_SERVICE --file src/http/zmy_service.http.json --package $TMP --json
+abap create HTTP ZMY_SERVICE --file src/zmy_service.http.json --package $TMP --json
 
 # 或者手写 .http.json 后直接 push —— HTTP push 允许 create-on-push
-abap push src/http/zmy_service.http.json --tr DEVK900001 --json
+abap push src/zmy_service.http.json --tr DEVK900001 --json
 
 # 改完推回
-abap push src/http/zmy_service.http.json --tr DEVK900001 --json
+abap push src/zmy_service.http.json --tr DEVK900001 --json
 ```
 
 ## abap-file-format 合规性

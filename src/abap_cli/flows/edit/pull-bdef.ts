@@ -13,7 +13,7 @@
  */
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { pullObject } from './pull-source.js';
-import { folderFor } from '../../formats/type-folder.js';
+import { affObjectToken } from '../../formats/file-resolver.js';
 import type { PullHandler } from './routing.js';
 
 export interface PullBdefOptions {
@@ -51,10 +51,9 @@ export async function runPullBdef(name: string, opts: PullBdefOptions = {}): Pro
     overwrite: opts.overwrite,
     skipExisting: opts.skipExisting,
   });
-  const expectedFolder = folderFor('BDEF');
   for (const f of result.written) {
-    if (!f.includes(`/${expectedFolder}/${lower}/`)) {
-      throw new Error(`BDEF file landed outside the expected folder: ${f}`);
+    if (!f.includes(`/${affObjectToken(name)}.bdef.`)) {
+      throw new Error(`BDEF file landed outside the expected flat layout: ${f}`);
     }
   }
   return {

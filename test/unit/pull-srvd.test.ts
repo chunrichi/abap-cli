@@ -64,7 +64,7 @@ describe('runPullSrvd (T3.1)', () => {
     expect(result.object).toBe('ZSD_TEST');
     expect(result.files).toHaveLength(2);
 
-    const dir = path.join(root, 'srvd', 'zsd_test');
+    const dir = root;
     const jsonPath = path.join(dir, 'zsd_test.srvd.json');
     const acdsPath = path.join(dir, 'zsd_test.srvd.acds');
     expect(fs.existsSync(jsonPath)).toBe(true);
@@ -86,7 +86,7 @@ describe('runPullSrvd (T3.1)', () => {
     const { runPullSrvd } = await load();
     await runPullSrvd('zsd_test', { rootDir: root });
     const json = JSON.parse(
-      fs.readFileSync(path.join(root, 'srvd', 'zsd_test', 'zsd_test.srvd.json'), 'utf8'),
+      fs.readFileSync(path.join(root, 'zsd_test.srvd.json'), 'utf8'),
     );
     // SRVD nests sourceOrigin/sourceType under generalInformation (per
     // srvd-v1.json). Top-level sourceOrigin/sourceType would not match
@@ -107,7 +107,7 @@ describe('runPullSrvd (T3.1)', () => {
     const { runPullSrvd } = await load();
     await runPullSrvd('zsd_test', { rootDir: root });
     const json = JSON.parse(
-      fs.readFileSync(path.join(root, 'srvd', 'zsd_test', 'zsd_test.srvd.json'), 'utf8'),
+      fs.readFileSync(path.join(root, 'zsd_test.srvd.json'), 'utf8'),
     );
     expect(json.generalInformation).toEqual({
       sourceOrigin: 'abapDevelopmentTools',

@@ -99,15 +99,14 @@ function formatTypesHuman(rows: TadirMapping[]): string {
   const lines: string[] = [
     `abap-cli type catalog (${rows.length} entries)`,
     '',
-    '  CLI   TADIR OBJECT   DDIC tabclass   CHANNEL  FOLDER            AFF SCHEMA          DESCRIPTION',
+    '  CLI   TADIR OBJECT   DDIC tabclass   CHANNEL  AFF SCHEMA          DESCRIPTION',
   ];
   for (const r of rows) {
     const tadir = r.tadirObject.padEnd(13);
     const tabclass = (r.ddicTabclass || '—').padEnd(14);
     const channel = r.channel.padEnd(8);
-    const folder = r.folder.padEnd(17);
     const schema = r.affSchema.padEnd(19);
-    lines.push(`  ${r.cliType.padEnd(6)} ${tadir} ${tabclass} ${channel} ${folder} ${schema} ${r.description}`);
+    lines.push(`  ${r.cliType.padEnd(6)} ${tadir} ${tabclass} ${channel} ${schema} ${r.description}`);
   }
   return lines.join('\n');
 }
@@ -119,7 +118,6 @@ function formatSingleTypeHuman(r: TadirMapping): string {
     `  TADIR OBJECT     : ${r.tadirObject}`,
     `  DDIC tabclass    : ${r.ddicTabclass || '—'}`,
     `  Routing channel  : ${r.channel}`,
-    `  Local folder     : src/${r.folder}/`,
     `  AFF schema       : ${r.affSchema}`,
     `  Description      : ${r.description}`,
   ].join('\n');
