@@ -2,12 +2,19 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import type { AdtClientWrapper } from '../../clients/adt-client.js';
+import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError, toErrorShape } from '../../output/json.js';
-import { affObjectToken, resolveFile } from '../../formats/file-resolver.js';
+import { affObjectToken, buildFilename, resolveFile } from '../../formats/file-resolver.js';
 import { readAbapFile } from '../../formats/abap-source.js';
 import { resolveObject, getObjectParts, validateLocalFile } from '../../core/resolve.js';
 import { pushObject } from './push-object.js';
+import {
+  loadDeployManifest,
+  mergeReleaseSources,
+  orderDevObjects,
+  type DeployManifest,
+  type DevClassSource,
+} from './deploy-merge.js';
 import { probeAdtRuntime, steampunkDeployHint, type AdtRuntime, type RuntimeProbeResult } from '../../adc/runtime-probe.js';
 import { getOrProbeRuntime } from '../../config/runtime-cache.js';
 import { executeIcfRegister } from '../../adc/icf-register-registry.js';
@@ -49,6 +56,10 @@ export interface DeploymentSummary {
   objects: DeployObjectResult[];
   forced: boolean;
   dryRun: boolean;
+  /** Bundled-service form: `release` = dev classes merged into the handler; `dev` = every class installed globally. */
+  mode: 'dev' | 'release';
+  /** release only: number of development classes folded into the handler's includes. */
+  mergedClasses?: number;
   /** ICF node state after the setup step (absent when no setup ran). */
   icfNode?: DeployIcfNode;
   /** 030: detected ADT runtime tier (steampunk / netweaver740 / netweaver750 / unknown). */
@@ -63,6 +74,8 @@ export interface DeployOptions {
   diff?: boolean;
   force?: boolean;
   yes?: boolean;
+  /** Deploy the global-class development form (maintainers; skips the release merge). */
+  dev?: boolean;
   /** Target SAP package for any auto-created objects. Defaults to '$TMP'. */
   package?: string;
   /** Overridable for tests; defaults to the bundled abap/src directory. */
@@ -140,7 +153,16 @@ export async function deployBundled(client: AdtClientWrapper, opts: DeployOption
     });
   }
 
-  const bundled = await loadBundledSources(sourceDir, files);
+  const manifest = await loadManifestIfPresent(sourceDir);
+  const merged = manifest !== undefined && !opts.dev;
+  const bundled = merged
+    ? await loadReleaseSources(sourceDir, files, manifest)
+    : await loadBundledSources(sourceDir, files);
+  const ordered = merged
+    ? bundled
+    : manifest !== undefined
+      ? orderDevFormObjects(bundled, manifest)
+      : bundled;
   const objectResults: DeployObjectResult[] = [];
   const fileResults: DeployFileResult[] = [];
 
@@ -159,7 +181,7 @@ export async function deployBundled(client: AdtClientWrapper, opts: DeployOption
   const runtime: AdtRuntime = runtimeResult?.runtime ?? 'unknown';
   const isSteampunk = runtime === 'steampunk';
 
-  for (const obj of bundled) {
+  for (const obj of ordered) {
     const objectResult = await deployOneObject(client, obj, opts, fileResults);
     objectResults.push(objectResult);
   }
@@ -194,9 +216,28 @@ export async function deployBundled(client: AdtClientWrapper, opts: DeployOption
         ? { apiCapabilities: (runtimeResult as { apiCapabilities: RuntimeProbeResult['apiCapabilities'] }).apiCapabilities }
         : {}),
   };
-  const outcome = opts.dryRun
+  let outcome = opts.dryRun
     ? { status: 'planned' as const, strategyId: 'on-prem-cl-icf-tree' as const }
     : await executeIcfRegister(client, strategySpec, probeForRegistry);
+
+  // The setup class was (re)activated moments ago. SAP's classrun endpoint can
+  // still serve the class load from before the activation and answers
+  // "Class does not implement if_oo_adt_classrun~main method!" even though the
+  // class is active. Retry once after a short settle delay; if the edit
+  // session keeps the stale handle, retry again in a fresh SAP session (the
+  // session is dropped and re-created, which is what makes a manual re-run
+  // succeed). Genuine setup failures (permissions, SICF errors) are reported.
+  if (!opts.dryRun && outcome.status === 'error' && isStaleClassrunSetupError(outcome)) {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    outcome = await executeIcfRegister(client, strategySpec, probeForRegistry);
+    if (outcome.status === 'error' && isStaleClassrunSetupError(outcome)) {
+      await client.logout().catch(() => undefined);
+      const freshSession = await AdtClientWrapper.create().catch(() => undefined);
+      if (freshSession) {
+        outcome = await executeIcfRegister(freshSession, strategySpec, probeForRegistry);
+      }
+    }
+  }
 
   if (outcome.status === 'planned') {
     icfNode = { status: 'planned' };
@@ -223,7 +264,14 @@ export async function deployBundled(client: AdtClientWrapper, opts: DeployOption
   } else {
     // Setup failure is a hard error: sources may be deployed but the node is not ready.
     throw new CliError('SAP_ERROR', `ICF setup failed: ${outcome.error?.message ?? 'unknown'}`, {
-      details: { code: outcome.error?.code ?? 'ICF_SETUP_FAILED', strategyId: outcome.strategyId },
+      // Carry the per-object/file outcome so a failed setup does not hide
+      // whether the bundled sources themselves deployed (and which object failed).
+      details: {
+        code: outcome.error?.code ?? 'ICF_SETUP_FAILED',
+        strategyId: outcome.strategyId,
+        objects: objectResults,
+        files: fileResults.map((file) => ({ ...file, file: toOutputPath(file.file) })),
+      },
       nextSteps: [
         'Verify the user has SICF administration permissions (e.g. S_ICF_ADMIN).',
         'Check the setup class is fully activated: abap inspect ZCL_ABAP_VIBE_ICF_SETUP --activation',
@@ -238,10 +286,47 @@ export async function deployBundled(client: AdtClientWrapper, opts: DeployOption
     objects: objectResults,
     forced: !!opts.force,
     dryRun: !!opts.dryRun,
+    mode: opts.dev ? 'dev' : 'release',
+    mergedClasses: opts.dev ? undefined : (manifest?.merged.length ?? 0),
     runtime,
     deployKind: isSteampunk ? 'source-only' : 'full',
     ...(icfNode ? { icfNode } : {}),
   };
+}
+
+/**
+ * Stable class-pool source URLs for a freshly created class whose
+ * objectStructure is not readable yet. Mirrors the ADT object layout used by
+ * `getObjectParts` (main source + the two generated includes).
+ */
+function classPartUrls(objectUrl: string): { subtype: string; sourceUrl: string }[] {
+  const base = objectUrl.replace(/\/$/, '');
+  return [
+    { subtype: 'main', sourceUrl: `${base}/source/main` },
+    { subtype: 'definitions', sourceUrl: `${base}/includes/definitions` },
+    { subtype: 'implementations', sourceUrl: `${base}/includes/implementations` },
+  ];
+}
+
+/**
+ * Normalise a source text for the `--diff` comparison against real SAP:
+ * SAP returns class sources with CRLF line endings and may drop the trailing
+ * newline of include parts, while the bundled sources use LF with a final
+ * newline. Ignoring both keeps `--diff` idempotent without hiding real edits.
+ */
+function normaliseForSourceDiff(text: string): string {
+  return text.replace(/\r\n?/g, '\n').trimEnd();
+}
+
+/**
+ * True when the ICF setup classrun failed because SAP still saw the class
+ * version from before its activation (class load handle not refreshed yet).
+ * The retry path in the deploy flow only targets this transient symptom.
+ */
+function isStaleClassrunSetupError(outcome: { error?: { code?: string; message?: string } }): boolean {
+  const code = outcome.error?.code;
+  const message = outcome.error?.message ?? '';
+  return code === 'ICF_SETUP_OUTPUT' || /does not implement if_oo_adt_classrun~main/i.test(message);
 }
 
 /**
@@ -304,14 +389,21 @@ async function deployOneObject(
     }
   }
 
-  // Fetch live source-part URLs for the object.
+  // Fetch live source-part URLs for the object. A class that was created a
+  // moment ago can still be unreadable via objectStructure on real SAP
+  // ("Resource <name>: wrong input data for processing"); retry briefly and,
+  // for a freshly created CLAS, fall back to the stable source/includes URLs.
   let parts: { subtype: string; sourceUrl: string }[];
   try {
-    const live = await getObjectParts(client, resolved);
+    const live = await getObjectParts(client, resolved, createdHere ? 4 : 0, 500);
     parts = live;
   } catch (error: unknown) {
-    const err = toErrorShape(error);
-    return recordObjectFailure(obj, fileResults, err.code as string, err.message as string);
+    if (createdHere && obj.type.toUpperCase() === 'CLAS') {
+      parts = classPartUrls(resolved.objectUrl);
+    } else {
+      const err = toErrorShape(error);
+      return recordObjectFailure(obj, fileResults, err.code as string, err.message as string);
+    }
   }
 
   // Build a (subtype → sourceUrl) map for quick lookup; fall back to the first
@@ -331,20 +423,20 @@ async function deployOneObject(
   }
 
   // --diff: short-circuit when the remote content already matches.
-  let anyChanged = false;
+  // SAP returns class sources with CRLF line endings while the checked-out
+  // bundled sources use LF, so compare after normalising line endings —
+  // otherwise every class is reported as changed on every run.
   if (opts.diff && !opts.force) {
     let allUnchanged = true;
     for (const p of pushParts) {
       try {
         const remote = await client.getObjectSource(p.sourceUrl);
-        if (remote !== p.content) {
+        if (normaliseForSourceDiff(remote) !== normaliseForSourceDiff(p.content)) {
           allUnchanged = false;
-          anyChanged = true;
           break;
         }
       } catch {
         allUnchanged = false;
-        anyChanged = true;
         break;
       }
     }
@@ -506,6 +598,236 @@ async function readObjectMetadata(
     }
   }
   return { description: '' };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Release form: merge dev global classes into the handler                    */
+/* -------------------------------------------------------------------------- */
+
+/** Path of `abap/deploy.json` (one level above the flat `abap/src` tree). */
+function manifestPathFor(sourceDir: string): string {
+  return path.resolve(sourceDir, '..', 'deploy.json');
+}
+
+/**
+ * Read `abap/deploy.json` when present.
+ *
+ * A missing manifest keeps the historical as-is deploy (every bundled class is
+ * installed as a global) instead of failing hard: an installation that lost the
+ * manifest still gets a working — if larger — ICF service, and arbitrary
+ * `sourceDir` overrides (tests, ad-hoc source trees) stay deployable. The
+ * warning makes the degraded form visible.
+ */
+async function loadManifestIfPresent(sourceDir: string): Promise<DeployManifest | undefined> {
+  const manifestPath = manifestPathFor(sourceDir);
+  if (!existsSync(manifestPath)) {
+    collectWarning(
+      'DEPLOY_MANIFEST_MISSING',
+      'abap/deploy.json not found next to the bundled sources; deploying every class as-is (no release merge).',
+      { source: toOutputPath(manifestPath) },
+    );
+    return undefined;
+  }
+  return loadDeployManifest(sourceDir);
+}
+
+/** The single `main` source part of a bundled class, or a manifest error. */
+function requireMainPart(obj: BundledObject): BundledSource {
+  const main = obj.parts.find((part) => part.subtype === 'main');
+  if (!main) {
+    throw new CliError('DEPLOY_MANIFEST_INVALID', `bundled class ${obj.name} has no main source to deploy`, {
+      details: { object: obj.name, parts: obj.parts.map((part) => part.rel) },
+      nextSteps: [`Add ${affObjectToken(obj.name)}.clas.abap under abap/src, then re-run abap deploy.`],
+      example: 'abap deploy --yes',
+    });
+  }
+  return main;
+}
+
+/**
+ * Enforce the release-form contract for one bundled class:
+ *  - the handler only carries its main source — definitions/implementations are
+ *    generated from the merged helpers and must never be committed next to it;
+ *  - a merged helper may carry a definitions prelude (e.g. TYPE-POOLS) but no
+ *    separate implementation include — implementations live in the main source.
+ */
+function assertReleaseSubtypes(obj: BundledObject, role: 'handler' | 'merged'): void {
+  const allowed = role === 'handler' ? ['main'] : ['main', 'definitions'];
+  const unexpected = obj.parts.filter((part) => !allowed.includes(part.subtype));
+  if (unexpected.length === 0) return;
+  const files = unexpected.map((part) => part.rel);
+  throw new CliError(
+    'DEPLOY_MANIFEST_INVALID',
+    role === 'handler'
+      ? `deploy handler ${obj.name} must have only its main source in abap/src (found ${files.join(', ')}); its definitions/implementations are generated at deploy time`
+      : `merged helper ${obj.name} must not carry a separate implementation include (found ${files.join(', ')}); put the implementation in its .clas.abap main source`,
+    {
+      details: { object: obj.name, files, role },
+      nextSteps: [
+        'Do not commit a release-form include next to the development sources.',
+        'The release form is generated by abap deploy; only the development form lives in abap/src.',
+      ],
+      example: 'abap deploy --dev --yes',
+    },
+  );
+}
+
+/** Load the dev-form class sources needed for the release merge. */
+async function releaseClassSources(
+  bundled: BundledObject[],
+  manifest: DeployManifest,
+): Promise<Map<string, DevClassSource>> {
+  const byName = new Map<string, BundledObject>();
+  for (const obj of bundled) {
+    if (obj.type.toUpperCase() === 'CLAS') byName.set(obj.name.toUpperCase(), obj);
+  }
+
+  const mergedGlobals = new Set(manifest.merged.map((entry) => entry.global));
+  const standalone = new Set(manifest.standalone);
+  const classes = new Map<string, DevClassSource>();
+
+  for (const obj of bundled) {
+    if (obj.type.toUpperCase() !== 'CLAS') continue;
+    const name = obj.name.toUpperCase();
+    if (name !== manifest.handler && !mergedGlobals.has(name) && !standalone.has(name)) {
+      throw new CliError(
+        'DEPLOY_MANIFEST_INVALID',
+        `bundled class ${name} is not listed in abap/deploy.json (neither handler, merged nor standalone)`,
+        {
+          details: { class: name },
+          nextSteps: ['Add the class to "merged" (folded into the handler) or "standalone" (installed globally) in abap/deploy.json.'],
+          example: 'abap deploy --yes',
+        },
+      );
+    }
+    if (name === manifest.handler) {
+      assertReleaseSubtypes(obj, 'handler');
+      classes.set(name, { main: requireMainPart(obj).content });
+    } else if (mergedGlobals.has(name)) {
+      assertReleaseSubtypes(obj, 'merged');
+      const definitions = obj.parts.find((part) => part.subtype === 'definitions');
+      classes.set(name, {
+        main: requireMainPart(obj).content,
+        ...(definitions ? { definitionsPrelude: definitions.content } : {}),
+      });
+    }
+  }
+
+  const expected = [manifest.handler, ...manifest.merged.map((entry) => entry.global), ...manifest.standalone];
+  const missing = expected.filter((name) => !byName.has(name));
+  if (missing.length > 0) {
+    throw new CliError(
+      'DEPLOY_MANIFEST_INVALID',
+      `bundled sources are missing class(es) listed in abap/deploy.json: ${missing.join(', ')}`,
+      {
+        details: { missing },
+        nextSteps: ['Add the missing .clas.abap files under abap/src, or remove the entries from abap/deploy.json.'],
+        example: 'abap deploy --yes',
+      },
+    );
+  }
+  return classes;
+}
+
+/**
+ * Build the release-form object list: one handler object with the generated
+ * main/definitions/implementations parts, then the standalone classes as-is.
+ * Non-class source objects (none today) keep their historical as-is deploy.
+ */
+async function loadReleaseSources(
+  sourceDir: string,
+  files: string[],
+  manifest: DeployManifest,
+): Promise<BundledObject[]> {
+  const bundled = await loadBundledSources(sourceDir, files);
+  const classes = await releaseClassSources(bundled, manifest);
+  const merged = mergeReleaseSources({ manifest, classes });
+
+  const handler = bundled.find(
+    (obj) => obj.type.toUpperCase() === 'CLAS' && obj.name.toUpperCase() === manifest.handler,
+  )!;
+  const template = requireMainPart(handler);
+  const generatedPart = (subtype: 'definitions' | 'implementations'): BundledSource => ({
+    ...template,
+    subtype,
+    rel: buildFilename(handler.name, handler.type, subtype, '.abap'),
+    content: subtype === 'definitions' ? merged.handler.definitions : merged.handler.implementations,
+  });
+  const handlerObject: BundledObject = {
+    name: handler.name,
+    type: handler.type,
+    parts: [
+      { ...template, subtype: 'main', content: merged.handler.main },
+      generatedPart('definitions'),
+      generatedPart('implementations'),
+    ],
+  };
+
+  const standaloneObjects = manifest.standalone.map(
+    (name) => bundled.find((obj) => obj.name.toUpperCase() === name)!,
+  );
+  const extraObjects = bundled.filter((obj) => {
+    if (obj.type.toUpperCase() !== 'CLAS') return true;
+    const name = obj.name.toUpperCase();
+    return name !== manifest.handler && !manifest.merged.some((entry) => entry.global === name)
+      && !manifest.standalone.includes(name);
+  });
+  return [handlerObject, ...standaloneObjects, ...extraObjects];
+}
+
+/** Dev-form class sources keyed by uppercase global name (for activation ordering). */
+function devClassSources(bundled: BundledObject[], manifest: DeployManifest): Map<string, DevClassSource> {
+  const byName = new Map<string, BundledObject>();
+  for (const obj of bundled) {
+    if (obj.type.toUpperCase() === 'CLAS') byName.set(obj.name.toUpperCase(), obj);
+  }
+  const names = [manifest.handler, ...manifest.merged.map((entry) => entry.global), ...manifest.standalone];
+  const classes = new Map<string, DevClassSource>();
+  const missing: string[] = [];
+  for (const name of names) {
+    const obj = byName.get(name);
+    const main = obj?.parts.find((part) => part.subtype === 'main');
+    if (!main) {
+      missing.push(name);
+      continue;
+    }
+    const definitions = obj!.parts.find((part) => part.subtype === 'definitions');
+    classes.set(name, {
+      main: main.content,
+      ...(definitions ? { definitionsPrelude: definitions.content } : {}),
+    });
+  }
+  if (missing.length > 0) {
+    throw new CliError(
+      'DEPLOY_MANIFEST_INVALID',
+      `bundled sources are missing class(es) listed in abap/deploy.json: ${missing.join(', ')}`,
+      {
+        details: { missing },
+        nextSteps: ['Add the missing .clas.abap files under abap/src, or remove the entries from abap/deploy.json.'],
+        example: 'abap deploy --dev --yes',
+      },
+    );
+  }
+  return classes;
+}
+
+/**
+ * Dev form: every class is installed as its own global object. Activation needs
+ * referenced classes to be active first, so order the objects by the merged
+ * dependency graph (types → response/formats → domain helpers → handler →
+ * standalone) instead of readdir order. Objects outside the manifest keep their
+ * relative order after the manifest objects.
+ */
+function orderDevFormObjects(bundled: BundledObject[], manifest: DeployManifest): BundledObject[] {
+  const classes = devClassSources(bundled, manifest);
+  const order = orderDevObjects(manifest, classes);
+  const rank = new Map(order.map((name, index) => [name.toUpperCase(), index]));
+  const position = new Map(bundled.map((obj, index) => [obj.name.toUpperCase(), index]));
+  const rankOf = (name: string): number => {
+    const known = rank.get(name);
+    return known !== undefined ? known : order.length + (position.get(name) ?? 0);
+  };
+  return [...bundled].sort((a, b) => rankOf(a.name.toUpperCase()) - rankOf(b.name.toUpperCase()));
 }
 
 /** Recursively list .abap and .xml files under dir. */

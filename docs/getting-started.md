@@ -151,12 +151,15 @@ abap push src/zcl_my_new_class.clas.abap --tr DEVK900001
 
 ## Deploy the Bundled ICF Service
 
-The bundled service (handler + setup classes in `abap/src/`, e.g. `abap/src/zcl_abap_vibe_icf.clas.abap`) exposes `/sap/abap_cli/`: service id/version plus DDIC, HTTP, transaction, table-data, report-run, MIME, textpool and version-source routes. It is versioned independently from the CLI (see `ICF_SERVICE_VERSION`), and `npm run check-skills-drift` fails when the CLI and skill metadata disagree on that version.
+The bundled service (`abap/src/`, e.g. `abap/src/zcl_abap_vibe_icf.clas.abap`) is developed as a tree of global classes and published by `abap deploy` as 3 global classes (handler + setup + runner) — the helpers are merged into the handler at deploy time. It exposes `/sap/abap_cli/`: service id/version plus DDIC, HTTP, transaction, table-data, report-run, MIME, textpool and version-source routes. It is versioned independently from the CLI (see `ICF_SERVICE_VERSION`), and `npm run check-skills-drift` fails when the CLI and skill metadata disagree on that version.
 
 ```bash
-# Deploy sources and trigger SICF node creation/activation (idempotent)
+# Deploy the release form and trigger SICF node creation/activation (idempotent)
 abap deploy --yes --json
-# → data.icfNode: { status: "success", action: "created|already_active", url: "/sap/abap_cli", active: true, handler: "ZCL_ABAP_VIBE_ICF" }
+# → data.mode: "release", data.mergedClasses: 16, data.icfNode: { status: "success", action: "created|already_active", url: "/sap/abap_cli", active: true, handler: "ZCL_ABAP_VIBE_ICF" }
+
+# Maintainers iterating on the bundled service: install the development form instead
+abap deploy --dev --yes --json
 
 # Verify the endpoint
 abap profile test <name> --json       # icf layer should be ok

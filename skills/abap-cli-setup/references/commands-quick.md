@@ -141,6 +141,7 @@ abap deploy [options] | abap deploy status [options]
 | `--package <package>` | Target SAP package (default $TMP — local, no transport needed). |
 | `--dry-run` | Plan only — make no mutating SAP calls. |
 | `--diff` | Report per-file source differences. |
+| `--dev` | Deploy the global-class development form (maintainers; skips the release merge). |
 | `--force` | Bypass safety guards (forced: true in the result). |
 | `--yes` | Confirm in non-interactive mode. |
 
@@ -149,10 +150,10 @@ abap deploy [options] | abap deploy status [options]
   ```bash
   abap deploy --yes
   ```
-- Deploy to a custom package
+- Deploy the global-class development form (maintainers)
 
   ```bash
-  abap deploy --package ZPKG --tr DEVK900001 --yes
+  abap deploy --dev --yes
   ```
 
 ## `abap session`

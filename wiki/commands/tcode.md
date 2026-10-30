@@ -114,7 +114,7 @@ abap where-used ZPROG_FOO --json      # 谁引用了它（影响面）
 ## 版本与服务依赖
 
 - **CLI 版本**: 0.2.0（含 `tcode` 命令）。
-- **ICF 服务**: `ZCL_ABAP_VIBE_ICF` 的 `dispatch_tcode` / `read_tcode`（GET only）。`abap deploy` 部署后可用；`abap doctor` 探测版本匹配。
+- **ICF 服务**: `ZCL_ABAP_VIBE_ICF_TCODE` 的 `dispatch_tcode` / `read_tcode`（GET only）。`abap deploy` 部署后可用；`abap doctor` 探测版本匹配。
 
 # More
 
@@ -132,7 +132,7 @@ abap where-used ZPROG_FOO --json      # 谁引用了它（影响面）
 # references
 
 - 实现: [src/abap_cli/commands/tcode.ts](../../src/abap_cli/commands/tcode.ts) · [src/abap_cli/flows/search/tcode.ts](../../src/abap_cli/flows/search/tcode.ts)（`validateTcode` / `interpretTcode`）
-- SAP 后端: `abap/src/zcl_abap_vibe_icf.clas.abap`（`lcl_tcode=>dispatch_tcode`，`GET /sap/abap_cli/tcode/<code>`）
+- SAP 后端: `abap/src/zcl_abap_vibe_icf_tcode.clas.abap`（`ZCL_ABAP_VIBE_ICF_TCODE=>dispatch_tcode`，`GET /sap/abap_cli/tcode/<code>`）
 - 文档: [docs/commands.md](../../docs/commands.md)
 - 相关命令页: [abap pull](pull.md)、[abap where-used](where-used.md)、[abap inspect](inspect.md)、[abap deploy](deploy.md)
 - 测试: `test/unit/tcode-flow.test.ts`

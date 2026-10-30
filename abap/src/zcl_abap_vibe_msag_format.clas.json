@@ -1,7 +1,7 @@
 {
-    "class": {
-        "type": "CLAS",
-        "description": "Canonical ABAP file format generator for message classes.",
-        "final": true
-    }
+  "formatVersion": "1",
+  "header": {
+    "description": "Canonical ABAP file format generator for message classes.",
+    "originalLanguage": "en"
+  }
 }

@@ -5,8 +5,13 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`abap deploy --dev`**：安装内置 ICF 服务的开发形态 — `abap/src` 的 19 个类全部作为全局对象按依赖顺序安装，供维护者在真机上做单类语法检查 / 激活 / 迭代；发布形态仍由不带 `--dev` 的 `abap deploy` 产出。
+
 ### Changed
 
+- **内置 ICF 服务按"开发期全局类树 / 发布期合并单类"维护**：`abap/src` 现在是 19 个开发期全局类（handler + 共享类型 + 10 个域 helper + 5 个 format + setup/runner），`abap/deploy.json` 是唯一清单；`abap deploy` 在推送前把 16 个 helper 降级为 `lcl_*` 本地类、按依赖顺序合并进 handler 的 definitions / implementations，SAP 上只装 3 个全局类。`abap deploy` 的结果新增 `mode: "dev" | "release"` 与 `mergedClasses`；清单缺失 / 不一致分别给 `DEPLOY_MANIFEST_MISSING` warning 与 `DEPLOY_MANIFEST_INVALID` 错误。ICF 端点与服务版本不变（仍 `1.0.0`）。**Migration**：升级后执行一次 `abap deploy --yes` 刷新 handler；旧系统上残留的 helper 全局类不再被引用、无需删除。
 - **keychain 后端默认改为原生实现**：默认先探测原生后端（macOS `/usr/bin/security`、Windows `cmdkey.exe`、Linux `secret-tool`），仅在原生不可用时回退 `keytar`；`ABAP_CLI_KEYCHAIN_BACKEND` 仍可强制指定。原生后端把条目的可信应用绑定到系统签名 helper，跨 Node 升级稳定；`keytar` 绑定 node 二进制的 cdhash，Homebrew 升级 node 后 ACL 失效。**Migration**：旧 `keytar` 条目仍可读（service/account 命名一致）；macOS 上建议在普通终端执行一次 `abap profile set <name> --password <pwd>` 重建密码条目，再 `security delete-generic-password -a abap-cli/session-key -s abap-cli` 并重跑一次命令重建会话密钥。
 - **macOS 写入已存在的 keychain 条目改为重建**：`security add-generic-password` 返回退出码 45（条目已存在）时先删除再创建，使 ACL 重新绑定 `/usr/bin/security`；受限/沙箱 shell 写 login keychain 被拒时，错误信息提示改用普通终端。
 

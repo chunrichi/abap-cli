@@ -1,7 +1,7 @@
 {
-    "class": {
-        "type": "CLAS",
-        "description": "ABAP file format generator for number ranges (NROB).",
-        "final": true
-    }
+  "formatVersion": "1",
+  "header": {
+    "description": "ABAP file format generator for number ranges (NROB).",
+    "originalLanguage": "en"
+  }
 }

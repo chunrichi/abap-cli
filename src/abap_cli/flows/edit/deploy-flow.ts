@@ -21,6 +21,8 @@ export interface DeployRunOptions {
   diff?: boolean;
   force?: boolean;
   yes?: boolean;
+  /** Deploy the global-class development form (maintainers; skips the release merge). */
+  dev?: boolean;
 }
 
 /** Flow outcome: JSON envelope data + human summary, printed by the command layer. */
@@ -78,6 +80,7 @@ export async function runDeploy(opts: DeployRunOptions): Promise<DeployResult> {
     force: opts.force,
     yes: opts.yes,
     package: targetPackage,
+    dev: opts.dev,
     profileName: projectConfig.systemName,
   });
   if (opts.force) {
@@ -140,6 +143,9 @@ export async function runDeployStatus(): Promise<DeployResult> {
 /** Human-readable deploy summary. */
 function humanSummary(summary: DeploymentSummary): string {
   const lines: string[] = [];
+  lines.push(
+    `Deploy mode: ${summary.mode}${summary.mode === 'release' && summary.mergedClasses !== undefined ? ` (${summary.mergedClasses} dev classes merged into the handler)` : ''}`,
+  );
   if (summary.objects.length > 0) {
     lines.push(`Objects (${summary.objects.length}):`);
     for (const o of summary.objects) {
