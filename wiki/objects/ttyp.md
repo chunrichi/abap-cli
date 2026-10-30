@@ -4,7 +4,7 @@ title: TTYP — 表类型（Table Type）
 description: TTYP 对象的双通道路由、字段契约、可选 .type.abap 侧车文件
 tags: [abap-cli, object-type, ttyp, ddic, adt, icf, abap-file-format, table-type]
 created at: 2026-09-04 00:00:00
-changed at: 2026-09-04 00:00:00
+changed at: 2026-10-30 20:00:00
 ---
 
 # TTYP — 表类型（Table Type）
@@ -23,7 +23,7 @@ ICF 兜底由 `zcl_abap_vibe_ttyp_format`（读，DD40L/DD40V + DD42V）与 `zcl
 ## 本地文件形态
 
 ```
-src/ttyp/zmy_ttyp/
+src/
 ├── zmy_ttyp.ttyp.json    # AFF 嵌套元数据
 └── zmy_ttyp.type.abap    # 可选侧车：define type ... DDL 形式
 ```
@@ -60,9 +60,9 @@ src/ttyp/zmy_ttyp/
 ## 命令示例
 
 ```bash
-abap create TTYP ZMY_TTYP --file src/ttyp/zmy_ttyp/zmy_ttyp.ttyp.json --package $TMP --json
+abap create TTYP ZMY_TTYP --file src/zmy_ttyp.ttyp.json --package $TMP --json
 abap pull LVC_T_TABL --type TTYP --json
-abap push src/ttyp/zmy_ttyp/zmy_ttyp.ttyp.json --tr DEVK900001 --json
+abap push src/zmy_ttyp.ttyp.json --tr DEVK900001 --json
 ```
 
 ## abap-file-format 合规性

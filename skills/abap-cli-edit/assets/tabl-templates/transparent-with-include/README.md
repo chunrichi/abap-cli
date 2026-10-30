@@ -27,12 +27,13 @@ include zsample_reuse;  // 同步结构：被 include 的 STRU 改动会反映�
 
 ```bash
 # 1. 先建被引用的 STRU
-abap create STRU ZSAMPLE_REUSE --file src/stru/zsample_reuse.stru.json --package $TMP --yes
+abap create STRU ZSAMPLE_REUSE --file src/zsample_reuse.stru.json --package $TMP --yes
 
-# 2. 复制整目录到目标位置
-cp -r <skill-dir>/tabl-templates/transparent-with-include/* src/tabl/ztodo.tabl.{json,ddic,settings.json}
-sed -i '' 's/zsample/ztodo/g' src/tabl/ztodo.tabl.{json,ddic,settings.json}
+# 2. 复制骨架到 src/（AFF 扁平布局）
+cp <skill-dir>/tabl-templates/transparent-with-include/zsample.tabl.{json,ddic,settings.json} src/
+for f in src/zsample.tabl.*; do mv "$f" "${f/zsample/ztodo}"; done
+sed -i '' 's/zsample/ztodo/g' src/ztodo.tabl.{json,ddic,settings.json}
 
 # 3. 创建
-abap create TABL ZTODO --file src/tabl/ztodo.tabl.json --package $TMP --yes
+abap create TABL ZTODO --file src/ztodo.tabl.json --package $TMP --yes
 ```

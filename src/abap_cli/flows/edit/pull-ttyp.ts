@@ -5,7 +5,7 @@
  *   1. `detectChannel` — picks ADT (EHP7+) or ICF fallback (EHP5/6).
  *   2. Reads the wire body via the chosen transport.
  *   3. Maps wire → local AFF nested shape.
- *   4. Writes `*.ttyp.json` to `<rootDir>/<folder>/<lower>/<lower>.ttyp.json`.
+ *   4. Writes `<rootDir>/<lower>.ttyp.json` (+ `.type.abap` source sidecar).
  *   5. Writes the optional sidecar `*.type.abap` (DDL `define type ...: ...`).
  *
  * Spec 035 push semantics: pull never auto-creates; if the object is missing
@@ -19,8 +19,8 @@ import { CliError } from '../../output/json.js';
 import { detectChannel } from './channel-detect.js';
 import type { SystemProfile } from './channel-detect.js';
 import { ttypArtifact, buildTypeSource, type TtypLocal } from '../../formats/ttyp/json.js';
+import { affObjectToken } from '../../formats/file-resolver.js';
 import { loadConfig, findWorkspaceConfig } from '../../config/project-config.js';
-import { folderFor } from '../../formats/type-folder.js';
 import type { PullHandler } from './routing.js';
 
 export interface PullTtypOptions {
@@ -106,10 +106,9 @@ export async function runPullTtyp(name: string, opts: PullTtypOptions = {}): Pro
   const upper = name.toUpperCase();
   const lower = name.toLowerCase();
   const root = await resolveRoot(opts);
-  const folder = folderFor('TTYP');
-  const dir = path.join(root, folder, lower);
-  const jsonPath = path.join(dir, `${lower}.ttyp.json`);
-  const abapPath = path.join(dir, `${lower}.type.abap`);
+  const token = affObjectToken(name);
+  const jsonPath = path.join(root, `${token}.ttyp.json`);
+  const abapPath = path.join(root, `${token}.type.abap`);
 
   let doc: TtypLocal;
   let fallbackReason: 'ECC_EHP6_NO_ADT_TABLETYPE' | undefined;

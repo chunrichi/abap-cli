@@ -69,8 +69,8 @@ abap status --json
   "meta": { "command": "abap status", "version": "1.0.0", "timestamp": "2026-08-28T00:00:00.000Z", "durationMs": 1800, "warnings": [] },
   "data": {
     "changedParts": [
-      { "object": "ZCL_DEMO", "part": "main", "direction": "divergent", "detail": "local file: src/clas/zcl_demo/zcl_demo.clas.abap" },
-      { "object": "ZLOCAL_ONLY", "part": "main", "direction": "local-only", "detail": "local file: src/prog/zlocal_only/zlocal_only.prog.abap" },
+      { "object": "ZCL_DEMO", "part": "main", "direction": "divergent", "detail": "local file: src/zcl_demo.clas.abap" },
+      { "object": "ZLOCAL_ONLY", "part": "main", "direction": "local-only", "detail": "local file: src/zlocal_only.prog.abap" },
       { "object": "ZREMOTE_ONLY", "part": "object", "direction": "remote-only" }
     ],
     "truncated": false,

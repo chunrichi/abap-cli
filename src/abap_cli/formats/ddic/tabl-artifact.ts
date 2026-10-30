@@ -129,7 +129,7 @@ export function parseTablDdic(source: string): ParsedTablDdic {
 
   for (const rawLine of lines) {
     const line = rawLine.trim();
-    const declarationMatch = line.match(/^define\s+(table|structure)\s+([\w/#]+)\s*\{$/i);
+    const declarationMatch = line.match(/^define\s+(table|structure)\s+([\w/#()]+)\s*\{$/i);
     if (declarationMatch) {
       declaration = declarationMatch;
       inBody = true;
@@ -246,11 +246,22 @@ export function parseTablDdic(source: string): ParsedTablDdic {
 
   if (!declaration || inBody) throw new Error('Invalid Table and Structure DDL: missing define declaration or closing brace');
   return {
-    objectName: declaration[2]!.toUpperCase().replace(/#/g, '/'),
+    objectName: normalizeDdlObjectName(declaration[2]!),
     type: declaration[1]!.toUpperCase() === 'STRUCTURE' ? 'STRU' : 'TABL',
     deliveryClass,
     fields,
   };
+}
+
+/**
+ * DDL `define table <name>` carries the ABAP repository name: `/NS/NAME` for
+ * namespaced objects (our SAP-side renderer writes the raw TADNAME). Accept
+ * the AFF `(ns)name` filename token too so hand-edited sidecars stay usable.
+ */
+function normalizeDdlObjectName(raw: string): string {
+  const namespaced = /^\(([^)]+)\)(.+)$/.exec(raw);
+  if (namespaced) return `/${namespaced[1]}/${namespaced[2]}`.toUpperCase();
+  return raw.toUpperCase().replace(/#/g, '/');
 }
 
 function parseDdlType(value: string): Pick<DdicFieldLocal, 'rollname' | 'dataType' | 'length' | 'decimals'> {

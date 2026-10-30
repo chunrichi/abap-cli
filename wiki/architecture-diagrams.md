@@ -4,7 +4,7 @@ title: abap-cli 架构与序列图
 description: 三层架构图 + 端到端 pull/push 序列图（Mermaid 渲染）
 tags: [abap-cli, architecture, diagram, mermaid, sequence]
 created at: 2026-09-01 00:00:00
-changed at: 2026-09-01 00:00:00
+changed at: 2026-10-30 20:00:00
 ---
 
 # abap-cli 架构与序列图
@@ -15,7 +15,7 @@ changed at: 2026-09-01 00:00:00
 flowchart LR
   subgraph User["用户工作区"]
     A[".abap.json<br/>项目配置"]
-    Src["src/<br/>源码/DDIC/HTTP/TRAN<br/>本地文件"]
+    Src["src/<br/>AFF 扁平布局<br/>源码/DDIC/HTTP/TRAN"]
   end
 
   subgraph Agent["Agent 层 (Markdown)"]
@@ -74,8 +74,8 @@ sequenceDiagram
   CLI->>SAP: GET /sap/bc/adt/.../source/main (×N includes)
   SAP-->>CLI: 源码
   CLI->>CLI: abap-file-format normalize
-  CLI->>FS: write src/clas/zcl_x/zcl_x.clas.json
-  CLI->>FS: write src/clas/zcl_x/zcl_x.clas.abap
+  CLI->>FS: write src/zcl_x.clas.json
+  CLI->>FS: write src/zcl_x.clas.abap
   CLI-->>A: { status: "success", meta, data: { object, type, entries, written, skipped, failed } }
   A->>A: edit zcl_x.clas.abap
 ```
@@ -91,7 +91,7 @@ sequenceDiagram
   participant CLI as abap-cli
   participant SAP as SAP ADT
 
-  A->>CLI: abap push src/clas/zcl_x/ --tr DEVK900001 --yes --json
+  A->>CLI: abap push src/zcl_x.clas.abap --tr DEVK900001 --yes --json
   CLI->>CLI: resolveLocalTargets() — 扫目录
   CLI->>SAP: POST .../lock (lockhandle)
   SAP-->>CLI: lockhandle (or 423 Locked)

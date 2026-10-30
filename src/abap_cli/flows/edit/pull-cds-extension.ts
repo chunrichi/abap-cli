@@ -11,7 +11,7 @@
  */
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { pullObject } from './pull-source.js';
-import { folderFor } from '../../formats/type-folder.js';
+import { affObjectToken } from '../../formats/file-resolver.js';
 import type { PullHandler } from './routing.js';
 
 export type CdsExtensionType = 'DCLS' | 'DDLX' | 'DDLA';
@@ -47,8 +47,8 @@ const ADT_PREFIX: Record<CdsExtensionType, string> = {
 
 /**
  * Pull a single CDS extension object. The `.json` and `.acds` files are
- * written under `<rootDir>/<folderFor(type)>/<lower>/` (e.g.
- * `dcls/zmy_dcls/zmy_dcls.dcls.json`).
+ * written flat under `<rootDir>/` (e.g. `zmy_dcls.dcls.json` +
+ * `zmy_dcls.dcls.acds`).
  */
 export async function runPullCdsExtension(
   type: CdsExtensionType,
@@ -67,10 +67,10 @@ export async function runPullCdsExtension(
     overwrite: opts.overwrite,
     skipExisting: opts.skipExisting,
   });
-  const expectedFolder = folderFor(type);
+  const expectedPrefix = `${affObjectToken(name)}.${type.toLowerCase()}.`;
   for (const f of result.written) {
-    if (!f.includes(`/${expectedFolder}/${lower}/`)) {
-      throw new Error(`${type} file landed outside the expected folder: ${f}`);
+    if (!f.includes(`/${expectedPrefix}`)) {
+      throw new Error(`${type} file landed outside the expected flat layout: ${f}`);
     }
   }
   return { object: object.name, files: result.written };

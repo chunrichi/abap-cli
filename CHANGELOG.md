@@ -7,6 +7,8 @@
 
 ### Removed (breaking)
 
+- **类型/对象子目录布局**：删除 `src/<typeFolder>/<objectName>/` 嵌套布局与 `formats/type-folder.ts#folderFor`。所有 `pull` / `create` / `create local` 产物直接平铺在输出目录（默认 `src/`），文件名遵循 abap-file-format：`<name>.<type>[.<sub_type>][.<content_type>][.<language>].<ext>`（如 `src/zcl_my_class.clas.json` + `src/zcl_my_class.clas.abap`、`src/ztabl_demo.tabl.json` + `.tabl.ddic` + `.tabl.settings.json`、`src/zfg.fugr.saplzfg.reps.abap`、`src/zprog.prog.texts.en.properties`）。`abap types` 输出删除 FOLDER 列/字段。bundled `abap/src/clas/*` 同步扁平为 `abap/src/*`。
+- **abapGit `#` 命名空间转义**：命名空间对象落盘从 `#ui2#cl_json` 改为 AFF 规范的括号形式 `(ui2)cl_json`（`/UI2/CL_JSON` → `src/(ui2)cl_json.clas.abap`）；旧 `#` token 不再识别，push 报 `FILE_PARSE_ERROR` 并提示重新 `abap pull`。
 - **非 basic 认证方式**：删除 `cert`（X.509 mTLS）、`browser_sso`（浏览器 SSO cookie）、`oauth_password`（BTP UAA password grant）、`sso`（Kerberos/SPNEGO）四种登录方式及全部实现（`auth/` 策略层、SSO cookie/loopback、SPNEGO、BTP service-key 解析）。CLI 只支持 basic auth：SAP username + OS keychain 密码。`--ca` / `--insecure` 保留（TLS 信任配置，不是认证方式）。
 - **认证相关命令面**：`abap profile login` / `abap profile cookie` 子命令；`--auth-method` / `--auth-option` / `--cert-path` / `--cert-key` / `--cert-ca` / `--cert-passphrase` / `--remove-cert-passphrase` / `--clear-cert-auth` / `--sso-cookie-file` / `--clear-sso-cookie-file` / `--service-key` / `--clear-oauth-password` / `--spn` / `--reauth-on-expiry` 参数；keychain 的 cert-passphrase 条目读写。
 - **profile 输出/格式**：profile JSON 不再含 `auth` 字段；`profile show` 不再输出 `auth` / `certPassphrase*`，`profile delete` 不再返回 `certPassphraseCleaned` / `cookieJarCleaned`；`profile export` bundle 版本 2 → 3；`profile test` 各层不再带 `authMethod`。
@@ -14,6 +16,8 @@
 
 **Migration**：
 
+- **本地布局**：旧工作区重新 `abap pull` 即可把产物写到 `src/` 平铺布局；旧的 `src/<type>/<object>/` 嵌套目录不再写入，可直接删除。旧的 `#ui2#cl_json` 命名空间文件必须重新 pull 后才能 push（push 会拒绝 `#` token 并给出迁移提示）。依赖旧路径的脚本 / CI 改用 AFF 文件名，或读 `abap pull --json` 的 `written[]`。
+- **`abap/src` 布局**：bundled 源码随 npm 包升级自动使用扁平布局，无需手动整理；已部署的 ICF 服务照常 `abap deploy --yes` 更新。
 - 旧 profile（`~/.abap-cli/systems.json` 中 `authMethod` / `auth` 为 cert/browser_sso/oauth_password/sso）仍可读取，`profile list` / `show` 会标注；连接类命令报 `CONFIG_ERROR`。迁移：`abap profile set <name> --password <pwd>`（转为 basic，下一次写入即丢弃旧 auth 字段）或 `profile delete` 后重建。
 - 旧 keychain 的 cert-passphrase 条目需手动清理（`abap profile delete` 不再删除它）。
 - 旧 `profile export` bundle（version 2）中带旧 auth 的条目在 `import` 时被拒绝；用 basic profile 重新导出/导入。

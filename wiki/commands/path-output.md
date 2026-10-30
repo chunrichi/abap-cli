@@ -4,7 +4,7 @@ title: output path contract (POSIX across platforms)
 description: CLI 在所有 --json 输出与 human 文本中统一使用 POSIX 相对路径（`/`），与 host OS（Windows / Linux / macOS）解耦
 tags: [abap-cli, contract, output, paths, windows, cross-platform, json, agent]
 created at: 2026-08-26 21:00:00
-changed at: 2026-08-26 21:00:00
+changed at: 2026-10-30 20:00:00
 ---
 
 # output path contract
@@ -15,7 +15,7 @@ Agent 在 Windows / Linux / macOS 下消费同一份结构化输出时，看到�
 
 ## Why
 
-- Node 内置 `path.join` / `path.relative` 在 Windows 上返回 `\`、POSIX 上返回 `/`。这对 `fs.readFile` / `fs.writeFile` 是正确的，但对 **Agent 解析的字符串** 是反模式：上游 JSON 在 Windows CI 上的输出形如 `src\clas\zcl_demo\zcl_demo.clas.abap`，与 abap-file-format 参考布局（`/`）不一致，测试与下游消费者都要做平台分支处理。
+- Node 内置 `path.join` / `path.relative` 在 Windows 上返回 `\`、POSIX 上返回 `/`。这对 `fs.readFile` / `fs.writeFile` 是正确的，但对 **Agent 解析的字符串** 是反模式：上游 JSON 在 Windows CI 上的输出形如 `src\zcl_demo.clas.abap`，与 abap-file-format 参考布局（`/`）不一致，测试与下游消费者都要做平台分支处理。
 - abap-file-format 把所有路径都定义为 POSIX 相对路径（规范随 vendored schema 见 [`src/abap_cli/schema/README.md`](../../src/abap_cli/schema/README.md)）。CLI 输出应与之一致。
 - 历史上 Windows 上 54/756 单元测试失败即源于此：`path.join('src', 'clas', ...)` 在 Windows 写盘后 `data.file` 也带 `\`，断言里写的是 `/`。
 
@@ -63,12 +63,12 @@ Agent 在 Windows / Linux / macOS 下消费同一份结构化输出时，看到�
     "object": "ZCL_DEMO",
     "type": "CLAS",
     "entries": [
-      { "object": "ZCL_DEMO", "type": "CLAS", "status": "written", "file": "src/clas/zcl_demo/zcl_demo.clas.abap" },
-      { "object": "ZCL_DEMO", "type": "CLAS", "status": "written", "file": "src/clas/zcl_demo/zcl_demo.clas.json" }
+      { "object": "ZCL_DEMO", "type": "CLAS", "status": "written", "file": "src/zcl_demo.clas.abap" },
+      { "object": "ZCL_DEMO", "type": "CLAS", "status": "written", "file": "src/zcl_demo.clas.json" }
     ],
     "written": [
-      "src/clas/zcl_demo/zcl_demo.clas.abap",
-      "src/clas/zcl_demo/zcl_demo.clas.json"
+      "src/zcl_demo.clas.abap",
+      "src/zcl_demo.clas.json"
     ],
     "skipped": [],
     "failed": []
@@ -85,14 +85,14 @@ TABL three-piece：
     "type": "TABL",
     "layout": "tabl-aff-three-piece",
     "entries": [
-      { "status": "written", "file": "src/tabl/zaff.tabl.json" },
-      { "status": "written", "file": "src/tabl/zaff.tabl.ddic" },
-      { "status": "written", "file": "src/tabl/zaff.tabl.settings.json" }
+      { "status": "written", "file": "src/zaff.tabl.json" },
+      { "status": "written", "file": "src/zaff.tabl.ddic" },
+      { "status": "written", "file": "src/zaff.tabl.settings.json" }
     ],
     "written": [
-      "src/tabl/zaff.tabl.json",
-      "src/tabl/zaff.tabl.ddic",
-      "src/tabl/zaff.tabl.settings.json"
+      "src/zaff.tabl.json",
+      "src/zaff.tabl.ddic",
+      "src/zaff.tabl.settings.json"
     ]
   }
 }
@@ -106,7 +106,7 @@ DDIC `abap create TABL/STRU` 走 ICF POST `/ddic/<type>`，data envelope 不展�
     "object": "ZTODO",
     "type": "TABL",
     "action": "created",
-    "file": "src/tabl/ztodo.tabl.json"
+    "file": "src/ztodo.tabl.json"
   }
 }
 ```
@@ -121,7 +121,7 @@ DDIC `abap create TABL/STRU` 走 ICF POST `/ddic/<type>`，data envelope 不展�
 # Same JSON on Windows / Linux / macOS:
 abap pull ZCL_DEMO --type CLAS --json
 # →
-# data.written[0] == "src/clas/zcl_demo/zcl_demo.clas.abap"  (no platform branch)
+# data.written[0] == "src/zcl_demo.clas.abap"  (no platform branch)
 ```
 
 ### 在新 flow 中应用
@@ -145,7 +145,7 @@ printResult(mode,
 
 ## Tests
 
-- `test/unit/path-output.test.ts` (19 cases) — `toOutputPath` / `toRelativeOutputPath` / `normalizePullData` / `isPathLike` 的单元覆盖，包括 Windows 模拟输入（`'src\\clas\\...'` → `'src/clas/...'`）与显式 `cwd` 参数。
+- `test/unit/path-output.test.ts` (19 cases) — `toOutputPath` / `toRelativeOutputPath` / `normalizePullData` / `isPathLike` 的单元覆盖，包括 Windows 模拟输入（`'src\\zcl_demo.clas.abap'` → `'src/zcl_demo.clas.abap'`）与显式 `cwd` 参数。
 - `test/unit/pull-layout.test.ts` — `data.written` / `data.skipped` 改为字面量 POSIX 断言（之前用 `path.join` 写死 `/`，在 Windows CI 不会失败但在 Linux 上是冗余的隐式约束）。
 - 全部 787 单元测试在 macOS / Linux 上通过；同代码在 Windows CI 上同样通过。
 
@@ -153,10 +153,10 @@ printResult(mode,
 
 ```ts
 // ❌ Wrong: 在 printResult 里直接放 path.join 的结果
-printResult(mode, { file: path.join('src', 'clas', name) });
+printResult(mode, { file: path.join('src', name) });
 
 // ✅ Right: 边界上 normalize
-printResult(mode, { file: toOutputPath(path.join('src', 'clas', name)) });
+printResult(mode, { file: toOutputPath(path.join('src', name)) });
 
 // ❌ Wrong: 用 toOutputPath 去做 fs.writeFile（输出 helper 只用于输出边界）
 await fs.writeFile(toOutputPath(path.join('src', name)), content); // Windows 上永远写不进去

@@ -166,7 +166,7 @@ describe('Phase 4 — ICF push routing table', () => {
   });
 
   it('TRAN routes to postTran + getTran existence probe (not the DDIC path)', async () => {
-    const fixture = JSON.parse(fs.readFileSync(path.resolve('test/fixtures/tran/z_aff_example_tran.tran.json'), 'utf8'));
+    const fixture = JSON.parse(fs.readFileSync(path.resolve('test/fixtures/z_aff_example_tran.tran.json'), 'utf8'));
     write('src/z_aff_example_tran.tran.json', { ...fixture, name: 'Z_AFF_EXAMPLE_TRAN' });
     const res = await push(['src/z_aff_example_tran.tran.json', '--tr', 'TRN001']);
     expect(res.exitCode).toBeUndefined();

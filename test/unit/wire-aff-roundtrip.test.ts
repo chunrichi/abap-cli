@@ -5,7 +5,7 @@ import { localToWire as httpLocalToWire, wireToLocal as httpWireToLocal } from '
 
 describe('wire ↔ local AFF round-trip (T033-038)', () => {
   it('DOMA wire ↔ local round-trips byte-identically', async () => {
-    const local = await readJsonFixture('doma/zdmy_sign_flag.doma.json');
+    const local = await readJsonFixture('zdmy_sign_flag.doma.json');
     const wire = localToWire('DOMA', local as any);
     const back = wireToLocal('DOMA', wire);
     expect((back as any).format).toEqual((local as any).format);
@@ -15,9 +15,9 @@ describe('wire ↔ local AFF round-trip (T033-038)', () => {
 
   it('DTEL wire ↔ local round-trips dataTypeInformation byte-identically', async () => {
     for (const rel of [
-      'dtel/zdm_domain_ref.dtel.json',
-      'dtel/zdm_predefined_type.dtel.json',
-      'dtel/zdm_type_ref.dtel.json',
+      'zdm_domain_ref.dtel.json',
+      'zdm_predefined_type.dtel.json',
+      'zdm_type_ref.dtel.json',
     ]) {
       const doc = await readJsonFixture(rel);
       const wire = localToWire('DTEL', doc as any);
@@ -27,7 +27,7 @@ describe('wire ↔ local AFF round-trip (T033-038)', () => {
   });
 
   it('TABL three-piece: localToWire merges header + fields + generalInformation', async () => {
-    const local = await readJsonFixture('tabl/zmy_basic.tabl.json');
+    const local = await readJsonFixture('zmy_basic.tabl.json');
     const wire = localToWire('TABL', local as any);
     expect((wire as any).header).toEqual((local as any).header);
     // Three-piece main JSON carries no fields directly; the wire forwarder
@@ -36,7 +36,7 @@ describe('wire ↔ local AFF round-trip (T033-038)', () => {
   });
 
   it('STRU shares the TABL wire shape (no fields in main JSON)', async () => {
-    const local = await readJsonFixture('stru/zmy_stru.stru.json');
+    const local = await readJsonFixture('zmy_stru.stru.json');
     const wire = localToWire('STRU', local as any);
     expect((wire as any).header).toEqual((local as any).header);
     expect(wire.fields).toBeUndefined();

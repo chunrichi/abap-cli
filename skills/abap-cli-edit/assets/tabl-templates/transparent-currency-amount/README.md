@@ -19,8 +19,9 @@
 ## 使用
 
 ```bash
-cp -r <skill-dir>/tabl-templates/transparent-currency-amount/* src/tabl/ztodo.tabl.{json,ddic,settings.json}
-sed -i '' 's/zsample/ztodo/g' src/tabl/ztodo.tabl.{json,ddic,settings.json}
+cp <skill-dir>/tabl-templates/transparent-currency-amount/zsample.tabl.{json,ddic,settings.json} src/
+for f in src/zsample.tabl.*; do mv "$f" "${f/zsample/ztodo}"; done
+sed -i '' 's/zsample/ztodo/g' src/ztodo.tabl.{json,ddic,settings.json}
 # 改 .tabl.ddic 时确保 @Semantics.amount.currencyCode 引用的字段名跟下一行一致
-abap create TABL ZTODO --file src/tabl/ztodo.tabl.json --package $TMP --yes
+abap create TABL ZTODO --file src/ztodo.tabl.json --package $TMP --yes
 ```

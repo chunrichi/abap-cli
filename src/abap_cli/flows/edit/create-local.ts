@@ -4,8 +4,7 @@
  */
 import * as path from 'node:path';
 import { CliError, printResult, type OutputMode } from '../../output/json.js';
-import { buildFilename, objectDirName } from '../../formats/file-resolver.js';
-import { folderFor } from '../../formats/type-folder.js';
+import { buildFilename } from '../../formats/file-resolver.js';
 import { writeAbapFile, fileExists } from '../../formats/abap-source.js';
 import { defaultSkeleton, getTemplate, listTemplates } from '../../formats/templates.js';
 import { toOutputPath } from '../../core/path-output.js';
@@ -29,7 +28,7 @@ export async function runCreateLocal(type: string, name: string, opts: CreateLoc
   const content = template ? template.skeleton(objectName) : defaultSkeleton(typeUpper, objectName);
 
   const filename = buildFilename(objectName, typeUpper, 'main', '.abap');
-  const relPath = path.join(opts.dir, folderFor(typeUpper), objectDirName(objectName), filename);
+  const relPath = path.join(opts.dir, filename);
   const targetPath = path.resolve(process.cwd(), relPath);
 
   if (await fileExists(targetPath)) {

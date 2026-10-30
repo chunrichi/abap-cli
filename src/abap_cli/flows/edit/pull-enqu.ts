@@ -2,7 +2,7 @@
  * PR5 (B1): ENQU (lock object) pull flow via the ICF `/ddic/enqu/<name>` route.
  *
  * Mirrors `pull-ddic.ts`: GET /ddic/enqu/<name> → wire → local AFF → write
- * `src/enqu/<lower>/<lower>.enqu.json`. Single-file shape (no sidecar — ENQU
+ * `src/<lower>.enqu.json`. Single-file shape (no sidecar — ENQU
  * has no DDL / settings split).
  */
 import * as path from 'node:path';
@@ -10,7 +10,6 @@ import { IcfClient } from '../../clients/icf-client.js';
 import { CliError } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
 import { buildFilename } from '../../formats/file-resolver.js';
-import { folderFor } from '../../formats/type-folder.js';
 import { fileExists } from '../../formats/abap-source.js';
 import { enquArtifact } from '../../formats/enqu/json.js';
 import { toOutputPath, normalizePullData } from '../../core/path-output.js';
@@ -36,7 +35,7 @@ export async function runPullEnqu(objectName: string, opts: PullOptions): Promis
 
   const local = enquArtifact.fromWire(resp.data);
   const filename = buildFilename(upper, 'ENQU', 'main', '.json');
-  const relPath = path.join(opts.dir, folderFor('ENQU'), filename);
+  const relPath = path.join(opts.dir, filename);
   const targetPath = path.resolve(process.cwd(), relPath);
 
   if (await fileExists(targetPath) && !opts.overwrite && !opts.skipExisting) {

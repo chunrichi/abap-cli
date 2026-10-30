@@ -14,6 +14,7 @@ import { CliError, printResult, type OutputMode } from '../../output/json.js';
 import { resolveTransport } from '../../core/transport.js';
 import { resolveObject } from '../../core/resolve.js';
 import { toOutputPath } from '../../core/path-output.js';
+import { affObjectToken } from '../../formats/file-resolver.js';
 import type { CreateOptions } from './create.js';
 import type { CreateHandler } from './routing.js';
 
@@ -32,7 +33,7 @@ async function runCreateSrvd(
       'USAGE',
       'Type SRVD requires --file <path> with an abap-file-format JSON',
       {
-        example: `abap create SRVD ${name} --file src/${name.toLowerCase()}/${name.toLowerCase()}.srvd.json --package $TMP --description "..." --yes`,
+        example: `abap create SRVD ${name} --file src/${affObjectToken(name)}.srvd.json --package $TMP --description "..." --yes`,
       },
     );
   }

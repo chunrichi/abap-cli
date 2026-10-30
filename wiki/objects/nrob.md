@@ -4,7 +4,7 @@ title: NROB — 编号范围对象（Number Range Object）
 description: NROB 对象的 ICF 路由、interval / configuration 字段契约、Z/Y 命名规则
 tags: [abap-cli, object-type, nrob, icf, abap-file-format, number-range, tnro, tnrot]
 created at: 2026-09-16 00:00:00
-changed at: 2026-09-17 02:00:00
+changed at: 2026-10-30 20:00:00
 ---
 
 # NROB — 编号范围对象（Number Range Object）
@@ -24,7 +24,7 @@ ICF handler 由 `zcl_abap_vibe_icf` 的 `/ddic/nrob` 分支 + `zcl_abap_vibe_nro
 ## 本地文件形态
 
 ```
-src/nrob/znr_doc_id/
+src/
 └── znr_doc_id.nrob.json
 ```
 

@@ -4,7 +4,7 @@ title: Agent Cookbook — 端到端 SAP 开发剧本
 description: AI agent 在 abap-cli 上完成常见 SAP 开发任务的最小可运行命令链。每个剧本：场景 → 完整命令序列 → 验证 → 失败兜底
 tags: [abap-cli, agent, cookbook, end-to-end, scenarios]
 created at: 2026-09-01 00:00:00
-changed at: 2026-09-01 00:00:00
+changed at: 2026-10-30 20:00:00
 ---
 
 # Agent Cookbook — 端到端 SAP 开发剧本
@@ -42,16 +42,16 @@ abap search ZCL_ORDER --type CLAS --exact --json  # 确认唯一性
 abap pull ZCL_ORDER --include-all-parts --json
 
 # 3. 找 main part（一般是 implementations）
-ls src/clas/zcl_order/
+ls src/zcl_order.*
 
 # 4. 修改 calculate_total 方法（agent 内部用编辑器工具改文件）
-# ... edit src/clas/zcl_order/zcl_order.clas.implementations.abap ...
+# ... edit src/zcl_order.clas.implementations.abap ...
 
 # 5. 推送前语法检查
-abap check syntax src/clas/zcl_order/ --json     # 失败则不推
+abap check syntax src/zcl_order.clas.implementations.abap --json     # 失败则不推
 
 # 6. 推送（自动 lock → write → activate → unlock）
-abap push src/clas/zcl_order/ --tr DEVK900001 --yes --json
+abap push src/zcl_order.clas.implementations.abap --tr DEVK900001 --yes --json
 
 # 7. 验证激活
 abap inspect ZCL_ORDER --activation --json
@@ -78,18 +78,18 @@ abap search ZORDER_STATUS --exact --json
 
 # 2. 创建 DOMA
 abap create DOMA ZORDER_STATUS \
-  --file src/doma/zorder_status/zorder_status.doma.json \
+  --file src/zorder_status.doma.json \
   --package $TMP --description "Order status" --tr $TMP --yes --json
 
 # 3. 创建 DTEL（引用上面的 DOMA）
 abap create DTEL ZORDER_STATUS_DE \
-  --file src/dtel/zorder_status_de/zorder_status_de.dtel.json \
+  --file src/zorder_status_de.dtel.json \
   --package $TMP --description "Order status DE" --tr $TMP --yes --json
 
 # 4. 创建 TABL（引用 DTEL）
 #    准备 zorder_status.tabl.{json,ddic,settings.json} 三件套
 abap create TABL ZORDER_TOTAL \
-  --file src/tabl/zorder_total/zorder_total.tabl.json \
+  --file src/zorder_total.tabl.json \
   --package $TMP --description "Order totals" --tr $TMP --yes --json
 
 # 5. 激活 TABL（虽然 create 会自动激活，但确认一下）
@@ -121,10 +121,10 @@ abap profile list --json  # 确认 PRD profile 名
 abap pull ZCL_DEMO --remote PRD --json
 
 # 4. 比对
-abap diff src/clas/zcl_demo/ --json
+abap diff src/zcl_demo.clas.abap --json
 
 # 5. 切回 DEV profile，再 push
-abap push src/clas/zcl_demo/ --tr DEVK900001 --json
+abap push src/zcl_demo.clas.abap --tr DEVK900001 --json
 ```
 
 > `--remote` 走 ICF `/version-source`（TMS destination `TMSADM@<id>.DOMAIN_<id>`）。CLI 类型 → VRSD 类型映射：`PROG → REPS`、`INTF → INTF`、`CLAS → CLSD`（类定义）。
@@ -167,7 +167,7 @@ abap create CLAS ZCL_TEST_NEW --package $TMP --description "test" \
 # 2. 编辑 + 推送
 abap pull ZCL_TEST_NEW --include-all-parts --json
 # ... edit ...
-abap push src/clas/zcl_test_new/ --tr $TMP --yes --json
+abap push src/zcl_test_new.clas.abap --tr $TMP --yes --json
 
 # 3. 跑
 abap run ZCL_TEST_NEW --json
@@ -175,7 +175,7 @@ abap run ZCL_TEST_NEW --json
 # 4. 验证 OK 后，再正式 transport
 abap pull ZCL_TEST_NEW --json  # 拉最新的 active 版本
 # ... 调整 ...
-abap push src/clas/zcl_test_new/ --tr DEVK900001 --yes --json
+abap push src/zcl_test_new.clas.abap --tr DEVK900001 --yes --json
 
 # 5. 清理：删除 $TMP 副本（CLI 未支持；用 SE80）
 ```
@@ -201,7 +201,7 @@ abap transport list --recent --json
 # 4. 回滚方案 A：在原 transport 内做反向修改
 abap pull ZCL_BAD --json
 # ... 写一个修复版本（不一定是回滚代码，可以是 fix-forward）...
-abap push src/clas/zcl_bad/ --tr DEVK900001 --yes --json
+abap push src/zcl_bad.clas.abap --tr DEVK900001 --yes --json
 
 # 5. 回滚方案 B：从 PRD 拉上一版本
 abap pull ZCL_BAD --remote PRD --json  # PRD 是上一个未污染版本
@@ -232,22 +232,22 @@ abap create CLAS ZCL_NEW_CLASS --package $TMP --description "new" \
   --tr $TMP --template minimal --yes --json
 
 # 4. 拉取（自动 create-then-pull 默认）
-# 已经把骨架写进 src/clas/zcl_new_class/
+# 已经把骨架写进 src/zcl_new_class.clas.abap
 
 # 5. 改 main part（用 public-method template）
-cat src/clas/zcl_new_class/zcl_new_class.clas.abap
+cat src/zcl_new_class.clas.abap
 # ... 编辑文件，加上 if_oo_adt_classrun~main ...
 
 # 6. 检查 + 推送
-abap check syntax src/clas/zcl_new_class/ --json
-abap push src/clas/zcl_new_class/ --tr $TMP --yes --json
+abap check syntax src/zcl_new_class.clas.abap --json
+abap push src/zcl_new_class.clas.abap --tr $TMP --yes --json
 
 # 7. 跑
 abap run ZCL_NEW_CLASS --json
 # data.stdout 是方法输出；data.exitCode 是 SAP 端业务退出码
 
 # 8. ATC 静态检查
-abap check atc src/clas/zcl_new_class/zcl_new_class.clas.abap \
+abap check atc src/zcl_new_class.clas.abap \
   --variant Z_ATC_VAR --out ./atc.json --json
 
 # 9. 验证激活

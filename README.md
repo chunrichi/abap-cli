@@ -16,8 +16,8 @@ Modifying ABAP in SAP usually means: log into the GUI, open SE80, hunt for a tra
 
 ```bash
 abap pull ZCL_MY_CLASS          # download the class (with all includes) to your filesystem
-# edit zcl_my_class.clas.abap in your favorite editor
-abap push src/zcl_my_class/ --tr DEVK900001   # lock → write → activate → unlock
+# edit src/zcl_my_class.clas.abap in your favorite editor
+abap push src/zcl_my_class.clas.abap --tr DEVK900001   # lock → write → activate → unlock
 ```
 
 Need a new object? `create` scaffolds it in one shot. Just want a syntax check? `check syntax` validates without activating or holding any lock. Need table data? `select` is the SE16N equivalent. Wondering which objects your change will impact? `where-used` lists direct references.
@@ -54,14 +54,16 @@ abap init --profile DEV --yes
 # 2. Pull an object to your filesystem
 abap pull ZCL_MY_CLASS
 
-# 3. Edit src/zcl_my_class/zcl_my_class.clas.abap
+# 3. Edit src/zcl_my_class.clas.abap
 
 # 4. Push it back to SAP
-abap push src/zcl_my_class/ --tr DEVK900001
+abap push src/zcl_my_class.clas.abap --tr DEVK900001
 
 # 5. No transport yet? Create one on the fly
 abap transport create "Feature X" --json
 ```
+
+Local files use the SAP abap-file-formats (AFF) native flat layout: every artifact is a single file directly under `src/`, named `<name>.<type>[.<sub_type>][.<content_type>][.<language>].<ext>`. A class pulls as `src/zcl_my_class.clas.json` + `src/zcl_my_class.clas.abap` (+ one file per include part), and namespaced objects use the AFF bracket token — `/UI2/CL_JSON` → `src/(ui2)cl_json.clas.abap`.
 
 For agent use, append `--json` or `--pretty-json` for structured output:
 

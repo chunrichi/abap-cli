@@ -10,20 +10,20 @@ import {
 describe('P0 — output-path normalization (Windows / cross-platform path contract)', () => {
   describe('toOutputPath', () => {
     it('passes POSIX paths through unchanged', () => {
-      expect(toOutputPath('src/clas/zcl_demo/zcl_demo.clas.abap')).toBe('src/clas/zcl_demo/zcl_demo.clas.abap');
+      expect(toOutputPath('src/zcl_demo.clas.abap')).toBe('src/zcl_demo.clas.abap');
       expect(toOutputPath('./src/foo.abap')).toBe('src/foo.abap');
       expect(toOutputPath('README.md')).toBe('README.md');
     });
 
     it('rewrites host-native separators from path.join to POSIX', () => {
-      // Simulates Windows `path.join('src', 'clas', 'zcl_demo')` returning `src\\clas\\zcl_demo`.
-      expect(toOutputPath('src\\clas\\zcl_demo\\zcl_demo.clas.abap')).toBe('src/clas/zcl_demo/zcl_demo.clas.abap');
+      // Simulates Windows `path.join('ddic', 'drafts')` returning `ddic\\drafts`.
+      expect(toOutputPath('ddic\\drafts\\zcl_demo.clas.abap')).toBe('ddic/drafts/zcl_demo.clas.abap');
       // path.join on POSIX still works — toOutputPath is idempotent.
-      expect(toOutputPath(path.join('src', 'clas', 'foo'))).toBe(path.join('src', 'clas', 'foo').replace(/\\/g, '/'));
+      expect(toOutputPath(path.join('src', 'zcl_demo.clas.abap'))).toBe(path.join('src', 'zcl_demo.clas.abap').replace(/\\/g, '/'));
     });
 
     it('handles mixed separators (defensive — file-resolver joining on POSIX paths but a downstream path module used \\)', () => {
-      expect(toOutputPath('src/clas\\zcl_demo/zcl_demo.clas.abap')).toBe('src/clas/zcl_demo/zcl_demo.clas.abap');
+      expect(toOutputPath('ddic\\drafts/zcl_demo.clas.abap')).toBe('ddic/drafts/zcl_demo.clas.abap');
     });
 
     it('strips a single leading "./"', () => {
@@ -74,18 +74,18 @@ describe('P0 — output-path normalization (Windows / cross-platform path contra
         object: 'ZCL_DEMO',
         type: 'CLAS',
         entries: [
-          { object: 'ZCL_DEMO', type: 'CLAS', status: 'written', file: 'src\\clas\\zcl_demo\\main.abap' },
-          { object: 'ZCL_DEMO', type: 'CLAS', status: 'skipped', files: ['src\\clas\\zcl_demo\\meta.json', 'src\\clas\\zcl_demo\\main.abap'] },
+          { object: 'ZCL_DEMO', type: 'CLAS', status: 'written', file: 'src\\zcl_demo.clas.abap' },
+          { object: 'ZCL_DEMO', type: 'CLAS', status: 'skipped', files: ['src\\zcl_demo.clas.json', 'src\\zcl_demo.clas.abap'] },
         ],
-        written: ['src\\clas\\zcl_demo\\main.abap'],
-        skipped: ['src\\clas\\zcl_demo\\meta.json'],
+        written: ['src\\zcl_demo.clas.abap'],
+        skipped: ['src\\zcl_demo.clas.json'],
         failed: [],
       };
       const out = normalizePullData(input) as typeof input;
-      expect(out.entries[0]?.file).toBe('src/clas/zcl_demo/main.abap');
-      expect((out.entries[1] as { files: string[] }).files).toEqual(['src/clas/zcl_demo/meta.json', 'src/clas/zcl_demo/main.abap']);
-      expect(out.written).toEqual(['src/clas/zcl_demo/main.abap']);
-      expect(out.skipped).toEqual(['src/clas/zcl_demo/meta.json']);
+      expect(out.entries[0]?.file).toBe('src/zcl_demo.clas.abap');
+      expect((out.entries[1] as { files: string[] }).files).toEqual(['src/zcl_demo.clas.json', 'src/zcl_demo.clas.abap']);
+      expect(out.written).toEqual(['src/zcl_demo.clas.abap']);
+      expect(out.skipped).toEqual(['src/zcl_demo.clas.json']);
       expect(out.failed).toEqual([]);
       // object / type untouched
       expect(out.object).toBe('ZCL_DEMO');
@@ -111,9 +111,9 @@ describe('P0 — output-path normalization (Windows / cross-platform path contra
     });
 
     it('preserves top-level `file` field (legacy single-file shape)', () => {
-      const input = { object: 'ZAFF', type: 'TABL', file: 'src\\tabl\\zaff.tabl.json' };
+      const input = { object: 'ZAFF', type: 'TABL', file: 'src\\zaff.tabl.json' };
       const out = normalizePullData(input) as typeof input;
-      expect(out.file).toBe('src/tabl/zaff.tabl.json');
+      expect(out.file).toBe('src/zaff.tabl.json');
     });
 
     it('is a no-op for empty data', () => {
@@ -129,8 +129,8 @@ describe('P0 — output-path normalization (Windows / cross-platform path contra
     });
 
     it('turns an absolute host path under cwd into a POSIX relative path', () => {
-      const abs = path.join(cwd, 'src', 'clas', 'zcl_demo', 'zcl_demo.clas.abap');
-      expect(toRelativeOutputPath(abs)).toBe('src/clas/zcl_demo/zcl_demo.clas.abap');
+      const abs = path.join(cwd, 'src', 'zcl_demo.clas.abap');
+      expect(toRelativeOutputPath(abs)).toBe('src/zcl_demo.clas.abap');
     });
 
     it('uses `..` for paths outside cwd (same shape on every platform)', () => {

@@ -50,8 +50,8 @@ beforeEach(() => {
 });
 
 /** Copy an AFF fixture out of the repo into the temp cwd. */
-function copyFixture(dir: string, name: string): string {
-  fs.copyFileSync(path.resolve('test/fixtures', dir, name), path.join(cwd, name));
+function copyFixture(name: string): string {
+  fs.copyFileSync(path.resolve('test/fixtures', name), path.join(cwd, name));
   return name;
 }
 
@@ -86,8 +86,8 @@ describe('create dispatcher — DCLS / DDLX / DDLA / SRVD happy path', () => {
     ['DDLA', 'zmy_ddla.ddla.json', 'DDLA/ADF', 'zmy_ddla.ddla.acds'],
     ['SRVD', 'zmy_srvd.srvd.json', 'SRVD/SRV', 'zmy_srvd.srvd.acds'],
   ])('%s routes to ADT typed createObject with the correct objtype', async (type, jsonName, objtype, acdsName) => {
-    copyFixture(type.toLowerCase(), jsonName);
-    copyFixture(type.toLowerCase(), acdsName);
+    copyFixture(jsonName);
+    copyFixture(acdsName);
     const res = await run(['create', type, 'ZMY_TEST', '--file', jsonName]);
     if (res.exitCode !== undefined) {
       console.error('FAILED. stderr:', res.stderr);
@@ -104,7 +104,7 @@ describe('create dispatcher — DCLS / DDLX / DDLA / SRVD happy path', () => {
   });
 
   it('rejects DCLS create when the .acds sidecar is missing (VALIDATION_ERROR)', async () => {
-    copyFixture('dcls', 'zmy_dcls.dcls.json'); // no acds
+    copyFixture('zmy_dcls.dcls.json'); // no acds
     const res = await run(['create', 'DCLS', 'ZMY_DCLS', '--file', 'zmy_dcls.dcls.json']);
     // VALIDATION_ERROR exits with the error's category code (7).
     expect(res.exitCode).toBe(7);

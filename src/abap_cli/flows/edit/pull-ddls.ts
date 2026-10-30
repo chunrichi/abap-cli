@@ -13,8 +13,8 @@ import { CliError } from '../../output/json.js';
 import { detectChannel } from './channel-detect.js';
 import type { SystemProfile } from './channel-detect.js';
 import { ddlsArtifact, wireToLocal, type DdlsLocal } from '../../formats/ddls/json.js';
+import { affObjectToken } from '../../formats/file-resolver.js';
 import { loadConfig, findWorkspaceConfig } from '../../config/project-config.js';
-import { folderFor } from '../../formats/type-folder.js';
 import type { PullHandler } from './routing.js';
 import * as fs from 'node:fs/promises';
 
@@ -51,10 +51,9 @@ export async function runPullDdls(name: string, opts: PullDdlsOptions = {}): Pro
   const upper = name.toLowerCase(); // DDLS names are typically lowercase in DDL convention
   const lower = upper;
   const root = await resolveRoot(opts);
-  const folder = folderFor('DDLS');
-  const dir = path.join(root, folder, lower);
-  const jsonPath = path.join(dir, `${lower}.ddls.json`);
-  const acdsPath = path.join(dir, `${lower}.ddls.acds`);
+  const token = affObjectToken(name);
+  const jsonPath = path.join(root, `${token}.ddls.json`);
+  const acdsPath = path.join(root, `${token}.ddls.acds`);
 
   const client = await AdtClientWrapper.create();
   const { xml, source } = await client.getDdls(upper);

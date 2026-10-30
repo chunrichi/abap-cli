@@ -5,7 +5,7 @@
  *   1. channel-detect → ADT (EHP7+) or ICF (EHP5/6).
  *   2. Wire → local AFF mapping.
  *   3. Schema-validate against `msag-v1.json`.
- *   4. Write `src/msag/<lower>/<lower>.msag.json`.
+ *   4. Write `src/<lower>.msag.json`.
  */
 import * as path from 'node:path';
 import { AdtClientWrapper } from '../../clients/adt-client.js';
@@ -14,8 +14,8 @@ import { CliError } from '../../output/json.js';
 import { detectChannel } from './channel-detect.js';
 import type { SystemProfile } from './channel-detect.js';
 import { msagArtifact, type MsagLocal } from '../../formats/msag/json.js';
+import { affObjectToken } from '../../formats/file-resolver.js';
 import { loadConfig, findWorkspaceConfig } from '../../config/project-config.js';
-import { folderFor } from '../../formats/type-folder.js';
 import type { PullHandler } from './routing.js';
 
 export interface PullMsagOptions { profile?: SystemProfile; rootDir?: string; type?: string; package?: string; tr?: string; dir?: string; overwrite?: boolean; skipExisting?: boolean; includeTests?: boolean; includeAllParts?: boolean; limit?: string; page?: string; textpool?: boolean; remote?: string }
@@ -65,9 +65,7 @@ export async function runPullMsag(name: string, opts: PullMsagOptions = {}): Pro
   const upper = name.toUpperCase();
   const lower = name.toLowerCase();
   const root = await resolveRoot(opts);
-  const folder = folderFor('MSAG');
-  const dir = path.join(root, folder, lower);
-  const jsonPath = path.join(dir, `${lower}.msag.json`);
+  const jsonPath = path.join(root, `${affObjectToken(name)}.msag.json`);
 
   let doc: MsagLocal;
   let fallbackReason: 'ECC_EHP6_NO_ADT_MESSAGECLASS' | undefined;

@@ -99,16 +99,16 @@ See [Configuration](configuration.md) for details.
 ## Your First Workflow
 
 ```bash
-# 1. Download an object (per-object dir under src/, e.g. src/zcl_my_class/)
+# 1. Download an object (AFF files are written flat under src/, e.g. src/zcl_my_class.clas.abap)
 abap pull ZCL_MY_CLASS
 
-# 2. Edit the local file (abap-file-format naming, e.g. src/zcl_my_class/zcl_my_class.clas.abap)
+# 2. Edit the local file (abap-file-format naming, e.g. src/zcl_my_class.clas.abap)
 
 # 3. Check the file (syntax mode is the default, checked against SAP; nothing is changed)
-abap check syntax src/zcl_my_class/zcl_my_class.clas.abap
+abap check syntax src/zcl_my_class.clas.abap
 
 # 4. Push back (lock → write → activate → unlock)
-abap push src/zcl_my_class/zcl_my_class.clas.abap --tr DEVK900001
+abap push src/zcl_my_class.clas.abap --tr DEVK900001
 ```
 
 ### When You Have No Transport Request
@@ -123,7 +123,7 @@ abap transport list --json
 abap transport create "Feature X" --json
 
 # Use the returned number via --tr
-abap push src/zcl_my_class/zcl_my_class.clas.abap --tr <REQUEST_NUMBER>
+abap push src/zcl_my_class.clas.abap --tr <REQUEST_NUMBER>
 ```
 
 ### Create → Pull → Edit → Push Loop
@@ -134,8 +134,8 @@ abap create CLAS ZCL_MY_NEW_CLASS --package ZDEV --description "My class" --tr D
 
 # Pull the skeleton, edit, push back
 abap pull ZCL_MY_NEW_CLASS
-# ... edit src/zcl_my_new_class/zcl_my_new_class.clas.abap ...
-abap push src/zcl_my_new_class/zcl_my_new_class.clas.abap --tr DEVK900001
+# ... edit src/zcl_my_new_class.clas.abap ...
+abap push src/zcl_my_new_class.clas.abap --tr DEVK900001
 ```
 
 ## What's Supported (v0.2)
@@ -151,7 +151,7 @@ abap push src/zcl_my_new_class/zcl_my_new_class.clas.abap --tr DEVK900001
 
 ## Deploy the Bundled ICF Service
 
-The bundled service (handler + setup classes in `abap/src/clas/`) exposes `/sap/abap_cli/`: service id/version plus DDIC, HTTP, transaction, table-data, report-run, MIME, textpool and version-source routes. It is versioned independently from the CLI (see `ICF_SERVICE_VERSION`), and `npm run check-skills-drift` fails when the CLI and skill metadata disagree on that version.
+The bundled service (handler + setup classes in `abap/src/`, e.g. `abap/src/zcl_abap_vibe_icf.clas.abap`) exposes `/sap/abap_cli/`: service id/version plus DDIC, HTTP, transaction, table-data, report-run, MIME, textpool and version-source routes. It is versioned independently from the CLI (see `ICF_SERVICE_VERSION`), and `npm run check-skills-drift` fails when the CLI and skill metadata disagree on that version.
 
 ```bash
 # Deploy sources and trigger SICF node creation/activation (idempotent)

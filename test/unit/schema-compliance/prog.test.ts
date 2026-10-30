@@ -4,7 +4,7 @@ import { validateAff } from '../../../src/abap_cli/aff/schema-validator.js';
 
 describe('schema-compliance / prog (T033-049)', () => {
   it('zaff_example.prog.json passes prog-v1.json (handcrafted — upstream has no example)', async () => {
-    await expectSchemaPass('prog/zaff_example.prog.json', 'PROG');
+    await expectSchemaPass('zaff_example.prog.json', 'PROG');
   });
 
   it('PROG rejects an additional top-level field (additionalProperties: false)', async () => {

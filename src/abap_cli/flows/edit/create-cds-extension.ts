@@ -12,6 +12,7 @@ import { CliError, printResult, type OutputMode } from '../../output/json.js';
 import { resolveTransport } from '../../core/transport.js';
 import { resolveObject } from '../../core/resolve.js';
 import { toOutputPath } from '../../core/path-output.js';
+import { affObjectToken } from '../../formats/file-resolver.js';
 import type { CreateOptions } from './create.js';
 import type { CreateHandler } from './routing.js';
 
@@ -33,7 +34,7 @@ async function runCreateCdsExtension(
       'USAGE',
       `Type ${type} requires --file <path> with an abap-file-format JSON`,
       {
-        example: `abap create ${type} ${name} --file src/${name.toLowerCase()}/${name.toLowerCase()}.${type.toLowerCase()}.json --package $TMP --description "..." --yes`,
+        example: `abap create ${type} ${name} --file src/${affObjectToken(name)}.${type.toLowerCase()}.json --package $TMP --description "..." --yes`,
       },
     );
   }

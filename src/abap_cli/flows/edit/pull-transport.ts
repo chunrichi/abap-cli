@@ -5,7 +5,6 @@
 import * as path from 'path';
 import { IcfClient } from '../../clients/icf-client.js';
 import { buildFilename } from '../../formats/file-resolver.js';
-import { folderFor } from '../../formats/type-folder.js';
 import { fileExists } from '../../formats/abap-source.js';
 import { tranArtifact, type TranWirePayload } from '../../formats/transport/json.js';
 import { CliError } from '../../output/json.js';
@@ -31,7 +30,7 @@ export async function runPullTran(objectName: string, opts: PullOptions): Promis
 
   const local = tranArtifact.fromWire(resp.data);
   const filename = buildFilename(objectName, 'TRAN', 'main', '.json');
-  const relPath = path.join(opts.dir, folderFor('TRAN'), filename);
+  const relPath = path.join(opts.dir, filename);
   const targetPath = path.resolve(process.cwd(), relPath);
 
   if (await fileExists(targetPath) && !opts.overwrite && !opts.skipExisting) {
