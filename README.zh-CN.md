@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://github.com/chunrichi/abap-cli/actions/workflows/verify.yml"><img alt="verify" src="https://github.com/chunrichi/abap-cli/actions/workflows/verify.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
-  <img alt="Node >= 18" src="https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg">
+  <a href="https://nodejs.org"><img alt="Node.js 18+" src="https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg"></a>
 </p>
 
 `abap-cli` 把 SAP 的 ADT REST API，连同 ADT 覆盖不到的那部分能力所需的捆绑 ABAP 服务，收敛成一条命令链：pull → 编辑 → check → push → run → 验证。每条命令都支持 `--json` 并提供 `--schema` 契约，npm 包还自带 skills 与 agent 定义，所以 AI agent 可以完全脱离 GUI 端到端驱动 SAP。
