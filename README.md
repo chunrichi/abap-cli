@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://github.com/chunrichi/abap-cli/actions/workflows/verify.yml"><img alt="verify" src="https://github.com/chunrichi/abap-cli/actions/workflows/verify.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
-  <a href="https://nodejs.org"><img alt="Node.js 18+" src="https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg"></a>
+  <a href="https://nodejs.org"><img alt="Node.js 22.23.4+" src="https://img.shields.io/badge/node-%3E%3D22.23.4-brightgreen.svg"></a>
 </p>
 
 `abap-cli` turns SAP's ADT REST API — plus a bundled ABAP service for the endpoints ADT does not cover — into one command chain: pull → edit → check → push → run → verify. Every command speaks `--json` and publishes a `--schema` contract, and the package ships skills plus an agent definition, so an AI agent can drive SAP end-to-end without the GUI.
@@ -62,7 +62,7 @@ If you would otherwise script the ADT REST API yourself, `abap-cli` packages the
 
 ## Install
 
-Requirements: **Node.js >= 18**; an SAP system with the **ADT service** enabled; a user with developer authorizations (create / change / activate repository objects).
+Requirements: a **security-patched Node.js** — 22.23.4+, or 24.22.1+ / 26.12.1+ on newer lines (see [SECURITY.md](SECURITY.md)); an SAP system with the **ADT service** enabled; a user with developer authorizations (create / change / activate repository objects).
 
 ```bash
 npm install -g abap-cli
