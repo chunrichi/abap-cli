@@ -8,6 +8,8 @@
  *      read-only test backend (`ABAP_CLI_KEYCHAIN_FIXTURE_PASSWORD`) that
  *      never touches the OS — use it in CI/E2E so no prompt can block tests.
  *   2. Default: native OS keychain (`cmdkey` / `security` / `secret-tool`).
+ *      `keytar` is only a fallback for hosts where the native helper is
+ *      missing; it is never selected ahead of a working native backend.
  *
  * The native backend uses the same `SERVICE` / account-key conventions as
  * the legacy `keytar` backend so credentials persist across upgrades and
@@ -46,15 +48,17 @@ let cachedBackend: SecretsBackend | undefined;
  *   - `ABAP_CLI_KEYCHAIN_BACKEND=native` → native (throws if unsupported)
  *   - `ABAP_CLI_KEYCHAIN_BACKEND=none` → disabled backend (no keychain prompts)
  *   - `ABAP_CLI_KEYCHAIN_BACKEND=fixture` → test backend (fixed password, no OS access)
- *   - Otherwise: keytar if installed (legacy compatibility — preserves
- *     entries written by previous `keytar`-only versions of abap-cli).
- *     Falls back to native when keytar is unavailable.
+ *   - Otherwise: native OS keychain first, keytar only when native is
+ *     unavailable (unsupported platform or helper binary missing).
  *
- * Why keytar-first by default: keytar uses the macOS Keychain Services API
- * directly (not the `security` CLI), so it can read entries that previous
- * `keytar`-only versions wrote — those entries are not always visible to
- * `security find-generic-password`. Once a project is on a fresh install,
- * users can opt in to native via `ABAP_CLI_KEYCHAIN_BACKEND=native`.
+ * Why native-first: both backends use the same `SERVICE` / account names, so
+ * existing entries stay readable. The difference is the item's keychain ACL:
+ * a native backend delegates to a platform-signed helper (`/usr/bin/security`,
+ * `cmdkey.exe`, `secret-tool`), so the trusted application is stable across
+ * upgrades. keytar writes items whose ACL trusts the node binary's cdhash; a
+ * Homebrew node upgrade invalidates it and macOS then prompts for keychain
+ * access on every read. The reference implementation (`vscode_abap_remote_fs`)
+ * dropped keytar for the same reason, delegating to VS Code's secure storage.
  */
 /** Explicitly disabled backend — CI/tests only; never touches the OS keychain. */
 function createDisabledBackend(): SecretsBackend {
@@ -121,14 +125,8 @@ export async function resolveBackend(): Promise<SecretsBackend> {
     return cachedBackend;
   }
 
-  // Default: prefer keytar if it's installed (legacy compatibility).
-  const keytar = tryCreateKeytarBackend();
-  if (keytar) {
-    cachedBackend = keytar;
-    return cachedBackend;
-  }
-
-  // No keytar — fall back to native.
+  // Default: native OS keychain first. keytar is a fallback for hosts where
+  // the platform helper is unavailable.
   try {
     const native = createNativeBackend();
     if (await native.isAvailable()) {
@@ -136,7 +134,13 @@ export async function resolveBackend(): Promise<SecretsBackend> {
       return cachedBackend;
     }
   } catch {
-    // Unsupported platform — fall through to the error below.
+    // Unsupported platform — try keytar below.
+  }
+
+  const keytar = tryCreateKeytarBackend();
+  if (keytar) {
+    cachedBackend = keytar;
+    return cachedBackend;
   }
 
   throw new CliError('CONFIG_ERROR',
