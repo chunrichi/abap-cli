@@ -5,11 +5,16 @@ import * as path from 'path';
 import { createRequire } from 'module';
 import { makeProgram, runCommand } from './cli-helper.js';
 
-import { runDoctorChecks } from '../../src/abap_cli/flows/setup/doctor-checks.js';
+import { runDoctorChecks, type DoctorOptions } from '../../src/abap_cli/flows/setup/doctor-checks.js';
 
 // The version env.install must report is the one statically read from the
 // package.json this test process is running against.
 const { version: pkgVersion } = createRequire(import.meta.url)('../../package.json') as { version: string };
+
+// Pin the runtime doctor evaluates so the suite does not depend on the Node.js
+// version of the machine running it; the floor itself is covered separately.
+const PATCHED_NODE = 'v22.23.4';
+const run = (opts: DoctorOptions = {}) => runDoctorChecks({ nodeVersion: PATCHED_NODE, ...opts });
 
 function tmpDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'doctor-'));
@@ -39,17 +44,33 @@ describe('doctor-checks (FR-001..005)', () => {
     });
     // Workspace initialized so the config section is all ok.
     fs.writeFileSync(path.join(cwd, '.abap.json'), JSON.stringify({ system: 'mock' }, null, 2) + '\n');
-    const report = await runDoctorChecks({ home, cwd });
+    const report = await run({ home, cwd });
     expect(report.environment.every((i) => i.status === 'ok')).toBe(true);
     expect(report.config.every((i) => i.status === 'ok')).toBe(true);
     expect(report.nextSteps).toEqual([]);
+  });
+
+  it('env.node errs on an unpatched runtime and suggests a patched release', async () => {
+    const report = await runDoctorChecks({ home, cwd, nodeVersion: 'v22.23.3' });
+    const item = report.environment.find((i) => i.key === 'env.node');
+    expect(item?.status).toBe('err');
+    expect(item?.message).toContain('v22.23.3');
+    expect(item?.suggestion).toContain('22.23.4');
+    expect(report.nextSteps).toContain(item?.suggestion);
+  });
+
+  it('env.node accepts every supported patched release line', async () => {
+    for (const nodeVersion of ['v22.23.4', 'v24.22.1', 'v26.12.1']) {
+      const report = await runDoctorChecks({ home, cwd, nodeVersion });
+      expect(report.environment.find((i) => i.key === 'env.node')?.status).toBe('ok');
+    }
   });
 
   it('uninitialized workspace → config.workspace err + suggestion in nextSteps', async () => {
     writeSystems(home, {
       mock: { url: 'http://localhost:8080', client: '100', username: 'MOCKUSER', language: 'EN' },
     });
-    const report = await runDoctorChecks({ home, cwd });
+    const report = await run({ home, cwd });
     const item = report.config.find((i) => i.key === 'config.workspace');
     expect(item?.status).toBe('err');
     expect(item?.suggestion).toContain('abap init');
@@ -61,7 +82,7 @@ describe('doctor-checks (FR-001..005)', () => {
     fs.mkdirSync(cliDir, { recursive: true });
     const configPath = path.join(cliDir, 'systems.json');
     fs.writeFileSync(configPath, '{ not valid json');
-    const report = await runDoctorChecks({ home, cwd });
+    const report = await run({ home, cwd });
     const env = report.environment.find((i) => i.key === 'env.config');
     expect(env?.status).toBe('err');
     expect(env?.suggestion).toBeTruthy();
@@ -70,7 +91,7 @@ describe('doctor-checks (FR-001..005)', () => {
 
   it('invalid profile → config item err ()', async () => {
     writeSystems(home, { bad: { url: 'not-a-url', username: 'x' } });
-    const report = await runDoctorChecks({ home, cwd });
+    const report = await run({ home, cwd });
     const item = report.config.find((i) => i.key.startsWith('config.profile'));
     expect(item?.status).toBe('err');
   });
@@ -79,8 +100,8 @@ describe('doctor-checks (FR-001..005)', () => {
     writeSystems(home, {
       mock: { url: 'http://localhost:8080', client: '100', username: 'MOCKUSER', language: 'EN' },
     });
-    const brief = await runDoctorChecks({ home, cwd });
-    const verbose = await runDoctorChecks({ home, cwd, verbose: true });
+    const brief = await run({ home, cwd });
+    const verbose = await run({ home, cwd, verbose: true });
     expect(brief.environment.every((i) => i.detail === undefined)).toBe(true);
     expect(verbose.environment.some((i) => i.detail !== undefined)).toBe(true);
   });
@@ -91,8 +112,8 @@ describe('doctor-checks (FR-001..005)', () => {
     });
     fs.writeFileSync(path.join(cwd, '.abap.json'), JSON.stringify({ system: 'mock' }, null, 2) + '\n');
 
-    const brief = await runDoctorChecks({ home, cwd });
-    const verbose = await runDoctorChecks({ home, cwd, verbose: true });
+    const brief = await run({ home, cwd });
+    const verbose = await run({ home, cwd, verbose: true });
 
     for (const report of [brief, verbose]) {
       const item = report.environment.find((i) => i.key === 'env.install');
@@ -120,7 +141,7 @@ describe('doctor-checks (FR-001..005)', () => {
     const child = path.join(cwd, 'pkg', 'sub');
     fs.mkdirSync(child, { recursive: true });
     fs.writeFileSync(path.join(cwd, '.abap.json'), JSON.stringify({ system: 'mock' }, null, 2) + '\n');
-    const report = await runDoctorChecks({ home, cwd: child });
+    const report = await run({ home, cwd: child });
     const item = report.config.find((i) => i.key === 'config.active');
     expect(item?.status).toBe('ok');
     expect(report.config.find((i) => i.key === 'config.workspace')).toBeUndefined();
@@ -135,7 +156,7 @@ describe('doctor-checks (FR-001..005)', () => {
     fs.mkdirSync(child, { recursive: true });
     fs.writeFileSync(path.join(cwd, '.abap.json'), JSON.stringify({ system: 'mock' }, null, 2) + '\n');
     fs.writeFileSync(path.join(child, '.abap.json'), JSON.stringify({ system: 'other' }, null, 2) + '\n');
-    const report = await runDoctorChecks({ home, cwd: child, verbose: true });
+    const report = await run({ home, cwd: child, verbose: true });
     const item = report.config.find((i) => i.key === 'config.active');
     expect(item?.status).toBe('ok');
     expect(item?.detail).toContain('other');

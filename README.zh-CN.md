@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://github.com/chunrichi/abap-cli/actions/workflows/verify.yml"><img alt="verify" src="https://github.com/chunrichi/abap-cli/actions/workflows/verify.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
-  <a href="https://nodejs.org"><img alt="Node.js 18+" src="https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg"></a>
+  <a href="https://nodejs.org"><img alt="Node.js 22.23.4+" src="https://img.shields.io/badge/node-%3E%3D22.23.4-brightgreen.svg"></a>
 </p>
 
 `abap-cli` 把 SAP 的 ADT REST API，连同 ADT 覆盖不到的那部分能力所需的捆绑 ABAP 服务，收敛成一条命令链：pull → 编辑 → check → push → run → 验证。每条命令都支持 `--json` 并提供 `--schema` 契约，npm 包还自带 skills 与 agent 定义，所以 AI agent 可以完全脱离 GUI 端到端驱动 SAP。
@@ -62,7 +62,7 @@ abap push src/zcl_my_class.clas.abap --tr DEVK900001    # 锁 → 写 → 激活
 
 ## 安装
 
-要求：**Node.js >= 18**；启用 **ADT 服务**的 SAP 系统；具备开发权限的用户（创建 / 修改 / 激活仓库对象）。
+要求：**已修复安全漏洞的 Node.js** —— 22.23.4+，或更新版本线的 24.22.1+ / 26.12.1+（见 [SECURITY.md](SECURITY.md)）；启用 **ADT 服务**的 SAP 系统；具备开发权限的用户（创建 / 修改 / 激活仓库对象）。
 
 ```bash
 npm install -g abap-cli

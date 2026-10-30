@@ -4,7 +4,7 @@ title: abap doctor
 description: 诊断 CLI 环境 — 环境 / 配置 / 连接三段检查，支持安全可逆修复 --fix
 tags: [abap-cli, command, doctor, diagnose, setup]
 created at: 2026-08-06 23:10:00
-changed at: 2026-08-06 23:10:00
+changed at: 2026-10-31 00:40:00
 ---
 
 # abap doctor
@@ -29,7 +29,7 @@ abap doctor [--verbose] [--fix] [--yes]
 
 ### environment
 
-- `env.node`: Node ≥ 18
+- `env.node`: Node 为受支持且已修复安全漏洞的版本（22.23.4+ / 24.22.1+ / 26.12.1+）
 - `env.tls`: OpenSSL 运行时存在
 - `env.config`: `~/.abap-cli/systems.json` 可读可解析
 - `env.deps`: OS keychain 后端可用（原生 `security` / `cmdkey.exe` / `secret-tool`，不可用时回退 keytar）

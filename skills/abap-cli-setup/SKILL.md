@@ -81,7 +81,7 @@ metadata:
 
 ## scripts / assets
 
-- [scripts/diagnose.mjs](./scripts/diagnose.mjs) — 一次性跑 `doctor` + `profile test`（Node 18+ 跨平台）
+- [scripts/diagnose.mjs](./scripts/diagnose.mjs) — 一次性跑 `doctor` + `profile test`（Node 22.23.4+ 跨平台）
 - [scripts/resolve-transport.mjs](./scripts/resolve-transport.mjs) — 自动 list → create → 输出新请求号
 - [scripts/deploy-if-outdated.mjs](./scripts/deploy-if-outdated.mjs) — 仅在 ICF 服务版本过期时才部署
 - [assets/.abap.json.template](./assets/.abap.json.template) — 工作区配置样板

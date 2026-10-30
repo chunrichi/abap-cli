@@ -19,8 +19,13 @@
 
 - **macOS 反复弹出的钥匙串授权窗口**：旧条目由 `keytar` 写入，ACL 只信任创建时的 node 二进制；回退到原生 `security` 读取时每次访问都会触发系统授权弹窗。现在 macOS 默认用原生 `security` 写入/读取，条目由 `/usr/bin/security`（Apple 签名）创建，读取不再弹窗。
 
+### Security
+
+- **Node.js Brotli 解码器越界写（CVE-2026-111497）**：CLI 在进程内解压 SAP HTTP 响应（axios 默认解码 `Content-Encoding: br`），未打补丁的 Node.js 运行时会被构造的响应破坏进程；`engines.node` 因此收紧为 `^22.23.4 || ^24.22.1 || >=26.12.1`，`abap doctor` 的 `env.node` 检查、README 与入门文档同步收紧。
+
 ### Removed (breaking)
 
+- **Node.js 18 / 20 及未打补丁的 22 / 24 / 26 运行时**：不再受支持 —— 这些版本的 Brotli 解码器未修复，EOL 版本也不会再收到修复。
 - **类型/对象子目录布局**：删除 `src/<typeFolder>/<objectName>/` 嵌套布局与 `formats/type-folder.ts#folderFor`。所有 `pull` / `create` / `create local` 产物直接平铺在输出目录（默认 `src/`），文件名遵循 abap-file-format：`<name>.<type>[.<sub_type>][.<content_type>][.<language>].<ext>`（如 `src/zcl_my_class.clas.json` + `src/zcl_my_class.clas.abap`、`src/ztabl_demo.tabl.json` + `.tabl.ddic` + `.tabl.settings.json`、`src/zfg.fugr.saplzfg.reps.abap`、`src/zprog.prog.texts.en.properties`）。`abap types` 输出删除 FOLDER 列/字段。bundled `abap/src/clas/*` 同步扁平为 `abap/src/*`。
 - **abapGit `#` 命名空间转义**：命名空间对象落盘从 `#ui2#cl_json` 改为 AFF 规范的括号形式 `(ui2)cl_json`（`/UI2/CL_JSON` → `src/(ui2)cl_json.clas.abap`）；旧 `#` token 不再识别，push 报 `FILE_PARSE_ERROR` 并提示重新 `abap pull`。
 - **非 basic 认证方式**：删除 `cert`（X.509 mTLS）、`browser_sso`（浏览器 SSO cookie）、`oauth_password`（BTP UAA password grant）、`sso`（Kerberos/SPNEGO）四种登录方式及全部实现（`auth/` 策略层、SSO cookie/loopback、SPNEGO、BTP service-key 解析）。CLI 只支持 basic auth：SAP username + OS keychain 密码。`--ca` / `--insecure` 保留（TLS 信任配置，不是认证方式）。
@@ -36,6 +41,7 @@
 - 旧 keychain 的 cert-passphrase 条目需手动清理（`abap profile delete` 不再删除它）。
 - 旧 `profile export` bundle（version 2）中带旧 auth 的条目在 `import` 时被拒绝；用 basic profile 重新导出/导入。
 - 依赖 BTP trial / SAML / X.509 认证的系统在 basic-only 下无法登录；请使用支持 basic auth 的 on-prem/ADT 端点，或等待认证方式重新引入。
+- **Node.js 运行时**：升级到 22.23.4+ / 24.22.1+ / 26.12.1+（或更新的受支持版本线），然后重新运行；`abap doctor` 会指出不合规的运行时并给出升级建议。
 
 ## [1.0.0] - 2026-10-30
 

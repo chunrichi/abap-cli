@@ -3,7 +3,7 @@
 // 用法：pages-select.mjs <table> [--where <clause>] [--fields <csv>] [--page-size <n>] [--order-by <pair>]
 // 退出码：0 全部取完；2 用法错；非 0 abap 调用失败
 //
-// 依赖：Node 18+（使用 fetch / Readable / TextDecoder / core ESM）
+// 依赖：Node 22.23.4+（使用 fetch / Readable / TextDecoder / core ESM）
 
 import { spawn } from 'node:child_process';
 
