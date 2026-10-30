@@ -148,14 +148,28 @@ class MacosKeychainAdapter implements SecretsBackend {
   }
 
   async set(account: string, kind: SecretKind, value: string): Promise<void> {
+    const key = accountKey(account, kind);
+    const add = () => execFile('/usr/bin/security',
+      ['add-generic-password', '-a', key, '-s', SERVICE, '-w', value],
+      { timeout: 10000 },
+    );
     try {
-      await execFile('/usr/bin/security',
-        ['add-generic-password', '-a', accountKey(account, kind), '-s', SERVICE, '-w', value],
-        { timeout: 10000 },
-      );
+      await add();
+      return;
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new CliError('CONFIG_ERROR', `security add-generic-password failed: ${message}`);
+      // 45 = errSecDuplicateItem: fall through to the recreate path.
+      if (Number((error as { code?: unknown })?.code) !== 45) throw macWriteError(error);
+    }
+    // The item already exists. `-U` would update the secret but keep the old
+    // access list: entries written by the legacy keytar backend trust the node
+    // binary (whose cdhash changes on every node upgrade) instead of
+    // /usr/bin/security, so reads through `security` keep prompting. Recreate
+    // the item so the creator — the Apple-signed security CLI — is trusted.
+    await this.delete(account, kind);
+    try {
+      await add();
+    } catch (error: unknown) {
+      throw macWriteError(error);
     }
   }
 
@@ -189,6 +203,16 @@ class MacosKeychainAdapter implements SecretsBackend {
       throw new CliError('CONFIG_ERROR', `security delete-generic-password failed: ${message}`);
     }
   }
+}
+
+/** Map an `execFile` failure from `security add-generic-password` to `CONFIG_ERROR`. */
+function macWriteError(error: unknown): CliError {
+  const message = error instanceof Error ? error.message : String(error);
+  // Sandboxes (agent shells) deny writes under ~/Library/Keychains.
+  const hint = /Operation not permitted/i.test(message)
+    ? ' (keychain writes are blocked in sandboxed shells; run credential commands from a normal terminal)'
+    : '';
+  return new CliError('CONFIG_ERROR', `security add-generic-password failed: ${message}${hint}`);
 }
 
 /* ───────────────────── Linux ───────────────────── */

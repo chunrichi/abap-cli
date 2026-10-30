@@ -24,6 +24,7 @@ changed at: 2026-09-01 00:00:00
 | [009](009-basic-auth-only.md) | 认证只保留 basic | 删除 cert / browser_sso / oauth_password / sso；profile schema 去掉 auth 判别联合 |
 | [008](008-formats-artifact-contract.md) | AFF 格式层 Artifact 契约与 ddic 拆分 | 5 个纯 JSON 格式模块共享 read/write/validate/load；880 行 ddic/json.ts 拆 wire/io/validate/examples |
 | [010](010-aff-flat-layout.md) | AFF 原生扁平布局（`src/` 平铺 + 命名空间括号） | 所有产物平铺 `src/`，文件名遵循 AFF 规范；命名空间 `/UI2/CL_JSON` → `(ui2)cl_json` |
+| [011](011-macos-keychain-native-backend.md) | macOS keychain 默认走原生 security 后端 | 条目由 Apple 签名的 `/usr/bin/security` 创建，ACL 稳定、不再弹授权窗；keytar 降为回退 |
 
 ## 阅读顺序建议
 
@@ -33,6 +34,7 @@ changed at: 2026-09-01 00:00:00
 - 改 create / pull / push 的类型路由：先读 [007](007-explicit-type-routing.md)
 - 改 formats/ 的文件格式或 wire 映射：先读 [008](008-formats-artifact-contract.md)
 - 改本地落盘布局 / 文件名规则：先读 [010](010-aff-flat-layout.md)（历史背景见 [003](003-typesubdir-layout.md)）
+- 改 keychain / 凭据存储：先读 [011](011-macos-keychain-native-backend.md)（历史认证背景见 [009](009-basic-auth-only.md)）
 
 # references
 

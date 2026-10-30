@@ -164,6 +164,47 @@ describe('secrets (native backend dispatcher)', () => {
       const backend = await resolveBackend();
       expect(await backend.get('PROD', 'password')).toBeNull();
     });
+
+    it('recreates an existing item (exit 45) so legacy keytar entries get the security ACL', async () => {
+      let addCalls = 0;
+      execFileMock.mockImplementation((_cmd: string, args: string[]) => {
+        if (args[0] === 'add-generic-password') {
+          addCalls += 1;
+          if (addCalls === 1) {
+            return makeExecFileFail('The specified item already exists in the keychain.', 45)(
+              '/usr/bin/security', args,
+            );
+          }
+          return Promise.resolve({ stdout: '', stderr: '' });
+        }
+        if (args[0] === 'delete-generic-password') {
+          return Promise.resolve({ stdout: 'password has been deleted.', stderr: '' });
+        }
+        return Promise.reject(new Error(`unexpected ${String(args[0])}`));
+      });
+
+      const backend = await resolveBackend();
+      await backend.set('PROD', 'password', 'hunter2');
+
+      const subcommands = execFileMock.mock.calls.map(call => (call[1] as string[])[0]);
+      expect(subcommands).toEqual([
+        'add-generic-password',
+        'delete-generic-password',
+        'add-generic-password',
+      ]);
+      expect(execFileMock).toHaveBeenCalledWith('/usr/bin/security',
+        ['delete-generic-password', '-a', 'PROD', '-s', 'abap-cli'],
+        expect.any(Object),
+      );
+    });
+
+    it('reports sandboxed keychain-write denials with a normal-terminal hint', async () => {
+      execFileMock.mockImplementation(
+        makeExecFileFail('security: SecKeychainItemCreateFromContent: UNIX[Operation not permitted]', 1),
+      );
+      const backend = await resolveBackend();
+      await expect(backend.set('PROD', 'password', 'hunter2')).rejects.toThrow(/normal terminal/);
+    });
   });
 
   describe('Linux adapter (secret-tool)', () => {
@@ -244,16 +285,25 @@ describe('secrets (native backend dispatcher)', () => {
       await expect(resolveBackend()).rejects.toMatchObject({ code: 'CONFIG_ERROR' });
     });
 
-    it('prefers keytar when env var is unset (legacy compatibility)', async () => {
+    it('prefers the native backend by default even when keytar is installed', async () => {
+      delete process.env.ABAP_CLI_KEYCHAIN_BACKEND;
+      platformMock.mockReturnValue('darwin');
+      execFileMock.mockImplementation(makeExecFileOk());
+      const backend = await resolveBackend();
+      expect(backend.name).toBe('native-macos');
+    });
+
+    it('falls back to keytar when the native helper is unsupported', async () => {
       // Pretend the current OS is 'aix' so native is unsupported, but keytar
       // module is loadable in the test environment (it's in optionalDeps).
+      delete process.env.ABAP_CLI_KEYCHAIN_BACKEND;
       platformMock.mockReturnValue('aix');
       // No execFile mocks needed — keytar's `tryCreateKeytarBackend` will
       // either succeed (keytar is installed) or return null. Either way the
       // dispatcher should not hang.
       try {
         const backend = await resolveBackend();
-        // keytar takes precedence (legacy compat); native only if keytar absent.
+        // native is unsupported here, so keytar must be the resolved backend.
         expect(['keytar', 'native']).toContain(backend.name);
       } catch (error) {
         // Acceptable if keytar is also absent in the test environment — the

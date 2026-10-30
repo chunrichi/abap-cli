@@ -7,7 +7,7 @@ abap-cli keeps configuration in two places: a **user-level** system profile stor
 | Layer | File | Content | Secrets |
 |-------|------|---------|---------|
 | User-level | `~/.abap-cli/systems.json` | Named system profiles (URL, client, user, language) | No |
-| OS keychain | (native backend / keytar fallback) | Password per system profile name | Yes |
+| OS keychain | native backend (`/usr/bin/security` / `cmdkey.exe` / `secret-tool`); `keytar` only as fallback | Password per system profile name | Yes |
 | Workspace | `<project>/.abap.json` | References a system profile + default transport/package | No |
 
 Precedence for credentials: **OS keychain** for the referenced system name; passwords are also accepted via `--password` on the command line and (interactively) from a TTY prompt.
@@ -63,10 +63,20 @@ A template lives at [`.abap.json.example`](../.abap.json.example). This file is 
 |----------|---------|
 | `SAP_URL` / `SAP_USER` / `SAP_CLIENT` / `SAP_LANGUAGE` | Used by `abap init` in non-interactive mode |
 | `NODE_TLS_REJECT_UNAUTHORIZED` | Set to `0` for self-signed certs (development only) |
+| `ABAP_CLI_KEYCHAIN_BACKEND` | Force the credential store: `native` (default), `keytar` (legacy fallback), `none` (CI/tests), `fixture` (tests only) |
 
 Passwords are **not** read from environment variables — they come from the OS keychain, `--password`, or a TTY prompt. `SAP_PASSWORD` / `BTP_PASSWORD` overrides were removed.
 
 Credentials are resolved **lazily**: local/meta commands (`--help`, `init`, `profile`, `types`, …) never touch the OS keychain, so they cannot trigger a macOS keychain prompt. Set `ABAP_CLI_KEYCHAIN_BACKEND=none` to disable keychain access entirely (CI/tests); credential-writing commands then fail with `CONFIG_ERROR` instead of prompting.
+
+On macOS the default backend is the native `security` CLI. Entries it creates are owned by `/usr/bin/security` (Apple-signed), so reading them never triggers the keychain authorization dialog. That dialog appears for entries created by another application whose code identity no longer matches — the legacy `keytar` backend binds entries to the node binary, so every node upgrade invalidates them. Re-store the password once in a normal terminal to migrate:
+
+```bash
+abap profile set <name> --password '<pwd>'                              # recreates the item, trusted by security
+security delete-generic-password -a abap-cli/session-key -s abap-cli    # next abap command recreates it
+```
+
+Sandboxed/agent shells cannot write the login keychain (`Operation not permitted`); run credential-writing commands from a normal terminal. Reads work from sandboxed shells.
 
 A template lives at [`.env.example`](../.env.example). `.env` files are gitignored.
 
@@ -85,7 +95,8 @@ When a command accepts `--tr`:
 
 ## Credentials & Security
 
-- Passwords are stored via the OS keychain (native backends on macOS / Linux / Windows, `keytar` fallback when available), keyed by system profile name
+- Passwords are stored via the OS keychain — native `security` / `cmdkey.exe` / `secret-tool` backend by default; `keytar` is only used when no native helper is available. Entries are keyed by system profile name.
+- On macOS, keychain items created by an older `keytar`-backed version keep their old access list; re-run `abap profile set <name> --password` once to recreate them under `/usr/bin/security` and stop the authorization dialog.
 - Credentials never appear in command output or error messages
 - `.env`, `.abap.json`, and `~/.abap-cli/` are excluded from version control
 - Give agents the minimum SAP authorizations they need (least-privilege users; see `AGENTS.md`)

@@ -32,7 +32,7 @@ abap doctor [--verbose] [--fix] [--yes]
 - `env.node`: Node ≥ 18
 - `env.tls`: OpenSSL 运行时存在
 - `env.config`: `~/.abap-cli/systems.json` 可读可解析
-- `env.deps`: keytar（OS keychain）可导入
+- `env.deps`: OS keychain 后端可用（原生 `security` / `cmdkey.exe` / `secret-tool`，不可用时回退 keytar）
 
 ### config
 
