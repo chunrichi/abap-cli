@@ -26,10 +26,12 @@ vi.mock('../../src/abap_cli/clients/basic-auth.js', () => ({
 
 const request = vi.fn();
 vi.mock('abap-adt-api', () => ({
-  ADTClient: vi.fn().mockImplementation(() => ({
-    login: vi.fn().mockResolvedValue(undefined),
-    httpClient: { request: (...a: unknown[]) => request(...a) },
-  })),
+  ADTClient: vi.fn().mockImplementation(function () {
+    return {
+      login: vi.fn().mockResolvedValue(undefined),
+      httpClient: { request: (...a: unknown[]) => request(...a) },
+    };
+  }),
 }));
 
 import { probeAdtRuntime, steampunkDeployHint } from '../../src/abap_cli/adc/runtime-probe.js';

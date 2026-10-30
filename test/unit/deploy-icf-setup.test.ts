@@ -53,7 +53,7 @@ describe('abap deploy — ICF setup trigger (US3..010)', () => {
     await deployBundled(client, { transport: 'TRN001', yes: true, sourceDir });
     await deployBundled(client, { transport: 'TRN001', yes: true, sourceDir });
     expect(runClass).toHaveBeenCalledTimes(2);
-    expect(runClass.mock.results[1].value).toContain('already_active');
+    expect(runClass.mock.settledResults[1].value).toContain('already_active');
   });
 
   it('setup failure surfaces a structured SAP_ERROR', async () => {
