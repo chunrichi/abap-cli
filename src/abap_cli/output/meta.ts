@@ -52,6 +52,8 @@ export type WarningCode =
   | 'STUCK_REPORT_DEGRADED' // writeStuckReport encountered non-fatal issues
   // 030-runtime-deploy
   | 'STEAMPUNK_ICF_MANUAL'  // deploy on Steampunk: ICF node must be wired via CF route
+  // bundled-service deploy — manifest missing, deployed as-is without the release merge
+  | 'DEPLOY_MANIFEST_MISSING'
   ;
 
 export interface Warning {

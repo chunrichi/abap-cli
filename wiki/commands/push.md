@@ -265,6 +265,6 @@ abap push src/zprog.prog.texts.en.properties
 
 - 实现：`src/abap_cli/commands/push.ts`、`src/abap_cli/flows/edit/routing.ts`（`PUSH_ROUTES` 单一路由表）、`src/abap_cli/flows/edit/push.ts`（`runPush`/`pushOne`/`resolveObjectTransport`）、`push-icf.ts`（DDIC/HTTP/TRAN 的 ICF 写与校验）、`push-object.ts`、`push-fugr.ts`、`push-textpool.ts`、`push-{ttyp,msag,ddls}.ts`、`src/abap_cli/core/confirmation.ts`
 - transport 解析：`src/abap_cli/core/transport.ts`（`resolveTransport`）、`src/abap_cli/core/resolve.ts`（`ResolvedObject.packageName`）
-- SAP 后端：`abap/src/zcl_abap_vibe_icf.clas.abap`（`dispatch_ddic` / `dispatch_textpool`）
+- SAP 后端：`abap/src/zcl_abap_vibe_icf_ddic.clas.abap`（`dispatch_ddic`）· `abap/src/zcl_abap_vibe_icf_textpool.clas.abap`（`dispatch_textpool`）
 - 文档：`docs/commands.md`（`abap push` 一节）、`docs/configuration.md`（Transport Resolution Order）
 - 设计决策：[010 — AFF 原生扁平布局](../design-decisions/010-aff-flat-layout.md)

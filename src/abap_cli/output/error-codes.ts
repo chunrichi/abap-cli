@@ -120,6 +120,9 @@ export type ErrorCode =
   | 'NROB_PUSH_FAILED'           // ICF /ddic/nrob POST failure during push (SAP_ERROR)
   | 'ENQU_NOT_IMPLEMENTED'       // ICF handler accepts /ddic/enqu but the SAP-side read/write is not deployed yet (SAP_ERROR)
   | 'NROB_NOT_IMPLEMENTED'       // ICF handler accepts /ddic/nrob but the SAP-side read/write is not deployed yet (SAP_ERROR)
+  // bundled-service deploy: dev-class merge into the handler class
+  | 'DEPLOY_MANIFEST_INVALID'   // abap/deploy.json missing or inconsistent with abap/src (VALIDATION_ERROR)
+  | 'DEPLOY_MERGE_FAILED'       // source split / dependency cycle / rename leftover (VALIDATION_ERROR)
   // P3.3: feedback service error codes
   | 'CONFLICT'                  // 409: idempotency key reused with different payload
   | 'PERSISTENCE_ERROR'         // 5xx: feedback service unavailable
@@ -212,6 +215,9 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   // 036-ttyp-msag-ddls: 2 reserved-range categories
   CHANNEL_DETECTION_FAILED: 'CHANNEL_DETECT',
   DDLS_NOT_SUPPORTED_ON_ECC: 'DDLS_NOT_SUPPORTED',
+  // bundled-service deploy merge
+  DEPLOY_MANIFEST_INVALID: 'VALIDATION_ERROR',
+  DEPLOY_MERGE_FAILED: 'VALIDATION_ERROR',
   // P3.3: feedback service error codes
   CONFLICT: 'CONFLICT',
   PERSISTENCE_ERROR: 'PERSISTENCE_ERROR',

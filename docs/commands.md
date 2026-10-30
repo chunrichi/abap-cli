@@ -659,6 +659,7 @@ abap deploy [options] | abap deploy status [options]
 | `--package` `<package>` | no | `"$TMP"` |  | Target SAP package (default $TMP — local, no transport needed). |
 | `--dry-run` | no |  |  | Plan only — make no mutating SAP calls. |
 | `--diff` | no |  |  | Report per-file source differences. |
+| `--dev` | no |  |  | Deploy the global-class development form (maintainers; skips the release merge). |
 | `--force` | no |  |  | Bypass safety guards (forced: true in the result). |
 | `--yes` | no |  |  | Confirm in non-interactive mode. |
 
@@ -668,6 +669,11 @@ abap deploy [options] | abap deploy status [options]
 
   ```bash
   abap deploy --yes
+  ```
+- Deploy the global-class development form (maintainers)
+
+  ```bash
+  abap deploy --dev --yes
   ```
 - Deploy to a custom package
 
@@ -1177,6 +1183,8 @@ Aggregated from the per-command schemas. The authoritative TypeScript source is 
 | `CONFLICT` | VALIDATION_ERROR | 7 |
 | `DDIC_NOT_SUPPORTED` | VALIDATION_ERROR | 7 |
 | `DELETE_FAILED` | SAP_ERROR | 6 |
+| `DEPLOY_MANIFEST_INVALID` | VALIDATION_ERROR | 7 |
+| `DEPLOY_MERGE_FAILED` | VALIDATION_ERROR | 7 |
 | `FILE_EXISTS` | USAGE | 2 |
 | `FILE_PARSE_ERROR` | USAGE | 2 |
 | `FORCE_BYPASSED` | VALIDATION_ERROR | 7 |

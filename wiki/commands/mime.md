@@ -148,13 +148,13 @@ abap mime --schema
 
 ## 关联命令
 
-- **`abap deploy`**：管理内置 ICF handler（含 `dispatch_mime`）的部署/状态。`mime` 子命令可用前提是 `deploy status` 报告版本 ≥ 0.6.0（`dispatch_mime` 端点在该版本启用）
+- **`abap deploy`**：管理内置 ICF 服务（`dispatch_mime` 端点随服务发布）的部署/状态。`mime` 子命令可用前提是 `deploy status` 报告版本 ≥ 0.6.0（`dispatch_mime` 端点在该版本启用）
 - **`abap search`**：MIME 资源不进 SAP 对象索引，需直接走 `mime` CRUD
 - **`abap doctor`**：ICF 端点不可达或 401/403 时排查
 
 ## 实现要点
 
-- **不走 ADT**：所有子命令走自建 ICF `/sap/abap_cli/mime/...`，端点契约见 `abap/src/zcl_abap_vibe_icf` 内 `dispatch_mime`
+- **不走 ADT**：所有子命令走自建 ICF `/sap/abap_cli/mime/...`，端点契约见 `abap/src/zcl_abap_vibe_icf_mime.clas.abap` 内 `dispatch_mime`
 - **不走 `SCMS_*`**：本 S/4HANA 2023 release 的 `SCMS_AO_STATUS`/`SCMS_R_CREATE_FOLDER` 函数模块不可用，统一通过 `CL_MIME_REPOSITORY_API`
 - **错误信封**：handler 把 SAP `CL_MIME_REPOSITORY_API` 的 `cx_mime_repository` 异常归一化为 `{code, message, details}`，映射 `INVALID_ARGUMENT` 400 / `NOT_FOUND` 404 / `OBJECT_EXISTS` 409 / `OBJECT_NOT_EMPTY` 409 / `VALIDATION_ERROR` 422 / 其余 500
 - **批量推送**：每个文件一次 POST（不走事务 wrapper，除非传 `--tr`；handler 端 SAP 内部逐文件独立 commit）
@@ -181,6 +181,6 @@ abap mime --schema
 # references
 
 - 真实 SAP 验证（S/4HANA 2023 FPS02 on-prem）`dispatch_mime` 三端点：`POST /mime/folder` / `PUT /mime/folder?recursive=...` / `POST /mime/resources`，handler 期望版本 0.6.0
-- ABAP 侧：自建 ICF handler `ZCL_ABAP_VIBE_ICF`，method `dispatch_mime` 在 0.6.0 加入；`CL_MIME_REPOSITORY_API` 为 SAP 标准 MIME 存储库 API（`SCMS_*` 在本 release 不可用）
+- ABAP 侧：自建 ICF 服务的 `ZCL_ABAP_VIBE_ICF_MIME` 类（发布形态里合并为 handler 内的 `lcl_mime`），method `dispatch_mime` 在 0.6.0 加入；`CL_MIME_REPOSITORY_API` 为 SAP 标准 MIME 存储库 API（`SCMS_*` 在本 release 不可用）
 - 设计决策：走自建 ICF 而非 `MWBTO_*`/`SCMS_*`，原因见 `wiki/architecture-diagrams.md`「自建 ICF」分节
 - 验证脚本：`tests/260808001-abap-select-real-sap/`（同套 ICF 测试基础设施）

@@ -1,0 +1,12 @@
+{
+  "handler": "ZCL_MY_HANDLER",
+  "merged": [
+    {
+      "global": "ZCL_MY_TYPES",
+      "local": "lcl_types"
+    }
+  ],
+  "standalone": [
+    "ZCL_MY_SETUP"
+  ]
+}

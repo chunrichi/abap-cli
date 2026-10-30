@@ -18,12 +18,14 @@ export const SCHEMA: CommandSchema = {
     { name: '--package', type: 'string', valuePlaceholder: '<package>', default: '$TMP', description: 'Target SAP package (default $TMP — local, no transport needed).' },
     { name: '--dry-run', type: 'boolean', description: 'Plan only — make no mutating SAP calls.' },
     { name: '--diff', type: 'boolean', description: 'Report per-file source differences.' },
+    { name: '--dev', type: 'boolean', description: 'Deploy the global-class development form (maintainers; skips the release merge).' },
     { name: '--force', type: 'boolean', description: 'Bypass safety guards (forced: true in the result).' },
     { name: '--yes', type: 'boolean', description: 'Confirm in non-interactive mode.' },
     schemaOption(),
   ],
   examples: [
     { description: 'Deploy to $TMP (no transport)', command: 'abap deploy --yes' },
+    { description: 'Deploy the global-class development form (maintainers)', command: 'abap deploy --dev --yes' },
     { description: 'Deploy to a custom package', command: 'abap deploy --package ZPKG --tr DEVK900001 --yes' },
     { description: 'Read-only status probe', command: 'abap deploy status' },
   ],
@@ -33,6 +35,8 @@ export const SCHEMA: CommandSchema = {
     { code: 'FORCE_BYPASSED', category: 'VALIDATION_ERROR', exitCode: 7 },
     { code: 'ICF_CHECK_DEGRADED', category: 'VALIDATION_ERROR', exitCode: 7 },
     { code: 'STEAMPUNK_ICF_MANUAL', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'DEPLOY_MANIFEST_INVALID', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'DEPLOY_MERGE_FAILED', category: 'VALIDATION_ERROR', exitCode: 7 },
   ],
 };
 
@@ -46,6 +50,7 @@ function applyDeployOptions(cmd: Command): Command {
     .option('--package <package>', 'Target SAP package (default $TMP — local, no transport needed)', '$TMP')
     .option('--dry-run', 'Plan only — make no mutating SAP calls')
     .option('--diff', 'Report per-file source differences')
+    .option('--dev', 'Deploy the global-class development form (maintainers; skips the release merge)')
     .option('--force', 'Bypass safety guards')
     .option('--yes', 'Confirm in non-interactive mode');
 }

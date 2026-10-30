@@ -220,6 +220,6 @@ abap pull --tr NDK123456
 # references
 
 - 实现：`src/abap_cli/commands/pull.ts`、`src/abap_cli/flows/edit/pull.ts`、`src/abap_cli/flows/edit/routing.ts`（`TYPE_ROUTES` 单一路由表）、`src/abap_cli/formats/pull-strategy.ts`、`pull-fugr.ts`、`fugr-layout.ts`、`src/abap_cli/clients/icf-client.ts`
-- SAP 后端：`abap/src/zcl_abap_vibe_icf.clas.abap`（`dispatch_ddic` / `dispatch_textpool` / `dispatch_version_management`）
+- SAP 后端：`abap/src/zcl_abap_vibe_icf_ddic.clas.abap`（`dispatch_ddic`）· `abap/src/zcl_abap_vibe_icf_textpool.clas.abap`（`dispatch_textpool`）· `abap/src/zcl_abap_vibe_icf_version.clas.abap`（`dispatch_version_management`）
 - 文档：`docs/commands.md`（`abap pull` 一节）；规范参考：[abap-file-formats specification](https://github.com/SAP/abap-file-formats/blob/main/docs/specification.md)
 - 设计决策：[010 — AFF 原生扁平布局](../design-decisions/010-aff-flat-layout.md)

@@ -16,9 +16,9 @@
 ## 架构（三层）
 
 - **CLI**（`src/abap_cli/`）：TypeScript 薄客户端，所有命令都支持 `--json`；命令清单唯一入口是 `src/abap_cli/registry/commands.ts`。
-- **SAP**（`abap/`）：ABAP，DDIC CRUD 的 ICF 服务处理器。
+- **SAP**（`abap/`）：ABAP，DDIC CRUD 的 ICF 服务处理器；开发期是全局类树（`abap/src`，19 个类），发布期由 `abap deploy` 合并为单类 handler。
 - **Agent**：`skills/` + `agents/` 是随 npm 包分发给用户的内容；`.agents/skills/` 是本仓库开发用的本地技能，不随包分发。
-- **分发**：`npm run build` 产物为 `dist/index.js`（`rootDir: src/abap_cli`）；npm 包只含 `dist`、`abap/src`、`skills`、`agents`。
+- **分发**：`npm run build` 产物为 `dist/index.js`（`rootDir: src/abap_cli`）；npm 包只含 `dist`、`abap/src`、`abap/deploy.json`、`skills`、`agents`。
 
 ## 关键约定
 
@@ -29,6 +29,7 @@
 - 所有新增 CLI 命令必须注册到 `src/abap_cli/registry/commands.ts`（`COMMAND_SPECS` + lazy load），并补 `wiki/commands/<cmd>.md` 与所属 skill 的 `metadata.commands`。
 - 沿用既有命令模式：`export function register<Name>Command(program: Command)`。
 - `abap/src/` 下的 ABAP 代码遵循 abap-file-format 文件命名约定。
+- 内置 ICF 服务的内部类按普通全局类开发（`abap/src/zcl_abap_vibe_icf_*.clas.abap`）；`abap/deploy.json` 是唯一清单（`handler` / `merged` / `standalone`），`abap deploy` 在推送前把它们降级为 `lcl_*` 合并进 handler 的两个 include（SAP 上只装 3 个全局类）；`abap deploy --dev` 安装开发形态的全部全局类。发布形态的 definitions / implementations 是 deploy 生成的，不进仓库、不 pull 回 `abap/src`。
 
 ## 工作风格
 
