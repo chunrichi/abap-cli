@@ -55,6 +55,9 @@ abap session info --profile vhcala4hci
    `~/.abap-cli/sessions/<system-hash>.json`。下一次命令读取并注入 cookie，跳过 `login()` 往返。
 2. **fresh login**：jar 不存在 / 解密失败 / SAP 返回 401 时自动回退到全新登录并覆盖 jar。
 3. **`always-logout` 模式**：每条命令结束都调 `ADTClient.logout()`，不留会话。
+4. **复用降级时的兜底关闭**：默认模式只保留"确实能被下一条命令复用"的会话。本进程新开的登录如果
+   session key 不可持久化（`ABAP_CLI_KEYCHAIN_BACKEND=none|fixture` 等测试后端）或 jar 写不进任何
+   候选路径，命令结束会主动 logout，避免退化成"每条命令各留一条会话"。
 
 ### 配置字段 `.abap.json#sap.sessionPolicy`
 
@@ -78,6 +81,7 @@ cloud / btp profile **不支持** cookie 复用：不读、不写、不删 jar�
 
 - jar 文件整体 AES-256-GCM 加密；32 字节对称密钥存 OS keychain（`service: abap-cli`, `account: abap-cli/session-key`）。
 - keychain 不可用时退化为 PBKDF2-SHA256 派生密钥（从 `url|username|client`），stderr 每次 WARN。
+- session key 必须可持久化：`fixture` / `disabled` 这类只在内存里保存的测试后端不会写盘，此时复用被禁用、命令结束 logout。
 - 不要将 `~/.abap-cli/sessions/` 拷贝到其他机器 / 提交到仓库。
 
 ## Exit codes

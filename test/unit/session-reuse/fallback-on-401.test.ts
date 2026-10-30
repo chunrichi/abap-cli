@@ -37,7 +37,7 @@ const h = vi.hoisted(() => {
     login: () => mockClient.login,
     searchObject: () => mockClient.searchObject,
     captureMock: vi.fn(),
-    markPersistedMock: vi.fn().mockResolvedValue(undefined),
+    markPersistedMock: vi.fn().mockResolvedValue(true),
     loadJarMock: vi.fn().mockResolvedValue(null),
     clearJarMock: vi.fn(),
     injectMock: vi.fn(),
@@ -148,6 +148,7 @@ describe('AdtClientWrapper 401 fallback (reuse mode)', () => {
     h.loadConfigMock.mockResolvedValue(defaultConfig());
     h.buildAuthMock.mockReturnValue({ password: 'x', options: { headers: {} } });
     h.keyMock.mockResolvedValue({ key: Buffer.alloc(32, 1), mode: 'derived' });
+    h.markPersistedMock.mockResolvedValue(true);
     h.login().mockReset().mockResolvedValue(undefined);
     h.httpClient.cookie.clear();
     h.httpClient.cookie.set('SAP_SESSIONID_VH4_001', 'SAP_SESSIONID_VH4_001=stale');
@@ -215,5 +216,31 @@ describe('AdtClientWrapper 401 fallback (reuse mode)', () => {
     await wrapper.searchObject('ZCL');
     expect(h.loadJarMock).not.toHaveBeenCalled();
     expect(h.keyMock).not.toHaveBeenCalled();
+  });
+
+  it('marks a reused session as reusable (no release needed at command end)', async () => {
+    h.loadJarMock.mockResolvedValue(jarFixture as never);
+    h.searchObject().mockReset().mockResolvedValue([{ 'adtcore:name': 'ZCL_X', 'adtcore:type': 'CLAS/OC' }]);
+    const wrapper = await AdtClientWrapper.create();
+    await wrapper.searchObject('ZCL');
+    expect(wrapper.reusedSession).toBe(true);
+    expect(wrapper.sessionNeedsRelease).toBe(false);
+  });
+
+  it('marks a fresh login as needing release when its jar cannot be persisted', async () => {
+    h.loadJarMock.mockResolvedValue(null);
+    h.markPersistedMock.mockResolvedValue(false);
+    h.searchObject().mockReset().mockResolvedValue([{ 'adtcore:name': 'ZCL_X', 'adtcore:type': 'CLAS/OC' }]);
+    const wrapper = await AdtClientWrapper.create();
+    await wrapper.searchObject('ZCL');
+    expect(wrapper.sessionNeedsRelease).toBe(true);
+  });
+
+  it('marks a persisted fresh login as reusable (no release needed)', async () => {
+    h.loadJarMock.mockResolvedValue(null);
+    h.searchObject().mockReset().mockResolvedValue([{ 'adtcore:name': 'ZCL_X', 'adtcore:type': 'CLAS/OC' }]);
+    const wrapper = await AdtClientWrapper.create();
+    await wrapper.searchObject('ZCL');
+    expect(wrapper.sessionNeedsRelease).toBe(false);
   });
 });
