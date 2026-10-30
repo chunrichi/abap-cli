@@ -10,6 +10,7 @@
   "files": [
     "dist",
     "abap/src",
+    "abap/deploy.json",
     "skills",
     "agents"
   ],

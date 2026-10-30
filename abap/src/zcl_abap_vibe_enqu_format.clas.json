@@ -1,7 +1,7 @@
 {
-    "class": {
-        "type": "CLAS",
-        "description": "ABAP file format generator for lock objects (ENQU).",
-        "final": true
-    }
+  "formatVersion": "1",
+  "header": {
+    "description": "ABAP file format generator for lock objects (ENQU).",
+    "originalLanguage": "en"
+  }
 }

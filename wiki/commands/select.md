@@ -122,7 +122,7 @@ abap select --table ZTABLE --where "FIELD = 'X'" --dry-run --json
 ```mermaid
 graph LR
   A[CLI flows/data/select.ts] -->|buildDataQueryRequest| B[IcfClient.postDataQuery]
-  B -->|POST /sap/abap_cli/data/query| C[ZCL_ABAP_VIBE_ICF.dispatch_data]
+  B -->|POST /sap/abap_cli/data/query| C[ZCL_ABAP_VIBE_ICF_DATA.dispatch_data]
   C --> D[DD02L + DD03L 元数据校验]
   D -->|合法| E[where 语法解析 + 宿主变量绑定]
   E -->|动态 Open SQL limit+1| F[SELECT 行结果]
@@ -186,7 +186,7 @@ abap select --table ZTAB_FIXTURE --where "NAME = 'O''Brien; DROP TABLE ZTAB_FIXT
 
 - **CLI 版本**: 0.2.0（含 `select` 命令）。
 - **ICF 服务版本**: **0.4.0**（`abap deploy` 部署后可用）。`abap doctor` / `abap init` 探测 outdated 时升级。
-- **握手**: 复用 014 DDIC CRUD 的 `ZCL_ABAP_VIBE_ICF` 类（`/data/*` 子路由新增）。
+- **握手**: 同一个 ICF 服务，handler 把 `/data/*` 子路由转发到 `ZCL_ABAP_VIBE_ICF_DATA`。
 - **开发模式**: 014 `ICF_SERVICE_VERSION` + ABAP `gc_version` 同步 bump 0.3.0 → 0.4.0（017：select 行值原生类型化）。
 
 ## 错误修复速查
@@ -224,7 +224,7 @@ QUERY_FAILED              runtime SQL failure             →  abap activate <ta
 # references
 
 - 实现: [src/abap_cli/commands/select.ts](../../src/abap_cli/commands/select.ts) · [src/abap_cli/flows/data/select.ts](../../src/abap_cli/flows/data/select.ts) · [src/abap_cli/clients/icf-client.ts](../../src/abap_cli/clients/icf-client.ts)
-- SAP 后端: `abap/src/zcl_abap_vibe_icf.clas.abap`（`lcl_data=>dispatch_data`，`/data/query` 端点）
+- SAP 后端: `abap/src/zcl_abap_vibe_icf_data.clas.abap`（`ZCL_ABAP_VIBE_ICF_DATA=>dispatch_data`，`/data/query` 端点）
 - 文档: [docs/commands.md](../../docs/commands.md)
 - 设计回顾：见 wiki 顶层 `abap-select` 历史回顾（动态 SQL 注入安全 + DDIC 元数据 + 行类型构建）
 - 相关命令页: [abap deploy](deploy.md)、[abap search](search.md)

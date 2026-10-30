@@ -1,1 +1,7 @@
-{"class":{"type":"CLAS","description":"ICF handler for /sap/abap_cli.","final":false}}
+{
+  "formatVersion": "1",
+  "header": {
+    "description": "ICF handler for /sap/abap_cli.",
+    "originalLanguage": "en"
+  }
+}

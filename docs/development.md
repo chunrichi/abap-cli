@@ -94,6 +94,9 @@ Then run the workflows from [Getting Started](getting-started.md) against the mo
 ## Project Structure
 
 ```
+abap/                     # bundled ICF service — development tree of global classes
+├── src/                  # 19 AFF classes (one <name>.clas.abap + canonical <name>.clas.json each)
+└── deploy.json           # manifest: handler / merged global→lcl_* map / standalone classes
 src/abap_cli/
 ├── index.ts              # commander entry: global options + lifecycle hooks
 ├── top-error.ts          # top-level commander error routing (--json safe)
@@ -110,6 +113,47 @@ src/abap_cli/
 ├── schema/               # vendored abap-file-format JSON schemas
 └── output/               # unified JSON output, error codes, meta, check-issue types — see output/README.md
 ```
+
+## ICF Service Development
+
+The bundled ICF service ships in two forms generated from the same sources (decision record: [012](../wiki/design-decisions/012-icf-dev-global-release-merged.md)):
+
+- **Development form** — `abap/src/` is a tree of normal global classes: handler `zcl_abap_vibe_icf`, shared types `zcl_abap_vibe_icf_types`, ten domain helpers (`response` / `mime` / `http` / `ddic` / `textpool` / `tcode` / `data` / `fields` / `version` / `run`), five `zcl_abap_vibe_*_format` renderers, and the standalone `zcl_abap_vibe_icf_setup` / `zcl_abap_vibe_runner`. Each class is one `<name>.clas.abap` (definition + implementation) plus a canonical `<name>.clas.json`; there are no committed handler `definitions` / `implementations` includes.
+- **Release form** — `abap deploy` merges the 16 helper classes into the handler as `lcl_*` local classes (3 global objects on SAP). `abap/deploy.json` is the single manifest: `handler`, `merged[]` (global name → local `lcl_*` name), `standalone[]`.
+- **Merger** — `src/abap_cli/flows/edit/deploy-merge.ts` is pure (strings in / strings out): manifest validation, class-header downgrade, `zcl_*` → `lcl_*` rename, dependency topological sort, deterministic output, leftover-global guard. Covered by unit tests in `test/unit/deploy-merge*.test.ts`; it is not an ABAP compiler, so real syntax errors surface on the first activation.
+
+Loop for a single-class change:
+
+```bash
+# 1. iterate: push and activate the development form on a maintainer system
+abap push abap/src/zcl_abap_vibe_icf_data.clas.abap --yes   # or:
+abap deploy --dev --yes                                  # all 19 globals, dependency order
+
+# 2. verify the class itself, then the endpoint
+abap inspect ZCL_ABAP_VIBE_ICF_DATA --activation --json
+abap check syntax abap/src/zcl_abap_vibe_icf_data.clas.abap --json
+
+# 3. publish-form check (merges into the handler, 3 objects)
+abap deploy --yes
+abap deploy status --json
+
+# 4. idempotency
+abap deploy --diff --json     # every part unchanged after the previous deploy
+```
+
+Adding or renaming an ICF helper:
+
+1. Add `<name>.clas.abap` + `<name>.clas.json` under `abap/src/` (class header `PUBLIC FINAL CREATE PUBLIC`; implementation in the same file). Reference shared types as `zcl_abap_vibe_icf_types=>ty_*`.
+2. Route to it from `zcl_abap_vibe_icf`'s front controller.
+3. Register it in `abap/deploy.json`: a new line in `merged` with a fresh `lcl_*` name (must be unique and `^lcl_[a-z0-9_]+$`), or in `standalone` when it must stay a global object in the release form.
+4. If it needs `TYPE-POOLS` or other class-pool prelude, put it in a `<name>.clas.definitions.abap` next to the class (this is the one include the dev tree keeps); it is folded into the generated handler definitions.
+5. Run `abap deploy --dev --yes` and `abap deploy --yes` on a real system, then `npm run verify`.
+
+Rules that the deploy flow enforces:
+
+- The handler must have **only** its main source in `abap/src`; merged helpers may have only a main source plus an optional definitions prelude. A committed or pulled-back release include fails `abap deploy` with `DEPLOY_MANIFEST_INVALID`.
+- Never `abap pull` the deployed handler back into `abap/src` — the pull writes `definitions` / `implementations` files that are generated at deploy time and would then be treated as source.
+- A class in `abap/src` that is not listed in the manifest fails the release deploy. A missing manifest degrades to installing every class globally (`DEPLOY_MANIFEST_MISSING` warning).
 
 ## Adding a New Command
 
@@ -182,7 +226,7 @@ export function registerMyCommand(program: Command): void {
 - **Reuse, don't duplicate** — config (`loadConfig`), transport resolution (`resolveTransport`), and output helpers are shared; do not re-implement them
 - **All commands support `--json`**（见 `AGENTS.md` 的验证与架构约定）
 - **Credentials never in output** — passwords only via keychain / `--password` / TTY prompt
-- **SAP-side code via Dogfooding** — develop `abap/` ICF code using the CLI's own pull → edit → push loop (no Eclipse/SAP GUI)
+- **SAP-side code via Dogfooding** — develop `abap/` ICF code using the CLI's own pull → edit → push loop (no Eclipse/SAP GUI); `abap deploy --dev` installs the single-class development form so each helper can be checked and activated on its own (see [ICF Service Development](#icf-service-development))
 
 ## Contributing
 

@@ -1,0 +1,73 @@
+{
+  "handler": "ZCL_ABAP_VIBE_ICF",
+  "merged": [
+    {
+      "global": "ZCL_ABAP_VIBE_ICF_TYPES",
+      "local": "lcl_types"
+    },
+    {
+      "global": "ZCL_ABAP_VIBE_ICF_RESPONSE",
+      "local": "lcl_response"
+    },
+    {
+      "global": "ZCL_ABAP_VIBE_ICF_MIME",
+      "local": "lcl_mime"
+    },
+    {
+      "global": "ZCL_ABAP_VIBE_ICF_HTTP",
+      "local": "lcl_http"
+    },
+    {
+      "global": "ZCL_ABAP_VIBE_ICF_DDIC",
+      "local": "lcl_ddic"
+    },
+    {
+      "global": "ZCL_ABAP_VIBE_ICF_TEXTPOOL",
+      "local": "lcl_textpool"
+    },
+    {
+      "global": "ZCL_ABAP_VIBE_ICF_TCODE",
+      "local": "lcl_tcode"
+    },
+    {
+      "global": "ZCL_ABAP_VIBE_ICF_DATA",
+      "local": "lcl_data"
+    },
+    {
+      "global": "ZCL_ABAP_VIBE_ICF_FIELDS",
+      "local": "lcl_fields"
+    },
+    {
+      "global": "ZCL_ABAP_VIBE_ICF_VERSION",
+      "local": "lcl_version"
+    },
+    {
+      "global": "ZCL_ABAP_VIBE_ICF_RUN",
+      "local": "lcl_run"
+    },
+    {
+      "global": "ZCL_ABAP_VIBE_TABL_FORMAT",
+      "local": "lcl_tabl_format"
+    },
+    {
+      "global": "ZCL_ABAP_VIBE_TTYP_FORMAT",
+      "local": "lcl_ttyp_format"
+    },
+    {
+      "global": "ZCL_ABAP_VIBE_MSAG_FORMAT",
+      "local": "lcl_msag_format"
+    },
+    {
+      "global": "ZCL_ABAP_VIBE_ENQU_FORMAT",
+      "local": "lcl_enqu_format"
+    },
+    {
+      "global": "ZCL_ABAP_VIBE_NROB_FORMAT",
+      "local": "lcl_nrob_format"
+    }
+  ],
+  "standalone": [
+    "ZCL_ABAP_VIBE_ICF_SETUP",
+    "ZCL_ABAP_VIBE_RUNNER"
+  ]
+}
