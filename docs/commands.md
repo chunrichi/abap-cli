@@ -24,7 +24,7 @@ Every command supports `--json` (compact envelope, default for agents) and `--pr
 | `abap select` | sap | Query table data read-only (SE16N equivalent) via the bundled ICF /data endpoint |
 | `abap fields` | sap | List the fields of a table or view (read-only, DD03L-backed) |
 | `abap run-report` | sap | Execute an activated REPORT and return its list output (read-only) |
-| `abap list` | sap | List ABAP objects by package or author (read-only) |
+| `abap list` | sap | List ABAP objects in a package (read-only) |
 | `abap delete` | sap | Delete an ABAP object from SAP (lock → delete → unlock) |
 | `abap push` | sap | Push local ABAP files to SAP |
 | `abap check` | sap | Validate ABAP source code (syntax / content / atc) |

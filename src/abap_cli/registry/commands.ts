@@ -42,7 +42,7 @@ export const COMMAND_SPECS: LazyCommandSpec[] = [
   {
     name: 'list',
     scope: 'sap',
-    description: 'List ABAP objects by package or author (read-only)',
+    description: 'List ABAP objects in a package (read-only)',
     load: () => import('../commands/list.js').then((m) => ({ register: m.registerListCommand })),
   },
   {

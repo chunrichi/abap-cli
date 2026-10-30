@@ -10,7 +10,7 @@ Per-command knowledge pages (prerequisites, gotchas, real-system evidence) live 
 | `abap select` | [select.md](select.md) | Query table data read-only (SE16N equivalent) via the bundled ICF /data endpoint |
 | `abap fields` | [fields.md](fields.md) | List the fields of a table or view (read-only, DD03L-backed) |
 | `abap run-report` | [run-report.md](run-report.md) | Execute an activated REPORT and return its list output (read-only) |
-| `abap list` | [list.md](list.md) | List ABAP objects by package or author (read-only) |
+| `abap list` | [list.md](list.md) | List ABAP objects in a package (read-only) |
 | `abap delete` | [delete.md](delete.md) | Delete an ABAP object from SAP (lock → delete → unlock) |
 | `abap push` | [push.md](push.md) | Push local ABAP files to SAP |
 | `abap check` | [check.md](check.md) | Validate ABAP source code (syntax / content / atc) |

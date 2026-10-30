@@ -67,7 +67,7 @@ A template lives at [`.abap.json.example`](../.abap.json.example). This file is 
 
 Passwords are **not** read from environment variables — they come from the OS keychain, `--password`, or a TTY prompt. `SAP_PASSWORD` / `BTP_PASSWORD` overrides were removed.
 
-Credentials are resolved **lazily**: local/meta commands (`--help`, `init`, `profile`, `types`, …) never touch the OS keychain, so they cannot trigger a macOS keychain prompt. Set `ABAP_CLI_KEYCHAIN_BACKEND=none` to disable keychain access entirely (CI/tests); credential-writing commands then fail with `CONFIG_ERROR` instead of prompting.
+Credentials are resolved **lazily** for metadata-only commands (`--help`, `types`, `init --show-config`), which never touch the OS keychain and cannot trigger a macOS keychain prompt. Password paths (`profile add / set / show / delete / export`, `init --test-*`) do access it. Set `ABAP_CLI_KEYCHAIN_BACKEND=none` to disable keychain access entirely (CI/tests); credential-writing commands then fail with `CONFIG_ERROR` instead of prompting.
 
 On macOS the default backend is the native `security` CLI. Entries it creates are owned by `/usr/bin/security` (Apple-signed), so reading them never triggers the keychain authorization dialog. That dialog appears for entries created by another application whose code identity no longer matches — the legacy `keytar` backend binds entries to the node binary, so every node upgrade invalidates them. Re-store the password once in a normal terminal to migrate:
 
