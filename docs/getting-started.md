@@ -4,7 +4,7 @@ This guide walks through installing `abap-cli`, configuring a connection to an S
 
 ## Requirements
 
-- **Node.js >= 18** (ESM project, `"type": "module"`)
+- A **security-patched Node.js** — 22.23.4+, or 24.22.1+ / 26.12.1+ on newer lines (ESM project, `"type": "module"`); see [SECURITY.md](../SECURITY.md)
 - An SAP system with the **ADT (ABAP Development Tools)** service enabled (ADT is part of the standard ABAP application server)
 - A user with developer authorizations (create/change/activate repository objects)
 

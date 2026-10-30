@@ -5,6 +5,7 @@ import { createRequire } from 'module';
 import { assertValidProfile } from '../../config/validation.js';
 import { findWorkspaceConfig } from '../../config/project-config.js';
 import { toOutputPath } from '../../core/path-output.js';
+import { nodeSatisfies } from './node-runtime.js';
 
 export type DoctorStatus = 'ok' | 'err';
 
@@ -35,6 +36,8 @@ export interface DoctorOptions {
   home?: string;
   /** Workspace root for .abap.json checks (defaults to cwd). */
   cwd?: string;
+  /** Node.js version to evaluate (injectable for tests; defaults to process.version). */
+  nodeVersion?: string;
 }
 
 const okItem = (key: string, detail?: string): DoctorItem => ({ key, status: 'ok', message: '', detail });
@@ -146,22 +149,6 @@ function readInstallInfo(): InstallInfo {
   }
 }
 
-function nodeSatisfies(nodeVersion: string, engines: { node?: string }): boolean {
-  const req = engines.node ?? '';
-  const m = /^>=(\d+)(?:\.(\d+))?/.exec(req);
-  if (!m) return true;
-  const [majorStr, minorStr] = nodeVersion.replace(/^v/, '').split('.');
-  const major = Number(majorStr);
-  if (Number.isNaN(major)) return true;
-  const minor = Number(minorStr);
-  if (major > Number(m[1])) return true;
-  if (major === Number(m[1])) {
-    if (m[2] === undefined) return true;
-    return !Number.isNaN(minor) && minor >= Number(m[2]);
-  }
-  return false;
-}
-
 /** Read systems.json as a record — never throws; reports parse errors as items. */
 function readSystems(configPath: string): { systems: Record<string, unknown>; error?: { message: string; suggestion: string } } {
   try {
@@ -212,12 +199,16 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
   };
 
   // --- environment ---
-  const nodeVersion = process.version;
+  const nodeVersion = opts.nodeVersion ?? process.version;
   push(
     environment,
-    nodeSatisfies(nodeVersion, { node: '>=18' })
+    nodeSatisfies(nodeVersion)
       ? okItem('env.node', verbose ? `node ${nodeVersion}` : undefined)
-      : errItem('env.node', `Node ${nodeVersion} does not meet the >=18 requirement.`, 'Upgrade Node.js to v18 or newer.'),
+      : errItem(
+          'env.node',
+          `Node ${nodeVersion} is not a supported, security-patched release.`,
+          'Upgrade Node.js to 22.23.4+, 24.22.1+, or 26.12.1+.',
+        ),
   );
   push(
     environment,
