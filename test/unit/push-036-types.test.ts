@@ -152,6 +152,29 @@ describe('runPushTtyp (036 US2)', () => {
     await expect(runPushTtyp(file, { profile: ADT_PROFILE })).rejects.toMatchObject({ code: 'AFF_FIXTURE_INVALID' });
     expect(adtLock).not.toHaveBeenCalled();
   });
+
+  it('derives the namespaced object name from the AFF (ns)name token', async () => {
+    await fresh();
+    const { runPushTtyp } = await import('../../src/abap_cli/flows/edit/push-ttyp.js');
+    const file = write('(ui2)cl_json.ttyp.json', TTYP_DOC);
+
+    const result = await runPushTtyp(file, { profile: ADT_PROFILE });
+
+    expect(result.object).toBe('/UI2/CL_JSON');
+    expect(adtGetTtyp).toHaveBeenCalledWith('/UI2/CL_JSON');
+    expect(adtLock).toHaveBeenCalledWith('/sap/bc/adt/ddic/tabletypes//UI2/CL_JSON');
+  });
+
+  it('rejects the retired # namespace filename before touching SAP', async () => {
+    await fresh();
+    const { runPushTtyp } = await import('../../src/abap_cli/flows/edit/push-ttyp.js');
+    const file = write('#ui2#cl_json.ttyp.json', TTYP_DOC);
+
+    await expect(runPushTtyp(file, { profile: ADT_PROFILE })).rejects.toMatchObject({
+      code: 'FILE_PARSE_ERROR',
+    });
+    expect(adtGetTtyp).not.toHaveBeenCalled();
+  });
 });
 
 describe('runPushMsag (036 US3)', () => {
@@ -185,6 +208,18 @@ describe('runPushMsag (036 US3)', () => {
     expect(result.channel).toBe('icf');
     expect(result.fallbackReason).toBe('ECC_EHP6_NO_ADT_MESSAGECLASS');
     expect(icfPut).toHaveBeenCalledWith('/ddic/msag/ZMY_MSAG', { main: MSAG_DOC });
+  });
+
+  it('derives the namespaced object name from the AFF (ns)name token', async () => {
+    await fresh();
+    const { runPushMsag } = await import('../../src/abap_cli/flows/edit/push-msag.js');
+    const file = write('(ui2)cl_json.msag.json', MSAG_DOC);
+
+    const result = await runPushMsag(file, { profile: ADT_PROFILE });
+
+    expect(result.object).toBe('/UI2/CL_JSON');
+    expect(adtGetMsag).toHaveBeenCalledWith('/UI2/CL_JSON');
+    expect(adtLock).toHaveBeenCalledWith('/sap/bc/adt/messageclass//UI2/CL_JSON');
   });
 });
 
@@ -234,5 +269,19 @@ describe('runPushDdls (036 US4)', () => {
     });
     expect(icfPut).not.toHaveBeenCalled();
     expect(adtUpdateDdls).not.toHaveBeenCalled();
+  });
+
+  it('derives the namespaced object name and companion from the AFF token', async () => {
+    await fresh();
+    const { runPushDdls } = await import('../../src/abap_cli/flows/edit/push-ddls.js');
+    const file = path.join(cwd, '(ui2)cl_json.ddls.json');
+    fs.writeFileSync(file, JSON.stringify(DDLS_DOC, null, 2));
+    fs.writeFileSync(path.join(cwd, '(ui2)cl_json.ddls.acds'), DDLS_SOURCE);
+
+    const result = await runPushDdls(file, { profile: ADT_PROFILE });
+
+    expect(result.object).toBe('/UI2/CL_JSON');
+    expect(adtGetDdls).toHaveBeenCalledWith('/UI2/CL_JSON');
+    expect(adtLock).toHaveBeenCalledWith('/sap/bc/adt/ddic/ddl/sources//UI2/CL_JSON');
   });
 });

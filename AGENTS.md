@@ -24,7 +24,7 @@
 
 - 源对象（Class、Interface、Program、CDS）：通过 `abap-adt-api` 走 ADT REST API。
 - DDIC 对象（Domain、DataElement、Table、Structure、TableType 等）：自建 ICF 服务（`/sap/abap_cli`），RESTful JSON 通信。
-- 文件格式遵循 SAP abap-file-format 约定；DDIC 的 JSON schema 由 ICF 服务端定义。
+- 文件格式遵循 SAP abap-file-format 约定；DDIC 的 JSON schema 由 ICF 服务端定义。本地布局为 AFF 原生扁平：所有产物平铺在 `src/`，文件名 `<name>.<type>[.<sub_type>][.<content_type>].<ext>`，命名空间用括号 token（`/UI2/CL_JSON` → `(ui2)cl_json`）。
 - 配置放在 `.abap.json`（gitignored）；凭证写入 OS keychain。
 - 所有新增 CLI 命令必须注册到 `src/abap_cli/registry/commands.ts`（`COMMAND_SPECS` + lazy load），并补 `wiki/commands/<cmd>.md` 与所属 skill 的 `metadata.commands`。
 - 沿用既有命令模式：`export function register<Name>Command(program: Command)`。

@@ -15,7 +15,7 @@ changed at: 2026-10-30 01:14:53
 
 ```bash
 abap diff [options] [file]
-abap diff src/clas/zcl_foo/zcl_foo.clas.abap
+abap diff src/zcl_foo.clas.abap
 abap diff --all
 abap diff --remote
 abap diff --local-only --limit 50
@@ -93,7 +93,7 @@ abap diff --local-only --limit 50
 
 ```bash
 # 对比一个类
-abap diff src/clas/zcl_foo/zcl_foo.clas.abap --json
+abap diff src/zcl_foo.clas.abap --json
 
 # 全部 .abap（含未变 part）
 abap diff --all --json

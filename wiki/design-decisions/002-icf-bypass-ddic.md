@@ -34,7 +34,7 @@ changed at: 2026-09-01 00:00:00
 ## 当前代价
 
 - 用户必须先 `abap deploy` 一次（把 ICF 服务部署到 SAP）
-- ICF 服务本身的 ABAP 代码（`abap/src/clas/zcl_abap_vibe_icf.clas.abap`）需要独立维护
+- ICF 服务本身的 ABAP 代码（`abap/src/zcl_abap_vibe_icf.clas.abap`）需要独立维护
 - 增加了"DDIC 走 ICF"的认知负担（`wiki/object-types.md` 顶部专门标注了路由矩阵）
 
 ## 后果
@@ -44,5 +44,5 @@ changed at: 2026-09-01 00:00:00
 
 # references
 
-- 实现：[`src/abap_cli/clients/icf-client.ts`](../../src/abap_cli/clients/icf-client.ts)、[`abap/src/clas/zcl_abap_vibe_icf.clas.abap`](../../abap/src/clas/zcl_abap_vibe_icf.clas.abap)
+- 实现：[`src/abap_cli/clients/icf-client.ts`](../../src/abap_cli/clients/icf-client.ts)、[`abap/src/zcl_abap_vibe_icf.clas.abap`](../../abap/src/zcl_abap_vibe_icf.clas.abap)
 - 文档：[`wiki/object-types.md`](../object-types.md)

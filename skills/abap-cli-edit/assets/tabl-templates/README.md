@@ -1,6 +1,6 @@
 # DDL 骨架（abap-file-format TABL/STRU）
 
-LM Agent 写新 TABL/STRU 时**直接 cp 一个骨架到 `src/<typeFolder>/<name>.<type>.{json,ddic[,settings.json]}`，再 sed 重命名**。比凭空写 DDL 注释、`@AbapCatalog.*` 列表、`@Semantics.*` 配对等少踩 90% 坑。
+LM Agent 写新 TABL/STRU 时**直接 cp 一个骨架到 `src/<name>.<type>.{json,ddic[,settings.json]}`（AFF 扁平布局），再 sed 重命名**。比凭空写 DDL 注释、`@AbapCatalog.*` 列表、`@Semantics.*` 配对等少踩 90% 坑。
 
 ## 5 个场景
 
@@ -20,17 +20,18 @@ LM Agent 写新 TABL/STRU 时**直接 cp 一个骨架到 `src/<typeFolder>/<name
 # 1. 选骨架
 ls <skill-dir>/tabl-templates/
 
-# 2. cp 到目标位置
-cp <skill-dir>/tabl-templates/transparent-key/* src/tabl/ztodo.tabl.{json,ddic,settings.json}
+# 2. cp 到 src/（平铺，文件名自带类型后缀）
+cp <skill-dir>/tabl-templates/transparent-key/zsample.tabl.{json,ddic,settings.json} src/
+for f in src/zsample.tabl.*; do mv "$f" "${f/zsample/ztodo}"; done
 
 # 3. sed 重命名（小写）
-sed -i '' 's/zsample/ztodo/g' src/tabl/ztodo.tabl.{json,ddic,settings.json}
+sed -i '' 's/zsample/ztodo/g' src/ztodo.tabl.{json,ddic,settings.json}
 
 # 4. 改 description、字段定义
-$EDITOR src/tabl/ztodo.tabl.ddic
+$EDITOR src/ztodo.tabl.ddic
 
 # 5. 创建
-abap create TABL ZTODO --file src/tabl/ztodo.tabl.json --package $TMP --yes
+abap create TABL ZTODO --file src/ztodo.tabl.json --package $TMP --yes
 ```
 
 ## 跟 abap-file-format / DDL 解析器对齐

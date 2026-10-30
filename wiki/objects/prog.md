@@ -4,7 +4,7 @@ title: PROG — ABAP 报表程序
 description: PROG 对象的字段契约、4 种 programType、本地文件形态
 tags: [abap-cli, object-type, prog, abap-file-format, adt, textpool]
 created at: 2026-09-01 00:00:00
-changed at: 2026-09-02 22:06:00
+changed at: 2026-10-30 20:00:00
 ---
 
 # PROG — ABAP 报表程序
@@ -16,7 +16,7 @@ changed at: 2026-09-02 22:06:00
 ## 本地文件形态
 
 ```
-src/prog/zprog/
+src/
 ├── zprog.prog.json          # 元数据（含 programType）
 ├── zprog.prog.abap          # main source
 ├── zprog.prog.texts.en.properties        # 可选 — textpool

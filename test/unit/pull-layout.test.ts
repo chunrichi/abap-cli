@@ -53,7 +53,7 @@ function read(res: { stdout: string }): { status: string; data: Record<string, u
 }
 
 describe('abap pull (abap-file-format layout)', () => {
-  it('writes one directory per object with .json metadata + .abap source (main part)', async () => {
+  it('writes flat <name>.<type>.* artifacts with .json metadata + .abap source (main part)', async () => {
     const program = makeProgram();
     registerPullCommand(program);
     const res = await runCommand(program, ['pull', 'ZCL_DEMO', '--type', 'CLAS', '--json'], { cwd });
@@ -61,7 +61,7 @@ describe('abap pull (abap-file-format layout)', () => {
     const data = read(res).data;
     expect(res.exitCode).toBeUndefined();
 
-    const dir = path.join(cwd, 'src', 'clas', 'zcl_demo');
+    const dir = path.join(cwd, 'src');
     expect(fs.existsSync(path.join(dir, 'zcl_demo.clas.json'))).toBe(true);
     expect(fs.existsSync(path.join(dir, 'zcl_demo.clas.abap'))).toBe(true);
     // local types use the abap-file-format include names (definitions/implementations)
@@ -75,8 +75,8 @@ describe('abap pull (abap-file-format layout)', () => {
     expect(meta.header.description).toBe('Demo class');
     expect(meta.header.originalLanguage).toBe('en');
 
-    expect(data.written).toContain('src/clas/zcl_demo/zcl_demo.clas.json');
-    expect(data.written).toContain('src/clas/zcl_demo/zcl_demo.clas.abap');
+    expect(data.written).toContain('src/zcl_demo.clas.json');
+    expect(data.written).toContain('src/zcl_demo.clas.abap');
   });
 
   it('--include-tests also writes the testclasses part', async () => {
@@ -84,10 +84,10 @@ describe('abap pull (abap-file-format layout)', () => {
     registerPullCommand(program);
     const res = await runCommand(program, ['pull', 'ZCL_DEMO', '--type', 'CLAS', '--include-tests', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
-    expect(fs.existsSync(path.join(cwd, 'src', 'clas', 'zcl_demo', 'zcl_demo.clas.testclasses.abap'))).toBe(true);
+    expect(fs.existsSync(path.join(cwd, 'src', 'zcl_demo.clas.testclasses.abap'))).toBe(true);
   });
 
-  it('namespaced objects land in a #-escaped directory', async () => {
+  it('namespaced objects land flat with the AFF parentheses token', async () => {
     searchObject.mockResolvedValue([
       { 'adtcore:name': '/UI2/CL_JSON', 'adtcore:type': 'CLAS', 'adtcore:uri': '/sap/bc/adt/oo/classes/ui2/cl_json' },
     ]);
@@ -96,9 +96,11 @@ describe('abap pull (abap-file-format layout)', () => {
     const res = await runCommand(program, ['pull', '/UI2/CL_JSON', '--type', 'CLAS', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
 
-    const dir = path.join(cwd, 'src', 'clas', '#ui2#cl_json');
-    expect(fs.existsSync(path.join(dir, '#ui2#cl_json.clas.json'))).toBe(true);
-    expect(fs.existsSync(path.join(dir, '#ui2#cl_json.clas.abap'))).toBe(true);
+    const dir = path.join(cwd, 'src');
+    expect(fs.existsSync(path.join(dir, '(ui2)cl_json.clas.json'))).toBe(true);
+    expect(fs.existsSync(path.join(dir, '(ui2)cl_json.clas.abap'))).toBe(true);
+    // The retired abapGit-style '#' token must not appear anywhere.
+    expect(fs.existsSync(path.join(dir, '#ui2#cl_json.clas.abap'))).toBe(false);
   });
 
   it('PROG main program: generalInformation.programType passes the enum through', async () => {
@@ -122,7 +124,7 @@ describe('abap pull (abap-file-format layout)', () => {
     const res = await runCommand(program, ['pull', 'ZAKIT_DEMO', '--type', 'PROG', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
 
-    const dir = path.join(cwd, 'src', 'prog', 'zakit_demo');
+    const dir = path.join(cwd, 'src');
     const meta = JSON.parse(fs.readFileSync(path.join(dir, 'zakit_demo.prog.json'), 'utf-8'));
     expect(meta.generalInformation.programType).toBe('executableProgram');
     expect(fs.existsSync(path.join(dir, 'zakit_demo.prog.abap'))).toBe(true);
@@ -148,7 +150,7 @@ describe('abap pull (abap-file-format layout)', () => {
     const res = await runCommand(program, ['pull', 'ZPROG_TOP', '--type', 'PROG', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
 
-    const dir = path.join(cwd, 'src', 'prog', 'zprog_top');
+    const dir = path.join(cwd, 'src');
     const meta = JSON.parse(fs.readFileSync(path.join(dir, 'zprog_top.prog.json'), 'utf-8'));
     expect(meta.generalInformation.programType).toBe('include');
     // 032 US13: PROG/I sub-route — file lands at <name>.prog.include.abap
@@ -159,8 +161,7 @@ describe('abap pull (abap-file-format layout)', () => {
   });
 
   it('existing identical files are skipped; differing files need --overwrite', async () => {
-    const dir = path.join(cwd, 'src', 'clas', 'zcl_demo');
-    fs.mkdirSync(dir, { recursive: true });
+    const dir = path.join(cwd, 'src');
     fs.writeFileSync(path.join(dir, 'zcl_demo.clas.abap'), 'SOURCE /sap/bc/adt/oo/classes/zcl_demo/source/main');
 
     const program = makeProgram();
@@ -168,8 +169,8 @@ describe('abap pull (abap-file-format layout)', () => {
     const res = await runCommand(program, ['pull', 'ZCL_DEMO', '--type', 'CLAS', '--json'], { cwd });
     const data = read(res).data;
     // identical .abap skipped, .json still written (did not exist)
-    expect(data.skipped).toContain('src/clas/zcl_demo/zcl_demo.clas.abap');
-    expect(data.written).toContain('src/clas/zcl_demo/zcl_demo.clas.json');
+    expect(data.skipped).toContain('src/zcl_demo.clas.abap');
+    expect(data.written).toContain('src/zcl_demo.clas.json');
 
     // differing file without --overwrite → OVERWRITE_REQUIRED
     fs.writeFileSync(path.join(dir, 'zcl_demo.clas.abap'), 'DIFFERENT');

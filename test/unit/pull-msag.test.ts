@@ -82,7 +82,7 @@ describe('runPullMsag — ADT channel (036 US3)', () => {
     expect(adtGetMsag).toHaveBeenCalledTimes(1);
     expect(icfGet).not.toHaveBeenCalled();
 
-    const json = JSON.parse(fs.readFileSync(path.join(root, 'msag/zmy_empty/zmy_empty.msag.json'), 'utf8'));
+    const json = JSON.parse(fs.readFileSync(path.join(root, 'zmy_empty.msag.json'), 'utf8'));
     expect(json.header.description).toBe('Empty class');
   });
 

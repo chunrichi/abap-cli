@@ -25,7 +25,7 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 ## Options
 
 - `<type>`: 对象类型 `CLAS` / `INTF` / `PROG` / `FUGR`；DDIC 类型 `DOMA` / `DTEL` / `TABL` / `STRU`（须配 `--file`）；其余类型 → `TYPE_NOT_SUPPORTED`，`TTYP` → `DDIC_NOT_SUPPORTED`
-- `<name>`: 对象名（自动转大写；命名空间名如 `/UI2/CL_JSON` 映射为 `#` 转义目录）。本地预校验：≤30 字符、仅 `A-Z 0-9 _`、命名空间形如 `/NS/NAME`（NS ≤10，总长 ≤30），违规 → `VALIDATION_ERROR`（exit 7）
+- `<name>`: 对象名（自动转大写；命名空间名如 `/UI2/CL_JSON` 在磁盘上用 AFF 括号 token `(ui2)cl_json`）。本地预校验：≤30 字符、仅 `A-Z 0-9 _`、命名空间形如 `/NS/NAME`（NS ≤10，总长 ≤30），违规 → `VALIDATION_ERROR`（exit 7）
 - `--package <package>`: 目标 SAP 包（必填）
 - `--description <desc>`: 对象描述（必填；有 `--file` 时可选，由 JSON 提供）
 - `--tr <transport>`: 传输请求号；缺省时 `resolveTransport` 解析（非 `$TMP` 包下 DDIC 必须显式给出）
@@ -43,7 +43,7 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 
 - `<type>` / `<name>`: 同主命令（不支持 DDIC）
 - `--template <template>`: skeleton 模板
-- `--dir <path>`: 输出目录（默认 `src/`）
+- `--dir <path>`: 输出目录（默认 `src/`；仅 `create local` 读这个 flag）
 
 ## 行为规则
 
@@ -52,13 +52,13 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 - **防覆盖**：创建前 `assertNotExists`；已存在 → `OBJECT_EXISTS`（不覆盖）
 - **创建即激活**：复用 push 流程（lock → 写 skeleton → activate → unlock）；`--no-activate` 跳过激活
 - **FUGR 与源对象的差异**：新 FUGR 用 `objectStructure` 取 parts（立即可读）；CLAS/INTF/PROG 对新建对象 objectStructure 有就绪延迟（真机 "wrong input data"），回退到稳定 `<objectUrl>/source/main`
-- **FUGR/FF（组内建函数模块）**：`--func` 形态不改组、只建模块。组须先存在（`resolveObject` 校验）；模块经 `createObject({objtype:'FUGR/FF', parentName:<group>, parentPath:<group URL>})` 打到 `/sap/bc/adt/functions/groups/<group>/fmodules`（abap-adt-api objectcreator 内建类型，真机 $TMP 下直接产出激活态模块）；随后按 `--no-activate` 决定是否显式 activate。create-then-pull 只补写 `src/fugr/<group>/<group>.fugr.<fm>.func.{abap,json}`（`skipExisting`，绝不覆盖用户已编辑的组文件）；`includeNumber`（UXX 编号）由 SAP 创建时自动分配、pull 时从 UXX include 读取（如 FF01→01、FF02→02）
+- **FUGR/FF（组内建函数模块）**：`--func` 形态不改组、只建模块。组须先存在（`resolveObject` 校验）；模块经 `createObject({objtype:'FUGR/FF', parentName:<group>, parentPath:<group URL>})` 打到 `/sap/bc/adt/functions/groups/<group>/fmodules`（abap-adt-api objectcreator 内建类型，真机 $TMP 下直接产出激活态模块）；随后按 `--no-activate` 决定是否显式 activate。create-then-pull 只补写 `src/<group>.fugr.<fm>.func.{abap,json}`（`skipExisting`，绝不覆盖用户已编辑的组文件）；`includeNumber`（UXX 编号）由 SAP 创建时自动分配、pull 时从 UXX include 读取（如 FF01→01、FF02→02）
 - **DDIC 客户端校验**（快失败，零 SAP 往返）：命名空间（Z/Y/slash）与必需字段 → `VALIDATION_ERROR`；非 `$TMP` 包必须 `--tr`
 - **DDIC TABL/STRU 三件套解析**：`readDdicObjectForCreate(filePath, type)` 探测同目录 `.tabl.ddic`（或 `.stru.ddic`）与 `.tabl.settings.json`；三件齐全走 `readTablArtifact`，否则回落 `readDdicJson`（legacy wire-flat）。DDL 解析失败 → `TABL_DDL_INVALID`（exit 7）；main JSON 缺 `header.description` 等必填 → `VALIDATION_ERROR`，`error.example` 字段附 wire-flat 最小模板
 - **CLI flag 覆盖文件值**：`--description` / `--package` / `--tr` 优先于 `--file` JSON 内字段；`--description` 覆盖 `header.description`
 - **`--check-only` 仅源对象**：DDIC 路由不接受（走 `--file` 校验）
-- **create-then-pull**：成功后把激活后的源码写回 `src/<obj>/<obj>.<type>.abap`（`--no-pull` 关闭）
-- **`create local` 落库路径**：本地草稿 → `abap create <type> <name> --package <pkg> --description <desc> --no-pull` → `abap push src/<obj>/<obj>.<type>.abap --tr <transport>`（帮助文本中给出）
+- **create-then-pull**：成功后把激活后的源码平铺写回 `src/<name>.<type>.abap`（`--no-pull` 关闭）。目标固定为工作区 `src/`——`create` 不读 `--dir`（`--dir` 只对 `abap pull` 与 `abap create local` 生效）
+- **`create local` 落库路径**：本地草稿 → `abap create <type> <name> --package <pkg> --description <desc> --no-pull` → `abap push src/<name>.<type>.abap --tr <transport>`（帮助文本中给出）
 - **写保护**：非 TTY 必须 `--yes`（或 `--dry-run` 占位），由 `core/confirmation.ts#requireWriteConfirmation` 统一处理，TTY 模式直接执行不提示
 
 ### 新增 TTYP / MSAG / DDLS（双通道）
@@ -91,7 +91,7 @@ abap create CLAS ZCL_MY_CLASS --package ZPKG --description "My class" --yes
 # 先建函数组，再在组内新建函数模块（FF01/FF02 → UXX 自动编号 01/02）
 abap create FUGR ZFG_DEMO --package $TMP --description "demo group" --yes
 abap create FUGR ZFG_DEMO --func ZFG_DEMO_FF01 --package $TMP --description "first fm" --yes
-# → src/fugr/zfg_demo/zfg_demo.fugr.zfg_demo_ff01.func.abap + .func.json（includeNumber 01）
+# → src/zfg_demo.fugr.zfg_demo_ff01.func.abap + .func.json（includeNumber 01）
 
 # 组不存在时报 OBJECT_NOT_FOUND 并提示先建组；组内重名报 OBJECT_EXISTS
 
@@ -102,27 +102,27 @@ abap create PROG ZREPORT --package $TMP --description "Report" --template report
 abap create CLAS ZCL_VALIDATE --package ZPKG --description "check" --check-only
 
 # DDIC：从 abap-file-format JSON 创建数据元素（$TMP 免 transport）
-abap create DTEL ZDTEL_NAME --file src/dtel/zdtel_name.dtel.json --package $TMP
+abap create DTEL ZDTEL_NAME --file src/zdtel_name.dtel.json --package $TMP
 
 # DDIC：非 $TMP 包必须给 transport
-abap create DOMA ZDOMA_CODE --file src/doma/zdoma_code.doma.json --package ZPKG --tr A4HK900116
+abap create DOMA ZDOMA_CODE --file src/zdoma_code.doma.json --package ZPKG --tr A4HK900116
 
-# DDIC TABL/STRU：abap-file-format 三件套（happy path；--file 指向 main，自动读取 .tabl.ddic + .tabl.settings.json）
-abap create TABL ZTODO --file src/tabl/ztodo.tabl.json --package $TMP --yes
-# src/tabl/ztodo.tabl.json    — { formatVersion, header.description }
-# src/tabl/ztodo.tabl.ddic    — define table ztodo { ... }（DDL 源真值）
-# src/tabl/ztodo.tabl.settings.json — generalInformation.{dataClassCategory,sizeCategory}（可选）
+# DDIC TABL/STRU：abap-file-format 三件套（happy path；--file 指向 main，自动读取同名 .tabl.ddic + .tabl.settings.json）
+abap create TABL ZTODO --file src/ztodo.tabl.json --package $TMP --yes
+# src/ztodo.tabl.json    — { formatVersion, header.description }
+# src/ztodo.tabl.ddic    — define table ztodo { ... }（DDL 源真值）
+# src/ztodo.tabl.settings.json — generalInformation.{dataClassCategory,sizeCategory}（可选）
 
 # DDIC TABL/STRU：legacy wire-flat 单文件（只有 main JSON，无 .tabl.ddic sidecar）仍可工作
 # 顶层 name / description / fields[]；与 014 旧行为一致
-abap create TABL ZFLAT --file src/tabl/zflat.tabl.json --package $TMP --yes
+abap create TABL ZFLAT --file src/zflat.tabl.json --package $TMP --yes
 
 # agent 写新表：直接 cp DDL 骨架（5 个场景：透明表 / include / 货币金额 / 数量单位 / STRU）
 # 比凭空写 @AbapCatalog.* / @Semantics.* 少踩 90% 坑
-cp <skill-dir>/skills/abap-cli-edit/assets/tabl-templates/transparent-key/* src/tabl/ztodo.tabl.{json,ddic,settings.json}
-sed -i '' 's/zsample/ztodo/g' src/tabl/ztodo.tabl.{json,ddic,settings.json}
-$EDITOR src/tabl/ztodo.tabl.ddic   # 改字段定义
-abap create TABL ZTODO --file src/tabl/ztodo.tabl.json --package $TMP --yes
+cp <skill-dir>/skills/abap-cli-edit/assets/tabl-templates/transparent-key/* src/ztodo.tabl.{json,ddic,settings.json}
+sed -i '' 's/zsample/ztodo/g' src/ztodo.tabl.{json,ddic,settings.json}
+$EDITOR src/ztodo.tabl.ddic   # 改字段定义
+abap create TABL ZTODO --file src/ztodo.tabl.json --package $TMP --yes
 
 # agent 自省：通用 schema 与类型维度（DDIC 类型带 exampleJson 字段，三件套形态）
 abap create --schema
@@ -148,7 +148,7 @@ abap create local CLAS ZCL_DRAFT --template public-method --dir src/
     "transport": "A4HK900116",
     "activated": true,
     "template": null,
-    "localFile": "src/clas/zcl_my_class/zcl_my_class.clas.abap"
+    "localFile": "src/zcl_my_class.clas.abap"
   }
 }
 ```
@@ -167,7 +167,7 @@ abap create local CLAS ZCL_DRAFT --template public-method --dir src/
     "description": "first fm",
     "transport": "",
     "activated": true,
-    "localFile": "src/fugr/zfg_demo/zfg_demo.fugr.zfg_demo_ff01.func.abap"
+    "localFile": "src/zfg_demo.fugr.zfg_demo_ff01.func.abap"
   }
 }
 ```
@@ -182,7 +182,7 @@ abap create local CLAS ZCL_DRAFT --template public-method --dir src/
     "object": "ZDOMA_CODE",
     "type": "DOMA",
     "action": "created",
-    "file": "src/doma/zdoma_code.doma.json"
+    "file": "src/zdoma_code.doma.json"
   }
 }
 ```
@@ -197,7 +197,7 @@ abap create local CLAS ZCL_DRAFT --template public-method --dir src/
     "object": "ZCL_DRAFT",
     "type": "CLAS",
     "template": "public-method",
-    "file": "src/clas/zcl_draft/zcl_draft.clas.abap",
+    "file": "src/zcl_draft.clas.abap",
     "experimental": true
   }
 }

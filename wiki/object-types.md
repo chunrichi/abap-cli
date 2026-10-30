@@ -4,7 +4,7 @@ title: 支持的对象类型
 description: abap CLI 支持的 ABAP 对象类型总览 — 类型码 × 命令 × 路由（ADT / ICF）
 tags: [abap-cli, object-types, ddic, http, sicf, reference]
 created at: 2026-08-29 10:00:00
-changed at: 2026-09-18 22:05:00
+changed at: 2026-10-30 20:00:00
 ---
 
 # 支持的对象类型
@@ -15,32 +15,32 @@ abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **21 个
 
 ## 类型 × 命令矩阵
 
-| 类型码 | 对象 | 路由 | `create` | `pull` | `push` | `create local` | 本地文件 |
+| 类型码 | 对象 | 路由 | `create` | `pull` | `push` | `create local` | 本地文件（平铺 `src/`） |
 |---|---|---|---|---|---|---|---|
-| `CLAS` | 类 | ADT | ✅ | ✅ | ✅ | ✅ | `clas/*.clas.abap` |
-| `INTF` | 接口 | ADT | ✅ | ✅ | ✅ | ✅ | `intf/*.intf.abap` |
-| `PROG` | 报表程序 | ADT | ✅ | ✅ | ✅ | ✅ | `prog/*.prog.abap` |
-| `FUGR` | 函数组 | ADT | ✅ | ✅ | ✅ | ✅ | `fugr/*` |
-| `TABL` | 透明表 | ICF | ✅ | ✅ | ✅ | ❌ | `tabl/*.tabl.json` + `.tabl.ddic` |
-| `STRU` | 结构 | ICF | ✅ | ✅ | ✅ | ❌ | `stru/*.tabl.json` + `.tabl.ddic` |
-| `DOMA` | 域 | ICF | ✅ | ✅ | ✅ | ❌ | `doma/*.doma.json` |
-| `DTEL` | 数据元素 | ICF | ✅ | ✅ | ✅ | ❌ | `dtel/*.dtel.json` |
-| `HTTP` | **ICF / SICF 节点** | ICF | ✅ | ✅ | ✅ | ❌ | `http/*.http.json` |
-| `TRAN` | 事务码 (SE93) | ICF | ✅（`--file`） | ✅ | ✅ | ❌ | `tran/*.tran.json` |
-| `TTYP` | 表类型 | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `ttyp/*.ttyp.json` |
-| `MSAG` | 消息类 | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `msag/*.msag.json` |
-| `DDLS` | CDS 源对象 | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `ddls/*.ddls.json` + `*.acds` |
-| `SRVB` | Service Binding (metadata only) | ADT | ❌ | ✅ | ❌ | ❌ | `srvb/*.srvb.json` |
-| `SRVD` | Service Definition | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `srvd/*.srvd.json` + `*.acds` |
-| `BDEF` | Behaviour Definition | ADT | ❌（pull-only：SAP 不接受 CLI 创建 BDEF） | ✅ | ✅ | ❌ | `bdef/*.bdef.json` + `*.abdl` |
-| `DCLS` | CDS Access Control | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `dcls/*.dcls.json` + `*.acds` |
-| `DDLX` | CDS Metadata Extension | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `ddlx/*.ddlx.json` + `*.acds` |
-| `DDLA` | CDS Annotation Definition | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `ddla/*.ddla.json` + `*.acds` |
+| `CLAS` | 类 | ADT | ✅ | ✅ | ✅ | ✅ | `<name>.clas.json` + `<name>.clas.abap` + 各 include `.clas.<subtype>.abap` |
+| `INTF` | 接口 | ADT | ✅ | ✅ | ✅ | ✅ | `<name>.intf.json` + `<name>.intf.abap` |
+| `PROG` | 报表程序 | ADT | ✅ | ✅ | ✅ | ✅ | `<name>.prog.json` + `<name>.prog.abap` |
+| `FUGR` | 函数组 | ADT | ✅ | ✅ | ✅ | ✅ | `<group>.fugr.json` + `.fugr.sapl<group>.reps.*` + `.fugr.l<group>top.reps.*` + 每 FM `.fugr.<fm>.func.*` |
+| `TABL` | 透明表 | ICF | ✅ | ✅ | ✅ | ❌ | `<name>.tabl.{json,ddic,settings.json}` |
+| `STRU` | 结构 | ICF | ✅ | ✅ | ✅ | ❌ | `<name>.stru.{json,ddic,settings.json}` |
+| `DOMA` | 域 | ICF | ✅ | ✅ | ✅ | ❌ | `<name>.doma.json` |
+| `DTEL` | 数据元素 | ICF | ✅ | ✅ | ✅ | ❌ | `<name>.dtel.json` |
+| `HTTP` | **ICF / SICF 节点** | ICF | ✅ | ✅ | ✅ | ❌ | `<name>.http.json` |
+| `TRAN` | 事务码 (SE93) | ICF | ✅（`--file`） | ✅ | ✅ | ❌ | `<code>.tran.json` |
+| `TTYP` | 表类型 | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `<name>.ttyp.json` + 可选 `<name>.type.abap` |
+| `MSAG` | 消息类 | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `<name>.msag.json` |
+| `DDLS` | CDS 源对象 | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `<name>.ddls.{json,acds}` |
+| `SRVB` | Service Binding (metadata only) | ADT | ❌ | ✅ | ❌ | ❌ | `<name>.srvb.json` |
+| `SRVD` | Service Definition | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `<name>.srvd.{json,acds}` |
+| `BDEF` | Behaviour Definition | ADT | ❌（pull-only：SAP 不接受 CLI 创建 BDEF） | ✅ | ✅ | ❌ | `<name>.bdef.{json,abdl}` |
+| `DCLS` | CDS Access Control | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `<name>.dcls.{json,acds}` |
+| `DDLX` | CDS Metadata Extension | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `<name>.ddlx.{json,acds}` |
+| `DDLA` | CDS Annotation Definition | ADT | ✅（`--file`） | ✅ | ✅ | ❌ | `<name>.ddla.{json,acds}` |
 
 > **`create local` 只支持 `CLAS` / `INTF` / `PROG` / `FUGR`**（`formats/templates.ts` 只有这四类模板），其余类型一律 `TYPE_NOT_SUPPORTED`（exit 7）。
 > **`create` 的 `--file` 是数据驱动必填项**（`types/registry.ts` 的 `ObjectTypeEntry.requiresFile`）：`TABL` / `STRU` / `DOMA` / `DTEL` / `HTTP` / `TRAN` / `TTYP` / `MSAG` / `DDLS` / `SRVD` / `DCLS` / `DDLX` / `DDLA` 缺 `--file` 直接 `USAGE`（exit 2）。`BDEF` 是 pull-only（SAP 不接受 CLI 创建）；`SRVB` 仅 pull（SAP GUI 管理 binding）。
 
-DDIC 三件套（TABL / STRU）与 DOMA / DTEL 的详细字段契约见 [create](commands/create.md) 与 [pull](commands/pull.md)。
+本地产物一律平铺在 `src/` 下（无类型/对象子目录），文件名自带类型后缀；命名空间用 AFF 括号 token（`/UI2/CL_JSON` → `(ui2)cl_json`）。DDIC 三件套（TABL / STRU）与 DOMA / DTEL 的详细字段契约见 [create](commands/create.md) 与 [pull](commands/pull.md)。
 
 ## HTTP —— 就是 SICF 节点
 
@@ -53,10 +53,10 @@ DDIC 三件套（TABL / STRU）与 DOMA / DTEL 的详细字段契约见 [create]
 abap pull ZMY_SERVICE --type HTTP --json
 
 # 创建（必须 --file，走真实 SAP）
-abap create HTTP ZMY_SERVICE --file src/http/zmy_service.http.json --package $TMP --description "My service"
+abap create HTTP ZMY_SERVICE --file src/zmy_service.http.json --package $TMP --description "My service"
 
 # 改完推回
-abap push src/http/zmy_service.http.json --tr <TR>
+abap push src/zmy_service.http.json --tr <TR>
 ```
 
 `.http.json` 遵循 abap-file-format（`http-v1.json`）的嵌套结构，同时也接受扁平写法：

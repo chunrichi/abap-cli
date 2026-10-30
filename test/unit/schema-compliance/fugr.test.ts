@@ -3,11 +3,11 @@ import { expectSchemaPass, readJsonFixture } from './_helpers.js';
 import { validateAff } from '../../../src/abap_cli/aff/schema-validator.js';
 
 const fugrFiles = [
-  'fugr/zmy_group.fugr.json',
-  'fugr/zmy_group.fugr.lzmy_grouptop.reps.json',
-  'fugr/zmy_group.fugr.saplzmy_group.reps.json',
-  'fugr/zmy_group.fugr.zfm_first.func.json',
-  'fugr/zmy_group.fugr.zfm_second.func.json',
+  'zmy_group.fugr.json',
+  'zmy_group.fugr.lzmy_grouptop.reps.json',
+  'zmy_group.fugr.saplzmy_group.reps.json',
+  'zmy_group.fugr.zfm_first.func.json',
+  'zmy_group.fugr.zfm_second.func.json',
 ];
 
 describe('schema-compliance / fugr (T033-042)', () => {

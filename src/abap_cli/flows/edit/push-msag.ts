@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { IcfClient } from '../../clients/icf-client.js';
 import { CliError } from '../../output/json.js';
+import { resolveFile } from '../../formats/file-resolver.js';
 import { detectChannel } from './channel-detect.js';
 import type { SystemProfile } from './channel-detect.js';
 import { msagArtifact } from '../../formats/msag/json.js';
@@ -25,7 +26,8 @@ async function loadProfile(opts: PushMsagOptions): Promise<SystemProfile> {
 }
 
 function nameFromFile(file: string): string {
-  return path.basename(file).split('.')[0]!.toUpperCase();
+  // filename shape: <name>.msag.json — AFF namespace token `(ns)name` → `/NS/NAME`.
+  return resolveFile(file).objectName;
 }
 
 async function pushAdt(name: string, xml: string, transport: string | undefined): Promise<void> {

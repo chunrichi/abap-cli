@@ -39,8 +39,6 @@ export interface TadirMapping {
   ddicTabclass: 'TRANSP' | 'INTTAB' | 'POOL' | 'CLUSTER' | 'VIEW' | 'APPEND' | '';
   /** Routing channel the CLI uses to read/write this object. */
   channel: 'ADT' | 'ICF';
-  /** Local source folder under `src/<folder>/` for `--type <type>` writes. */
-  folder: string;
   /** AFF canonical schema filename, when the object has one. */
   affSchema: string;
   /** Human-readable description (one line). */
@@ -54,7 +52,7 @@ export interface TadirMapping {
  * full TADIR table has ~7000 OBJECT codes and is not worth listing.
  *
  * Source of truth for the mappings:
- *   - TYPE_REGISTRY (CLI ↔ channel ↔ folder ↔ AFF schema) — see types/registry.ts
+ *   - TYPE_REGISTRY (CLI ↔ channel ↔ AFF schema) — see types/registry.ts
  *   - SAP TADIR-PGMID/OBJECT standard values for development objects
  *   - DD02L-TABCLASS values from SAP ABAP DDIC documentation
  *
@@ -64,47 +62,47 @@ export interface TadirMapping {
  */
 const TADIR_OBJECT_BY_CLI: Record<string, Omit<TadirMapping, 'cliType'>> = {
   // Source objects (ADT)
-  CLAS: { pgmid: 'R3TR', tadirObject: 'CLAS', ddicTabclass: '', channel: 'ADT', folder: 'clas', affSchema: 'clas-v1.json', description: 'Global ABAP class' },
-  INTF: { pgmid: 'R3TR', tadirObject: 'INTF', ddicTabclass: '', channel: 'ADT', folder: 'intf', affSchema: 'intf-v1.json', description: 'ABAP interface' },
-  PROG: { pgmid: 'R3TR', tadirObject: 'PROG', ddicTabclass: '', channel: 'ADT', folder: 'prog', affSchema: 'prog-v1.json', description: 'Executable program / report (TRDIR-SUBC=1)' },
-  FUGR: { pgmid: 'R3TR', tadirObject: 'FUGR', ddicTabclass: '', channel: 'ADT', folder: 'fugr', affSchema: 'fugr-v1.json', description: 'Function group (FF = function module lives under FUGR)' },
+  CLAS: { pgmid: 'R3TR', tadirObject: 'CLAS', ddicTabclass: '', channel: 'ADT', affSchema: 'clas-v1.json', description: 'Global ABAP class' },
+  INTF: { pgmid: 'R3TR', tadirObject: 'INTF', ddicTabclass: '', channel: 'ADT', affSchema: 'intf-v1.json', description: 'ABAP interface' },
+  PROG: { pgmid: 'R3TR', tadirObject: 'PROG', ddicTabclass: '', channel: 'ADT', affSchema: 'prog-v1.json', description: 'Executable program / report (TRDIR-SUBC=1)' },
+  FUGR: { pgmid: 'R3TR', tadirObject: 'FUGR', ddicTabclass: '', channel: 'ADT', affSchema: 'fugr-v1.json', description: 'Function group (FF = function module lives under FUGR)' },
 
   // DDIC objects (ICF)
-  TABL: { pgmid: 'R3TR', tadirObject: 'TABL', ddicTabclass: 'TRANSP', channel: 'ICF', folder: 'tabl', affSchema: 'tabl-v1.json', description: 'Transparent table (DD02L-TABCLASS=TRANSP)' },
-  STRU: { pgmid: 'R3TR', tadirObject: 'TABL', ddicTabclass: 'INTTAB', channel: 'ICF', folder: 'stru', affSchema: 'tabl-v1.json', description: 'Structure (DDIC) — TADIR OBJECT is also TABL; disambiguate via DD02L-TABCLASS=INTTAB' },
-  DOMA: { pgmid: 'R3TR', tadirObject: 'DOMA', ddicTabclass: '', channel: 'ICF', folder: 'doma', affSchema: 'doma-v1.json', description: 'Domain (DDIC)' },
-  DTEL: { pgmid: 'R3TR', tadirObject: 'DTEL', ddicTabclass: '', channel: 'ICF', folder: 'dtel', affSchema: 'dtel-v1.json', description: 'Data element (DDIC)' },
-  ENQU: { pgmid: 'R3TR', tadirObject: 'ENQU', ddicTabclass: '', channel: 'ICF', folder: 'enqu', affSchema: 'enqu-v1.json', description: 'Lock object (DDIC)' },
-  NROB: { pgmid: 'R3TR', tadirObject: 'NROB', ddicTabclass: '', channel: 'ADT', folder: 'nrob', affSchema: 'nrob-v1.json', description: 'Number range object' },
+  TABL: { pgmid: 'R3TR', tadirObject: 'TABL', ddicTabclass: 'TRANSP', channel: 'ICF', affSchema: 'tabl-v1.json', description: 'Transparent table (DD02L-TABCLASS=TRANSP)' },
+  STRU: { pgmid: 'R3TR', tadirObject: 'TABL', ddicTabclass: 'INTTAB', channel: 'ICF', affSchema: 'tabl-v1.json', description: 'Structure (DDIC) — TADIR OBJECT is also TABL; disambiguate via DD02L-TABCLASS=INTTAB' },
+  DOMA: { pgmid: 'R3TR', tadirObject: 'DOMA', ddicTabclass: '', channel: 'ICF', affSchema: 'doma-v1.json', description: 'Domain (DDIC)' },
+  DTEL: { pgmid: 'R3TR', tadirObject: 'DTEL', ddicTabclass: '', channel: 'ICF', affSchema: 'dtel-v1.json', description: 'Data element (DDIC)' },
+  ENQU: { pgmid: 'R3TR', tadirObject: 'ENQU', ddicTabclass: '', channel: 'ICF', affSchema: 'enqu-v1.json', description: 'Lock object (DDIC)' },
+  NROB: { pgmid: 'R3TR', tadirObject: 'NROB', ddicTabclass: '', channel: 'ADT', affSchema: 'nrob-v1.json', description: 'Number range object' },
 
   // CDS family (ADT)
-  DDLS: { pgmid: 'R3TR', tadirObject: 'DDLS', ddicTabclass: '', channel: 'ADT', folder: 'ddls', affSchema: 'ddls-v1.json', description: 'CDS view (DDDLSRC-SOURCE_TYPE=V); not supported on ECC pre-7.40' },
-  DDLX: { pgmid: 'R3TR', tadirObject: 'DDLX', ddicTabclass: '', channel: 'ADT', folder: 'ddlx', affSchema: 'ddlx-v1.json', description: 'CDS metadata extension' },
-  DDLA: { pgmid: 'R3TR', tadirObject: 'DDLA', ddicTabclass: '', channel: 'ADT', folder: 'ddla', affSchema: 'ddla-v1.json', description: 'CDS annotation definition' },
-  DCLS: { pgmid: 'R3TR', tadirObject: 'DCLS', ddicTabclass: '', channel: 'ADT', folder: 'dcls', affSchema: 'dcls-v1.json', description: 'CDS access control (RAP)' },
+  DDLS: { pgmid: 'R3TR', tadirObject: 'DDLS', ddicTabclass: '', channel: 'ADT', affSchema: 'ddls-v1.json', description: 'CDS view (DDDLSRC-SOURCE_TYPE=V); not supported on ECC pre-7.40' },
+  DDLX: { pgmid: 'R3TR', tadirObject: 'DDLX', ddicTabclass: '', channel: 'ADT', affSchema: 'ddlx-v1.json', description: 'CDS metadata extension' },
+  DDLA: { pgmid: 'R3TR', tadirObject: 'DDLA', ddicTabclass: '', channel: 'ADT', affSchema: 'ddla-v1.json', description: 'CDS annotation definition' },
+  DCLS: { pgmid: 'R3TR', tadirObject: 'DCLS', ddicTabclass: '', channel: 'ADT', affSchema: 'dcls-v1.json', description: 'CDS access control (RAP)' },
 
   // RAP behavior
-  BDEF: { pgmid: 'R3TR', tadirObject: 'BDEF', ddicTabclass: '', channel: 'ADT', folder: 'bdef', affSchema: 'bdef-v1.json', description: 'RAP behavior definition (pull-only — no ADT create endpoint)' },
+  BDEF: { pgmid: 'R3TR', tadirObject: 'BDEF', ddicTabclass: '', channel: 'ADT', affSchema: 'bdef-v1.json', description: 'RAP behavior definition (pull-only — no ADT create endpoint)' },
 
   // Service bindings (RAP / ABAP annotations)
-  SRVD: { pgmid: 'R3TR', tadirObject: 'SRVD', ddicTabclass: '', channel: 'ADT', folder: 'srvd', affSchema: 'srvd-v1.json', description: 'Service definition (CDS + behavior)' },
-  SRVB: { pgmid: 'R3TR', tadirObject: 'SRVB', ddicTabclass: '', channel: 'ADT', folder: 'srvb', affSchema: 'srvb-v1.json', description: 'Service binding (metadata-only)' },
+  SRVD: { pgmid: 'R3TR', tadirObject: 'SRVD', ddicTabclass: '', channel: 'ADT', affSchema: 'srvd-v1.json', description: 'Service definition (CDS + behavior)' },
+  SRVB: { pgmid: 'R3TR', tadirObject: 'SRVB', ddicTabclass: '', channel: 'ADT', affSchema: 'srvb-v1.json', description: 'Service binding (metadata-only)' },
 
   // Message class
-  MSAG: { pgmid: 'R3TR', tadirObject: 'MSAG', ddicTabclass: '', channel: 'ADT', folder: 'msag', affSchema: 'msag-v1.json', description: 'Message class (T100A)' },
+  MSAG: { pgmid: 'R3TR', tadirObject: 'MSAG', ddicTabclass: '', channel: 'ADT', affSchema: 'msag-v1.json', description: 'Message class (T100A)' },
 
   // Table type (DDIC)
-  TTYP: { pgmid: 'R3TR', tadirObject: 'TTYP', ddicTabclass: '', channel: 'ADT', folder: 'ttyp', affSchema: 'ttyp-v1.json', description: 'Table type (DDIC)' },
+  TTYP: { pgmid: 'R3TR', tadirObject: 'TTYP', ddicTabclass: '', channel: 'ADT', affSchema: 'ttyp-v1.json', description: 'Table type (DDIC)' },
 
   // HTTP / SICF
   // CLI HTTP ↔ TADIR SICF (the gotcha). SAP's TADIR OBJECT for an SICF
   // service node is 'SICF', not 'HTTP' (which is reserved for something
   // else in the SAP namespace). The CLI's HTTP type code is a friendly
   // rename — keep this single source of truth.
-  HTTP: { pgmid: 'R3TR', tadirObject: 'SICF', ddicTabclass: '', channel: 'ICF', folder: 'http', affSchema: 'http-v1.json', description: 'ICF/SICF service node (TADIR OBJECT is SICF, not HTTP)' },
+  HTTP: { pgmid: 'R3TR', tadirObject: 'SICF', ddicTabclass: '', channel: 'ICF', affSchema: 'http-v1.json', description: 'ICF/SICF service node (TADIR OBJECT is SICF, not HTTP)' },
 
   // Transaction code (SE93)
-  TRAN: { pgmid: 'R3TR', tadirObject: 'TRAN', ddicTabclass: '', channel: 'ICF', folder: 'tran', affSchema: 'tran-v1.json', description: 'Transaction code (TSTC/TSTCC)' },
+  TRAN: { pgmid: 'R3TR', tadirObject: 'TRAN', ddicTabclass: '', channel: 'ICF', affSchema: 'tran-v1.json', description: 'Transaction code (TSTC/TSTCC)' },
 };
 
 /** Complete catalog in registry-stable order. */

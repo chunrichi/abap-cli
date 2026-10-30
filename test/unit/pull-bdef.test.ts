@@ -55,7 +55,7 @@ describe('runPullBdef (T3.3)', () => {
     expect(result.object).toBe('ZRB_TRAVEL_BDEF');
     expect(result.files).toHaveLength(2);
 
-    const dir = path.join(root, 'bdef', 'zrb_travel_bdef');
+    const dir = root;
     expect(fs.existsSync(path.join(dir, 'zrb_travel_bdef.bdef.json'))).toBe(true);
     expect(fs.existsSync(path.join(dir, 'zrb_travel_bdef.bdef.abdl'))).toBe(true);
 
@@ -88,7 +88,7 @@ describe('runPullBdef (T3.3)', () => {
     await runPullBdef('zrb_travel_bdef', { rootDir: root });
     const json = JSON.parse(
       fs.readFileSync(
-        path.join(root, 'bdef', 'zrb_travel_bdef', 'zrb_travel_bdef.bdef.json'),
+        path.join(root, 'zrb_travel_bdef.bdef.json'),
         'utf8',
       ),
     );

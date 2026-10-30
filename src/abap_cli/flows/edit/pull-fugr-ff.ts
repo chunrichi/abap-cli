@@ -17,7 +17,7 @@ interface PullResolvedObject {
  * Rewrite the resolved object so it points at the parent function group
  * (the FUGR/F URL). The fugr pull strategy already iterates every FM in the
  * group, so rewriting the URL alone is enough to get the canonical
- * `src/<group>/<group>.<fm>.func.abap` layout that matches SAP's
+ * flat `src/<group>.fugr.<fm>.func.abap` layout that matches SAP's
  * abap-file-format convention.
  *
  * Reuses `parentFunctionGroupFromUri` from `formats/fugr-layout.ts` so the

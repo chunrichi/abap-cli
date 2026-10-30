@@ -70,7 +70,7 @@ function run(args: string[]) {
 
 describe('create dispatcher — handler registry routing', () => {
   it('TTYP routes to the ADT handler on a modern kernel', async () => {
-    const file = copyFixture('ttyp/zmy_ttyp.ttyp.json');
+    const file = copyFixture('zmy_ttyp.ttyp.json');
     const res = await run(['create', 'TTYP', 'ZMY_TTYP', '--file', file]);
     expect(res.exitCode).toBeUndefined();
     expect(createTtyp).toHaveBeenCalledWith('ZMY_TTYP', expect.any(String), '$TMP', undefined);
@@ -82,7 +82,7 @@ describe('create dispatcher — handler registry routing', () => {
 
   it('TTYP falls back to the ICF handler on an ECC EHP6 kernel', async () => {
     mockConfig.systemVersion = '731';
-    const file = copyFixture('ttyp/zmy_ttyp.ttyp.json');
+    const file = copyFixture('zmy_ttyp.ttyp.json');
     const res = await run(['create', 'TTYP', 'ZMY_TTYP', '--file', file]);
     expect(res.exitCode).toBeUndefined();
     expect(createTtyp).not.toHaveBeenCalled();
@@ -96,7 +96,7 @@ describe('create dispatcher — handler registry routing', () => {
   });
 
   it('MSAG routes through its registered handler', async () => {
-    const file = copyFixture('msag/zmy_msag.msag.json');
+    const file = copyFixture('zmy_msag.msag.json');
     const res = await run(['create', 'MSAG', 'ZMY_MSAG', '--file', file]);
     expect(res.exitCode).toBeUndefined();
     expect(createMsag).toHaveBeenCalledTimes(1);
@@ -106,8 +106,8 @@ describe('create dispatcher — handler registry routing', () => {
   });
 
   it('DDLS routes through its handler (ADT only, needs the .acds companion)', async () => {
-    const file = copyFixture('ddls/zmy_ddls.ddls.json');
-    copyFixture('ddls/zmy_ddls.ddls.acds');
+    const file = copyFixture('zmy_ddls.ddls.json');
+    copyFixture('zmy_ddls.ddls.acds');
     const res = await run(['create', 'DDLS', 'ZMY_DDLS', '--file', file]);
     expect(res.exitCode).toBeUndefined();
     expect(createDdls).toHaveBeenCalledTimes(1);

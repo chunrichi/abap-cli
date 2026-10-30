@@ -7,8 +7,7 @@ import type { ObjectPart } from '../../formats/object-parts.js';
 import { resolveTransport } from '../../core/transport.js';
 import { pushObject } from './push-object.js';
 import { requireWriteConfirmation } from '../../core/confirmation.js';
-import { buildFilename, objectDirName } from '../../formats/file-resolver.js';
-import { folderFor } from '../../formats/type-folder.js';
+import { affObjectToken, buildFilename } from '../../formats/file-resolver.js';
 import { fileExists, normalizeLineEndings, readAbapFile, writeAbapFile } from '../../formats/abap-source.js';
 import { collectWarning } from '../../output/meta.js';
 import { defaultSkeleton, getTemplate } from '../../formats/templates.js';
@@ -87,7 +86,7 @@ export async function runCreate(type: string | undefined, name: string | undefin
   // end in a USAGE error.
   if (requiresFileFor(typeUpper) && !opts.file) {
     throw new CliError('USAGE', `Type ${typeUpper} requires --file <path> with an abap-file-format JSON`, {
-      example: `abap create ${typeUpper} ${objectName} --file src/${objectName.toLowerCase()}/${objectName.toLowerCase()}.${typeUpper.toLowerCase()}.json --package $TMP --yes`,
+      example: `abap create ${typeUpper} ${objectName} --file src/${affObjectToken(objectName)}.${typeUpper.toLowerCase()}.json --package $TMP --yes`,
     });
   }
   requireWriteConfirmation(
@@ -236,9 +235,9 @@ export async function runCreate(type: string | undefined, name: string | undefin
       const content = await client.getObjectSource(mainPart.sourceUrl);
       const filename = buildFilename(object.name, object.type, mainPart.subtype, '.abap');
       // F-04: use the exact layout `abap pull` writes
-      // (src/<typeFolder>/<object>/<file>) so create-then-pull and pull no
+      // (flat src/<name>.<type>.<ext>) so create-then-pull and pull no
       // longer fork the same object into two different paths.
-      const relPath = path.join('src', folderFor(object.type), objectDirName(object.name), filename);
+      const relPath = path.join('src', filename);
       const absPath = path.resolve(process.cwd(), relPath);
       if (opts.overwrite !== true && (await hasLocalDraft(absPath, content))) {
         // Keep the draft: it may be newer than what SAP just returned.

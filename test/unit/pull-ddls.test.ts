@@ -78,7 +78,7 @@ describe('runPullDdls — ADT channel (036 US4)', () => {
     expect(result.files).toHaveLength(2);
     expect(result.doc.sourceType).toBe('viewEntity');
 
-    const dir = path.join(root, 'ddls/zmy_view_entity');
+    const dir = root;
     const json = JSON.parse(fs.readFileSync(path.join(dir, 'zmy_view_entity.ddls.json'), 'utf8'));
     expect(json.sourceType).toBe('viewEntity');
     expect(json.header.originalLanguage).toBe('EN');

@@ -64,7 +64,7 @@ changed at: 2026-10-29 22:20:00
 - 回退映射按 **类型族** 处理（INT1/2/4/8、RAW、RAWSTRING、DF16/DECFLOAT、UTCLONG…），不得把 INT/RAW 一律映射成 CHAR——那会让 `DD03L`、`VRSD`、`TSTC`、`REPOSRC` 等表直接 dump（`not Unicode convertible`）。
 - 这批表是行类型映射的回归基准。
 
-**实现落点**：`abap/src/clas/zcl_abap_vibe_icf.clas.implementations.abap`（动态行类型构建）、`src/abap_cli/formats/ddic/*`（客户端字段元数据）。
+**实现落点**：`abap/src/zcl_abap_vibe_icf.clas.implementations.abap`（动态行类型构建）、`src/abap_cli/formats/ddic/*`（客户端字段元数据）。
 
 ## 5. 发布产物依赖与顶层错误边界
 

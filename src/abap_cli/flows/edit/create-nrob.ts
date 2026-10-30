@@ -14,6 +14,7 @@ import { CliError, printResult, type OutputMode } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
 import { nrobArtifact, type NrobLocal } from '../../formats/nrob/json.js';
 import { toOutputPath } from '../../core/path-output.js';
+import { affObjectToken } from '../../formats/file-resolver.js';
 import type { CreateOptions } from './create.js';
 import type { CreateHandler } from './routing.js';
 
@@ -46,7 +47,7 @@ export async function runCreateNrob(
         object: upper,
         type: 'NROB',
         nextSteps: ['See `abap create --schema NROB` for the contract.'],
-        example: `abap create NROB ${upper} --file src/nrob/${upper.toLowerCase()}/${upper.toLowerCase()}.nrob.json --yes`,
+        example: `abap create NROB ${upper} --file src/${affObjectToken(upper)}.nrob.json --yes`,
       },
     );
   }

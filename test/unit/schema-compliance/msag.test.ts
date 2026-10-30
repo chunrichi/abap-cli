@@ -6,7 +6,7 @@ import { expectSchemaPass, expectSchemaFail } from './_helpers.js';
 
 describe('MSAG schema compliance (036)', () => {
   it('zmy_msag.msag.json PASSes msag-v1.json', async () => {
-    await expectSchemaPass('msag/zmy_msag.msag.json', 'MSAG');
+    await expectSchemaPass('zmy_msag.msag.json', 'MSAG');
   });
 
   it('missing messages field fails msag-v1.json', async () => {

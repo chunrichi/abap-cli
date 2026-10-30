@@ -4,7 +4,7 @@ title: CLAS — ABAP OO 类
 description: CLAS 对象的字段契约、本地文件形态、abap-file-format 合规性、已知坑
 tags: [abap-cli, object-type, clas, abap-file-format, adt]
 created at: 2026-09-01 00:00:00
-changed at: 2026-09-02 22:06:00
+changed at: 2026-10-30 20:00:00
 ---
 
 # CLAS — ABAP OO 类
@@ -15,10 +15,10 @@ changed at: 2026-09-02 22:06:00
 
 ## 本地文件形态
 
-类型子目录布局（详见 [design-decisions/003](../design-decisions/003-typesubdir-layout.md)）：
+AFF 原生扁平布局（详见 [design-decisions/010](../design-decisions/010-aff-flat-layout.md)），所有文件直接平铺在 `src/` 下：
 
 ```
-src/clas/zcl_my_class/
+src/
 ├── zcl_my_class.clas.json     # 元数据（abap-file-format）
 ├── zcl_my_class.clas.abap     # main part
 ├── zcl_my_class.clas.testclasses.abap   # abapUnit 测试
@@ -64,10 +64,10 @@ abap create CLAS ZCL_DEMO --package $TMP --description "demo" --tr $TMP --json
 abap pull ZCL_DEMO --include-all-parts --json
 
 # 推送（main + 任意修改的 include）
-abap push src/clas/zcl_demo/ --tr DEVK900001 --json
+abap push src/zcl_demo.clas.abap --tr DEVK900001 --json
 
 # 语法检查
-abap check syntax src/clas/zcl_demo/zcl_demo.clas.abap --json
+abap check syntax src/zcl_demo.clas.abap --json
 
 # 跑（classrun）
 abap run ZCL_DEMO --json
@@ -79,7 +79,7 @@ abap run ZCL_DEMO --json
 
 ## 已知坑
 
-- **partial class / LOCAL 定义区**：ADT 返回的 `includeType` 不一定在五个标准 subtype 内；pull 时会落到 `unknown/` 子目录（虽然这是 `clas/` 子目录内的未知文件名）
+- **partial class / LOCAL 定义区**：ADT 返回的 `includeType` 不一定在五个标准 subtype 内；pull 时会以该 `includeType` 作为文件名后缀平铺在 `src/` 下（没有 `unknown/` 目录）
 - **`abapLanguageVersion` 写权限**：BTP trial 上 `abapLanguageVersion: 'cloudDevelopment'` 会被强制为 `standard`
 - **激活不掩盖语法错**：push 报 activated 还要 `inspect --activation` 复核
 

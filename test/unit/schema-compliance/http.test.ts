@@ -5,11 +5,11 @@ import { localToWire as httpLocalToWire, wireToLocal as httpWireToLocal } from '
 
 describe('schema-compliance / http (T033-051)', () => {
   it('zmy_service.http.json passes http-v1.json (handcrafted — upstream has no example)', async () => {
-    await expectSchemaPass('http/zmy_service.http.json', 'HTTP');
+    await expectSchemaPass('zmy_service.http.json', 'HTTP');
   });
 
   it('HTTP wire ↔ local round-trips serviceId / descriptionByLang through nested generalInformation / header', async () => {
-    const local = await readJsonFixture('http/zmy_service.http.json');
+    const local = await readJsonFixture('zmy_service.http.json');
     // Inject SICF extension fields that are not in AFF http-v1.json but live
     // in the CLI's nested wire shape.
     (local as Record<string, unknown>).generalInformation = {

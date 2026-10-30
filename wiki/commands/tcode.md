@@ -132,7 +132,7 @@ abap where-used ZPROG_FOO --json      # 谁引用了它（影响面）
 # references
 
 - 实现: [src/abap_cli/commands/tcode.ts](../../src/abap_cli/commands/tcode.ts) · [src/abap_cli/flows/search/tcode.ts](../../src/abap_cli/flows/search/tcode.ts)（`validateTcode` / `interpretTcode`）
-- SAP 后端: `abap/src/clas/zcl_abap_vibe_icf.clas.abap`（`lcl_tcode=>dispatch_tcode`，`GET /sap/abap_cli/tcode/<code>`）
+- SAP 后端: `abap/src/zcl_abap_vibe_icf.clas.abap`（`lcl_tcode=>dispatch_tcode`，`GET /sap/abap_cli/tcode/<code>`）
 - 文档: [docs/commands.md](../../docs/commands.md)
 - 相关命令页: [abap pull](pull.md)、[abap where-used](where-used.md)、[abap inspect](inspect.md)、[abap deploy](deploy.md)
 - 测试: `test/unit/tcode-flow.test.ts`

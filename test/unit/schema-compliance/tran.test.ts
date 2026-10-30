@@ -4,7 +4,7 @@ import { validateAff } from '../../../src/abap_cli/aff/schema-validator.js';
 
 describe('schema-compliance / tran (T033-016)', () => {
   it('upstream example z_aff_example_tran.tran.json passes', async () => {
-    await expectSchemaPass('tran/z_aff_example_tran.tran.json');
+    await expectSchemaPass('z_aff_example_tran.tran.json');
   });
 
   it('abapLanguageVersion is allowed for TRAN main header', async () => {

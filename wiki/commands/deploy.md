@@ -81,7 +81,7 @@ abap deploy status --json
   "meta": { "command": "abap deploy", "version": "0.2.6", "timestamp": "2026-09-05T00:00:00.000Z", "durationMs": 8400, "warnings": [] },
   "data": {
     "objects": [ { "object": "ZCL_ABAP_VIBE_ICF", "type": "CLAS", "status": "updated" } ],
-    "files": [ { "file": "abap/src/clas/zcl_abap_vibe_icf.clas.abap", "status": "written" } ],
+    "files": [ { "file": "abap/src/zcl_abap_vibe_icf.clas.abap", "status": "written" } ],
     "icfNode": { "status": "success", "action": "already_active", "url": "/sap/abap_cli", "active": true, "handler": "ZCL_ABAP_VIBE_ICF" },
     "runtime": "netweaver750",
     "deployKind": "full"
@@ -164,7 +164,7 @@ BTP ABAP environment 受 SAP Steampunk Released APIs 白名单限制：
   "status": "success",
   "data": {
     "objects": [ { "object": "ZCL_ABAP_VIBE_ICF", "type": "CLAS", "status": "updated" } ],
-    "files": [ { "file": "abap/src/clas/zcl_abap_vibe_icf.clas.abap", "status": "written" } ],
+    "files": [ { "file": "abap/src/zcl_abap_vibe_icf.clas.abap", "status": "written" } ],
     "icfNode": { "status": "planned" },
     "runtime": "steampunk",
     "deployKind": "source-only"
@@ -209,5 +209,5 @@ CLI 也会在 human 输出（不传 `--json`）末尾打印上述步骤的精简
 
 - 实现: [src/abap_cli/commands/deploy.ts](../../src/abap_cli/commands/deploy.ts) · [src/abap_cli/flows/edit/deploy.ts](../../src/abap_cli/flows/edit/deploy.ts) · [src/abap_cli/flows/edit/deploy-flow.ts](../../src/abap_cli/flows/edit/deploy-flow.ts) · [src/abap_cli/clients/icf-version.ts](../../src/abap_cli/clients/icf-version.ts)
 - ICF 注册策略: [src/abap_cli/adc/strategies/](../../src/abap_cli/adc/strategies/)
-- SAP 后端: `abap/src/clas/zcl_abap_vibe_icf.clas.abap`、`abap/src/clas/zcl_abap_vibe_icf_setup.clas.abap`
+- SAP 后端: `abap/src/zcl_abap_vibe_icf.clas.abap`、`abap/src/zcl_abap_vibe_icf_setup.clas.abap`
 - 文档: [docs/commands.md](../../docs/commands.md)、[docs/configuration.md](../../docs/configuration.md)
