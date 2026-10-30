@@ -26,7 +26,6 @@ const SERVICE = 'abap-cli';
 
 /** Per-account credential key derivation (must match `keytar` legacy layout). */
 function accountKey(account: string, kind: SecretKind): string {
-  if (kind === 'cert-passphrase') return `${account}.cert-passphrase`;
   if (kind === 'session-key') return 'abap-cli/session-key';
   return account;
 }

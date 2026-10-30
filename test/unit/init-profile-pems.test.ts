@@ -1,7 +1,7 @@
 /**
  * `abap init` profile writes go through the same PEM import path as
- * `profile add/set`: `saveProfile()` imports local CA / client-cert / key
- * files into the content-addressed store before persisting the profile.
+ * `profile add/set`: `saveProfile()` imports the local CA file into the
+ * content-addressed store before persisting the profile.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'fs';
@@ -11,7 +11,6 @@ import { createHash } from 'crypto';
 
 const SAMPLE_PEM = '-----BEGIN CERTIFICATE-----\nMIIBcorp\n-----END CERTIFICATE-----\n';
 const OTHER_PEM = '-----BEGIN CERTIFICATE-----\nMIIBother\n-----END CERTIFICATE-----\n';
-const THIRD_PEM = '-----BEGIN CERTIFICATE-----\nMIIBthird\n-----END CERTIFICATE-----\n';
 const sha = (content: string) => createHash('sha256').update(content).digest('hex');
 
 let systems: Record<string, Record<string, unknown>>;
@@ -29,7 +28,6 @@ vi.mock('../../src/abap_cli/config/secrets.js', () => ({
   getPassword: vi.fn().mockResolvedValue(null),
   storePassword: vi.fn().mockResolvedValue(''),
   deletePassword: vi.fn().mockResolvedValue(true),
-  storeCertPassphrase: vi.fn().mockResolvedValue(''),
 }));
 
 vi.mock('../../src/abap_cli/clients/textpool-capability.js', () => ({
@@ -38,7 +36,6 @@ vi.mock('../../src/abap_cli/clients/textpool-capability.js', () => ({
 }));
 
 import { saveProfile } from '../../src/abap_cli/flows/setup/init.js';
-import { defaultAuth } from '../../src/abap_cli/auth/v2-types.js';
 
 let srcDir: string;
 let certDir: string;
@@ -74,18 +71,15 @@ describe('init saveProfile — PEM import', () => {
       username: 'DEV',
       language: 'EN',
       ca: src,
-      auth: defaultAuth(),
     }, '', '');
 
     expect(systems.dev!.ca).toBe(path.join(certDir, `${sha(SAMPLE_PEM)}.pem`));
     expect(fs.readFileSync(systems.dev!.ca as string, 'utf-8')).toBe(SAMPLE_PEM);
   });
 
-  it('imports cert-auth cert + key and reclaims the replaced CA on re-save', async () => {
-    const certSrc = writeSrc('client.pem', SAMPLE_PEM);
-    const keySrc = writeSrc('client.key', '-----BEGIN PRIVATE KEY-----\nMIIBkey\n-----END PRIVATE KEY-----\n');
+  it('reclaims the replaced CA on re-save', async () => {
     const caOne = writeSrc('ca-one.pem', OTHER_PEM);
-    const caTwo = writeSrc('ca-two.pem', THIRD_PEM);
+    const caTwo = writeSrc('ca-two.pem', SAMPLE_PEM);
 
     await saveProfile('dev', {
       url: 'https://sap.example.com',
@@ -93,28 +87,20 @@ describe('init saveProfile — PEM import', () => {
       username: 'DEV',
       language: 'EN',
       ca: caOne,
-      auth: defaultAuth(),
     }, '', '');
     const firstCa = path.join(certDir, `${sha(OTHER_PEM)}.pem`);
     expect(fs.existsSync(firstCa)).toBe(true);
 
-    // Re-save with a different CA and cert auth on top.
+    // Re-save with a different CA — the first one is no longer referenced.
     await saveProfile('dev', {
       url: 'https://sap.example.com',
       client: '100',
       username: 'DEV',
       language: 'EN',
       ca: caTwo,
-      auth: { method: 'cert', cert: { certPath: certSrc, keyPath: keySrc } },
     }, '', '');
 
-    const storedCert = path.join(certDir, `${sha(SAMPLE_PEM)}.pem`);
-    const storedKey = path.join(certDir, `${sha('-----BEGIN PRIVATE KEY-----\nMIIBkey\n-----END PRIVATE KEY-----\n')}.pem`);
-    expect(systems.dev!.ca).toBe(path.join(certDir, `${sha(THIRD_PEM)}.pem`));
-    expect((systems.dev!.auth as { cert: { certPath: string; keyPath: string } }).cert.certPath).toBe(storedCert);
-    expect((systems.dev!.auth as { cert: { certPath: string; keyPath: string } }).cert.keyPath).toBe(storedKey);
-    expect(fs.statSync(storedKey).mode & 0o777).toBe(0o600);
-    // The replaced CA is no longer referenced by any profile and was reclaimed.
+    expect(systems.dev!.ca).toBe(path.join(certDir, `${sha(SAMPLE_PEM)}.pem`));
     expect(fs.existsSync(firstCa)).toBe(false);
   });
 });

@@ -17,9 +17,9 @@ vi.mock('../../src/abap_cli/config/secrets.js', () => ({
   deletePassword: vi.fn(),
 }));
 
-vi.mock('../../src/abap_cli/auth/adapter.js', () => ({
-  buildAuth: vi.fn().mockResolvedValue({
-    passwordOrFetcher: 'pw',
+vi.mock('../../src/abap_cli/clients/basic-auth.js', () => ({
+  buildBasicAuth: vi.fn().mockReturnValue({
+    password: 'pw',
     options: { headers: {} },
   }),
 }));

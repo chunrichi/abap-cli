@@ -13,29 +13,22 @@
  * the legacy `keytar` backend so credentials persist across upgrades and
  * platforms (macOS users migrating from Windows keep their password visible).
  *
- * Public API (the seven exports below) is unchanged from the pre-F refactor:
+ * Public API is re-exported for:
  *   - `flows/setup/profile.ts`, `flows/setup/init.ts`
  *   - `clients/probe.ts`, `adc/runtime-probe.ts`
- *   - `auth/strategies/cert.ts`, `auth/strategies/oauth-password.ts`
  *   - `session/key.ts`, `session/jar.ts`
- * keep their imports. Adding a new backend only requires dropping a file
- * under `secrets/` and adding it to the resolver below.
+ * Adding a new backend only requires dropping a file under `secrets/` and
+ * adding it to the resolver below.
  */
 import { CliError } from '../output/json.js';
 import { createNativeBackend } from './secrets/native.js';
 import { createKeytarBackend, tryCreateKeytarBackend } from './secrets/keytar.js';
-import type { SecretsBackend } from './secrets-types.js';
+import type { SecretsBackend, SecretKind } from './secrets-types.js';
 
 const SERVICE = 'abap-cli';
 
-/** Account suffix for X.509 cert passphrase (kept off the main keychain entry). */
-export const CERT_PASSPHRASE_SUFFIX = '.cert-passphrase';
-
 /** Account name for the global session-jar encryption key. */
 export const SESSION_KEYCHAIN_ACCOUNT = 'abap-cli/session-key';
-
-/** Per-account credentials the CLI cares about. */
-export type SecretKind = 'password' | 'cert-passphrase' | 'session-key';
 
 /* Re-export so existing call sites keep `import { SecretsBackend } from '../secrets.js'` */
 export type { SecretsBackend };
@@ -158,7 +151,6 @@ export function _resetBackendForTesting(): void {
 /* ─────────── Public API ─────────── */
 
 function accountKey(account: string, kind: SecretKind): string {
-  if (kind === 'cert-passphrase') return `${account}${CERT_PASSPHRASE_SUFFIX}`;
   if (kind === 'session-key') return SESSION_KEYCHAIN_ACCOUNT;
   return account;
 }
@@ -176,21 +168,6 @@ export async function getPassword(account: string): Promise<string | null> {
 export async function deletePassword(account: string): Promise<boolean> {
   const backend = await resolveBackend();
   return backend.delete(account, 'password');
-}
-
-export async function storeCertPassphrase(account: string, passphrase: string): Promise<void> {
-  const backend = await resolveBackend();
-  await backend.set(account, 'cert-passphrase', passphrase);
-}
-
-export async function getCertPassphrase(account: string): Promise<string | null> {
-  const backend = await resolveBackend();
-  return backend.get(account, 'cert-passphrase');
-}
-
-export async function deleteCertPassphrase(account: string): Promise<boolean> {
-  const backend = await resolveBackend();
-  return backend.delete(account, 'cert-passphrase');
 }
 
 /** Global 32-byte session-jar encryption key (shared across profiles). */

@@ -31,7 +31,7 @@ vi.mock('node:os', async () => {
   return { ...actual, platform: () => platformMock() };
 });
 
-import { _resetBackendForTesting, resolveBackend, storePassword, getPassword, deletePassword, storeCertPassphrase, getCertPassphrase, deleteCertPassphrase, getSessionKey, storeSessionKey, deleteSessionKey } from '../../src/abap_cli/config/secrets.js';
+import { _resetBackendForTesting, resolveBackend, storePassword, getPassword, deletePassword, getSessionKey, storeSessionKey, deleteSessionKey } from '../../src/abap_cli/config/secrets.js';
 
 function makeExecFileOk(stdout = '', stderr = '') {
   return (_cmd: string, _args: string[]) => Promise.resolve({ stdout, stderr });
@@ -222,18 +222,6 @@ describe('secrets (native backend dispatcher)', () => {
       expect(await getPassword('PROD')).toBe('hunter2');
       execFileMock.mockImplementation(makeExecFileOk());
       expect(await deletePassword('PROD')).toBe(true);
-    });
-
-    it('cert-passphrase kind uses `<account>.cert-passphrase` account key', async () => {
-      execFileMock.mockImplementation(makeExecFileOk());
-      await storeCertPassphrase('PROD', 'secret-pp');
-      expect(execFileMock).toHaveBeenCalledWith('/usr/bin/security',
-        ['add-generic-password', '-a', 'PROD.cert-passphrase', '-s', 'abap-cli', '-w', 'secret-pp'],
-        expect.any(Object),
-      );
-      execFileMock.mockImplementation(() => Promise.resolve({ stdout: 'secret-pp\n', stderr: '' }));
-      expect(await getCertPassphrase('PROD')).toBe('secret-pp');
-      expect(await deleteCertPassphrase('PROD')).toBe(true);
     });
 
     it('session-key kind uses the dedicated global account name', async () => {

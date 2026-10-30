@@ -50,9 +50,9 @@ vi.mock('../../../src/abap_cli/config/project-config.js', async (importOriginal)
   return { ...actual, loadConfig: h.loadConfigMock };
 });
 
-vi.mock('../../../src/abap_cli/auth/adapter.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../src/abap_cli/auth/adapter.js')>();
-  return { ...actual, buildAuth: h.buildAuthMock };
+vi.mock('../../../src/abap_cli/clients/basic-auth.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/abap_cli/clients/basic-auth.js')>();
+  return { ...actual, buildBasicAuth: h.buildAuthMock };
 });
 
 // Redirect the real jar-loading so reuse mode is decided purely by mocks.
@@ -84,7 +84,7 @@ describe('IcfClient cookie reuse', () => {
     resetRegistry();
     vi.clearAllMocks();
     h.loadConfigMock.mockResolvedValue(defaultConfig());
-    h.buildAuthMock.mockResolvedValue({ passwordOrFetcher: 'pw', options: { headers: {} }, label: 'basic' });
+    h.buildAuthMock.mockReturnValue({ password: 'pw', options: { headers: {} } });
   });
 
   afterEach(() => {

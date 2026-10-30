@@ -2,13 +2,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { CliError } from '../output/json.js';
-import type { AuthConfig } from '../auth/v2-types.js';
-import { normalizeAuth } from '../auth/normalize.js';
 
 /**
- * Canonical SystemProfile (v2). The on-disk shape may still be v1 (flat
- * `authMethod` + optional blocks); `loadUserConfig` always normalises to v2
- * before returning. `upsertSystem` always writes v2.
+ * Canonical user-level SystemProfile. Profiles created by older versions may
+ * still declare a removed auth method (`cert` / `browser_sso` / `oauth_password`
+ * / `sso`) plus its credential blocks; `loadUserConfig` ignores those fields
+ * and records `unsupportedAuth` in memory so connection attempts can point the
+ * user at the migration step. `saveUserConfig` never writes the marker.
  */
 export interface SystemProfile {
   url: string;
@@ -21,8 +21,11 @@ export interface SystemProfile {
   ca?: string;
   /** ISO timestamp of when the PEM behind `ca` entered the cert store. */
   caImportedAt?: string;
-  /** Canonical auth config (v2 discriminated union). Replaces flat authMethod + blocks. */
-  auth: AuthConfig;
+  /**
+   * In-memory only: the auth method a stored entry still declares but the CLI
+   * no longer supports. Empty for profiles that were always basic.
+   */
+  unsupportedAuth?: string;
   /** SAP release recorded at connect time (diagnostics). */
   systemVersion?: string;
   /** 034: optional system flavour tag — drives cookie reuse opt-in/out. */
@@ -63,14 +66,10 @@ export interface UserConfig {
 const CONFIG_DIR = path.join(os.homedir(), '.abap-cli');
 const CONFIG_PATH = path.join(CONFIG_DIR, 'systems.json');
 
-/** Marker field — set when a profile has been written in v2 shape. */
-const MIGRATION_FLAG = '__abapCliAuthShape';
-const MIGRATED_TO_V2 = 'v2';
-
 /**
  * Load user-level system profiles from ~/.abap-cli/systems.json.
  * Returns an empty config if the file does not exist; throws if it is corrupt.
- * Accepts both v1 and v2 on-disk shapes — v1 entries are normalised in memory.
+ * Removed auth fields on disk are ignored (see `SystemProfile.unsupportedAuth`).
  */
 export function loadUserConfig(): UserConfig {
   if (!fs.existsSync(CONFIG_PATH)) return { systems: {} };
@@ -96,7 +95,7 @@ export function loadUserConfig(): UserConfig {
   return { systems };
 }
 
-/** Convert an arbitrary stored entry (v1 or v2) to a canonical v2 SystemProfile. */
+/** Convert an arbitrary stored entry to the canonical SystemProfile. */
 function normaliseStoredProfile(name: string, raw: unknown): SystemProfile {
   if (!raw || typeof raw !== 'object') {
     throw new CliError('CONFIG_ERROR', `Profile '${name}' in ${CONFIG_PATH} is not an object.`, {
@@ -119,7 +118,7 @@ function normaliseStoredProfile(name: string, raw: unknown): SystemProfile {
       nextSteps: [`Re-add the profile: abap profile set ${name} --username <user>`],
     });
   }
-  const auth = normaliseAuthField(r);
+  const unsupportedAuth = detectUnsupportedAuth(r);
   return {
     url,
     client: typeof r.client === 'string' ? r.client : '100',
@@ -128,29 +127,45 @@ function normaliseStoredProfile(name: string, raw: unknown): SystemProfile {
     ...(typeof r.insecure === 'boolean' ? { insecure: r.insecure } : {}),
     ...(typeof r.ca === 'string' && r.ca ? { ca: r.ca } : {}),
     ...(typeof r.caImportedAt === 'string' && r.caImportedAt ? { caImportedAt: r.caImportedAt } : {}),
-    auth,
+    ...(unsupportedAuth ? { unsupportedAuth } : {}),
     ...(typeof r.systemVersion === 'string' ? { systemVersion: r.systemVersion } : {}),
     ...(r.adtTextpool && typeof r.adtTextpool === 'object' ? { adtTextpool: r.adtTextpool as SystemProfile['adtTextpool'] } : {}),
     ...(r.runtime && typeof r.runtime === 'object' ? { runtime: r.runtime as SystemProfile['runtime'] } : {}),
   };
 }
 
-function normaliseAuthField(r: Record<string, unknown>) {
-  // Strip the migration flag before passing to the type-driven normalizer.
-  const { [MIGRATION_FLAG]: _flag, ...rest } = r;
-  return normalizeAuth(rest as Parameters<typeof normalizeAuth>[0]);
+/**
+ * Detect auth methods the CLI no longer supports on a stored profile entry.
+ * Both the canonical `auth` block and the flat pre-canonical fields are read so
+ * profiles written by every earlier version surface the same migration hint.
+ */
+function detectUnsupportedAuth(r: Record<string, unknown>): string | undefined {
+  const auth = r.auth;
+  if (auth && typeof auth === 'object') {
+    const method = (auth as { method?: unknown }).method;
+    if (typeof method === 'string' && method !== 'basic' && method !== '') return method;
+  }
+  const flat = r.authMethod;
+  if (typeof flat === 'string' && flat !== '' && flat !== 'basic') return flat;
+  if (r.certAuth) return 'cert';
+  if (r.oauthPassword) return 'oauth_password';
+  if (r.ssoCookieFile) return 'browser_sso';
+  if (r.negotiate) return 'sso';
+  return undefined;
 }
 
 /**
  * Save user-level system profiles to ~/.abap-cli/systems.json.
- * Creates the directory with 700 permissions if needed.
- * Always writes v2 (canonical) shape.
+ * Creates the directory with 700 permissions if needed. The in-memory
+ * `unsupportedAuth` marker is never persisted.
  */
 export function saveUserConfig(config: UserConfig): void {
   fs.mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
   const out: Record<string, unknown> = {};
   for (const [name, profile] of Object.entries(config.systems)) {
-    out[name] = { ...profile, [MIGRATION_FLAG]: MIGRATED_TO_V2 };
+    const { unsupportedAuth: _unsupported, ...canonical } = profile;
+    void _unsupported;
+    out[name] = canonical;
   }
   fs.writeFileSync(CONFIG_PATH, JSON.stringify({ systems: out }, null, 2) + '\n', { encoding: 'utf-8', mode: 0o600 });
 }
@@ -166,7 +181,6 @@ export function upsertSystem(name: string, profile: SystemProfile): void {
 
 /**
  * Get a system profile by name, or null if not found.
- * Returns the canonical v2 shape (v1 entries on disk are normalised in memory).
  */
 export function getSystem(name: string): SystemProfile | null {
   return loadUserConfig().systems[name] ?? null;

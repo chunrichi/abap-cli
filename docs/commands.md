@@ -68,16 +68,6 @@ abap init [options]
 | `--language` `<language>` | no |  |  | SAP language. |
 | `--insecure` | no |  |  | Skip SSL certificate verification (development only). |
 | `--ca` `<path>` | no |  |  | PEM CA certificate to import into ~/.abap-cli/certificates/ and bind to this profile. |
-| `--auth-method` `<method>` | no |  |  | Login strategy: basic \| cert \| browser_sso \| oauth_password. |
-| `--auth-option` `<kv>` | no |  |  | Generic auth option, repeatable as key=value. New auth methods add no Commander options — they read from this bag. |
-| `--cert-path` `<path>` | no |  |  | X.509 client cert file (PEM) — used with --auth-method=cert. |
-| `--cert-key` `<path>` | no |  |  | X.509 private key file (PEM) — used with --auth-method=cert. |
-| `--cert-ca` `<path>` | no |  |  | Optional X.509 client CA override — used with --auth-method=cert. |
-| `--cert-passphrase` `<pwd>` | no |  |  | Passphrase for .p12 / encrypted key — written to keychain. |
-| `--sso-cookie-file` `<path>` | no |  |  | SSO cookie jar path — used with --auth-method=browser_sso. |
-| `--service-key` `<path>` | no |  |  | BTP service key JSON — used with --auth-method=oauth_password. |
-| `--spn` `<spn>` | no |  |  | Kerberos service principal name — used with --auth-method=sso (defaults to HTTP/<host>). |
-| `--reauth-on-expiry` | no |  |  | Force re-acquisition of the Kerberos ticket when the cached one expires — used with --auth-method=sso. |
 | `--tr` `<transport>` | no |  |  | Default transport number (written to .abap.json). |
 | `--package` `<package>` | no |  |  | Default SAP package (written to .abap.json). |
 | `--source-dir` `<path>` | no |  |  | Base directory for `push --all` / `check --all` (written to .abap.json). |
@@ -692,7 +682,7 @@ abap deploy [options] | abap deploy status [options]
 
 ## `abap profile`
 
-Manage global connection profiles (list / show / add / set / test / login / delete / export / import).
+Manage global connection profiles (list / show / add / set / test / delete / export / import).
 
 ```bash
 abap profile <command> [options]
@@ -711,18 +701,6 @@ abap profile <command> [options]
 | `--insecure` | no |  |  | Skip SSL certificate verification (development only). |
 | `--ca` `<path>` | no |  |  | PEM CA certificate to import into ~/.abap-cli/certificates/ and bind to this profile. |
 | `--clear-ca` | no |  |  | Remove the CA certificate setting. |
-| `--auth-method` `<method>` | no |  |  | Login strategy: basic \| cert \| browser_sso \| oauth_password. |
-| `--auth-option` `<kv>` | no |  |  | Generic auth option, repeatable as key=value. |
-| `--cert-path` `<path>` | no |  |  | X.509 client cert file (PEM). |
-| `--cert-key` `<path>` | no |  |  | X.509 private key file (PEM). |
-| `--cert-ca` `<path>` | no |  |  | Optional X.509 client CA override (PEM). |
-| `--cert-passphrase` `<pwd>` | no |  |  | Passphrase for .p12 / encrypted key — written to keychain. |
-| `--remove-cert-passphrase` | no |  |  | Remove the stored cert passphrase from keychain. |
-| `--clear-cert-auth` | no |  |  | Reset to basic auth (drops authMethod and certAuth). |
-| `--sso-cookie-file` `<path>` | no |  |  | SSO cookie jar path — used with --auth-method=browser_sso. |
-| `--clear-sso-cookie-file` | no |  |  | Reset SSO cookie file path to the default. |
-| `--service-key` `<path>` | no |  |  | BTP service key JSON — used with --auth-method=oauth_password. |
-| `--clear-oauth-password` | no |  |  | Drop oauthPassword config (reset to authMethod). |
 | `--file` `<path>` | no |  |  | Bundle file path for export / import. |
 | `--with-passwords` | no |  |  | Include passwords in the export bundle (warned opt-in). |
 | `--overwrite` | no |  |  | Update profiles that already exist on import. |

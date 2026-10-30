@@ -30,8 +30,8 @@ vi.mock('../../src/abap_cli/flows/setup/init.js', () => ({
   // only the function we use is referenced; nothing else
 }));
 
-vi.mock('../../src/abap_cli/auth/adapter.js', () => ({
-  buildAuth: vi.fn().mockResolvedValue({ passwordOrFetcher: 'pw', options: {} }),
+vi.mock('../../src/abap_cli/clients/basic-auth.js', () => ({
+  buildBasicAuth: vi.fn().mockReturnValue({ password: 'pw', options: {} }),
 }));
 
 vi.mock('abap-adt-api', () => ({

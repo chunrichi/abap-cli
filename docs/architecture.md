@@ -34,9 +34,8 @@ src/abap_cli/
 ├── formats/              # abap-file-format: file resolver + pull strategies + shared AFF artifact contract
 │   └── ddic/             # DDIC wire / io / validate / examples (split from the former 880-line json.ts)
 ├── types/                # TYPE_REGISTRY — object-type metadata single source of truth
-├── clients/              # AdtClientWrapper (abap-adt-api), ICF client + version check, connection probe
+├── clients/              # AdtClientWrapper (abap-adt-api), ICF client + version check, connection probe, basic auth
 ├── config/               # .abap.json + user system profiles, keychain (secrets.ts), CA, profile export/import
-├── auth/                 # v2 auth model + strategies (basic / cert / browser_sso / oauth_password)
 ├── session/              # session reuse, cookie / key policy
 ├── core/                 # cross-layer utilities: object/transport resolution, limits, path output, confirmation
 ├── aff/                  # vendored AFF schema resolution + validation

@@ -122,7 +122,6 @@ function loadConfigForProfile(profileName: string): ProjectConfig {
       language: profile.language || 'EN',
       insecure: profile.insecure ?? (process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0'),
       caPath: profile.ca || '',
-      auth: profile.auth,
       sourceDir: ws.sourceDir || process.cwd(),
       systemType: profile.systemType,
       sessionPolicy: profile.sessionPolicy,

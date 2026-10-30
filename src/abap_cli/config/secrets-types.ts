@@ -4,7 +4,7 @@
  */
 
 /** Per-account credentials the CLI cares about (kept in sync with keychain account names). */
-export type SecretKind = 'password' | 'cert-passphrase' | 'session-key';
+export type SecretKind = 'password' | 'session-key';
 
 /**
  * Minimal credential-store contract. Implementations must NOT throw on

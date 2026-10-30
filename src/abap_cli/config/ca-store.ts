@@ -1,18 +1,18 @@
 /**
- * PEM credential store under the user config directory.
+ * CA certificate store under the user config directory.
  *
- * `profile add/set` used to store the user's absolute paths verbatim in
- * `systems.json`. A reboot, a `rm /tmp/foo.pem`, or a container restart
- * then breaks every subsequent SAP command at the TLS layer.
+ * `profile add/set` used to store the user's absolute CA path verbatim in
+ * `systems.json`. A reboot, a `rm /tmp/foo.pem`, or a container restart would
+ * then break every subsequent SAP command at the TLS layer.
  *
- * This module imports each PEM into `~/.abap-cli/certificates/<sha256>.pem`
- * and returns the canonical stored path. The store is content-addressed, so
- * the same PEM imported from many places becomes a single file, and we can
- * count how many profiles reference a sha256 to clean up orphans without
- * breaking another profile that still needs it.
+ * This module imports the CA into `~/.abap-cli/certificates/<sha256>.pem` and
+ * returns the canonical stored path. The store is content-addressed, so the
+ * same PEM imported from many places becomes a single file, and we can count
+ * how many profiles reference a sha256 to clean up orphans without breaking
+ * another profile that still needs it.
  *
- * Accepted blocks: certificates (CA / client cert) and private keys.
- * PKCS#12 / DER must be converted by the user before import.
+ * Only `-----BEGIN CERTIFICATE-----` PEMs are accepted (PKCS#12 / DER must be
+ * converted by the user first).
  */
 
 import { createHash } from 'crypto';
@@ -27,9 +27,6 @@ const PEM_CERTIFICATE_BEGIN = '-----BEGIN CERTIFICATE-----';
 
 /** Stored PEM filenames are the lowercase sha256 of their bytes. */
 const STORED_PEM_RE = /^([0-9a-f]{64})\.pem$/;
-
-/** What a PEM import is allowed to be. */
-export type PemKind = 'certificate' | 'private-key';
 
 /** Where imported PEM files live. Overridable for tests. */
 export function certDir(): string {
@@ -48,19 +45,14 @@ export interface CaImportResult {
 }
 
 /**
- * Parse a PEM block marker. Returns the block type (e.g. `CERTIFICATE`,
- * `RSA PRIVATE KEY`) when the text has a well-formed BEGIN/END pair, else
- * `undefined`.
+ * Parse a PEM block marker. Returns the block type (e.g. `CERTIFICATE`) when
+ * the text has a well-formed BEGIN/END pair, else `undefined`.
  */
 function pemBlockType(text: string): string | undefined {
   const begin = /-----BEGIN ([A-Z0-9 ]+)-----/.exec(text);
   if (!begin) return undefined;
   const type = begin[1]!;
   return text.includes(`-----END ${type}-----`) ? type : undefined;
-}
-
-function kindMatches(blockType: string, kind: PemKind): boolean {
-  return kind === 'certificate' ? blockType === 'CERTIFICATE' : blockType.endsWith('PRIVATE KEY');
 }
 
 /** Sha of a path that already lives inside the store, else undefined. */
@@ -75,30 +67,29 @@ export function isStoredPemPath(p: string): boolean {
 }
 
 /**
- * Read a PEM file from disk, validate the block type, and import it into the
- * credential store. Returns the canonical stored path.
- *
- * Idempotent: importing the same bytes twice returns the existing entry.
+ * Read the CA PEM from disk, validate it, and import it into the credential
+ * store. Returns the canonical stored path. Idempotent: importing the same
+ * bytes twice returns the existing entry.
  */
-export function importPem(srcPath: string, kind: PemKind): CaImportResult {
+export function importCaPem(srcPath: string): CaImportResult {
   const resolved = path.resolve(srcPath);
+  if (isStoredPemPath(resolved)) return importedPemResult(resolved);
+
   let bytes: Buffer;
   try {
     bytes = fs.readFileSync(resolved);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    const label = kind === 'certificate' ? 'CA certificate' : 'private key';
-    throw new CliError('CONFIG_ERROR', `Cannot read ${label} file '${resolved}': ${message}`, {
+    throw new CliError('CONFIG_ERROR', `Cannot read CA certificate file '${resolved}': ${message}`, {
       file: resolved,
       nextSteps: ['Verify the path exists and is readable.'],
     });
   }
   const blockType = pemBlockType(bytes.toString('utf-8'));
-  if (!blockType || !kindMatches(blockType, kind)) {
-    const expected = kind === 'certificate' ? PEM_CERTIFICATE_BEGIN : '-----BEGIN … PRIVATE KEY-----';
+  if (blockType !== 'CERTIFICATE') {
     throw new CliError(
       'INVALID_ARGUMENT',
-      `File '${resolved}' is not a PEM ${kind} (expected a '${expected}' block). Convert PKCS#12 / DER to PEM first.`,
+      `File '${resolved}' is not a PEM certificate (expected a '${PEM_CERTIFICATE_BEGIN}' block). Convert PKCS#12 / DER to PEM first.`,
       { file: resolved },
     );
   }
@@ -116,33 +107,6 @@ export function importPem(srcPath: string, kind: PemKind): CaImportResult {
     importedAt = new Date().toISOString();
   }
   return { storedPath: target, sha256, importedAt };
-}
-
-/**
- * CA certificate convenience wrapper (unchanged public contract):
- * `store/` paths pass through untouched so repeat writes stay idempotent.
- */
-export function importCaPem(srcPath: string): CaImportResult {
-  if (isStoredPemPath(path.resolve(srcPath))) {
-    return importedPemResult(path.resolve(srcPath));
-  }
-  return importPem(srcPath, 'certificate');
-}
-
-/** Client certificate convenience wrapper. */
-export function importClientCert(srcPath: string): CaImportResult {
-  if (isStoredPemPath(path.resolve(srcPath))) {
-    return importedPemResult(path.resolve(srcPath));
-  }
-  return importPem(srcPath, 'certificate');
-}
-
-/** Client private key convenience wrapper. */
-export function importClientKey(srcPath: string): CaImportResult {
-  if (isStoredPemPath(path.resolve(srcPath))) {
-    return importedPemResult(path.resolve(srcPath));
-  }
-  return importPem(srcPath, 'private-key');
 }
 
 /** Result shape for a path that already lives in the store. */
@@ -216,8 +180,7 @@ export function fingerprint(sha256: string | undefined, length = 16): string {
 }
 
 /**
- * Every store path mentioned by a profile-shaped object, whatever the auth
- * method's field names are (`ca`, `caPath`, `certPath`, `keyPath`). Values
+ * Every store path mentioned by a profile-shaped object (today: `ca`). Values
  * outside the store (legacy absolute paths) yield no sha and are ignored.
  */
 function storeShasOf(profile: unknown): Set<string> {
@@ -252,8 +215,8 @@ function shasInUse(profiles: Record<string, unknown>): Set<string> {
 /**
  * Reclaim PEMs that `previous` referenced and `next` no longer does and no
  * other profile in `remainingProfiles` uses either. This is the GC path for
- * `--clear-ca`, a replaced `--ca` / `--cert-path` / `--cert-key`, and
- * `profile delete`. Returns the number of files removed. Never throws.
+ * a replaced `--ca`, `--clear-ca`, and `profile delete`. Returns the number of
+ * files removed. Never throws.
  */
 export function collectOrphanPems(
   previous: unknown,

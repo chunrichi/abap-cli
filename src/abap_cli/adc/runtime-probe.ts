@@ -2,7 +2,7 @@ import { getSystem } from '../config/user-config.js';
 import { getPassword } from '../config/secrets.js';
 import { readCaCertificate, type SapConfig } from '../config/project-config.js';
 import { CliError } from '../output/json.js';
-import { buildAuth } from '../auth/adapter.js';
+import { buildBasicAuth } from '../clients/basic-auth.js';
 
 /** ADT runtime tier detected from public discovery endpoints.
  *  Drives deploy-flow branching and surfaces the runtime on `profile test`
@@ -77,6 +77,17 @@ export async function probeAdtRuntime(profileName: string): Promise<RuntimeProbe
       error: { code: 'CONFIG_ERROR', message: `Connection profile '${profileName}' not found.` },
     };
   }
+  if (profile.unsupportedAuth) {
+    return {
+      runtime: 'unknown',
+      source: 'none',
+      icfSetupBlocked: false,
+      error: {
+        code: 'CONFIG_ERROR',
+        message: `Profile '${profileName}' uses the removed '${profile.unsupportedAuth}' auth method; only basic auth (username + password) is supported.`,
+      },
+    };
+  }
   const password = (await getPassword(profileName)) || '';
   const sap: SapConfig = {
     url: profile.url,
@@ -86,12 +97,11 @@ export async function probeAdtRuntime(profileName: string): Promise<RuntimeProbe
     language: profile.language || 'EN',
     insecure: profile.insecure ?? process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0',
     caPath: profile.ca || '',
-    auth: profile.auth,
     sourceDir: process.cwd(),
   };
   let built;
   try {
-    built = await buildAuth(sap, profileName);
+    built = buildBasicAuth(sap);
   } catch (error) {
     return {
       runtime: 'unknown',
@@ -100,13 +110,13 @@ export async function probeAdtRuntime(profileName: string): Promise<RuntimeProbe
       error: { code: 'AUTH_ERROR', message: error instanceof Error ? error.message : String(error) },
     };
   }
-  const { passwordOrFetcher, options } = built;
+  const { password: authPassword, options } = built;
   try {
     const { ADTClient } = await import('abap-adt-api');
     const client = new ADTClient(
       profile.url,
       profile.username,
-      passwordOrFetcher,
+      authPassword,
       profile.client || '100',
       profile.language || 'EN',
       options,

@@ -15,8 +15,6 @@ import { registerProfileCommand } from '../../src/abap_cli/commands/profile.js';
 import { makeProgram, runCommand } from './cli-helper.js';
 
 const SAMPLE_PEM = '-----BEGIN CERTIFICATE-----\nMIIBcorp\n-----END CERTIFICATE-----\n';
-const CERT_PEM = '-----BEGIN CERTIFICATE-----\nMIIBclient\n-----END CERTIFICATE-----\n';
-const KEY_PEM = '-----BEGIN PRIVATE KEY-----\nMIIBkey\n-----END PRIVATE KEY-----\n';
 
 /** Mutable stand-ins so each case controls what "the store" contains. */
 let systems: Record<string, Record<string, unknown>>;
@@ -181,28 +179,4 @@ describe('profile add/set --ca (cert store import)', () => {
     expect(fs.existsSync(path.join(certDir, `${shaOf()}.pem`))).toBe(true);
   });
 
-  it('imports cert-auth cert + key into the store and reclaims them on delete', async () => {
-    const certSrc = writeSrc('client.pem', CERT_PEM);
-    const keySrc = writeSrc('client.key', KEY_PEM);
-    await runProfile([
-      'add', 'dev', '--url', 'http://sap.example:50000', '--username', 'DEV',
-      '--auth-method', 'cert', '--cert-path', certSrc, '--cert-key', keySrc,
-    ]);
-
-    const auth = systems.dev!.auth as { method: string; cert: { certPath: string; keyPath: string } };
-    const storedCert = path.join(certDir, `${shaOf(CERT_PEM)}.pem`);
-    const storedKey = path.join(certDir, `${shaOf(KEY_PEM)}.pem`);
-    expect(auth.cert.certPath).toBe(storedCert);
-    expect(auth.cert.keyPath).toBe(storedKey);
-    expect(fs.statSync(storedKey).mode & 0o777).toBe(0o600);
-
-    // The source files are now irrelevant.
-    fs.rmSync(certSrc);
-    fs.rmSync(keySrc);
-
-    const res = await runProfile(['delete', 'dev', '--yes']);
-    expect(JSON.parse(res.stdout).data.caOrphanRemoved).toBe(true);
-    expect(fs.existsSync(storedCert)).toBe(false);
-    expect(fs.existsSync(storedKey)).toBe(false);
-  });
 });

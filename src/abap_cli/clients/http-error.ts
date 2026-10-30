@@ -1,12 +1,6 @@
 import axios from 'axios';
 import { CliError, type CliErrorOptions } from '../output/json.js';
 import type { ErrorCode } from '../output/error-codes.js';
-// Side-effect import: ensures all auth strategies are registered before
-// `getAuthHints()` is called (each strategies/*.ts calls `registerStrategy`
-// at module load). Required when http-error.ts is imported before the CLI
-// commands have pulled in adapter.ts.
-import '../auth/registry-bootstrap.js';
-import { getAuthHints as lookupAuthHints } from '../auth/strategy.js';
 
 /** Shape of the body SAP answered with, exposed as `details.errorKind` so an
  *  agent can branch on it without re-sniffing the (truncated) body. */
@@ -140,13 +134,12 @@ const TLS_REFERENCE = 'skills/abap-cli-setup/references/errors.md#tls_error';
 const AUTH_REFERENCE = 'skills/abap-cli-setup/references/errors.md#auth_error';
 const SAP_ERROR_REFERENCE = 'skills/abap-cli-setup/references/errors.md#sap_error';
 
-/**
- * Choose the "what now?" hint for a 401/403 based on the auth method actually
- * used to log in. The hint set is owned by the registered AuthStrategy, so
- * new methods just declare their own `hints` and this file stays untouched.
- * Unknown / unset method falls back to the generic basic-auth guidance.
- */
-const authHints = lookupAuthHints;
+/** "What now?" guidance for 401/403 on the only supported auth method (basic). */
+const BASIC_AUTH_NEXT_STEPS = [
+  "Verify credentials: 'abap profile test <name> --json'.",
+  "If password expired: 'abap profile set <name> --password <new>'.",
+];
+const BASIC_AUTH_EXAMPLE = 'abap profile set <name> --password <new>';
 
 /**
  * Classify any thrown value from an HTTP client into a CliError with the right
@@ -154,12 +147,11 @@ const authHints = lookupAuthHints;
  *
  * Detection happens on `error.code` (Node system errors propagated through
  * axios's `error.cause` chain) and `error.response.status` — never by
- * string-matching the response body. The optional `context.authMethod` lets
- * the classifier pick cert-specific guidance on 401/403.
+ * string-matching the response body.
  */
 export function classifyHttpError(
   error: unknown,
-  context?: { name?: string; authMethod?: string },
+  context?: { name?: string },
 ): CliError {
   // abap-adt-api wraps AxiosError into HttpClientException with a `status`
   // number field, or AdtErrorException with the status on `.err`. Normalise
@@ -188,11 +180,10 @@ export function classifyHttpError(
       });
     }
     if (status === 401 || status === 403) {
-      const hints = authHints(context?.authMethod);
       return new CliError('AUTH_ERROR', httpEx.message || 'authentication failed', {
-        details: { httpStatus: status, ...(context?.name ? { system: context.name, authMethod: context.authMethod } : { authMethod: context?.authMethod }) },
-        nextSteps: hints.nextSteps,
-        example: hints.example,
+        details: { httpStatus: status, ...(context?.name ? { system: context.name } : {}) },
+        nextSteps: BASIC_AUTH_NEXT_STEPS,
+        example: BASIC_AUTH_EXAMPLE,
         references: AUTH_REFERENCE,
       });
     }
@@ -210,11 +201,10 @@ export function classifyHttpError(
     // Surface it as AUTH_ERROR so `_call`'s re-login fallback kicks in
     // instead of bubbling a misleading SAP_ERROR.
     if (status === 400 && /session\s+timed\s+out/i.test(rawBody)) {
-      const hints = authHints(context?.authMethod);
       return new CliError('AUTH_ERROR', 'SAP session timed out', {
-        details: { httpStatus: 400, ...(context?.name ? { system: context.name, authMethod: context.authMethod } : { authMethod: context?.authMethod }), sapErrorBody: rawBody.slice(0, 400), errorKind: 'text' },
-        nextSteps: hints.nextSteps,
-        example: hints.example,
+        details: { httpStatus: 400, ...(context?.name ? { system: context.name } : {}), sapErrorBody: rawBody.slice(0, 400), errorKind: 'text' },
+        nextSteps: BASIC_AUTH_NEXT_STEPS,
+        example: BASIC_AUTH_EXAMPLE,
         references: AUTH_REFERENCE,
       });
     }
@@ -256,11 +246,10 @@ export function classifyHttpError(
     const status = error.response?.status;
     if (status === 401 || status === 403) {
       const body = error.response?.data as { message?: string } | undefined;
-      const hints = authHints(context?.authMethod);
       return new CliError('AUTH_ERROR', body?.message || error.message, {
-        details: { httpStatus: status, ...(context?.name ? { system: context.name, authMethod: context.authMethod } : { authMethod: context?.authMethod }) },
-        nextSteps: hints.nextSteps,
-        example: hints.example,
+        details: { httpStatus: status, ...(context?.name ? { system: context.name } : {}) },
+        nextSteps: BASIC_AUTH_NEXT_STEPS,
+        example: BASIC_AUTH_EXAMPLE,
         references: AUTH_REFERENCE,
       });
     }

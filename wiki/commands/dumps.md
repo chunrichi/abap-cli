@@ -85,7 +85,7 @@ abap dumps --schema
 |---|---|---|---|
 | `INVALID_ARGUMENT` | USAGE / 2 | `--limit` 越界或 `--user` 格式不合法 | 重设参数（参考 `example`） |
 | `CONFIG_ERROR` | CONFIG_ERROR / 2 | 未配置 SAP profile 或 `.abap.json` | `abap init` 或 `abap profile add` |
-| `AUTH_ERROR` | AUTH_ERROR / 5 | SAP 返回 401/403 | `abap doctor` 检查凭据与 mTLS 证书 |
+| `AUTH_ERROR` | AUTH_ERROR / 5 | SAP 返回 401/403 | `abap doctor` 检查凭据（keychain 密码） |
 | `SAP_ERROR` | SAP_ERROR / 6 | ADT 5xx 或 ICF 端点不可达 | `abap doctor` 诊断 |
 
 ## 关联命令

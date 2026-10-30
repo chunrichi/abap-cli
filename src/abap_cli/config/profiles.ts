@@ -1,15 +1,14 @@
 import { getSystem, listSystemNames, upsertSystem, type SystemProfile } from './user-config.js';
 import { getPassword, storePassword } from './secrets.js';
-import { normalizeAuth } from '../auth/normalize.js';
+import { CliError } from '../output/json.js';
 
 /**
- * Portable profile bundle. Both v1 (flat authMethod + blocks) and v2 (canonical
- * `auth`) shapes are accepted on import; v1 entries are normalised in memory
- * before storage. On export we always emit v2 (canonical).
+ * Portable profile bundle. Passwords are excluded by default; `--with-passwords`
+ * includes them as an explicit, warned opt-in.
  */
 export interface ProfileBundle {
   format: 'abap-cli-profiles';
-  version: 2;
+  version: 3;
   exportedAt: string;
   systems: ProfileBundleEntry[];
 }
@@ -22,13 +21,6 @@ export interface ProfileBundleEntry {
   language: string;
   insecure?: boolean;
   ca?: string;
-  /** Canonical v2 auth config. v1 entries (authMethod + blocks) are also accepted. */
-  auth?: SystemProfile['auth'];
-  /** Legacy v1 fields — kept for back-compat reads of pre-v2 bundles. */
-  authMethod?: 'basic' | 'cert' | 'browser_sso' | 'oauth_password';
-  certAuth?: { certPath: string; keyPath: string; caPath?: string };
-  ssoCookieFile?: string;
-  oauthPassword?: { uaaUrl: string; clientId: string; clientSecret: string; serviceKeyFile?: string };
   password?: string;
 }
 
@@ -49,7 +41,6 @@ export interface ImportResult {
 /**
  * Export system profiles as a portable bundle. Passwords are excluded by
  * default; `--with-passwords` includes them as an explicit, warned opt-in.
- * Always emits the canonical v2 auth shape.
  */
 export async function exportProfiles(opts: ExportOptions = {}): Promise<ProfileBundle> {
   const names = opts.names && opts.names.length > 0 ? opts.names : listSystemNames();
@@ -57,6 +48,16 @@ export async function exportProfiles(opts: ExportOptions = {}): Promise<ProfileB
   for (const name of names) {
     const p = getSystem(name);
     if (!p) continue;
+    if (p.unsupportedAuth) {
+      throw new CliError(
+        'CONFIG_ERROR',
+        `Profile '${name}' still uses the removed '${p.unsupportedAuth}' auth method; only basic auth can be exported.`,
+        {
+          nextSteps: [`Store a password to migrate it: abap profile set ${name} --password <password>`],
+          example: `abap profile set ${name} --password <password>`,
+        },
+      );
+    }
     const entry: ProfileBundleEntry = {
       name,
       url: p.url,
@@ -65,7 +66,6 @@ export async function exportProfiles(opts: ExportOptions = {}): Promise<ProfileB
       language: p.language,
       ...(p.insecure !== undefined ? { insecure: p.insecure } : {}),
       ...(p.ca ? { ca: p.ca } : {}),
-      auth: p.auth,
     };
     if (opts.withPasswords) {
       const password = await getPassword(name);
@@ -73,25 +73,36 @@ export async function exportProfiles(opts: ExportOptions = {}): Promise<ProfileB
     }
     systems.push(entry);
   }
-  return { format: 'abap-cli-profiles', version: 2, exportedAt: new Date().toISOString(), systems };
+  return { format: 'abap-cli-profiles', version: 3, exportedAt: new Date().toISOString(), systems };
 }
 
 /**
- * Import a profile bundle. Accepts both v1 (legacy authMethod+blocks) and v2
- * (canonical auth) entry shapes; v1 entries are normalised to the canonical
- * form via `normalizeAuth`. Existing profiles are skipped unless `overwrite`
- * is set; any bundled password is routed into the keychain (never stored on
- * disk in plain text).
+ * Import a profile bundle. Bundles that still carry a removed auth method are
+ * rejected: the CLI only logs in with basic auth. Existing profiles are skipped
+ * unless `overwrite` is set; bundled passwords go to the keychain, never to
+ * disk in plain text.
  */
 export async function importProfiles(bundle: ProfileBundle, opts: ImportOptions = {}): Promise<ImportResult> {
   const imported: ImportResult['imported'] = [];
   for (const entry of bundle.systems) {
+    const unsupported = detectUnsupportedAuth(entry);
+    if (unsupported) {
+      throw new CliError(
+        'CONFIG_ERROR',
+        `Profile '${entry.name}' in the bundle uses the removed '${unsupported}' auth method; only basic auth is supported.`,
+        {
+          nextSteps: [
+            `Recreate the profile on the target machine with basic auth: abap profile add ${entry.name} --url ${entry.url} --username ${entry.username} --password <password>`,
+          ],
+          example: `abap profile add ${entry.name} --url ${entry.url} --username ${entry.username} --password <password>`,
+        },
+      );
+    }
     const exists = getSystem(entry.name) !== null;
     if (exists && !opts.overwrite) {
       imported.push({ name: entry.name, action: 'skipped' });
       continue;
     }
-    const auth = entry.auth ?? legacyToCanonical(entry);
     const profile: SystemProfile = {
       url: entry.url,
       client: entry.client,
@@ -99,7 +110,6 @@ export async function importProfiles(bundle: ProfileBundle, opts: ImportOptions 
       language: entry.language,
       ...(entry.insecure !== undefined ? { insecure: entry.insecure } : {}),
       ...(entry.ca ? { ca: entry.ca } : {}),
-      auth,
     };
     upsertSystem(entry.name, profile);
     if (entry.password) {
@@ -110,14 +120,23 @@ export async function importProfiles(bundle: ProfileBundle, opts: ImportOptions 
   return { imported };
 }
 
-/** Convert a legacy v1 bundle entry to canonical auth via the v1 normaliser. */
-function legacyToCanonical(entry: ProfileBundleEntry): SystemProfile['auth'] {
-  // Delegate to the same normaliser used for stored profiles — any inconsistency
-  // throws `CONFIG_ERROR` rather than silently writing a broken profile.
-  return normalizeAuth({
-    ...(entry.authMethod !== undefined ? { authMethod: entry.authMethod } : {}),
-    ...(entry.certAuth ? { certAuth: entry.certAuth } : {}),
-    ...(entry.ssoCookieFile ? { ssoCookieFile: entry.ssoCookieFile } : {}),
-    ...(entry.oauthPassword ? { oauthPassword: entry.oauthPassword } : {}),
-  });
+/**
+ * Detect the removed auth fields older bundles may still carry (v2 bundles wrote
+ * a canonical `auth` block; v1 bundles wrote flat `authMethod` + credential
+ * blocks). Basic auth declarations are ignored.
+ */
+function detectUnsupportedAuth(entry: ProfileBundleEntry): string | undefined {
+  const raw = entry as unknown as Record<string, unknown>;
+  const auth = raw.auth;
+  if (auth && typeof auth === 'object') {
+    const method = (auth as { method?: unknown }).method;
+    if (typeof method === 'string' && method !== '' && method !== 'basic') return method;
+  }
+  const flat = raw.authMethod;
+  if (typeof flat === 'string' && flat !== '' && flat !== 'basic') return flat;
+  if (raw.certAuth) return 'cert';
+  if (raw.oauthPassword) return 'oauth_password';
+  if (raw.ssoCookieFile) return 'browser_sso';
+  if (raw.negotiate) return 'sso';
+  return undefined;
 }

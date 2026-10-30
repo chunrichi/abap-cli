@@ -136,20 +136,16 @@ sequenceDiagram
 
 ---
 
-## 5. Auth Strategy 路由
+## 5. Basic Auth 路由
 
 ```mermaid
 flowchart TD
-  Start["profile add / init"] --> Auth{auth.method}
-  Auth -->|basic| B["User + Password<br/>→ ADTClient.password<br/>→ keychain"]
-  Auth -->|browser_sso| SSO["sso-loopback.ts<br/>127.0.0.1 捕获 cookie<br/>→ Cookie header"]
-  Auth -->|cert| C["X.509 cert + key<br/>→ https.Agent<br/>→ 'x509-cert-auth' 占位密码"]
-  Auth -->|oauth_password| O["Username + Password<br/>→ reentranceticket / oauth2<br/>→ Bearer token"]
-  B --> Apply["buildAuth() → ClientOptions"]
-  SSO --> Apply
-  C --> Apply
-  O --> Apply
-  Apply -->|应用到 ADT + ICF| Done["同一认证对 ADT 与 ICF 通用"]
+  Start["profile add / init"] --> Auth["buildBasicAuth(sap)"]
+  Auth --> P["sap.password<br/>（OS keychain）"]
+  Auth --> T["TLS options<br/>--ca / --insecure<br/>→ https.Agent"]
+  P --> Apply["ADTClient password + ClientOptions"]
+  T --> Apply
+  Apply -->|"同一凭据对 ADT 与 ICF 通用"| Done["login → SAP"]
 ```
 
 ---

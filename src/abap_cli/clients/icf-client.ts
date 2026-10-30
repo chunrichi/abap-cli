@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import { loadConfig, type ProjectConfig } from '../config/project-config.js';
-import { buildAuth } from '../auth/adapter.js';
+import { buildBasicAuth } from './basic-auth.js';
 import { CliError } from '../output/json.js';
 import type { ErrorCode } from '../output/error-codes.js';
 import { classifyHttpError } from './http-error.js';
@@ -47,43 +47,34 @@ export class IcfClient {
   /** Cookie header from the session jar when reuse is active (else undefined). */
   private jarCookie: string | undefined;
   /** Whether this client attempted a stale-session 401 fallback already. */
-  private fallbackUsed = false;  private constructor(config: ProjectConfig, authOpts: { passwordOrFetcher: string | (() => Promise<string>); options: import('abap-adt-api').ClientOptions }) {
+  private fallbackUsed = false;
+
+  private constructor(config: ProjectConfig, auth: { password: string; options: import('abap-adt-api').ClientOptions }) {
     this.baseUrl = `${config.sap.url}${ICF_BASE_PATH}`;
 
-    // Reuse the SAME artefacts `buildAuth()` produces for ADT — `httpsAgent`
-    // (cert mTLS) and `headers.Cookie` (browser_sso) flow through verbatim,
-    // so every auth strategy that works for ADT now also works for ICF.
-    //
-    // For strategies whose `passwordOrFetcher` is an async BearerFetcher
-    // (oauth_password), axios basic-auth can't carry it, so we fall back to
-    // the SAP-conventional placeholder password and rely on a future
-    // Authorization-header strategy. For literal-password strategies (basic,
-    // cert, browser_sso) we pass the literal through.
-    const password = typeof authOpts.passwordOrFetcher === 'string'
-      ? authOpts.passwordOrFetcher
-      : 'icf-fallback'; // oauth_password strategies plug in here when supported
-
+    // Reuse the SAME artefacts `buildBasicAuth()` produces for ADT — the TLS
+    // options (`httpsAgent`) and any auth headers flow through verbatim.
     this.http = axios.create({
       baseURL: this.baseUrl,
-      auth: { username: config.sap.username, password },
+      auth: { username: config.sap.username, password: auth.password },
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         'sap-client': config.sap.client,
-        ...(authOpts.options.headers ?? {}),
+        ...(auth.options.headers ?? {}),
       },
-      httpsAgent: authOpts.options.httpsAgent,
+      httpsAgent: auth.options.httpsAgent,
       timeout: 30000,
     });
   }
 
   static async create(): Promise<IcfClient> {
     const config = await loadConfig();
-    const authOpts = await buildAuth(config.sap, config.systemName);
+    const authOpts = buildBasicAuth(config.sap);
 
     // Session reuse for ICF: same jar as ADT, so a pull + push pair on the
     // same profile reuses the SAP session (no new `User Sessions` entry per
-    // push). cloud / btp / always-logout keep the legacy basic-auth path.
+    // push). cloud / btp / always-logout keep the fresh-login path.
     const policy = effectivePolicy(resolveSessionPolicy(config));
     if (!isUnsupportedInContext(config) && policy === 'reuse') {
       const { key } = await loadOrCreateSessionKey(config.sap);
