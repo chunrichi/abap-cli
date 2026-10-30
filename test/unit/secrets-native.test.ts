@@ -21,7 +21,17 @@ const execFileMock = vi.fn();
 const spawnMock = vi.fn();
 
 vi.mock('node:child_process', () => ({
-  execFile: (...args: unknown[]) => execFileMock(...args),
+  // Mirror the real callback contract: production reads go through
+  // `execFileAsync`, which passes a callback and awaits its output. A mock
+  // that returns a bare promise would hide a callback-vs-promise mix-up
+  // instead of exercising it.
+  execFile: (...args: unknown[]) => {
+    const callback = args.pop() as (error: unknown, stdout?: string, stderr?: string) => void;
+    void (execFileMock(...args) as Promise<{ stdout: string; stderr: string }>).then(
+      (output) => callback(null, output.stdout, output.stderr),
+      (error: unknown) => callback(error),
+    );
+  },
   spawn: (...args: unknown[]) => spawnMock(...args),
 }));
 

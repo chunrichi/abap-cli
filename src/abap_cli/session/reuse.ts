@@ -39,8 +39,11 @@ export function jarCookieHeader(jar: SessionJar): string {
 /**
  * Read + decrypt the jar for a profile. Returns `null` when there is no jar
  * or when it cannot be trusted (missing file, corrupt blob, wrong system
- * hash) — each failure path logs a one-line `WARN session jar:` to stderr
- * so the caller can fall back to a fresh login without surprising the user.
+ * hash). Both candidate paths (the canonical home-dir jar and the TMPDIR
+ * fallback) are tried before giving up, so a stale jar on one path does not
+ * hide a usable jar on the other. A `WARN session jar:` line is emitted only
+ * when every candidate fails — i.e. when the caller really falls back to a
+ * fresh login.
  */
 /**
  * Session-jar warnings are emitted at most once per process, per kind.
@@ -105,6 +108,7 @@ export async function loadJarFromDisk(profile: SapConfig, key: Buffer): Promise<
   const fallback = fallbackJarPaths.get(hash) ?? fallbackJarPath(profile);
   const ordered = fallbackJarPaths.has(hash) ? [fallback, primary] : [primary, fallback];
   let lastReadError: unknown = null;
+  let lastDecryptError: string | null = null;
   for (const file of ordered) {
     if (!fs.existsSync(file)) continue;
     let blob: Buffer;
@@ -115,15 +119,22 @@ export async function loadJarFromDisk(profile: SapConfig, key: Buffer): Promise<
       continue;
     }
     try {
-      return decryptJar(blob, key, computeSystemHash(profile));
+      return decryptJar(blob, key, hash);
     } catch (error: unknown) {
       if (error instanceof CliError && error.code === 'SESSION_JAR_DECRYPT_FAILED') {
-        const msg = error instanceof Error ? error.message : String(error);
-        warnJarOnce('decrypt', `WARN session jar: ${msg}, re-logging in\n`);
-        return null;
+        // A jar encrypted under a rotated key must not hide a usable jar on
+        // the other candidate path (e.g. the home-dir jar is stale while the
+        // TMPDIR fallback still decrypts). Keep trying; warn only if none of
+        // the candidates decrypts.
+        lastDecryptError = error.message;
+        continue;
       }
       throw error;
     }
+  }
+  if (lastDecryptError !== null) {
+    warnJarOnce('decrypt', `WARN session jar: ${lastDecryptError}, re-logging in\n`);
+    return null;
   }
   if (lastReadError !== null) {
     const msg = lastReadError instanceof Error ? lastReadError.message : String(lastReadError);

@@ -149,4 +149,39 @@ describe('session jar fallback (S-8)', () => {
     resetJarWarnings();
     expect(getFallbackJarPath(profile)).toBeUndefined();
   });
+
+  it('falls through a stale home-dir jar and still reuses the fallback jar', async () => {
+    const key = Buffer.alloc(32, 1);
+    await markJarPersisted(jar, profile, key);
+    expect(getFallbackJarPath(profile)).toBeDefined();
+
+    // Next run: the home dir is writable again and holds a jar encrypted
+    // under a rotated key (undecryptable with `key`).
+    resetJarWarnings();
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'jarhome-'));
+    h.home.value = home;
+    const primaryPath = path.join(home, '.abap-cli', 'sessions', `${computeSystemHash(profile)}.json`);
+    fs.mkdirSync(path.dirname(primaryPath), { recursive: true });
+    fs.writeFileSync(primaryPath, Buffer.from('stale jar encrypted with another key'));
+
+    const loaded = await loadJarFromDisk(profile, key);
+    expect(loaded?.cookies).toEqual(jar.cookies);
+    // A usable fallback must not look like a fresh login.
+    expect(stderr.filter((line) => line.includes('re-logging in'))).toHaveLength(0);
+  });
+
+  it('emits one fresh-login warning when every candidate jar fails to decrypt', async () => {
+    const key = Buffer.alloc(32, 1);
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'jarhome-'));
+    h.home.value = home;
+    const primaryPath = path.join(home, '.abap-cli', 'sessions', `${computeSystemHash(profile)}.json`);
+    fs.mkdirSync(path.dirname(primaryPath), { recursive: true });
+    fs.writeFileSync(primaryPath, Buffer.from('stale jar encrypted with another key'));
+
+    const loaded = await loadJarFromDisk(profile, key);
+    expect(loaded).toBeNull();
+    const warnings = stderr.filter((line) => line.includes('WARN session jar'));
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('re-logging in');
+  });
 });

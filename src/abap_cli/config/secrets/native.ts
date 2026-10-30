@@ -16,10 +16,11 @@
  * `find-generic-password` / `secret-tool lookup` and vice versa — migrating
  * from `keytar` to native is data-preserving.
  */
-import { execFile, spawn } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { platform } from 'node:os';
 import { CliError } from '../../output/json.js';
 import type { SecretKind, SecretsBackend } from '../secrets-types.js';
+import { execFileAsync } from './exec.js';
 
 /** Mirrors `SERVICE` in secrets.ts — kept in sync deliberately. */
 const SERVICE = 'abap-cli';
@@ -37,7 +38,7 @@ class WindowsKeychainAdapter implements SecretsBackend {
 
   async isAvailable(): Promise<boolean> {
     try {
-      await execFile('cmdkey.exe', ['/list'], { windowsHide: true, timeout: 5000 });
+      await execFileAsync('cmdkey.exe', ['/list'], { windowsHide: true, timeout: 5000 });
       return true;
     } catch {
       return false;
@@ -47,7 +48,7 @@ class WindowsKeychainAdapter implements SecretsBackend {
   async set(account: string, kind: SecretKind, value: string): Promise<void> {
     const target = `${SERVICE}/${accountKey(account, kind)}`;
     try {
-      await execFile('cmdkey.exe',
+      await execFileAsync('cmdkey.exe',
         [`/generic:${target}`, `/user:${account}`, `/pass:${value}`],
         { windowsHide: true, timeout: 10000 },
       );
@@ -99,11 +100,11 @@ public class WinCredRead {
 
     let stdout: string;
     try {
-      const result = await execFile('powershell.exe',
+      const result = await execFileAsync('powershell.exe',
         ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', psScript],
         { windowsHide: true, timeout: 15000 },
       );
-      stdout = typeof result.stdout === 'string' ? result.stdout : String(result.stdout ?? '');
+      stdout = result.stdout;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       throw new CliError('CONFIG_ERROR', `powershell.exe failed: ${message}`);
@@ -116,7 +117,7 @@ public class WinCredRead {
   async delete(account: string, kind: SecretKind): Promise<boolean> {
     const target = `${SERVICE}/${accountKey(account, kind)}`;
     try {
-      await execFile('cmdkey.exe', [`/delete:${target}`], { windowsHide: true, timeout: 5000 });
+      await execFileAsync('cmdkey.exe', [`/delete:${target}`], { windowsHide: true, timeout: 5000 });
       return true;
     } catch (error: unknown) {
       // cmdkey /delete exits 1 when target doesn't exist; treat as success.
@@ -140,7 +141,7 @@ class MacosKeychainAdapter implements SecretsBackend {
 
   async isAvailable(): Promise<boolean> {
     try {
-      await execFile('/usr/bin/security', ['help'], { timeout: 5000 });
+      await execFileAsync('/usr/bin/security', ['help'], { timeout: 5000 });
       return true;
     } catch {
       return false;
@@ -149,7 +150,7 @@ class MacosKeychainAdapter implements SecretsBackend {
 
   async set(account: string, kind: SecretKind, value: string): Promise<void> {
     const key = accountKey(account, kind);
-    const add = () => execFile('/usr/bin/security',
+    const add = () => execFileAsync('/usr/bin/security',
       ['add-generic-password', '-a', key, '-s', SERVICE, '-w', value],
       { timeout: 10000 },
     );
@@ -175,11 +176,10 @@ class MacosKeychainAdapter implements SecretsBackend {
 
   async get(account: string, kind: SecretKind): Promise<string | null> {
     try {
-      const result = await execFile('/usr/bin/security',
+      const { stdout } = await execFileAsync('/usr/bin/security',
         ['find-generic-password', '-a', accountKey(account, kind), '-s', SERVICE, '-w'],
         { timeout: 10000 },
       );
-      const stdout = typeof result.stdout === 'string' ? result.stdout : String(result.stdout ?? '');
       return stdout.replace(/\r?\n$/, '');
     } catch (error: unknown) {
       const code = (error as { code?: unknown })?.code;
@@ -191,7 +191,7 @@ class MacosKeychainAdapter implements SecretsBackend {
 
   async delete(account: string, kind: SecretKind): Promise<boolean> {
     try {
-      await execFile('/usr/bin/security',
+      await execFileAsync('/usr/bin/security',
         ['delete-generic-password', '-a', accountKey(account, kind), '-s', SERVICE],
         { timeout: 10000 },
       );
@@ -222,7 +222,7 @@ class LinuxKeychainAdapter implements SecretsBackend {
 
   async isAvailable(): Promise<boolean> {
     try {
-      await execFile('secret-tool', ['--help'], { timeout: 5000 });
+      await execFileAsync('secret-tool', ['--help'], { timeout: 5000 });
       return true;
     } catch {
       return false;
