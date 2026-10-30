@@ -38,6 +38,7 @@ function toAdtCloseable(client: AdtClientWrapper): CloseableClient {
         // logout is best-effort per client
       }
     },
+    needsRelease: () => client.sessionNeedsRelease,
   };
 }
 
@@ -77,6 +78,16 @@ export async function drainClients(opts: { adt?: boolean; icf?: boolean } = {}):
   if (opts.adt ?? true) labels.add('adt');
   if (opts.icf ?? true) labels.add('icf');
   await closeTrackedClients(undefined, labels);
+}
+
+/**
+ * Release only the clients whose session will not be reusable by the next
+ * command (see `AdtClientWrapper.sessionNeedsRelease`). The default `reuse`
+ * policy calls this at command end as a safety net: a fresh login that could
+ * not be persisted must not linger as one orphan SAP session per command.
+ */
+export async function drainUnreusableClients(): Promise<void> {
+  await closeTrackedClients(undefined, undefined, (client) => client.needsRelease?.() === true);
 }
 
 /** Test-only: reset the registry between cases. */

@@ -19,6 +19,13 @@ export interface CloseableClient {
   readonly label: string;
   /** Release any network resources. Resolves once done; must not throw. */
   close(): Promise<void>;
+  /**
+   * Optional predicate for policies that normally keep sessions open: return
+   * `true` when this client's session must still be released (e.g. a fresh
+   * login that could not be persisted for the next command). Absent means the
+   * client follows the policy default.
+   */
+  needsRelease?: () => boolean;
 }
 
 export const DEFAULT_TIMEOUT_MS = 5_000;
@@ -45,19 +52,21 @@ export function untrackClient(client: CloseableClient): void {
 
 /**
  * Best-effort shutdown for every tracked client, or for just the given
- * labels when a set is passed. Callers that arrive while a drain is already
- * running are handed that in-flight promise once, then re-snapshot, so the
- * call never resolves while clients it asked for are still tracked.
+ * labels when a set is passed; `select` narrows the batch further (used by
+ * the reuse policy's safety net). Callers that arrive while a drain is
+ * already running are handed that in-flight promise once, then re-snapshot,
+ * so the call never resolves while clients it asked for are still tracked.
  */
 export function closeTrackedClients(
   timeoutMs: number = DEFAULT_TIMEOUT_MS,
   labels?: ReadonlySet<string>,
+  select?: (client: CloseableClient) => boolean,
 ): Promise<void> {
   // Synchronous fast path: a re-entrant or concurrent call joins the running
   // drain instead of queueing a second one, and gets the identical promise.
   if (draining) return current ?? idle;
   draining = true;
-  current = runBatches(timeoutMs, labels).finally(() => {
+  current = runBatches(timeoutMs, labels, select).finally(() => {
     draining = false;
     current = undefined;
     releaseIdle?.();
@@ -66,12 +75,16 @@ export function closeTrackedClients(
   return current;
 }
 
-async function runBatches(timeoutMs: number, labels?: ReadonlySet<string>): Promise<void> {
+async function runBatches(
+  timeoutMs: number,
+  labels?: ReadonlySet<string>,
+  select?: (client: CloseableClient) => boolean,
+): Promise<void> {
   // Only the caller that flipped `draining` runs the loop; anyone who joined
   // afterwards is parked on `idle` and re-snapshots once this batch settles.
   await idle;
   for (;;) {
-    const batch = snapshot(labels);
+    const batch = snapshot(labels, select);
     if (batch.length === 0) return;
     // Untrack up-front so a concurrent / later drain never closes twice.
     for (const client of batch) clients.delete(client);
@@ -88,9 +101,13 @@ async function runBatches(timeoutMs: number, labels?: ReadonlySet<string>): Prom
   }
 }
 
-function snapshot(labels?: ReadonlySet<string>): CloseableClient[] {
-  const all = [...clients];
-  return labels ? all.filter((client) => labels.has(client.label)) : all;
+function snapshot(
+  labels?: ReadonlySet<string>,
+  select?: (client: CloseableClient) => boolean,
+): CloseableClient[] {
+  let all = [...clients];
+  if (labels) all = all.filter((client) => labels.has(client.label));
+  return select ? all.filter(select) : all;
 }
 
 /**

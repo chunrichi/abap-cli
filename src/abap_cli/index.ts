@@ -10,7 +10,7 @@ import { COMMAND_SPECS } from './registry/commands.js';
 import { handleTopLevelError } from './top-error.js';
 import { loadConfig } from './config/project-config.js';
 import { installSignalHandlers } from './session/signals.js';
-import { runAlwaysLogoutIfNeeded } from './session/end-of-command.js';
+import { runEndOfCommandCleanup } from './session/end-of-command.js';
 
 
 const require = createRequire(import.meta.url);
@@ -64,13 +64,14 @@ const configPromise = (async (): Promise<Awaited<ReturnType<typeof loadConfig>> 
 // `config.extensions`) see the resolved values, while meta/help/version paths
 // never block on a missing profile.
 program.hook('postAction', async (_thisCmd, actionCmd) => {
-  // 034: release SAP sessions at command end when the policy demands it
-  // (`always-logout`). The default `reuse` policy intentionally keeps the
-  // session alive so the next CLI process can reuse it. Skipped when no
-  // config was resolved (e.g. `init` in an unconfigured workspace).
+  // Release SAP sessions at command end. `always-logout` drains
+  // everything; the default `reuse` policy keeps the session for the next
+  // command but still releases any session this run could not persist (safety
+  // net against one orphan SAP session per command). Skipped when no config
+  // was resolved (e.g. `init` in an unconfigured workspace).
   const config = await configPromise;
   if (config) {
-    await runAlwaysLogoutIfNeeded(config);
+    await runEndOfCommandCleanup(config);
   }
 });
 

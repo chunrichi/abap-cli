@@ -74,19 +74,22 @@ export class IcfClient {
 
     // Session reuse for ICF: same jar as ADT, so a pull + push pair on the
     // same profile reuses the SAP session (no new `User Sessions` entry per
-    // push). cloud / btp / always-logout keep the fresh-login path.
+    // push). cloud / btp / always-logout / non-durable key stores keep the
+    // fresh-login path.
     const policy = effectivePolicy(resolveSessionPolicy(config));
     if (!isUnsupportedInContext(config) && policy === 'reuse') {
-      const { key } = await loadOrCreateSessionKey(config.sap);
-      const jar = await loadJarFromDisk(config.sap, key);
-      if (jar && jar.cookies.length > 0) {
-        const cookieHeader = icfCookieHeader(jar);
-        if (cookieHeader) {
-          const client = new IcfClient(config, authOpts);
-          client.jarCookie = cookieHeader;
-          client.http.defaults.headers.common['Cookie'] = cookieHeader;
-          registerIcfClient(client);
-          return client;
+      const { key, mode } = await loadOrCreateSessionKey(config.sap);
+      if (mode !== 'ephemeral') {
+        const jar = await loadJarFromDisk(config.sap, key);
+        if (jar && jar.cookies.length > 0) {
+          const cookieHeader = icfCookieHeader(jar);
+          if (cookieHeader) {
+            const client = new IcfClient(config, authOpts);
+            client.jarCookie = cookieHeader;
+            client.http.defaults.headers.common['Cookie'] = cookieHeader;
+            registerIcfClient(client);
+            return client;
+          }
         }
       }
     }

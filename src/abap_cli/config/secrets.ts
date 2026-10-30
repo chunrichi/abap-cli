@@ -152,6 +152,19 @@ export function _resetBackendForTesting(): void {
   cachedBackend = undefined;
 }
 
+/**
+ * Whether the active secret store persists values across processes.
+ *
+ * The `fixture` and `disabled` backends are test/CI stand-ins: anything
+ * written there is gone on the next invocation, so a session-jar key stored
+ * through them could never decrypt the jar again. Session reuse is disabled
+ * for such stores.
+ */
+export async function isSecretStoreDurable(): Promise<boolean> {
+  const backend = await resolveBackend();
+  return backend.name !== 'fixture' && backend.name !== 'disabled';
+}
+
 /* ─────────── Public API ─────────── */
 
 function accountKey(account: string, kind: SecretKind): string {
