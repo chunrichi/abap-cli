@@ -16,10 +16,20 @@
  * `find-generic-password` / `secret-tool lookup` and vice versa — migrating
  * from `keytar` to native is data-preserving.
  */
-import { execFile, spawn } from 'node:child_process';
+import { execFile as execFileCallback, spawn } from 'node:child_process';
 import { platform } from 'node:os';
+import { promisify } from 'node:util';
 import { CliError } from '../../output/json.js';
 import type { SecretKind, SecretsBackend } from '../secrets-types.js';
+
+/**
+ * `child_process.execFile` is callback-based: awaiting it directly resolves to a
+ * `ChildProcess` (not `{ stdout, stderr }`), which made every keychain read
+ * return the string `"[object Object]"` and made writes/duplicates race. The
+ * promisified variant resolves with the process result and rejects with the
+ * `ExecFileException` carrying `code`/`stdout`/`stderr`.
+ */
+const execFile = promisify(execFileCallback);
 
 /** Mirrors `SERVICE` in secrets.ts — kept in sync deliberately. */
 const SERVICE = 'abap-cli';
@@ -121,7 +131,7 @@ public class WinCredRead {
     } catch (error: unknown) {
       // cmdkey /delete exits 1 when target doesn't exist; treat as success.
       const code = (error as { code?: unknown })?.code;
-      if (code === 1) return false;
+      if (Number(code) === 1) return false;
       const message = error instanceof Error ? error.message : String(error);
       throw new CliError('CONFIG_ERROR', `cmdkey.exe failed: ${message}`);
     }
@@ -183,7 +193,7 @@ class MacosKeychainAdapter implements SecretsBackend {
       return stdout.replace(/\r?\n$/, '');
     } catch (error: unknown) {
       const code = (error as { code?: unknown })?.code;
-      if (code === 44) return null; // item not found
+      if (Number(code) === 44) return null; // item not found
       const message = error instanceof Error ? error.message : String(error);
       throw new CliError('CONFIG_ERROR', `security find-generic-password failed: ${message}`);
     }
@@ -198,7 +208,7 @@ class MacosKeychainAdapter implements SecretsBackend {
       return true;
     } catch (error: unknown) {
       const code = (error as { code?: unknown })?.code;
-      if (code === 44) return false; // item not found
+      if (Number(code) === 44) return false; // item not found
       const message = error instanceof Error ? error.message : String(error);
       throw new CliError('CONFIG_ERROR', `security delete-generic-password failed: ${message}`);
     }

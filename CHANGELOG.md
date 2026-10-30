@@ -17,6 +17,7 @@
 
 ### Fixed
 
+- **原生 keychain 后端的 `execFile` 调用**：`execFile` 是回调式 API，直接 `await` 得到的是 `ChildProcess` 而不是 `{ stdout, stderr }`，导致 macOS / Windows 原生后端把密码读成字符串 `"[object Object]"`（连接类命令全部 401）、session-key 解码失败、写入与重复条目检测未真正等待。改为 `promisify(execFile)`，单测 mock 同步改成回调契约（缺 wrapper 时测试会失败）。
 - **macOS 反复弹出的钥匙串授权窗口**：旧条目由 `keytar` 写入，ACL 只信任创建时的 node 二进制；回退到原生 `security` 读取时每次访问都会触发系统授权弹窗。现在 macOS 默认用原生 `security` 写入/读取，条目由 `/usr/bin/security`（Apple 签名）创建，读取不再弹窗。
 
 ### Removed (breaking)

@@ -33,14 +33,23 @@ vi.mock('node:os', async () => {
 
 import { _resetBackendForTesting, resolveBackend, storePassword, getPassword, deletePassword, getSessionKey, storeSessionKey, deleteSessionKey } from '../../src/abap_cli/config/secrets.js';
 
+/**
+ * `execFile` is callback-based; the adapter promisifies it. Mocks must follow the
+ * callback contract — returning a Promise here would hide the `[object Object]`
+ * regression where awaiting the raw API resolved to a `ChildProcess`.
+ */
+type ExecFileCallback = (error: Error | null, result?: { stdout?: string; stderr?: string }) => void;
+
 function makeExecFileOk(stdout = '', stderr = '') {
-  return (_cmd: string, _args: string[]) => Promise.resolve({ stdout, stderr });
+  return (_cmd: string, _args: string[], _opts: unknown, callback: ExecFileCallback) => {
+    callback(null, { stdout, stderr });
+  };
 }
 
 function makeExecFileFail(message: string, code?: string | number) {
-  return (_cmd: string, _args: string[]) => {
+  return (_cmd: string, _args: string[], _opts: unknown, callback: ExecFileCallback) => {
     const err: NodeJS.ErrnoException = Object.assign(new Error(message), code !== undefined ? { code } : {});
-    return Promise.reject(err);
+    callback(err);
   };
 }
 
@@ -105,26 +114,27 @@ describe('secrets (native backend dispatcher)', () => {
         'cmdkey.exe',
         ['/generic:abap-cli/PROD', '/user:PROD', '/pass:hunter2'],
         expect.objectContaining({ windowsHide: true }),
+        expect.any(Function),
       );
     });
 
     it('reads via PowerShell Add-Type + Advapi32 CredReadW', async () => {
-      execFileMock.mockImplementation((cmd: string) => {
-        if (cmd === 'cmdkey.exe') return Promise.resolve({ stdout: '', stderr: '' });
-        if (cmd === 'powershell.exe') return Promise.resolve({ stdout: 'hunter2\n', stderr: '' });
-        return Promise.reject(new Error(`unexpected ${cmd}`));
+      execFileMock.mockImplementation((cmd: string, _args: string[], _opts: unknown, callback: ExecFileCallback) => {
+        if (cmd === 'cmdkey.exe') return callback(null, { stdout: '', stderr: '' });
+        if (cmd === 'powershell.exe') return callback(null, { stdout: 'hunter2\n', stderr: '' });
+        return callback(new Error(`unexpected ${cmd}`));
       });
       const backend = await resolveBackend();
       const got = await backend.get('PROD', 'password');
       expect(got).toBe('hunter2');
-      expect(execFileMock).toHaveBeenCalledWith('powershell.exe', expect.arrayContaining(['-Command']), expect.any(Object));
+      expect(execFileMock).toHaveBeenCalledWith('powershell.exe', expect.arrayContaining(['-Command']), expect.any(Object), expect.any(Function));
     });
 
     it('returns null when PowerShell emits `$null`', async () => {
-      execFileMock.mockImplementation((cmd: string) => {
-        if (cmd === 'cmdkey.exe') return Promise.resolve({ stdout: '', stderr: '' });
-        if (cmd === 'powershell.exe') return Promise.resolve({ stdout: '$null\n', stderr: '' });
-        return Promise.reject(new Error(`unexpected ${cmd}`));
+      execFileMock.mockImplementation((cmd: string, _args: string[], _opts: unknown, callback: ExecFileCallback) => {
+        if (cmd === 'cmdkey.exe') return callback(null, { stdout: '', stderr: '' });
+        if (cmd === 'powershell.exe') return callback(null, { stdout: '$null\n', stderr: '' });
+        return callback(new Error(`unexpected ${cmd}`));
       });
       const backend = await resolveBackend();
       expect(await backend.get('MISSING', 'password')).toBeNull();
@@ -147,13 +157,14 @@ describe('secrets (native backend dispatcher)', () => {
       expect(execFileMock).toHaveBeenCalledWith('/usr/bin/security',
         ['add-generic-password', '-a', 'PROD', '-s', 'abap-cli', '-w', 'hunter2'],
         expect.any(Object),
+        expect.any(Function),
       );
     });
 
     it('reads via security find-generic-password', async () => {
-      execFileMock.mockImplementation((cmd: string) => {
-        if (cmd === '/usr/bin/security') return Promise.resolve({ stdout: 'hunter2\n', stderr: '' });
-        return Promise.reject(new Error(`unexpected ${cmd}`));
+      execFileMock.mockImplementation((cmd: string, _args: string[], _opts: unknown, callback: ExecFileCallback) => {
+        if (cmd === '/usr/bin/security') return callback(null, { stdout: 'hunter2\n', stderr: '' });
+        return callback(new Error(`unexpected ${cmd}`));
       });
       const backend = await resolveBackend();
       expect(await backend.get('PROD', 'password')).toBe('hunter2');
@@ -167,21 +178,23 @@ describe('secrets (native backend dispatcher)', () => {
 
     it('recreates an existing item (exit 45) so legacy keytar entries get the security ACL', async () => {
       let addCalls = 0;
-      execFileMock.mockImplementation((_cmd: string, args: string[]) => {
-        if (args[0] === 'add-generic-password') {
-          addCalls += 1;
-          if (addCalls === 1) {
-            return makeExecFileFail('The specified item already exists in the keychain.', 45)(
-              '/usr/bin/security', args,
-            );
+      execFileMock.mockImplementation(
+        (_cmd: string, args: string[], opts: unknown, callback: ExecFileCallback) => {
+          if (args[0] === 'add-generic-password') {
+            addCalls += 1;
+            if (addCalls === 1) {
+              return makeExecFileFail('The specified item already exists in the keychain.', 45)(
+                '/usr/bin/security', args, opts, callback,
+              );
+            }
+            return callback(null, { stdout: '', stderr: '' });
           }
-          return Promise.resolve({ stdout: '', stderr: '' });
-        }
-        if (args[0] === 'delete-generic-password') {
-          return Promise.resolve({ stdout: 'password has been deleted.', stderr: '' });
-        }
-        return Promise.reject(new Error(`unexpected ${String(args[0])}`));
-      });
+          if (args[0] === 'delete-generic-password') {
+            return callback(null, { stdout: 'password has been deleted.', stderr: '' });
+          }
+          return callback(new Error(`unexpected ${String(args[0])}`));
+        },
+      );
 
       const backend = await resolveBackend();
       await backend.set('PROD', 'password', 'hunter2');
@@ -195,6 +208,7 @@ describe('secrets (native backend dispatcher)', () => {
       expect(execFileMock).toHaveBeenCalledWith('/usr/bin/security',
         ['delete-generic-password', '-a', 'PROD', '-s', 'abap-cli'],
         expect.any(Object),
+        expect.any(Function),
       );
     });
 
@@ -259,7 +273,7 @@ describe('secrets (native backend dispatcher)', () => {
     it('storePassword / getPassword / deletePassword go through the active backend', async () => {
       execFileMock.mockImplementation(makeExecFileOk());
       await storePassword('PROD', 'hunter2');
-      execFileMock.mockImplementation(() => Promise.resolve({ stdout: 'hunter2\n', stderr: '' }));
+      execFileMock.mockImplementation((_cmd: string, _args: string[], _opts: unknown, callback: ExecFileCallback) => callback(null, { stdout: 'hunter2\n', stderr: '' }));
       expect(await getPassword('PROD')).toBe('hunter2');
       execFileMock.mockImplementation(makeExecFileOk());
       expect(await deletePassword('PROD')).toBe(true);
@@ -271,8 +285,9 @@ describe('secrets (native backend dispatcher)', () => {
       expect(execFileMock).toHaveBeenCalledWith('/usr/bin/security',
         ['add-generic-password', '-a', 'abap-cli/session-key', '-s', 'abap-cli', '-w', 'base64=='],
         expect.any(Object),
+        expect.any(Function),
       );
-      execFileMock.mockImplementation(() => Promise.resolve({ stdout: 'base64==\n', stderr: '' }));
+      execFileMock.mockImplementation((_cmd: string, _args: string[], _opts: unknown, callback: ExecFileCallback) => callback(null, { stdout: 'base64==\n', stderr: '' }));
       expect(await getSessionKey()).toBe('base64==');
       expect(await deleteSessionKey()).toBe(true);
     });
