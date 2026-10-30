@@ -21,7 +21,7 @@ A one-line ABAP change usually means: launch SAP GUI, open SE80, hunt for a tran
 `abap-cli` compresses it to two commands:
 
 ```bash
-abap pull ZCL_MY_CLASS                                  # class + all includes → src/
+abap pull ZCL_MY_CLASS                                  # class + source parts → src/
 # edit src/zcl_my_class.clas.abap in your editor
 abap push src/zcl_my_class.clas.abap --tr DEVK900001    # lock → write → activate → unlock
 ```
@@ -89,7 +89,7 @@ abap profile add DEV --url https://sap.example.com:44300 --client 100 --username
 
 # 2. Bind this workspace to the profile
 abap init --profile DEV --yes
-abap doctor                       # environment + connection diagnostics
+abap doctor                       # environment + config diagnostics
 
 # 3. Pull, edit, push
 abap pull ZCL_MY_CLASS
@@ -104,7 +104,7 @@ In a terminal, a bare `abap init` opens the interactive wizard instead.
 
 ### Enable the DDIC, data and runtime endpoints
 
-Source objects work against ADT alone. DDIC CRUD, `select`, `fields`, `run-report`, `tcode`, `mime` and `run --method` use the bundled ICF service under `/sap/abap_cli`. Install it once per system:
+Source pull / push / check work against ADT alone. DDIC CRUD, SICF node and transaction-code operations, `select`, `fields`, `run-report`, `tcode`, `mime`, `run --method` and `pull --remote` use the bundled ICF service under `/sap/abap_cli`. Install it once per system:
 
 ```bash
 abap deploy --yes      # 3 global classes into $TMP — no transport needed
@@ -119,7 +119,7 @@ For a transported install into your own package, pass `--package <pkg> --tr <req
 abap init --agent claude    # copilot | claude | cursor | generic
 ```
 
-This copies the 6 skills and the `abap-developer` agent definition into the matching vendor directory (`.github/`, `.claude/`, `.cursor/`, `.agents/`). See [skills/README.md](skills/README.md) for the layout and the skill routing table.
+This copies the 6 skills and the `abap-developer` agent definition into the matching vendor directory (`.github/`, `.claude/`, `.cursor/`, `.agents/`), plus a `CLAUDE.md` or `.cursor/rules/abap.mdc` overlay where the vendor needs one. See [skills/README.md](skills/README.md) for the layout and the skill routing table.
 
 ---
 
@@ -136,7 +136,7 @@ graph LR
 ```
 
 - **ADT channel** — source objects (CLAS / INTF / PROG / FUGR / CDS / RAP) use the standard ADT REST API: search, source read/write, lock, syntax check, activation, transports, where-used.
-- **ICF channel** — DDIC objects, table data, reports, MIME, textpool and the runtime wrapper use the bundled ABAP service, deployed with `abap deploy`. It exposes `/ddic/*`, `/data/*`, `/run/*`, `/mime/*`, `/tcode/*`, `/tran/*`, `/textpool/*`.
+- **ICF channel** — DDIC objects, SICF nodes and transaction codes, table data, reports, MIME, remote version pulls, textpool reads on releases without the ADT text-elements endpoint, and the runtime wrapper use the bundled ABAP service, deployed with `abap deploy`. It exposes `/ddic/*`, `/http/*`, `/tran/*`, `/tcode/*`, `/data/*`, `/run/*`, `/mime/*`, `/textpool/*`, `/version-source*` and `/_class-check*`.
 
 The release form of the service installs **3 global classes** (handler + setup + runtime wrapper); `abap deploy --dev` installs the full 19-class development tree for maintainers. The ICF node is created idempotently by the setup class, so `abap deploy` can be re-run safely.
 
@@ -166,7 +166,7 @@ No type or object subdirectories, and namespaced objects use the AFF bracket tok
 |---|---|
 | `abap init` | Bind the workspace to a profile (writes `.abap.json`), set default transport / package / source dir, inspect (`--show-config`) or clear fields, scaffold agent context (`--agent copilot / claude / cursor / generic`) |
 | `abap profile` | Manage global connection profiles: `list` / `show` / `add` / `set` / `test` / `delete` / `export` / `import` |
-| `abap doctor` | Diagnose environment, configuration and connectivity (`--fix` applies safe fixes) |
+| `abap doctor` | Diagnose environment and configuration (read-only and offline — use `abap profile test` for connectivity); `--fix` applies safe fixes |
 | `abap session` | Inspect the session cookie jar for the active profile (`session info`) |
 | `abap deploy` | Deploy the bundled ICF service (`status` probes the installed version; `--dev` installs the development form) |
 | `abap transport` | `list` (`--open`) / `create` / `show` / `resolve` / `assign` transport requests |
@@ -174,16 +174,16 @@ No type or object subdirectories, and namespaced objects use the AFF bracket tok
 | `abap push <files...>` | Push local files back: lock → write → activate → unlock (`--tr`, `--all`, `--atomic`, `--check-only`, `--dry-run`, `--no-activate`, `--fail-fast`) |
 | `abap check` | `syntax` (against SAP) / `content` (local only) / `atc` (`--variant`, `--out`), each with `--all`, `--changed`, `--strict` |
 | `abap create <type> <name>` | Create and activate an object (`--package`, `--description`, `--tr`, `--file`, `--template`, `--check-only`, `--audit`); `--func <name>` adds a function module to an existing function group |
-| `abap create local <type> <name>` | Generate an offline AFF draft skeleton for CLAS / INTF / PROG / FUGR, no SAP connection |
+| `abap create local <type> <name>` | Generate an offline AFF draft skeleton for CLAS / INTF / PROG / FUGR and the SRVD / DCLS / DDLX / DDLA companions, no SAP connection |
 | `abap activate <object>` | Activate all inactive items of an object (repairs stale activation) |
 | `abap delete <object>` | Delete an object: lock → delete → unlock (`--type`, `--tr`, `--yes`) |
 | `abap mime` | `create` / `delete` (`--recursive`) / `push` MIME repository folders and files |
-| `abap validate:aff` | Validate AFF JSON files against the official vendored schemas, locally (`--wire`) |
+| `abap validate:aff` | Validate AFF JSON files against the official vendored schemas, locally (`--wire <wire-dir>`) |
 | `abap search <query>` | Search objects by name pattern (`--type`, `--package`, `--exact`, `--fuzzy`, `--page-all`) |
 | `abap inspect <object>` | Read-only metadata: `--structure`, `--includes`, `--locks`, `--package`, `--activation` |
 | `abap where-used <object>` | Direct references for impact analysis (`--type`, `--ref-type`, `--package`, `--limit`) |
 | `abap tcode <code>` | Resolve a transaction code to its entry program and screen (TSTC → TSTCT) |
-| `abap list` | List objects by package or author (`--package`, `--type`, `--limit`) |
+| `abap list` | List objects in a package (`--package` required; `--type`, `--limit`) |
 | `abap dumps` | List recent ST22 runtime dumps (`--limit`, `--user`) |
 | `abap diff [file]` | Read-only local ↔ SAP comparison (`--all`, `--remote`, `--local-only`) |
 | `abap status` | Show which objects differ from SAP (`--remote-only`, `--local-only`, `--since`, `--all`) |
@@ -192,10 +192,10 @@ No type or object subdirectories, and namespaced objects use the AFF bracket tok
 | `abap select --table <name>` | Read-only table query, the SE16N equivalent (`--fields`, `--where`, `--limit`, `--offset`, `--order-by`, `--group-by`, `--count-only`) |
 | `abap fields <table>` | List table / view fields from DD03L, or reverse-lookup with `--find` (`--with-text`, `--as4local`, `--limit`) |
 | `abap types` | Print the CLI type ↔ TADIR / DDIC mapping, locally (`<type>`, `--tadir-object`) |
-| `abap feedback` | Submit a sanitized issue report from an agent session (`--feature-key`, `--title`, `--description`, `--dry-run`) |
+| `abap feedback` | Submit an issue report from an agent session (`--feature-key`, `--title`, `--description`, `--dry-run`) |
 | `abap report-stuck` | Record a stuck-agent report locally for triage (`--goal`, `--tried`, `--where`) |
 
-All commands support `--json` (compact) and `--pretty-json` (indented). Every command also supports `--schema --json`, which returns its arguments, options, allowed values, examples and error codes without touching SAP.
+All commands support `--json` (compact) and `--pretty-json` (indented). Every top-level command also supports `--schema --json`, which returns its arguments, options, allowed values, examples and error codes without touching SAP; nested subcommands (e.g. `create local`, `transport list`, `deploy status`) only expose `--help`.
 
 ---
 
@@ -211,10 +211,10 @@ All commands support `--json` (compact) and `--pretty-json` (indented). Every co
 | `HTTP` `TRAN` | ✅ | ✅ | ✅ | SICF service node / transaction code (SE93), `create --file` |
 | `TTYP` `MSAG` `DDLS` | ✅ | ✅ | ✅ | `create --file`; TTYP / MSAG fall back to ICF on older ECC, DDLS is ADT-only |
 | `SRVD` `DCLS` `DDLX` `DDLA` | ✅ | ✅ | ✅ | CDS / RAP companions, `create --file`, ADT only |
-| `BDEF` | — | ✅ | ✅ | RAP behavior definition is pull-only (no ADT create endpoint) |
+| `BDEF` | — | ✅ | ✅ | RAP behavior definition cannot be created (no ADT create endpoint); pull / push only |
 | `SRVB` | — | ✅ | — | Service binding is metadata-only (managed in SAP GUI) |
 
-`create` for DDIC, HTTP, TRAN, TTYP, MSAG and the CDS / RAP types requires an `--file <aff.json>` input; `abap create --schema <type>` prints the per-type contract, and DDIC types also include an example JSON. The full type × command matrix lives in [wiki/object-types.md](wiki/object-types.md).
+`create` for DDIC, HTTP, TRAN, TTYP, MSAG and the CDS / RAP types requires an `--file <aff.json>` input; `abap create --schema <type>` prints the per-type contract, and TABL / STRU / DOMA / DTEL include an example JSON. The full type × command matrix lives in [wiki/object-types.md](wiki/object-types.md).
 
 ---
 
@@ -224,13 +224,13 @@ All commands support `--json` (compact) and `--pretty-json` (indented). Every co
 
 ```jsonc
 // success — stdout, exit 0
-{ "status": "success", "meta": { "command": "abap pull", "version": "1.0.0", "durationMs": 42, "warnings": [] }, "data": { /* ... */ } }
+{ "status": "success", "meta": { "command": "abap pull", "version": "1.0.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { /* ... */ } }
 
 // failure — stderr, non-zero exit, stdout stays empty
 { "status": "error", "meta": { /* ... */ }, "error": { "code": "NO_TRANSPORT", "category": "VALIDATION_ERROR", "message": "..." } }
 ```
 
-Exit codes are stable and 1:1 with `error.category`: `0` success, `1` unknown, `2` usage, `3` config, `4` TLS, `5` auth, `6` SAP, `7` validation, `8` not found, `9` locked. Warnings live in `meta.warnings` and never change the exit code.
+Exit codes are stable and 1:1 with `error.category`: `0` success, `1` unknown, `2` usage, `3` config, `4` TLS, `5` auth, `6` SAP, `7` validation, `8` not found, `9` locked. Warnings live in `meta.warnings` and never change the exit code. Reserved-range codes: `64` DDLS not supported on this release, `65` channel detection, `66` conflict, `67` persistence, `68` HTTP error.
 
 ### Self-describing commands
 
@@ -255,8 +255,8 @@ They load progressively (name + description first, full body on demand), so an a
 
 ## Security and credentials
 
-- **Basic auth only.** The SAP password lives in the OS keychain — native `security` / `cmdkey.exe` / `secret-tool` backends, with `keytar` as fallback — keyed by profile name. It never lands in `.abap.json`, `.env`, logs or command output.
-- **Credentials are resolved lazily**, so local commands (`--help`, `init`, `profile`, `types`, …) never touch the keychain.
+- **Basic auth only.** The SAP password lives in the OS keychain — native `security` / `cmdkey.exe` / `secret-tool` backends, with `keytar` as fallback — keyed by profile name. It never lands in `.abap.json`, `.env` or logs, and only an explicit `abap profile export --with-passwords` echoes it.
+- **Credential resolution is lazy for metadata-only commands** (`--help`, `types`, `init --show-config`); password paths (`profile add / set / show / delete / export`, `init --test-*`) do touch the keychain.
 - **TLS trust** is managed per profile: `--ca` imports a PEM CA; `--insecure` skips verification for development only.
 - `.abap.json` and `.env` are gitignored. `abap profile export` includes passwords only with `--with-passwords`; treat that output as a secret.
 

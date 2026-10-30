@@ -21,7 +21,7 @@
 `abap-cli` 把它压缩成两条命令：
 
 ```bash
-abap pull ZCL_MY_CLASS                                  # 类 + 所有 include → src/
+abap pull ZCL_MY_CLASS                                  # 类 + 源码 part → src/
 # 用你喜欢的编辑器改 src/zcl_my_class.clas.abap
 abap push src/zcl_my_class.clas.abap --tr DEVK900001    # 锁 → 写 → 激活 → 解锁
 ```
@@ -89,7 +89,7 @@ abap profile add DEV --url https://sap.example.com:44300 --client 100 --username
 
 # 2. 把当前工作区绑定到该 profile
 abap init --profile DEV --yes
-abap doctor                       # 环境 + 连通性诊断
+abap doctor                       # 环境 + 配置诊断
 
 # 3. 拉取、编辑、推送
 abap pull ZCL_MY_CLASS
@@ -104,7 +104,7 @@ abap transport create "Feature work" --yes --json
 
 ### 启用 DDIC、数据与运行时端点
 
-源对象只依赖 ADT 就能工作。DDIC CRUD、`select`、`fields`、`run-report`、`tcode`、`mime` 以及 `run --method` 走捆绑在 `/sap/abap_cli` 下的 ICF 服务。每个系统装一次即可：
+源对象的 pull / push / check 只依赖 ADT。DDIC CRUD、SICF 节点与事务码操作、`select`、`fields`、`run-report`、`tcode`、`mime`、`run --method` 以及 `pull --remote` 走捆绑在 `/sap/abap_cli` 下的 ICF 服务。每个系统装一次即可：
 
 ```bash
 abap deploy --yes      # 3 个全局类装进 $TMP —— 无需 transport
@@ -119,7 +119,7 @@ abap deploy status     # 确认 SAP 侧版本与当前 CLI 一致
 abap init --agent claude    # copilot | claude | cursor | generic
 ```
 
-把 6 个 skill 与 `abap-developer` agent 定义拷到对应 vendor 目录（`.github/`、`.claude/`、`.cursor/`、`.agents/`）。目录结构与路由表见 [skills/README.md](skills/README.md)。
+把 6 个 skill 与 `abap-developer` agent 定义拷到对应 vendor 目录（`.github/`、`.claude/`、`.cursor/`、`.agents/`），需要时还会写 `CLAUDE.md` 或 `.cursor/rules/abap.mdc` 覆盖文件。目录结构与路由表见 [skills/README.md](skills/README.md)。
 
 ---
 
@@ -136,7 +136,7 @@ graph LR
 ```
 
 - **ADT 通道**——源对象（CLAS / INTF / PROG / FUGR / CDS / RAP）走标准 ADT REST API：搜索、源码读写、加锁、语法检查、激活、传输、where-used。
-- **ICF 通道**——DDIC 对象、表数据、报表、MIME、textpool 与运行时 wrapper 走捆绑 ABAP 服务，由 `abap deploy` 安装。端点包括 `/ddic/*`、`/data/*`、`/run/*`、`/mime/*`、`/tcode/*`、`/tran/*`、`/textpool/*`。
+- **ICF 通道**——DDIC 对象、SICF 节点与事务码、表数据、报表、MIME、远程版本拉取、无 ADT text-elements 端点时的 textpool 读取，以及运行时 wrapper 走捆绑 ABAP 服务，由 `abap deploy` 安装。端点包括 `/ddic/*`、`/http/*`、`/tran/*`、`/tcode/*`、`/data/*`、`/run/*`、`/mime/*`、`/textpool/*`、`/version-source*` 与 `/_class-check*`。
 
 发布形态只装 **3 个全局类**（handler + setup + 运行时 wrapper）；`abap deploy --dev` 装完整的 19 类开发形态供维护者使用。ICF 节点由 setup 类幂等创建，所以 `abap deploy` 可以安全重跑。
 
@@ -166,7 +166,7 @@ src/(ui2)cl_json.clas.abap                # 命名空间对象 /UI2/CL_JSON
 |---|---|
 | `abap init` | 把工作区绑定到 profile（写 `.abap.json`），设置默认 transport / 包 / 源目录，自省（`--show-config`）或清空字段，脚手架 agent 上下文（`--agent copilot / claude / cursor / generic`） |
 | `abap profile` | 管理全局连接 profile：`list` / `show` / `add` / `set` / `test` / `delete` / `export` / `import` |
-| `abap doctor` | 诊断环境、配置与连通性（`--fix` 应用安全修复） |
+| `abap doctor` | 诊断环境与配置（只读且不连 SAP——连通性用 `abap profile test`）；`--fix` 应用安全修复 |
 | `abap session` | 查看当前 profile 的会话 cookie jar（`session info`） |
 | `abap deploy` | 部署捆绑 ICF 服务（`status` 探测 SAP 侧已装版本；`--dev` 安装开发形态） |
 | `abap transport` | `list`（`--open`）/ `create` / `show` / `resolve` / `assign` 传输请求 |
@@ -174,16 +174,16 @@ src/(ui2)cl_json.clas.abap                # 命名空间对象 /UI2/CL_JSON
 | `abap push <files...>` | 把本地改动写回 SAP：锁 → 写 → 激活 → 解锁（`--tr`、`--all`、`--atomic`、`--check-only`、`--dry-run`、`--no-activate`、`--fail-fast`） |
 | `abap check` | `syntax`（走 SAP）/ `content`（纯本地）/ `atc`（`--variant`、`--out`），三者都支持 `--all`、`--changed`、`--strict` |
 | `abap create <type> <name>` | 在 SAP 创建并激活对象（`--package`、`--description`、`--tr`、`--file`、`--template`、`--check-only`、`--audit`）；`--func <name>` 在已有函数组里加函数模块 |
-| `abap create local <type> <name>` | 离线生成 AFF 草稿骨架，仅 CLAS / INTF / PROG / FUGR，不连 SAP |
+| `abap create local <type> <name>` | 离线生成 AFF 草稿骨架，支持 CLAS / INTF / PROG / FUGR 及 SRVD / DCLS / DDLX / DDLA 配套对象，不连 SAP |
 | `abap activate <object>` | 激活对象的所有 inactive items（修复陈旧未激活） |
 | `abap delete <object>` | 删除对象：锁 → 删除 → 解锁（`--type`、`--tr`、`--yes`） |
 | `abap mime` | `create` / `delete`（`--recursive`）/ `push` MIME 仓库目录与文件 |
-| `abap validate:aff` | 按官方 vendored schema 本地校验 AFF JSON 文件（`--wire`） |
+| `abap validate:aff` | 按官方 vendored schema 本地校验 AFF JSON 文件（`--wire <wire-dir>`） |
 | `abap search <query>` | 按名称模式搜索对象（`--type`、`--package`、`--exact`、`--fuzzy`、`--page-all`） |
 | `abap inspect <object>` | 只读对象元数据：`--structure`、`--includes`、`--locks`、`--package`、`--activation` |
 | `abap where-used <object>` | 查对象直接引用，用于改动影响面评估（`--type`、`--ref-type`、`--package`、`--limit`） |
 | `abap tcode <code>` | 事务码 → 入口程序与屏幕（TSTC → TSTCT） |
-| `abap list` | 按包或作者列对象（`--package`、`--type`、`--limit`） |
+| `abap list` | 按包列对象（`--package` 必填；`--type`、`--limit`） |
 | `abap dumps` | 列最近的 ST22 运行时 dump（`--limit`、`--user`） |
 | `abap diff [file]` | 本地 ↔ SAP 只读对比（`--all`、`--remote`、`--local-only`） |
 | `abap status` | 看哪些对象与 SAP 有差异（`--remote-only`、`--local-only`、`--since`、`--all`） |
@@ -192,10 +192,10 @@ src/(ui2)cl_json.clas.abap                # 命名空间对象 /UI2/CL_JSON
 | `abap select --table <name>` | 只读查表，SE16N 等价物（`--fields`、`--where`、`--limit`、`--offset`、`--order-by`、`--group-by`、`--count-only`） |
 | `abap fields <table>` | 从 DD03L 列表 / 视图字段，`--find` 反查（`--with-text`、`--as4local`、`--limit`） |
 | `abap types` | 打印 CLI 类型 ↔ TADIR / DDIC 映射，纯本地（`<type>`、`--tadir-object`） |
-| `abap feedback` | 提交脱敏的 agent 会话 issue 报告（`--feature-key`、`--title`、`--description`、`--dry-run`） |
+| `abap feedback` | 提交 agent 会话的 issue 报告（`--feature-key`、`--title`、`--description`、`--dry-run`） |
 | `abap report-stuck` | 在本地记录 agent 卡死报告用于 triage（`--goal`、`--tried`、`--where`） |
 
-所有命令支持 `--json`（紧凑）和 `--pretty-json`（缩进）。每条命令还支持 `--schema --json`，在不连 SAP 的情况下返回参数、选项、允许值、示例与错误码。
+所有命令支持 `--json`（紧凑）和 `--pretty-json`（缩进）。每个顶层命令还支持 `--schema --json`，在不连 SAP 的情况下返回参数、选项、允许值、示例与错误码；嵌套子命令（如 `create local`、`transport list`、`deploy status`）只提供 `--help`。
 
 ---
 
@@ -211,10 +211,10 @@ src/(ui2)cl_json.clas.abap                # 命名空间对象 /UI2/CL_JSON
 | `HTTP` `TRAN` | ✅ | ✅ | ✅ | SICF 服务节点 / 事务码（SE93），`create --file` |
 | `TTYP` `MSAG` `DDLS` | ✅ | ✅ | ✅ | `create --file`；TTYP / MSAG 在旧版 ECC 自动兜底 ICF，DDLS 仅 ADT |
 | `SRVD` `DCLS` `DDLX` `DDLA` | ✅ | ✅ | ✅ | CDS / RAP 配套对象，`create --file`，仅 ADT |
-| `BDEF` | — | ✅ | ✅ | RAP behavior definition 仅 pull（ADT 无 create 端点） |
+| `BDEF` | — | ✅ | ✅ | RAP behavior definition 不能新建（ADT 无 create 端点），仅 pull / push |
 | `SRVB` | — | ✅ | — | Service binding 仅元数据（在 SAP GUI 管理） |
 
-DDIC、HTTP、TRAN、TTYP、MSAG 及 CDS / RAP 类型执行 `create` 时必须提供 `--file <aff.json>`；`abap create --schema <type>` 会给出该类型的契约，DDIC 类型还附带示例 JSON。完整的类型 × 命令矩阵见 [wiki/object-types.md](wiki/object-types.md)。
+DDIC、HTTP、TRAN、TTYP、MSAG 及 CDS / RAP 类型执行 `create` 时必须提供 `--file <aff.json>`；`abap create --schema <type>` 会给出该类型的契约，TABL / STRU / DOMA / DTEL 还附带示例 JSON。完整的类型 × 命令矩阵见 [wiki/object-types.md](wiki/object-types.md)。
 
 ---
 
@@ -224,13 +224,13 @@ DDIC、HTTP、TRAN、TTYP、MSAG 及 CDS / RAP 类型执行 `create` 时必须�
 
 ```jsonc
 // 成功 — 写 stdout，exit 0
-{ "status": "success", "meta": { "command": "abap pull", "version": "1.0.0", "durationMs": 42, "warnings": [] }, "data": { /* ... */ } }
+{ "status": "success", "meta": { "command": "abap pull", "version": "1.0.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { /* ... */ } }
 
 // 失败 — 写 stderr，非零退出码，stdout 保持为空
 { "status": "error", "meta": { /* ... */ }, "error": { "code": "NO_TRANSPORT", "category": "VALIDATION_ERROR", "message": "..." } }
 ```
 
-退出码稳定且与 `error.category` 一一对应：`0` 成功、`1` 未知、`2` 用法、`3` 配置、`4` TLS、`5` 认证、`6` SAP、`7` 校验、`8` 未找到、`9` 锁定。警告只进 `meta.warnings`，不改变退出码。
+退出码稳定且与 `error.category` 一一对应：`0` 成功、`1` 未知、`2` 用法、`3` 配置、`4` TLS、`5` 认证、`6` SAP、`7` 校验、`8` 未找到、`9` 锁定。警告只进 `meta.warnings`，不改变退出码。另有保留区退出码：`64` 本版本不支持 DDLS、`65` 通道探测、`66` CONFLICT、`67` 持久化、`68` HTTP 错误。
 
 ### 命令自描述
 
@@ -255,8 +255,8 @@ npm 包内含 6 个 skill 和 1 个 agent 定义：
 
 ## 安全与凭证
 
-- **只支持 basic 认证。** SAP 密码住在 OS keychain——原生 `security` / `cmdkey.exe` / `secret-tool` 后端，`keytar` 作为兜底——按 profile 名索引。它不会出现在 `.abap.json`、`.env`、日志或命令输出里。
-- **凭证惰性解析**：本地命令（`--help`、`init`、`profile`、`types` 等）完全不碰 keychain。
+- **只支持 basic 认证。** SAP 密码住在 OS keychain——原生 `security` / `cmdkey.exe` / `secret-tool` 后端，`keytar` 作为兜底——按 profile 名索引。它不会出现在 `.abap.json`、`.env` 或日志里；只有显式 `abap profile export --with-passwords` 会输出它。
+- **仅元数据类命令惰性解析凭证**（`--help`、`types`、`init --show-config`）；密码路径（`profile add / set / show / delete / export`、`init --test-*`）会访问 keychain。
 - **TLS 信任**按 profile 管理：`--ca` 导入 PEM CA；`--insecure` 仅供开发期跳过校验。
 - `.abap.json` 与 `.env` 均在 `.gitignore` 中。`abap profile export` 只有在加 `--with-passwords` 时才导出密码，该输出需按密钥对待。
 
