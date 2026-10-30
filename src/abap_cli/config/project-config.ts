@@ -3,8 +3,8 @@ import * as path from 'path';
 import { getPassword } from './secrets.js';
 import { getSystem } from './user-config.js';
 import { readCa } from './ca-store.js';
+import { assertSupportedAuth } from './validation.js';
 import { CliError } from '../output/json.js';
-import type { AuthConfig } from '../auth/v2-types.js';
 import { userConfigPath } from './paths.js';
 
 export interface SapConfig {
@@ -17,8 +17,6 @@ export interface SapConfig {
   insecure: boolean;
   /** Path to a CA certificate (PEM) used for SSL verification. */
   caPath: string;
-  /** Canonical v2 auth config (discriminated union). */
-  auth: AuthConfig;
   /** Base directory for whole-workspace scans (`push --all`, `check --all|--changed`, `status`, `diff`); falls back to cwd. */
   sourceDir: string;
   /** 034: Optional system flavour tag (e.g. 'on-prem', 'cloud', 'btp', 'mock').
@@ -196,6 +194,7 @@ async function loadFileConfig(configPath: string | null): Promise<LoadedConfig> 
         : 'Missing "system" in .abap.json. Run \'abap init --profile <name>\' to set up.',
     );
   }
+  assertSupportedAuth(systemName, profile);
 
   // Validate required fields
   const missing: string[] = [];
@@ -217,7 +216,6 @@ async function loadFileConfig(configPath: string | null): Promise<LoadedConfig> 
       language: profile.language || 'EN',
       insecure: profile.insecure ?? (process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0'),
       caPath: profile.ca || '',
-      auth: profile.auth,
       sourceDir: workspace.sourceDir || process.cwd(),
       systemType: profile.systemType,
       sessionPolicy: profile.sessionPolicy,

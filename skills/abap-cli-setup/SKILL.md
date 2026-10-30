@@ -61,7 +61,7 @@ metadata:
 | `ACTIVATION_FAILED` (exit 7) | **仅 ICF 部署语境**：ICF handler 激活失败；走 `inspect <obj> --activation` 复检 → `activate --yes`（后两步跳 `abap-cli-edit`） |
 | `SAP_ERROR` (exit 6) | `data.objects[]` 看哪个失败 |
 | `ICF_CHECK_DEGRADED` | **双形态**：① 多数场景为 `meta.warnings` 条目（`deploy status` 探测 / `init` 信息性检查），不阻断；② `init` 的 ICF 探针若解析失败且不致命则降级为 warning，若致命则升级为 error（exit 7） | 看 `meta.warnings` 详情 / 跳过；致命时按 SAP_ERROR 处理 |
-| `STEAMPUNK_ICF_MANUAL` (exit 7) | BTP / Steampunk 不允许 ICF 自动部署 | 走 GUI 手动部署；profile 已标 `--auth-method` 为 oauth 时常见 |
+| `STEAMPUNK_ICF_MANUAL` (exit 7) | BTP / Steampunk 不允许 ICF 自动部署 | 走 GUI 手动部署 |
 | `FORCE_BYPASSED` (exit 7) | `deploy --force` 跳过安全守卫 | 检查 `data.forced: true` 是否预期 |
 | `ICF_OUTDATED_DEADLOCK` | `deploy status` 报 outdated 且 transport 持有新源（用户已导入但未 release） | 走 transport release 后重 deploy；当前 CLI 无 `transport release` 子命令 |
 | `USAGE` / `INVALID_ARGUMENT` | 看 `error.nextSteps` 或 `error.references` |

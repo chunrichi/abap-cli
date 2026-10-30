@@ -147,14 +147,12 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | 添加 connection profile | `profile add` | ✅ | |
 | 删除 profile | `profile delete` | ✅ | 非 TTY 需 --yes |
 | 导入/导出 profile | `profile export/import` | ✅ | |
-| Basic auth（user/password） | `profile add --auth basic` | ✅ | 密码在 OS keychain |
-| Browser SSO 捕获 | `profile login` | ✅ | 127.0.0.1 loopback |
-| OAuth password | `profile add --auth oauth_password` | ✅ | |
-| Cert mTLS | `profile add --auth cert` | ✅ | 需 cert/key 文件 |
+| Basic auth（user/password） | `profile add --password` | ✅ | 唯一登录方式；密码在 OS keychain |
+| 历史 auth profile 迁移 | `profile show/set` | ✅ | 旧 cert/SSO/OAuth profile → basic |
 | 路径解析 | — | ✅ | BTP trial 包路径校验 |
 | 配置刷新缓存 | `runtime-cache.ts` | ✅ | 自动 |
 
-**覆盖率**：10/10 ✅。
+**覆盖率**：7/7 ✅。
 
 ---
 

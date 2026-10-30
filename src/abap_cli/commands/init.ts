@@ -17,16 +17,6 @@ export const SCHEMA: CommandSchema = {
     { name: '--language', type: 'string', valuePlaceholder: '<language>', description: 'SAP language.' },
     { name: '--insecure', type: 'boolean', description: 'Skip SSL certificate verification (development only).' },
     { name: '--ca', type: 'string', valuePlaceholder: '<path>', description: 'PEM CA certificate to import into ~/.abap-cli/certificates/ and bind to this profile.' },
-    { name: '--auth-method', type: 'string', valuePlaceholder: '<method>', description: 'Login strategy: basic | cert | browser_sso | oauth_password.' },
-    { name: '--auth-option', type: 'string', valuePlaceholder: '<kv>', description: 'Generic auth option, repeatable as key=value. New auth methods add no Commander options — they read from this bag.' },
-    { name: '--cert-path', type: 'string', valuePlaceholder: '<path>', description: 'X.509 client cert file (PEM) — used with --auth-method=cert.' },
-    { name: '--cert-key', type: 'string', valuePlaceholder: '<path>', description: 'X.509 private key file (PEM) — used with --auth-method=cert.' },
-    { name: '--cert-ca', type: 'string', valuePlaceholder: '<path>', description: 'Optional X.509 client CA override — used with --auth-method=cert.' },
-    { name: '--cert-passphrase', type: 'string', valuePlaceholder: '<pwd>', description: 'Passphrase for .p12 / encrypted key — written to keychain.' },
-    { name: '--sso-cookie-file', type: 'string', valuePlaceholder: '<path>', description: 'SSO cookie jar path — used with --auth-method=browser_sso.' },
-    { name: '--service-key', type: 'string', valuePlaceholder: '<path>', description: 'BTP service key JSON — used with --auth-method=oauth_password.' },
-    { name: '--spn', type: 'string', valuePlaceholder: '<spn>', description: 'Kerberos service principal name — used with --auth-method=sso (defaults to HTTP/<host>).' },
-    { name: '--reauth-on-expiry', type: 'boolean', description: 'Force re-acquisition of the Kerberos ticket when the cached one expires — used with --auth-method=sso.' },
     { name: '--tr', type: 'string', valuePlaceholder: '<transport>', description: 'Default transport number (written to .abap.json).' },
     { name: '--package', type: 'string', valuePlaceholder: '<package>', description: 'Default SAP package (written to .abap.json).' },
     { name: '--source-dir', type: 'string', valuePlaceholder: '<path>', description: 'Base directory for `push --all` / `check --all` (written to .abap.json).' },
@@ -124,16 +114,6 @@ export function registerInitCommand(program: Command): void {
     .option('-l, --language <language>', 'SAP language')
     .option('--insecure', 'Skip SSL certificate verification (development only)')
     .option('--ca <path>', 'PEM CA certificate to import into ~/.abap-cli/certificates/ and bind to this profile')
-    .option('--auth-method <method>', 'Login strategy: basic (default) | cert (X.509 client cert, 025) | browser_sso (BTP trial / SAML, 026) | oauth_password (BTP / CF service-key JWT, 027) | sso (native SSO via Windows SSPI / Linux krb5 / macOS GSS)')
-    .option('--auth-option <kv>', 'Generic auth option, repeatable as key=value (e.g. --auth-option certPath=/abs/cert.pem). New auth methods add no Commander options — they read from this bag.')
-    .option('--cert-path <path>', 'X.509 client cert file (PEM) — used with --auth-method=cert')
-    .option('--cert-key <path>', 'X.509 private key file (PEM) — used with --auth-method=cert')
-    .option('--cert-ca <path>', 'Optional X.509 client CA override — used with --auth-method=cert')
-    .option('--cert-passphrase <pwd>', 'Passphrase for .p12 / encrypted key — written to keychain')
-    .option('--sso-cookie-file <path>', 'SSO cookie jar path — used with --auth-method=browser_sso')
-    .option('--spn <spn>', 'Kerberos service principal name — used with --auth-method=sso (defaults to HTTP/<host>)')
-    .option('--reauth-on-expiry', 'Force re-acquisition of the Kerberos ticket when the cached one expires — used with --auth-method=sso')
-    .option('--service-key <path>', 'BTP service key JSON — used with --auth-method=oauth_password')
     .option('--tr <transport>', 'Default transport number (written to .abap.json)')
     .option('--package <package>', 'Default SAP package (written to .abap.json)')
     .option('--source-dir <path>', 'Base directory for `push --all` / `check --all` (written to .abap.json)')

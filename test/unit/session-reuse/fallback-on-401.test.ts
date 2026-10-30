@@ -98,11 +98,11 @@ vi.mock('../../../src/abap_cli/config/project-config.js', async (importOriginal)
   };
 });
 
-vi.mock('../../../src/abap_cli/auth/adapter.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../src/abap_cli/auth/adapter.js')>();
+vi.mock('../../../src/abap_cli/clients/basic-auth.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/abap_cli/clients/basic-auth.js')>();
   return {
     ...actual,
-    buildAuth: h.buildAuthMock,
+    buildBasicAuth: h.buildAuthMock,
   };
 });
 
@@ -144,7 +144,7 @@ describe('AdtClientWrapper 401 fallback (reuse mode)', () => {
     resetRegistry();
     vi.clearAllMocks();
     h.loadConfigMock.mockResolvedValue(defaultConfig());
-    h.buildAuthMock.mockResolvedValue({ passwordOrFetcher: 'x', options: { headers: {} }, label: 'basic' });
+    h.buildAuthMock.mockReturnValue({ password: 'x', options: { headers: {} } });
     h.keyMock.mockResolvedValue({ key: Buffer.alloc(32, 1), mode: 'derived' });
     h.login().mockReset().mockResolvedValue(undefined);
     h.httpClient.cookie.clear();

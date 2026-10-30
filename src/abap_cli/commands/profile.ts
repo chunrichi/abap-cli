@@ -6,13 +6,11 @@ import { collectWarning } from '../output/meta.js';
 import { exportProfiles, importProfiles, type ProfileBundle } from '../config/profiles.js';
 import { runList, runShow, runTest, runDelete } from '../flows/setup/profile.js';
 import { runAdd, runSet } from '../flows/setup/profile.js';
-import { runLogin } from '../flows/setup/sso.js';
-import { runCookieImport } from '../flows/setup/cookie-import.js';
 import { toOutputPath } from '../core/path-output.js';
 import { baseSchema, schemaOption } from './schema-helpers.js';
 
 export const SCHEMA: CommandSchema = {
-  ...baseSchema('profile', 'Manage global connection profiles (list / show / add / set / test / login / delete / export / import).', 'abap profile <command> [options]', 'local'),
+  ...baseSchema('profile', 'Manage global connection profiles (list / show / add / set / test / delete / export / import).', 'abap profile <command> [options]', 'local'),
   arguments: [],
   options: [
     { name: '--url', type: 'string', valuePlaceholder: '<url>', description: 'SAP system URL.' },
@@ -24,18 +22,6 @@ export const SCHEMA: CommandSchema = {
     { name: '--insecure', type: 'boolean', description: 'Skip SSL certificate verification (development only).' },
     { name: '--ca', type: 'string', valuePlaceholder: '<path>', description: 'PEM CA certificate to import into ~/.abap-cli/certificates/ and bind to this profile.' },
     { name: '--clear-ca', type: 'boolean', description: 'Remove the CA certificate setting.' },
-    { name: '--auth-method', type: 'string', valuePlaceholder: '<method>', description: 'Login strategy: basic | cert | browser_sso | oauth_password.' },
-    { name: '--auth-option', type: 'string', valuePlaceholder: '<kv>', description: 'Generic auth option, repeatable as key=value.' },
-    { name: '--cert-path', type: 'string', valuePlaceholder: '<path>', description: 'X.509 client cert file (PEM).' },
-    { name: '--cert-key', type: 'string', valuePlaceholder: '<path>', description: 'X.509 private key file (PEM).' },
-    { name: '--cert-ca', type: 'string', valuePlaceholder: '<path>', description: 'Optional X.509 client CA override (PEM).' },
-    { name: '--cert-passphrase', type: 'string', valuePlaceholder: '<pwd>', description: 'Passphrase for .p12 / encrypted key — written to keychain.' },
-    { name: '--remove-cert-passphrase', type: 'boolean', description: 'Remove the stored cert passphrase from keychain.' },
-    { name: '--clear-cert-auth', type: 'boolean', description: 'Reset to basic auth (drops authMethod and certAuth).' },
-    { name: '--sso-cookie-file', type: 'string', valuePlaceholder: '<path>', description: 'SSO cookie jar path — used with --auth-method=browser_sso.' },
-    { name: '--clear-sso-cookie-file', type: 'boolean', description: 'Reset SSO cookie file path to the default.' },
-    { name: '--service-key', type: 'string', valuePlaceholder: '<path>', description: 'BTP service key JSON — used with --auth-method=oauth_password.' },
-    { name: '--clear-oauth-password', type: 'boolean', description: 'Drop oauthPassword config (reset to authMethod).' },
     { name: '--file', type: 'string', valuePlaceholder: '<path>', description: 'Bundle file path for export / import.' },
     { name: '--with-passwords', type: 'boolean', description: 'Include passwords in the export bundle (warned opt-in).' },
     { name: '--overwrite', type: 'boolean', description: 'Update profiles that already exist on import.' },
@@ -100,16 +86,6 @@ export function registerProfileCommand(program: Command): void {
     .option('-p, --password <password>', 'Password (stores credential in keychain)')
     .option('--insecure', 'Skip SSL certificate verification (self-signed certs, development only)')
     .option('--ca <path>', 'PEM CA certificate to import into ~/.abap-cli/certificates/ and bind to this profile')
-    .option('--auth-method <method>', 'Login strategy: basic (default) | cert (X.509 client cert, 025) | browser_sso (BTP trial / SAML, 026) | oauth_password (BTP / CF service-key JWT, 027) | sso (native SSO via Windows SSPI / Linux krb5 / macOS GSS)')
-    .option('--auth-option <kv>', 'Generic auth option, repeatable as key=value (e.g. --auth-option certPath=/abs/cert.pem). New auth methods add no Commander options — they read from this bag.')
-    .option('--cert-path <path>', 'X.509 client cert file (PEM) — used when --auth-method=cert')
-    .option('--cert-key <path>', 'X.509 private key file (PEM) — used when --auth-method=cert')
-    .option('--cert-ca <path>', 'Optional X.509 client CA override — used when --auth-method=cert')
-    .option('--cert-passphrase <passphrase>', 'Passphrase for .p12 / encrypted key — written to keychain')
-    .option('--sso-cookie-file <path>', 'SSO cookie jar path — used when --auth-method=browser_sso')
-    .option('--spn <spn>', 'Kerberos service principal name — used when --auth-method=sso (defaults to HTTP/<host>)')
-    .option('--reauth-on-expiry', 'Force re-acquisition of the Kerberos ticket when the cached one expires — used when --auth-method=sso')
-    .option('--service-key <path>', 'BTP service key JSON — used when --auth-method=oauth_password (extracts uaa.url/clientid/clientsecret)')
     .action(async (name: string, opts, cmd) => {
       try {
         await runAdd(name, opts, jsonFromCommand(cmd));
@@ -123,28 +99,13 @@ export function registerProfileCommand(program: Command): void {
     .description('Modify an existing connection profile (fields or password)')
     .option('--url <url>', 'New SAP system URL')
     .option('-c, --client <client>', 'New SAP client number')
-    .option('-u, --username <user>', 'New SAP username')
+    .option('-u, --username <username>', 'New SAP username')
     .option('-l, --language <lang>', 'New SAP language')
     .option('-p, --password <password>', 'New password (updates keychain credential)')
     .option('--remove-password', 'Remove the stored password from keychain')
     .option('--insecure', 'Skip SSL certificate verification (self-signed certs, development only)')
     .option('--ca <path>', 'PEM CA certificate to import into ~/.abap-cli/certificates/ and bind to this profile')
     .option('--clear-ca', 'Remove the CA certificate setting')
-    .option('--auth-method <method>', 'Login strategy: basic | cert | browser_sso | oauth_password | sso')
-    .option('--auth-option <kv>', 'Generic auth option, repeatable as key=value (e.g. --auth-option certPath=/abs/cert.pem). New auth methods add no Commander options — they read from this bag.')
-    .option('--cert-path <path>', 'X.509 client cert file (PEM)')
-    .option('--cert-key <path>', 'X.509 private key file (PEM)')
-    .option('--cert-ca <path>', 'X.509 client CA override (PEM)')
-    .option('--cert-passphrase <passphrase>', 'Passphrase for .p12 / encrypted key — written to keychain')
-    .option('--remove-cert-passphrase', 'Remove the stored cert passphrase from keychain')
-    .option('--clear-cert-auth', 'Reset to basic auth (drops authMethod and certAuth)')
-    .option('--sso-cookie-file <path>', 'SSO cookie jar path — used when --auth-method=browser_sso')
-    .option('--clear-sso-cookie-file', 'Reset SSO cookie file path to the default')
-    .option('--spn <spn>', 'Kerberos service principal name — used when --auth-method=sso (defaults to HTTP/<host>)')
-    .option('--reauth-on-expiry', 'Force re-acquisition of the Kerberos ticket when the cached one expires — used when --auth-method=sso')
-    .option('--clear-negotiate', 'Drop negotiate config (reset to authMethod)')
-    .option('--service-key <path>', 'BTP service key JSON — used when --auth-method=oauth_password (extracts uaa.url/clientid/clientsecret)')
-    .option('--clear-oauth-password', 'Drop oauthPassword config (reset to authMethod)')
     .action(async (name: string, opts, cmd) => {
       try {
         await runSet(name, opts, jsonFromCommand(cmd));
@@ -161,48 +122,6 @@ export function registerProfileCommand(program: Command): void {
         await runTest(name, jsonFromCommand(cmd));
       } catch (error: unknown) {
         handleError(jsonFromCommand(cmd), error);
-      }
-    });
-
-  profile
-    .command('login <name>')
-    .description('Capture browser-SSO cookies for a profile (BTP trial / SAML); writes the cookie jar file')
-    .action(async (name: string, _opts, cmd) => {
-      try {
-        await runLogin(name, jsonFromCommand(cmd));
-      } catch (error: unknown) {
-        handleError(jsonFromCommand(cmd), error);
-      }
-    });
-
-  profile
-    .command('cookie <name>')
-    .description('Import a raw Cookie: header for a browser_sso profile (alternative to `profile login`)')
-    .option('--header <cookie>', 'Raw Cookie header value (e.g. "SAP_SESSIONID_001_100=AbC; route=R/...")')
-    .option('--from-file <path>', 'Read the Cookie header from a text file (first non-empty line)')
-    .option('--cookie-file <path>', 'Override the cookie jar path (defaults to ~/.abap-cli/<name>.sso.cookies.json)')
-    .action(async (name: string, opts: { header?: string; fromFile?: string; cookieFile?: string }, cmd) => {
-      const mode = jsonFromCommand(cmd);
-      try {
-        let raw = opts.header;
-        if (!raw && opts.fromFile) {
-          const content = fs.readFileSync(path.resolve(opts.fromFile), 'utf-8');
-          raw = content.split(/\r?\n/).find((line) => line.trim().length > 0) ?? '';
-        }
-        if (!raw) {
-          await printError(mode, new CliError('USAGE',
-            'Provide --header "<cookie-string>" or --from-file <path>.',
-            {
-              nextSteps: [
-                'Open browser DevTools → Network → click any SAP request → Headers → Cookie.',
-              ],
-              example: `abap profile cookie ${name} --header "SAP_SESSIONID_001_100=AbCdEf; route=R/..."`,
-            }));
-          return;
-        }
-        await runCookieImport(name, raw, { cookieFile: opts.cookieFile }, mode);
-      } catch (error: unknown) {
-        handleError(mode, error);
       }
     });
 

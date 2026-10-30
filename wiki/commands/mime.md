@@ -140,7 +140,7 @@ abap mime --schema
 | `USAGE` | USAGE / 2 | `mime push <local>` 无文件可读（路径既不是文件也不是目录） | 确认 `local` 是有效路径 |
 | `VALIDATION_ERROR` | VALIDATION_ERROR / 4 | 非 TTY 未传 `--yes` | 加 `--yes` 或 `--dry-run` |
 | `CONFIG_ERROR` | CONFIG_ERROR / 3 | 未配置 SAP profile 或 `.abap.json` | `abap init` 或 `abap profile add` |
-| `AUTH_ERROR` | AUTH_ERROR / 5 | SAP 401/403 | `abap doctor` 检查凭据与 mTLS |
+| `AUTH_ERROR` | AUTH_ERROR / 5 | SAP 401/403 | `abap doctor` 检查凭据（keychain 密码） |
 | `NOT_FOUND` | NOT_FOUND / 8 | MIME 路径在 SAP 上不存在（如 `push` 的 `--root` 未建） | 先 `mime create <root>`，再 `push` |
 | `OBJECT_EXISTS` | USAGE / 9 | `mime create` 路径已存在 | 用 `delete --recursive` 先清，或换路径 |
 | `OBJECT_NOT_EMPTY` | USAGE / 9 | `mime delete` 非空目录缺 `--recursive` | 加 `--recursive` |

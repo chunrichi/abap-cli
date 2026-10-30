@@ -1,19 +1,16 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { confirm, isCancel, select, text, password } from '@clack/prompts';
-import { getPassword, storePassword, storeCertPassphrase } from '../../config/secrets.js';
-import { parseBtpServiceKey } from '../../auth/service-key.js';
-import { getSystem, listSystemNames, upsertSystem, type SystemProfile } from '../../config/user-config.js';
+import { getPassword, storePassword } from '../../config/secrets.js';
+import { getSystem, listSystemNames, type SystemProfile } from '../../config/user-config.js';
 import { upsertProfileWithPems } from '../../config/profile-pems.js';
+import { assertSupportedAuth } from '../../config/validation.js';
 import { CliError, printResult, type OutputMode } from '../../output/json.js';
 import { collectWarning } from '../../output/meta.js';
 import { toOutputPath } from '../../core/path-output.js';
 import { probeSystem, type ProbeLayerResult } from '../../clients/probe.js';
 import { checkIcfDeployment, ICF_SERVICE_VERSION, type IcfDeploymentInfo } from '../../clients/icf-version.js';
 import { probeTextpoolCapability, recordCapability } from '../../clients/textpool-capability.js';
-import type { AuthConfig, OAuthPasswordBlock, SsoAuthBlock, CertAuthBlock } from '../../auth/v2-types.js';
-import { defaultAuth, parseAuthMethodV2 } from '../../auth/v2-types.js';
-import { authOptionsFromCli, resolveAuthFromOptions } from '../../auth/strategy.js';
 
 interface WorkspaceConfig {
   system: string;
@@ -48,46 +45,15 @@ export function transportFromOpts(opts: CommandOpts): string {
   return str(opts.tr);
 }
 
-/** BTP trial endpoint host pattern. */
-function isBtpTrialUrl(url: string): boolean {
-  return /\.abap\..*\.hana\.ondemand\.com$/i.test(new URL(url).hostname);
-}
-
-/** SAP Note 3237141: trial development must use a sub-package under ZLOCAL or ZCUSTOM_DEVELOPMENT. */
-const BTP_TRIAL_ALLOWED_PACKAGE_ROOTS = ['ZLOCAL', 'ZCUSTOM_DEVELOPMENT', '$TMP'];
-
-/** Warn when the package is not under a BTP-allowed root, refuse to auto-create under $TMP in trial. */
-function validateTrialPackage(url: string, pkg: string, auth: AuthConfig): void {
-  if (!isBtpTrialUrl(url)) return;
-  if (auth.method === 'oauth_password' || auth.method === 'browser_sso') {
-    const upper = pkg.toUpperCase();
-    const ok = BTP_TRIAL_ALLOWED_PACKAGE_ROOTS.some((root) => upper === root || upper.startsWith(`${root}/`));
-    if (!ok) {
-      throw new CliError(
-        'VALIDATION_ERROR',
-        `BTP trial only allows packages under ${BTP_TRIAL_ALLOWED_PACKAGE_ROOTS.join(' / ')} (got '${pkg}').`,
-        {
-          details: { url, package: pkg },
-          nextSteps: [
-            `Re-run with a BTP-allowed package, e.g. --package zlocal/<sub-pkg>.`,
-            `Sub-package rules: see SAP Note 3237141 (CAUSE 3).`,
-          ],
-          example: 'abap init --profile btptrial --package zlocal/my_sub_pkg --yes',
-        },
-      );
-    }
-  }
-}
-
 /** Save profile to user config + password to keychain. */
 export async function saveProfile(name: string, profile: SystemProfile, password: string, mode: OutputMode): Promise<void> {
-  // Import any local PEM paths into the content-addressed store before the
+  // Import any local CA path into the content-addressed store before the
   // write, then reclaim whatever the previous profile version dropped. This is
-  // the single write path for `init`, so `--ca` / `--cert-path` / `--cert-key`
-  // behave the same here as in `profile add/set`.
+  // the single write path for `init`, so `--ca` behaves the same here as in
+  // `profile add/set`.
   upsertProfileWithPems(name, getSystem(name), profile);
-  // Only persist the password when it's non-empty — an empty password (oauth_password
-  // without --password) must NOT clobber whatever the wizard stored earlier.
+  // Only persist the password when it's non-empty — an empty password must NOT
+  // clobber whatever the wizard/`profile add` stored earlier.
   if (password.length > 0) {
     await storePassword(name, password);
   }
@@ -140,10 +106,8 @@ export async function handleFileOverwrite(mode: 'prompt' | 'overwrite' | 'refuse
 
 /** Input validation. */
 export function validateInputs(config: CollectedConfig): void {
-  // Only `basic` requires a stored password — cert / browser_sso / oauth_password
-  // supply credentials via different storage (cert files, cookie jar, env).
-  if (!config.password && config.auth.method === 'basic') {
-    throw new CliError('INVALID_ARGUMENT', 'Password is required for basic auth');
+  if (!config.password) {
+    throw new CliError('INVALID_ARGUMENT', 'Password is required');
   }
 }
 
@@ -178,7 +142,6 @@ export function outputJson(
       client: config.client,
       username: config.username,
       language: config.language,
-      auth: config.auth,
     },
     transport: config.transport,
     package: config.pkg,
@@ -279,26 +242,23 @@ export async function runInitWizard(opts: CommandOpts, mode: OutputMode): Promis
   let config: CollectedConfig;
   if (systemName) {
     const profile = getSystem(systemName)!;
+    assertSupportedAuth(systemName, profile);
     config = {
       ...profile,
       password: '',
       transport: '',
       pkg: '',
     };
-    // Prompt for a password when the profile actually needs one (basic or
-    // oauth_password — both need a user password; cert/sso don't).
-    if (config.auth.method === 'basic' || config.auth.method === 'oauth_password') {
-      const useStored = orCancel(await confirm({ message: 'Use stored password?', initialValue: true }));
-      if (useStored) {
-        config.password = (await getPassword(systemName)) || '';
-        if (!config.password) {
-          if (!mode) console.log(`No stored password for '${systemName}'.`);
-          config.password = orCancel(await password({ message: `Password for ${systemName}` }));
-          await storePassword(systemName, config.password);
-        }
-      } else {
+    const useStored = orCancel(await confirm({ message: 'Use stored password?', initialValue: true }));
+    if (useStored) {
+      config.password = (await getPassword(systemName)) || '';
+      if (!config.password) {
+        if (!mode) console.log(`No stored password for '${systemName}'.`);
         config.password = orCancel(await password({ message: `Password for ${systemName}` }));
+        await storePassword(systemName, config.password);
       }
+    } else {
+      config.password = orCancel(await password({ message: `Password for ${systemName}` }));
     }
     if (!mode) console.log(`Using system profile '${systemName}' (${profile.url}).`);
   } else {
@@ -317,14 +277,12 @@ export async function runInitWizard(opts: CommandOpts, mode: OutputMode): Promis
       language: config.language,
       insecure: config.insecure,
       ca: config.ca,
-      auth: config.auth,
     }, config.password, mode);
   }
 
   config.transport = transportFromOpts(opts) || (orCancel(await text({ message: 'Transport request (optional)' }))) || '';
   config.pkg = str(opts.package) || (orCancel(await text({ message: 'Default package (optional)' }))) || '';
 
-  validateTrialPackage(config.url, config.pkg, config.auth);
   validateInputs(config);
   await handleFileOverwrite(opts.yes === true || opts.nonInteractive === true ? 'overwrite' : 'prompt');
   await writeConfig(systemName, config, mode);
@@ -348,21 +306,6 @@ async function selectSystem(names: string[]): Promise<string> {
   return choice === '__new__' ? '' : choice;
 }
 
-/** Resolve the canonical auth from CLI options (init wizard). */
-function resolveAuthFromOpts(opts: CommandOpts): AuthConfig {
-  if (!opts.authMethod) return defaultAuth();
-  const method = parseAuthMethodV2(opts.authMethod);
-  const bag = {
-    ...(opts.certPath ? { certPath: str(opts.certPath) } : {}),
-    ...(opts.certKey ? { keyPath: str(opts.certKey) } : {}),
-    ...(opts.certCa ? { caPath: str(opts.certCa) } : {}),
-    ...(opts.ssoCookieFile ? { cookieFile: str(opts.ssoCookieFile) } : {}),
-    ...(opts.serviceKey ? { serviceKey: str(opts.serviceKey) } : {}),
-    ...(authOptionsFromCli(opts, method).bag),
-  };
-  return resolveAuthFromOptions({ method, bag }, defaultAuth());
-}
-
 /**
  * Prompt for a brand-new system profile.
  *
@@ -372,9 +315,6 @@ function resolveAuthFromOpts(opts: CommandOpts): AuthConfig {
  * password-manager + paste + URL simultaneously.
  */
 async function collectNewSystem(opts: CommandOpts): Promise<CollectedConfig> {
-  const auth = resolveAuthFromOpts(opts);
-  const wantPassword = auth.method === 'basic' || auth.method === 'oauth_password';
-
   const url = str(opts.url) || orCancel(await text({
     message: 'SAP URL',
     placeholder: 'https://sap.example.com',
@@ -400,13 +340,11 @@ async function collectNewSystem(opts: CommandOpts): Promise<CollectedConfig> {
   // Local name shadows the imported `@clack/prompts` `password` — rename so the
   // ESM/TypeScript output doesn't trip on the inner `await password(...)` below.
   let resolvedPassword = '';
-  if (wantPassword) {
-    const fromFlag = str(opts.password);
-    if (fromFlag) {
-      resolvedPassword = fromFlag;
-    } else {
-      resolvedPassword = orCancel(await password({ message: 'Password (stored in OS keychain)' }));
-    }
+  const fromFlag = str(opts.password);
+  if (fromFlag) {
+    resolvedPassword = fromFlag;
+  } else {
+    resolvedPassword = orCancel(await password({ message: 'Password (stored in OS keychain)' }));
   }
 
   return {
@@ -417,28 +355,23 @@ async function collectNewSystem(opts: CommandOpts): Promise<CollectedConfig> {
     language,
     insecure: insecure ? true : undefined,
     ca,
-    auth,
     transport: '',
     pkg: '',
   };
 }
 
 /**
- * Resolve the user password by auth method. Lookup order (matches
- * `auth/adapter.ts` so every profile type behaves identically):
- *   - basic:         keychain > --password > TTY prompt (and store)
- *   - oauth_password: keychain > --password > TTY prompt (and store)
- *   - cert / browser_sso: never asked (their auth supplies credentials)
+ * Resolve the user password. Lookup order: keychain > --password > TTY prompt
+ * (stored back to the keychain).
  */
-async function resolvePassword(profileName: string, auth: AuthConfig, explicit: string | undefined): Promise<string> {
-  if (auth.method === 'cert' || auth.method === 'browser_sso') return '';
+async function resolvePassword(profileName: string, explicit: string | undefined): Promise<string> {
   const stored = (await getPassword(profileName)) || '';
   if (stored) return stored;
   if (explicit) return explicit;
   if (process.stdin.isTTY) {
-    const { password } = await import('@clack/prompts');
-    const entered = await password({
-      message: `Password for '${profileName}' (auth=${auth.method}) — will be stored in OS keychain`,
+    const { password: promptPassword } = await import('@clack/prompts');
+    const entered = await promptPassword({
+      message: `Password for '${profileName}' — will be stored in OS keychain`,
     });
     if (typeof entered === 'string' && entered.length > 0) {
       await storePassword(profileName, entered);
@@ -468,8 +401,9 @@ async function useExistingSystem(
       },
     );
   }
+  assertSupportedAuth(profileName, profile);
 
-  const password = await resolvePassword(profileName, profile.auth, str(opts.password) || undefined);
+  const password = await resolvePassword(profileName, str(opts.password) || undefined);
 
   const config: CollectedConfig = {
     ...profile,
@@ -478,26 +412,13 @@ async function useExistingSystem(
     pkg: str(opts.package) || '',
   };
 
-  if (!config.password && profile.auth.method === 'basic') {
+  if (!config.password) {
     throw new CliError(
       'CONFIG_ERROR',
       `No password stored for profile '${profileName}'. Re-run with --password or update the profile: abap profile set ${profileName} --password <new>.`,
     );
   }
-  if (!config.password && profile.auth.method === 'oauth_password') {
-    throw new CliError(
-      'CONFIG_ERROR',
-      `No BTP password available for oauth_password profile '${profileName}'. Store it via abap profile set --password, or re-run with --password.`,
-      {
-        nextSteps: [
-          `Store once: abap profile set ${profileName} --password <your SAP ID password> (writes to keychain, never to disk).`,
-        ],
-        example: `abap profile set ${profileName} --password <your SAP ID password>  # then abap init --profile ${profileName}`,
-      },
-    );
-  }
 
-  validateTrialPackage(config.url, config.pkg, config.auth);
   validateInputs(config);
   const probe = await maybeProbe(profileName, opts);
   await handleFileOverwrite(opts.yes === true || opts.nonInteractive === true ? 'overwrite' : 'refuse');
@@ -547,7 +468,6 @@ async function maybeProbe(
 /** Create/update a system profile from CLI params */
 async function createSystemFromParams(opts: CommandOpts, mode: OutputMode): Promise<void> {
   const url = str(opts.url) || process.env.SAP_URL || '';
-  const auth = resolveAuthFromOpts(opts);
   const profile: SystemProfile = {
     url,
     client: str(opts.client) || process.env.SAP_CLIENT || '100',
@@ -555,7 +475,6 @@ async function createSystemFromParams(opts: CommandOpts, mode: OutputMode): Prom
     language: str(opts.language) || process.env.SAP_LANGUAGE || 'EN',
     insecure: opts.insecure === true ? true : undefined,
     ca: str(opts.ca) || undefined,
-    auth,
   };
   const password = str(opts.password) || '';
 
@@ -565,13 +484,10 @@ async function createSystemFromParams(opts: CommandOpts, mode: OutputMode): Prom
     transport: transportFromOpts(opts) || process.env.SAP_TRANSPORT || '',
     pkg: str(opts.package) || process.env.SAP_PACKAGE || '',
   };
-  validateTrialPackage(config.url, config.pkg, config.auth);
   validateInputs(config);
 
   const systemName = str(opts.profile) || deriveSystemName(profile);
   await saveProfile(systemName, profile, password, mode);
-  // If the user supplied a cert passphrase, persist it in keychain too.
-  if (str(opts.certPassphrase)) await storeCertPassphrase(systemName, str(opts.certPassphrase)!);
   await handleFileOverwrite(opts.yes === true || opts.nonInteractive === true ? 'overwrite' : 'refuse');
   await writeConfig(systemName, config, mode);
   const icf = await icfDeploymentCheck(mode, systemName);

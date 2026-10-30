@@ -20,16 +20,6 @@ abap init [options]
 | `--language <language>` | SAP language. |
 | `--insecure` | Skip SSL certificate verification (development only). |
 | `--ca <path>` | PEM CA certificate to import into ~/.abap-cli/certificates/ and bind to this profile. |
-| `--auth-method <method>` | Login strategy: basic \| cert \| browser_sso \| oauth_password. |
-| `--auth-option <kv>` | Generic auth option, repeatable as key=value. New auth methods add no Commander options — they read from this bag. |
-| `--cert-path <path>` | X.509 client cert file (PEM) — used with --auth-method=cert. |
-| `--cert-key <path>` | X.509 private key file (PEM) — used with --auth-method=cert. |
-| `--cert-ca <path>` | Optional X.509 client CA override — used with --auth-method=cert. |
-| `--cert-passphrase <pwd>` | Passphrase for .p12 / encrypted key — written to keychain. |
-| `--sso-cookie-file <path>` | SSO cookie jar path — used with --auth-method=browser_sso. |
-| `--service-key <path>` | BTP service key JSON — used with --auth-method=oauth_password. |
-| `--spn <spn>` | Kerberos service principal name — used with --auth-method=sso (defaults to HTTP/<host>). |
-| `--reauth-on-expiry` | Force re-acquisition of the Kerberos ticket when the cached one expires — used with --auth-method=sso. |
 | `--tr <transport>` | Default transport number (written to .abap.json). |
 | `--package <package>` | Default SAP package (written to .abap.json). |
 | `--source-dir <path>` | Base directory for `push --all` / `check --all` (written to .abap.json). |
@@ -58,7 +48,7 @@ abap init [options]
 
 ## `abap profile`
 
-Manage global connection profiles (list / show / add / set / test / login / delete / export / import).
+Manage global connection profiles (list / show / add / set / test / delete / export / import).
 
 ```bash
 abap profile <command> [options]
@@ -75,18 +65,6 @@ abap profile <command> [options]
 | `--insecure` | Skip SSL certificate verification (development only). |
 | `--ca <path>` | PEM CA certificate to import into ~/.abap-cli/certificates/ and bind to this profile. |
 | `--clear-ca` | Remove the CA certificate setting. |
-| `--auth-method <method>` | Login strategy: basic \| cert \| browser_sso \| oauth_password. |
-| `--auth-option <kv>` | Generic auth option, repeatable as key=value. |
-| `--cert-path <path>` | X.509 client cert file (PEM). |
-| `--cert-key <path>` | X.509 private key file (PEM). |
-| `--cert-ca <path>` | Optional X.509 client CA override (PEM). |
-| `--cert-passphrase <pwd>` | Passphrase for .p12 / encrypted key — written to keychain. |
-| `--remove-cert-passphrase` | Remove the stored cert passphrase from keychain. |
-| `--clear-cert-auth` | Reset to basic auth (drops authMethod and certAuth). |
-| `--sso-cookie-file <path>` | SSO cookie jar path — used with --auth-method=browser_sso. |
-| `--clear-sso-cookie-file` | Reset SSO cookie file path to the default. |
-| `--service-key <path>` | BTP service key JSON — used with --auth-method=oauth_password. |
-| `--clear-oauth-password` | Drop oauthPassword config (reset to authMethod). |
 | `--file <path>` | Bundle file path for export / import. |
 | `--with-passwords` | Include passwords in the export bundle (warned opt-in). |
 | `--overwrite` | Update profiles that already exist on import. |
