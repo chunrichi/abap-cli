@@ -66,7 +66,7 @@ abap status --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap status", "version": "1.1.0", "timestamp": "2026-08-28T00:00:00.000Z", "durationMs": 1800, "warnings": [] },
+  "meta": { "command": "abap status", "version": "1.2.0", "timestamp": "2026-08-28T00:00:00.000Z", "durationMs": 1800, "warnings": [] },
   "data": {
     "changedParts": [
       { "object": "ZCL_DEMO", "part": "main", "direction": "divergent", "detail": "local file: src/zcl_demo.clas.abap" },
@@ -84,7 +84,7 @@ abap status --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap status", "version": "1.1.0", "timestamp": "2026-08-28T00:00:00.000Z", "durationMs": 900, "warnings": [] },
+  "meta": { "command": "abap status", "version": "1.2.0", "timestamp": "2026-08-28T00:00:00.000Z", "durationMs": 900, "warnings": [] },
   "data": { "truncated": false, "checked": 5 }
 }
 ```

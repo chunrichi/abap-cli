@@ -16,7 +16,7 @@
 ## 架构（三层）
 
 - **CLI**（`src/abap_cli/`）：TypeScript 薄客户端，所有命令都支持 `--json`；命令清单唯一入口是 `src/abap_cli/registry/commands.ts`。
-- **SAP**（`abap/`）：ABAP，DDIC CRUD 的 ICF 服务处理器；开发期是全局类树（`abap/src`，19 个类），发布期由 `abap deploy` 合并为单类 handler。
+- **SAP**（`abap/`）：ABAP，DDIC CRUD 的 ICF 服务处理器；开发期是全局类树（`abap/src`，20 个类），发布期由 `abap deploy` 合并为单类 handler。
 - **Agent**：`skills/` + `agents/` 是随 npm 包分发给用户的内容；`.agents/skills/` 是本仓库开发用的本地技能，不随包分发。
 - **分发**：`npm run build` 产物为 `dist/index.js`（`rootDir: src/abap_cli`）；npm 包只含 `dist`、`abap/src`、`abap/deploy.json`、`skills`、`agents`。
 

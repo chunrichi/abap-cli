@@ -2,7 +2,7 @@
 name: abap-cli-data
 description: abap-cli 对对象的运行时消费 — `select` 查表/视图数据 / `fields` 列字段（表/视图字段清单，含 `--find` 反查）/ `run` 跑类（classrun 或静态方法）/ `run-report` 跑报表（取经典 list 输出）/ `test` 跑 ABAP Unit 单测。use when asking how to query a table / how to list the fields of a table / how to run a class / how to run a report and read its list output / how to run ABAP Unit tests and read the result / how to see the output of a classrun / how to do read-only data analysis against SAP.
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
   scope: sap
   commands: [select, fields, run, run-report, test]
   tags: [read-only, no-lock, no-transport, no-data-mutation]
