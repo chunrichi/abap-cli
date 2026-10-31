@@ -21,6 +21,7 @@
 | `OBJECT_NOT_ACTIVE` | SAP_ERROR/6 | inspect --activation | `activate --yes` 修复 |
 | `VERSION_DESTINATION_INVALID` | USAGE/2 | pull --remote | 系统 ID 非法；看 `--remote` 参数 |
 | `INVALID_FIELD` | VALIDATION_ERROR/7 | push（DDIC JSON 写） | DDIC 结构校验失败；看 `error.details` |
+| `VALIDATION_ERROR` | VALIDATION_ERROR/7 | validate:aff | AFF schema 校验失败或缺少必需 companion；看 `error.details.files[]`（cwd-relative POSIX，`status: "fail"` / `missingCompanions[]`） |
 | `INVALID_ARGUMENT` | USAGE/2 | 任意 | 看 `error.nextSteps` / `error.references` |
 | `USAGE` | USAGE/2 | 任意 | 缺必填参数；看 `error.nextSteps` |
 

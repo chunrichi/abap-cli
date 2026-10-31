@@ -92,6 +92,7 @@ abap doctor [options]
 | Option | Description |
 | --- | --- |
 | `--verbose` | Include detail (versions, paths, underlying messages). |
+| `--strict` | Exit 3 with CONFIG_ERROR when any environment/config check fails (CI / agent gate). |
 | `--fix` | Apply safe, reversible fixes (requires --yes). |
 | `--yes` | Confirm --fix without prompting. |
 
@@ -100,10 +101,10 @@ abap doctor [options]
   ```bash
   abap doctor
   ```
-- Apply safe fixes
+- Gate on a healthy environment (exit 3 when not ok)
 
   ```bash
-  abap doctor --fix --yes
+  abap doctor --strict --json
   ```
 
 ## `abap transport`

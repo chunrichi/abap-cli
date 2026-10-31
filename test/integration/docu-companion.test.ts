@@ -192,7 +192,7 @@ describe.skipIf(!hasBuiltCli)('DOMA/DTEL .docu.json companion lifecycle (mock IC
       // validate:aff accepts the companion via the docu-v1 schema.
       const validate = await runCli(['validate:aff', DOMA_DOCU, '--json']);
       expect(validate.exit).toBe(0);
-      expect(parseEnvelope(validate).files[0]).toMatchObject({ status: 'pass', type: 'DOCU' });
+      expect(parseEnvelope(validate).data.files[0]).toMatchObject({ status: 'pass', type: 'DOCU' });
 
       // edit + push again: the changed text round-trips.
       const edited = [
