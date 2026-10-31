@@ -174,7 +174,7 @@ src/(ui2)cl_json.clas.abap                # 命名空间对象 /UI2/CL_JSON
 | `abap push <files...>` | 把本地改动写回 SAP：锁 → 写 → 激活 → 解锁（`--tr`、`--all`、`--atomic`、`--check-only`、`--dry-run`、`--no-activate`、`--fail-fast`） |
 | `abap check` | `syntax`（走 SAP）/ `content`（纯本地）/ `atc`（`--variant`、`--out`），三者都支持 `--all`、`--changed`、`--strict` |
 | `abap create <type> <name>` | 在 SAP 创建并激活对象（`--package`、`--description`、`--tr`、`--file`、`--template`、`--check-only`、`--audit`）；`--func <name>` 在已有函数组里加函数模块 |
-| `abap create local <type> <name>` | 离线生成 AFF 草稿骨架，支持 CLAS / INTF / PROG / FUGR 及 SRVD / DCLS / DDLX / DDLA 配套对象，不连 SAP |
+| `abap create local <type> <name>` | 离线生成 AFF 草稿骨架，仅支持 CLAS / INTF / PROG / FUGR，不连 SAP |
 | `abap activate <object>` | 激活对象的所有 inactive items（修复陈旧未激活） |
 | `abap delete <object>` | 删除对象：锁 → 删除 → 解锁（`--type`、`--tr`、`--yes`） |
 | `abap mime` | `create` / `delete`（`--recursive`）/ `push` MIME 仓库目录与文件 |

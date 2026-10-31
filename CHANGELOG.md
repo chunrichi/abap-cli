@@ -17,6 +17,7 @@
 
 ### Fixed
 
+- **`create local` 对 CDS/RAP 伴生类型写到错误文件**：`SRVD` / `DCLS` / `DDLX` / `DDLA` 有 `createObjtype` 但没有本地骨架模板，旧实现会落一个 `REPORT <name>.` 内容的 `<name>.<type>.abap`（既不是合法 AFF 草稿也无法 push）。现在 `create local` 对这四类返回 `TYPE_NOT_SUPPORTED`（exit 7）并提示用 `abap create <type> <name> --file <aff.json>`，`--help` 与 README 的"支持 CDS/RAP 配套对象"文案同步更正。
 - **macOS 反复弹出的钥匙串授权窗口**：旧条目由 `keytar` 写入，ACL 只信任创建时的 node 二进制；回退到原生 `security` 读取时每次访问都会触发系统授权弹窗。现在 macOS 默认用原生 `security` 写入/读取，条目由 `/usr/bin/security`（Apple 签名）创建，读取不再弹窗。
 
 ### Security
