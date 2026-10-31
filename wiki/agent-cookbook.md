@@ -24,7 +24,7 @@ changed at: 2026-10-30 20:00:00
 | [5](#剧本-5试运行--不污染) | 试运行 + 不污染 transport | `create $TMP → push --tr $TMP → run → activate --tr 正式` |
 | [6](#剧本-6紧急回滚) | 紧急回滚（生产事故） | `inspect --activation → transport list → 手动释放` |
 | [7](#剧本-7新类--完整开发循环) | 新类（完整开发循环） | `create → pull → write body → check → push → run` |
-| [8](#剧本-8删除对象) | 删除对象（极少用） | CLI 当前**未支持**；需 GUI |
+| [8](#剧本-8删除对象) | 删除对象（极少用） | `abap delete <obj> --type <type> --yes` |
 
 ---
 
@@ -177,7 +177,7 @@ abap pull ZCL_TEST_NEW --json  # 拉最新的 active 版本
 # ... 调整 ...
 abap push src/zcl_test_new.clas.abap --tr DEVK900001 --yes --json
 
-# 5. 清理：删除 $TMP 副本（CLI 未支持；用 SE80）
+# 5. 清理 $TMP 副本：abap delete ZCL_TEST_NEW --type CLAS --yes --json
 ```
 
 ---
@@ -263,13 +263,23 @@ abap inspect ZCL_NEW_CLASS --activation --json
 
 ## 剧本 8：删除对象（极少用）
 
-CLI 当前**未实现** `abap delete`（见 [wiki/roadmap.md](roadmap.md) 第二节）。
+`abap delete <obj> --type <type> --yes --json` 删除对象（lock → delete → unlock）。`--type` 必填（避免同名歧义），非 `$TMP` 对象需要 `--tr`。
 
-绕过方案：
-1. `abap pull <obj> --json`（保留源码副本）
-2. 用 SAP GUI（SE80 / SE10）删除
+```bash
+# 1. 先留一份源码副本
+abap pull ZCL_OLD --json
 
-不建议 agent 自动删除——属于不可逆操作。
+# 2. 评估影响面
+abap where-used ZCL_OLD --json
+
+# 3. 删除（$TMP 对象不需要 --tr）
+abap delete ZCL_OLD --type CLAS --yes --json
+
+# 4. 只清理本地文件时不需要走 SAP
+rm -f src/zcl_old.clas.abap
+```
+
+不建议 agent 自动删除——属于不可逆操作，先让用户确认。
 
 ---
 

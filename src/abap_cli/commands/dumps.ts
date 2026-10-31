@@ -56,7 +56,7 @@ export const DUMPS_SCHEMA: CommandSchema = {
   ],
   errors: [
     { code: 'INVALID_ARGUMENT', category: 'USAGE', exitCode: 2 },
-    { code: 'CONFIG_ERROR', category: 'CONFIG_ERROR', exitCode: 2 },
+    { code: 'CONFIG_ERROR', category: 'CONFIG_ERROR', exitCode: 3 },
     { code: 'AUTH_ERROR', category: 'AUTH_ERROR', exitCode: 5 },
     { code: 'SAP_ERROR', category: 'SAP_ERROR', exitCode: 6 },
   ],

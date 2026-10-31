@@ -31,7 +31,7 @@ sed -i '' 's/zsample/ztodo/g' src/ztodo.tabl.{json,ddic,settings.json}
 $EDITOR src/ztodo.tabl.ddic
 
 # 5. 创建
-abap create TABL ZTODO --file src/ztodo.tabl.json --package $TMP --yes
+abap create TABL ZTODO --file src/ztodo.tabl.json --package '$TMP' --yes
 ```
 
 ## 跟 abap-file-format / DDL 解析器对齐

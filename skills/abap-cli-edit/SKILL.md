@@ -63,8 +63,8 @@ ICF / SICF 服务节点？→ 类型码是 HTTP，不是 SICF
 └── 推 → push <name>.http.json --tr <tr>
 
 MIME Repository（SE80 / UI 资产）？
-├── 建目录 → mime create /<path> --package $TMP --yes   # 非 TTY 必填 --yes
-├── 传文件 → mime push ./dist --root /zntf_ui/assets ----tr <request> --yes
+├── 建目录 → mime create /<path> --package '$TMP' --yes   # 非 TTY 必填 --yes
+├── 传文件 → mime push ./dist --root /zntf_ui/assets --tr <request> --yes
 └── 删目录 → mime delete /<path> [--recursive] --tr <request> --yes
 
 AFF 写盘前 gate（纯本地，不进 SAP）
@@ -117,7 +117,7 @@ AFF 写盘前 gate（纯本地，不进 SAP）
 | `DDLS_NOT_SUPPORTED_ON_ECC` (exit 64) | DDLS 在 ECC EHP5/6 | 不可降级；需升级到 ECC EHP7+ 或 S/4HANA |
 | `CHANNEL_DETECTION_FAILED` (exit 65) | profile 缺 systemVersion，channel-detect 拿不到 release | 跑 `profile test` 重读 release |
 | `TYPE_NOT_SUPPORTED` (exit 7) | 类型未注册，或该类型不支持 create | 看 [GitHub wiki/object-types.md](https://github.com/chunrichi/abap-cli/blob/main/wiki/object-types.md) 类型表 |
-| `OBJECT_NOT_FOUND` (exit 8) | 类型码传错（如 `--type SICF` 应为 `HTTP`） | 改用 `HTTP` 类型码；老 `SICF` 自动映射 + deprecation warning |
+| `OBJECT_NOT_FOUND` (exit 8) | 类型码传错（如 `--type SICF` 应为 `HTTP`） | 改用 `HTTP` 类型码；1.0.0 起不再接受 `SICF` |
 
 HTTP 服务（SICF 节点）的文件契约与完整示例见 [references/workflow.md](references/workflow.md) 变体 12。
 

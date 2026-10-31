@@ -14,7 +14,7 @@ export const SCHEMA: CommandSchema = {
   options: [schemaOption()],
   globalOptions: ['--json', '--pretty-json'],
   examples: [
-    { description: 'Create a MIME folder under $TMP', command: 'abap mime create /zntf_ui --package $TMP --yes' },
+    { description: 'Create a MIME folder under $TMP', command: "abap mime create /zntf_ui --package '$TMP' --yes" },
     { description: 'Recursively delete a folder (with transport)', command: 'abap mime delete /zntf_ui --recursive --tr NDK123456 --yes' },
     { description: 'Upload local assets into an existing folder', command: 'abap mime push ./out --root /zntf_ui/assets --tr NDK123456 --yes' },
     { description: 'Dry-run (no SAP calls)', command: 'abap mime push ./out --root /zntf_ui/assets --dry-run' },
@@ -22,7 +22,7 @@ export const SCHEMA: CommandSchema = {
   errors: [
     { code: 'INVALID_ARGUMENT', category: 'USAGE', exitCode: 2 },
     { code: 'USAGE', category: 'USAGE', exitCode: 2 },
-    { code: 'SAP_ERROR', category: 'SAP_ERROR', exitCode: 1 },
+    { code: 'SAP_ERROR', category: 'SAP_ERROR', exitCode: 6 },
   ],
 };
 
