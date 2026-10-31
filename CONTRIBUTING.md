@@ -24,7 +24,7 @@ Full development guide: [docs/development.md](docs/development.md).
 ## Verify before pushing
 
 ```bash
-npm run verify   # build + vitest + docs:check + skills drift
+npm run verify   # build + unit + integration + docs:check + skills drift
 ```
 
 CI runs the same command on every push to `main` and every PR; the pre-push hook
