@@ -138,7 +138,7 @@ graph LR
 - **ADT 通道**——源对象（CLAS / INTF / PROG / FUGR / CDS / RAP）走标准 ADT REST API：搜索、源码读写、加锁、语法检查、激活、传输、where-used。
 - **ICF 通道**——DDIC 对象、SICF 节点与事务码、表数据、报表、MIME、远程版本拉取、无 ADT text-elements 端点时的 textpool 读取，以及运行时 wrapper 走捆绑 ABAP 服务，由 `abap deploy` 安装。端点包括 `/ddic/*`、`/http/*`、`/tran/*`、`/tcode/*`、`/data/*`、`/run/*`、`/mime/*`、`/textpool/*`、`/version-source*` 与 `/_class-check*`。
 
-发布形态只装 **3 个全局类**（handler + setup + 运行时 wrapper）；`abap deploy --dev` 装完整的 19 类开发形态供维护者使用。ICF 节点由 setup 类幂等创建，所以 `abap deploy` 可以安全重跑。
+发布形态只装 **3 个全局类**（handler + setup + 运行时 wrapper）；`abap deploy --dev` 装完整的 20 类开发形态供维护者使用。ICF 节点由 setup 类幂等创建，所以 `abap deploy` 可以安全重跑。
 
 ---
 
