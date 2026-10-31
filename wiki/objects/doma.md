@@ -4,7 +4,7 @@ title: DOMA — 域（Domain）
 description: DOMA 对象的字段契约、单 JSON 嵌套结构、长文本伴生文件与关键字段
 tags: [abap-cli, object-type, doma, ddic, icf, abap-file-format, domain]
 created at: 2026-09-01 00:00:00
-changed at: 2026-10-31 17:05:00
+changed at: 2026-10-31 17:45:00
 ---
 
 # DOMA — 域（Domain）
@@ -109,10 +109,26 @@ abap push src/zmy_doma.doma.json --tr DEVK900001 --json
 ## 已知坑
 
 - **长文本行超 72 字符**：SAP 会静默截断；CLI 在 push 前校验并报 `AFF_FIXTURE_INVALID`（exit 7），且主对象不会被写入。先修 `.docu.json` 再 push。
+- **行首 TAB 不保留**：真机实测 `DOCU_GET` 把以 TAB 开头的文本行读成空行（SAP 侧行为）；缩进用空格。
 - **伴生文件直接 push**：`abap push src/zmy_doma.doma.docu.json` 会以 `INVALID_ARGUMENT`（exit 2）拒绝——推送主文件 `src/zmy_doma.doma.json` 即可，伴生会自动跟随。
 - **`fixedValues` 元素形态**：CLI 本地形态为 `fixedValue` + `description`（语言独立 / 多语言 `languageDependent[]`），也可放 `format.fixedValues`（abap-file-format 嵌套输入）；两者双向均可 round-trip
 - **没有 `create local` 骨架**：DDIC 子集仅 `create` + `pull` + `push`，没有离线骨架生成（DDIC 需要 SAP 端激活）
 - **`fixedValues` 重复值**：SAP 端会拒绝；CLI 不做去重校验（依赖 SAP 错误码）
+
+## 真机证据
+
+S/4HANA `8.134.214.7:44300`（profile `test`，client 100，`$TMP` + `ZCLI_TC_*`，release form handler）：
+
+- ICF `GET/POST /ddic/doma/<name>/docu` 闭环：push 5 行长文本 → `data.results[].docu: "saved"` → pull 逐字节比对 **EQUAL**；72 字符整行、`&DEFINITION&` / `<DS:GLOS.…>` / `</>` SAPscript 标记、行内 TAB、行首 4 空格缩进、`format: "H1"` 与空 format 段落都原样保留。
+- `validate:aff` 对拉回的 `<name>.doma.docu.json` PASS（`type: "DOCU"`）。
+- 改文本再 push → pull 后内容一致；`lines: []` push → `docu: "deleted"`，DOKIL/DOKTL 无残留，再次 pull 不写伴生并删除陈旧本地文件（`DOCU_LOCAL_STALE_REMOVED`）。
+- 非法伴生（73 字符行）：push 在写主对象之前以 `AFF_FIXTURE_INVALID`（exit 7）拒绝，主对象 description 保持旧值。
+- `--dry-run` 的 plan 为 `["ddic-icf", "docu-icf"]`。
+- 语言：`$TMP` 对象的 TADIR 主语言为 `E`，DOKIL 行 `ID=DO / TYP=T / LANGU=E`（AFF docu-v1 无语言字段，pull 不落语言）。
+
+真机实测坑：**行首是 TAB 的文本行经 `DOCU_GET` 读回时为空行**（DOKTL 里原文仍在，如 `\tleading tab`）；行内 / 行尾 TAB、行首空格不受影响。需要缩进请用空格，不要把 TAB 放在行首（SAP 侧行为，CLI 不做转义或清洗）。
+
+证据：`tests/261031004-realsap-docu/`（本地，不入库）。
 
 # references
 

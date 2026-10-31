@@ -132,7 +132,7 @@ DOMA/DTEL 的长文本不在对象 JSON 里，而是 0..1 伴生文件 `<name>.<
 
 - 单语言：服务端按对象 TADIR 主语言读写；`line` ≤72、`format` ≤2，SAPscript 标记原样保留。
 - `--skip-existing` 且主文件已存在时整对象跳过，伴生同样不拉取。
-- 真机证据：待 ICF docu 端点部署后补六阶段回归（当前仅 mock 回归）；届时同步 [doma](../objects/doma.md) / [dtel](../objects/dtel.md) 页。
+- 真机证据（S/4HANA profile `test`）：主文件 + 伴生 pull、push 后逐字节比对 EQUAL、`lines: []` 删除后 pull 不落盘并清理陈旧伴生、`validate:aff` PASS；详见 [doma](../objects/doma.md) / [dtel](../objects/dtel.md) 页。对象删除清理因 SAP 端 stateful 会话枯竭（`400`/stateful 错误）阻塞，恢复后补跑，证据在 `tests/261031004-realsap-docu/`（本地，不入库）。
 
 ### Package（DEVC）
 

@@ -158,7 +158,7 @@ abap validate:aff --schema
 }
 ```
 
-有 FAIL（或 companion 缺失）时 `status: "error"`、退出码 1（长文本伴生校验失败也走这里，`type: "DOCU"`）：
+有 FAIL（或 companion 缺失）时 `status: "error"`、退出码 1（长文本伴生校验失败也走这里，`type: "DOCU"`）。真机证据：S/4HANA profile `test` 上从 ICF 拉回的 `<name>.doma.docu.json` / `.dtel.docu.json` 均 PASS（`type: "DOCU"`）；证据在 `tests/261031004-realsap-docu/`（本地，不入库）。
 
 ```json
 {

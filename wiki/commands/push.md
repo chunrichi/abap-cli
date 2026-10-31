@@ -118,9 +118,11 @@ DOMA/DTEL 主文件 push 时，若同目录存在 `<name>.doma.docu.json` / `<na
 # 主文件 + 同目录伴生（有则推 / 空 lines 则删）
 abap push src/zmy_dom.doma.json --yes
 
-# 只看计划
+# 只看计划（有伴生时 plan 追加 docu-icf）
 abap push src/zmy_dom.doma.json --dry-run
 ```
+
+真机证据（S/4HANA profile `test`）：伴生 save / 改文本 / `lines: []` 删除、非法伴生先于主对象拒绝、`--dry-run` plan 均按上述行为；详见 [doma](../objects/doma.md) / [dtel](../objects/dtel.md)。
 
 ### TTYP / MSAG / DDLS（双通道）
 

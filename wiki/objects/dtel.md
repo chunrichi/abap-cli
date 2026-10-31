@@ -4,7 +4,7 @@ title: DTEL — 数据元素（Data Element）
 description: DTEL 对象的字段契约、单 JSON 嵌套结构、长文本伴生文件、与 DOMA 的关系
 tags: [abap-cli, object-type, dtel, ddic, icf, abap-file-format, data-element]
 created at: 2026-09-01 00:00:00
-changed at: 2026-10-31 17:05:00
+changed at: 2026-10-31 17:45:00
 ---
 
 # DTEL — 数据元素（Data Element）
@@ -111,9 +111,21 @@ abap push src/zmy_dtel.dtel.json --tr DEVK900001 --json
 ## 已知坑
 
 - **长文本伴生不要单独 push**：直接 `abap push src/zmy_dtel.dtel.docu.json` 会被 `INVALID_ARGUMENT`（exit 2）拒绝，推主文件即可。
+- **行首 TAB 不保留**：与 DOMA 相同（SAP `DOCU_GET` 行为），缩进请用空格。
 - **`typeRef` 第三类别（TTYP 引用）**（commit `28235e2`）：本地 `dataTypeInformation: { category: 'typeRef', typeName, referencedTypeName? }` ↔ wire `typeRef: { typeName, referencedTypeName? }`；未知 category（如 `referenceClasIntType`）→ `DTEL_CATEGORY_UNSUPPORTED`（exit 7）
 - **DTEL 的 DOMA 必须先激活**：push DTEL 时如果 `dataElement.domain` 引用的 DOMA 不存在或未激活，SAP 端会拒
 - **`shortText` 是 10 字符限制**：CLI 不校验长度；超长时 SAP 端报 `TEXT_TOO_LONG`
+
+## 真机证据
+
+S/4HANA `8.134.214.7:44300`（profile `test`，client 100，`$TMP` + `ZCLI_TC_*`）：
+
+- ICF `GET/POST /ddic/dtel/<name>/docu` 闭环：push 伴生（`H1` + 普通行）→ `docu: "saved"` → pull 逐字节比对 **EQUAL**；`validate:aff` PASS。
+- `lines: []` push → `docu: "deleted"`；再次 pull 不写伴生、删除陈旧本地文件（`DOCU_LOCAL_STALE_REMOVED`），DOKIL/DOKTL 无残留。
+- 语言：`$TMP` 对象 TADIR 主语言 `E`，DOKIL 行 `ID=DE / TYP=E`（AFF docu-v1 无语言字段）。
+- SAPscript 行首 TAB 的读回行为与 DOMA 相同（见 [doma](doma.md) 的真机坑）。
+
+证据：`tests/261031004-realsap-docu/`（本地，不入库）。
 
 # references
 
