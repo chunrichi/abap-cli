@@ -42,7 +42,6 @@ Every command supports `--json` (compact envelope, default for agents) and `--pr
 | `abap diff` | sap | Compare local files against SAP |
 | `abap dumps` | sap | List recent ST22 ABAP runtime dumps (read-only) |
 | `abap types` | local | Print the CLI type ↔ TADIR / DDIC mapping (no SAP call) |
-| `abap feedback` | sap | Send CLI feedback to upstream tracker |
 | `abap report-stuck` | sap | Write a stuck-operation report for offline triage |
 | `abap mime` | sap | Create, delete, or upload MIME Repository resources (create \| delete \| push) |
 | `abap validate:aff` | sap | Validate JSON files against official abap-file-format (AFF) canonical schemas (Draft 2020-12) |
@@ -1005,46 +1004,6 @@ abap types [--json] | abap types <type> [--json]
   abap types STRU --tadir-object
   ```
 
-## `abap feedback`
-
-Submit one sanitized issue from a completed agent session.
-
-```bash
-feedback [options]
-```
-
-### Options
-
-| Option | Required | Default | Values | Description |
-| --- | --- | --- | --- | --- |
-| `--username` `<name>` | no |  |  | Optional business username override; when omitted it is resolved from $USERNAME, $USER, the OS user info, or `git config user.name`. |
-| `--email` `<address>` | no |  |  | Optional contact email. |
-| `--feature-key` `<key>` | yes |  |  | Stable feature or function identifier. |
-| `--title` `<text>` | yes |  |  | Short issue summary. |
-| `--description` `<text>` | yes |  |  | Concise plain-text observation, maximum 255 characters. |
-| `--priority` `<level>` | no | `"NORMAL"` | LOW, NORMAL, HIGH, URGENT | Issue priority. |
-| `--source-system` `<name>` | no | `"abap-cli"` |  | Calling client or system name. |
-| `--agent-id` `<id>` | no |  |  | Optional agent or product identifier. |
-| `--session-id` `<id>` | no |  |  | Optional completed agent session identifier. |
-| `--idempotency-key` `<key>` | no |  |  | Stable retry key; generated when omitted. |
-| `--correlation-id` `<id>` | no |  |  | Optional trace identifier sent as X-Correlation-ID. |
-| `--dry-run` | no |  |  | Validate and print the normalized request without submitting it. |
-| `--json` | no |  |  | Emit the unified JSON envelope on stdout. |
-| `--pretty-json` | no |  |  | Emit formatted JSON instead of compact JSON. |
-
-### Examples
-
-- Submit a concise issue from a completed session
-
-  ```bash
-  abap feedback --feature-key abap.push --title "Push reports an unclear error" --description "A valid class push fails after syntax check with no actionable detail." --priority NORMAL --session-id session-123 --json
-  ```
-- Validate the request without sending it
-
-  ```bash
-  abap feedback --username agent-user --feature-key abap.cli --title "Example" --description "Example feedback." --dry-run --json
-  ```
-
 ## `abap report-stuck`
 
 Record a stuck-agent report locally (feedback loop)
@@ -1180,14 +1139,12 @@ Aggregated from the per-command schemas. The authoritative TypeScript source is 
 | `AUTH_ERROR` | AUTH_ERROR | 5 |
 | `CLASS_NOT_RUNNABLE` | VALIDATION_ERROR | 7 |
 | `CONFIG_ERROR` | CONFIG_ERROR | 3 |
-| `CONFLICT` | CONFLICT | 66 |
 | `DDIC_NOT_SUPPORTED` | VALIDATION_ERROR | 7 |
 | `DELETE_FAILED` | SAP_ERROR | 6 |
 | `DEPLOY_MANIFEST_INVALID` | VALIDATION_ERROR | 7 |
 | `DEPLOY_MERGE_FAILED` | VALIDATION_ERROR | 7 |
 | `FILE_EXISTS` | USAGE | 2 |
 | `FILE_PARSE_ERROR` | USAGE | 2 |
-| `HTTP_ERROR` | HTTP_ERROR | 68 |
 | `INVALID_ARGUMENT` | USAGE | 2 |
 | `INVALID_FIELD` | VALIDATION_ERROR | 7 |
 | `INVALID_WHERE` | VALIDATION_ERROR | 7 |
@@ -1202,7 +1159,6 @@ Aggregated from the per-command schemas. The authoritative TypeScript source is 
 | `OBJECT_NOT_FOUND` | NOT_FOUND | 8 |
 | `OFFSET_EXCEEDED` | VALIDATION_ERROR | 7 |
 | `OVERWRITE_REQUIRED` | USAGE | 2 |
-| `PERSISTENCE_ERROR` | PERSISTENCE_ERROR | 67 |
 | `PULL_PARTIAL_FAILURE` | VALIDATION_ERROR | 7 |
 | `PUSH_FAILED` | VALIDATION_ERROR | 7 |
 | `QUERY_FAILED` | SAP_ERROR | 6 |
