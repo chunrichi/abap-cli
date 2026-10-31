@@ -300,6 +300,37 @@ TYPES:
     status TYPE string,
     data   TYPE REF TO data,
   END OF ty_ddic_get.
+" DDIC long-text (documentation) wire payloads — /ddic/<doma|dtel>/<name>/docu.
+" AFF docu-v1 has no language field: the endpoint reads/writes the object's
+" TADIR master language (single-language companion file).
+TYPES:
+  BEGIN OF ty_docu_line,
+    format TYPE string,
+    line   TYPE string,
+  END OF ty_docu_line,
+  tt_docu_line TYPE STANDARD TABLE OF ty_docu_line WITH EMPTY KEY,
+  BEGIN OF ty_docu_read_data,
+    name           TYPE string,
+    type           TYPE string,
+    language       TYPE string,
+    format_version TYPE string,
+    lines          TYPE tt_docu_line,
+  END OF ty_docu_read_data,
+  BEGIN OF ty_docu_write_request,
+    format_version TYPE string,
+    lines          TYPE tt_docu_line,
+  END OF ty_docu_write_request,
+  BEGIN OF ty_docu_write_data,
+    name     TYPE string,
+    type     TYPE string,
+    language TYPE string,
+    action   TYPE string,
+  END OF ty_docu_write_data,
+  BEGIN OF ty_docu_write,
+    status TYPE string,
+    data   TYPE ty_docu_write_data,
+  END OF ty_docu_write.
+
 " DDIC GET (pull) wire payloads — component names target the camelCase wire
 " (field_name → fieldName etc.); booleans are abap_bool (→ JSON true/false).
 TYPES:

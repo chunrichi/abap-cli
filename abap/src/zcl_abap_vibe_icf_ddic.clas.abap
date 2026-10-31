@@ -118,6 +118,35 @@ CLASS zcl_abap_vibe_icf_ddic DEFINITION PUBLIC FINAL CREATE PUBLIC.
                 iv_request TYPE trkorr
       EXPORTING es_payload TYPE zcl_abap_vibe_icf_types=>ty_ddic_create
                 ev_error   TYPE zcl_abap_vibe_icf_types=>ty_error.
+
+    " DDIC long text (SAPscript documentation) for DOMA/DTEL, exposed as
+    " /ddic/<type>/<name>/docu. AFF docu-v1 is language-less, so reads/writes
+    " target the object's TADIR master language.
+    CLASS-METHODS read_ddic_docu
+      IMPORTING iv_type    TYPE string
+                iv_name    TYPE string
+      EXPORTING es_payload TYPE REF TO data
+                ev_error   TYPE zcl_abap_vibe_icf_types=>ty_error.
+
+    CLASS-METHODS write_ddic_docu
+      IMPORTING iv_type    TYPE string
+                iv_name    TYPE string
+                iv_payload TYPE string
+      EXPORTING es_payload TYPE zcl_abap_vibe_icf_types=>ty_docu_write
+                ev_error   TYPE zcl_abap_vibe_icf_types=>ty_error.
+
+    " Resolve the SAPscript identity of a DDIC object's documentation:
+    " DOMA -> (ID 'DO', TYP 'T'), DTEL -> (ID 'DE', TYP 'E'), plus the
+    " object's TADIR master language (fallback: logon language).
+    CLASS-METHODS docu_spec
+      IMPORTING iv_type     TYPE string
+                iv_name     TYPE string
+      EXPORTING ev_id       TYPE dokhl-id
+                ev_typ      TYPE dokhl-typ
+                ev_language TYPE dokhl-langu.
+
+    CLASS-METHODS docu_message
+      RETURNING VALUE(rv_text) TYPE string.
 ENDCLASS.
 
 CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
@@ -128,6 +157,70 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
     DATA lv_match_name TYPE string.
     DATA lv_pkg TYPE string.
     DATA lv_req TYPE string.
+
+    " Documentation companion route: /ddic/<doma|dtel>/<name>/docu.
+    DATA lv_docu_type TYPE string.
+    DATA lv_docu_name TYPE string.
+    FIND REGEX '^/ddic/(doma|dtel)/(.+)/docu$' IN iv_path IGNORING CASE
+      SUBMATCHES lv_docu_type lv_docu_name.
+    IF sy-subrc = 0.
+      lv_docu_type = to_upper( lv_docu_type ).
+      lv_docu_name = to_upper( lv_docu_name ).
+      IF iv_method = 'GET'.
+        read_ddic_docu( EXPORTING iv_type    = lv_docu_type
+                                  iv_name    = lv_docu_name
+                        IMPORTING es_payload = DATA(lr_docu)
+                                  ev_error   = DATA(ls_docu_err) ).
+        IF ls_docu_err IS NOT INITIAL.
+          zcl_abap_vibe_icf_response=>respond_error( io_server = io_server
+                         iv_status = 200
+                         iv_reason = 'OK'
+                         iv_code   = ls_docu_err-error-code
+                         iv_msg    = ls_docu_err-error-message ).
+        ELSE.
+          DATA(ls_docu_get) = VALUE zcl_abap_vibe_icf_types=>ty_ddic_get( status = 'success'
+                                                                           data   = lr_docu ).
+          zcl_abap_vibe_icf_response=>respond_json( io_server = io_server iv_status = 200
+                                                    iv_reason = 'OK' is_payload = ls_docu_get ).
+        ENDIF.
+      ELSEIF iv_method = 'POST' OR iv_method = 'PUT'.
+        write_ddic_docu( EXPORTING iv_type    = lv_docu_type
+                                   iv_name    = lv_docu_name
+                                   iv_payload = iv_body
+                         IMPORTING es_payload = DATA(ls_docu_write)
+                                   ev_error   = DATA(ls_docu_write_err) ).
+        IF ls_docu_write_err IS NOT INITIAL.
+          zcl_abap_vibe_icf_response=>respond_error( io_server = io_server
+                         iv_status = 200
+                         iv_reason = 'OK'
+                         iv_code   = ls_docu_write_err-error-code
+                         iv_msg    = ls_docu_write_err-error-message
+                         iv_details = ls_docu_write_err-error-details ).
+        ELSE.
+          zcl_abap_vibe_icf_response=>respond_json( io_server = io_server iv_status = 200
+                                                    iv_reason = 'OK' is_payload = ls_docu_write ).
+        ENDIF.
+      ELSE.
+        zcl_abap_vibe_icf_response=>respond_error( io_server = io_server
+                       iv_status = 405
+                       iv_reason = 'Method Not Allowed'
+                       iv_code = 'METHOD_NOT_ALLOWED'
+                       iv_msg = |{ iv_method } not supported on /ddic/{ lv_docu_type }/<name>/docu| ).
+      ENDIF.
+      RETURN.
+    ENDIF.
+    " /docu suffix on a type without documentation support.
+    FIND REGEX '^/ddic/([a-z]+)/(.+)/docu$' IN iv_path IGNORING CASE
+      SUBMATCHES lv_docu_type lv_docu_name.
+    IF sy-subrc = 0.
+      zcl_abap_vibe_icf_response=>respond_error( io_server = io_server
+                     iv_status = 400
+                     iv_reason = 'Bad Request'
+                     iv_code = 'DOCU_TYPE_UNSUPPORTED'
+                     iv_msg = |long text is supported for DOMA and DTEL only, not { lv_docu_type }| ).
+      RETURN.
+    ENDIF.
+
     FIND REGEX '^/ddic/(doma|dtel|tabl|stru|enqu|nrob|ttyp|msag)(?:/(.+))?$' IN iv_path IGNORING CASE
       SUBMATCHES lv_match_type lv_match_name.
     IF sy-subrc <> 0 OR lv_match_type IS INITIAL.
@@ -292,6 +385,246 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
                      iv_msg = |{ iv_method } not supported on /ddic/{ lv_type }| ).
     ENDIF.
   ENDMETHOD.
+  METHOD read_ddic_docu.
+    CLEAR: es_payload, ev_error.
+    DATA lv_id       TYPE dokhl-id.
+    DATA lv_typ      TYPE dokhl-typ.
+    DATA lv_language TYPE dokhl-langu.
+    docu_spec( EXPORTING iv_type     = iv_type
+                         iv_name     = iv_name
+               IMPORTING ev_id       = lv_id
+                         ev_typ      = lv_typ
+                         ev_language = lv_language ).
+
+    " DOCU_GET/DOCU_DEL/DOCU_INIT take DOKHL field types; a string actual
+    " parameter is rejected at runtime (CALL_FUNCTION_CONFLICT_TYPE), so
+    " convert the DDIC name into the documented parameter type first.
+    DATA lv_object TYPE dokhl-object.
+    lv_object = iv_name.
+    DATA lt_lines TYPE tline_tab.
+    DATA ls_head  TYPE thead.
+    CALL FUNCTION 'DOCU_GET'
+      EXPORTING
+        id     = lv_id
+        object = lv_object
+        langu  = lv_language
+        typ    = lv_typ
+      IMPORTING
+        head   = ls_head
+      TABLES
+        line   = lt_lines
+      EXCEPTIONS
+        no_docu_on_screen = 1
+        no_docu_self_def  = 2
+        no_docu_temp      = 3
+        ret_code          = 4
+        OTHERS            = 5.
+    DATA lv_subrc TYPE syst-subrc.
+    lv_subrc = sy-subrc.
+    IF lv_subrc = 4.
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+        error = VALUE zcl_abap_vibe_icf_types=>ty_error_body(
+          code    = 'DOCU_NOT_FOUND'
+          message = |No documentation for { iv_type } { iv_name } in language { lv_language }| ) ).
+      RETURN.
+    ELSEIF lv_subrc <> 0.
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+        error = VALUE zcl_abap_vibe_icf_types=>ty_error_body(
+          code    = 'DOCU_READ_FAILED'
+          message = |Could not read documentation for { iv_type } { iv_name }: { docu_message( ) }| ) ).
+      RETURN.
+    ENDIF.
+
+    CREATE DATA es_payload TYPE zcl_abap_vibe_icf_types=>ty_docu_read_data.
+    FIELD-SYMBOLS <ls_docu_data> TYPE zcl_abap_vibe_icf_types=>ty_docu_read_data.
+    ASSIGN es_payload->* TO <ls_docu_data>.
+    <ls_docu_data>-name           = iv_name.
+    <ls_docu_data>-type           = iv_type.
+    <ls_docu_data>-language       = lv_language.
+    <ls_docu_data>-format_version = '1'.
+    LOOP AT lt_lines INTO DATA(ls_line).
+      DATA lv_text TYPE string.
+      lv_text = ls_line-tdline.
+      IF strlen( lv_text ) > 72.
+        lv_text = lv_text(72).
+      ENDIF.
+      APPEND VALUE zcl_abap_vibe_icf_types=>ty_docu_line( format = ls_line-tdformat
+                                                          line   = lv_text ) TO <ls_docu_data>-lines.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD write_ddic_docu.
+    CLEAR: es_payload, ev_error.
+    DATA lv_id       TYPE dokhl-id.
+    DATA lv_typ      TYPE dokhl-typ.
+    DATA lv_language TYPE dokhl-langu.
+    docu_spec( EXPORTING iv_type     = iv_type
+                         iv_name     = iv_name
+               IMPORTING ev_id       = lv_id
+                         ev_typ      = lv_typ
+                         ev_language = lv_language ).
+    DATA lv_object TYPE dokhl-object.
+    lv_object = iv_name.
+
+    DATA ls_request TYPE zcl_abap_vibe_icf_types=>ty_docu_write_request.
+    TRY.
+        /ui2/cl_json=>deserialize( EXPORTING json        = iv_payload
+                                             pretty_name = /ui2/cl_json=>pretty_mode-camel_case
+                                   CHANGING  data        = ls_request ).
+      CATCH cx_root INTO DATA(lx_json).
+        ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+          error = VALUE zcl_abap_vibe_icf_types=>ty_error_body(
+            code    = 'DOCU_INVALID_PAYLOAD'
+            message = |invalid documentation JSON: { lx_json->get_text( ) }| ) ).
+        RETURN.
+    ENDTRY.
+
+    " AFF docu-v1 bounds: format <= 2 chars, line <= 72 chars (SAP silently
+    " truncates longer lines in DOKTL-DOKTEXT, which would drift a round-trip).
+    DATA lv_position TYPE i.
+    LOOP AT ls_request-lines INTO DATA(ls_request_line).
+      ADD 1 TO lv_position.
+      IF strlen( ls_request_line-format ) > 2.
+        ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+          error = VALUE zcl_abap_vibe_icf_types=>ty_error_body(
+            code    = 'DOCU_FORMAT_TOO_LONG'
+            message = |line { lv_position }: format { ls_request_line-format } exceeds 2 characters|
+            details = VALUE #( ( |format must be at most 2 characters (AFF docu-v1)| ) ) ) ).
+        RETURN.
+      ENDIF.
+      IF strlen( ls_request_line-line ) > 72.
+        ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+          error = VALUE zcl_abap_vibe_icf_types=>ty_error_body(
+            code    = 'DOCU_LINE_TOO_LONG'
+            message = |line { lv_position }: { strlen( ls_request_line-line ) } characters exceed the 72-character SAPscript limit|
+            details = VALUE #( ( |split long text into multiple lines of at most 72 characters| ) ) ) ).
+        RETURN.
+      ENDIF.
+    ENDLOOP.
+
+    " Empty lines delete the documentation instead of creating an empty one
+    " (DOCU_UPDATE with an empty TLINE table leaves a zero-line document).
+    IF ls_request-lines IS INITIAL.
+      CALL FUNCTION 'DOCU_DEL'
+        EXPORTING
+          id     = lv_id
+          object = lv_object
+          langu  = lv_language
+          typ    = lv_typ
+        EXCEPTIONS
+          ret_code = 1
+          OTHERS   = 2.
+      DATA lv_del_subrc TYPE syst-subrc.
+      lv_del_subrc = sy-subrc.
+      IF lv_del_subrc <> 0.
+        ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+          error = VALUE zcl_abap_vibe_icf_types=>ty_error_body(
+            code    = 'DOCU_WRITE_FAILED'
+            message = |Could not delete documentation for { iv_type } { iv_name }: { docu_message( ) }| ) ).
+        RETURN.
+      ENDIF.
+      COMMIT WORK.
+      es_payload = VALUE zcl_abap_vibe_icf_types=>ty_docu_write(
+        status = 'success'
+        data   = VALUE zcl_abap_vibe_icf_types=>ty_docu_write_data( name     = iv_name
+                                                                    type     = 'DOCU'
+                                                                    language = lv_language
+                                                                    action   = 'deleted' ) ).
+      RETURN.
+    ENDIF.
+
+    DATA ls_dokil TYPE dokil.
+    DATA lv_found TYPE syst-subrc.
+    CALL FUNCTION 'DOCU_INIT'
+      EXPORTING
+        id     = lv_id
+        object = lv_object
+        langu  = lv_language
+        typ    = lv_typ
+      IMPORTING
+        xdokil = ls_dokil
+        found  = lv_found
+      EXCEPTIONS
+        OTHERS = 5.
+    DATA lv_init_subrc TYPE syst-subrc.
+    lv_init_subrc = sy-subrc.
+    IF lv_init_subrc <> 0.
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+        error = VALUE zcl_abap_vibe_icf_types=>ty_error_body(
+          code    = 'DOCU_WRITE_FAILED'
+          message = |Could not initialise documentation for { iv_type } { iv_name }: { docu_message( ) }| ) ).
+      RETURN.
+    ENDIF.
+
+    DATA ls_head TYPE thead.
+    ls_head-tdobject = 'DOKU'.
+    ls_head-tdname   = iv_name.
+    ls_head-tdid     = lv_id.
+    ls_head-tdspras  = lv_language.
+
+    DATA lt_tline TYPE tline_tab.
+    LOOP AT ls_request-lines INTO ls_request_line.
+      APPEND VALUE tline( tdformat = ls_request_line-format
+                          tdline   = ls_request_line-line ) TO lt_tline.
+    ENDLOOP.
+
+    CALL FUNCTION 'DOCU_UPDATE'
+      EXPORTING
+        head    = ls_head
+        state   = 'A'
+        typ     = lv_typ
+        version = ls_dokil-version
+      TABLES
+        line    = lt_tline
+      EXCEPTIONS
+        OTHERS  = 5.
+    DATA lv_update_subrc TYPE syst-subrc.
+    lv_update_subrc = sy-subrc.
+    IF lv_update_subrc <> 0.
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+        error = VALUE zcl_abap_vibe_icf_types=>ty_error_body(
+          code    = 'DOCU_WRITE_FAILED'
+          message = |Could not write documentation for { iv_type } { iv_name }: { docu_message( ) }| ) ).
+      RETURN.
+    ENDIF.
+    COMMIT WORK.
+
+    es_payload = VALUE zcl_abap_vibe_icf_types=>ty_docu_write(
+      status = 'success'
+      data   = VALUE zcl_abap_vibe_icf_types=>ty_docu_write_data( name     = iv_name
+                                                                  type     = 'DOCU'
+                                                                  language = lv_language
+                                                                  action   = 'saved' ) ).
+  ENDMETHOD.
+
+  METHOD docu_spec.
+    CASE iv_type.
+      WHEN 'DOMA'.
+        ev_id  = 'DO'.
+        ev_typ = 'T'.
+      WHEN OTHERS.
+        ev_id  = 'DE'.
+        ev_typ = 'E'.
+    ENDCASE.
+    SELECT SINGLE masterlang FROM tadir INTO ev_language
+      WHERE pgmid = 'R3TR'
+        AND object = iv_type
+        AND obj_name = iv_name.
+    IF sy-subrc <> 0 OR ev_language IS INITIAL.
+      ev_language = sy-langu.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD docu_message.
+    DATA lv_text TYPE string.
+    IF sy-msgid IS NOT INITIAL.
+      MESSAGE ID sy-msgid TYPE 'S' NUMBER sy-msgno
+        WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 INTO lv_text.
+    ENDIF.
+    rv_text = COND string( WHEN lv_text IS NOT INITIAL THEN lv_text
+                           ELSE |subrc={ sy-subrc }| ).
+  ENDMETHOD.
+
   METHOD get_uuid.
     TRY.
         rv_uuid = cl_system_uuid=>if_system_uuid_static~create_uuid_c32( ).
