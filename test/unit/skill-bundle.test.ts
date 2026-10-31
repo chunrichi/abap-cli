@@ -162,7 +162,7 @@ describe('skill bundle structural audit', () => {
       const fm = parseFrontmatter(content);
       const description = fm.description ?? '';
       const commands = fm.metadata?.commands ?? [];
-      // meta skill (abap-cli) 的 metadata.commands 是空数组；description 描述路由层而非命令，豁免
+      // meta skill (abap-cli) 只代理 report-stuck；description 描述路由层而非单命令，豁免
       if (skill.dirName === 'abap-cli') return;
       // 不拥有命令的方法论 skill（abap-cli-performance）无需在 description 里点名命令
       if (commands.length === 0) return;
@@ -259,8 +259,8 @@ describe('skill bundle — size constraints', () => {
   const skills = getAllSkills();
   // 各领域 skill ≤ 旧对应 skill 行数；meta skill 无对应旧 skill 但保持精简
   const MAX_SKILL_LINES: Record<string, number> = {
-      // 0.2.6 起：meta 多了 feedback / report-stuck，edit 多了 mime / validate:aff / 19 类对象类型表 + 11 个 push stage，
-      // 阈值放宽以容纳新增内容；详细命令速查下沉到 references/commands-quick.md（self-contained 不变）。
+      // meta 只保留 report-stuck，edit 多了 mime / validate:aff / 19 类对象类型表 + 11 个 push stage，
+      // 阈值放宽以容纳这些内容；详细命令速查下沉到 references/commands-quick.md（self-contained 不变）。
       'abap-cli': 180,
       'abap-cli-setup': 140,
       'abap-cli-search': 90,

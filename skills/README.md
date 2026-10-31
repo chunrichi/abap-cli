@@ -64,7 +64,7 @@ cp agents/abap-developer.agent.md <your-project>/.claude/agents/
 
 | skill | scope | 覆盖命令 | 一句话职责 |
 |---|---|---|---|
-| **`abap-cli`** | meta | `feedback` `report-stuck` | 入口路由层：按意图分发到 4 个领域 skill + 1 个方法论 skill；代理反馈链路 |
+| **`abap-cli`** | meta | `report-stuck` | 入口路由层：按意图分发到 4 个领域 skill + 1 个方法论 skill；本地卡死留痕；CLI 反馈直接提 GitHub issue |
 | **`abap-cli-setup`** | workspace-and-sap | `init` `profile` `doctor` `transport` `deploy` `session` `types` | 环境就绪：工作区、凭证、诊断、传输请求、ICF 部署、session、TADIR 映射 |
 | **`abap-cli-search`** | sap（只读） | `search` `where-used` `inspect` `tcode` `diff` `status` `dumps` | 元数据探查：不改对象、不加锁、不写 transport；`dumps` 列 ST22 dump |
 | **`abap-cli-edit`** | sap（写） | `pull` `push` `check` `create`（含 `create local`）`activate` `delete` `list` `mime` `validate:aff` | 写路径：源码/DDIC/MIME 的拉取、创建、修改、推送、激活、删除；类型码以 `src/abap_cli/types/registry.ts` 为准（当前 21 个注册类型，`SRVB` 等部分类型仅支持 pull） |
@@ -98,14 +98,15 @@ skills/<name>/
 | 拉对象 / 改 / 推 / 语法检查 / 激活 / 创建 / 删除 / 列举 / MIME / AFF 校验 | `abap-cli-edit` | `pull` `push` `check` `create` `activate` `delete` `list` `mime` `validate:aff` |
 | 跑类 / 查表数据 / 列表字段 / 跑报表 / 翻页 select | `abap-cli-data` | `select` `fields` `run` `run-report` |
 | ABAP 性能 review / 慢路径诊断 / 优化建议 | `abap-cli-performance` | （方法论 skill，不直接管命令） |
-| Agent 提交反馈 / 卡死留痕 | `abap-cli`（meta） | `feedback` `report-stuck` |
+| Agent 卡死留痕（不依赖 SAP） | `abap-cli`（meta） | `report-stuck` |
+| Agent 提交反馈 / bug | `abap-cli`（meta） | GitHub Issues（无 CLI 命令） |
 | 意图模糊 / 不确定归哪类 | `abap-cli`（meta） | （路由查询本身） |
 
 > ⚠️ **`pull` 归 `abap-cli-edit`**（写路径中间步骤），**`inspect` 归 `abap-cli-search`**（只读元数据，修复动作归 edit）。
 >
 > ⚠️ **`abap-cli-performance` 不是领域 skill**——不声明 `metadata.commands`（命令归属仍是 4 个领域 skill）；本 skill 全程只读、不写对象。
 >
-> ⚠️ **`feedback` / `report-stuck` 归 `abap-cli`（meta）**——不操作 SAP 对象；`feedback` 需网络，`report-stuck` 纯本地留痕。
+> ⚠️ **`report-stuck` 归 `abap-cli`（meta）**——不操作 SAP 对象，纯本地留痕；CLI 反馈不再有内置命令，agent 直接建 GitHub issue（GitHub MCP / `gh` / 预填 URL）。
 
 ### 错误码不重叠（硬性约束）
 
@@ -115,18 +116,18 @@ skills/<name>/
 - `abap-cli-edit`：`LOCK_FAILED` / `LOCKED` / `SYNTAX_ERROR` / `OBJECT_NOT_ACTIVE` / `ACTIVATION_FAILED` / `DDIC_NOT_SUPPORTED` / `TYPE_NOT_SUPPORTED` / `CHANNEL_DETECTION_FAILED` / `DDLS_NOT_SUPPORTED_ON_ECC` / `PUSH_FAILED`
 - `abap-cli-search`：`OBJECT_NOT_FOUND` / `TCODE_NOT_FOUND` / `AUTH_ERROR` / `TCODE_NOT_AUTHORIZED` / `AMBIGUOUS_OBJECT`
 - `abap-cli-setup`：`CONFIG_ERROR` / `TLS_ERROR` / `NO_TRANSPORT` / `SESSION_INVALID` / `SESSION_JAR_DECRYPT_FAILED`
-- `abap-cli`（meta）：`HTTP_ERROR` / `CONFLICT` / `PERSISTENCE_ERROR`（保留区间 exit 66-68）
+- `abap-cli`（meta）：无专属错误码（`report-stuck` 只用公共 `USAGE`）
 - 公共错误（`INVALID_ARGUMENT` / `USAGE` / `VALIDATION_ERROR` / `SAP_ERROR` 等）在涉及它的每个 skill 中各自内联，不做 cross-reference
 
-## 命令覆盖核对（29 CLI 命令）
+## 命令覆盖核对（28 CLI 命令）
 
 - ✅ `abap-cli-setup`：`init` `profile` `doctor` `transport` `deploy` `session` `types` — **7 顶层**
 - ✅ `abap-cli-search`：`search` `where-used` `inspect` `tcode` `diff` `status` `dumps` — **7 顶层**
 - ✅ `abap-cli-edit`：`pull` `push` `check` `create`（含 `create local`）`activate` `delete` `list` `mime` `validate:aff` — **9 顶层 + `create local` 子命令**
 - ✅ `abap-cli-data`：`select` `fields` `run` `run-report` — **4 顶层**
-- ✅ `abap-cli`（meta）：`feedback` `report-stuck` — **2 顶层**
+- ✅ `abap-cli`（meta）：`report-stuck` — **1 顶层**
 - ✅ `abap-cli-performance`：方法论 skill，不占顶层命令
-- **合计**：7 + 7 + 9 + 4 + 2 = **29 顶层命令**（与 `src/abap_cli/index.ts` 的 `COMMAND_SPECS` 1:1，由 `npm run check-skills-drift` 校验）
+- **合计**：7 + 7 + 9 + 4 + 1 = **28 顶层命令**（与 `src/abap_cli/registry/commands.ts` 的 `COMMAND_SPECS` 1:1，由 `npm run check-skills-drift` 校验）
 
 ## 版本
 

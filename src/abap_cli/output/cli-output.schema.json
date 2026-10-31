@@ -157,10 +157,7 @@
             "NOT_FOUND",
             "LOCKED",
             "DDLS_NOT_SUPPORTED",
-            "CHANNEL_DETECT",
-            "CONFLICT",
-            "PERSISTENCE_ERROR",
-            "HTTP_ERROR"
+            "CHANNEL_DETECT"
           ],
           "description": "ErrorCategory; maps 1:1 to the exit code (output/exit-codes.ts). Derived by scripts/build-cli-schema.mjs."
         },
@@ -247,18 +244,6 @@
         "CHANNEL_DETECT": {
           "type": "number",
           "const": 65
-        },
-        "CONFLICT": {
-          "type": "number",
-          "const": 66
-        },
-        "PERSISTENCE_ERROR": {
-          "type": "number",
-          "const": 67
-        },
-        "HTTP_ERROR": {
-          "type": "number",
-          "const": 68
         }
       },
       "additionalProperties": false

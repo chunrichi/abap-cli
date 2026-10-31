@@ -3,8 +3,8 @@
  * `scripts/check-skills-drift.mjs` — 检测 skills/ 与实际 CLI 实现之间的漂移。
  *
  * 检查项：
- *  1. 命令覆盖核对：每个 SKILL.md 的 `metadata.commands` 是否覆盖 src/abap_cli/index.ts
- *     的 COMMAND_SPECS（数量动态，当前 30 顶层命令）。
+ *  1. 命令覆盖核对：每个 SKILL.md 的 `metadata.commands` 是否覆盖 registry/commands.ts
+ *     的 COMMAND_SPECS（数量动态，见 `--json` 的 topLevelCommandCount）。
  *  2. SKILL.md 版本号：必须 == package.json 的 version。
  *  3. 已退役命令：grep `extension deploy` / `extension status` 等旧命令名。
  *  4. 脚本调用：skills/<name>/scripts/<file>.mjs 中 spawn 的第一参数必须在 COMMAND_SPECS 中。
@@ -167,12 +167,13 @@ for (const s of skills) {
     );
 }
 
-// 3. 已退役命令（extension deploy / extension status）
+// 3. 已退役命令（extension deploy / extension status / feedback）
 const retiredPatterns = [
     { re: /\babap extension deploy\b/g, label: 'extension deploy (0.2.6 renamed to deploy)' },
     { re: /\babap extension status\b/g, label: 'extension status (0.2.6 renamed to deploy status)' },
     { re: /\bextension deploy\b(?! \.mjs)/g, label: 'extension deploy reference' },
     { re: /\bextension status\b(?! \.mjs)/g, label: 'extension status reference' },
+    { re: /\babap feedback\b/g, label: 'feedback command (removed; file a GitHub issue instead)' },
 ];
 for (const s of skills) {
     const allFiles = listFiles(path.dirname(s.path), '.md');

@@ -33,6 +33,7 @@
 - **认证相关命令面**：`abap profile login` / `abap profile cookie` 子命令；`--auth-method` / `--auth-option` / `--cert-path` / `--cert-key` / `--cert-ca` / `--cert-passphrase` / `--remove-cert-passphrase` / `--clear-cert-auth` / `--sso-cookie-file` / `--clear-sso-cookie-file` / `--service-key` / `--clear-oauth-password` / `--spn` / `--reauth-on-expiry` 参数；keychain 的 cert-passphrase 条目读写。
 - **profile 输出/格式**：profile JSON 不再含 `auth` 字段；`profile show` 不再输出 `auth` / `certPassphrase*`，`profile delete` 不再返回 `certPassphraseCleaned` / `cookieJarCleaned`；`profile export` bundle 版本 2 → 3；`profile test` 各层不再带 `authMethod`。
 - **CA store**：删除客户端证书/私钥导入（`--cert-path` / `--cert-key` / `--cert-ca`）；只保留 `--ca` 的 CA 导入/回收。
+- **`abap feedback` 与自建反馈服务**：删除命令、`FeedbackClient` / 反馈 flow，以及 `feedback.example.com` 占位 HTTP 契约（幂等 key、priority、username 解析、`CONFLICT` exit 66 / `PERSISTENCE_ERROR` 67 / `HTTP_ERROR` 68 三个保留错误类别）。反馈改为 agent 直接提 GitHub issue（GitHub MCP / `gh issue create` / `GITHUB_TOKEN`），无凭据时给用户预填 issue URL；离线留档仍用 `abap report-stuck`。
 
 **Migration**：
 
@@ -43,6 +44,7 @@
 - 旧 `profile export` bundle（version 2）中带旧 auth 的条目在 `import` 时被拒绝；用 basic profile 重新导出/导入。
 - 依赖 BTP trial / SAML / X.509 认证的系统在 basic-only 下无法登录；请使用支持 basic auth 的 on-prem/ADT 端点，或等待认证方式重新引入。
 - **Node.js 运行时**：升级到 22.23.4+ / 24.22.1+ / 26.12.1+（或更新的受支持版本线），然后重新运行；`abap doctor` 会指出不合规的运行时并给出升级建议。
+- **反馈链路**：脚本 / 文档中的 `abap feedback ...` 调用改为直接建 GitHub issue —— `gh issue create --repo chunrichi/abap-cli --title "..." --body "..."`（或 GitHub MCP 的建 issue 工具、`POST /repos/chunrichi/abap-cli/issues`）；没有 GitHub 凭据时用 `https://github.com/chunrichi/abap-cli/issues/new?title=...&body=...` 预填 URL 交给用户手动提交。退出码 66–68 不再出现。
 
 ## [1.0.0] - 2026-10-30
 

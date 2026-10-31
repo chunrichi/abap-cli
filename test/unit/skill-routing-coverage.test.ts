@@ -93,9 +93,9 @@ describe('routing coverage (metadata.commands 互不相交)', () => {
   it('meta skill (abap-cli) 的 metadata.commands 仅含 agent 元命令', () => {
     const meta = skills.find((s) => s.name === 'abap-cli')!;
     const cmds = meta.fm.metadata?.commands ?? [];
-    // meta skill 允许有 commands，但这些必须是 agent 元命令（feedback / report-stuck 等），
+    // meta skill 允许有 commands，但这些必须是 agent 元命令（report-stuck 等），
     // 不允许混入任何领域 skill 已声明的命令（互不相交）。
-    // 与 0.2.6+ 对齐：feedback / report-stuck 不操作 SAP 对象，归属 meta。
+    // report-stuck 不操作 SAP 对象，归属 meta；反馈已改为 GitHub issue，无 CLI 命令。
     expect(cmds, 'meta skill 必须有 metadata.commands 字段').toBeDefined();
     for (const cmd of cmds) {
       expect(commandToSkill.has(cmd), `meta 命令 ${cmd} 与领域 skill 重名`).toBe(false);
@@ -118,11 +118,11 @@ describe('routing coverage (metadata.commands 互不相交)', () => {
 
   it('4 领域 skill 的 metadata.commands 并集覆盖全部 CLI 命令', () => {
     // The four domain skills must cover every top-level command except the
-    // meta-skill commands (feedback / report-stuck). Derived from the registry.
+    // meta-skill commands (report-stuck). Derived from the registry.
     const registrySrc = fs.readFileSync(path.join(repoRoot, 'src/abap_cli/registry/commands.ts'), 'utf8');
     const expected = [...registrySrc.matchAll(/name: '([^']+)'/g)]
       .map((match) => match[1]!)
-      .filter((name) => !['feedback', 'report-stuck'].includes(name));
+      .filter((name) => name !== 'report-stuck');
     for (const cmd of expected) {
       expect(commandToSkill.has(cmd), `${cmd} 未被任何领域 skill 覆盖`).toBe(true);
     }

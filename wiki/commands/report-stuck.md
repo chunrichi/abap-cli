@@ -4,7 +4,7 @@ title: abap report-stuck
 description: "把一次 agent 卡死记录成本地 JSON 报告（离线、不连 SAP / 网络），供事后 offline triage。"
 tags: [abap-cli, command, report-stuck, meta, local, triage, feedback-loop]
 created at: 2026-10-29 14:30:14
-changed at: 2026-10-31 13:24:09
+changed at: 2026-10-31 06:45:00
 ---
 
 # abap report-stuck
@@ -97,9 +97,9 @@ SCHEMA 未声明 `errors[]`；唯一会主动抛错的是参数校验：
 
 - **报告不在工作区**：落在 `~/.abap-cli/reports/`，同一用户的所有项目共享；triage 时去该目录按 `STUCK-*` 前缀找。
 - **`recorded: false` 仍是 exit 0**：写盘失败只体现在 `data.recorded` 和 `meta.warnings`，agent 不能只看退出码。
-- **报告不会自动上传**：要提交上游用 `abap feedback`；`report-stuck` 只负责本地留痕。
+- **报告不会自动上传**：要提交上游请直接建 GitHub issue（GitHub MCP / `gh issue create` / 预填 URL，默认仓库 `chunrichi/abap-cli`）；`report-stuck` 只负责本地留痕，CLI 已没有 `abap feedback` 命令。
 - **不要写敏感信息**：`--goal` / `--tried` / `--where` 会明文落盘，密码、token 先脱敏。
-- **`--report-stuck` 不是全局 flag**：顶层 CLI 只注册了 `--json` / `--pretty-json`；`feedback` / `dumps` 的 schema 曾误列该选项，已从 schema 移除。
+- **`--report-stuck` 不是全局 flag**：顶层 CLI 只注册了 `--json` / `--pretty-json`；`dumps` 的 schema 曾误列该选项，已从 schema 移除。
 
 # references
 

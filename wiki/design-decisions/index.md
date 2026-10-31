@@ -4,7 +4,7 @@ title: 设计决策录
 description: abap-cli 关键架构与契约决策的「为什么」— 决策 / 被否决方案 / 当前代价，便于新人和 agent 快速理解项目取舍
 tags: [abap-cli, design-decisions, architecture, adr]
 created at: 2026-09-01 00:00:00
-changed at: 2026-10-30 21:40:00
+changed at: 2026-10-31 06:45:00
 ---
 
 # 设计决策录（Design Decisions）
@@ -26,6 +26,7 @@ changed at: 2026-10-30 21:40:00
 | [010](010-aff-flat-layout.md) | AFF 原生扁平布局（`src/` 平铺 + 命名空间括号） | 所有产物平铺 `src/`，文件名遵循 AFF 规范；命名空间 `/UI2/CL_JSON` → `(ui2)cl_json` |
 | [011](011-macos-keychain-native-backend.md) | macOS keychain 默认走原生 security 后端 | 条目由 Apple 签名的 `/usr/bin/security` 创建，ACL 稳定、不再弹授权窗；keytar 降为回退 |
 | [012](012-icf-dev-global-release-merged.md) | ICF 服务开发期全局类树 / 发布期合并单类 | `abap/src` 按全局类维护（19 个），`abap/deploy.json` 是清单；`abap deploy` 推送前把 helper 降级为 `lcl_*` 合并进 handler，SAP 上只装 3 个全局类；`--dev` 装开发形态 |
+| [013](013-github-issues-feedback.md) | 反馈改走 GitHub Issues，删除自建反馈服务 | 删除 `abap feedback` 与自建 issue HTTP 契约；agent 用 GitHub MCP / `gh` / token / 预填 URL 提 issue，离线留档仍用 `report-stuck` |
 
 ## 阅读顺序建议
 
@@ -37,6 +38,7 @@ changed at: 2026-10-30 21:40:00
 - 改本地落盘布局 / 文件名规则：先读 [010](010-aff-flat-layout.md)（历史背景见 [003](003-typesubdir-layout.md)）
 - 改 keychain / 凭据存储：先读 [011](011-macos-keychain-native-backend.md)（历史认证背景见 [009](009-basic-auth-only.md)）
 - 改内置 ICF 服务的源码布局 / deploy 形态：先读 [012](012-icf-dev-global-release-merged.md)
+- 改反馈链路 / 反馈文档：先读 [013](013-github-issues-feedback.md)
 
 # references
 

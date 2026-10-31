@@ -139,12 +139,6 @@ export const COMMAND_SPECS: LazyCommandSpec[] = [
     load: () => import('../commands/types.js').then((m) => ({ register: m.registerTypesCommand })),
   },
   {
-    // feedback command
-    name: 'feedback',
-    description: 'Send CLI feedback to upstream tracker',
-    load: () => import('../commands/feedback.js').then((m) => ({ register: m.registerFeedbackCommand })),
-  },
-  {
     // report-stuck command
     name: 'report-stuck',
     description: 'Write a stuck-operation report for offline triage',

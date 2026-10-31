@@ -18,12 +18,7 @@ export type ErrorCategory =
   // Split from VALIDATION_ERROR so the agent/exit-channel tells the user
   // *which* validation failure happened (capability gap vs. semantic rejection).
   | 'DDLS_NOT_SUPPORTED' // exit 64 - DDLS requested on ECC release that lacks DDL sources
-  | 'CHANNEL_DETECT'    // exit 65 - channel-detect could not classify the system profile
-  // feedback service error categories
-  | 'CONFLICT'          // 409: idempotency key reused with different payload
-  | 'PERSISTENCE_ERROR' // 5xx: feedback service unavailable
-  | 'HTTP_ERROR';       // generic transport failure
-
+  | 'CHANNEL_DETECT';   // exit 65 - channel-detect could not classify the system profile
 /**
  * Sub-codes are emitted as the `code` value to preserve backward compatibility
  * with existing callers. `UNLOCK_WARNING` is a WarningCode (meta.warnings),
@@ -123,10 +118,6 @@ export type ErrorCode =
   // bundled-service deploy: dev-class merge into the handler class
   | 'DEPLOY_MANIFEST_INVALID'   // abap/deploy.json missing or inconsistent with abap/src (VALIDATION_ERROR)
   | 'DEPLOY_MERGE_FAILED'       // source split / dependency cycle / rename leftover (VALIDATION_ERROR)
-  // feedback service error codes
-  | 'CONFLICT'                  // 409: idempotency key reused with different payload
-  | 'PERSISTENCE_ERROR'         // 5xx: feedback service unavailable
-  | 'HTTP_ERROR'                // generic transport failure
   ;
 
 const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
@@ -216,10 +207,6 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   // bundled-service deploy merge
   DEPLOY_MANIFEST_INVALID: 'VALIDATION_ERROR',
   DEPLOY_MERGE_FAILED: 'VALIDATION_ERROR',
-  // feedback service error codes
-  CONFLICT: 'CONFLICT',
-  PERSISTENCE_ERROR: 'PERSISTENCE_ERROR',
-  HTTP_ERROR: 'HTTP_ERROR',
 };
 
 export function categoryOf(code: ErrorCode): ErrorCategory {
