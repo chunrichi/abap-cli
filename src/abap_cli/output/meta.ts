@@ -64,6 +64,9 @@ export type WarningCode =
   | 'STEAMPUNK_ICF_MANUAL'  // deploy on Steampunk: ICF node must be wired via CF route
   // bundled-service deploy — manifest missing, deployed as-is without the release merge
   | 'DEPLOY_MANIFEST_MISSING'
+  // profile add/set/init — the pasted URL carried a path/query/fragment; only
+  // the origin is persisted because the ADT client appends resource paths.
+  | 'URL_NORMALIZED'
   ;
 
 export interface Warning {

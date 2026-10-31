@@ -27,7 +27,11 @@ vi.mock('../../src/abap_cli/config/secrets.js', () => ({
   getPassword: vi.fn(async () => null),
 }));
 
-function parseData(res: { stdout: string }): { status: string; data: Record<string, unknown> } {
+function parseData(res: { stdout: string }): {
+  status: string;
+  data: Record<string, unknown>;
+  meta?: { warnings?: { code: string }[] };
+} {
   return JSON.parse(res.stdout);
 }
 
@@ -95,5 +99,75 @@ describe('abap profile add', () => {
     const err = JSON.parse(res.stderr);
     expect(err.error.code).toBe('INVALID_ARGUMENT');
     expect(upsertSystem).not.toHaveBeenCalled();
+  });
+
+  it('normalizes a pasted browser URL to its origin and warns', async () => {
+    const program = makeProgram();
+    registerProfileCommand(program);
+    const res = await runCommand(
+      program,
+      ['profile', 'add', 'dev', '--url', 'https://sap.example.com:44300/sap/bc/ui2/flp?sap-client=100', '--username', 'DEV', '--json'],
+      { cwd },
+    );
+    expect(res.exitCode).toBeUndefined();
+    expect(upsertSystem).toHaveBeenCalledWith('dev', expect.objectContaining({ url: 'https://sap.example.com:44300' }));
+    const parsed = parseData(res);
+    expect(parsed.data.system).toMatchObject({ url: 'https://sap.example.com:44300' });
+    expect(parsed.meta.warnings).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'URL_NORMALIZED' })]),
+    );
+  });
+
+  it('rejects an URL with embedded credentials', async () => {
+    const program = makeProgram();
+    registerProfileCommand(program);
+    const res = await runCommand(
+      program,
+      ['profile', 'add', 'dev', '--url', 'https://user:secret@sap.example.com', '--username', 'DEV', '--json'],
+      { cwd },
+    );
+    expect(res.exitCode).toBe(2);
+    const err = JSON.parse(res.stderr);
+    expect(err.error.code).toBe('INVALID_ARGUMENT');
+    expect(err.error.message).toContain('embed credentials');
+    expect(upsertSystem).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid profile name before touching the store', async () => {
+    const program = makeProgram();
+    registerProfileCommand(program);
+    const res = await runCommand(
+      program,
+      ['profile', 'add', 'my profile', '--url', 'http://sap.example:50000', '--username', 'DEV', '--json'],
+      { cwd },
+    );
+    expect(res.exitCode).toBe(2);
+    const err = JSON.parse(res.stderr);
+    expect(err.error.code).toBe('INVALID_ARGUMENT');
+    expect(err.error.message).toContain('Invalid profile name');
+    expect(upsertSystem).not.toHaveBeenCalled();
+  });
+
+  it('reports the profile as unverified with next steps', async () => {
+    const program = makeProgram();
+    registerProfileCommand(program);
+    const res = await runCommand(
+      program,
+      ['profile', 'add', 'dev', '--url', 'http://sap.example:50000', '--username', 'DEV', '--json'],
+      { cwd },
+    );
+    const data = parseData(res).data;
+    expect(data.verified).toBe(false);
+    expect(data.nextSteps).toEqual(['abap profile test dev', 'abap init --profile dev']);
+  });
+
+  it('prints a subcommand schema for `profile add --schema`', async () => {
+    const program = makeProgram();
+    registerProfileCommand(program);
+    const res = await runCommand(program, ['profile', 'add', '--schema', '--json'], { cwd });
+    const parsed = parseData(res);
+    expect(parsed.data.command).toBe('profile add');
+    expect(parsed.data.arguments).toEqual(expect.arrayContaining([expect.objectContaining({ name: 'name', required: true })]));
+    expect(parsed.data.options).toEqual(expect.arrayContaining([expect.objectContaining({ name: '--url' })]));
   });
 });

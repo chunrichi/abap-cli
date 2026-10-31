@@ -8,9 +8,8 @@ import { collectWarning } from '../../output/meta.js';
 import { findWorkspaceConfig } from '../../config/project-config.js';
 import { probeSystem } from '../../clients/probe.js';
 import { toOutputPath } from '../../core/path-output.js';
-import { probeTextpoolCapability, recordCapability } from '../../clients/textpool-capability.js';
 import { getOrProbeRuntime } from '../../config/runtime-cache.js';
-import { assertValidProfile } from '../../config/validation.js';
+import { assertValidProfile, assertValidProfileName, normalizeProfileUrl } from '../../config/validation.js';
 import { fingerprint, collectOrphanPems } from '../../config/ca-store.js';
 import { applyPemsToProfileWithTimestamp, upsertProfileWithPems } from '../../config/profile-pems.js';
 
@@ -21,16 +20,6 @@ export function orCancel<T>(value: T | symbol): T {
     process.exit(130);
   }
   return value as T;
-}
-
-/** informational textpool capability probe (one-shot, non-blocking). */
-async function recordTextpoolCapabilityIfPossible(name: string): Promise<void> {
-  try {
-    const cap = await probeTextpoolCapability();
-    await recordCapability(name, cap);
-  } catch {
-    // informational — degraded, non-blocking
-  }
 }
 
 /** True when any profile field option (incl. password / CA) is present. */
@@ -65,7 +54,16 @@ async function applyProfileOptions(
   // the CLI no longer supports is dropped here (the migration path).
   const updated: SystemProfile = { ...base };
   delete updated.unsupportedAuth;
-  if (has('url')) updated.url = opts.url as string;
+  if (has('url')) {
+    const normalized = normalizeProfileUrl(opts.url as string);
+    updated.url = normalized.url;
+    if (normalized.dropped.length > 0) {
+      collectWarning(
+        'URL_NORMALIZED',
+        `URL normalized to '${normalized.url}' — dropped ${normalized.dropped.join(', ')} (the ADT client appends its own resource paths).`,
+      );
+    }
+  }
   if (has('client')) updated.client = opts.client as string;
   if (has('username')) updated.username = opts.username as string;
   if (has('language')) updated.language = opts.language as string;
@@ -125,6 +123,31 @@ function reclaimReplacedPems(previous: SystemProfile | null, next: SystemProfile
   }
 }
 
+/** Name of the profile bound to the nearest .abap.json, if any. */
+function currentWorkspaceSystem(): string | undefined {
+  const configPath = findWorkspaceConfig();
+  if (!configPath) return undefined;
+  try {
+    const parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as { system?: unknown };
+    return typeof parsed.system === 'string' ? parsed.system : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** One row of `abap profile list` (also the JSON payload shape). */
+interface ProfileListRow {
+  name: string;
+  username: string;
+  url: string;
+  client: string;
+  language: string;
+  current?: true;
+  systemVersion?: string;
+  runtimeTier?: string;
+  unsupportedAuth?: string;
+}
+
 /** List saved connection profiles. */
 export function runList(mode: OutputMode): void {
   const names = listSystemNames();
@@ -132,13 +155,26 @@ export function runList(mode: OutputMode): void {
     printResult(mode, { systems: [] }, "No connection profiles saved. Run 'abap profile add <name> --url <url> --username <user>' to create one.");
     return;
   }
-  const systems = names.map((name) => {
+  const current = currentWorkspaceSystem();
+  const systems: ProfileListRow[] = names.map((name) => {
     const p = getSystem(name)!;
-    return { name, username: p.username, url: p.url, ...(p.unsupportedAuth ? { unsupportedAuth: p.unsupportedAuth } : {}) };
+    return {
+      name,
+      username: p.username,
+      url: p.url,
+      client: p.client || '100',
+      language: p.language || 'EN',
+      ...(name === current ? { current: true as const } : {}),
+      ...(p.systemVersion ? { systemVersion: p.systemVersion } : {}),
+      ...(p.runtime?.tier ? { runtimeTier: p.runtime.tier } : {}),
+      ...(p.unsupportedAuth ? { unsupportedAuth: p.unsupportedAuth } : {}),
+    };
   });
   const human = ['Connection profiles:', ...systems.map((p) => {
     const legacy = p.unsupportedAuth ? ` [legacy auth: ${p.unsupportedAuth} — run 'abap profile set ${p.name} --password <pwd>']` : '';
-    return `  ${p.name} — ${p.username}@${p.url}${legacy}`;
+    const binding = p.current ? '* ' : '  ';
+    const details = [`client ${p.client}`, p.language, ...(p.runtimeTier ? [p.runtimeTier] : [])].join(', ');
+    return `${binding}${p.name} — ${p.username}@${p.url} (${details})${legacy}`;
   })].join('\n');
   printResult(mode, { systems }, human);
 }
@@ -294,6 +330,7 @@ export async function runAdd(
   opts: Record<string, string | boolean>,
   mode: OutputMode,
 ): Promise<void> {
+  assertValidProfileName(name);
   if (getSystem(name)) {
     throw new CliError('CONFIG_ERROR', `Connection profile '${name}' already exists.`, {
       nextSteps: [`Modify it: abap profile set ${name} --url <url>`, `Or delete it first: abap profile delete ${name}`],
@@ -316,12 +353,17 @@ export async function runAdd(
     await applyProfileOptions({ url: '', client: '100', username: '', language: 'EN' }, name, opts);
   // Funnel through the same PEM-aware writer as `set` / `delete`.
   upsertProfileWithPems(name, null, updated);
-  await recordTextpoolCapabilityIfPossible(name);
 
   printResult(
     mode,
-    { system: { name, ...updated }, passwordUpdated, passwordRemoved },
-    `Connection profile '${name}' created.`,
+    {
+      system: { name, ...updated },
+      passwordUpdated,
+      passwordRemoved,
+      verified: false,
+      nextSteps: [`abap profile test ${name}`, `abap init --profile ${name}`],
+    },
+    `Connection profile '${name}' created (not verified).\nNext: abap profile test ${name} && abap init --profile ${name}`,
   );
 }
 
@@ -330,6 +372,7 @@ export async function runSet(
   opts: Record<string, string | boolean>,
   mode: OutputMode,
 ): Promise<void> {
+  assertValidProfileName(name);
   const profile = getSystem(name);
   if (!profile) {
     throw new CliError('CONFIG_ERROR', `Connection profile '${name}' not found.`, {
@@ -354,7 +397,6 @@ export async function runSet(
   // Import the CA before the write (a bad PEM aborts without touching
   // systems.json) and reclaim replaced ones after it.
   upsertProfileWithPems(name, profile, updated);
-  await recordTextpoolCapabilityIfPossible(name);
 
   printResult(
     mode,
@@ -371,13 +413,26 @@ async function interactiveSet(
 ): Promise<void> {
   const updated: SystemProfile = { ...profile };
   const url = orCancel(await text({ message: 'URL', initialValue: updated.url }));
-  if (url) updated.url = url;
+  if (url) {
+    const normalized = normalizeProfileUrl(url);
+    updated.url = normalized.url;
+    if (normalized.dropped.length > 0) {
+      collectWarning(
+        'URL_NORMALIZED',
+        `URL normalized to '${normalized.url}' — dropped ${normalized.dropped.join(', ')} (the ADT client appends its own resource paths).`,
+      );
+    }
+  }
   const client = orCancel(await text({ message: 'Client', initialValue: updated.client || '100' }));
   if (client) updated.client = client;
   const username = orCancel(await text({ message: 'Username', initialValue: updated.username }));
   if (username) updated.username = username;
   const language = orCancel(await text({ message: 'Language', initialValue: updated.language || 'EN' }));
   if (language) updated.language = language;
+
+  // The wizard must produce the same contract as the flag path: an empty URL or
+  // malformed field must fail here, before anything lands in systems.json.
+  assertValidProfile(updated);
 
   let passwordUpdated = false;
   const passwordRemoved = false;

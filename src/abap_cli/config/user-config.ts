@@ -66,6 +66,10 @@ export interface UserConfig {
 const CONFIG_DIR = path.join(os.homedir(), '.abap-cli');
 const CONFIG_PATH = path.join(CONFIG_DIR, 'systems.json');
 
+/** Written to `systems.json` so future migrations can branch on a version
+ *  instead of sniffing individual legacy fields. Readers ignore it today. */
+export const USER_CONFIG_FORMAT_VERSION = 1;
+
 /**
  * Load user-level system profiles from ~/.abap-cli/systems.json.
  * Returns an empty config if the file does not exist; throws if it is corrupt.
@@ -167,7 +171,11 @@ export function saveUserConfig(config: UserConfig): void {
     void _unsupported;
     out[name] = canonical;
   }
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify({ systems: out }, null, 2) + '\n', { encoding: 'utf-8', mode: 0o600 });
+  fs.writeFileSync(
+    CONFIG_PATH,
+    JSON.stringify({ formatVersion: USER_CONFIG_FORMAT_VERSION, systems: out }, null, 2) + '\n',
+    { encoding: 'utf-8', mode: 0o600 },
+  );
 }
 
 /**
