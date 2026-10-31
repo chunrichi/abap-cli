@@ -781,6 +781,16 @@ export class AdtClientWrapper {
     return this._call(() => this.client.transportDetails(transportNumber));
   }
 
+  /** Release a transport request. Destructive — a released request cannot be undone. */
+  transportRelease(transportNumber: string, ignoreLocks?: boolean, ignoreATC?: boolean) {
+    return this._call(() => this.client.transportRelease(transportNumber, ignoreLocks, ignoreATC));
+  }
+
+  /** Version history (Atom feed) for an object or one of its class includes. */
+  revisions(objectUrl: string, includeName?: Parameters<ADTClient['revisions']>[1]) {
+    return this._call(() => this.client.revisions(objectUrl, includeName));
+  }
+
   // --- Object creation ---
 
   /**

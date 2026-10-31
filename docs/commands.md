@@ -665,10 +665,10 @@ abap status [options]
 
 ## `abap transport`
 
-Manage SAP transport requests (list / create / show / resolve / assign).
+Manage SAP transport requests (list / create / show / resolve / assign / check / release).
 
 ```bash
-abap transport <list|create|show|resolve|assign> [options]
+abap transport <list|create|show|resolve|assign|check|release> [options]
 ```
 
 ### Options
@@ -691,6 +691,21 @@ abap transport <list|create|show|resolve|assign> [options]
 
   ```bash
   abap transport assign ZCL_MY --tr DEVK900001 --yes
+  ```
+- Check whether an object can be recorded
+
+  ```bash
+  abap transport check ZCL_MY
+  ```
+- Release a transport request
+
+  ```bash
+  abap transport release DEVK900001 --yes
+  ```
+- Inspect a subcommand schema
+
+  ```bash
+  abap transport release --schema
   ```
 
 ## `abap deploy`
@@ -843,6 +858,14 @@ abap inspect [options] <object>
 | `--locks` | no |  |  | Include lock / transport ownership (read-only). |
 | `--package` | no |  |  | Include the object package name. |
 | `--activation` | no |  |  | Verify active vs latest source per part (read-only; detect stale activation). |
+| `--versions` | no |  |  | Read the version history (ADT versions feed; read-only). |
+| `--include` `<part>` | no |  |  | Include part for --versions: main \| definitions \| implementations \| macros \| testclasses (default main). |
+| `--limit` `<n>` | no |  |  | Max version entries to return (default 50, max 200). |
+| `--show` `<version>` | no |  |  | Return the source of one version (requires --versions). |
+| `--out` `<path>` | no |  |  | Write the shown version source to a file instead of returning it. |
+| `--symbols` | no |  |  | Flatten the class/interface structure into symbols with source line ranges. |
+| `--kinds` `<list>` | no |  |  | Filter --symbols by kind, comma separated (method, attribute, …). |
+| `--name-pattern` `<regex>` | no |  |  | Filter --symbols by name (case-insensitive regular expression). |
 
 ### Examples
 
@@ -855,6 +878,21 @@ abap inspect [options] <object>
 
   ```bash
   abap inspect ZCL_MY_CLASS --activation
+  ```
+- List version history
+
+  ```bash
+  abap inspect ZCL_MY_CLASS --versions
+  ```
+- Read one version into a file
+
+  ```bash
+  abap inspect ZCL_MY_CLASS --versions --show 000001 --out zcl_my_class.v1.abap
+  ```
+- Symbols for methods only
+
+  ```bash
+  abap inspect ZCL_MY_CLASS --symbols --kinds method
   ```
 
 ## `abap where-used`
