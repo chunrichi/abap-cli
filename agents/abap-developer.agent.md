@@ -2,7 +2,7 @@
 name: abap-developer
 description: abap-cli 端到端开发代理 — 编排 6 个 skill（abap-cli 路由 + setup / search / edit / data 四个领域 + performance 方法论）完成多步骤 ABAP 开发任务。use when asking "帮我创建并修改一个 ABAP 类 / 推上去跑一下验证 / 改代码直到通过测试 / 拉一个对象改完推回去 / 跑端到端开发循环 / 优化一段慢 ABAP 代码" 等多动作组合任务。
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
   skills: [abap-cli, abap-cli-setup, abap-cli-search, abap-cli-edit, abap-cli-data, abap-cli-performance]
 ---
 

@@ -52,7 +52,7 @@ abap push src/zcl_my_class.clas.abap --tr DEVK900001    # 锁 → 写 → 激活
 ## 能做什么
 
 - **就地在本地编辑**——`pull` 把对象拉成 abap-file-format 文件树，用编辑器改，`push` 写回（锁 → 写 → 激活 → 解锁）；写之前可以先 `check` 和 `diff`。
-- **覆盖 21 种对象类型**——类、接口、程序、函数组；DDIC 表、结构、域、数据元素、锁对象、编号范围对象；SICF 节点、事务码；表类型、消息类、CDS 视图及 CDS / RAP 配套对象。其中 19 种支持 create / pull / push，`BDEF` 支持 pull / push，`SRVB` 仅元数据拉取。
+- **覆盖 25 种对象类型**——类、接口、程序、函数组；包；DDIC 表、结构、域、数据元素、数据库视图、搜索帮助、锁对象、编号范围对象；SICF 节点、事务码、XSLT 转换程序；表类型、消息类、CDS 视图及 CDS / RAP 配套对象。其中 23 种支持 create、25 种支持 pull、23 种有 push 入口；`DEVC` 支持 create / pull / delete（无 push），`BDEF` 支持 pull / push，`SRVB` 仅元数据拉取。
 - **只读探查 SAP**——`search`、`inspect`、`where-used`、`tcode`、`list`、`dumps`、`fields`、`select`、`run-report` 都不改系统。
 - **运行与验证**——`abap run` 执行类（classrun）或 PUBLIC STATIC 方法；`abap run-report` 返回列表输出；`abap select` 就是 SE16N 的等价物。
 - **管理传输**——`transport list / create / show / resolve / assign`，`push` 时按对象自动解析。
@@ -201,20 +201,23 @@ src/(ui2)cl_json.clas.abap                # 命名空间对象 /UI2/CL_JSON
 
 ## 支持的对象类型
 
-21 个类型码，按 ADT 或捆绑 ICF 服务路由：
+25 个类型码，按 ADT 或捆绑 ICF 服务路由：
 
 | 类型 | create | pull | push | 说明 |
 |---|---|---|---|---|
 | `CLAS` `INTF` `PROG` `FUGR` | ✅ | ✅ | ✅ | ABAP 源对象；可用 `create local` 离线草稿 |
+| `DEVC` | ✅ | ✅ | — | ABAP 包（`DEVC/K`）走 ADT；`--package` 是父包；支持 delete、无 push（ADT 无包更新端点） |
 | `TABL` `STRU` `DOMA` `DTEL` | ✅ | ✅ | ✅ | DDIC 走 ICF；TABL / STRU 为三件套 AFF |
+| `VIEW` `SHLP` | ✅ | ✅ | ✅ | DDIC 数据库视图 / 搜索帮助走 ICF，`create --file`；仅 `$TMP` 可删除 |
 | `ENQU` `NROB` | ✅ | ✅ | ✅ | 锁对象 / 编号范围对象，`create --file` |
 | `HTTP` `TRAN` | ✅ | ✅ | ✅ | SICF 服务节点 / 事务码（SE93），`create --file` |
+| `XSLT` | ✅ | ✅ | ✅ | XSLT 转换程序走 ICF，AFF 两件套 `.xslt.json` + `.xslt.xml`，`create --file` |
 | `TTYP` `MSAG` `DDLS` | ✅ | ✅ | ✅ | `create --file`；TTYP / MSAG 在旧版 ECC 自动兜底 ICF，DDLS 仅 ADT |
 | `SRVD` `DCLS` `DDLX` `DDLA` | ✅ | ✅ | ✅ | CDS / RAP 配套对象，`create --file`，仅 ADT |
 | `BDEF` | — | ✅ | ✅ | RAP behavior definition 不能新建（ADT 无 create 端点），仅 pull / push |
 | `SRVB` | — | ✅ | — | Service binding 仅元数据（在 SAP GUI 管理） |
 
-DDIC、HTTP、TRAN、TTYP、MSAG 及 CDS / RAP 类型执行 `create` 时必须提供 `--file <aff.json>`；`abap create --schema <type>` 会给出该类型的契约，TABL / STRU / DOMA / DTEL 还附带示例 JSON。完整的类型 × 命令矩阵见 [wiki/object-types.md](wiki/object-types.md)。
+DDIC（含 VIEW / SHLP）、HTTP、TRAN、XSLT、TTYP、MSAG 及 CDS / RAP 类型执行 `create` 时必须提供 `--file <aff.json>`；`abap create --schema <type>` 会给出该类型的契约，TABL / STRU / DOMA / DTEL / VIEW / SHLP 还附带示例 JSON。完整的类型 × 命令矩阵见 [wiki/object-types.md](wiki/object-types.md)。
 
 ---
 
@@ -224,7 +227,7 @@ DDIC、HTTP、TRAN、TTYP、MSAG 及 CDS / RAP 类型执行 `create` 时必须�
 
 ```jsonc
 // 成功 — 写 stdout，exit 0
-{ "status": "success", "meta": { "command": "abap pull", "version": "1.0.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { /* ... */ } }
+{ "status": "success", "meta": { "command": "abap pull", "version": "1.1.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { /* ... */ } }
 
 // 失败 — 写 stderr，非零退出码，stdout 保持为空
 { "status": "error", "meta": { /* ... */ }, "error": { "code": "NO_TRANSPORT", "category": "VALIDATION_ERROR", "message": "..." } }

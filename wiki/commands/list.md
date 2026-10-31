@@ -52,7 +52,7 @@ abap list --package ZDEV --type PROG --limit 20
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap list", "version": "1.0.0", "timestamp": "2026-10-31T05:34:02.115Z", "durationMs": 268, "warnings": [] },
+  "meta": { "command": "abap list", "version": "1.1.0", "timestamp": "2026-10-31T05:34:02.115Z", "durationMs": 268, "warnings": [] },
   "data": {
     "count": 2, "truncated": false, "packageName": "$TMP", "type": "CLAS",
     "entries": [

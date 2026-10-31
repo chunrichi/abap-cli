@@ -7,7 +7,10 @@
  * same constant. These tests guard against accidental regressions.
  */
 import { describe, expect, it } from 'vitest';
+import { createRequire } from 'module';
 import { ICF_BASE_PATH, ICF_SERVICE_VERSION } from '../../src/abap_cli/clients/icf-version.js';
+
+const pkg = createRequire(import.meta.url)('../../package.json') as { version: string };
 
 describe('ICF_BASE_PATH centralization', () => {
   it('is /sap/abap_cli', () => {
@@ -15,6 +18,6 @@ describe('ICF_BASE_PATH centralization', () => {
   });
 
   it('version constant follows the package release line', () => {
-    expect(ICF_SERVICE_VERSION).toBe('1.0.0');
+    expect(ICF_SERVICE_VERSION).toBe(pkg.version);
   });
 });
