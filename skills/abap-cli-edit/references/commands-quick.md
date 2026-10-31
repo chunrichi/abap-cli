@@ -165,7 +165,7 @@ abap mime push <local> --root <path> [options]
 - Create a MIME folder under $TMP
 
   ```bash
-  abap mime create /zntf_ui --package $TMP --yes
+  abap mime create /zntf_ui --package '$TMP' --yes
   ```
 - Recursively delete a folder (with transport)
 
@@ -238,10 +238,10 @@ abap list --package <pkg> [--type <type>] [--limit <n>]
 - List everything in $TMP
 
   ```bash
-  abap list --package $TMP
+  abap list --package '$TMP'
   ```
 - List every local scratch class
 
   ```bash
-  abap list --package $TMP --type CLAS
+  abap list --package '$TMP' --type CLAS
   ```

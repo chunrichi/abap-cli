@@ -13,7 +13,7 @@
 | `status` vs `diff` | 功能重叠（都是本地↔SAP 差异），仅粒度不同 | 合并为一个命令 + `--detail` 开关，或 `status` 支持 `--summary`/`--json` 两种粒度 | 减小 agent 需记忆的命令面 | - [ ] |
 | `check` | 三种模式已子命令化 | 增加 `--all-modes`（内容+语法+ATC 一次跑完）并聚合结果；`check atc --out` 结果持久化到本地 | 推前一次把关（"默认高信号"） | - [ ] |
 | `transport` | 缺 `release` 能力，`assign` 后仍需手工 | 补充 `abap transport release <req> --tr <target>`；`transport list` 增加 `--mine/--all` | 闭合传输生命周期管理 | - [ ] |
-| `--schema` | 仅 `search`/`create` 有 | 推广到所有命令（尤其 `push`/`pull`），形成统一自描述协议 | agent 无需读文档即可调用任意命令 | - [ ] |
+| `--schema` | 已覆盖全部命令（1.0.0） | — | agent 无需读文档即可调用任意命令 | - [x] |
 | `--dry-run` | 各命令实现不一（有的出 plan 有的只是 no-op） | 统一为"输出机器可读 plan 对象 + exit 0"，统一 `--plan` 命名 | 一致可组合原则 | - [ ] |
 | `doctor --fix` | 只做安全可逆修复 | `doctor --fix --all` 分级（安全/需确认），输出"修复前后 diff" | 提升自助修复能力 | - [ ] |
 
@@ -21,9 +21,9 @@
 
 | 命令 | 功能 | 使用场景 | 价值 | 状态 |
 |------|------|---------|------|------|
-| `abap delete` | 删除对象（source/DDIC），支持 `--dry-run`/`--force` | 目前完全没有删除能力 | 补齐对象生命周期最后一块 | - [ ] |
+| `abap delete` | 删除对象（source/DDIC），支持 `--dry-run`/`--force` | 已实现：`abap delete <obj> --type <type> --yes`（非 `$TMP` 需 `--tr`） | 补齐对象生命周期最后一块 | - [x] |
 | `abap test` | 运行 ABAP 单元测试（复用 `runClass`，跑 `cl_abap_unit_assert` 类），输出测试结果 JSON | 修改类后验证不破坏既有测试 | 让"改-验"闭环自动化 | - [ ] |
-| `abap where-used` / `references` | 查询对象引用/使用处（SE85/RSWBO 数据） | agent 重构前评估影响面 | 重构安全性的关键信息 | - [ ] |
+| `abap where-used` / `references` | 查询对象引用/使用处（SE85/RSWBO 数据） | 已实现：`abap where-used`（ADT 引用查询） | 重构安全性的关键信息 | - [x] |
 | `abap release` | 释放传输请求（`WS_RELEASE` 类） | 变更完成后的收尾 | 与 `transport create` 对称 | - [ ] |
 | `abap watch` | 监听本地目录，文件变更自动 `check`→`push` | 本地编辑时实时反馈 | 开发者体验提升（注意与 agent 模型配合） | - [ ] |
 | `abap export` | 批量导出对象快照（含文本池/DDIC）到可版本化目录 | 备份、迁移、审计 | 使本地成为可版本化的完整镜像 | - [ ] |
@@ -35,8 +35,8 @@
 
 | 命令 | 功能 | 为什么这是空白 | 价值 | 状态 |
 |------|------|--------------|------|------|
-| `abap run` | 执行类方法或 report（`ZCL_X=>method` 或 classrun），返回 stdout/返回码 | 底层 `runClass` 已存在（`deploy` 在用）但只对内部暴露；现在 agent 只能"编译"不能"运行" | 从静态开发跨到动态验证：push 后直接跑一次看结果。agent 闭环里最缺的一环 | - [ ] |
-| `abap select` | 只读查询表数据（`--table ZTAB --fields ... --where ... --limit`），走 ICF 新增 `/data` 端点 | 014 spec 只做 DDIC **定义** CRUD，完全不碰**数据**；ABAP 排障 90% 是"看这条记录" | 给 agent 提供 SE16N 等价能力，测试/验证/排障全自动化 | - [ ] |
+| `abap run` | 执行类方法或 report（`ZCL_X=>method` 或 classrun），返回 stdout/返回码 | 已实现：`abap run`（classrun / PUBLIC STATIC 方法） | 从静态开发跨到动态验证：push 后直接跑一次看结果。agent 闭环里最缺的一环 | - [x] |
+| `abap select` | 只读查询表数据（`--table ZTAB --fields ... --where ... --limit`），走 ICF 新增 `/data` 端点 | 已实现：`abap select`（ICF `/data` 端点，只读） | 给 agent 提供 SE16N 等价能力，测试/验证/排障全自动化 | - [x] |
 | `abap gen` | 基于系统元数据生成代码：给表名 → 生成 CRUD 类/报告/选择屏幕骨架 | `create --template` 是**静态**模板，不知道系统里有什么 | 把"系统知识"变成生成输入，agent 生产力放大器 | - [ ] |
 | `abap impact` | 影响分析：对象被谁引用、引用链、激活风险，输出 JSON 调用图 | `search`/`inspect` 只答"是什么"，不答"改它会炸什么" | 重构安全性的核心决策数据 | - [ ] |
 | `abap docs` | 从对象生成文档（类/接口/方法说明、签名、依赖） | 现在全是读代码 | 让 agent 读懂存量代码后给出总结 | - [ ] |
@@ -55,8 +55,7 @@
 
 | 优先级 | 项 | 理由 |
 |--------|-----|------|
-| P0 | `abap run` | 底层已就绪、改动最小、收益最大——补上"验证"这个 agent 闭环缺口 |
-| P1 | `abap select`（数据层） | ICF 服务已建好，扩展一个端点即可；覆盖开发最高频需求 |
+| P0 | ~~`abap run`~~ / ~~`abap select`~~ | 均已在 1.0.0 实现（见第三节），从待办中移除 |
 | P1 | `abap serve`（协议化） | 改变交付形态，与"agent-native"目标完全一致 |
 | P2 | `abap gen` / `abap impact` | 生产力放大器，但依赖前两者稳定 |
 | P2 | 多 agent 协调 / 快照回滚 | 从单工具到平台的关键，但场景还没到 |

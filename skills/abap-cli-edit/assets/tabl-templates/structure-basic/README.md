@@ -29,7 +29,7 @@ CLI 解析器（[tabl-artifact.ts:parseTablDdic](https://github.com/chunrichi/ab
 cp <skill-dir>/tabl-templates/structure-basic/zsample.stru.{json,ddic} src/
 for f in src/zsample.stru.*; do mv "$f" "${f/zsample/zsample_reuse}"; done
 sed -i '' 's/zsample/zsample_reuse/g' src/zsample_reuse.stru.{json,ddic}
-abap create STRU ZSAMPLE_REUSE --file src/zsample_reuse.stru.json --package $TMP --yes
+abap create STRU ZSAMPLE_REUSE --file src/zsample_reuse.stru.json --package '$TMP' --yes
 
 # 然后在 TABL/STRU 里 .INCLUDE 引用：
 #   include zsample_reuse;

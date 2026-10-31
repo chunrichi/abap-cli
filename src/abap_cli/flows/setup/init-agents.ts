@@ -72,10 +72,10 @@ function copyOne(
 }
 
 /**
- * Copy a directory tree recursively, but skip any entry whose name matches one
- * of `excludeNames` (matched as exact basename). Used to drop `skills/README.md`,
- * which is repository-internal metadata (describes the repo's two `skills/` sets)
- * and has no value in a user workspace.
+ * Copy a directory tree recursively, skipping entries whose POSIX path relative
+ * to the copied root is in `excludePaths`. Only the repo-level
+ * `skills/README.md` layering doc is dropped; the template READMEs under
+ * `skills/<name>/assets/` are linked from the skills and must reach the user.
  */
 function copyTree(
   srcDir: string,
@@ -83,16 +83,16 @@ function copyTree(
   force: boolean,
   baseRel: string,
   out: ScaffoldingResult,
-  excludeNames: ReadonlySet<string>,
+  excludePaths: ReadonlySet<string>,
 ): void {
   if (!fs.existsSync(srcDir)) return;
   for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
-    if (excludeNames.has(entry.name)) continue;
-    const rel = path.join(baseRel, entry.name);
+    const rel = path.posix.join(baseRel, entry.name);
+    if (excludePaths.has(rel)) continue;
     const src = path.join(srcDir, entry.name);
     const dst = path.join(destDir, entry.name);
     if (entry.isDirectory()) {
-      copyTree(src, dst, force, rel, out, excludeNames);
+      copyTree(src, dst, force, rel, out, excludePaths);
     } else if (entry.isFile()) {
       const targetExists = fs.existsSync(dst);
       if (targetExists && !force) {
@@ -125,11 +125,12 @@ function rewriteOne(vendorDir: string): (p: string) => string {
 }
 
 /**
- * Files that must never be copied into a user workspace.
- * - `skills/README.md` is the repository's own layering doc (talks about the
- *   repo's `.github/skills/` vs top-level `skills/` split, meaningless to a user).
+ * Paths that must never be copied into a user workspace, POSIX and relative to
+ * the copied root. Only the repository's own `skills/README.md` (talks about the
+ * repo's internal `.agents/` vs `skills/` split) is excluded; the template
+ * READMEs under `skills/<name>/assets/` are user-facing documentation.
  */
-const REPO_METADATA_FILES: ReadonlySet<string> = new Set(['README.md']);
+const REPO_METADATA_PATHS: ReadonlySet<string> = new Set(['skills/README.md']);
 
 /**
  * Scaffold the cross-vendor base: `skills/<name>/...` and `agents/abap-developer.agent.md`
@@ -148,7 +149,7 @@ function scaffoldGeneric(
     force,
     'skills',
     out,
-    REPO_METADATA_FILES,
+    REPO_METADATA_PATHS,
   );
   // copyOne already prepends 'agents/' to the relative path inside destRoot,
   // so destRoot here is the vendor dir, not vendor/agents.

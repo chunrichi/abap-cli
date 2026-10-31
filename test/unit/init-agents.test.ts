@@ -88,20 +88,17 @@ describe('init --agent (scaffoldAgents)', () => {
       }
     });
 
-    it('never copies skills/README.md (repo metadata, not user content)', async () => {
+    it('never copies skills/README.md but keeps the template READMEs the skills link to', async () => {
+      const vendor: Record<string, string> = { generic: '.agents', copilot: '.github', claude: '.claude', cursor: '.cursor' };
       for (const target of ['generic', 'copilot', 'claude', 'cursor'] as const) {
         cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'init-agents-'));
         cwdSpy.mockReturnValue(cwd);
         const result = await scaffoldAgents(target, false);
-        const all = [...result.written, ...result.skipped];
-        expect(
-          all.some((p) => p.endsWith('README.md')),
-          `vendor ${target} should not copy any README.md; saw: ${all.join(', ')}`,
-        ).toBe(false);
-        // Spot-check the .github/ case specifically.
-        if (target === 'copilot') {
-          expectNoFile(path.join(cwd, '.github', 'skills', 'README.md'));
-        }
+        // Repo-internal layering doc: must not reach the user.
+        expectNoFile(path.join(cwd, vendor[target], 'skills', 'README.md'));
+        // Template docs linked from skills/abap-cli-edit/SKILL.md: must be copied.
+        expectFile(path.join(cwd, vendor[target], 'skills', 'abap-cli-edit', 'assets', 'tabl-templates', 'README.md'));
+        expect(result.written.some((p) => p.endsWith('assets/tabl-templates/README.md'))).toBe(true);
       }
     });
 
@@ -124,8 +121,8 @@ describe('init --agent (scaffoldAgents)', () => {
       const second = await scaffoldAgents('copilot', false);
       expect(second.written).toEqual([]);
       expect(second.skipped.length).toBeGreaterThan(0);
-      // None of the skipped should be README.md (still excluded).
-      expect(second.skipped.some((p) => p.endsWith('README.md'))).toBe(false);
+      // Asset READMEs are copied content now, so the second run reports them as skipped.
+      expect(second.skipped.some((p) => p.endsWith('assets/tabl-templates/README.md'))).toBe(true);
       // And all skipped paths are vendor-prefixed so agents see the actual location.
       expect(second.skipped.every((p) => p.startsWith('.github/'))).toBe(true);
     });

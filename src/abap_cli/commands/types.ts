@@ -41,7 +41,7 @@ export const SCHEMA = {
   ],
   errors: [
     { code: 'USAGE', category: 'USAGE', exitCode: 2 },
-    { code: 'INVALID_ARGUMENT', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'INVALID_ARGUMENT', category: 'USAGE', exitCode: 2 },
   ],
 };
 

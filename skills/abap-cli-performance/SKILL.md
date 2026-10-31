@@ -6,7 +6,6 @@ user-invocable: true
 metadata:
   version: "1.0.0"
   scope: abap-performance-review
-  commands: [search, inspect, pull, check, select]
   tags: [read-only-first, no-mutation, no-transport]
 ---
 
@@ -60,7 +59,7 @@ metadata:
 ```
 已知慢对象 / 报告？
 ├── 否
-│   └── 加载 abap-cli-search 定位所有者与直接依赖（references/commands-quick.md）
+│   └── 加载 abap-cli-search 定位所有者与直接依赖
 ├── 是
 │   └── abap-cli-search: search → inspect → pull 读受影响路径
 ├── 需要数据形状事实？
@@ -120,7 +119,7 @@ metadata:
 
 ## references（按需加载）
 
-- [references/commands-quick.md](./references/commands-quick.md) — 本 skill 触发的命令速查（与 `abap-cli-search` / `-edit` / `-data` 对齐）
+- 命令速查归 4 个领域 skill 所有（`abap-cli-setup` / `-search` / `-edit` / `-data` 各自的 `commands-quick.md`）；本 skill 不再生成重复副本。
 
 ## scripts / assets
 

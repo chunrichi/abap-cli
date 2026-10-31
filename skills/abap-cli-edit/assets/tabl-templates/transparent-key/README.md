@@ -25,5 +25,5 @@ for f in src/zsample.tabl.*; do mv "$f" "${f/zsample/ztodo}"; done
 sed -i '' 's/zsample/ztodo/g' src/ztodo.tabl.{json,ddic,settings.json}
 # 3. 改 ztodo.tabl.ddic 里的字段定义 + ztodo.tabl.json 的 description
 # 4. 创建
-abap create TABL ZTODO --file src/ztodo.tabl.json --package $TMP --yes
+abap create TABL ZTODO --file src/ztodo.tabl.json --package '$TMP' --yes
 ```

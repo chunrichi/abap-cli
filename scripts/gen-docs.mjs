@@ -328,6 +328,9 @@ for (const skill of skillDirs) {
   const refsDir = path.join(repoRoot, 'skills', skill, 'references');
   if (!fs.existsSync(refsDir)) continue;
   const commands = parseSkillCommands(path.join(repoRoot, 'skills', skill, 'SKILL.md'));
+  // Skills that only route to other skills (e.g. the performance methodology)
+  // own no commands, so they get no generated quick reference.
+  if (commands.length === 0) continue;
   outputs.set(`skills/${skill}/references/commands-quick.md`, renderQuickRef(skill, commands));
 }
 

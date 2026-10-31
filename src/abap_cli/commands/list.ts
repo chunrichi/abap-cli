@@ -43,9 +43,9 @@ export const SCHEMA = {
   ],
   globalOptions: ['--json', '--pretty-json'],
   examples: [
-    { description: 'List everything in $TMP', command: 'abap list --package $TMP' },
-    { description: 'List every local scratch class', command: 'abap list --package $TMP --type CLAS' },
-    { description: 'Limit the result set', command: 'abap list --package $TMP --type CLAS --limit 50' },
+    { description: 'List everything in $TMP', command: "abap list --package '$TMP'" },
+    { description: 'List every local scratch class', command: "abap list --package '$TMP' --type CLAS" },
+    { description: 'Limit the result set', command: "abap list --package '$TMP' --type CLAS --limit 50" },
   ],
   errors: [
     { code: 'USAGE', category: 'USAGE', exitCode: 2 },

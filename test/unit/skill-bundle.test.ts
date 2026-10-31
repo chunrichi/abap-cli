@@ -140,6 +140,8 @@ describe('skill bundle (019-cli-skill-agent-bundle) structural audit', () => {
       expect(fm.description, '`description` field missing').toBeDefined();
       expect(fm.metadata, '`metadata` block missing').toBeDefined();
       expect(fm.metadata?.version, '`metadata.version` missing').toBeDefined();
+      // 方法论 skill（abap-performance-review）不拥有命令，豁免 metadata.commands
+      if (fm.metadata?.scope === 'abap-performance-review') return;
       expect(fm.metadata?.commands, '`metadata.commands` missing').toBeTruthy();
     },
   );
@@ -162,6 +164,8 @@ describe('skill bundle (019-cli-skill-agent-bundle) structural audit', () => {
       const commands = fm.metadata?.commands ?? [];
       // meta skill (abap-cli) 的 metadata.commands 是空数组；description 描述路由层而非命令，豁免
       if (skill.dirName === 'abap-cli') return;
+      // 不拥有命令的方法论 skill（abap-cli-performance）无需在 description 里点名命令
+      if (commands.length === 0) return;
       // 至少一个 metadata.commands 里的命令名必须出现在 description 中
       const found = commands.some((cmd: string) => description.includes(cmd));
       expect(found, `description 必须包含至少一个 metadata.commands 命令名`).toBe(true);

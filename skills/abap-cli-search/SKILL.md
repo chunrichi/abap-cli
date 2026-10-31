@@ -17,7 +17,7 @@ metadata:
 - 不知道对象在哪个包 → `search <name>`
 - 改对象前评估冲击面 → `where-used <name>`
 - 对象激活状态对不上 → `inspect <obj> --activation`（诊断线索；**修复**走 `abap-cli-edit` 的 `activate`）
-- 谁持锁 / 元数据详情 → `inspect <obj> --locks` / `inspect <obj> --metadata`
+- 谁持锁 / transport 归属 → `inspect <obj> --locks`；对象元数据（名称/类型/描述/包名）→ `inspect <obj> [--package]`
 - 业务码入口解析 → `tcode <code>`
 - 推送前对账 → `status` 看本地 vs SAP 差异
 - 局部小对比 → `diff <obj>` 看本地与 SAP 的具体行差
@@ -30,7 +30,7 @@ metadata:
 ├── 定位 → search [--package ...] [--type ...] <pattern>
 ├── 影响 → where-used <obj>          # 别名 references；--ref-type 过滤子集
 ├── 详情 → inspect <obj>
-│         ├── --metadata → 元数据（package / 描述 / 负责人 / 创建日期）
+│         ├── 默认输出 → 名称 / 类型 / 描述；加 --package 得包名
 │         ├── --activation → method / OSI 激活状态
 │         └── --locks → 谁持锁（**修复**走 abap-cli-edit 的 push/unlock）
 ├── 业务码 → tcode <code>

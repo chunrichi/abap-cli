@@ -370,17 +370,17 @@ abap list --package <pkg> [--type <type>] [--limit <n>]
 - List everything in $TMP
 
   ```bash
-  abap list --package $TMP
+  abap list --package '$TMP'
   ```
 - List every local scratch class
 
   ```bash
-  abap list --package $TMP --type CLAS
+  abap list --package '$TMP' --type CLAS
   ```
 - Limit the result set
 
   ```bash
-  abap list --package $TMP --type CLAS --limit 50
+  abap list --package '$TMP' --type CLAS --limit 50
   ```
 
 ## `abap delete`
@@ -1088,7 +1088,7 @@ abap mime push <local> --root <path> [options]
 - Create a MIME folder under $TMP
 
   ```bash
-  abap mime create /zntf_ui --package $TMP --yes
+  abap mime create /zntf_ui --package '$TMP' --yes
   ```
 - Recursively delete a folder (with transport)
 
@@ -1173,23 +1173,21 @@ Aggregated from the per-command schemas. The authoritative TypeScript source is 
 | Code | Category | Exit |
 | --- | --- | --- |
 | `ACTIVATION_FAILED` | VALIDATION_ERROR | 7 |
-| `AFF_SCHEMA_COMPILE_ERROR` | NOT_FOUND | 2 |
-| `AFF_SCHEMA_INVALID` | NOT_FOUND | 2 |
-| `AFF_SCHEMA_MISSING` | NOT_FOUND | 2 |
-| `AMBIGUOUS_OBJECT` | VALIDATION_ERROR | 7 |
+| `AFF_SCHEMA_COMPILE_ERROR` | VALIDATION_ERROR | 7 |
+| `AFF_SCHEMA_INVALID` | VALIDATION_ERROR | 7 |
+| `AFF_SCHEMA_MISSING` | VALIDATION_ERROR | 7 |
+| `AMBIGUOUS_OBJECT` | NOT_FOUND | 8 |
 | `AUTH_ERROR` | AUTH_ERROR | 5 |
 | `CLASS_NOT_RUNNABLE` | VALIDATION_ERROR | 7 |
 | `CONFIG_ERROR` | CONFIG_ERROR | 3 |
-| `CONFLICT` | VALIDATION_ERROR | 7 |
+| `CONFLICT` | CONFLICT | 66 |
 | `DDIC_NOT_SUPPORTED` | VALIDATION_ERROR | 7 |
 | `DELETE_FAILED` | SAP_ERROR | 6 |
 | `DEPLOY_MANIFEST_INVALID` | VALIDATION_ERROR | 7 |
 | `DEPLOY_MERGE_FAILED` | VALIDATION_ERROR | 7 |
 | `FILE_EXISTS` | USAGE | 2 |
 | `FILE_PARSE_ERROR` | USAGE | 2 |
-| `FORCE_BYPASSED` | VALIDATION_ERROR | 7 |
-| `HTTP_ERROR` | SAP_ERROR | 6 |
-| `ICF_CHECK_DEGRADED` | VALIDATION_ERROR | 7 |
+| `HTTP_ERROR` | HTTP_ERROR | 68 |
 | `INVALID_ARGUMENT` | USAGE | 2 |
 | `INVALID_FIELD` | VALIDATION_ERROR | 7 |
 | `INVALID_WHERE` | VALIDATION_ERROR | 7 |
@@ -1204,9 +1202,7 @@ Aggregated from the per-command schemas. The authoritative TypeScript source is 
 | `OBJECT_NOT_FOUND` | NOT_FOUND | 8 |
 | `OFFSET_EXCEEDED` | VALIDATION_ERROR | 7 |
 | `OVERWRITE_REQUIRED` | USAGE | 2 |
-| `PASSWORD_EXPORT` | VALIDATION_ERROR | 7 |
-| `PERSISTENCE_ERROR` | SAP_ERROR | 6 |
-| `PROFILE_MISMATCH` | VALIDATION_ERROR | 7 |
+| `PERSISTENCE_ERROR` | PERSISTENCE_ERROR | 67 |
 | `PULL_PARTIAL_FAILURE` | VALIDATION_ERROR | 7 |
 | `PUSH_FAILED` | VALIDATION_ERROR | 7 |
 | `QUERY_FAILED` | SAP_ERROR | 6 |
@@ -1214,9 +1210,8 @@ Aggregated from the per-command schemas. The authoritative TypeScript source is 
 | `REPORT_NOT_EXECUTABLE` | VALIDATION_ERROR | 7 |
 | `REPORT_NOT_FOUND` | NOT_FOUND | 8 |
 | `REPORT_RUN_FAILED` | SAP_ERROR | 6 |
-| `SAP_ERROR` | SAP_ERROR | 1 |
+| `SAP_ERROR` | SAP_ERROR | 6 |
 | `SESSION_JAR_DECRYPT_FAILED` | VALIDATION_ERROR | 7 |
-| `STEAMPUNK_ICF_MANUAL` | VALIDATION_ERROR | 7 |
 | `SYNTAX_ERROR` | VALIDATION_ERROR | 7 |
 | `TABLE_NOT_FOUND` | NOT_FOUND | 8 |
 | `TABLE_TYPE_NOT_SUPPORTED` | VALIDATION_ERROR | 7 |

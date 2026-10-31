@@ -29,5 +29,5 @@
 cp <skill-dir>/tabl-templates/transparent-quantity-unit/zsample.tabl.{json,ddic,settings.json} src/
 for f in src/zsample.tabl.*; do mv "$f" "${f/zsample/ztodo}"; done
 sed -i '' 's/zsample/ztodo/g' src/ztodo.tabl.{json,ddic,settings.json}
-abap create TABL ZTODO --file src/ztodo.tabl.json --package $TMP --yes
+abap create TABL ZTODO --file src/ztodo.tabl.json --package '$TMP' --yes
 ```

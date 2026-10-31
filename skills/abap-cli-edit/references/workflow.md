@@ -81,7 +81,7 @@ cat > src/zt_x.tabl.settings.json <<'EOF'
   "generalInformation": { "dataClassCategory": "APPL0", "sizeCategory": "0" }
 }
 EOF
-abap create TABL ZT_X --file src/zt_x.tabl.json --package $TMP --yes
+abap create TABL ZT_X --file src/zt_x.tabl.json --package '$TMP' --yes
 
 # 推
 abap push src/zt_x.tabl.json --tr DEVK900001 --yes   # DDIC 的 .json 必须显式给路径（--all 只扫 .abap/.xml）
@@ -273,7 +273,7 @@ abap pull ZMY_SERVICE --type HTTP --json
 
 # 建 — 必须 --file，无 create local 骨架（漏了报 USAGE）
 abap create HTTP ZMY_SERVICE --file src/zmy_service.http.json \
-  --package $TMP --description "My service"
+  --package '$TMP' --description "My service"
 
 # 推
 abap push src/zmy_service.http.json --tr <TR>

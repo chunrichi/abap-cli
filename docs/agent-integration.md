@@ -1,6 +1,6 @@
 # Agent Integration
 
-abap-cli is designed to be driven by AI agents. Every command supports `--json` output that is stable, machine-parseable, and never requires interactive input.
+abap-cli is designed to be driven by AI agents. Every command supports `--json` output that is stable, machine-parseable, and never requires an interactive TTY (write commands take `--yes`).
 
 ## The `--json` Contract
 
@@ -22,7 +22,7 @@ Commands require no TTY:
 
 - Fully parameterized `abap init` (no prompts)
 - `--json` on every command
-- No interactive confirmations in the pull/push/check/create/transport flows
+- Write commands (`create`, `push`, `delete`, `mime create/push/delete`, `transport create`) require `--yes` outside a TTY, or `--dry-run` where supported to preview; read-only commands never prompt
 
 ## The Core Loop for Agents
 
@@ -30,7 +30,7 @@ Commands require no TTY:
 
 ```bash
 # Create a class with a default skeleton (activated by default)
-abap create CLAS ZCL_DEMO --package ZDEV --description "Demo" --tr DEVK900001 --json
+abap create CLAS ZCL_DEMO --package ZDEV --description "Demo" --tr DEVK900001 --yes --json
 
 # Pull it back to edit locally
 abap pull ZCL_DEMO --json
@@ -38,7 +38,7 @@ abap pull ZCL_DEMO --json
 # ... edit src/zcl_demo.clas.abap ...
 
 # Push the change (lock → write → activate → unlock)
-abap push src/zcl_demo.clas.abap --tr DEVK900001 --json
+abap push src/zcl_demo.clas.abap --tr DEVK900001 --yes --json
 ```
 
 ### 2. Recovering from `NO_TRANSPORT`
@@ -51,11 +51,11 @@ abap transport list --open --json
 # → { "status": "success", "data": { "workbench": [], "customizing": [] } }
 
 # Create a request (default $TMP → local request)
-abap transport create "Feature work" --json
+abap transport create "Feature work" --yes --json
 # → { "status": "success", "data": { "transport": "DEVK900123", ... } }
 
 # Retry with the explicit request
-abap push src/zcl_demo.clas.abap --tr DEVK900123 --json
+abap push src/zcl_demo.clas.abap --tr DEVK900123 --yes --json
 ```
 
 This closes the "no request → create → use with `--tr`" loop without touching SAP GUI (Constitution Principle VII, Dogfooding).
@@ -97,8 +97,8 @@ if (result.status === 'success') {
 ### Shell (jq)
 
 ```bash
-transport=$(abap transport create "task" --json | jq -r '.data.transport')
-abap push src/zcl_demo.clas.abap --tr "$transport" --json
+transport=$(abap transport create "task" --yes --json | jq -r '.data.transport')
+abap push src/zcl_demo.clas.abap --tr "$transport" --yes --json
 ```
 
 ## Guidance for Agents

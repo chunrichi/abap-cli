@@ -32,9 +32,6 @@ export const SCHEMA: CommandSchema = {
   errors: [
     { code: 'NO_TRANSPORT', category: 'VALIDATION_ERROR', exitCode: 7 },
     { code: 'SAP_ERROR', category: 'SAP_ERROR', exitCode: 6 },
-    { code: 'FORCE_BYPASSED', category: 'VALIDATION_ERROR', exitCode: 7 },
-    { code: 'ICF_CHECK_DEGRADED', category: 'VALIDATION_ERROR', exitCode: 7 },
-    { code: 'STEAMPUNK_ICF_MANUAL', category: 'VALIDATION_ERROR', exitCode: 7 },
     { code: 'DEPLOY_MANIFEST_INVALID', category: 'VALIDATION_ERROR', exitCode: 7 },
     { code: 'DEPLOY_MERGE_FAILED', category: 'VALIDATION_ERROR', exitCode: 7 },
   ],
