@@ -31,7 +31,25 @@ import { orderTargetsByDependency } from './push-order.js';
 import { deduplicateTablArtifactTargets } from './push-dedup.js';
 import { toRelativeOutputPath } from '../../core/path-output.js';
 import { pushRouteFor } from './routing.js';
+import { pushUnsupportedReasonFor } from '../../types/registry.js';
 import type { PushFileOptions, PushFileResult, PushOneResult } from './push-types.js';
+
+/**
+ * Read-only types (currently DEVC) own a local artifact but have no ADT write
+ * endpoint. Reject with the registry's reason instead of falling through to the
+ * generic ABAP-source path, which would try to read the artifact as source.
+ */
+function rejectUnsupportedPushType(objectType: string): void {
+  const reason = pushUnsupportedReasonFor(objectType);
+  if (!reason) return;
+  throw new CliError('TYPE_NOT_SUPPORTED', `Cannot push ${objectType} changes: ${reason}`, {
+    type: objectType,
+    nextSteps: [
+      `Type ${objectType} is read-only in abap-cli; edit the object in SAP GUI if supported there.`,
+      'Re-create the object instead: pull, edit, `abap delete`, `abap create`.',
+    ],
+  });
+}
 
 /** Flow outcome: JSON envelope data + human summary, printed by the command layer. */
 export interface PushResult {
@@ -82,6 +100,7 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
       try {
         const resolved = resolveFile(file);
         validateLocalFile(resolved);
+        rejectUnsupportedPushType(resolved.objectType);
         const route = pushRouteFor(resolved.objectType);
         if (route && route.kind !== 'source') {
           // Artifact routes own their validators (DDIC / HTTP / TRAN / AFF
@@ -281,6 +300,7 @@ async function pushOne(
     throw new CliError('FILE_PARSE_ERROR', `Cannot parse ${outFile}: ${message(error)}`, { details: { file: outFile } });
   }
   validateLocalFile(resolved);
+  rejectUnsupportedPushType(resolved.objectType);
 
   // Textpool .properties files route via ADT/ICF (mixed mode, cache-decided).
   if (resolved.route === 'textpool') {

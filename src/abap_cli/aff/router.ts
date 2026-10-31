@@ -18,6 +18,7 @@
  *   *.dtel.json / *.dtel.*.json        → DTEL
  *   *.http.json / *.http.*.json        → HTTP
  *   *.tran.json / *.tran.*.json        → TRAN
+ *   *.devc.json                        → DEVC
  *
  * STRU is routed to `tabl-v1.json` at runtime via schemaPathFor().
  */
@@ -66,6 +67,8 @@ const SUFFIX_RULES: ReadonlyArray<{ suffix: string; type: string; schemaFile?: s
   { suffix: '.msag.json', type: 'MSAG' },
   { suffix: '.ddls.json', type: 'DDLS' },
   { suffix: '.ddls.acds', type: 'DDLS' },
+  // Package (DEVC) local document.
+  { suffix: '.devc.json', type: 'DEVC' },
 ];
 
 const SUFFIX_INDEX: Map<string, string> = new Map(

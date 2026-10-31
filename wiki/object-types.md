@@ -1,17 +1,17 @@
 ---
 type: reference
 title: 支持的对象类型
-description: abap CLI 支持的 ABAP 对象类型总览 — 21 个类型码 × create/pull/push 路由（ADT / ICF）与本地 AFF 文件布局
+description: abap CLI 支持的 ABAP 对象类型总览 — 22 个类型码 × create/pull/push 路由（ADT / ICF）与本地 AFF 文件布局
 tags: [abap-cli, object-types, ddic, http, sicf, reference]
 created at: 2026-08-29 10:00:00
-changed at: 2026-10-31 14:40:00
+changed at: 2026-10-31 16:20:00
 ---
 
 # 支持的对象类型
 
-abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **21 个对象类型**：4 个 ABAP 源对象、6 个 DDIC 对象、2 个 ICF/事务对象、2 个双通道 DDIC/CDS 对象、7 个 CDS/RAP 对象。分两条路由：**ADT**（`abap-adt-api` 走标准 ADT REST API）与 **ICF**（自建服务 `/sap/abap_cli`，需先 `abap deploy`）。
+abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **22 个对象类型**：4 个 ABAP 源对象、1 个 ADT 包（DEVC）、6 个 DDIC 对象、2 个 ICF/事务对象、2 个双通道 DDIC/CDS 对象、7 个 CDS/RAP 对象。分两条路由：**ADT**（`abap-adt-api` 走标准 ADT REST API）与 **ICF**（自建服务 `/sap/abap_cli`，需先 `abap deploy`）。
 
-`create <type>` 的 `--schema` 参数 `allowedValues` 即这 21 个类型码：`CLAS, INTF, PROG, FUGR, TABL, STRU, DOMA, DTEL, ENQU, NROB, HTTP, TRAN, TTYP, MSAG, DDLS, SRVB, SRVD, BDEF, DCLS, DDLX, DDLA`。先查能力再动手：`abap create --schema <TYPE>` 会给出某个类型的字段契约。
+`create <type>` 的 `--schema` 参数 `allowedValues` 即这 21 个类型码：`CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, ENQU, NROB, HTTP, TRAN, TTYP, MSAG, DDLS, SRVB, SRVD, BDEF, DCLS, DDLX, DDLA`。先查能力再动手：`abap create --schema <TYPE>` 会给出某个类型的字段契约。
 
 ## 类型 × 命令矩阵
 
@@ -21,6 +21,7 @@ abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **21 个
 | `INTF` | 接口 | ADT | 骨架 | ✅ | ✅ | ✅ | `<name>.intf.json` + `<name>.intf.abap` |
 | `PROG` | 报表程序 | ADT | 骨架 | ✅ | ✅ | ✅ | `<name>.prog.json` + `<name>.prog.abap`（include 为 `.prog.include.abap`） |
 | `FUGR` | 函数组 | ADT | 骨架 | ✅ | ✅ | ✅ | `<group>.fugr.json` + `.fugr.sapl<group>.reps.*` + `.fugr.l<group>top.reps.*` + 每 FM `.fugr.<fm>.func.*` |
+| `DEVC` | 包（Package） | ADT | 包参数（`--package` = 父包，无需 `--file`） | ✅ | ✅ | ❌（ADT 无更新端点） | ❌ | `<name>.devc.json` |
 | `TABL` | 透明表 | ICF | `--file` | ✅ | ✅ | ❌ | `<name>.tabl.{json,ddic,settings.json}` |
 | `STRU` | 结构 | ICF | `--file` | ✅ | ✅ | ❌ | `<name>.stru.{json,ddic,settings.json}` |
 | `DOMA` | 域 | ICF | `--file` | ✅ | ✅ | ❌ | `<name>.doma.json` |
@@ -80,6 +81,17 @@ abap push src/zmy_service.http.json --tr <TR>
 
 `create HTTP` 必须带 `--file`（abap-file-format JSON）走真实 SAP create；"无 `--file` 自动落最小骨架"的旧路径已删除，与 DDIC / DDLS 对齐。`create local` 不支持 HTTP；要手写 JSON 可参考 `abap create --schema HTTP` 的 `exampleJson`，或先 `abap pull` 一个同类节点。HTTP push 仍允许 create-on-push（见 [commands/push](commands/push.md)）。
 
+## Package（DEVC）
+
+`DEVC` 是唯一走 ADT 的"非源码"类型：一个包就是 `GET /sap/bc/adt/packages/<name>` 返回的单个
+`pak:package` 资源，没有 include、没有激活步骤。
+
+- **create**：`abap create DEVC <name> --package <super> --description <desc>`；软件组件 / 传输层默认继承父包，可用 `--software-component` / `--transport-layer` 覆盖，`--package-type` 选 `development`（默认）/ `main` / `structure`。`--check-only` 用 SAP 自己的 `POST /sap/bc/adt/packages/validation` 预检，名字/软件组件的错误原文回显。
+- **LOCAL 包名硬约束**：软件组件为 `LOCAL` 时，SAP 要求包名以 `$` 或 `TEST` 开头（`$TMP` 下建子包只能写 `$...` / `TEST...`）。
+- **pull**：映射 `header`（description / masterLanguage）+ `generalInformation`（packageType / superPackage / switch / applicationComponent / softwareComponent / transportLayer / recordChanges / encapsulation / ABAP 语言版本）+ `useAccesses[]`；语言版本键 `0`/`2`/`5` → `standard`/`keyUser`/`cloudDevelopment`。
+- **delete**：包删除**不加锁、不传 lockHandle**（先 lock 再 DELETE 会被 SAP 拒绝），且不能删除仍有子包的包；transportable 包（软件组件非 `LOCAL`）需 `--tr`。
+- **push**：不支持。ADT 对包只有读 + 创建 + 删除，`PUT` 直接被资源控制器拒绝，`abap push *.devc.json` 报 `TYPE_NOT_SUPPORTED`（exit 7）并说明替代路径。
+
 ## 两种 "ICF" 的区别
 
 仓库里 "ICF" 指两件不同的事，别混淆：
@@ -103,7 +115,7 @@ abap push src/zmy_service.http.json --tr <TR>
 | SAPscript / Smart Forms / Adobe Form | 不支持 | — |
 | Web Dynpro / ITS / BSP | 不支持 | — |
 | IDoc / ALE 配置、Workflow | 不支持 | — |
-| Package（`DEVC`）创建 | 不支持 | `pull --package` / `list --package` 只读；`transport create --package` 只指定已有包 |
+| Package（`DEVC`）更新/推送 | 不支持 | ADT 资源控制器拒绝 `PUT /sap/bc/adt/packages/<name>`；`create DEVC` / `pull DEVC` / `delete` 已支持，改包请在 SAP GUI 操作或删除后重建 |
 | `TRAN` 写入 | 未实现（501） | 读取用 `pull TRAN` / `abap tcode` |
 | Pool / Cluster Table | 不支持 | 仅 TABL / STRU |
 
@@ -112,7 +124,7 @@ abap push src/zmy_service.http.json --tr <TR>
 ## 常见误判
 
 - `abap pull X --type SICF` / `abap create SICF ...` → **不会**再映射为 `HTTP`（别名已在 1.0.0 删除）；请直接写 `HTTP`。
-- `create <type>` 的 `--schema` `allowedValues` 已是全 21 类：`CLAS, INTF, PROG, FUGR, TABL, STRU, DOMA, DTEL, ENQU, NROB, HTTP, TRAN, TTYP, MSAG, DDLS, SRVB, SRVD, BDEF, DCLS, DDLX, DDLA`。
+- `create <type>` 的 `--schema` `allowedValues` 已是全 22 类：`CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, ENQU, NROB, HTTP, TRAN, TTYP, MSAG, DDLS, SRVB, SRVD, BDEF, DCLS, DDLX, DDLA`。
 - `DDIC_NOT_SUPPORTED` (exit 7) → 类型在 DOMA/DTEL/TABL/STRU 之外。
 - 所有 ICF 路由类型在扩展未部署时都会失败 → 先 `abap deploy status`。
 - CDS 家族（`DDLS`/`DCLS`/`DDLX`/`DDLA`）+ RAP 三件套（`SRVB`/`SRVD`/`BDEF`）走 ADT，**不**经 ICF。`SRVB` 仅 `pull`（SAP GUI 管理 binding），其余 7 类支持完整 create/push（`BDEF` 仅 pull/push）。

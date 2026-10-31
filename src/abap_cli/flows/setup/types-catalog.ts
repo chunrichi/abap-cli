@@ -66,6 +66,7 @@ const TADIR_OBJECT_BY_CLI: Record<string, Omit<TadirMapping, 'cliType'>> = {
   INTF: { pgmid: 'R3TR', tadirObject: 'INTF', ddicTabclass: '', channel: 'ADT', affSchema: 'intf-v1.json', description: 'ABAP interface' },
   PROG: { pgmid: 'R3TR', tadirObject: 'PROG', ddicTabclass: '', channel: 'ADT', affSchema: 'prog-v1.json', description: 'Executable program / report (TRDIR-SUBC=1)' },
   FUGR: { pgmid: 'R3TR', tadirObject: 'FUGR', ddicTabclass: '', channel: 'ADT', affSchema: 'fugr-v1.json', description: 'Function group (FF = function module lives under FUGR)' },
+  DEVC: { pgmid: 'R3TR', tadirObject: 'DEVC', ddicTabclass: '', channel: 'ADT', affSchema: 'devc-v1.json', description: 'Package (read-only after create — ADT has no package update endpoint)' },
 
   // DDIC objects (ICF)
   TABL: { pgmid: 'R3TR', tadirObject: 'TABL', ddicTabclass: 'TRANSP', channel: 'ICF', affSchema: 'tabl-v1.json', description: 'Transparent table (DD02L-TABCLASS=TRANSP)' },

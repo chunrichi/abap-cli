@@ -20,6 +20,56 @@ import { effectivePolicy, isUnsupportedInContext, resolveSessionPolicy } from '.
 import { loadOrCreateSessionKey } from '../session/key.js';
 import { captureSessionFromAdt, clearJarFromDisk, injectSessionIntoAdt, loadJarFromDisk, markJarPersisted } from '../session/reuse.js';
 import { registerAdtClient } from '../session/registry.js';
+import { buildCreateWire, type DevcCreateWireOptions } from '../formats/devc/json.js';
+
+/** ADT media type of a single package resource. */
+const PACKAGE_MEDIA_TYPE = 'application/vnd.sap.adt.packages.v2+xml';
+
+/** Inputs for `POST /sap/bc/adt/packages/validation` (package name preflight). */
+export interface PackageValidationOptions {
+  name: string;
+  description: string;
+  /** Super package. */
+  parentName: string;
+  softwareComponent: string;
+  transportLayer: string;
+  packageType: 'development' | 'main' | 'structure';
+}
+
+/** Outcome of the package name preflight (SAP reports rejects as HTTP 200). */
+export interface PackageValidationResult {
+  success: boolean;
+  /** Raw `SEVERITY` value: `OK` / `ERROR`. */
+  severity: string;
+  message: string;
+  longText?: string;
+}
+
+/** ADT package resource URL; namespace `/NS/NAME` names are percent-encoded. */
+function packageUrl(name: string): string {
+  return `/sap/bc/adt/packages/${encodeURIComponent(name)}`;
+}
+
+/**
+ * Re-classify a 404 package response as `OBJECT_NOT_FOUND`.
+ *
+ * `classifyHttpError` maps every non-auth HTTP status to `SAP_ERROR`; a
+ * missing package is a NOT_FOUND (exit 8) and callers branch on it.
+ */
+function mapPackageNotFound(error: unknown, name: string, action: 'read' | 'delete'): unknown {
+  const asHttp = error as { err?: unknown; status?: unknown; message?: string };
+  const status = typeof asHttp.err === 'number' ? asHttp.err : asHttp.status;
+  if (status !== 404) return error;
+  return new CliError('OBJECT_NOT_FOUND', `Package ${name} not found${asHttp.message ? `: ${asHttp.message}` : ''}`, {
+    object: name,
+    type: 'DEVC',
+    nextSteps: [
+      'Verify the package name: `abap search <name> --type DEVC`.',
+      'Confirm the active system: `abap profile test <name>`.',
+    ],
+    example: action === 'read' ? `abap pull ${name} --type DEVC` : `abap delete ${name} --type DEVC --yes`,
+  });
+}
 
 /**
  * Thin wrapper around abap-adt-api ADTClient.
@@ -718,6 +768,102 @@ export class AdtClientWrapper {
   /** Validate a proposed object without creating it (`create --check-only`). */
   validateNewObject(options: Parameters<ADTClient['validateNewObject']>[0]) {
     return this._call(() => this.client.validateNewObject(options));
+  }
+
+  // --- Packages (DEVC) ---
+
+  /**
+   * GET `/sap/bc/adt/packages/<name>` and return the `pak:package` XML
+   * verbatim. The caller maps it to the local AFF document
+   * (`formats/devc/json.ts#wireToLocal`).
+   */
+  getPackage(name: string): Promise<string> {
+    return this._call(async () => {
+      try {
+        const response = await this.client.httpClient.request(packageUrl(name), {
+          method: 'GET',
+          headers: { Accept: PACKAGE_MEDIA_TYPE },
+        });
+        return String(response.body ?? '');
+      } catch (error: unknown) {
+        throw mapPackageNotFound(error, name, 'read');
+      }
+    });
+  }
+
+  /**
+   * Preflight a package creation (`create DEVC --check-only`).
+   *
+   * `POST /sap/bc/adt/packages/validation` answers an `asx:abap` envelope with
+   * `SEVERITY` (`OK` / `ERROR`) and `SHORT_TEXT`. SAP reports a rejected name
+   * as a *successful* HTTP response, so the caller decides based on `success`.
+   */
+  validatePackage(options: PackageValidationOptions): Promise<PackageValidationResult> {
+    return this._call(async () => {
+      const response = await this.client.httpClient.request('/sap/bc/adt/packages/validation', {
+        method: 'POST',
+        qs: {
+          objtype: 'DEVC/K',
+          objname: options.name,
+          description: options.description,
+          packagename: options.parentName,
+          swcomp: options.softwareComponent,
+          transportLayer: options.transportLayer,
+          packagetype: options.packageType,
+        },
+        headers: { Accept: 'application/*' },
+      });
+      const xml = String(response.body ?? '');
+      const severity = /<SEVERITY>([^<]*)<\/SEVERITY>/.exec(xml)?.[1]?.trim() ?? '';
+      const message = /<SHORT_TEXT>([^<]*)<\/SHORT_TEXT>/.exec(xml)?.[1]?.trim() ?? '';
+      const longText = /<LONG_TEXT>([^<]*)<\/LONG_TEXT>/.exec(xml)?.[1]?.trim() ?? '';
+      return {
+        success: severity !== 'ERROR' && severity !== 'A' && severity !== 'X',
+        severity,
+        message: message || longText,
+        longText,
+      };
+    });
+  }
+
+  /**
+   * POST `/sap/bc/adt/packages` to create a package (`DEVC/K`).
+   *
+   * The request body carries the super package in both `adtcore:packageRef`
+   * and `pak:superPackage`; `pak:transport` carries the software component and
+   * transport layer. Errors bubble up as classified CliErrors — the flow adds
+   * the object context.
+   */
+  createPackage(options: DevcCreateWireOptions & { transport?: string }): Promise<void> {
+    return this._call(async () => {
+      await this.client.httpClient.request('/sap/bc/adt/packages', {
+        method: 'POST',
+        ...(options.transport ? { qs: { corrNr: options.transport } } : {}),
+        headers: { 'Content-Type': 'application/*', Accept: 'application/*' },
+        body: buildCreateWire(options),
+      });
+    });
+  }
+
+  /**
+   * DELETE `/sap/bc/adt/packages/<name>`.
+   *
+   * Packages are deleted *without* a prior lock: `DELETE` with a lock handle
+   * is rejected by SAP with "package is locked". `transport` is forwarded as
+   * `corrNr` for transportable packages.
+   */
+  deletePackage(name: string, transport?: string): Promise<void> {
+    return this._call(async () => {
+      try {
+        await this.client.httpClient.request(packageUrl(name), {
+          method: 'DELETE',
+          ...(transport ? { qs: { corrNr: transport } } : {}),
+          headers: { Accept: 'application/*' },
+        });
+      } catch (error: unknown) {
+        throw mapPackageNotFound(error, name, 'delete');
+      }
+    });
   }
 
   // --- Deletion ---

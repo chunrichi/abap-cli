@@ -42,6 +42,8 @@ import { createCdsExtensionHandler } from './create-cds-extension.js';
 import { createSrvdHandler } from './create-srvd.js';
 import { createEnquHandler } from './create-enqu.js';
 import { createNrobHandler } from './create-nrob.js';
+import { createDevcHandler } from './create-devc.js';
+import { pullDevcHandler } from './pull-devc.js';
 import { pullTtypHandler } from './pull-ttyp.js';
 import { pullMsagHandler } from './pull-msag.js';
 import { pullDdlsHandler } from './pull-ddls.js';
@@ -196,6 +198,15 @@ export const TYPE_ROUTES: Readonly<Record<string, TypeRoute>> = {
   INTF: { create: source(), pull: source(), push: source() },
   PROG: { create: source(), pull: source(), push: source() },
   FUGR: { create: source(), pull: source(), push: source() },
+
+  // Package (DEVC) — one ADT resource, no source include. Create/pull are
+  // dedicated handlers (`create-devc` / `pull-devc`) because the wire format is
+  // the `pak:package` XML, not ABAP source. No push route: ADT has no package
+  // update endpoint (PUT is rejected by the resource controller).
+  DEVC: {
+    create: handler('adt', createDevcHandler),
+    pull: handler('adt', pullDevcHandler),
+  },
 
   // DDIC objects — ICF `/ddic/<type>` on all three operations.
   TABL: { create: handler('icf', createDdicHandler), pull: ddicPullRoute('TABL'), push: ddicPushRoute('TABL') },

@@ -26,6 +26,7 @@ The set is intentionally minimal — only the schemas abap-cli resolves through
 | `dtel-v1.json` | DTEL | `file-formats/dtel/dtel-v1.json` | |
 | `enqu-v1.json` | ENQU | `file-formats/enqu/enqu-v1.json` | |
 | `nrob-v1.json` | NROB | `file-formats/nrob/nrob-v1.json` | |
+| `devc-v1.json` | DEVC | `file-formats/devc/devc-v1.json` | |
 | `http-v1.json` | HTTP | `file-formats/http/http-v1.json` | |
 | `tran-v1.json` | TRAN | `file-formats/tran/tran-v1.json` | |
 | `ttyp-v1.json` | TTYP | — | **local variant**, handcrafted |

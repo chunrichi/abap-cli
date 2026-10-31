@@ -30,6 +30,7 @@ const EXPECTED: Record<string, ExpectedRoute> = {
   INTF: { create: 'adt', pull: 'adt', push: 'adt' },
   PROG: { create: 'adt', pull: 'adt', push: 'adt' },
   FUGR: { create: 'adt', pull: 'adt', push: 'adt' },
+  DEVC: { create: 'adt', pull: 'adt', push: undefined },
   TABL: { create: 'icf', pull: 'icf', push: 'icf' },
   STRU: { create: 'icf', pull: 'icf', push: 'icf' },
   DOMA: { create: 'icf', pull: 'icf', push: 'icf' },

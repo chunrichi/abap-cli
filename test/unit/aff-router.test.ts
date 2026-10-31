@@ -20,6 +20,12 @@ describe('aff-router', () => {
     expect(schemaFileFor('TABL')).toBe('tabl-v1.json');
   });
 
+  it('routes the DEVC package document', () => {
+    const routed = routeAffSchema('zmy_package.devc.json');
+    expect(routed).toEqual({ type: 'DEVC', isJson: true, schemaFile: 'devc-v1.json' });
+    expect(routeType('(mock)ns_pkg.devc.json')).toBe('DEVC');
+  });
+
   it('routes companion JSON files for FUGR (reps/func)', () => {
     expect(routeType('zmy.fugr.lzmy_grouptop.reps.json')).toBe('FUGR');
     expect(routeType('zmy.fugr.saplzmy_group.reps.json')).toBe('FUGR');

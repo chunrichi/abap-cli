@@ -34,6 +34,12 @@ export interface ObjectTypeEntry {
   affSchemaFile?: string;
   /** dual-channel capability (ICF fallback + ECC support). */
   channel?: ChannelCapability;
+  /**
+   * Why `abap push` cannot send this type's local artifact to SAP. Present only
+   * for read-only types; the push flow turns it into `TYPE_NOT_SUPPORTED` with
+   * this text so the limitation is stated in one place.
+   */
+  pushUnsupportedReason?: string;
 }
 
 /** per-type capability hints for channel-detect. */
@@ -53,6 +59,16 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
   { type: 'INTF', source: 'ADT', createObjtype: 'INTF/OI', affSchemaFile: 'intf-v1.json' },
   { type: 'PROG', source: 'ADT', createObjtype: 'PROG/P', affSchemaFile: 'prog-v1.json' },
   { type: 'FUGR', source: 'ADT', createObjtype: 'FUGR/F', affSchemaFile: 'fugr-v1.json' },
+  // Package (DEVC) — a single ADT resource with no source include. Create and
+  // pull use dedicated handlers (flows/edit/{create,pull}-devc.ts); ADT has no
+  // package update endpoint, so push is rejected with the registry's reason.
+  {
+    type: 'DEVC',
+    source: 'ADT',
+    affSchemaFile: 'devc-v1.json',
+    pushUnsupportedReason:
+      'ADT exposes packages read-only after creation (PUT /sap/bc/adt/packages/<name> is rejected by the resource controller); change the package in SAP GUI or delete and recreate it',
+  },
   // DDIC objects (ICF) — STRU reuses TABL's schema.
   { type: 'TABL', source: 'ICF', affSchemaFile: 'tabl-v1.json', requiresFile: true },
   { type: 'STRU', source: 'ICF', affSchemaFile: 'tabl-v1.json', requiresFile: true },
@@ -187,6 +203,15 @@ export function sourceFor(type: string): ObjectSource | undefined {
 export function isSupportedType(type: string): boolean {
   const primary = type.split('/')[0]!.toUpperCase();
   return primary in INDEX;
+}
+
+/**
+ * Why `abap push` cannot write this type (read-only types only), or
+ * `undefined` when push is supported or the type is unknown.
+ */
+export function pushUnsupportedReasonFor(type: string): string | undefined {
+  const primary = type.split('/')[0]!.toUpperCase();
+  return INDEX[primary]?.pushUnsupportedReason;
 }
 
 /** Return all supported type codes (uppercase, in registry order). */

@@ -74,7 +74,7 @@ export const COMMAND_SPECS: LazyCommandSpec[] = [
   },
   {
     name: 'create',
-    description: 'Create and activate a new ABAP object (CLAS, INTF, PROG, FUGR, TABL, STRU, DOMA, DTEL, HTTP)',
+    description: 'Create a new ABAP object (CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, HTTP)',
     load: () => import('../commands/create.js').then((m) => ({ register: m.registerCreateCommand })),
   },
   {

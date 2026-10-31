@@ -102,6 +102,7 @@ describe('abap create --schema (introspection)', () => {
     expect(data.type).toBeUndefined();
     expect(data.arguments[0].allowedValues).toEqual([
       'CLAS', 'INTF', 'PROG', 'FUGR',
+      'DEVC',
       'TABL', 'STRU', 'DOMA', 'DTEL',
       'ENQU', 'NROB',
       'HTTP', 'TRAN',
@@ -124,6 +125,21 @@ describe('abap create --schema (introspection)', () => {
     expect(data.templates.map((t: { name: string }) => t.name)).toEqual(['minimal', 'public-method']);
     const template = data.options.find((o: { name: string }) => o.name === '--template');
     expect(template.allowedValues).toEqual(['minimal', 'public-method']);
+    expect(createObject).not.toHaveBeenCalled();
+  });
+
+  it('reports DEVC as a supported ADT type with the DEVC-only flags', async () => {
+    const program = makeProgram();
+    registerCreateCommand(program);
+    const res = await runCommand(program, ['create', '--schema', 'DEVC']);
+    expect(res.exitCode).toBeUndefined();
+    const { data } = parseStdout(res);
+    expect(data).toMatchObject({ type: 'DEVC', supported: true, route: 'adt' });
+    expect(data.options.map((o: { name: string }) => o.name)).toEqual(
+      expect.arrayContaining(['--software-component', '--transport-layer', '--package-type']),
+    );
+    // `--package` means the super package for DEVC.
+    expect(data.options.find((o: { name: string }) => o.name === '--package').description).toContain('Super package');
     expect(createObject).not.toHaveBeenCalled();
   });
 

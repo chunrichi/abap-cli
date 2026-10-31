@@ -2,9 +2,9 @@
 type: reference
 title: 对象类型详细文档索引
 description: 每个 SAP 对象类型的字段契约、命令路径、本地文件形态与示例
-tags: [abap-cli, object-types, reference, clas, intf, prog, fugr, tabl, stru, doma, dtel, enqu, nrob, http, tran, ttyp, msag, ddls]
+tags: [abap-cli, object-types, reference, clas, intf, prog, fugr, devc, tabl, stru, doma, dtel, enqu, nrob, http, tran, ttyp, msag, ddls]
 created at: 2026-09-01 00:00:00
-changed at: 2026-10-30 20:00:00
+changed at: 2026-10-31 16:20:00
 ---
 
 # 对象类型详细文档
@@ -17,6 +17,7 @@ changed at: 2026-10-30 20:00:00
 | `INTF` | ADT | `src/<name>.intf.json` + `src/<name>.intf.abap` | [intf.md](intf.md) |
 | `PROG` | ADT | `src/<name>.prog.json` + `src/<name>.prog.abap` | [prog.md](prog.md) |
 | `FUGR` | ADT | `src/<group>.fugr.json` + `.fugr.sapl<group>.reps.*` + `.fugr.l<group>top.reps.*` + 每 FM `.fugr.<fm>.func.*` | [fugr.md](fugr.md) |
+| `DEVC` | ADT | `src/<name>.devc.json`（包；pull / create-then-pull，push 不支持） | [devc.md](devc.md) |
 | `TABL` | ICF | `src/<name>.tabl.{json,ddic,settings.json}` 三件套 | [tabl.md](tabl.md) |
 | `STRU` | ICF | `src/<name>.stru.{json,ddic,settings.json}` 三件套 | [stru.md](stru.md) |
 | `DOMA` | ICF | `src/<name>.doma.json`（嵌套） | [doma.md](doma.md) |

@@ -55,6 +55,8 @@ FILES=(
   # lock object + number range object.
   "enqu/enqu-v1.json"
   "nrob/nrob-v1.json"
+  # package (DEVC).
+  "devc/devc-v1.json"
   "http/http-v1.json"
   "tran/tran-v1.json"
   # dual-channel DDIC + CDS.
