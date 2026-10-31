@@ -25,10 +25,13 @@ vi.mock('../../src/abap_cli/clients/basic-auth.js', () => ({
 }));
 
 const request = vi.fn();
+const login = vi.fn();
+const logout = vi.fn();
 vi.mock('abap-adt-api', () => ({
   ADTClient: vi.fn().mockImplementation(function () {
     return {
-      login: vi.fn().mockResolvedValue(undefined),
+      login: (...a: unknown[]) => login(...a),
+      logout: (...a: unknown[]) => logout(...a),
       httpClient: { request: (...a: unknown[]) => request(...a) },
     };
   }),
@@ -56,7 +59,24 @@ describe('probeAdtRuntime — 030 ADT runtime tier detection', () => {
   beforeEach(() => {
     request.mockReset();
     getSystem.mockReset();
+    login.mockReset().mockResolvedValue(undefined);
+    logout.mockReset().mockResolvedValue(undefined);
     getSystem.mockReturnValue({ url: 'https://sap.example:50000', username: 'dev', client: '001', language: 'EN', auth: { method: 'basic' } });
+  });
+
+  it('releases the stateful SAP session after a successful probe', async () => {
+    request.mockResolvedValueOnce(makeAtom({ sapComponent: 'S4CORE', release: '756' }));
+    await probeAdtRuntime('s4prem');
+    expect(login).toHaveBeenCalledTimes(1);
+    expect(logout).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases the stateful SAP session when the probe fails', async () => {
+    request.mockRejectedValue(new Error('connection reset'));
+    const r = await probeAdtRuntime('s4prem');
+    expect(r.runtime).toBe('unknown');
+    expect(login).toHaveBeenCalledTimes(1);
+    expect(logout).toHaveBeenCalledTimes(1);
   });
 
   it('classifies Steampunk from informationsystem sap-component=BTP', async () => {
