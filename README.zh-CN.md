@@ -116,10 +116,10 @@ abap deploy status     # 确认 SAP 侧版本与当前 CLI 一致
 ### 给 AI agent 装上下文
 
 ```bash
-abap init --agent claude    # copilot | claude | cursor | generic
+abap init --agent agents    # agents | copilot | claude | cursor | generic
 ```
 
-把 6 个 skill 与 `abap-developer` agent 定义拷到对应 vendor 目录（`.github/`、`.claude/`、`.cursor/`、`.agents/`），需要时还会写 `CLAUDE.md` 或 `.cursor/rules/abap.mdc` 覆盖文件。目录结构与路由表见 [skills/README.md](skills/README.md)。
+把 6 个 skill 与 `abap-developer` agent 定义拷到对应 target 目录——vendor 中立的 `agents` 目标写 `.agents/`，厂商目标写 `.github/`、`.claude/`、`.cursor/`——需要时还会写 `CLAUDE.md` 或 `.cursor/rules/abap.mdc` 覆盖文件（`generic` 是 `agents` 的早期名称）。目录结构与路由表见 [skills/README.md](skills/README.md)。
 
 ---
 
@@ -164,7 +164,7 @@ src/(ui2)cl_json.clas.abap                # 命名空间对象 /UI2/CL_JSON
 
 | 命令 | 干什么 |
 |---|---|
-| `abap init` | 把工作区绑定到 profile（写 `.abap.json`），设置默认 transport / 包 / 源目录，自省（`--show-config`）或清空字段，脚手架 agent 上下文（`--agent copilot / claude / cursor / generic`） |
+| `abap init` | 把工作区绑定到 profile（写 `.abap.json`），设置默认 transport / 包 / 源目录，自省（`--show-config`）或清空字段，脚手架 agent 上下文（`--agent agents / copilot / claude / cursor / generic`） |
 | `abap profile` | 管理全局连接 profile：`list` / `show` / `add` / `set` / `test` / `delete` / `export` / `import` |
 | `abap doctor` | 诊断环境与配置（只读且不连 SAP——连通性用 `abap profile test`）；`--fix` 应用安全修复 |
 | `abap session` | 查看当前 profile 的会话 cookie jar（`session info`） |

@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`abap init --agent agents`**：`--agent` 新增 vendor 中立的 `agents` 目标，把 6 个 skill 与 `abap-developer` agent 定义装进 `.agents/` 目录；输出与 `generic` 相同，未绑定某个厂商 IDE 时用它即可。
+
 ## [1.1.0] - 2026-10-31
 
 新增 4 类对象（DEVC / VIEW / SHLP / XSLT）、事务码写路径与长文本支持，并修复真实 SAP 上的会话、DDIC、HTTP pull 问题。升级后执行一次 `abap deploy --yes` 刷新内置 ICF 服务。含 breaking 变更，见 Migration。

@@ -37,7 +37,7 @@ abap init --profile dev --yes
 
 # Optionally set default transport and package, and scaffold agent context:
 abap init --profile dev --tr DEVK900001 --package ZDEV --yes
-abap init --agent copilot
+abap init --agent agents    # vendor-neutral; or copilot / claude / cursor / generic
 ```
 
 Global **system profiles** are stored under `~/.abap-cli/systems.json`; `abap init` writes a `.abap.json` in the current directory referencing the chosen profile. The password is stored in the OS keychain, never in plain text.

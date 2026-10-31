@@ -4,7 +4,7 @@ title: abap init
 description: 工作区唯一入口 — 绑定/修改/自省 .abap.json、脚手架 AI agent 上下文；裸 abap init 进入交互向导
 tags: [abap-cli, command, init, workspace, profile, agent]
 created at: 2026-08-17 00:00:00
-changed at: 2026-10-30 01:14:53
+changed at: 2026-10-31 22:40:00
 ---
 
 # abap init
@@ -17,7 +17,7 @@ changed at: 2026-10-30 01:14:53
 | 修改字段 | `--profile/--tr/--package/--source-dir`（已有 `.abap.json`，merge） | 更新（不替换） |
 | 自省 | `--show-config` | 否（只读） |
 | 清空字段 | `--unset-package / --unset-tr / --unset-source-dir` | 是（删字段） |
-| Agent 脚手架 | `--agent copilot/claude/cursor/generic` | 否（不碰 `.abap.json`） |
+| Agent 脚手架 | `--agent agents/copilot/claude/cursor/generic` | 否（不碰 `.abap.json`） |
 
 ## Usage
 
@@ -37,7 +37,7 @@ abap init --unset-tr --unset-source-dir --yes
 abap init
 
 # 仅脚手架 agent 上下文
-abap init --agent copilot|claude|cursor|generic [--force]
+abap init --agent agents|copilot|claude|cursor|generic [--force]
 ```
 
 ## Options
@@ -48,7 +48,7 @@ abap init --agent copilot|claude|cursor|generic [--force]
 - `--show-config`: 打印当前 `.abap.json`（向上找最近的，git 边界停），只读
 - `--unset-package` / `--unset-tr` / `--unset-source-dir`: 移除对应顶层 key；非 TTY 需 `--yes`
 - `--test-connection` / `--test-tls` / `--test-auth`: 分层探针（探针失败 → 结构化错误）
-- `--agent <target>`: 脚手架 agent 上下文（见下表；幂等，已存在文件跳过）
+- `--agent <target>`: 脚手架 agent 上下文（见下表；幂等，已存在文件跳过）。`agents` 是 vendor 中立的通用目标（写 `.agents/`），`generic` 是它的早期名称、输出相同
 - `--force`: `--agent` 时覆盖已存在文件
 - `--yes` / `--non-interactive`: 非交互确认（aliases）
 - `--schema`: 打印本命令参数 schema（unified envelope，meta 仅含 `command` / `version` / `durationMs`，无 SAP 调用）
@@ -67,14 +67,15 @@ abap init --agent copilot|claude|cursor|generic [--force]
 
 ## Agent Scaffold Matrix
 
-每个 vendor 写入**自己的 agent 框架约定的目录**，不再污染 workspace 根目录：
+每个 target 写入**对应 agent 框架约定的目录**，不再污染 workspace 根目录。`agents` 不绑定任何厂商，把 skill 与 agent 定义放进中立的 `.agents/` 树：
 
 | 值 | 写入路径 |
 |---|---|
+| `agents` | `.agents/skills/<name>/` + `.agents/agents/abap-developer.agent.md`（通用目标） |
 | `copilot` | `.github/skills/<name>/` + `.github/agents/abap-developer.agent.md` |
 | `claude`  | `.claude/skills/<name>/` + `.claude/agents/abap-developer.agent.md` + `CLAUDE.md` |
 | `cursor`  | `.cursor/skills/<name>/` + `.cursor/agents/abap-developer.agent.md` + `.cursor/rules/abap.mdc` |
-| `generic` | `.agents/skills/<name>/` + `.agents/agents/abap-developer.agent.md` |
+| `generic` | 与 `agents` 相同（早期中性 fallback，保留兼容） |
 
 **不写入** `AGENTS.md` / `skills/README.md`（仓库级文件，不属于用户 workspace 上下文）。`skills/README.md`（仓库分层边界说明）也被 init 排除。
 
@@ -102,6 +103,7 @@ abap init --unset-package --yes
 abap init
 
 # 只补装 agent 上下文（幂等；已存在文件跳过）
+abap init --agent agents        # vendor 中立的 .agents/ 目录
 abap init --agent copilot
 abap init --agent copilot --force
 ```
