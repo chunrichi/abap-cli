@@ -205,7 +205,8 @@ abap validate:aff src/zcl_foo.clas.json
 | 对象不存在（ADT 源对象 / DDIC / TRAN / XSLT） | `OBJECT_NOT_FOUND` | NOT_FOUND / 8 | `nextSteps`：`abap search <name>` 验证；**引导 `abap create <TYPE> <name> --file <path> --package ... --tr ...`**。push 不自动创建（创建走 `abap create`；HTTP 例外——push 会创建 SICF 节点） |
 | push DEVC（`.devc.json`） | `TYPE_NOT_SUPPORTED` | VALIDATION_ERROR / 7 | `details.results[].code` 同为 `TYPE_NOT_SUPPORTED`；`nextSteps` 建议 `delete` 后重建或改用 SAP GUI |
 | 命名的 include part 不存在（如 `.macros.abap` 而对象无 macros） | `SAP_ERROR` | SAP_ERROR / 6 | `subtype` + `nextSteps`：`abap inspect <obj> --includes` 列出可用 include |
-| 激活失败 | `ACTIVATION_FAILED` | VALIDATION_ERROR / 7 | `stage: 'activate'` + SAP 消息/`lineScope`；HTTP 200 但 `activationExecuted=false`（silent no-op）同样报 `ACTIVATION_FAILED`，`details` 带 `checkExecuted`/`activationExecuted`/`generationExecuted` 与 `silentNoop: true` |
+| 激活失败 | `ACTIVATION_FAILED` | VALIDATION_ERROR / 7 | `stage: 'activate'` + SAP 消息/`lineScope`；HTTP 200 但 `activationExecuted=false` 且仍有 pending inactive 版本（silent no-op）同样报 `ACTIVATION_FAILED`，`details` 带 `checkExecuted`/`activationExecuted`/`generationExecuted` 与 `silentNoop: true` |
+| 无变更重推（源码未变） | 成功 + warning `ACTIVATION_NOT_EXECUTED` | 0 | SAP 对"没有 pending 变更"同样回 `activationExecuted=false`，但不是失败：CLI 探测 inactive-objects 列表，确认没有 pending inactive 版本后以 warning 放行（`details.pendingInactiveVersion=false`）；无法探测时也只 warning，提示用 `abap inspect <obj> --activation` 复核 |
 | 写源码失败 | `SAP_ERROR` | SAP_ERROR / 6 | `stage: 'write'` + `subtype`；ADT `<exc:exception>` 的 `type`/`namespace`/`properties` 进 `details.sapErrorType`/`sapErrorNamespace`/`sapErrorProperties` |
 | push 源码对象的元数据 `.json` | `READONLY_METADATA` | VALIDATION_ERROR / 7 | 零 ADT 调用；`details.results[].file` + `nextSteps` 指向 `<name>.<type>.abap` 与 `abap validate:aff` |
 | 语法检查失败（`--check-only`） | `SYNTAX_ERROR` | VALIDATION_ERROR / 7 | `errors` 数组（`{line, offset, severity, text, uri}`，仅 `E`） |

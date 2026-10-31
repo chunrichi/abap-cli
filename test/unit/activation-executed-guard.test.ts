@@ -5,15 +5,19 @@
  * Real SAP answers the wrong request shape with a silent no-op: HTTP 200, no
  * message, and `checkExecuted="false" activationExecuted="false"
  * generationExecuted="false"`. The source is written, the active version is
- * unchanged, and a caller that only inspects messages sees success. On a write
- * path (push) that must be a failure; a standalone `abap activate` can hit the
- * same flags for an already-active object, so it warns instead of throwing.
+ * unchanged, and a caller that only inspects messages sees success.
+ *
+ * On a write path (push) that must be a failure — but a push of *unchanged*
+ * source produces the same flags for a legitimate reason (nothing to
+ * activate). The pending-inactive probe separates the two; verified against
+ * S/4HANA: an unchanged re-push leaves `hasPendingInactiveVersion=false` and
+ * every part active.
  */
 import { describe, expect, it, beforeEach } from 'vitest';
 import {
   assertActivationExecuted,
-  enforceActivationOutcome,
   parseActivationResponse,
+  resolveActivationOutcome,
 } from '../../src/abap_cli/clients/activation.js';
 import { CliError } from '../../src/abap_cli/output/json.js';
 import { getWarnings, resetWarnings } from '../../src/abap_cli/output/meta.js';
@@ -26,9 +30,9 @@ const EXECUTED =
   '<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist">' +
   '<chkl:properties checkExecuted="true" activationExecuted="true" generationExecuted="true"/></chkl:messages>';
 
-function catchError(run: () => void): CliError | undefined {
+async function catchAsyncError(run: () => Promise<void>): Promise<CliError | undefined> {
   try {
-    run();
+    await run();
     return undefined;
   } catch (error) {
     return error as CliError;
@@ -47,9 +51,9 @@ describe('silent no-op (HTTP 200 + activationExecuted=false)', () => {
     expect(result.success).toBe(true);
   });
 
-  it('fails the push path with ACTIVATION_FAILED and all three executed flags', () => {
-    const error = catchError(() =>
-      enforceActivationOutcome(parseActivationResponse(SILENT_NOOP), 'ZCL_FOO', { requireExecuted: true }),
+  it('fails the push path when a pending inactive version remains', async () => {
+    const error = await catchAsyncError(() =>
+      resolveActivationOutcome(parseActivationResponse(SILENT_NOOP), 'ZCL_FOO', { requireExecuted: true }, async () => true),
     );
     expect(error?.code).toBe('ACTIVATION_FAILED');
     expect(error?.message).toMatch(/silently skipped/);
@@ -67,18 +71,48 @@ describe('silent no-op (HTTP 200 + activationExecuted=false)', () => {
     expect(steps).toContain('abap activate ZCL_FOO --yes');
   });
 
-  it('does not throw when the flags report execution', () => {
-    const error = catchError(() =>
-      enforceActivationOutcome(parseActivationResponse(EXECUTED), 'ZCL_FOO', { requireExecuted: true }),
+  it('is fail-closed when no pending-state probe is supplied', async () => {
+    const error = await catchAsyncError(() =>
+      resolveActivationOutcome(parseActivationResponse(SILENT_NOOP), 'ZCL_FOO', { requireExecuted: true }),
+    );
+    expect(error?.code).toBe('ACTIVATION_FAILED');
+  });
+
+  it('succeeds with a warning when nothing is pending (unchanged re-push)', async () => {
+    await expect(
+      resolveActivationOutcome(parseActivationResponse(SILENT_NOOP), 'ZCL_FOO', { requireExecuted: true }, async () => false),
+    ).resolves.toBeUndefined();
+    const warnings = getWarnings();
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatchObject({
+      code: 'ACTIVATION_NOT_EXECUTED',
+      details: { object: 'ZCL_FOO', pendingInactiveVersion: false },
+    });
+    expect(warnings[0]!.message).toMatch(/no inactive version was pending/);
+  });
+
+  it('warns instead of failing when the pending state cannot be verified', async () => {
+    await expect(
+      resolveActivationOutcome(parseActivationResponse(SILENT_NOOP), 'ZCL_FOO', { requireExecuted: true }, async () => undefined),
+    ).resolves.toBeUndefined();
+    const warnings = getWarnings();
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]!.message).toMatch(/could not verify/);
+    expect(warnings[0]!.details).toMatchObject({ pendingInactiveVersion: undefined });
+  });
+
+  it('does not warn when the flags report execution', async () => {
+    const error = await catchAsyncError(() =>
+      resolveActivationOutcome(parseActivationResponse(EXECUTED), 'ZCL_FOO', { requireExecuted: true }, async () => true),
     );
     expect(error).toBeUndefined();
     expect(getWarnings()).toEqual([]);
   });
 
-  it('standalone activate keeps succeeding but records a warning', () => {
-    expect(() =>
-      enforceActivationOutcome(parseActivationResponse(SILENT_NOOP), 'ZCL_FOO'),
-    ).not.toThrow();
+  it('standalone activate keeps succeeding but records a warning', async () => {
+    await expect(
+      resolveActivationOutcome(parseActivationResponse(SILENT_NOOP), 'ZCL_FOO'),
+    ).resolves.toBeUndefined();
     const warnings = getWarnings();
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toMatchObject({
@@ -87,14 +121,14 @@ describe('silent no-op (HTTP 200 + activationExecuted=false)', () => {
     });
   });
 
-  it('hard failures still win over the executed flag', () => {
+  it('hard failures still win over the executed flag', async () => {
     const body =
       '<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist">' +
       '<chkl:properties checkExecuted="true" activationExecuted="false" generationExecuted="false"/>' +
       '<msg type="E" line="1"><shortText><txt>Field "GC_X" is unknown.</txt></shortText></msg>' +
       '</chkl:messages>';
-    const error = catchError(() =>
-      enforceActivationOutcome(parseActivationResponse(body), 'ZCL_FOO', { requireExecuted: true }),
+    const error = await catchAsyncError(() =>
+      resolveActivationOutcome(parseActivationResponse(body), 'ZCL_FOO', { requireExecuted: true }, async () => true),
     );
     expect(error?.code).toBe('ACTIVATION_FAILED');
     expect(error?.message).toContain('Field "GC_X" is unknown.');
@@ -103,8 +137,6 @@ describe('silent no-op (HTTP 200 + activationExecuted=false)', () => {
   });
 
   it('assertActivationExecuted is a no-op once activation ran', () => {
-    expect(() =>
-      assertActivationExecuted(parseActivationResponse(EXECUTED), 'ZCL_FOO'),
-    ).not.toThrow();
+    expect(() => assertActivationExecuted(parseActivationResponse(EXECUTED), 'ZCL_FOO')).not.toThrow();
   });
 });

@@ -275,31 +275,58 @@ export function assertActivationExecuted(result: ActivationResult, label: string
 }
 
 /**
+ * Probe for a written-but-unactivated version of the activated object(s).
+ * `true` — SAP still lists the object as pending (the silent no-op is real);
+ * `false` — nothing is pending (SAP skipped activation because there was no
+ * change to apply); `undefined` — the endpoint could not tell us.
+ */
+export type PendingInactiveProbe = () => Promise<boolean | undefined>;
+
+/**
  * Single entry point for the activation outcome: report hard failures first,
  * then handle the execution flags according to the caller's policy.
- * `requireExecuted` throws the silent no-op (push path); otherwise it degrades
- * to a `meta.warnings` entry so a standalone `activate` stays informative
- * without failing on an object that was already active.
+ *
+ * `requireExecuted` (push path) does not fail on `activationExecuted=false`
+ * alone: pushing unchanged source leaves every part active and no pending
+ * inactive version, and SAP answers the same flags for "nothing to activate"
+ * (verified against S/4HANA). The pending-inactive probe separates that
+ * legitimate no-op from the real silent failure (source written, activation
+ * skipped, object left inactive). Without a probe the push path stays
+ * fail-closed, preserving the historical protection for callers that cannot
+ * check.
  */
-export function enforceActivationOutcome(
+export async function resolveActivationOutcome(
   result: ActivationResult,
   label: string,
   opts: ActivationEnforcementOptions = {},
-): void {
+  probePending?: PendingInactiveProbe,
+): Promise<void> {
   throwOnActivationFailure(result, label);
   if (result.activationExecuted) return;
-  if (opts.requireExecuted) {
+  const details = {
+    object: label,
+    checkExecuted: result.checkExecuted,
+    activationExecuted: result.activationExecuted,
+    generationExecuted: result.generationExecuted,
+  };
+  if (!opts.requireExecuted) {
+    collectWarning(
+      'ACTIVATION_NOT_EXECUTED',
+      `SAP reported activationExecuted=false for ${label}; the activation may not have run`,
+      details,
+    );
+    return;
+  }
+  const pending = probePending ? await probePending() : true;
+  if (pending === true) {
     assertActivationExecuted(result, label);
     return;
   }
   collectWarning(
     'ACTIVATION_NOT_EXECUTED',
-    `SAP reported activationExecuted=false for ${label}; the activation may not have run`,
-    {
-      object: label,
-      checkExecuted: result.checkExecuted,
-      activationExecuted: result.activationExecuted,
-      generationExecuted: result.generationExecuted,
-    },
+    pending === false
+      ? `SAP skipped activation for ${label} because no inactive version was pending — the object is already active`
+      : `SAP reported activationExecuted=false for ${label}; could not verify whether an inactive version remains — run 'abap inspect ${label} --activation'`,
+    { ...details, pendingInactiveVersion: pending },
   );
 }

@@ -304,7 +304,7 @@ async function checkActivation(
 
   // Authoritative object-level signal: does this user currently hold an
   // unactivated version of the object?
-  const hasPendingInactiveVersion = await probePendingInactiveVersion(client, objectUrl);
+  const hasPendingInactiveVersion = await client.pendingInactiveObject(objectUrl);
 
   // Annotate the OO `main` part now that the ambiguity is resolved.
   if (isOOClass) {
@@ -333,36 +333,6 @@ async function checkActivation(
   if (hasPendingInactiveVersion !== undefined) info.hasPendingInactiveVersion = hasPendingInactiveVersion;
   if (inactive.length > 0) info.inactive = inactive;
   return info;
-}
-
-/** One entry of the ADT inactive-objects list. */
-interface InactiveObjectEntry {
-  object?: { 'adtcore:uri'?: string; 'adtcore:name'?: string; deleted?: boolean };
-}
-
-/**
- * Whether the ADT inactive-objects list contains `objectUrl` for the current
- * user. Returns `undefined` when the probe fails (endpoint unavailable on some
- * releases) so callers can distinguish "known active" from "unknown".
- */
-async function probePendingInactiveVersion(
-  client: AdtClientWrapper,
-  objectUrl: string,
-): Promise<boolean | undefined> {
-  try {
-    const list = (await client.inactiveObjects()) as InactiveObjectEntry[];
-    const target = objectUrl.replace(/\/+$/, '').toLowerCase();
-    return list.some((entry) => {
-      const obj = entry?.object;
-      if (!obj || obj.deleted === true) return false;
-      if (typeof obj['adtcore:uri'] !== 'string') return false;
-      return obj['adtcore:uri'].replace(/\/+$/, '').toLowerCase() === target;
-    });
-  } catch {
-    // Endpoint missing/forbidden on this release — the caller falls back to the
-    // per-part comparison rather than reporting a bogus "active".
-    return undefined;
-  }
 }
 
 /** Flow outcome: JSON envelope data + human summary, printed by the command layer. */

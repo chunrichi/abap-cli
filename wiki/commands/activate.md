@@ -42,7 +42,7 @@ abap activate <object> [options]
 
 - `activate(objectUrl, type, name, opts?)` **总是用数组重载**：字符串重载会追加 `?context=main`，真实 SAP 对 program 和 class 拒绝并报 `User X is currently editing Y`
 - `activateAll(items, opts?)`：API 接受每个 item 的 `adtcore:uri/type/name/parentUri`，但请求体只发送 `uri` + `name`——带 `type`/`parentUri` 的 objectReference 会让真实 SAP 返回 HTTP 200 + 三个 `*Executed=false` 的 **silent no-op**
-- `opts.requireExecuted`：`push` 路径传 `{ requireExecuted: true }`，HTTP 200 + 无 E/A/X 消息 + `activationExecuted=false` 时抛 `ACTIVATION_FAILED`（`details.silentNoop: true` + 三个 executed 布尔）。`abap activate` **不传**该选项：对象本来就可能已是 active，无法据此判定失败，改为在 `meta.warnings` 记 `ACTIVATION_NOT_EXECUTED`（`details.activationExecuted=false`），命令照常成功
+- `opts.requireExecuted`：`push` 路径传 `{ requireExecuted: true }`。HTTP 200 + 无 E/A/X 消息 + `activationExecuted=false` 时**先查 ADT inactive-objects 列表**：仍有 pending inactive 版本 → 抛 `ACTIVATION_FAILED`（`details.silentNoop: true` + 三个 executed 布尔）；没有 pending 版本（例如源码未变的重推）→ 只记 warning `ACTIVATION_NOT_EXECUTED`、命令照常成功；端点不可查询时同样 warning 并提示 `abap inspect <obj> --activation` 复核。`abap activate` **不传**该选项：对象本来就可能已是 active，无法据此判定失败，改为在 `meta.warnings` 记 `ACTIVATION_NOT_EXECUTED`（`details.activationExecuted=false`），命令照常成功
 
 激活响应里的 `chkl:properties` 三个标志：
 

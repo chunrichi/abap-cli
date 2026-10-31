@@ -2,8 +2,8 @@ import { ADTClient, session_types, type ClientOptions, type TextElement, type Te
 import { parseServiceBinding, type ServiceBinding } from 'abap-adt-api/build/api/tablecontents.js';
 import {
   buildActivationRequest,
-  enforceActivationOutcome,
   parseActivationResponse,
+  resolveActivationOutcome,
   type ActivationEnforcementOptions,
   type ActivationItem,
 } from './activation.js';
@@ -572,8 +572,9 @@ export class AdtClientWrapper {
    * be used: it emits `adtcore:type` + `adtcore:parentUri`, which makes on-prem
    * SAP answer `activationExecuted="false"` — a silent no-op that leaves the
    * source written-but-inactive while callers see success. `opts.requireExecuted`
-   * turns a remaining silent no-op into a hard failure (push path); without it
-   * the flag degrades to a warning (standalone `abap activate`).
+   * turns a remaining silent no-op into a hard failure (push path) after
+   * checking whether a pending inactive version really exists; without it the
+   * flag degrades to a warning (standalone `abap activate`).
    */
   private postActivation(items: ActivationItem[], opts?: ActivationEnforcementOptions) {
     return this._call(async () => {
@@ -583,9 +584,44 @@ export class AdtClientWrapper {
         qs: { method: 'activate', preauditRequested: true },
       });
       const result = parseActivationResponse(String(response.body ?? ''));
-      enforceActivationOutcome(result, items.map((i) => i.name).join(', '), opts);
+      const label = items.map((i) => i.name).join(', ');
+      await resolveActivationOutcome(result, label, opts, async () => {
+        // "Nothing to activate" (push of unchanged source) and "activation
+        // skipped while a new version waits" share the same flags; only the
+        // pending-inactive list tells them apart.
+        let pending: boolean | undefined = false;
+        for (const item of items) {
+          const state = await this.pendingInactiveObject(item.uri);
+          if (state === true) return true;
+          if (state === undefined) pending = undefined;
+        }
+        return pending;
+      });
       return result;
     });
+  }
+
+  /**
+   * Is there a written-but-unactivated version of `objectUrl` for the current
+   * user? `undefined` when the inactive-objects endpoint cannot be queried.
+   */
+  async pendingInactiveObject(objectUrl: string): Promise<boolean | undefined> {
+    try {
+      const list = (await this.client.inactiveObjects()) as Array<{
+        object?: { 'adtcore:uri'?: string; deleted?: boolean };
+      }>;
+      const target = objectUrl.replace(/\/+$/, '').toLowerCase();
+      return list.some((entry) => {
+        const object = entry?.object;
+        if (!object || object.deleted === true) return false;
+        if (typeof object['adtcore:uri'] !== 'string') return false;
+        return object['adtcore:uri'].replace(/\/+$/, '').toLowerCase() === target;
+      });
+    } catch {
+      // Endpoint missing/forbidden on this release — the caller degrades to a
+      // warning instead of claiming an activation state it cannot verify.
+      return undefined;
+    }
   }
 
   /** List inactive objects (edit sessions awaiting activation). */
