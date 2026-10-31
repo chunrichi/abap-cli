@@ -4,12 +4,12 @@ title: abap profile
 description: 管理全局连接 profile — add / list / show / set / test / delete / export / import；绑定工作区用 abap init --profile。登录方式只有 basic auth
 tags: [abap-cli, command, profile, connection, keychain]
 created at: 2026-08-17 00:00:00
-changed at: 2026-10-30 19:25:00
+changed at: 2026-10-31 22:35:00
 ---
 
 # abap profile
 
-管理全局连接 profiles（021 — 原 `abap connection` 更名；`use` 移除，绑定工作区由 `abap init --profile <name>` 承担）。存储：`~/.abap-cli/systems.json`（mode 0600）+ OS keychain（密码）。零数据迁移。
+管理全局连接 profiles（021 — 原 `abap connection` 更名；`use` 移除，绑定工作区由 `abap init --profile <name>` 承担）。存储：`~/.abap-cli/systems.json`（mode 0600，含 `formatVersion`）+ OS keychain（密码）。零数据迁移。
 
 登录方式只有 **basic auth**：SAP username + 密码（HTTP Basic），密码只存 OS keychain；`--ca` / `--insecure` 只影响 TLS 信任，不是独立认证方式。
 
@@ -17,20 +17,27 @@ changed at: 2026-10-30 19:25:00
 
 ```bash
 abap profile <command> [args...]
+abap profile <command> --schema --json   # 子命令级机器契约
 ```
 
 ## Subcommands
 
 | 子命令 | 说明 |
 |---|---|
-| `list` | 列出所有 profile（name / username@url；历史遗留 auth 会标注） |
+| `list` | 列出所有 profile（name / username@url / client / language / 工作区绑定标记 `current` / 缓存的 runtime tier；历史遗留 auth 会标注） |
 | `show <name>` | 详情（无 secrets；历史遗留 auth 会带 `unsupportedAuth`） |
-| `add <name>` | 新建（`--url`+`--username` 必填；`--password` 写 keychain） |
+| `add <name>` | 新建（`--url`+`--username` 必填；`--password` 写 keychain）；**不连接、不验证**，输出 `verified:false` 与 `nextSteps` |
 | `set <name>` | 修改字段 / 密码（`--remove-password`、`--clear-ca`）；也是历史 profile 的迁移入口 |
 | `test <name>` | 分层探测 tls → auth → adt → icf |
 | `delete <name>` | 删除 profile + keychain 密码 + 不再被引用的 CA 文件（非 TTY 需 `--yes`） |
 | `export [names...]` | 导出便携 bundle（`--file`、`--with-passwords`） |
 | `import <file>` | 导入 bundle（`--overwrite` 覆盖已有） |
+
+## 输入校验（URL / profile 名）
+
+- **profile 名**：`1–64` 字符，`[A-Za-z0-9_.-]`，首字符必须是字母或数字。名字同时是 `systems.json` 的键与 keychain account，非法字符在 `add` / `set` / `import` 阶段即被拒绝（`INVALID_ARGUMENT`）。
+- **URL 归一化**：`--url` 只保留 `scheme://host[:port]`。用户从浏览器粘贴的 Fiori / WebGUI / 深链接会丢掉 path / query / fragment，并在 `meta.warnings` 给出 `URL_NORMALIZED`；URL 内嵌 `user:pass@` 一律拒绝。原因：ADT 客户端在 base URL 后拼接自己的 `/sap/bc/adt/...` 路径，带 path 的 base 必然 404。旧 profile 里已存的带 path URL 可通过 `abap profile set <name> --url <origin>` 修正。
+- **交互向导与非交互 path 同一套校验**：向导落盘前调用同一 `assertValidProfile`，不会写出半成品 profile。
 
 ## 登录方式（basic auth）
 
@@ -52,18 +59,18 @@ abap profile delete <name>
 abap profile add <name> --url <url> --username <user> --password '<pwd>'
 ```
 
-`profile export` bundle 版本为 3；旧 bundle 里带旧 auth 的条目在 `import` 时被拒绝并提示用 basic 重建。
+`profile export` bundle 版本为 3；旧 bundle 里带旧 auth 的条目在 `import` 时被拒绝并提示用 basic 重建。`import` 同样会归一化 URL、校验 profile 名。
 
 ## Options（add / set 共用）
 
-- `--url <url>`: SAP 系统 URL
+- `--url <url>`: SAP 系统 URL（只保留 origin；带 path/query 会归一化并告警）
 - `-c, --client <client>`: SAP 客户端号
 - `-u, --username <user>`: SAP 用户名
 - `-l, --language <lang>`: SAP 语言
 - `-p, --password <password>`: 密码（写 keychain；add 时建议必给）
 - `--insecure`: 跳过 SSL 证书校验（开发环境）
 - `--ca <path>`: PEM CA 证书路径（被导入到 `~/.abap-cli/certificates/<sha256>.pem`，profile 只保留规范路径，详见下文）
-- `--schema`: 打印本命令参数 schema（unified envelope，本地调用）
+- `--schema`: 子命令参数 schema（`abap profile <command> --schema --json`；parent 的 `abap profile --schema` 仍是扁平总览）
 
 `set` 额外支持：`--remove-password`（删 keychain 凭证）、`--clear-ca`（移除 CA 设置）。
 
@@ -72,12 +79,14 @@ abap profile add <name> --url <url> --username <user> --password '<pwd>'
 - **裸 `abap profile`** 打印子命令 help（exit 0）
 - **`add` 已存在** → `CONFIG_ERROR`（exit 3），提示 `set` 或 `delete` 后重建
 - **`add`/`set` 无字段选项 + 非 TTY** → `USAGE`（exit 2）
+- **`add` 不连接、不验证密码**：`data.verified: false` + `nextSteps`（`profile test` → `init --profile`）；连通性由 `profile test` 负责
 - **`set` 改密码**：`--password` 与 `--remove-password` 互斥 → `INVALID_ARGUMENT`
 - **`--ca` 与 `--clear-ca` 互斥** → `INVALID_ARGUMENT`；PEM 格式不对 / 源文件不存在 → `INVALID_ARGUMENT` / `CONFIG_ERROR`
 - **历史 auth profile**：`show` 返回 `unsupportedAuth`；`test` 与所有连接类命令报 `CONFIG_ERROR` + 迁移 `nextSteps`（不会静默按 basic 连接）
 - **`test` 分层退出码**：最差层决定退出码（TLS→4、AUTH→5、ADT/ICF→6），但各层结果都返回（部分结果，非崩溃）
 - **`delete` 非 TTY 无 `--yes`** → `VALIDATION_ERROR`（exit 7）；`--json` 返回 `passwordCleaned` / `caOrphanRemoved`
-- **textpool 能力探测（014）**：add/set 时一次性非阻断探测 ADT text-elements 读写能力并缓存到 profile（`adtTextpool`，落盘 `~/.abap-cli/systems.json`）——textpool 操作据此选路由，无运行时回退。`adtTextpool.write: false` 表示写路由到 ICF `/textpool/*`，而该 POST 在无 ADT 写端点的 release 上是 stub（`TEXTPOOL_WRITE_UNSUPPORTED`，A4H 实测）；读不受影响。
+- **textpool 能力探测**：由 `abap init` 针对**目标 profile** 一次性探测 ADT text-elements 读写能力并缓存（`adtTextpool`，落盘 `~/.abap-cli/systems.json`）——textpool 操作据此选路由，无运行时回退。探测未连上系统时**不落盘**（避免把网络故障固化成 read/write=false）。`adtTextpool.write: false` 表示写路由到 ICF `/textpool/*`，而该 POST 在无 ADT 写端点的 release 上是 stub（`TEXTPOOL_WRITE_UNSUPPORTED`，A4H 实测）；读不受影响。
+
 - **ADT runtime cache（034）**：`profile test` 在 adt layer 成功时主动探测 ADT runtime tier + API capabilities 并缓存到 `systems[].runtime: { tier, icfSetupBlocked, source, apiCapabilities: { icf, httpService, steampunkMarkers? }, probedAt }`。`deploy` 优先读 cache，缺时再 `probeAdtRuntime`。`profile test --json` 本身不变（runtime 仍只在 adt 路径内部缓存）。
 - **`use` 已移除**：绑定工作区用 `abap init --profile <name>`
 
@@ -119,14 +128,18 @@ abap profile import profiles.json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap profile add", "version": "0.2.0", "timestamp": "2026-08-17T00:00:00.000Z", "durationMs": 210, "warnings": [] },
+  "meta": { "command": "abap profile add", "version": "1.1.0", "timestamp": "2026-10-31T00:00:00.000Z", "durationMs": 210, "warnings": [] },
   "data": {
     "system": { "name": "dev", "url": "https://sap:44300", "client": "100", "username": "DEV", "language": "EN" },
     "passwordUpdated": true,
-    "passwordRemoved": false
+    "passwordRemoved": false,
+    "verified": false,
+    "nextSteps": ["abap profile test dev", "abap init --profile dev"]
   }
 }
 ```
+
+粘贴带 path 的 URL 时 `meta.warnings` 会多一条 `URL_NORMALIZED`（`url` 只保留 origin）。
 
 `test` 输出四层结果：
 

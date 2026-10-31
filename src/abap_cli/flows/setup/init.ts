@@ -4,7 +4,8 @@ import { confirm, isCancel, select, text, password } from '@clack/prompts';
 import { getPassword, storePassword } from '../../config/secrets.js';
 import { getSystem, listSystemNames, type SystemProfile } from '../../config/user-config.js';
 import { upsertProfileWithPems } from '../../config/profile-pems.js';
-import { assertSupportedAuth } from '../../config/validation.js';
+import { assertSupportedAuth, assertValidProfile, assertValidProfileName, normalizeProfileUrl } from '../../config/validation.js';
+import { writeProjectConfig } from '../../config/project-config.js';
 import { CliError, printResult, type OutputMode } from '../../output/json.js';
 import { collectWarning } from '../../output/meta.js';
 import { toOutputPath } from '../../core/path-output.js';
@@ -12,16 +13,12 @@ import { probeSystem, type ProbeLayerResult } from '../../clients/probe.js';
 import { checkIcfDeployment, ICF_SERVICE_VERSION, type IcfDeploymentInfo } from '../../clients/icf-version.js';
 import { probeTextpoolCapability, recordCapability } from '../../clients/textpool-capability.js';
 
-interface WorkspaceConfig {
-  system: string;
-  transport: string;
-  package: string;
-}
-
 export interface CollectedConfig extends SystemProfile {
   password: string;
   transport: string;
   pkg: string;
+  /** Base directory for `push --all` style scans; written to .abap.json. */
+  sourceDir?: string;
 }
 
 export type CommandOpts = Record<string, string | boolean | undefined>;
@@ -47,11 +44,21 @@ export function transportFromOpts(opts: CommandOpts): string {
 
 /** Save profile to user config + password to keychain. */
 export async function saveProfile(name: string, profile: SystemProfile, password: string, mode: OutputMode): Promise<void> {
+  assertValidProfileName(name);
+  assertValidProfile(profile);
+  const normalized = normalizeProfileUrl(profile.url);
+  if (normalized.dropped.length > 0) {
+    collectWarning(
+      'URL_NORMALIZED',
+      `URL normalized to '${normalized.url}' — dropped ${normalized.dropped.join(', ')} (the ADT client appends its own resource paths).`,
+    );
+  }
+  const storedProfile: SystemProfile = { ...profile, url: normalized.url };
   // Import any local CA path into the content-addressed store before the
   // write, then reclaim whatever the previous profile version dropped. This is
   // the single write path for `init`, so `--ca` behaves the same here as in
   // `profile add/set`.
-  upsertProfileWithPems(name, getSystem(name), profile);
+  upsertProfileWithPems(name, getSystem(name), storedProfile);
   // Only persist the password when it's non-empty — an empty password must NOT
   // clobber whatever the wizard/`profile add` stored earlier.
   if (password.length > 0) {
@@ -61,10 +68,11 @@ export async function saveProfile(name: string, profile: SystemProfile, password
   if (!mode) console.log(`System profile '${name}' saved. Password stored securely in OS keychain.`);
 }
 
-/** informational capability probe — never blocks init. */
+/** informational capability probe — never blocks init; only reached systems persist. */
 async function recordCapabilityIfPossible(name: string): Promise<void> {
   try {
-    const cap = await probeTextpoolCapability();
+    const cap = await probeTextpoolCapability(name);
+    if (!cap.reached) return;
     await recordCapability(name, cap);
   } catch {
     // informational — the profile simply has no adtTextpool record
@@ -111,19 +119,21 @@ export function validateInputs(config: CollectedConfig): void {
   }
 }
 
-/** Write workspace config referencing a user-level system profile */
+/** Write workspace config referencing a user-level system profile.
+ *  Merges into an existing .abap.json: keys this command does not own (e.g. a
+ *  previously configured sourceDir) are preserved. */
 export async function writeConfig(systemName: string, config: CollectedConfig, mode: OutputMode): Promise<void> {
   const cwd = process.cwd();
-
-  const workspaceConfig: WorkspaceConfig = {
-    system: systemName,
-    transport: config.transport,
-    package: config.pkg,
-  };
-  const configPath = path.join(cwd, '.abap.json');
-  fs.writeFileSync(configPath, JSON.stringify(workspaceConfig, null, 2) + '\n', 'utf-8');
-  if (!mode) console.log(`Created ${toOutputPath(configPath)}`);
-
+  await writeProjectConfig(
+    {
+      systemName,
+      package: config.pkg,
+      transport: config.transport,
+      ...(config.sourceDir !== undefined ? { sourceDir: config.sourceDir } : {}),
+    },
+    { cwd },
+  );
+  if (!mode) console.log(`Created ${toOutputPath(path.join(cwd, '.abap.json'))}`);
   if (!mode) console.log('Workspace initialized.');
 }
 
@@ -145,6 +155,7 @@ export function outputJson(
     },
     transport: config.transport,
     package: config.pkg,
+    ...(config.sourceDir ? { sourceDir: config.sourceDir } : {}),
     ...(probe ?? {}),
     ...(icf ? { icf } : {}),
   };
@@ -218,16 +229,99 @@ export async function runInitFromOpts(opts: CommandOpts, mode: OutputMode): Prom
     await createSystemFromParams(opts, mode);
   } else if (profileName) {
     await useExistingSystem(profileName, opts, mode);
+  } else if (Object.keys(collectFieldUpdates(opts)).length > 0) {
+    // Field-only update: keep the current binding, merge the provided defaults.
+    await updateWorkspaceFields(collectFieldUpdates(opts), mode);
   } else {
     throw new CliError(
       'USAGE',
-      'Non-interactive environment detected. Provide --profile:\n  abap init --profile <name>',
+      'Non-interactive environment detected. Provide --profile, or field updates (--tr / --package / --source-dir):\n' +
+      '  abap init --profile <name>\n' +
+      '  abap init --tr <request> --package <package>',
       {
-        nextSteps: ["Run 'abap init --profile <name>' to reference an existing profile."],
+        nextSteps: [
+          "Run 'abap init --profile <name>' to bind an existing profile.",
+          "Or update workspace defaults: 'abap init --package <pkg> --yes'.",
+        ],
         example: 'abap init --profile dev --yes',
       },
     );
   }
+}
+
+/** Field updates that only touch .abap.json (no profile change). */
+function collectFieldUpdates(opts: CommandOpts): { transport?: string; package?: string; sourceDir?: string } {
+  const updates: { transport?: string; package?: string; sourceDir?: string } = {};
+  if (opts.tr !== undefined) updates.transport = transportFromOpts(opts);
+  if (opts.package !== undefined) updates.package = str(opts.package);
+  if (opts.sourceDir !== undefined) updates.sourceDir = str(opts.sourceDir);
+  return updates;
+}
+
+/** Nearest .abap.json parsed as a plain object (empty when absent/unparseable). */
+function readExistingWorkspaceConfig(): Record<string, unknown> {
+  const configPath = findNearestWorkspaceConfig();
+  if (!configPath) return {};
+  try {
+    const parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function stringField(source: Record<string, unknown>, key: string): string {
+  const value = source[key];
+  return typeof value === 'string' ? value : '';
+}
+
+function optionalStringField(source: Record<string, unknown>, key: string): string | undefined {
+  const value = source[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
+/** Merge --tr / --package / --source-dir into the nearest .abap.json. */
+async function updateWorkspaceFields(
+  updates: { transport?: string; package?: string; sourceDir?: string },
+  mode: OutputMode,
+): Promise<void> {
+  const configPath = findNearestWorkspaceConfig();
+  if (!configPath) {
+    throw new CliError(
+      'CONFIG_ERROR',
+      'No .abap.json found (searched cwd and parent directories up to the git boundary).',
+      {
+        nextSteps: ["Bind a profile first: 'abap init --profile <name> --yes'."],
+        example: 'abap init --profile dev --yes',
+      },
+    );
+  }
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new CliError('CONFIG_ERROR', `Cannot parse ${toOutputPath(configPath)}: ${message}.`, { file: toOutputPath(configPath) });
+  }
+  const system = typeof parsed.system === 'string' ? parsed.system : '';
+  if (!system) {
+    throw new CliError(
+      'CONFIG_ERROR',
+      'The workspace .abap.json has no system binding; field updates need one.',
+      {
+        nextSteps: ["Bind a profile: 'abap init --profile <name> --yes'."],
+        example: 'abap init --profile dev --yes',
+      },
+    );
+  }
+  await writeProjectConfig({ systemName: system, ...updates }, { cwd: process.cwd() });
+  const display = {
+    configPath: toOutputPath(path.relative(process.cwd(), configPath)) || '.abap.json',
+    system,
+    ...updates,
+  };
+  const human = `Updated ${display.configPath} (${Object.keys(updates).join(', ')}).`;
+  printResult(mode, display, human);
 }
 
 /** `abap init` (TTY wizard). Replaces the legacy `runConfigWizard`. */
@@ -282,6 +376,7 @@ export async function runInitWizard(opts: CommandOpts, mode: OutputMode): Promis
 
   config.transport = transportFromOpts(opts) || (orCancel(await text({ message: 'Transport request (optional)' }))) || '';
   config.pkg = str(opts.package) || (orCancel(await text({ message: 'Default package (optional)' }))) || '';
+  config.sourceDir = str(opts.sourceDir) || undefined;
 
   validateInputs(config);
   await handleFileOverwrite(opts.yes === true || opts.nonInteractive === true ? 'overwrite' : 'prompt');
@@ -404,12 +499,16 @@ async function useExistingSystem(
   assertSupportedAuth(profileName, profile);
 
   const password = await resolvePassword(profileName, str(opts.password) || undefined);
+  const existing = readExistingWorkspaceConfig();
 
   const config: CollectedConfig = {
     ...profile,
     password,
-    transport: transportFromOpts(opts),
-    pkg: str(opts.package) || '',
+    // Re-binding preserves workspace defaults unless the flag is explicit —
+    // matching the documented "merge, not replace" behavior.
+    transport: opts.tr !== undefined ? transportFromOpts(opts) : stringField(existing, 'transport'),
+    pkg: opts.package !== undefined ? str(opts.package) : stringField(existing, 'package'),
+    sourceDir: opts.sourceDir !== undefined ? str(opts.sourceDir) : optionalStringField(existing, 'sourceDir'),
   };
 
   if (!config.password) {
@@ -483,6 +582,7 @@ async function createSystemFromParams(opts: CommandOpts, mode: OutputMode): Prom
     password,
     transport: transportFromOpts(opts) || process.env.SAP_TRANSPORT || '',
     pkg: str(opts.package) || process.env.SAP_PACKAGE || '',
+    sourceDir: str(opts.sourceDir) || undefined,
   };
   validateInputs(config);
 

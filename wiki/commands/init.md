@@ -56,14 +56,14 @@ abap init --agent agents|copilot|claude|cursor|generic [--force]
 ## 行为规则
 
 - **非 TTY 裸 `abap init`**（无任何 flag）→ `USAGE`（exit 2）——Agent-First：不挂起等输入
+- **非交互字段更新**：只给 `--tr` / `--package` / `--source-dir` 时更新最近的 `.abap.json`，**不需要 `--profile`**；未传的键保留（merge）。无 `.abap.json` 或其中无 `system` → `CONFIG_ERROR`（exit 4）
 - **非交互 + 直连参数** → `VALIDATION_ERROR`（exit 7）：init 不创建 profile，提示 `abap profile add`
 - **profile 不存在** → `NOT_FOUND`（exit 8）+ 提示 `abap profile add`
 - **`--agent` 独立运行**：不碰 `.abap.json`，可对已初始化目录补装；非法值 → `USAGE`
 - **`--show-config` 无 `.abap.json`** → `CONFIG_ERROR`（exit 4）+ 提示 `abap init --profile <name> --yes`
-- **`--unset-*` 非 TTY 无 `--yes`** → `VALIDATION_ERROR`（exit 7）
-- **`--unset-*` 无 `.abap.json`** → `CONFIG_ERROR`（exit 4）
-- **已存在 `.abap.json` 的首次绑定**：merge 已有字段（用户传的字段覆盖，未传的保留）；`--yes` 跳过确认，否则 `FILE_EXISTS`（exit 3 类）
-- **ICF 部署检查**（信息性，不阻断）：`data.icf` 四态 `not_deployed` / `current` / `outdated` / `unreachable`；`unreachable` 降级为 `meta.warnings` 条目
+- **`--unset-*` 非 TTY 无 `--yes`** → `VALIDATION_ERROR`（exit 7）；无 `.abap.json` → `CONFIG_ERROR`（exit 4）
+- **绑定 / 更新 `.abap.json` 一律 merge**：未传的键（含 `sourceDir`）保留；`--profile` 重绑时未传的 `transport`/`package`/`sourceDir` 沿用旧值，显式传值才覆盖（传空字符串即清空）
+- **`--profile` 解析后会自动探测 ICF 部署**（信息性，不阻断）：`data.icf` 四态 `not_deployed` / `current` / `outdated` / `unreachable`；`unreachable` 降级为 `meta.warnings` 条目
 
 ## Agent Scaffold Matrix
 

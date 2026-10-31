@@ -6,9 +6,34 @@
 
 ## [Unreleased]
 
+加固 `abap profile add/set/import` 的输入契约，并修复 `abap init` 字段更新与写盘行为。含 breaking 变更（profile 名规则），见 Migration。
+
 ### Added
 
 - **`abap init --agent agents`**：`--agent` 新增 vendor 中立的 `agents` 目标，把 6 个 skill 与 `abap-developer` agent 定义装进 `.agents/` 目录；输出与 `generic` 相同，未绑定某个厂商 IDE 时用它即可。
+- **profile 子命令机器契约**：`abap profile <command> --schema --json` 返回该子命令自己的参数与选项，不再依赖把 add/set/export 选项混在一起的父级总览。
+- **profile 列表更可读**：`abap profile list` 显示 client / language，并标出当前工作区绑定的 profile 与缓存的系统信息；`profile add` 明确返回"未验证"与下一步（`profile test` → `init --profile`）。
+
+### Changed
+
+- **URL 一律归一化到 origin**：`profile add/set/import` 与 `init` 建 profile 时，粘贴的 Fiori/WebGUI/深链接只保留 `scheme://host[:port]`，丢弃 path/query/fragment 并给出告警；URL 内嵌用户名密码直接拒绝。此前带 path 的 URL 会被原样保存，后续所有请求都会 404。
+- **`abap init` 支持非交互字段更新**：`abap init --tr/--package/--source-dir --yes` 不需要 `--profile`，直接更新最近的 `.abap.json`；写入改为 merge，未传的字段（含 `sourceDir`）保留，不再整份覆盖。
+- **profile 名规则**：名称需 1–64 字符、字母/数字/`_`/`.`/`-` 且以字母或数字开头（名称同时是配置键与 keychain 账号）。
+
+### Fixed
+
+- **`profile add` 的 textpool 探测用错连接**：此前用当前工作区的连接去探测刚创建的 profile，可能把别的系统的能力结论写进新 profile；现在由 `abap init` 针对目标 profile 探测，且连不上时不写结论。
+- **交互式 `profile add` 可能写出坏配置**：URL 直接回车会写入空 URL，导致整份 profile 配置无法读取；现在向导落盘前与参数路径使用同一套校验。
+- **`abap init` 覆盖 `.abap.json` 丢失 `sourceDir`**：字段更新与 profile 重绑现在都保留未传字段。
+
+### Removed (breaking)
+
+- **含空格、斜杠等字符的 profile 名不再接受**：`profile add/set/import` 会拒绝非法名称。既有 profile 仍可读取、连接与删除，但无法再 `set` 或导出后重新导入。
+
+**Migration**：
+
+- 旧 profile 名含空格/斜杠等字符时，用 `abap profile delete <name>` 后以合法名称重新 `abap profile add`（密码需要重新写入 keychain）；工作区 `.abap.json` 的 `system` 用 `abap init --profile <新名>` 重新绑定。
+- 旧 profile 里保存了带 path/query 的 URL 时，执行 `abap profile set <name> --url https://host:port` 修正。
 
 ## [1.1.0] - 2026-10-31
 

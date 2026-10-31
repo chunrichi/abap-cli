@@ -779,6 +779,11 @@ abap profile <command> [options]
   ```bash
   abap profile export --file profiles.json
   ```
+- Inspect a subcommand schema
+
+  ```bash
+  abap profile add --schema
+  ```
 
 ## `abap doctor`
 

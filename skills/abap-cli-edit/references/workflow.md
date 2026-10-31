@@ -201,7 +201,7 @@ abap pull ZCL_FOO --textpool
 abap push src/zcl_foo.clas.texts.en.properties
 ```
 
-**可用性检查**：`profile add/set` / `abap init` 时**一次探测**并缓存 textpool 读写能力到 profile 的 `adtTextpool`（`~/.abap-cli/systems.json`）；`adtTextpool.write: false` 表示写会路由到 ICF `/textpool/*`，而自带 ICF handler 对 textpool POST **无条件**返回 `TEXTPOOL_WRITE_UNSUPPORTED`（不是可重试的运行时故障）。
+**可用性检查**：`abap init` 针对目标 profile **一次探测**并缓存 textpool 读写能力到 `adtTextpool`（`~/.abap-cli/systems.json`；系统连不上时不缓存，避免把故障固化成能力结论）；`adtTextpool.write: false` 表示写会路由到 ICF `/textpool/*`，而自带 ICF handler 对 textpool POST **无条件**返回 `TEXTPOOL_WRITE_UNSUPPORTED`（不是可重试的运行时故障）。
 
 **选择屏幕文本的变通做法（A4H 实测）**：`TEXT-xxx` / 选择文本无法通过 CLI 定义时，用 `SELECTION-SCREEN COMMENT <pos>(<len>) lbl_xxx` 声明字段标签，并在 `INITIALIZATION` 里给 `lbl_xxx` 赋值。
 

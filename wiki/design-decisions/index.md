@@ -27,6 +27,7 @@ changed at: 2026-10-31 18:06:00
 | [011](011-macos-keychain-native-backend.md) | macOS keychain 默认走原生 security 后端 | 条目由 Apple 签名的 `/usr/bin/security` 创建，ACL 稳定、不再弹授权窗；keytar 降为回退 |
 | [012](012-icf-dev-global-release-merged.md) | ICF 服务开发期全局类树 / 发布期合并单类 | `abap/src` 按全局类维护（20 个），`abap/deploy.json` 是清单；`abap deploy` 推送前把 helper 降级为 `lcl_*` 合并进 handler，SAP 上只装 3 个全局类；`--dev` 装开发形态 |
 | [013](013-github-issues-feedback.md) | 反馈改走 GitHub Issues，删除自建反馈服务 | 删除 `abap feedback` 与自建 issue HTTP 契约；agent 用 GitHub MCP / `gh` / token / 预填 URL 提 issue，离线留档仍用 `report-stuck` |
+| [014](014-profile-input-hardening.md) | profile 输入在写入前归一化与校验 | URL 只存 origin、profile 名限字符集、交互/参数同一套校验、textpool 探测定向、`init` 字段更新走 merge |
 
 ## 阅读顺序建议
 
@@ -39,6 +40,7 @@ changed at: 2026-10-31 18:06:00
 - 改 keychain / 凭据存储：先读 [011](011-macos-keychain-native-backend.md)（历史认证背景见 [009](009-basic-auth-only.md)）
 - 改内置 ICF 服务的源码布局 / deploy 形态：先读 [012](012-icf-dev-global-release-merged.md)
 - 改反馈链路 / 反馈文档：先读 [013](013-github-issues-feedback.md)
+- 改 profile / init 的输入与配置写入：先读 [014](014-profile-input-hardening.md)（认证边界见 [009](009-basic-auth-only.md)）
 
 # references
 
