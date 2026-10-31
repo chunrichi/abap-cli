@@ -1,5 +1,5 @@
 /**
- * T3.1 — `renderSourceMetadata` (in pull-strategy.ts) projects sourceOrigin
+ * — `renderSourceMetadata` (in pull-strategy.ts) projects sourceOrigin
  * and sourceType for SRVD under `generalInformation` (per srvd-v1.json),
  * not at the top level as DDLS does.
  */
@@ -15,7 +15,7 @@ const baseMeta: ObjectMetadata = {
   sourceType: 'definition',
 };
 
-describe('renderSourceMetadata for SRVD (T3.1)', () => {
+describe('renderSourceMetadata for SRVD', () => {
   it('nests sourceOrigin + sourceType under generalInformation', () => {
     const result = renderSourceMetadata('SRVD', baseMeta, 'SRVD/SD');
     expect(result).not.toHaveProperty('sourceOrigin');

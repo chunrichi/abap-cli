@@ -1,7 +1,7 @@
 /**
  * TTYP create flow — dual-channel (ADT preferred, ICF fallback on ECC).
  *
- * Spec 036 US3 mirrors the create_ddic read → validate → POST shape but ships
+ * mirrors the create_ddic read → validate → POST shape but ships
  * only the AFF nested form. `channel-detect` picks the transport; ADT is
  * canonical, ICF only on older kernels.
  */

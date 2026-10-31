@@ -138,7 +138,7 @@ describe('P0 — output-path normalization (Windows / cross-platform path contra
       expect(toRelativeOutputPath(parent)).toBe('../outside/foo.abap');
     });
 
-    it('honours an explicit cwd that differs from process.cwd()', () => {
+    it('honours an explicit cwd that differs from process.cwd', () => {
       const abs = path.join(cwd, 'proj', 'src', 'foo.abap');
       expect(toRelativeOutputPath(abs, path.join(cwd, 'proj'))).toBe('src/foo.abap');
     });
@@ -152,7 +152,7 @@ describe('P0 — output-path normalization (Windows / cross-platform path contra
       expect(toRelativeOutputPath(winAbs)).not.toMatch(/\\/);
     });
 
-    it('falls back to the POSIX absolute path when relative() is empty', () => {
+    it('falls back to the POSIX absolute path when relative is empty', () => {
       const abs = path.resolve(cwd);
       expect(toRelativeOutputPath(abs)).toBe(toOutputPath(abs));
     });

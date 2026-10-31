@@ -34,4 +34,4 @@
 
 ## JSON 输出契约参考
 
-- 契约规范：见本仓库 `wiki/json-generation.md`（POSIX 路径是该契约的一部分）
+- `--json` 中的路径字段统一使用 `/` 分隔（POSIX 风格），不随运行平台变化；以 `abap <cmd> --schema --json` 为准。

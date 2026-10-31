@@ -1,11 +1,11 @@
 /**
- * Spec 036 US1: 12-cell decision matrix + 4-shape kernelRelease parser.
+ * 12-cell decision matrix + 4-shape kernelRelease parser.
  *
  * 4 profiles × 3 subjects (TTYP/MSAG/DDLS) = 12 cases. Each case asserts
  * the byte-level `{ channel, fallbackReason? }` shape so the agent / runtime
  * cannot drift silently if channel-detect becomes a multi-file module.
  *
- * Spec SC-008 requires the suite to run in < 500 ms; the cache is process-
+ * Spec requires the suite to run in < 500 ms; the cache is process-
  * local and reuses a Map between cases (clearChannelCache() flips state).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -106,7 +106,7 @@ describe('detectChannel (12-cell decision matrix)', () => {
   });
 });
 
-describe('detectChannel error envelopes (US1-AS5)', () => {
+describe('detectChannel error envelopes', () => {
   it('throws CHANNEL_DETECTION_FAILED when the profile is completely empty', () => {
     try {
       detectChannel({}, 'ttyp');
@@ -134,7 +134,7 @@ describe('detectChannel error envelopes (US1-AS5)', () => {
   });
 });
 
-describe('detectChannel performance (SC-008)', () => {
+describe('detectChannel performance', () => {
   it('runs the 12-cell matrix in well under 500 ms', () => {
     const start = performance.now();
     const profiles: SystemProfile[] = [ECC_75, ECC_75_NOT, ECC_74, ECC_EHP6, S4, { kernelRelease: '793' }];

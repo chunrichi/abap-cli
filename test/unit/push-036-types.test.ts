@@ -1,6 +1,6 @@
 /**
- * Spec 036 T036-012 / T036-023 / T036-034 + SC-007: push flows for the three
- * channel-routed types. Covers ADT update, ICF fallback, spec-035
+ * / / +: push flows for the three
+ * channel-routed types. Covers ADT update, ICF fallback, and more
  * OBJECT_NOT_FOUND semantics, and the DDLS sourceType cross-check.
  */
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
@@ -94,7 +94,7 @@ async function fresh() {
   clearChannelCache();
 }
 
-describe('runPushTtyp (036 US2)', () => {
+describe('runPushTtyp', () => {
   it('locks, updates and unlocks via ADT', async () => {
     await fresh();
     const { runPushTtyp } = await import('../../src/abap_cli/flows/edit/push-ttyp.js');
@@ -108,7 +108,7 @@ describe('runPushTtyp (036 US2)', () => {
     expect(adtUnlock).toHaveBeenCalledWith('/sap/bc/adt/ddic/tabletypes/ZMY_TTYP', 'LH1');
   });
 
-  it('reports OBJECT_NOT_FOUND instead of creating the object (spec 035)', async () => {
+  it('reports OBJECT_NOT_FOUND instead of creating the object', async () => {
     await fresh();
     adtGetTtyp.mockRejectedValueOnce(new Error('404'));
     const { runPushTtyp } = await import('../../src/abap_cli/flows/edit/push-ttyp.js');
@@ -177,7 +177,7 @@ describe('runPushTtyp (036 US2)', () => {
   });
 });
 
-describe('runPushMsag (036 US3)', () => {
+describe('runPushMsag', () => {
   it('locks, updates and unlocks via ADT', async () => {
     await fresh();
     const { runPushMsag } = await import('../../src/abap_cli/flows/edit/push-msag.js');
@@ -223,7 +223,7 @@ describe('runPushMsag (036 US3)', () => {
   });
 });
 
-describe('runPushDdls (036 US4)', () => {
+describe('runPushDdls', () => {
   function writeDdls(sourceType = 'viewEntity', source = DDLS_SOURCE): string {
     const file = path.join(cwd, 'zmy_ddls.ddls.json');
     fs.writeFileSync(file, JSON.stringify({ ...DDLS_DOC, sourceType }, null, 2));

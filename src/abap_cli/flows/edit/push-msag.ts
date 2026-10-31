@@ -1,5 +1,5 @@
 /**
- * Spec 036 US3 + spec 035: MSAG push.
+ * +: MSAG push.
  */
 import * as path from 'node:path';
 import { AdtClientWrapper } from '../../clients/adt-client.js';

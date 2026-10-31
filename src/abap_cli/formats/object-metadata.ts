@@ -13,7 +13,7 @@ import type { ObjectMetadata } from './object-parts.js';
  *   - INTF: `category` (7 enum values) + `proxy` + `descriptions`.
  *
  * `header.abapLanguageVersion` is emitted only for CLAS / INTF (PROG must not
- * carry it — that was a T1.2 spec change relative to the pre-0.3.0 renderer).
+ * carry it — that was a spec change relative to the pre-0.3.0 renderer).
  */
 export function renderObjectMetadataJson(metadata: ObjectMetadata): string {
   const primary = metadata.objectType?.split('/')[0]?.toUpperCase();

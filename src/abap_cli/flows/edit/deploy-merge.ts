@@ -53,7 +53,7 @@ const MAX_OBJECT_NAME_LENGTH = 30;
 const MAX_LOCAL_NAME_LENGTH = 30;
 
 /* -------------------------------------------------------------------------- */
-/* Manifest parsing / validation                                              */
+/* Manifest parsing / validation */
 /* -------------------------------------------------------------------------- */
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -234,7 +234,7 @@ export async function loadDeployManifest(sourceDir: string): Promise<DeployManif
 }
 
 /* -------------------------------------------------------------------------- */
-/* Dev class source splitting                                                 */
+/* Dev class source splitting */
 /* -------------------------------------------------------------------------- */
 
 function mergeFailed(message: string, details: Record<string, unknown> = {}): CliError {
@@ -419,7 +419,7 @@ function splitDevClass(globalName: string, localName: string, rawMain: string): 
 }
 
 /* -------------------------------------------------------------------------- */
-/* Rename pass                                                               */
+/* Rename pass */
 /* -------------------------------------------------------------------------- */
 
 /**
@@ -443,7 +443,7 @@ function renameGlobals(text: string, merged: ReadonlyArray<{ global: string; loc
 }
 
 /* -------------------------------------------------------------------------- */
-/* Dependency ordering                                                        */
+/* Dependency ordering */
 /* -------------------------------------------------------------------------- */
 
 /** Collect `lcl_*` references from a (already renamed) class-pool fragment. */
@@ -547,7 +547,7 @@ function findDependencyCycle(locals: string[], dependencies: ReadonlyMap<string,
 }
 
 /* -------------------------------------------------------------------------- */
-/* Release merge                                                              */
+/* Release merge */
 /* -------------------------------------------------------------------------- */
 
 /**

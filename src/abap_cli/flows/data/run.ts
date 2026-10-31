@@ -56,7 +56,7 @@ export interface RunResult {
   /** true when dry-run path was used (no SAP call). */
   wouldRun?: boolean;
   /**
-   * S-7: SAP-side source identity for the class that just executed.
+   * SAP-side source identity for the class that just executed.
    *
    * Surfaced so callers can answer "which version of `className` did
    * `run` actually execute?". Without this, the only way to detect a
@@ -74,7 +74,7 @@ export interface RunResult {
   sourceFingerprint?: SourceFingerprint | null;
 }
 
-/** S-7: per-class fingerprint returned alongside the run output. */
+/** per-class fingerprint returned alongside the run output. */
 export interface SourceFingerprint {
   objectName: string;
   /** Always 'CLAS' for `abap run`; reserved for future `--report` paths. */
@@ -91,7 +91,7 @@ export interface SourceFingerprint {
   unavailable?: boolean;
 }
 
-/** 015: bundled wrapper class name (single source of truth). */
+/** bundled wrapper class name (single source of truth). */
 export const RUNNER_CLASS = 'ZCL_ABAP_VIBE_RUNNER';
 
 /** Class name regex — SAP class names (allow `~` for syntax check; rejected at runtime). */
@@ -203,7 +203,7 @@ function isLocalClass(name: string): boolean {
  */
 function mapClassrunCode(code: string | undefined): ErrorCode {
   if (!code) return 'SAP_ERROR';
-  // 015 new codes
+  // new codes
   switch (code) {
     case 'METHOD_FAILED':
     case 'METHOD_NOT_SUPPORTED':
@@ -223,7 +223,7 @@ function mapClassrunCode(code: string | undefined): ErrorCode {
       return 'METHOD_NOT_SUPPORTED';
     case 'LOCAL_CLASS_NOT_FOUND':
       return 'LOCAL_CLASS_NOT_RUNNABLE';
-    // 015 implicitly reuses these existing codes
+    // implicitly reuses these existing codes
     case 'AUTH_ERROR':
     case 'OBJECT_NOT_FOUND':
     case 'LOCKED':
@@ -287,7 +287,7 @@ export async function runRun(
   const adt = client ?? (await AdtClientWrapper.create());
 
 
-  // S-7: probe the inactive-objects endpoint before execution so the
+  // probe the inactive-objects endpoint before execution so the
   // fingerprint (returned alongside the run output) reflects the state
   // SAP saw when it dispatched the classrun. The endpoint is supported
   // on every modern NetWeaver release; the probe is wrapped in a
@@ -320,7 +320,7 @@ export async function runRun(
 }
 
 /**
- * S-7: ask ADT for the active-version fingerprint of `className`.
+ * ask ADT for the active-version fingerprint of `className`.
  *
  * Implementation: read `/sap/bc/adt/repository/inactiveobjects` and
  * locate the entry for this object's URL. The inactive-objects feed
@@ -476,7 +476,7 @@ export function interpret(
     });
   }
 
-  // Non-JSON text with exception markers → treat as SAP_ERROR (US-4 acceptance 2)
+  // Non-JSON text with exception markers → treat as SAP_ERROR
   if (parsed.parsed === null && looksLikeException(parsed.raw)) {
     const message = `classrun output looks like an exception (truncated): ${parsed.raw.slice(0, 200)}`;
     throw new CliError('SAP_ERROR', message, {
@@ -555,7 +555,7 @@ function nextStepsFor(code: ErrorCode, className: string, method: string | null)
 }
 
 /** Map a run-flow error code to the skill reference anchor that documents it.
- *  025 重构后：
+ * 重构后：
  *  - WRAPPER_NOT_DEPLOYED / AUTH_ERROR 由 abap-cli-setup 文档
  *    （deploy / profile test 修复路径）
  *  - 其他 run 错误（METHOD_FAILED / TIMEOUT / OBJECT_NOT_ACTIVE / WRAPPER_INPUT_UNAVAILABLE ...）

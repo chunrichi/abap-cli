@@ -21,7 +21,7 @@ vi.mock('../../src/abap_cli/config/secrets.js', () => ({
   deletePassword: vi.fn(),
 }));
 
-describe('connection export/import ()', () => {
+describe('connection export/import', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('export excludes passwords by default', async () => {

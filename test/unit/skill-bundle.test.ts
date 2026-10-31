@@ -3,16 +3,16 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'node:url';
 
-// --- Skill bundle structural audit (019-cli-skill-agent-bundle, FR7/FR8) ---
+// --- Skill bundle structural audit ---
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const skillsRoot = path.join(repoRoot, 'skills');
 const agentsRoot = path.join(repoRoot, 'agents');
 
-// CLI 命令清单（与 src/abap_cli/index.ts 的 LazyCommandSpec 对齐）
+// CLI 命令清单（与 src/abap_cli/registry/commands.ts 的 COMMAND_SPECS 对齐）
 const EXPECTED_COMMANDS = new Set([
-  'config', 'connection', 'doctor', 'transport',
-  'search', 'where-used', 'pull', 'push', 'check', 'create', 'activate', 'inspect', 'diff', 'status', 'sync',
+  'doctor', 'transport',
+  'search', 'where-used', 'pull', 'push', 'check', 'create', 'activate', 'inspect', 'diff', 'status',
   'select', 'run', 'tcode', 'deploy',
   // 'create local' 子命令特殊处理
 ]);
@@ -104,7 +104,7 @@ function getAllSkills(): SkillInfo[] {
   return listSkillDirs();
 }
 
-describe('skill bundle (019-cli-skill-agent-bundle) structural audit', () => {
+describe('skill bundle structural audit', () => {
   const skills = getAllSkills();
 
   it('discovers exactly 6 skills (meta + 5 领域/方法)', () => {
@@ -255,11 +255,11 @@ describe('skill bundle (019-cli-skill-agent-bundle) structural audit', () => {
   });
 });
 
-describe('skill bundle — size constraints (025 SC-004 / FR3)', () => {
+describe('skill bundle — size constraints', () => {
   const skills = getAllSkills();
-  // 025 SC-004: 各领域 skill ≤ 旧对应 skill 行数；meta skill 无对应旧 skill 但保持精简
+  // 各领域 skill ≤ 旧对应 skill 行数；meta skill 无对应旧 skill 但保持精简
   const MAX_SKILL_LINES: Record<string, number> = {
-      // 0.2.6 起：meta 多了 feedback / report-stuck（spec P3.3），edit 多了 mime / validate:aff / 19 类对象类型表 + 11 个 push stage，
+      // 0.2.6 起：meta 多了 feedback / report-stuck，edit 多了 mime / validate:aff / 19 类对象类型表 + 11 个 push stage，
       // 阈值放宽以容纳新增内容；详细命令速查下沉到 references/commands-quick.md（self-contained 不变）。
       'abap-cli': 180,
       'abap-cli-setup': 140,

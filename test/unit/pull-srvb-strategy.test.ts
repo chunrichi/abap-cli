@@ -1,5 +1,5 @@
 /**
- * T3.2 — `pull-strategy.ts#strategyFor` dispatches the Phase 3 types
+ * — `pull-strategy.ts#strategyFor` dispatches the types
  * to the right strategy:
  *   - SRVB → metadataOnlyStrategy (no source, only `<name>.srvb.json`)
  *   - SRVD / BDEF / DCLS / DDLX / DDLA → sourceObjectStrategy
@@ -78,7 +78,7 @@ const noopAdtClient = {
   serviceBinding: serviceBindingMock,
 };
 
-describe('strategyFor dispatch (T3.2)', () => {
+describe('strategyFor dispatch', () => {
   it('returns the metadata-only strategy for SRVB', async () => {
     const { strategyFor } = await loadStrategy();
     const strategy = strategyFor('SRVB');
@@ -91,7 +91,7 @@ describe('strategyFor dispatch (T3.2)', () => {
     expect(files[0]!.filename).toBe('zmy_binding.srvb.json');
   });
 
-  it('source-bearing Phase 3 types map to the .acds / .abdl extension', async () => {
+  it('source-bearing types map to the.acds /.abdl extension', async () => {
     const { sourceExtensionForObjectType } = await loadFileResolver();
     expect(sourceExtensionForObjectType('SRVD')).toBe('.acds');
     expect(sourceExtensionForObjectType('BDEF')).toBe('.abdl');
@@ -114,8 +114,8 @@ describe('strategyFor dispatch (T3.2)', () => {
   });
 });
 
-describe('SRVB end-to-end pull (T3.2)', () => {
-  it('writes the <name>.srvb.json file flat under <rootDir>/', async () => {
+describe('SRVB end-to-end pull', () => {
+  it('writes the <name>.srvb.json file flat under <rootDir>', async () => {
     const { pullObject } = await loadPullSource();
     const result = await pullObject(
       noopAdtClient as never,

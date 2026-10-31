@@ -23,7 +23,7 @@ export interface LazyCommandSpec {
   description: string;
   /**
    * Whether the command talks to SAP. Used by root --help to group commands
-   * under "Local Commands" / "SAP Commands" sections (P2.9). Defaults to 'sap'
+   * under "Local Commands" / "SAP Commands" sections. Defaults to 'sap'
    * so existing specs stay grouped with the SAP section unless explicitly
    * overridden.
    */
@@ -72,7 +72,7 @@ export function registerLazyCommands(program: Command, specs: LazyCommandSpec[])
     return dispatchHelp(subcommandName);
   };
 
-  // Root help (P2.9): append a "Local commands" section so the agent can see
+  // Root help: append a "Local commands" section so the agent can see
   // at a glance which commands don't need a SAP connection. The default
   // Commands: list above still shows every command; this section is a guide,
   // not a replacement.

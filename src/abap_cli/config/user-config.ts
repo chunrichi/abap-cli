@@ -28,13 +28,13 @@ export interface SystemProfile {
   unsupportedAuth?: string;
   /** SAP release recorded at connect time (diagnostics). */
   systemVersion?: string;
-  /** 034: optional system flavour tag — drives cookie reuse opt-in/out. */
+  /** optional system flavour tag — drives cookie reuse opt-in/out. */
   systemType?: 'on-prem' | 'cloud' | 'btp' | 'mock';
-  /** 034: session policy override at the profile level. */
+  /** session policy override at the profile level. */
   sessionPolicy?: 'reuse' | 'always-logout' | 'default';
-  /** ADT text-element capability recorded once at connect/init (Q1). */
+  /** ADT text-element capability recorded once at connect/init. */
   adtTextpool?: { read: boolean; write: boolean; checkedAt: string };
-  /** 034: Cached ADT runtime tier from the last successful `probeAdtRuntime` /
+  /** Cached ADT runtime tier from the last successful `probeAdtRuntime`
    *  `profile test`. Used by `deploy` to pick an ICF register
    *  strategy without re-probing the network. Refreshed by `profile test`
    *  and `init`. Absent on first use — `probeAdtRuntime` runs lazily. */

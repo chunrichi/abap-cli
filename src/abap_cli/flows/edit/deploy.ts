@@ -62,9 +62,9 @@ export interface DeploymentSummary {
   mergedClasses?: number;
   /** ICF node state after the setup step (absent when no setup ran). */
   icfNode?: DeployIcfNode;
-  /** 030: detected ADT runtime tier (steampunk / netweaver740 / netweaver750 / unknown). */
+  /** detected ADT runtime tier (steampunk / netweaver740 / netweaver750 / unknown). */
   runtime?: AdtRuntime;
-  /** 030: deploy kind — `full` on on-prem, `source-only` on Steampunk (no auto-SICF). */
+  /** deploy kind — `full` on on-prem, `source-only` on Steampunk (no auto-SICF). */
   deployKind?: 'full' | 'source-only';
 }
 
@@ -80,7 +80,7 @@ export interface DeployOptions {
   package?: string;
   /** Overridable for tests; defaults to the bundled abap/src directory. */
   sourceDir?: string;
-  /** 030: profile name for ADT runtime detection. Optional — when absent
+  /** profile name for ADT runtime detection. Optional — when absent
    *  the runtime falls back to 'unknown' and deploy uses on-prem behaviour. */
   profileName?: string;
 }
@@ -601,7 +601,7 @@ async function readObjectMetadata(
 }
 
 /* -------------------------------------------------------------------------- */
-/* Release form: merge dev global classes into the handler                    */
+/* Release form: merge dev global classes into the handler */
 /* -------------------------------------------------------------------------- */
 
 /** Path of `abap/deploy.json` (one level above the flat `abap/src` tree). */

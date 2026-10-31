@@ -25,7 +25,7 @@ function parseStdout(res: { stdout: string }) {
   return JSON.parse(res.stdout);
 }
 
-describe('abap search --schema (P0.1 introspection)', () => {
+describe('abap search --schema (introspection)', () => {
   it('prints the search schema as JSON without a query and without an SAP call', async () => {
     const program = makeProgram();
     registerSearchCommand(program);
@@ -53,7 +53,7 @@ describe('abap search --schema (P0.1 introspection)', () => {
     expect(limit).toMatchObject({ type: 'int', default: 20 });
   });
 
-  it('--page-all-max is documented as an int with the default page cap (P1.8)', async () => {
+  it('--page-all-max is documented as an int with the default page cap', async () => {
     const program = makeProgram();
     registerSearchCommand(program);
     const res = await runCommand(program, ['search', '--schema']);
@@ -62,7 +62,7 @@ describe('abap search --schema (P0.1 introspection)', () => {
     expect(cap).toMatchObject({ type: 'int', default: 50 });
   });
 
-  it('--schema output carries the reduced meta block (US-3, 025)', async () => {
+  it('--schema output carries the reduced meta block (U, 025)', async () => {
     const program = makeProgram();
     registerSearchCommand(program);
     const res = await runCommand(program, ['search', '--schema']);
@@ -90,7 +90,7 @@ describe('abap search --schema (P0.1 introspection)', () => {
   });
 });
 
-describe('abap create --schema (P0.1 introspection)', () => {
+describe('abap create --schema (introspection)', () => {
   it('prints the general create schema when no type is given', async () => {
     const program = makeProgram();
     registerCreateCommand(program);
@@ -127,7 +127,7 @@ describe('abap create --schema (P0.1 introspection)', () => {
     expect(createObject).not.toHaveBeenCalled();
   });
 
-  it('reports supported DDIC types (DOMA) as supported via ICF ', async () => {
+  it('reports supported DDIC types (DOMA) as supported via ICF', async () => {
     const program = makeProgram();
     registerCreateCommand(program);
     const res = await runCommand(program, ['create', '--schema', 'DOMA']);

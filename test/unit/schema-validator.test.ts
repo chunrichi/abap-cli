@@ -10,7 +10,7 @@ import {
 
 const MIRROR = path.join(process.cwd(), 'tmp', 'abap-file-formats', 'file-formats');
 
-describe('schema-validator (T033-002)', () => {
+describe('schema-validator', () => {
   beforeAll(() => {
     resetSchemaCache();
   });
@@ -125,7 +125,7 @@ describe('schema-validator (T033-002)', () => {
     expect(warnLine).toContain('unknown');
   });
 
-  // ----- T2.5 single-Map cache behaviour -----
+  // ----- single-Map cache behaviour -----
 
   it('repeated validateAff calls for the same type do not re-compile (timing)', async () => {
     resetSchemaCache();

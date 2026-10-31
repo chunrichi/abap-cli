@@ -1,6 +1,6 @@
 /**
  * SessionKey derivation + registry / signals / always-logout behaviour
- * (SC-007 e/f/g).
+ * (success criteria verified in the session-reuse suite).
  *
  * - PBKDF2 reference vector is stable across Node versions.
  * - `sessionKeyFromBase64` / `sessionKeyToBase64` round-trip.
@@ -74,7 +74,7 @@ describe('registry drain', () => {
     _resetSignalState();
   });
 
-  it('calls logout() on every registered ADT client exactly once', async () => {
+  it('calls logout on every registered ADT client exactly once', async () => {
     const a = { logout: vi.fn().mockResolvedValue(undefined) };
     const b = { logout: vi.fn().mockResolvedValue(undefined) };
     registerAdtClient(a as never);
@@ -87,14 +87,14 @@ describe('registry drain', () => {
     expect(a.logout).toHaveBeenCalledTimes(1);
   });
 
-  it('calls cleanup() on every registered ICF client', async () => {
+  it('calls cleanup on every registered ICF client', async () => {
     const a = { cleanup: vi.fn() };
     registerIcfClient(a as never);
     await drainClients({ adt: false, icf: true });
     expect(a.cleanup).toHaveBeenCalledTimes(1);
   });
 
-  it('tolerates a logout() that throws', async () => {
+  it('tolerates a logout that throws', async () => {
     const a = { logout: vi.fn().mockRejectedValue(new Error('network down')) };
     registerAdtClient(a as never);
     await expect(drainClients({ adt: true, icf: false })).resolves.toBeUndefined();

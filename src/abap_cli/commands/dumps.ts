@@ -48,7 +48,7 @@ export const DUMPS_SCHEMA: CommandSchema = {
     },
   ],
   exclusiveGroups: [],
-  globalOptions: ['--json', '--pretty-json', '--report-stuck'],
+  globalOptions: ['--json', '--pretty-json'],
   examples: [
     { description: 'List the most recent runtime dump summaries', command: 'abap dumps' },
     { description: 'Agent integration: restrict the result to five compact entries', command: 'abap dumps --limit 5 --json' },

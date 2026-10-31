@@ -1,7 +1,7 @@
 /**
  * DDIC wire/local type shapes shared by the DDIC format modules.
  *
- * Split out of the former 880-line `ddic/json.ts`: this module is types only,
+ * Split out of the former `ddic/json.ts`: this module is types only
  * so I/O (`io.ts`), wire mapping (`wire.ts`), validation (`validate.ts`) and
  * agent-facing examples (`examples.ts`) can depend on it without cycles.
  */
@@ -17,7 +17,7 @@ export interface DdicObject {
   [key: string]: unknown;
 }
 
-/** 014: local abap-file-format field representation (snake_case / nested). */
+/** local abap-file-format field representation (snake_case / nested). */
 export interface DdicFieldLocal {
   fieldName: string;
   rollname?: string;
@@ -30,15 +30,15 @@ export interface DdicFieldLocal {
   refTable?: string;
   refField?: string;
   checkTable?: string;
-  /** 024: TABL include/append target structure name (.INCLUDE / .INCLU--AP). */
+  /** TABL include/append target structure name (.INCLUDE /.INCLU--AP). */
   precField?: string;
-  /** 032 US6: TABL `.INCLUDE ... WITH SUFFIX <suffix>` suffix. */
+  /** TABL `.INCLUDE... WITH SUFFIX <suffix>` suffix. */
   includeSuffix?: string;
-  /** 032 US6: foreign-key entries for `@AbapCatalog.foreignKeys` block. */
+  /** foreign-key entries for `@AbapCatalog.foreignKeys` block. */
   foreignKeys?: Array<{ checkTable: string; label?: string }>;
 }
 
-/** 014: ICF wire representation (camelCase, transport envelope). */
+/** ICF wire representation (camelCase, transport envelope). */
 export interface DdicFieldWire {
   fieldName: string;
   rollname?: string;
@@ -51,12 +51,12 @@ export interface DdicFieldWire {
   refTable?: string;
   refField?: string;
   checkTable?: string;
-  /** 024: TABL include/append target structure name (.INCLUDE / .INCLU--AP). */
+  /** TABL include/append target structure name (.INCLUDE /.INCLU--AP). */
   precField?: string;
 }
 
 /**
- * T2.1: split `DdicWirePayload` into per-type wire interfaces so each
+ * split `DdicWirePayload` into per-type wire interfaces so each
  * DDIC variant (DOMA / DTEL / TABL settings) declares only the fields
  * its AFF schema actually carries. The legacy union `DdicWirePayload`
  * is preserved as a backward-compatible alias; new code should pick the
@@ -112,7 +112,7 @@ export interface DdicDtelWire {
       | 'referenceDictionaryType'
       | 'referenceClasIntType';
     typeName?: string;
-    /** Legacy 032 alias retained on the wire shape (not in AFF schema). */
+    /** Legacy alias retained on the wire shape (not in AFF schema). */
     referencedTypeName?: string;
     predefinedType?: { dataType?: string; length?: number; decimals?: number };
   };
@@ -175,12 +175,12 @@ export interface DdicTableSettingsWire {
 /**
  * @deprecated Use {@link DdicDomaWire} | {@link DdicDtelWire} | {@link DdicTableSettingsWire}
  * depending on the DDIC variant you are handling. Kept as a structural union
- * for backward compatibility with the pre-T2.1 single-interface contract.
+ * for backward compatibility with the pre- single-interface contract.
  */
 export type DdicWirePayload = DdicDomaWire | DdicDtelWire | DdicTableSettingsWire;
 
 /**
- * T2.1: type-level mapping from a DDIC variant code to its narrowed wire
+ * type-level mapping from a DDIC variant code to its narrowed wire
  * interface. Lets `localToWire<DOMA>(...)` / `wireToLocal<DTEL>(...)`
  * return / accept exactly the wire shape the AFF schema declares.
  */
@@ -189,7 +189,7 @@ export type WireForDdicType<T extends DdicSupportedType> =
   T extends 'DTEL' ? DdicDtelWire :
   DdicTableSettingsWire;
 
-/** 032 + 033: DOMA fixed-value wire shape. `description` is the AFF canonical
+/** +: DOMA fixed-value wire shape. `description` is the AFF canonical
  *  plain string; `fixedValueLong` is the legacy multi-language shape retained
  *  for backwards compatibility with objects that still use it. */
 export interface DdomaFixedValueWire {
@@ -201,7 +201,7 @@ export interface DdomaFixedValueWire {
   };
 }
 
-/** 033: DOMA fixed-value local shape. AFF canonical uses a plain string
+/** DOMA fixed-value local shape. AFF canonical uses a plain string
  *  description; legacy used a multi-language object. Both shapes are accepted
  *  on read; writers emit the AFF canonical plain string. */
 export interface DomaFixedValueLocal {

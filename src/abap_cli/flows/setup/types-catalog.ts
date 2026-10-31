@@ -1,7 +1,7 @@
 /**
  * Static catalog: CLI type code ↔ TADIR PGMID/OBJECT ↔ DDIC tabclass.
  *
- * Feedback S-5: callers had to learn "CLI HTTP is TADIR SICF" and
+ * Feedback: callers had to learn "CLI HTTP is TADIR SICF" and
  * "CLI STRU is TADIR TABL (distinguished by DD02L-TABCLASS=INTTAB)"
  * by trial and error. This module is the single source of truth so:
  *

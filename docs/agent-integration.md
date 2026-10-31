@@ -58,7 +58,7 @@ abap transport create "Feature work" --yes --json
 abap push src/zcl_demo.clas.abap --tr DEVK900123 --yes --json
 ```
 
-This closes the "no request → create → use with `--tr`" loop without touching SAP GUI (Constitution Principle VII, Dogfooding).
+This closes the "no request → create → use with `--tr`" loop without touching SAP GUI.
 
 ### 3. Detecting & fixing stale activation
 

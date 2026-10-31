@@ -62,22 +62,22 @@ export async function getObjectParts(
   return result.parts;
 }
 
-/** 014: DDIC types the CLI can create/pull via the ICF service.
- *  036-ttyp-msag-ddls: TTYP/MSAG reach ICF only via the channel-detect
+/** DDIC types the CLI can create/pull via the ICF service.
+ * TTYP/MSAG reach ICF only via the channel-detect
  *  fallback (not via this set — they default to ADT). Keep this set
  *  exclusively the four "ICF-only" DDIC types. */
 const DDIC_ICF_SUPPORTED = new Set(['DOMA', 'DTEL', 'TABL', 'STRU']);
 
-/** 036-ttyp-msag-ddls: types routed through channel-detect.
+/** types routed through channel-detect.
  *  These types prefer ADT but allow ICF fallback when the system profile
  *  reports an ECC release. Distinct from `DDIC_ICF_SUPPORTED` (which is
  *  ICF-only) — `ADT_ROUTED_TYPES` is "ICF optional". */
 const ADT_ROUTED_TYPES = new Set(['TTYP', 'MSAG', 'DDLS']);
 
-/** 022: object types the CLI can create/pull/push via the self-built ICF service. */
+/** object types the CLI can create/pull/push via the self-built ICF service. */
 const ICF_ROUTED_TYPES = new Set<string>([...DDIC_ICF_SUPPORTED, 'HTTP', 'TRAN']);
 
-/** 037 US3: union of all types the push validator should let through.
+/** union of all types the push validator should let through.
  *  Derived from `types/registry.ts` (the single source of truth) — every
  *  registered type, regardless of source. ADT-routed types (TTYP/MSAG/DDLS)
  *  reach the SAP via channel-detect rather than the legacy /ddic/<type>
@@ -89,7 +89,7 @@ const VALIDATED_ROUTE_TYPES = new Set<string>(
 );
 
 /**
- * 014/022: validate a local file before push. Source files are passed through;
+ * 014/: validate a local file before push. Source files are passed through
  * DDIC files for the four supported types (DOMA/DTEL/TABL/STRU), HTTP service
  * (.http.json), and Transaction code (.tran.json) are allowed through to the
  * matching ICF endpoint. TTYP/MSAG/DDLS share the .json extension but route

@@ -1,5 +1,5 @@
 /**
- * Spec 036 US4 + spec 035: DDLS push.
+ * +: DDLS push.
  *
  * Cross-validates the `.ddls.json` sourceType field against the .acds top
  * line (`define view entity ...` etc.). Mismatch → VALIDATION_ERROR.

@@ -1,10 +1,10 @@
 /**
- * Spec 036 T036-029: MSAG wire ↔ local byte-level zero-diff.
+ * MSAG wire ↔ local byte-level zero-diff.
  */
 import { describe, it, expect } from 'vitest';
 import { msagArtifact } from '../../src/abap_cli/formats/msag/json.js';
 
-describe('MSAG round-trip (036)', () => {
+describe('MSAG round-trip', () => {
   it('empty message class round-trips', () => {
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <mc:messageClass xmlns:mc="http://www.sap.com/adt/messageclass">

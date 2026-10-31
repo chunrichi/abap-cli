@@ -131,7 +131,7 @@ TYPES:
   END OF ty_field,
   tt_field TYPE STANDARD TABLE OF ty_field WITH EMPTY KEY.
 
-" 037 US1: AFF canonical wire shape. CLI sends nested payloads (DOMA
+" AFF canonical wire shape. CLI sends nested payloads (DOMA
 " `format.*`, DTEL `dataTypeInformation.*`, TABL/STRU `header.*` +
 " `generalInformation.*`); the handlers deserialize these into the
 " nested structs below. SAP-side single-side break: flat top-level
@@ -151,7 +151,7 @@ TYPES:
     allow_maintenance   TYPE abap_bool,
   END OF ty_tabl_general_information.
 
-  " P2.1: technical settings for apply_ddic_table_settings (TABT writeback).
+  " technical settings for apply_ddic_table_settings (TABT writeback).
   " Mirrors `tabt-v1.json#buffering` + `dbSpecificSettings`, plus the
   " apply-time fields (logChanges/translation) nested under
   " generalInformation but the plan flattens here for readability.
@@ -318,7 +318,7 @@ TYPES:
     key_flag   TYPE abap_bool,
   END OF ty_ddic_field_out_stru,
   tt_ddic_field_out_stru TYPE STANDARD TABLE OF ty_ddic_field_out_stru WITH EMPTY KEY,
-  " 037 US1: read-side payloads mirror AFF nested wire so the ICF client
+  " read-side payloads mirror AFF nested wire so the ICF client
   " can consume `format.*` / `dataTypeInformation.*` without remapping.
   BEGIN OF ty_ddic_get_doma_data,
     name        TYPE string,

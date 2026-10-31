@@ -8,7 +8,7 @@ abap-cli 用户的 AI agent 上下文集合。**自包含**——分发时每个
 
 | 路径 | 用途 | 谁用 | 随 npm 包分发？ |
 |---|---|---|---|
-| `.agents/skills/`（`abap-style` / `okf` / `abap-testing`） | 本仓库贡献者的本地元方法 | vibe_with_abap 开发者 | ❌（gitignored） |
+| `.agents/skills/`（`abap-style` / `abap-report-style` / `okf` / `abap-testing` / `repo-workflow`） | 本仓库贡献者的本地元方法 | vibe_with_abap 开发者 | ❌（gitignored） |
 | **顶层 `skills/`（本目录）** | **abap-cli 用户的路由/领域 skill** | **abap-cli 用户** | **✅（`package.json#files` 含 `skills/`）** |
 | **顶层 `agents/abap-developer.agent.md`** | **abap-cli 用户的端到端开发代理** | **abap-cli 用户** | **✅（`package.json#files` 含 `agents/`）** |
 
@@ -103,7 +103,7 @@ skills/<name>/
 
 > ⚠️ **`pull` 归 `abap-cli-edit`**（写路径中间步骤），**`inspect` 归 `abap-cli-search`**（只读元数据，修复动作归 edit）。
 >
-> ⚠️ **`abap-cli-performance` 不是领域 skill**——`metadata.commands` 列的是触发的只读命令，实际归属仍是 4 个领域 skill；本 skill 全程不写对象。
+> ⚠️ **`abap-cli-performance` 不是领域 skill**——不声明 `metadata.commands`（命令归属仍是 4 个领域 skill）；本 skill 全程只读、不写对象。
 >
 > ⚠️ **`feedback` / `report-stuck` 归 `abap-cli`（meta）**——不操作 SAP 对象；`feedback` 需网络，`report-stuck` 纯本地留痕。
 

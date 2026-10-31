@@ -1,7 +1,7 @@
 import { loadUserConfig, upsertSystem, getSystem, type CachedRuntime, type SystemProfile } from './user-config.js';
 import { probeAdtRuntime } from '../adc/runtime-probe.js';
 
-/** 034: helper that fetches (or refreshes) the cached runtime for a profile.
+/** helper that fetches (or refreshes) the cached runtime for a profile.
  *
  *  Two modes:
  *   - `force=false` (default): return the cached `runtime` if present, else
@@ -44,7 +44,7 @@ export async function getOrProbeRuntime(name: string, opts: { force?: boolean } 
   return mapped;
 }
 
-/** 034: drop the runtime cache for a profile (used by `--no-runtime-cache`,
+/** drop the runtime cache for a profile (used by `--no-runtime-cache`
  *  manual `profile reset-runtime`, etc.). No-op when absent. */
 export function clearRuntimeCache(name: string): void {
   const profile = getSystem(name);
@@ -53,7 +53,7 @@ export function clearRuntimeCache(name: string): void {
   upsertSystem(name, rest as SystemProfile);
 }
 
-/** 034: minimal load — read only the cached runtime without triggering a probe.
+/** minimal load — read only the cached runtime without triggering a probe.
  *  Used by `deploy` and `init` when the caller wants the cache hit
  *  only (no network). Returns undefined when there is no cache entry. */
 export function readCachedRuntime(name: string): CachedRuntime | undefined {

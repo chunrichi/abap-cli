@@ -23,7 +23,7 @@ export function orCancel<T>(value: T | symbol): T {
   return value as T;
 }
 
-/** 014: informational textpool capability probe (one-shot, non-blocking). */
+/** informational textpool capability probe (one-shot, non-blocking). */
 async function recordTextpoolCapabilityIfPossible(name: string): Promise<void> {
   try {
     const cap = await probeTextpoolCapability();

@@ -110,7 +110,7 @@ describe('abap pull FUGR (abap-file-format layout)', () => {
       'zfg_wechat_table.fugr.saplzfg_wechat_table.reps.json',
       'zfg_wechat_table.fugr.lzfg_wechat_tabletop.reps.abap',
       'zfg_wechat_table.fugr.lzfg_wechat_tabletop.reps.json',
-      // T1.5: FXX / OXX are now kept (previously dropped silently).
+      // FXX / OXX are now kept (previously dropped silently).
       'zfg_wechat_table.fugr.lzfg_wechat_tablef01.reps.abap',
       'zfg_wechat_table.fugr.lzfg_wechat_tablef01.reps.json',
       'zfg_wechat_table.fugr.lzfg_wechat_tableo01.reps.abap',

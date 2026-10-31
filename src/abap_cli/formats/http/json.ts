@@ -6,11 +6,11 @@ import { defineWireArtifact } from '../artifact.js';
 // Known HTTP Service object extension.
 export const HTTP_EXTENSIONS = ['.http.json'];
 
-/** Re-exported from `types/registry.ts` (T049, US11). */
+/** Re-exported from `types/registry.ts`. */
 export { HTTP_TYPES, type HttpSupportedType };
 
 /**
- * T2.2: AFF-shaped HTTP service definition (matches `http-v1.json` schema).
+ * AFF-shaped HTTP service definition (matches `http-v1.json` schema).
  *
  * This is the canonical abap-file-format HTTP shape. {@link httpArtifact}
  * owns the file plumbing and validates against the vendored SAP schema;
@@ -65,9 +65,9 @@ export interface HttpObjectLocal {
   abapLanguageVersion?: 'standard' | 'cloudDevelopment';
   handlerClass?: string;
   url?: string;
-  /** 032 US10: SICF service path (e.g. '/sap/zfoo'); not in abap-file-format schema. */
+  /** SICF service path (e.g. '/sap/zfoo'); not in abap-file-format schema. */
   serviceId?: string;
-  /** 032 US10: multi-language descriptions (one entry per language). */
+  /** multi-language descriptions (one entry per language). */
   descriptionByLang?: Array<{ language: string; description: string }>;
   formatVersion?: '1';
   header?: HttpServiceHeader;
@@ -78,7 +78,7 @@ export interface HttpObjectLocal {
 }
 
 /**
- * @deprecated Wire shape is identical to the local AFF shape since T059
+ * @deprecated Wire shape is identical to the local AFF shape since
  * (the ICF handler deserializes the nested abap-file-format directly).
  * Kept as an alias for downstream consumers that still import the name.
  */
@@ -109,7 +109,7 @@ export const httpArtifact = defineWireArtifact<HttpObjectLocal, HttpWirePayload>
  * Validate an HTTP service document against the vendored AFF `http-v1.json`
  * schema. Returns an array of human-readable errors (empty when valid).
  *
- * T2.2: delegates to `validateAffMetadata('HTTP', ...)` instead of the
+ * delegates to `validateAffMetadata('HTTP'...)` instead of the
  * hand-rolled enum / length checks (which duplicated the schema and drifted).
  */
 export function validateHttpService(data: unknown): string[] {
@@ -134,7 +134,7 @@ export function localToWire(local: HttpObjectLocal): HttpWirePayload {
   const abapLanguageVersion = (l.abapLanguageVersion as string | undefined) ?? (headerObj?.abapLanguageVersion as string | undefined);
   const handlerClass = (l.handlerClass as string | undefined) ?? (generalObj?.handlerClass as string | undefined);
   const url = (l.url as string | undefined) ?? (generalObj?.url as string | undefined);
-  // 032 US10: SICF extension fields — nested (preferred) or top-level flat (legacy fallback).
+  // SICF extension fields — nested (preferred) or top-level flat (legacy fallback).
   const serviceId = (l.serviceId as string | undefined) ?? (generalObj?.serviceId as string | undefined);
   const descByLangRaw = (l.descriptionByLang as Array<{ language: string; description: string }> | undefined)
     ?? (headerObj?.descriptionByLang as Array<{ language: string; description: string }> | undefined);

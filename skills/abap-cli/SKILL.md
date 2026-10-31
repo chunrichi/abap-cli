@@ -30,9 +30,9 @@ metadata:
 | Agent 提交反馈 / 卡死留痕（不依赖 SAP） | `abap-cli`（meta） | `feedback` `report-stuck` |
 | 意图模糊 / 不确定归哪类 | `abap-cli`（meta） | （路由查询本身） |
 
-> **同一命令唯一归属**：4 个领域 skill 的 `metadata.commands` 集合互不相交，并集 = 全部 30 个 CLI 命令（详见 `skills/README.md`）。
+> **同一命令唯一归属**：4 个领域 skill 的 `metadata.commands` 集合互不相交，合计 27 条；再加 meta 的 2 条，共 29 个 CLI 命令（详见 `skills/README.md`）。
 >
-> **`abap-cli-performance` 例外**：它是方法论 skill，`metadata.commands` 列的是其**触发**的只读命令集合（`search / inspect / pull / check / select`），实际归属仍是上表 4 个领域 skill。本 skill 全程不写对象。
+> **`abap-cli-performance` 例外**：它是方法论 skill，不声明 `metadata.commands`；它触发的只读命令（`search / inspect / pull / check / select`）归属上表 4 个领域 skill。本 skill 全程不写对象。
 
 ### 路由查询决策树
 
@@ -51,7 +51,7 @@ metadata:
 
 ### `feedback`（提交 issue）
 
-完成任务但发现 CLI 行为不对？提交给上游（spec P3.3 反馈服务）。**不需要 SAP 连接**（纯 HTTP），但需要网络；离线场景用 `report-stuck`。
+完成任务但发现 CLI 行为不对？提交给上游（反馈服务）。**不需要 SAP 连接**（纯 HTTP），但需要网络；离线场景用 `report-stuck`。
 
 ```bash
 abap feedback \
@@ -71,7 +71,7 @@ abap feedback --feature-key abap.cli --title "Example" --description "..." --dry
 | `--title <text>` | 简短标题 | ✅ |
 | `--description <text>` | 纯文本观察（≤255 字符） | ✅ |
 | `--priority <level>` | `LOW` / `NORMAL` / `HIGH` / `URGENT` | NORMAL |
-| `--username <name>` | 业务用户名；默认 `$env:USERNAME` | — |
+| `--username <name>` | 业务用户名；默认按 `$USERNAME` / `$USER` / OS 用户 / `git config user.name` 解析 | — |
 | `--email <address>` | 联系邮箱 | — |
 | `--source-system <name>` | 调用客户端 / 系统名；默认 `abap-cli` | — |
 | `--agent-id <id>` | agent / 产品标识 | — |
@@ -98,7 +98,7 @@ abap report-stuck \
 | `--tried <text>` | 已尝试的动作 | ✅ |
 | `--where <cmd>` | 卡死点（具体卡在哪条命令） | ✅ |
 
-输出落在 CLI 配置目录下的 `stuck-reports/<ts>.json`；agent 后续可读这些报告聚类重复问题。
+输出落在 `userConfigDir()/reports/STUCK-<ts>-<rand>.json`（即 `~/.abap-cli/reports/`）；agent 后续可读这些报告聚类重复问题。
 
 ### 错误码（meta 专属）
 
@@ -118,7 +118,7 @@ abap report-stuck \
 
 ## 边界
 
-本 skill 只负责路由。仓库本地开发技能（`.agents/skills/`：`abap-style` / `okf` / `abap-testing`）属于本仓库贡献者的上下文，**不随 npm 包分发**；用户机器上不存在时直接跳过，不影响路由。
+本 skill 只负责路由。仓库本地开发技能（`.agents/skills/`：`abap-style` / `abap-report-style` / `okf` / `abap-testing` / `repo-workflow`）属于本仓库贡献者的上下文，**不随 npm 包分发**；用户机器上不存在时直接跳过，不影响路由。
 
 ## 通用规则
 

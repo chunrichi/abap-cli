@@ -10,7 +10,7 @@
 
 ## 关键点
 
-- **`key client` 必须放第一行**（SAP 透明表约定）。CLI 解析时把 `CLIENT`/`MANDT` 从 `fields[]` 丢弃（SAP 端 `zcl_abap_vibe_ddic` 会在 `clientDependent: true` 时自动 prepend 一个 MANDT）。**不要**在 DDL 里写第二个 `key client` 或 `key mandt`。
+- **`key client` 必须放第一行**（SAP 透明表约定）。CLI 解析时把 `CLIENT`/`MANDT` 从 `fields[]` 丢弃（SAP 端 `zcl_abap_vibe_icf_ddic` 会在 `clientDependent: true` 时自动 prepend 一个 MANDT）。**不要**在 DDL 里写第二个 `key client` 或 `key mandt`。
 - 其它 `key` 字段紧跟 `key client`，可多可少（`key customer_id` 是业务主键）。
 - `@AbapCatalog.deliveryClass : #A` 是「应用表」最常见的取值；其它取值：`#C`（客户定制）、`#L`（临时存储）、`#W`（系统表，如 STXL）。
 - `@AbapCatalog.dataMaintenance : #RESTRICTED` 是默认（SM30 维护需要显式打开）；`#NOT_ALLOWED` 用于纯查询表。

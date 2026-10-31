@@ -10,7 +10,7 @@ const fivePieces = [
   'zmy_client_handling',
 ];
 
-describe('schema-compliance / tabl (T033-029)', () => {
+describe('schema-compliance / tabl', () => {
   for (const base of fivePieces) {
     it(`${base}.tabl.json passes tabl-v1.json`, async () => {
       const doc = await readJsonFixture(`${base}.tabl.json`);

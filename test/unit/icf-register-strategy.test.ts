@@ -33,7 +33,7 @@ describe('IcfRegisterStrategy registry — 034 strategy dispatch', () => {
     runClass.mockReset();
   });
 
-  it('selectIcfStrategy prefers SWB when its supports() returns true', async () => {
+  it('selectIcfStrategy prefers SWB when its supports returns true', async () => {
     const swb = new SteampunkSwbStrategy();
     vi.spyOn(swb, 'supports').mockReturnValue(true);
     registerIcfStrategy(swb);

@@ -61,7 +61,7 @@ export async function saveProfile(name: string, profile: SystemProfile, password
   if (!mode) console.log(`System profile '${name}' saved. Password stored securely in OS keychain.`);
 }
 
-/** 014: informational capability probe — never blocks init. */
+/** informational capability probe — never blocks init. */
 async function recordCapabilityIfPossible(name: string): Promise<void> {
   try {
     const cap = await probeTextpoolCapability();

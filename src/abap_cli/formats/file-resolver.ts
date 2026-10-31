@@ -23,13 +23,13 @@ const EXT_ROUTE_MAP: Record<string, 'adt' | 'icf'> = {
   '.json': 'icf',
 };
 
-/** 014: textpool .properties categories (abap-file-format layout). */
+/** textpool.properties categories (abap-file-format layout). */
 const TEXTPOOL_EXTENSIONS = new Set(['texts', 'selections', 'headings']);
 
 const SOURCE_EXTENSIONS = new Set(['.abap', '.asddls', '.asbdef', '.assrvd', '.acds', '.abdl']);
 
 /**
- * T3.1 / T3.3 / T3.4 — canonical source extension per object type.
+ * / / — canonical source extension per object type.
  * Five CDS-family types share `.acds` (DDLS / DCLS / DDLX / DDLA / SRVD);
  * BDEF carries ABAP Behavior Language in `.abdl`; everything else stays
  * in classic `.abap`. Keep this in sync with the supported-type set in
@@ -110,7 +110,7 @@ export function resolveFile(filePath: string): ResolvedFile {
   const objectName = affObjectNameFromToken(parts[0]!, basename);
   const objectType = parts[1]!.toUpperCase();
   const subtype = parts.slice(2).join('.') || 'main';
-  // 037 US3: type-based routing takes priority. ADT types (CLAS/INTF/PROG/FUGR
+  // type-based routing takes priority. ADT types (CLAS/INTF/PROG/FUGR
   // /TTYP/MSAG/DDLS) resolve to 'adt' regardless of `.json` extension;
   // DDIC/HTTP/TRAN resolve to 'icf'. Falls back to the legacy extension map
   // for unknown type codes (kept as a safety net).

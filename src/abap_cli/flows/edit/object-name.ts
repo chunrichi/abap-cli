@@ -3,7 +3,7 @@
  *
  * Extracted from the three call sites that used to carry byte-identical
  * copies (`flows/edit/create.ts`, `create-local.ts`, `create-fugr-func.ts`)
- * during the Phase 3 split. Keeping one copy matters because the rules are
+ * during the split. Keeping one copy matters because the rules are
  * user-facing: the length limit and legal-character set must stay in sync
  * with what SAP accepts.
  */

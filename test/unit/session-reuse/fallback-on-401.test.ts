@@ -1,5 +1,5 @@
 /**
- * 401 fallback on a stale reused session (SC-007 d).
+ * 401 fallback on a stale reused session.
  *
  * When a wrapper reuses a persisted jar and the first real request returns
  * 401 (SAP recycled the session), `_call` must:

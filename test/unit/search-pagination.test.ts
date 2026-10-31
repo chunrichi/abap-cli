@@ -3,7 +3,7 @@ import { registerSearchCommand } from '../../src/abap_cli/commands/search.js';
 import { SEARCH_EXACT_SCAN_LIMIT } from '../../src/abap_cli/core/limits.js';
 import { makeProgram, runCommand } from './cli-helper.js';
 
-// 25 synthetic matches so SC-001 (page 1 = 20, page 2 = 5) holds exactly.
+// 25 synthetic matches so (page 1 = 20, page 2 = 5) holds exactly.
 const NAMES = [
   ...Array.from({ length: 24 }, (_, i) => `ZPAGE_${String(i + 1).padStart(2, '0')}`),
   'ZPAGE',
@@ -32,7 +32,7 @@ function parseJsonOutput(res: { stdout: string; stderr: string; exitCode?: numbe
   return { json, exitCode: res.exitCode };
 }
 
-describe('abap search pagination (US1/SC-002)', () => {
+describe('abap search pagination', () => {
   beforeEach(() => searchObject.mockClear());
 
   it('default --limit 20 returns 20 items with truncated:true and a hint', async () => {

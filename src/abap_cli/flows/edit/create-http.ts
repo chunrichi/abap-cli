@@ -6,7 +6,7 @@
  * description. Other required fields (package, transport for non-$TMP) are validated
  * client-side before the round-trip.
  *
- * Per decision 1A (Phase 5): HTTP `create` requires `--file`. The legacy
+ * Per decision 1A: HTTP `create` requires `--file`. The legacy
  * "no-file → write a local skeleton" branch was removed to align with the
  * DDIC / DDLS behavior — write the abap-file-format JSON yourself (see
  * `abap create --schema HTTP`) and pass it via `--file`.

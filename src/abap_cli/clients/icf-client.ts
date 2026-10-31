@@ -120,12 +120,12 @@ export class IcfClient {
     return this.get(`/ddic/${type}/${encodeURIComponent(name)}`);
   }
 
-  /** 022: POST /http/<name> — create/overwrite an HTTP service (SICF node). */
+  /** POST /http/<name> — create/overwrite an HTTP service (SICF node). */
   async postHttp<T>(name: string, body: unknown): Promise<IcfResponse<T>> {
     return this.post(`/http/${encodeURIComponent(name)}`, body);
   }
 
-  /** 022: GET /http/<name> — pull an HTTP service as wire JSON. */
+  /** GET /http/<name> — pull an HTTP service as wire JSON. */
   async getHttp<T>(name: string): Promise<IcfResponse<T>> {
     return this.get(`/http/${encodeURIComponent(name)}`);
   }
@@ -157,14 +157,14 @@ export class IcfClient {
     return this.post(`/textpool/${category}?${qs.toString()}`, body);
   }
 
-  /** 015: GET /version-source — active (00000) source of an object as transported to a remote system. */
+  /** GET /version-source — active (00000) source of an object as transported to a remote system. */
   async getRemoteSource<T>(objectType: string, objectName: string, destination: string): Promise<IcfResponse<T>> {
     const qs = new URLSearchParams({ objectType, objectName, destination });
     return this.get(`/version-source?${qs.toString()}`);
   }
 
   /**
-   * 016-abap-select: POST /data/query — read-only table data query.
+   * POST /data/query — read-only table data query.
    *
    * The SAP-side handler validates the request against DD02L/DD03L metadata,
    * parses the `where` clause, and executes a dynamic Open SQL statement with
@@ -185,7 +185,7 @@ export class IcfClient {
   }
 
   /**
-   * S-2 reverse field lookup. POST /data/find-tables-by-fields.
+   * reverse field lookup. POST /data/find-tables-by-fields.
    *
    * Body shape:
    *   {
@@ -213,7 +213,7 @@ export class IcfClient {
     tabclass?: string;
     as4local?: string;
     limit?: number;
-    /** S-1: when true, SAP joins DD03T + DD04T to populate fieldText and
+    /** when true, SAP joins DD03T + DD04T to populate fieldText and
      *  elementText on each match. Default false (one-shot opt-in; the join
      *  adds ~2 left-queries per match set). */
     includeText?: boolean;

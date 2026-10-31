@@ -1,5 +1,5 @@
 /**
- * S-4 — `abap run-report --format tsv|csv` and `--param NAME=VALUE`.
+ * — `abap run-report --format tsv|csv` and `--param NAME=VALUE`.
  *
  * The `--format` flag is implemented client-side: the SAP response
  * carries the raw list; the CLI converts it to a tabular form without
@@ -46,7 +46,7 @@ const RAW_PAYLOAD = JSON.stringify({
   durationMs: 1,
 });
 
-describe('run-report --format (S-4)', () => {
+describe('run-report --format', () => {
   it('keeps the raw list when format is "raw" (default)', async () => {
     const client = fakeClient(RAW_PAYLOAD);
     const result = await runReport('ZR_TEST', {}, client);
@@ -104,7 +104,7 @@ describe('run-report --format (S-4)', () => {
   });
 });
 
-describe('run-report --param (S-4)', () => {
+describe('run-report --param', () => {
   it('forwards each param NAME=VALUE to the SAP-side handler', async () => {
     const post = vi.fn(async () => ({ status: 'success', data: JSON.parse(RAW_PAYLOAD), error: null }));
     const client = { post } as unknown as IcfClient;

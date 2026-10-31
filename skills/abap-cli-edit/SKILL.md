@@ -26,7 +26,7 @@ metadata:
 - 比较本地与 SAP 差异（`diff` / `status`）后再决定 pull 或 push——`diff` / `status` 在 `abap-cli-search`，本 skill 关注"差异确定后的拉/推动作"
 - 显式编排 status → pull → push——CI 友好
 - 离线起一份草稿（`create local`）再 push
-- DDIC 定义 CRUD：`pull <name> --type DOMA|DTEL|TABL|STRU`、`create <type> <name> --file <json>`、`push <name>.<type>.json`。TABL/STRU 现在遵循 abap-file-format 三件套（`--file` 指向 main `.tabl.json` + 同目录 `.tabl.ddic` + 可选 `.tabl.settings.json`）；只有 main JSON 时回落 014 legacy wire-flat（详见 workflow.md 变体 2）。**写新 TABL/STRU 时直接 `cp` [assets/tabl-templates](./assets/tabl-templates/README.md) 里的 DDL 骨架**（5 个场景：透明表 / include / 货币金额 / 数量单位 / STRU），别凭空写 `@AbapCatalog.*` 注释
+- DDIC 定义 CRUD：`pull <name> --type DOMA|DTEL|TABL|STRU`、`create <type> <name> --file <json>`、`push <name>.<type>.json`。TABL/STRU 现在遵循 abap-file-format 三件套（`--file` 指向 main `.tabl.json` + 同目录 `.tabl.ddic` + 可选 `.tabl.settings.json`）；只有 main JSON 时回落 legacy wire-flat（详见 workflow.md 变体 2）。**写新 TABL/STRU 时直接 `cp` [assets/tabl-templates](./assets/tabl-templates/README.md) 里的 DDL 骨架**（5 个场景：透明表 / include / 货币金额 / 数量单位 / STRU），别凭空写 `@AbapCatalog.*` 注释
 - 上传 UI 资产（JavaScript / CSS / 图片 / 模板）到 SAP MIME Repository（SE80）→ `mime create / push`；删 MIME 目录走 `mime delete --recursive`
 - 写盘前用官方 AFF schema 严格校验本地 JSON（CLAS / INTF / PROG / FUGR / TABL / STRU / DOMA / DTEL / HTTP / TRAN / TTYP / MSAG / DDLS）→ `validate:aff <file-or-dir> --json`（纯本地 ajv + Draft 2020-12，**不进 SAP**；CI / pretest gate）
 - 清理或审计 SAP 上的对象：列出包内对象用 `list --package <pkg> [--type <type>]`（只读）；删除单个对象用 `delete <name> --type <type> [--tr <req>] --yes`（lock → delete → unlock，必传 `--yes`，非 `$TMP` 必传 `--tr`，与 `push` 语义一致）。常用于删除一次性探针类 / $TMP 草稿清理 / 批量接管前先看包
@@ -87,8 +87,9 @@ AFF 写盘前 gate（纯本地，不进 SAP）
 | `DDLS` | CDS 视图源 | ADT（仅） | ✅ | ✅ | ✅ | ❌（`TYPE_NOT_SUPPORTED`） |
 | `HTTP` | **ICF / SICF 节点** | ICF | ✅（须 `--file`） | ✅ | ✅ | ❌（`TYPE_NOT_SUPPORTED`） |
 | `TRAN` | 事务码 (SE93) | ICF | ✅（须 `--file`） | ✅ | ✅ | ❌（`TYPE_NOT_SUPPORTED`） |
+| `ENQU` / `NROB` | 锁对象 / 号段对象 | ICF（`NROB` 的 `pull` 为 ADT 主路径 + ICF fallback） | ✅（须 `--file`） | ✅ | ✅ | ❌（`TYPE_NOT_SUPPORTED`） |
 
-> `create` 的 `--file` 是 **registry 数据驱动**的必填项（`ObjectTypeEntry.requiresFile`），对 `TABL` / `STRU` / `DOMA` / `DTEL` / `HTTP` / `TRAN` / `TTYP` / `MSAG` / `DDLS` 都适用；缺 `--file` 报 `USAGE`（exit 2），且该检查在写确认提示**之前**。`HTTP` 已没有"无 `--file` 落本地骨架"的旧路径（032 US10 行为已删除）。
+> `create` 的 `--file` 是 **registry 数据驱动**的必填项（`ObjectTypeEntry.requiresFile`），对 `TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `NROB` / `HTTP` / `TRAN` / `TTYP` / `MSAG` / `DDLS` 都适用；缺 `--file` 报 `USAGE`（exit 2），且该检查在写确认提示**之前**。`HTTP` 已没有"无 `--file` 落本地骨架"的旧路径（旧的无 --file 落本地骨架路径已删除）。
 >
 > `create local` 只支持 **`CLAS` / `INTF` / `PROG` / `FUGR`**（`formats/templates.ts` 只有这四类模板），其余类型一律 `TYPE_NOT_SUPPORTED`（exit 7）。`TTYP` / `MSAG` / `DDLS` 要起草稿就手写（或 `pull` 一份）AFF JSON 后走 `create --file`，别指望 `create local`。
 
@@ -104,8 +105,8 @@ AFF 写盘前 gate（纯本地，不进 SAP）
 
 ### 关键说明
 
-- **ICF 通道类型**（`TABL` / `STRU` / `DOMA` / `DTEL` / `HTTP` / `TRAN`）依赖内置 ICF 服务已部署——失败先跳 `abap-cli-setup` 跑 `deploy status`。`TTYP` / `MSAG` 在旧内核（ECC EHP5/6）也降级走同一 ICF 服务；`DDLS` 无兜底。
-- **`TTYP` / `MSAG` / `DDLS`**（0.2.5 036 spec）：envelope 多 `data.channel: 'adt' | 'icf'` 与 `data.fallbackReason: 'ECC_EHP6_NO_ADT_TABLETYPE'` / `'ECC_EHP6_NO_ADT_MESSAGECLASS'`；ECC EHP5/6 自动降级 ICF；`DDLS` ECC 旧内核硬错 `DDLS_NOT_SUPPORTED_ON_ECC`（exit 64），不静默降级。
+- **ICF 通道类型**（`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `NROB` / `HTTP` / `TRAN`）依赖内置 ICF 服务已部署——失败先跳 `abap-cli-setup` 跑 `deploy status`。`TTYP` / `MSAG` 在旧内核（ECC EHP5/6）也降级走同一 ICF 服务；`DDLS` 无兜底。
+- **`TTYP` / `MSAG` / `DDLS`**（双通道降级）：envelope 多 `data.channel: 'adt' | 'icf'` 与 `data.fallbackReason: 'ECC_EHP6_NO_ADT_TABLETYPE'` / `'ECC_EHP6_NO_ADT_MESSAGECLASS'`；ECC EHP5/6 自动降级 ICF；`DDLS` ECC 旧内核硬错 `DDLS_NOT_SUPPORTED_ON_ECC`（exit 64），不静默降级。
 - **DDIC 三件套（TABL/STRU）**：`--file` 指向 main `.tabl.json`，CLI 自动读同目录 `.tabl.ddic`（DDL 真值）与可选 `.tabl.settings.json`；详见下方 TABL vs STRU 注解差异。
 - **`create` 的未知类型报错已由 registry 驱动**：会列出全部 21 个注册类型码，无需再记住"哪些没被列进文案"。真正受限的是 `create local`（只 CLAS/INTF/PROG/FUGR）。
 
@@ -178,7 +179,7 @@ CLI 解析器（[tabl-artifact.ts:parseTablDdic](https://github.com/chunrichi/ab
 | `unlock` | 释放锁 | `UNLOCK_WARNING`（仅 `meta.warnings`，不阻断） |
 | `ddic-icf` | 所有 ICF/通道 JSON 推送的统一进入 stage（DDIC / HTTP / TRAN / TTYP / MSAG / DDLS；`--dry-run` 的 `plan` 也含它） | 视类型而定（DDIC: `INVALID_FIELD` / `VALIDATION_ERROR`；HTTP: `HTTP_CREATE_FAILED`；TRAN: `TRAN_CREATE_FAILED`；TTYP/MSAG: `LOCK_FAILED` 等透传） |
 | `textpool-adt` / `textpool-icf` | textpool 写（混合模式） | 视 mode 而定 |
-| `channel-adt` / `channel-icf` | TTYP/MSAG/DDLS 通道检测（0.2.5+） | `CHANNEL_DETECTION_FAILED` / `DDLS_NOT_SUPPORTED_ON_ECC` |
+| `channel-adt` / `channel-icf` | TTYP/MSAG/DDLS 通道检测 | `CHANNEL_DETECTION_FAILED` / `DDLS_NOT_SUPPORTED_ON_ECC` |
 | `read` | textpool 读（混合模式 pre-stage） | 通常不报错 |
 
 > ⚠️ **textpool 写受 SAP release 限制**：只有 ADT text-elements 写端点可用的系统才能写文本元素；`adtTextpool.write: false` 的系统（vhcala4hci / A4H 实测）走 ICF POST，无条件报 `TEXTPOOL_WRITE_UNSUPPORTED`。textpool **读**始终可用；写不可用时选择屏幕标签改用 `SELECTION-SCREEN COMMENT <pos>(<len>) lbl_xxx` + `INITIALIZATION` 赋值。详见 [references/workflow.md 变体 8](./references/workflow.md)。
@@ -194,11 +195,11 @@ CLI 解析器（[tabl-artifact.ts:parseTablDdic](https://github.com/chunrichi/ab
 1. **永远 `--json`**：`status` / `error.code` 分支
 2. **`check syntax` 默认对 SAP**：无副作用，可反复跑
 3. **`--atomic` 防雪崩**：多文件必加
-4. **`push` 报 activated 还要 `inspect --activation`（[abap-cli-search]）复核**：method / OSI 层级是 013 落地经验
+4. **`push` 报 activated 还要 `inspect --activation`（[abap-cli-search]）复核**：method / OSI 层级是真机经验
 5. **跨 skill**：`transport` 切到 `abap-cli-setup`；`search / inspect / diff / status` 切到 `abap-cli-search`
 
 ## references（按需加载）
 
-- [references/commands-quick.md](./references/commands-quick.md) — 6 写 + mime + validate:aff 共 8 命令完整速查
+- [references/commands-quick.md](./references/commands-quick.md) — 10 命令完整速查（含 `create local` 子命令）
 - [references/errors.md](./references/errors.md) — 本 skill 错误码全表
 - [references/workflow.md](./references/workflow.md) — DDIC / FUGR / textpool / stale 激活详细变体

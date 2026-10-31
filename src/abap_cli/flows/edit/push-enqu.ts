@@ -1,5 +1,5 @@
 /**
- * PR5 (B1): ENQU (lock object) push via the ICF `/ddic/enqu` route.
+ * (B1): ENQU (lock object) push via the ICF `/ddic/enqu` route.
  *
  * Like the other DDIC types, `push --file` first probes the object via
  * `GET /ddic/enqu/<name>` to satisfy the "push is update, not create"

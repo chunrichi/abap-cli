@@ -1,5 +1,5 @@
 /**
- * 032 US13: PROG/I sub-route on pull.
+ * PROG/I sub-route on pull.
  *
  * PROG/I (include program) is pulled as:
  *   `<name>.prog.include.abap`  — source part remapped from `main` → `include`
@@ -10,8 +10,8 @@
  * The "main" part is intentionally absent: PROG/I objects have no main,
  * they only carry their own source (which is itself an include).
  *
- * Real-SAP validation note: T058 spec calls for "mock + 真实 SAP 各 1 个 I
- * 类型程序". The real-SAP case is deferred to Phase 5 (vhcala4hci:50000
+ * Real-SAP validation note: the plan calls for "mock + 真实 SAP 各 1 个 I
+ * 类型程序". The real-SAP case is deferred to (vhcala4hci:50000
  * currently unreachable); mock coverage here exercises both PROG/I shapes
  * (mock returns `programType: 'I'`, real SAP may omit programType on
  * includes — `objectType: 'PROG/I'` is the fallback trigger).
@@ -61,7 +61,7 @@ beforeEach(() => {
   fs.mkdirSync(path.join(cwd, 'src'), { recursive: true });
 });
 
-describe('032/prog-subtype-include', () => {
+describe('prog-subtype-include', () => {
   it('PROG/I with programType: "I" → <name>.prog.include.abap', async () => {
     const program = makeProgram();
     registerPullCommand(program);

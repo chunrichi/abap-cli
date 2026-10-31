@@ -36,7 +36,7 @@ abap select --table <name> [options]
 
 ## `abap fields`
 
-List the DDIC fields of a table or view (read-only). Two modes: `abap fields <table>` enumerates the fields of one object; `abap fields --find <f1>,<f2>...` returns every table that contains those fields (S-2 reverse lookup).
+List the DDIC fields of a table or view (read-only). Two modes: `abap fields <table>` enumerates the fields of one object; `abap fields --find <f1>,<f2>...` returns every table that contains those fields (reverse lookup).
 
 ```bash
 abap fields <table> [--json] | abap fields --find <f1>,<f2>,...
@@ -92,7 +92,7 @@ abap run [options] <class-name>
 
 ## `abap run-report`
 
-Execute an activated REPORT and return its list output (read-only, via the bundled ICF /run/report endpoint). The report runs with DEFAULT selection values; only classic list output is captured. S-4 adds --format (raw\|tsv\|csv) and --param NAME=VALUE pass-through.
+Execute an activated REPORT and return its list output (read-only, via the bundled ICF /run/report endpoint). The report runs with DEFAULT selection values; only classic list output is captured. --format (raw\|tsv\|csv) and --param NAME=VALUE pass-through are supported.
 
 ```bash
 abap run-report <report> [--variant <name>] [--format raw|tsv|csv] [--param NAME=VALUE]...

@@ -1,5 +1,5 @@
 /**
- * US3 safety / injection tests for `abap select`.
+ * safety / injection tests for `abap select`.
  *
  * These tests drive the real CLI binary against mock-adt (which mirrors the
  * ABAP handler's where grammar per research R8). The tests assert that:
@@ -124,7 +124,7 @@ afterAll(() => {
   rmSync(TMP_PROJECT, { recursive: true, force: true });
 });
 
-describe.skipIf(!hasBuiltCli)('US3 — read-only safety contract', () => {
+describe.skipIf(!hasBuiltCli)('read-only safety contract', () => {
   it('basic select does not modify the mock table store', async () => {
     await withMock({}, async (port) => {
       await runCli(['select', '--table', 'ZTAB_FIXTURE', '--limit', '5', '--json'], port);
@@ -222,7 +222,7 @@ describe.skipIf(!hasBuiltCli)('US3 — read-only safety contract', () => {
       const json = JSON.parse(result.stdout);
       expect(json.status).toBe('success');
       expect(json.data.rowCount).toBe(2);
-      // 017 Q1 B: NUMC values are native integers (leading zeros dropped).
+      // NUMC values are native integers (leading zeros dropped).
       const ids = json.data.rows.map((r: { ID: number }) => r.ID);
       expect(ids).toEqual([1, 3]);
     });

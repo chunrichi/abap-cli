@@ -69,7 +69,7 @@ beforeEach(() => {
   );
 });
 
-describe('abap deploy — auto-create missing objects (US6.1)', () => {
+describe('abap deploy — auto-create missing objects', () => {
   it('calls createObject then pushObject when the object is missing', async () => {
     const summary = await deployBundled(client, {
       transport: 'TRN001', yes: true, sourceDir, package: '$TMP',

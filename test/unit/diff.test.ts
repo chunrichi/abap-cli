@@ -54,7 +54,7 @@ function parseData(res: { stdout: string }) {
   return JSON.parse(res.stdout).data;
 }
 
-describe('abap diff (US4..017)', () => {
+describe('abap diff', () => {
   it('diff <file> divergent → correct direction + bounded summary', async () => {
     const program = makeProgram();
     registerDiffCommand(program);
@@ -99,7 +99,7 @@ describe('abap diff (US4..017)', () => {
     }
   });
 
-  it('no differences → parts: [] exit 0 ()', async () => {
+  it('no differences → parts: [] exit 0', async () => {
     // Fresh workspace with only an identical object; SAP side has ONLY that object
     // too (override the search mock), so nothing differs.
     searchObject.mockImplementation(async () => [SAP_OBJECTS[1]!]); // ZCL_OK only
@@ -117,7 +117,7 @@ describe('abap diff (US4..017)', () => {
     expect((data.parts ?? []).length).toBe(0);
   });
 
-  it('read-only — zero mutating calls ()', async () => {
+  it('read-only — zero mutating calls', async () => {
     const program = makeProgram();
     registerDiffCommand(program);
     await runCommand(program, ['diff', '--all', '--json'], { cwd });

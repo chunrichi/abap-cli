@@ -100,7 +100,7 @@ export function getFallbackJarPath(profile: SapConfig): string | undefined {
 }
 
 export async function loadJarFromDisk(profile: SapConfig, key: Buffer): Promise<SessionJar | null> {
-  // S-8: try the home-dir path first; if the session was promoted to
+  // try the home-dir path first; if the session was promoted to
   // the TMPDIR fallback (markJarPersisted sets it), prefer the fallback
   // so re-logins on subsequent commands keep working.
   const hash = computeSystemHash(profile);
@@ -152,7 +152,7 @@ export async function loadJarFromDisk(profile: SapConfig, key: Buffer): Promise<
  * at command end instead of lingering as an orphan.
  */
 export async function markJarPersisted(jar: SessionJar, profile: SapConfig, key: Buffer): Promise<boolean> {
-  // S-8: if the home-dir write fails with a permission error, transparently
+  // if the home-dir write fails with a permission error, transparently
   // fall back to `$TMPDIR/abap-cli/sessions/<hash>.json` so session reuse
   // keeps working in sandboxed environments. The fallback path is cached
   // per profile so the warning fires once and later commands stay quiet.

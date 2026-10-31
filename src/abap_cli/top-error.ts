@@ -58,7 +58,7 @@ function writeBlock(stream: { write: (s: string) => unknown }, block: string): v
   stream.write(block.endsWith('\n') ? block : `${block}\n`);
 }
 
-/** Resolve the top-level output mode from argv (025 US1).
+/** Resolve the top-level output mode from argv.
  *  `--pretty-json` wins over `--json`. */
 export function isJson(argv: readonly string[]): OutputMode {
   if (argv.includes('--pretty-json')) return 'pretty-json';

@@ -2,7 +2,7 @@
  * `abap activate` flow.
  *
  * Activates every inactive item that belongs to one object. A root-URI-only
- * activate can report success while method / OSI items stay inactive (013
+ * activate can report success while method / OSI items stay inactive (
  * dogfooding lesson), so the flow collects the object's inactive items from
  * the ADT inactive-objects list and activates them together.
  */

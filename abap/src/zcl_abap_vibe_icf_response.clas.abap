@@ -67,7 +67,7 @@ CLASS zcl_abap_vibe_icf_response IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
   METHOD handle_class_check.
-    " 037 ops endpoint: probe the runtime class load version + last source
+    " ops endpoint: probe the runtime class load version + last source
     " change timestamp. Useful to confirm whether the ICF runtime picked up
     " a freshly-deployed main include (SM12/SICF deactivate+activate resets
     " the in-memory class load handle).
@@ -166,7 +166,7 @@ CLASS zcl_abap_vibe_icf_response IMPLEMENTATION.
     REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>horizontal_tab IN rv_value WITH '\t'.
   ENDMETHOD.
   METHOD escape_json_strings.
-    " Recursively escape char-like elements of a structure/table (017 quirk).
+    " Recursively escape char-like elements of a structure/table.
     " Fields typed /ui2/cl_json=>json (partial JSON pieces) are already escaped
     " at their source and are skipped by absolute_name.
     DATA lo_descr      TYPE REF TO cl_abap_typedescr.

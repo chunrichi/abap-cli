@@ -90,7 +90,7 @@ export async function runPull(objectName: string, opts: PullOptions): Promise<Pu
     return 'data' in result ? result : wrapPullResult(typeUpper!, result);
   }
 
-  // PR4 (C3): a FUGR/FF (function module) is owned by a parent function
+  // (C3): a FUGR/FF (function module) is owned by a parent function
   // group. Rewrite the resolved object to the parent so the fugr pull
   // strategy writes the canonical `<group>/<group>.<fm>.func.abap` layout;
   // `requestedFunctionModule` keeps the original FM identity so the

@@ -1,5 +1,5 @@
 /**
- * DOMA round-trip: fixedValues (032 P0) + format.signFlag/lowercase/convExit (033 US12).
+ * DOMA round-trip: fixedValues + format.signFlag/lowercase/convExit.
  *
  * Wire shape (AFF canonical):
  *   - `format: { signFlag, lowercase, convExit }` — strings, 'X' for "on",

@@ -74,7 +74,7 @@ CLASS zcl_abap_vibe_icf_data IMPLEMENTATION.
   METHOD dispatch_data.
     " Route /data/<sub> → sub-handlers. Two endpoints today:
     "   /data/query                   — F-10/F-26 SE16N-style field query
-    "   /data/find-tables-by-fields   — S-2 reverse field lookup
+    " /data/find-tables-by-fields — reverse field lookup
     IF iv_path = '/data/find-tables-by-fields'.
       " Delegate to zcl_abap_vibe_icf_fields. Keeping the dispatch here (not in the main
       " handler) means the `/data/*` try/catch in zcl_abap_vibe_icf wraps
@@ -251,7 +251,7 @@ CLASS zcl_abap_vibe_icf_data IMPLEMENTATION.
       ENDLOOP.
     ENDIF.
 
-    " 7. Parse where clause (US3 grammar: field op value [AND ...]).
+    " 7. Parse where clause.
     DATA(lt_where) = VALUE zcl_abap_vibe_icf_types=>tt_where_condition( ).
     IF ls_req-where IS NOT INITIAL.
       DATA(lv_where_ok) = abap_false.

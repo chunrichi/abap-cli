@@ -17,14 +17,14 @@ import type {
   WireForDdicType,
 } from './types.js';
 
-/** 024: extract the canonical three-piece strings from a wire payload. */
+/** extract the canonical three-piece strings from a wire payload. */
 export function extractTablArtifactWire(wire: DdicWirePayload): {
   mainJson: string;
   ddicSource: string;
   settingsJson: string | undefined;
   hasSettings: boolean;
 } | undefined {
-  // T2.1: TABL/STRU three-piece payload lives on the TABL-settings wire
+  // TABL/STRU three-piece payload lives on the TABL-settings wire
   // variant. Narrow via unknown before reading to keep the union type safe.
   const w = wire as unknown as Partial<DdicTableSettingsWire> & Record<string, unknown>;
   if (typeof w.mainJson !== 'string' || typeof w.ddicSource !== 'string') return undefined;
@@ -54,7 +54,7 @@ export function stripClientFields(fields: DdicFieldLocal[] | undefined): DdicFie
   return fields.filter((f) => !isClientFieldName(f.fieldName));
 }
 
-/** 014: map abap-file-format field (snake_case, mixed numeric) to wire (camelCase, number). */
+/** map abap-file-format field (snake_case, mixed numeric) to wire (camelCase, number). */
 export function localFieldToWire(local: DdicFieldLocal): DdicFieldWire {
   const wire: DdicFieldWire = { fieldName: local.fieldName };
   if (local.rollname !== undefined) wire.rollname = local.rollname;
@@ -71,7 +71,7 @@ export function localFieldToWire(local: DdicFieldLocal): DdicFieldWire {
   return wire;
 }
 
-/** 014: map wire field back to abap-file-format. Used for round-trip assertion. */
+/** map wire field back to abap-file-format. Used for round-trip assertion. */
 export function wireFieldToLocal(wire: DdicFieldWire): DdicFieldLocal {
   const local: DdicFieldLocal = { fieldName: wire.fieldName };
   if (wire.rollname !== undefined) local.rollname = wire.rollname;
@@ -89,7 +89,7 @@ export function wireFieldToLocal(wire: DdicFieldWire): DdicFieldLocal {
 }
 
 /**
- * T2.1: convert a local abap-file-format nested DDIC object to the ICF
+ * convert a local abap-file-format nested DDIC object to the ICF
  * wire payload. Wire equals the AFF nested shape (no flat fallback).
  * DOMA under `format.*`, DTEL under `dataTypeInformation.*`,
  * TABL/STRU as three-piece (DDL + settings + json).
@@ -176,7 +176,7 @@ export function localToWire<T extends DdicSupportedType>(type: T, local: DdicObj
       // Wire carries `dataTypeInformation.{category,...}` per AFF dtel-v1.json.
       // Five categories are accepted; `predefinedType` category nests its
       // type info under `predefinedType.{dataType,length,decimals}`. Legacy
-      // 032 alias `typeRef` is mapped to `referenceDictionaryType` (TTYP /
+      // alias `typeRef` is mapped to `referenceDictionaryType` (TTYP
       // dictionary reference) on the way out so existing callers keep working.
       const dti = l.dataTypeInformation as Record<string, unknown> | undefined;
       if (dti && typeof dti === 'object') {
@@ -240,10 +240,10 @@ export function localToWire<T extends DdicSupportedType>(type: T, local: DdicObj
   return wire as WireForDdicType<T>;
 }
 
-/** 033 US12: convert wire payload back to local abap-file-format shape.
+/** convert wire payload back to local abap-file-format shape.
  *  Wire is now nested AFF; local mirrors it.
  *
- *  T2.1: generic over the type so callers get a typed `wire` argument
+ * generic over the type so callers get a typed `wire` argument
  *  (DdicDomaWire | DdicDtelWire | DdicTableSettingsWire).
  */
 export function wireToLocal<T extends DdicSupportedType>(type: T, wire: WireForDdicType<T>): DdicObject {
@@ -297,15 +297,15 @@ export function wireToLocal<T extends DdicSupportedType>(type: T, wire: WireForD
       const w = wire as DdicDtelWire;
       if (w.dataTypeInformation && typeof w.dataTypeInformation === 'object') {
         const cat = w.dataTypeInformation.category;
-        // Legacy 032 alias `typeRef` is mapped back to itself on read so
-        // 032 callers that wrote `typeRef` get the same shape back.
+        // Legacy alias `typeRef` is mapped back to itself on read so
+        // callers that wrote `typeRef` get the same shape back.
         const allowed = [
           'domain',
           'predefinedType',
           'referenceToPredefinedType',
           'referenceDictionaryType',
           'referenceClasIntType',
-          'typeRef', // 032 legacy alias
+          'typeRef', // legacy alias
         ] as const;
         if (!(allowed as readonly string[]).includes(cat)) {
           throw new CliError(

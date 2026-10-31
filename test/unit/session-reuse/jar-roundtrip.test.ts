@@ -1,5 +1,5 @@
 /**
- * SessionJar round-trip + deterministic hash (SC-007 a/b).
+ * SessionJar round-trip + deterministic hash.
  *
  * - encrypt → decrypt is byte-lossless
  * - AES-GCM auth-tag mismatch / wrong system hash → SESSION_JAR_DECRYPT_FAILED

@@ -44,14 +44,14 @@ function makeProgramWithDumps(): { program: ReturnType<typeof makeProgram> } {
   return { program: makeProgram() };
 }
 
-describe('abap dumps (031-abap-dumps)', () => {
+describe('abap dumps', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     dumpsFn.mockReset();
     dumpsFn.mockResolvedValue(feedWith([]));
   });
 
-  it('calls ADT with default limit (20) and no user filter', async () => {
+  it('calls ADT with default limit and no user filter', async () => {
     const { program } = makeProgramWithDumps();
     registerDumpsCommand(program);
     const res = await runCommand(program, ['dumps', '--json']);
@@ -59,13 +59,13 @@ describe('abap dumps (031-abap-dumps)', () => {
     expect(dumpsFn).toHaveBeenCalledWith(20, undefined);
     const parsed = JSON.parse(res.stdout);
     expect(parsed.status).toBe('success');
-    // stripEmpty() drops empty `dumps: []` per the 022 token-efficient contract;
+    // stripEmpty drops empty `dumps: ` per the token-efficient contract
     // `total: 0` + `returned: 0` are the canonical "no dumps found" markers.
     expect(parsed.data.total).toBe(0);
     expect(parsed.data.returned).toBe(0);
   });
 
-  it('forwards --limit to AdtClientWrapper.dumps()', async () => {
+  it('forwards --limit to AdtClientWrapper.dumps', async () => {
     const { program } = makeProgramWithDumps();
     registerDumpsCommand(program);
     await runCommand(program, ['dumps', '--limit', '5', '--json']);
@@ -191,7 +191,7 @@ describe('formatHuman', () => {
 
 // Sanity: AdtClientWrapper.create is the only integration point we mock.
 describe('AdtClientWrapper.dumps wiring', () => {
-  it('uses the wrapper create() entry point', async () => {
+  it('uses the wrapper create entry point', async () => {
     const createSpy = vi.spyOn(AdtClientWrapper, 'create');
     dumpsFn.mockResolvedValue(feedWith([]));
     const { program } = makeProgramWithDumps();

@@ -1,5 +1,5 @@
 /**
- * Spec 036 T036-017: TTYP schema-compliance tests.
+ * TTYP schema-compliance tests.
  *
  * Two cases:
  *   1. `test/fixtures/zmy_ttyp.ttyp.json` PASSes against the
@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import { expectSchemaPass, expectSchemaFail } from './_helpers.js';
 
-describe('TTYP schema compliance (036)', () => {
+describe('TTYP schema compliance', () => {
   it('zmy_ttyp.ttyp.json PASSes ttyp-v1.json', async () => {
     await expectSchemaPass('zmy_ttyp.ttyp.json', 'TTYP');
   });

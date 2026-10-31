@@ -50,7 +50,7 @@ function helloSpec(loads: string[]): LazyCommandSpec {
   };
 }
 
-describe('lazy command registration (P1.6)', () => {
+describe('lazy command registration', () => {
   it('root help lists commands without importing their modules', async () => {
     const loads: string[] = [];
     const program = makeLazyProgram([helloSpec(loads)]);
@@ -148,7 +148,7 @@ const COMMAND_NAMES = [
   'transport', 'deploy', 'profile', 'doctor', 'inspect', 'diff',
 ];
 
-describe('lazy spec descriptions (P1.6)', () => {
+describe('lazy spec descriptions', () => {
   it('every COMMAND_NAMES entry is registered as a lazy spec in registry/commands.ts', () => {
     const index = fs.readFileSync(path.join(repoRoot, 'src/abap_cli/registry/commands.ts'), 'utf-8');
     for (const name of COMMAND_NAMES) {
@@ -175,11 +175,11 @@ describe('lazy spec descriptions (P1.6)', () => {
   });
 });
 
-// --- root --help groups local commands under a dedicated section (P2.9) ---
+// --- root --help groups local commands under a dedicated section ---
 const LOCAL_NAMES = ['init', 'profile', 'doctor'];
 const SAP_NAMES = ['pull', 'push', 'check', 'search', 'create', 'status', 'transport', 'deploy', 'inspect', 'diff'];
 
-describe('lazy command scope grouping (P2.9)', () => {
+describe('lazy command scope grouping', () => {
   it('every lazy spec is annotated as either local or sap (defaults to sap)', () => {
     const index = fs.readFileSync(path.join(repoRoot, 'src/abap_cli/registry/commands.ts'), 'utf-8');
     // Each spec is a `{\n  name: 'X', ...\n},` block. Anchor on the `name:`

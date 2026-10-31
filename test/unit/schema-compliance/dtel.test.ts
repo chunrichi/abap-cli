@@ -9,7 +9,7 @@ const three = [
   'zdm_type_ref.dtel.json',
 ];
 
-describe('schema-compliance / dtel (T033-025)', () => {
+describe('schema-compliance / dtel', () => {
   for (const rel of three) {
     it(`${rel} passes AFF schema`, async () => {
       await expectSchemaPass(rel, 'DTEL');

@@ -1,5 +1,5 @@
 /**
- * PR5 (B1): ENQU (lock object) pull flow via the ICF `/ddic/enqu/<name>` route.
+ * (B1): ENQU (lock object) pull flow via the ICF `/ddic/enqu/<name>` route.
  *
  * Mirrors `pull-ddic.ts`: GET /ddic/enqu/<name> → wire → local AFF → write
  * `src/<lower>.enqu.json`. Single-file shape (no sidecar — ENQU

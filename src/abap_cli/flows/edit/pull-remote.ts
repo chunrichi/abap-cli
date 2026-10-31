@@ -13,7 +13,7 @@ import type { ErrorCode } from '../../output/error-codes.js';
 import { toOutputPath, normalizePullData } from '../../core/path-output.js';
 import type { PullOptions, PullResult } from './pull-shared.js';
 
-/** 015: CLI object type → Version Management (VRSD) object type for remote pulls. */
+/** CLI object type → Version Management (VRSD) object type for remote pulls. */
 const VERSION_SOURCE_TYPES: Record<string, string> = {
   PROG: 'REPS',
   INTF: 'INTF',

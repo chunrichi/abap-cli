@@ -14,7 +14,7 @@ import { CliError } from '../../src/abap_cli/output/json.js';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 /* -------------------------------------------------------------------------- */
-/* Helpers                                                                    */
+/* Helpers */
 /* -------------------------------------------------------------------------- */
 
 function captureError(run: () => unknown): CliError {
@@ -68,7 +68,7 @@ function expectSingleTrailingNewline(text: string): void {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Manifest parsing / validation                                              */
+/* Manifest parsing / validation */
 /* -------------------------------------------------------------------------- */
 
 const VALID_MANIFEST: DeployManifest = {
@@ -288,7 +288,7 @@ describe('loadDeployManifest', () => {
 });
 
 /* -------------------------------------------------------------------------- */
-/* Release merge — normal path                                                */
+/* Release merge — normal path */
 /* -------------------------------------------------------------------------- */
 
 const MERGE_MANIFEST: DeployManifest = {
@@ -541,7 +541,7 @@ describe('mergeReleaseSources — release form', () => {
 });
 
 /* -------------------------------------------------------------------------- */
-/* Release merge — definitions preludes and ordering                         */
+/* Release merge — definitions preludes and ordering */
 /* -------------------------------------------------------------------------- */
 
 describe('mergeReleaseSources — definitions preludes and dependency order', () => {
@@ -735,7 +735,7 @@ describe('mergeReleaseSources — definitions preludes and dependency order', ()
 });
 
 /* -------------------------------------------------------------------------- */
-/* Release merge — input validation and split failures                        */
+/* Release merge — input validation and split failures */
 /* -------------------------------------------------------------------------- */
 
 describe('mergeReleaseSources — invalid inputs', () => {
@@ -805,7 +805,7 @@ describe('mergeReleaseSources — invalid inputs', () => {
 });
 
 /* -------------------------------------------------------------------------- */
-/* Dev-form activation order                                                  */
+/* Dev-form activation order */
 /* -------------------------------------------------------------------------- */
 
 const DEV_MANIFEST: DeployManifest = {

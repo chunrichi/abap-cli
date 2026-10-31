@@ -5,7 +5,7 @@ import { collectWarning } from '../output/meta.js';
 import { CliError } from '../output/json.js';
 import { userConfigDir } from '../config/paths.js';
 
-/** Stable report identity, sortable and unique (FR-022). */
+/** Stable report identity, sortable and unique. */
 export function newReportId(prefix = 'STUCK'): string {
   const ts = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, '');
   const rand = Math.random().toString(16).slice(2, 6);
@@ -71,7 +71,7 @@ function reportsAncestorIsWritable(): boolean {
 }
 
 /**
- * Record a stuck report to the local store (FR-022..024). Never throws: on a
+ * Record a stuck report to the local store. Never throws: on a
  * write failure it degrades to `recorded: false` with a synthetic id.
  */
 export function writeStuckReport(input: StuckReportInput): StuckReportResult {
@@ -99,7 +99,7 @@ export function writeStuckReport(input: StuckReportInput): StuckReportResult {
   }
 }
 
-// --- ABAP_REPORT_STUCK=1 auto-trigger (FR-023) ---
+// --- ABAP_REPORT_STUCK=1 auto-trigger ---
 
 let counterPath = path.join(userConfigDir(), '.stuck-count.json');
 /** Injectable for tests so the real home dir is never touched. */
@@ -145,7 +145,7 @@ export function recordFailure(): void {
   writeCounter(state);
 }
 
-/** True when the failure threshold is crossed (auto-report trigger, FR-023). */
+/** True when the failure threshold is crossed. */
 export function shouldAutoReport(envValue: string | undefined): boolean {
   if (envValue !== '1') return false;
   const state = readCounter();

@@ -3,11 +3,11 @@ import { registerRunCommand } from '../../src/abap_cli/commands/run.js';
 import { registerLazyCommands, type LazyCommandSpec } from '../../src/abap_cli/registry/lazy.js';
 import { makeProgram, runCommand } from './cli-helper.js';
 
-// FR-014 / SC-006 — `run` follows lazy loading: module not imported until
+// / — `run` follows lazy loading: module not imported until
 // dispatched (or its help is requested).
 
-describe('run command lazy load (P1.6)', () => {
-  it('registers as a lazy spec with scope=sap and a load() that imports commands/run', () => {
+describe('run command lazy load', () => {
+  it('registers as a lazy spec with scope=sap and a load that imports commands/run', () => {
     const spec: LazyCommandSpec = {
       name: 'run',
       scope: 'sap',

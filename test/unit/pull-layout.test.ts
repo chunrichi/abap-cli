@@ -153,7 +153,7 @@ describe('abap pull (abap-file-format layout)', () => {
     const dir = path.join(cwd, 'src');
     const meta = JSON.parse(fs.readFileSync(path.join(dir, 'zprog_top.prog.json'), 'utf-8'));
     expect(meta.generalInformation.programType).toBe('include');
-    // 032 US13: PROG/I sub-route — file lands at <name>.prog.include.abap
+    // PROG/I sub-route — file lands at <name>.prog.include.abap
     // (not <name>.prog.abap as the main part) so static checks can distinguish
     // include from executable.
     expect(fs.existsSync(path.join(dir, 'zprog_top.prog.include.abap'))).toBe(true);

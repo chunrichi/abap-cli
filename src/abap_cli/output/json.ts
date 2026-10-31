@@ -179,7 +179,7 @@ export function printError(mode: OutputMode, error: unknown, meta?: OutputMeta):
   process.exit(out.exitCode ?? EXIT_GENERIC_FALLBACK);
 }
 
-// --- Command parameter schema (`--schema` introspection, P0.1) ---
+// --- Command parameter schema ---
 // Machine-readable description of a command's arguments/options so an agent
 // can discover the exact invocation contract before calling it.
 
@@ -264,7 +264,7 @@ export function printSchema(schema: object, mode: OutputMode = 'json'): void {
   printResult(jsonMode, schema, '', buildSchemaMeta() as OutputMeta);
 }
 
-// --- Token-efficient output helpers (025 US2) ---
+// --- Token-efficient output helpers ---
 
 /** Recursively strip empty arrays and empty objects from `value` to save LM-agent
  *  tokens. Agent consumers rarely need `"skipped": []` or `"warnings": []` when

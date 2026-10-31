@@ -8,7 +8,7 @@ export const SCHEMA = {
   description:
     'Execute an activated REPORT and return its list output (read-only, via the bundled ICF /run/report endpoint). ' +
     'The report runs with DEFAULT selection values; only classic list output is captured. ' +
-    'S-4 adds --format (raw|tsv|csv) and --param NAME=VALUE pass-through.',
+    '--format (raw|tsv|csv) and --param NAME=VALUE pass-through are supported.',
   usage: 'abap run-report <report> [--variant <name>] [--format raw|tsv|csv] [--param NAME=VALUE]...',
   scope: 'sap',
   arguments: [

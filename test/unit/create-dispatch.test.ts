@@ -1,5 +1,5 @@
 /**
- * Phase 3 — `runCreate` dispatcher coverage.
+ * — `runCreate` dispatcher coverage.
  *
  * The per-type create flows are exercised elsewhere (`http-create.test.ts`,
  * `create-fugr-func.test.ts`, `create-name-validation.test.ts`). What was NOT

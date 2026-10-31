@@ -9,7 +9,7 @@ vi.mock('../../src/abap_cli/adc/runtime-probe.js', () => ({
 
 vi.mock('../../src/abap_cli/config/runtime-cache.js', () => ({
   // cache is empty in tests — every deploy probe forces a network call,
-  // which is what the original 030 assertions targeted.
+  // which is what the original assertions targeted.
   getOrProbeRuntime: (...a: unknown[]) => getOrProbeRuntime(...a),
   clearRuntimeCache: () => undefined,
   readCachedRuntime: () => undefined,

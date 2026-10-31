@@ -1,5 +1,5 @@
 /**
- * Spec 036 T036-038: parseAcds 5-shape coverage.
+ * parseAcds 5-shape coverage.
  *
  * Per spec: viewEntity / projectionView / tableFunction (define forms) +
  * viewEntityExtend / viewExtend (extend forms with parentName). The
@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { parseAcds } from '../../src/abap_cli/formats/ddls/acds.js';
 
-describe('parseAcds (036 US4)', () => {
+describe('parseAcds', () => {
   it('recognises viewEntity', () => {
     const r = parseAcds('define view entity ZMY_VIEW as select from t000 { key mandt as Client }');
     expect(r.sourceType).toBe('viewEntity');
