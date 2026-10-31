@@ -53,14 +53,16 @@ describe('wire ↔ local AFF round-trip', () => {
       },
       generalInformation: {
         handlerClass: 'ZCL_MY_HANDLER',
-        url: '/sap/zmy_http',
+        servicePath: '/sap/zmy_http',
         serviceId: '/sap/zfoo',
       },
     };
     const wire = httpLocalToWire(local as any);
     expect((wire as any).header?.description).toBe('HTTP service');
+    expect((wire as any).generalInformation?.url).toBe('/sap/zmy_http');
     expect((wire as any).generalInformation?.serviceId).toBe('/sap/zfoo');
     const back = httpWireToLocal(wire);
+    expect((back as any).generalInformation?.servicePath).toBe('/sap/zmy_http');
     expect((back as any).generalInformation?.serviceId).toBe('/sap/zfoo');
   });
 
