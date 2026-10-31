@@ -60,10 +60,11 @@ describe('wire ↔ local AFF round-trip', () => {
     const wire = httpLocalToWire(local as any);
     expect((wire as any).header?.description).toBe('HTTP service');
     expect((wire as any).generalInformation?.url).toBe('/sap/zmy_http');
-    expect((wire as any).generalInformation?.serviceId).toBe('/sap/zfoo');
+    // SICF-only metadata is not forwarded on the wire and is not written back.
+    expect((wire as any).generalInformation?.serviceId).toBeUndefined();
     const back = httpWireToLocal(wire);
     expect((back as any).generalInformation?.servicePath).toBe('/sap/zmy_http');
-    expect((back as any).generalInformation?.serviceId).toBe('/sap/zfoo');
+    expect((back as any).generalInformation?.serviceId).toBeUndefined();
   });
 
   it('DTEL unknown category raises DTEL_CATEGORY_UNSUPPORTED', () => {

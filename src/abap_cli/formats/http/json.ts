@@ -9,12 +9,19 @@ export const HTTP_EXTENSIONS = ['.http.json'];
 /** Re-exported from `types/registry.ts`. */
 export { HTTP_TYPES, type HttpSupportedType };
 
-/** `header` of an HTTP Service document (same members local and on the wire). */
+/** `header` of a local HTTP Service document (abap-file-format http-v1). */
 export interface HttpServiceHeader {
   description: string;
   originalLanguage: string;
   abapLanguageVersion?: 'standard' | 'cloudDevelopment';
-  /** SICF multi-language descriptions (not in the abap-file-format schema). */
+}
+
+/**
+ * `header` of the wire payload. The ICF GET path additionally reports SICF
+ * multi-language descriptions, which the abap-file-format schema does not
+ * model and therefore must not be written to the local `<name>.http.json`.
+ */
+export interface HttpWireHeader extends HttpServiceHeader {
   descriptionByLang?: Array<{ language: string; description: string }>;
 }
 
@@ -33,8 +40,6 @@ export interface HttpServiceGeneralInformation {
    * local-only for now.
    */
   tokenHandling?: boolean;
-  /** SICF node path as reported by the ICF GET path; CLI extension. */
-  serviceId?: string;
 }
 
 /**
@@ -49,13 +54,14 @@ export interface HttpWireGeneralInformation {
   handlerClass?: string;
   /** ICF wire name for the AFF `servicePath` value. */
   url?: string;
+  /** SICF node path reported by the ICF GET path (wire-only, never written). */
   serviceId?: string;
 }
 
 /** Wire payload accepted by the ICF `/http/<name>` route. */
 export interface HttpServiceDefinition {
   formatVersion: '1';
-  header: HttpServiceHeader;
+  header: HttpWireHeader;
   generalInformation: HttpWireGeneralInformation;
   /** Local-only: object name (used by CLI / SICF envelope, not by ABAP). */
   name?: string;
@@ -73,8 +79,11 @@ export interface HttpServiceDefinition {
  * The canonical shape is the abap-file-format nested one (`header` +
  * `generalInformation`); the flat CLI form (`description` / `handlerClass` /
  * `servicePath` at the top level) stays accepted for hand-written files.
- * `serviceId` / `header.descriptionByLang` are SICF extensions the AFF schema
- * does not model.
+ *
+ * SICF-only metadata (`serviceId`, `header.descriptionByLang[]`) is returned by
+ * the ICF GET path but is deliberately *not* part of this document: the AFF
+ * schema is `additionalProperties:false`, so writing those fields made a real
+ * `pull HTTP` fail its own pre-write validation.
  */
 export interface HttpObjectLocal {
   name?: string;
@@ -83,10 +92,6 @@ export interface HttpObjectLocal {
   abapLanguageVersion?: 'standard' | 'cloudDevelopment';
   handlerClass?: string;
   servicePath?: string;
-  /** SICF service path (e.g. '/sap/zfoo'); not in the AFF schema. */
-  serviceId?: string;
-  /** multi-language descriptions (one entry per language). */
-  descriptionByLang?: Array<{ language: string; description: string }>;
   formatVersion?: '1';
   header?: HttpServiceHeader;
   generalInformation?: HttpServiceGeneralInformation;
@@ -151,31 +156,26 @@ export function localToWire(local: HttpObjectLocal): HttpWirePayload {
   const abapLanguageVersion = (l.abapLanguageVersion as string | undefined) ?? (headerObj?.abapLanguageVersion as string | undefined);
   const handlerClass = (l.handlerClass as string | undefined) ?? (generalObj?.handlerClass as string | undefined);
   const servicePath = (l.servicePath as string | undefined) ?? (generalObj?.servicePath as string | undefined);
-  // SICF extension fields — nested (preferred) or top-level flat (legacy fallback).
-  const serviceId = (l.serviceId as string | undefined) ?? (generalObj?.serviceId as string | undefined);
-  const descByLangRaw = (l.descriptionByLang as Array<{ language: string; description: string }> | undefined)
-    ?? (headerObj?.descriptionByLang as Array<{ language: string; description: string }> | undefined);
 
   const header: Record<string, unknown> = {};
   if (description !== undefined) header.description = description;
   if (originalLanguage !== undefined) header.originalLanguage = originalLanguage;
   if (abapLanguageVersion !== undefined) header.abapLanguageVersion = abapLanguageVersion;
-  if (descByLangRaw !== undefined && descByLangRaw.length > 0) header.descriptionByLang = descByLangRaw;
 
   const generalInformation: Record<string, unknown> = {};
   if (handlerClass !== undefined) generalInformation.handlerClass = handlerClass;
   // The ICF handler deserializes the AFF shape but still names this member
   // `url`; keep the wire stable until the ABAP side adopts `servicePath`.
   if (servicePath !== undefined) generalInformation.url = servicePath;
-  if (serviceId !== undefined) generalInformation.serviceId = serviceId;
 
   const wire: HttpWirePayload = {
-    name: local.name !== undefined ? String(local.name).toUpperCase() : undefined,
     formatVersion: '1',
     header: header as unknown as HttpWirePayload['header'],
     generalInformation: generalInformation as unknown as HttpWirePayload['generalInformation'],
   };
-  // Transport envelope: carried at the top level of the local file.
+  // Local-only envelope fields are forwarded only when present, so the wire
+  // payload never carries explicit `undefined` keys.
+  if (local.name !== undefined) wire.name = String(local.name).toUpperCase();
   if (l.package !== undefined) wire.package = l.package as string;
   if (l.transportRequest !== undefined) wire.transportRequest = l.transportRequest as string;
   return wire;
@@ -200,21 +200,20 @@ export function wireToLocal(wire: HttpWirePayload): HttpObjectLocal {
   if (headerObj?.description !== undefined) header.description = headerObj.description;
   if (headerObj?.originalLanguage !== undefined) header.originalLanguage = headerObj.originalLanguage;
   if (headerObj?.abapLanguageVersion !== undefined) header.abapLanguageVersion = headerObj.abapLanguageVersion;
-  if (Array.isArray(headerObj?.descriptionByLang) && (headerObj?.descriptionByLang as unknown[]).length > 0) {
-    header.descriptionByLang = headerObj.descriptionByLang;
-  }
 
   const generalInformation: Record<string, unknown> = {};
   if (generalObj?.handlerClass !== undefined) generalInformation.handlerClass = generalObj.handlerClass;
   if (generalObj?.url !== undefined) generalInformation.servicePath = generalObj.url;
-  if (generalObj?.serviceId !== undefined) generalInformation.serviceId = generalObj.serviceId;
 
-  return {
-    name: w.name as string | undefined,
+  const local: HttpObjectLocal = {
     formatVersion: '1',
     header: header as unknown as HttpObjectLocal['header'],
     generalInformation: generalInformation as unknown as HttpObjectLocal['generalInformation'],
   };
+  // `name` is the CLI envelope (stripped before AFF validation), not part of
+  // the on-disk document; omit the key entirely when the wire has no name.
+  if (w.name !== undefined) local.name = w.name as string;
+  return local;
 }
 
 /**
