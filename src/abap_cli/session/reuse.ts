@@ -238,6 +238,29 @@ interface AdtHttpLike {
 }
 
 /**
+/**
+ * The ICM hands out `sap-contextid=SID:ANON:<host>:<sid>:…` cookies on
+ * stateless requests. Replaying that anonymous context with a stateful ADT
+ * request makes the server answer `400 Session not found`, so it must never be
+ * sent back nor persisted.
+ */
+function isAnonymousContextCookie(name: string, entry: string): boolean {
+  if (name !== 'sap-contextid') return false;
+  const eq = entry.indexOf('=');
+  const value = eq >= 0 ? entry.slice(eq + 1) : entry;
+  return /(?:^|%3a|:)anon(?:%3a|:)/i.test(value);
+}
+
+/** Drop anonymous ICM context cookies from the live ADT cookie map. */
+export function dropAnonymousContextCookies(client: { httpClient: unknown }): void {
+  const http = client.httpClient as AdtHttpLike;
+  if (!http.cookie) return;
+  for (const [name, entry] of [...http.cookie]) {
+    if (isAnonymousContextCookie(name, entry)) http.cookie.delete(name);
+  }
+}
+
+/**
  * Seed a live ADT client from a saved jar so the next request reuses the
  * SAP session instead of opening a new one. Sets `csrfToken` (public setter)
  * to the persisted value — a non-`fetch` token makes `loggedin` true, which
@@ -248,6 +271,7 @@ export function injectSessionIntoAdt(client: { httpClient: unknown }, jar: Sessi
   if (http.cookie) {
     http.cookie.clear();
     for (const c of jar.cookies) {
+      if (isAnonymousContextCookie(c.name, `${c.name}=${c.value}`)) continue;
       http.cookie.set(c.name, `${c.name}=${c.value}`);
     }
   }
@@ -265,6 +289,9 @@ export function captureSessionFromAdt(client: { httpClient: unknown }, jar: Sess
   const cookies: SessionJar['cookies'] = [];
   if (http.cookie) {
     for (const [name, entry] of http.cookie) {
+      // Never persist an anonymous ICM context: replaying it makes the SAP
+      // server reject the next request with `400 Session not found`.
+      if (isAnonymousContextCookie(name, entry)) continue;
       // entry is stored as `name=value` (path/expiry stripped by the lib).
       const eq = entry.indexOf('=');
       cookies.push({ name, value: eq >= 0 ? entry.slice(eq + 1) : entry });

@@ -18,7 +18,7 @@ import { buildBasicAuth } from './basic-auth.js';
 import { makeEmptyJar, type SessionJar } from '../session/jar.js';
 import { effectivePolicy, isUnsupportedInContext, resolveSessionPolicy } from '../session/policy.js';
 import { loadOrCreateSessionKey } from '../session/key.js';
-import { captureSessionFromAdt, clearJarFromDisk, injectSessionIntoAdt, loadJarFromDisk, markJarPersisted } from '../session/reuse.js';
+import { captureSessionFromAdt, clearJarFromDisk, dropAnonymousContextCookies, injectSessionIntoAdt, loadJarFromDisk, markJarPersisted } from '../session/reuse.js';
 import { registerAdtClient } from '../session/registry.js';
 import { buildCreateWire, type DevcCreateWireOptions } from '../formats/devc/json.js';
 
@@ -126,6 +126,7 @@ export class AdtClientWrapper {
   private async _loginNow(): Promise<void> {
     try {
       await this.client.login();
+      dropAnonymousContextCookies(this.client);
       this.freshLogin = true;
       this.sessionReady = true;
       if (this.jar && this.sessionKey) {
@@ -228,6 +229,7 @@ export class AdtClientWrapper {
   private async ensureSession(): Promise<void> {
     if (this.sessionReady) return;
     await this.client.login();
+    dropAnonymousContextCookies(this.client);
     this.freshLogin = true;
     this.sessionReady = true;
     if (this.jar && this.sessionKey) {
@@ -289,6 +291,7 @@ export class AdtClientWrapper {
         this.fallbackUsed = true;
         // Stale session: re-login, re-capture, persist, then retry the call.
         await this.client.login();
+        dropAnonymousContextCookies(this.client);
         this.freshLogin = true;
         captureSessionFromAdt(this.client, this.jar);
         if (this.sessionKey) {
