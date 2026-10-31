@@ -221,6 +221,18 @@ export function registerMyCommand(program: Command): void {
 - **依赖升级**：patch/minor 以 `verify` 绿为准；major 单独 PR，失败则关闭并留下可复现证据（失败测试 + 错误信息），不要强行合并。
 - **交付前自检**：分支命名 + `git status` 干净；`verify` 绿；生成物已重建并提交；架构 / 设计决策 / 交接文档已同步；commit 格式合规；PR CI 绿后 squash merge。
 
+## Release
+
+发版流程见本地技能 `.agents/skills/release/SKILL.md`；干净克隆按本节执行。
+
+1. **定版本号**：SemVer；新增功能 minor，修复 patch；移除命令/参数、收紧运行时要求、不兼容行为变化走 major。`CHANGELOG.md` 的 `Removed (breaking)` 即 breaking 清单。
+2. **版本单线**：同一次提交里改 `package.json`、`package-lock.json` 根条目、`ICF_SERVICE_VERSION`、ABAP `gc_version`、6 个 skill 与 agent 的版本、`skills/README.md` 的 CLI 版本，以及 README / wiki 中的当前版本示例；`docs/commands.md` 用 `npm run build && npm run docs:build` 重新生成（禁止手改）。
+3. **CHANGELOG 收口**：把 `[Unreleased]` 移到 `## [X.Y.Z] - YYYY-MM-DD`，顶部保留空的 `## [Unreleased]`；条目面向用户（行为 / 体验 / 迁移），breaking 写进 `Removed (breaking)` 并在 **Migration** 给出可执行步骤。
+4. **验证**：`npm run verify` 绿后走 PR（`chore(release): X.Y.Z`），CI `verify` 绿后 squash merge。
+5. **发布**：在合并后的 commit 上打 annotated tag `vX.Y.Z` 并 push；tag 触发 `publish.yml`，经 npm trusted publishing（OIDC）发布，tag 必须与 `package.json` 版本一致；已发布版本会被 npm view guard 跳过。
+6. **发布后**：等 registry 出现新版本（注意传播延迟）后创建 GitHub Release（notes 取 CHANGELOG 新版本段），核对 `gitHead` 与 tag commit 一致，`npx --yes abap-cli@X.Y.Z --version` 冒烟；ICF 服务版本变化时提醒用户与测试环境执行一次 `abap deploy --yes`。
+
+
 ## Conventions
 
 - **Reuse, don't duplicate** — config (`loadConfig`), transport resolution (`resolveTransport`), and output helpers are shared; do not re-implement them

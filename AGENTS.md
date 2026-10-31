@@ -59,7 +59,7 @@
 ## Agent 上下文布局
 
 - 仓库合约：根 `AGENTS.md`（本文件）。
-- 本地技能：`.agents/skills/`（DSH 项目级技能根；启动只加载 name+description，正文按需）。当前含 `abap-style` / `abap-report-style` / `abap-testing` / `okf` / `repo-workflow`。
+- 本地技能：`.agents/skills/`（DSH 项目级技能根；启动只加载 name+description，正文按需）。当前含 `abap-style` / `abap-report-style` / `abap-testing` / `okf` / `repo-workflow` / `release`。
 - 随包分发：`skills/`、`agents/abap-developer.agent.md`，由 `abap init --agent <copilot|claude|cursor|generic>` 拷入用户项目。
 - `.github/` 只承载 CI（`workflows/`、Dependabot）。本文件是仓库根目录的指令源；注意 coding agent 还会按目录加载子目录里的 `AGENTS.md` / `CLAUDE.md`（如 `tmp/repos/**` 的上游克隆），排查冲突指令时把这些也算上。
 
