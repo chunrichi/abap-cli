@@ -93,6 +93,22 @@ const getActiveObjectSource = vi.fn(async (uri: string) => {
 // i.e. the object has no unactivated version.
 const inactiveObjects = vi.fn(async () => [] as unknown[]);
 
+// Wrapper probe used by inspect-ops: same list, filtered by object URI.
+const pendingInactiveObject = vi.fn(async (objectUrl: string): Promise<boolean | undefined> => {
+  try {
+    const list = (await inactiveObjects()) as Array<{ object?: { 'adtcore:uri'?: string; deleted?: boolean } }>;
+    const target = objectUrl.replace(/\/+$/, '').toLowerCase();
+    return list.some((entry) => {
+      const object = entry?.object;
+      if (!object || object.deleted === true) return false;
+      if (typeof object['adtcore:uri'] !== 'string') return false;
+      return object['adtcore:uri'].replace(/\/+$/, '').toLowerCase() === target;
+    });
+  } catch {
+    return undefined;
+  }
+});
+
 vi.mock('../../src/abap_cli/clients/adt-client.js', () => ({
   AdtClientWrapper: {
     create: async () => ({
@@ -101,6 +117,7 @@ vi.mock('../../src/abap_cli/clients/adt-client.js', () => ({
       getObjectSource,
       getActiveObjectSource,
       inactiveObjects,
+      pendingInactiveObject,
       raw,
       lock: vi.fn(),
     }),
