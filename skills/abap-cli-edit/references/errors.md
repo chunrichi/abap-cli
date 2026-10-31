@@ -9,7 +9,7 @@
 | `OBJECT_NOT_FOUND` | NOT_FOUND/8 | pull / push / check / activate | `search <name>`（[abap-cli-search]）校对；`push` 不自动创建（创建走 `create`） |
 | `OBJECT_EXISTS` | USAGE/2 | create | 改用 `pull` + `push`；不要重复 `create` |
 | `LOCK_FAILED` | LOCKED/9 | push | `inspect <obj> --locks`（[abap-cli-search]）查持有者；SE03 手动释放 |
-| `ACTIVATION_FAILED` | VALIDATION_ERROR/7 | push / create / activate | `data.errors` 含行号；修复后重推 |
+| `ACTIVATION_FAILED` | VALIDATION_ERROR/7 | push / create / activate | `data.errors` 含行号；修复后重推。HTTP 200 但 `activationExecuted=false`（silent no-op）在 push 路径同报此码，`details.silentNoop: true` + 三个 executed 布尔 |
 | `SYNTAX_ERROR` | VALIDATION_ERROR/7 | check / push --check-only（源码对象） | `data.errors[]` 含 `{line, offset, severity, text}` |
 | `NO_TRANSPORT` | VALIDATION_ERROR/7 | push / create | 跳 `abap-cli-setup`：`transport list` / `transport create` → `--tr` 重试 |
 | `DDIC_NOT_SUPPORTED` | VALIDATION_ERROR/7 | pull / create / push | 类型不在白名单（DOMA/DTEL/TABL/STRU 之外）；看 `abap create --schema` |
@@ -17,9 +17,11 @@
 | `FILE_EXISTS` | USAGE/2 | pull | `pull --overwrite` 或 `--skip-existing` |
 | `TYPE_NOT_SUPPORTED` | VALIDATION_ERROR/7 | 任意 | `abap <cmd> --schema` 看支持列表 |
 | `PUSH_FAILED` | VALIDATION_ERROR/7 | push | `data.stage` 指示失败环节（lock/write/activate/unlock） |
+| `READONLY_METADATA` | VALIDATION_ERROR/7 | push | 推的是源码对象的 AFF 元数据 `.json`（`.clas.json` 等）；改推同目录的 `.abap` / `.acds` / `.abdl` 源码文件，元数据用 `validate:aff` 校验 |
 | `OBJECT_NOT_ACTIVE` | SAP_ERROR/6 | inspect --activation | `activate --yes` 修复 |
 | `VERSION_DESTINATION_INVALID` | USAGE/2 | pull --remote | 系统 ID 非法；看 `--remote` 参数 |
 | `INVALID_FIELD` | VALIDATION_ERROR/7 | push（DDIC JSON 写） | DDIC 结构校验失败；看 `error.details` |
+| `VALIDATION_ERROR` | VALIDATION_ERROR/7 | validate:aff | AFF schema 校验失败或缺少必需 companion；看 `error.details.files[]`（cwd-relative POSIX，`status: "fail"` / `missingCompanions[]`） |
 | `INVALID_ARGUMENT` | USAGE/2 | 任意 | 看 `error.nextSteps` / `error.references` |
 | `USAGE` | USAGE/2 | 任意 | 缺必填参数；看 `error.nextSteps` |
 

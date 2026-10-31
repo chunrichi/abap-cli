@@ -138,7 +138,7 @@ graph LR
 - **ADT channel** — source objects (CLAS / INTF / PROG / FUGR / CDS / RAP) use the standard ADT REST API: search, source read/write, lock, syntax check, activation, transports, where-used.
 - **ICF channel** — DDIC objects, SICF nodes and transaction codes, table data, reports, MIME, remote version pulls, textpool reads on releases without the ADT text-elements endpoint, and the runtime wrapper use the bundled ABAP service, deployed with `abap deploy`. It exposes `/ddic/*`, `/http/*`, `/tran/*`, `/tcode/*`, `/data/*`, `/run/*`, `/mime/*`, `/textpool/*`, `/version-source*` and `/_class-check*`.
 
-The release form of the service installs **3 global classes** (handler + setup + runtime wrapper); `abap deploy --dev` installs the full 19-class development tree for maintainers. The ICF node is created idempotently by the setup class, so `abap deploy` can be re-run safely.
+The release form of the service installs **3 global classes** (handler + setup + runtime wrapper); `abap deploy --dev` installs the full 20-class development tree for maintainers. The ICF node is created idempotently by the setup class, so `abap deploy` can be re-run safely.
 
 ---
 

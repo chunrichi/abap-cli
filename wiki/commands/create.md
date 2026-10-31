@@ -4,7 +4,7 @@ title: abap create
 description: 在 SAP 创建新对象并激活 — 源对象（CLAS/INTF/PROG/FUGR，ADT REST）、DDIC（DOMA/DTEL/TABL/STRU/ENQU/VIEW/SHLP/NROB，--file 走 ICF）、HTTP/SICF 节点、事务码、TTYP/MSAG/DDLS 及 CDS/RAP 配套对象；FUGR 配 --func 可在既有函数组内新建函数模块（FUGR/FF）；--no-activate / --template / --no-pull / --check-only / --audit；--schema 提供 agent 参数自省；create local 为离线草稿（仅 4 类源对象）
 tags: [abap-cli, command, create, clas, intf, prog, fugr, fugr-ff, doma, dtel, tabl, stru, ddic, icf, template, schema]
 created at: 2026-08-07 00:00:00
-changed at: 2026-10-31 18:06:00
+changed at: 2026-11-01 00:20:00
 ---
 
 # abap create
@@ -330,7 +330,7 @@ abap create local CLAS ZCL_DRAFT --template public-method --dir src/
 
 ## todo
 
-- [x] `TTYP` / `MSAG` / `DDLS` / `ENQU` / `NROB` / `XSLT` 等 `--file` 类型已接入（`create` 的 `--schema.allowedValues` 全 23 类）
+- [x] `TTYP` / `MSAG` / `DDLS` / `ENQU` / `NROB` / `XSLT` 等 `--file` 类型已接入（`create` 的 `--schema.allowedValues` 全 25 类）
 - [x] `TRAN` 写路径已实现（`/tran` POST/PUT，dialog/report/parameter/variant；OO 事务明确拒绝）
 - [ ] `create local` 为实验性命令，待与 `create` 主流程的落库闭环稳定后转正
 

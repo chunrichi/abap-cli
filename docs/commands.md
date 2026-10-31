@@ -798,6 +798,7 @@ abap doctor [options]
 | Option | Required | Default | Values | Description |
 | --- | --- | --- | --- | --- |
 | `--verbose` | no |  |  | Include detail (versions, paths, underlying messages). |
+| `--strict` | no |  |  | Exit 3 with CONFIG_ERROR when any environment/config check fails (CI / agent gate). |
 | `--fix` | no |  |  | Apply safe, reversible fixes (requires --yes). |
 | `--yes` | no |  |  | Confirm --fix without prompting. |
 
@@ -807,6 +808,11 @@ abap doctor [options]
 
   ```bash
   abap doctor
+  ```
+- Gate on a healthy environment (exit 3 when not ok)
+
+  ```bash
+  abap doctor --strict --json
   ```
 - Apply safe fixes
 
@@ -1218,6 +1224,7 @@ Aggregated from the per-command schemas. The authoritative TypeScript source is 
 | `PULL_PARTIAL_FAILURE` | VALIDATION_ERROR | 7 |
 | `PUSH_FAILED` | VALIDATION_ERROR | 7 |
 | `QUERY_FAILED` | SAP_ERROR | 6 |
+| `READONLY_METADATA` | VALIDATION_ERROR | 7 |
 | `REPORT_NO_LIST_OUTPUT` | SAP_ERROR | 6 |
 | `REPORT_NOT_EXECUTABLE` | VALIDATION_ERROR | 7 |
 | `REPORT_NOT_FOUND` | NOT_FOUND | 8 |

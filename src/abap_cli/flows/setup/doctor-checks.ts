@@ -22,10 +22,33 @@ export interface DoctorItem {
 
 /** The full doctor report. Sections never throw. */
 export interface DoctorReport {
+  /** False when any environment / config item is `err`. Always emitted so a
+   *  gate can branch on one boolean instead of re-scanning both sections. */
+  ok: boolean;
   environment: DoctorItem[];
   config: DoctorItem[];
   nextSteps: string[];
-  fixesApplied?: string[];
+}
+
+/** A safe, reversible fix applied by `abap doctor --fix --yes`. */
+export interface DoctorFixApplied {
+  /** Stable identifier the agent can branch on (e.g. `config-dir`). */
+  id: string;
+  /** What was done, one line. */
+  action: string;
+  /** What it touched — home-anchored, so not cwd-relative (`~/.abap-cli`). */
+  target: string;
+  /** Whether the change can be undone without data loss. */
+  reversible: boolean;
+}
+
+/** An err item that is still unresolved after `--fix`. */
+export interface DoctorRemaining {
+  /** Check key, e.g. `config.workspace`. */
+  key: string;
+  message: string;
+  /** The action that would clear it. */
+  nextStep?: string;
 }
 
 export interface DoctorOptions {
@@ -50,6 +73,19 @@ const errItem = (key: string, message: string, suggestion?: string, detail?: str
   suggestion,
   detail,
 });
+
+/** Collapse wording differences (case / whitespace) so identical advice is
+ *  emitted once in `nextSteps`. */
+function normalizeSuggestion(suggestion: string): string {
+  return suggestion.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/** One remediation text for every "configuration is missing" finding: the
+ *  missing systems.json and the missing .abap.json are cleared by the same
+ *  command, so doctor reports the fix once. */
+const INIT_SUGGESTION =
+  'Run "abap init" (interactive wizard) to create the connection profile and .abap.json, or "abap init --profile <name>" to bind an existing profile.';
+const INIT_SUGGESTION_KEY = 'init';
 
 /** How the running CLI was loaded — diagnostics only, never used to gate behavior. */
 type InstallKind = 'npm-install' | 'source-checkout' | 'linked-checkout' | 'unknown';
@@ -150,12 +186,15 @@ function readInstallInfo(): InstallInfo {
 }
 
 /** Read systems.json as a record — never throws; reports parse errors as items. */
-function readSystems(configPath: string): { systems: Record<string, unknown>; error?: { message: string; suggestion: string } } {
+function readSystems(configPath: string): {
+  systems: Record<string, unknown>;
+  error?: { message: string; suggestion: string; missing: boolean };
+} {
   try {
     if (!fs.existsSync(configPath)) {
       return {
         systems: {},
-        error: { message: `Config file not found: ${configPath}`, suggestion: 'Run "abap init --profile <name>" or "abap profile add <name> ..." to create it.' },
+        error: { message: `Config file not found: ${configPath}`, suggestion: INIT_SUGGESTION, missing: true },
       };
     }
     const parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as { systems?: Record<string, unknown> };
@@ -167,6 +206,7 @@ function readSystems(configPath: string): { systems: Record<string, unknown>; er
       error: {
         message: `Cannot parse config file ${configPath}: ${message}`,
         suggestion: `Fix or delete ${configPath}, then re-run "abap doctor".`,
+        missing: false,
       },
     };
   }
@@ -190,12 +230,19 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
   const environment: DoctorItem[] = [];
   const config: DoctorItem[] = [];
   const suggestions: string[] = [];
+  const suggestionKeys = new Set<string>();
 
-  const push = (section: DoctorItem[], item: DoctorItem) => {
+  /** Collect a suggestion once per remediation family. `suggestionKey` groups
+   *  advice that overlaps even when the wording differs (e.g. a missing
+   *  systems.json and a missing .abap.json are both repaired by `abap init`),
+   *  so nextSteps does not repeat the same command twice. */
+  const push = (section: DoctorItem[], item: DoctorItem, suggestionKey?: string) => {
     section.push(item);
-    if (item.status === 'err' && item.suggestion && !suggestions.includes(item.suggestion)) {
-      suggestions.push(item.suggestion);
-    }
+    if (item.status !== 'err' || !item.suggestion) return;
+    const key = suggestionKey ?? normalizeSuggestion(item.suggestion);
+    if (suggestionKeys.has(key)) return;
+    suggestionKeys.add(key);
+    suggestions.push(item.suggestion);
   };
 
   // --- environment ---
@@ -247,6 +294,7 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
     sys.error
       ? errItem('env.config', sys.error.message, sys.error.suggestion)
       : okItem('env.config', verbose ? configPath : undefined),
+    sys.error?.missing ? INIT_SUGGESTION_KEY : undefined,
   );
 
   // Dependency sanity, part 1: packages that the shipped `dist` imports
@@ -365,8 +413,9 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
       errItem(
         'config.workspace',
         'No workspace config (.abap.json) found in the current directory or any ancestor.',
-        'Run "abap init" (TTY wizard) or "abap init --profile <name>" to initialize the workspace.',
+        INIT_SUGGESTION,
       ),
+      INIT_SUGGESTION_KEY,
     );
   }
 
@@ -374,16 +423,41 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
   // `abap profile test <name>` for live connectivity diagnostics; doctor
   // stays read-only and offline.
 
-  return { environment, config, nextSteps: suggestions };
+  return { ok: isOk(environment, config), environment, config, nextSteps: suggestions };
 }
 
-/** Safe, reversible fixes for `doctor --fix`. Returns what was applied. */
-export function applySafeFixes(home: string = os.homedir()): string[] {
-  const applied: string[] = [];
+/** True iff every environment / config item is `ok`. */
+function isOk(environment: DoctorItem[], config: DoctorItem[]): boolean {
+  return ![...environment, ...config].some((item) => item.status === 'err');
+}
+
+/** The err items a `--fix` run could not clear (post-fix re-diagnosis). */
+export function remainingIssues(report: DoctorReport): DoctorRemaining[] {
+  const out: DoctorRemaining[] = [];
+  for (const item of [...report.environment, ...report.config]) {
+    if (item.status !== 'err') continue;
+    out.push({
+      key: item.key,
+      message: item.message,
+      ...(item.suggestion ? { nextStep: item.suggestion } : {}),
+    });
+  }
+  return out;
+}
+
+/** Safe, reversible fixes for `doctor --fix`. Returns what was applied
+ *  (structured so an agent can report exactly what changed vs. what remains). */
+export function applySafeFixes(home: string = os.homedir()): DoctorFixApplied[] {
+  const applied: DoctorFixApplied[] = [];
   const dir = path.join(home, '.abap-cli');
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-    applied.push(`recreated ${dir} with 0700 perms`);
+    applied.push({
+      id: 'config-dir',
+      action: 'Created the CLI config directory with 0700 permissions.',
+      target: '~/.abap-cli',
+      reversible: true,
+    });
   }
   return applied;
 }

@@ -103,14 +103,17 @@ describe('abap push FUGR (sub-object mapping)', () => {
     expect(unLock).toHaveBeenCalledWith(`${GROUP}/fmodules/tableframe_zfg_wechat_table`, 'lock-1');
     // FM activation now goes through activateAll (not the single-object
     // activate overload), with parentUri pointing at the enclosing group.
-    expect(activateAll).toHaveBeenCalledWith([
-      expect.objectContaining({
-        uri: `${GROUP}/fmodules/tableframe_zfg_wechat_table`,
-        type: 'FUGR/FF',
-        name: 'TABLEFRAME_ZFG_WECHAT_TABLE',
-        parentUri: GROUP,
-      }),
-    ]);
+    expect(activateAll).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          uri: `${GROUP}/fmodules/tableframe_zfg_wechat_table`,
+          type: 'FUGR/FF',
+          name: 'TABLEFRAME_ZFG_WECHAT_TABLE',
+          parentUri: GROUP,
+        }),
+      ],
+      { requireExecuted: true },
+    );
   });
 
   it('pushes the sapl<name>.reps file to the group source/main (group lock)', async () => {

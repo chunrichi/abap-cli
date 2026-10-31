@@ -56,16 +56,15 @@
 | 优先级 | 项 | 理由 |
 |--------|-----|------|
 | P0 | ~~`abap run`~~ / ~~`abap select`~~ / ~~`abap test`~~ | 均已在 1.0.0 后实现（见第三节），从待办中移除 |
-| P0 | 现有类型内补完（TRAN 写路径 / DOMA-DTEL 长文本 / AFF schema 同步） | 见第六节；决定 agent 闭环质量 |
+| P0 | ~~现有类型内补完（TRAN 写路径 / DOMA-DTEL 长文本 / AFF schema 同步）~~ | 三项均已完成（见第六节），从待办中移除 |
 | P1 | `abap serve`（协议化） | 改变交付形态，与"agent-native"目标完全一致 |
-| P1 | 对象类型补充 P1 批（VIEW / SHLP；XSLT、DEVC 已完成） | 见第六节；高价值且 SAP 侧路线已探明 |
 | P2 | `abap gen` / `abap impact` | 生产力放大器，但依赖前两者稳定 |
 | P2 | 多 agent 协调 / 快照回滚 | 从单工具到平台的关键，但场景还没到 |
 
 ## 六、对象类型补充路线（2026-10 评估）
 
 > 判据：**开发价值 × SAP 侧可行性（ADT / DDIC API）× AFF 成熟度 × agent 闭环收益**。
-> 对比依据：abap-cli 24 类 vs SAP abap-file-formats 上游 102 个类型格式（2026-10-30 HEAD）vs abapGit 168 个 TADIR handler（2026-10-29 HEAD）。
+> 对比依据：abap-cli 25 类 vs SAP abap-file-formats 上游 102 个类型格式（2026-10-30 HEAD）vs abapGit 168 个 TADIR handler（2026-10-29 HEAD）。
 > 本轮范围约定：**P0 不做 transport request 管理（release/delete）；P1 暂不做授权字段（AUTH）**。
 
 ### 6.1 P0：先在现有类型内补完
@@ -75,7 +74,7 @@
 - [x] **AFF vendor schema 与上游对齐 + 溯源治理**（重新同步 6 个漂移 schema，README 记录来源）
 - [x] **wiki 漂移修正**：object-types / coverage-matrix / create / pull / push / architecture
 - [x] **TRAN 写路径**：ABAP `/tran` GET/POST/PUT/DELETE 经 `RS_CORR_INSERT` + `RPY_TRANSACTION_INSERT` 实现（dialog/report/parameter/variant；OO 拒绝）；`abap create/pull/push/delete TRAN` 闭环，真机 23/23 TC
-- [ ] **DOMA/DTEL `.docu.json`**：vendor `docu-v1.json` + ICF 长文本读写（需真机验证）
+- [x] **DOMA/DTEL `.docu.json`**：vendor `docu-v1.json` + ICF `/ddic/<type>/<name>/docu` 长文本读写；pull/push 自动带出伴生文件（`lines: []` 删除远端长文本）；真机 16/18（2 项因 stateful 会话阻塞）
 - [ ] **AFF schema 季度同步**：`scripts/sync-aff-schema.sh` 已就绪；新增类型时按需 vendor
 
 ### 6.2 P1：高价值新类型（SAP 侧路线已探明）
@@ -85,7 +84,7 @@
 | `VIEW` | ICF `/ddic/view`：`DDIF_VIEW_GET` / `DDIF_VIEW_PUT` | 自建 `view-v1.json`（AFF 无此格式；按 AFF 命名/JSON 约定，README 标注 local extension） | - [x] 已完成（ABAP/CLI/mock/unit/integration + 真机 17/17 TC） |
 | `SHLP` | ICF `/ddic/shlp`：`DDIF_SHLP_GET` / `DDIF_SHLP_PUT` | 自建 `shlp-v1.json`（同上） | - [x] 已完成（elementary + collective；真机 18/18 TC） |
 | `DEVC` | ADT `createObject` `DEVC/K` + `GET /sap/bc/adt/packages/<name>` 读 | AFF `devc-v1.json` | - [x] 已完成（create/pull/delete；push 不支持——ADT 无包更新端点） |
-| `XSLT` | ICF + `CL_O2_API_XSLTDESC`（create/load/delete） | AFF `xslt-v1.json` + `.xslt.xml` | - [x] |
+| `XSLT` | ICF + `CL_O2_API_XSLTDESC`（create/load/save/activate/delete；更新走原地 `set_source`） | AFF `xslt-v1.json` + `.xslt.xml` | - [x] 已完成（更新保留版本历史；真机 18/18 TC） |
 
 > VIEW / SHLP 因 AFF 上游无格式，需按 TTYP 先例维护本地扩展 schema；可同步向上游 AFF 提 PR，采纳后切回官方 schema。
 
