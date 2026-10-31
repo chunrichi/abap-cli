@@ -38,6 +38,10 @@ const SCHEMA_FILE: Record<string, string> = {
   TABT: 'tabt-v1.json',
   DOMA: 'doma-v1.json',
   DTEL: 'dtel-v1.json',
+  // Long-text companion documents (`<name>.doma.docu.json` /
+  // `<name>.dtel.docu.json`). DOCU is a schema identifier, not an object type:
+  // it never appears in `types/registry.ts`, `abap create` or `abap types`.
+  DOCU: 'docu-v1.json',
   // ENQU (lock object) + NROB (number range object) schemas vendored
   // from the abap-file-format mirror.
   ENQU: 'enqu-v1.json',

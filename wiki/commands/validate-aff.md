@@ -2,14 +2,14 @@
 type: command
 title: abap validate:aff
 description: 用本地镜像的官方 abap-file-format JSON Schema 校验 10 个支持类型的 canonical JSON 形态；作为 create / push --file 的写盘前 gate
-tags: [abap-cli, command, validate:aff, validate, abap-file-format, schema, validator, ajv, canonical, doma, dtel, tabl, stru, fugr, clas, intf, prog, http, tran]
+tags: [abap-cli, command, validate:aff, validate, abap-file-format, schema, validator, ajv, canonical, doma, dtel, docu, tabl, stru, fugr, clas, intf, prog, http, tran]
 created at: 2026-09-03 00:00:00
-changed at: 2026-10-30 01:14:53
+changed at: 2026-10-31 17:05:00
 ---
 
 # abap validate:aff
 
-校验一个或一组 JSON 文件是否满足 **官方 abap-file-format**（AFF）规范。10 个支持类型（CLAS / INTF / PROG / FUGR / TABL / STRU / DOMA / DTEL / HTTP / TRAN）共享同一套校验层（`ajv@^8`，Draft 2020-12）；schema 来自仓库内 vendored 只读副本 `src/abap_cli/schema/`（`<type>/<type>-v1.json`；STRU 共享 `tabl-v1.json`，TABL/STRU `.settings.json` 走 `tabt-v1.json`），离线即可跑、不联网。
+校验一个或一组 JSON 文件是否满足 **官方 abap-file-format**（AFF）规范。10 个支持类型（CLAS / INTF / PROG / FUGR / TABL / STRU / DOMA / DTEL / HTTP / TRAN）共享同一套校验层（`ajv@^8`，Draft 2020-12）；schema 来自仓库内 vendored 只读副本 `src/abap_cli/schema/`（`<type>/<type>-v1.json`；STRU 共享 `tabl-v1.json`，TABL/STRU `.settings.json` 走 `tabt-v1.json`），离线即可跑、不联网。DOMA / DTEL 的长文本伴生文件（`<name>.doma.docu.json` / `<name>.dtel.docu.json`）按 `docu-v1.json` 校验——它是 companion schema，不占对象类型。
 
 ## Usage
 
@@ -49,6 +49,8 @@ abap validate:aff [file-or-dir] [--wire <wire-dir>] [--json] [--schema]
 | `<name>.stru.settings.json` | `tabt-v1.json` |
 | `<name>.doma.json` | `doma-v1.json` |
 | `<name>.dtel.json` | `dtel-v1.json` |
+| `<name>.doma.docu.json` | `docu-v1.json`（DOMA 长文本伴生，0..1） |
+| `<name>.dtel.docu.json` | `docu-v1.json`（DTEL 长文本伴生，0..1） |
 | `<name>.http.json` | `http-v1.json` |
 | `<name>.tran.json` | `tran-v1.json` |
 
@@ -62,6 +64,7 @@ abap validate:aff [file-or-dir] [--wire <wire-dir>] [--json] [--schema]
 - **STRU**: `.tabl.ddic` 必需；`.tabl.settings.json` optional（仅 WARN）。
 - **CLAS**: 4 个 `.clas.{definitions,implementations,macros,testclasses}.abap` 必需；`.clas.texts.<lang>.properties` optional。
 - **FUGR**: companion `*.reps.*` / `*.func.*` 动态从 main JSON 推断；缺件报告「missing companion」。
+- **DOMA / DTEL**: 长文本伴生 `.doma.docu.json` / `.dtel.docu.json` 是 **0..1 optional**，缺失不报错；存在时由路由直接按 `docu-v1.json` 校验（`line` ≤72、`format` ≤2、`formatVersion: "1"`）。
 
 companion 缺失 = exit 1。
 
@@ -114,6 +117,9 @@ abap validate:aff src/zmy_basic.tabl.json
 # 校验目录下全部 AFF 文件（含 STRU/TABL settings.json 走 tabt-v1.json）
 abap validate:aff src/
 
+# 单独校验 DOMA/DTEL 长文本伴生文件（docu-v1.json）
+abap validate:aff src/zmy_doma.doma.docu.json
+
 # 同时校验一个 wire payload 目录
 abap validate:aff src/zt_x.tabl.json --wire path/to/wire
 
@@ -152,7 +158,7 @@ abap validate:aff --schema
 }
 ```
 
-有 FAIL（或 companion 缺失）时 `status: "error"`、退出码 1：
+有 FAIL（或 companion 缺失）时 `status: "error"`、退出码 1（长文本伴生校验失败也走这里，`type: "DOCU"`）。真机证据：S/4HANA profile `test` 上从 ICF 拉回的 `<name>.doma.docu.json` / `.dtel.docu.json` 均 PASS（`type: "DOCU"`）；证据在 `tests/261031004-realsap-docu/`（本地，不入库）。
 
 ```json
 {

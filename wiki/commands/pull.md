@@ -1,15 +1,15 @@
 ---
 type: command
 title: abap pull
-description: 从 SAP 下载对象到本地文件 — 支持源码对象、包批量、DDIC JSON、textpool 与远程版本拉取
-tags: [abap-cli, command, pull, download, abap-file-format, ddic, textpool, version-management]
+description: 从 SAP 下载对象到本地文件 — 支持源码对象、包批量、DDIC JSON（含 DOMA/DTEL 长文本伴生）、textpool 与远程版本拉取
+tags: [abap-cli, command, pull, download, abap-file-format, ddic, docu, textpool, version-management]
 created at: 2026-08-06 23:21:15
-changed at: 2026-10-31 16:20:00
+changed at: 2026-10-31 17:05:00
 ---
 
 # abap pull
 
-从 SAP 系统下载 ABAP 对象到本地文件，遵循 abap-file-format（AFF）原生扁平布局。支持四类入口：单个源码对象（CLAS/PROG/INTF/FUGR）、包批量下载、DDIC 对象（DOMA/DTEL/TABL/STRU）、textpool 文本元素、以及远程系统版本源码。裸 `abap pull`（无对象名、无 `--package`）打印命令帮助（exit 0）。
+从 SAP 系统下载 ABAP 对象到本地文件，遵循 abap-file-format（AFF）原生扁平布局。支持五类入口：单个源码对象（CLAS/PROG/INTF/FUGR）、包批量下载、DDIC 对象（DOMA/DTEL/TABL/STRU，其中 DOMA/DTEL 会附带拉长文本伴生 `.docu.json`）、textpool 文本元素、以及远程系统版本源码。裸 `abap pull`（无对象名、无 `--package`）打印命令帮助（exit 0）。
 
 ## Usage
 
@@ -48,7 +48,7 @@ abap pull
 2. **`--package`** — `searchObject` 全量搜索 + 按 `adtcore:packageName` 过滤，分页（`limit × page`）逐对象拉取；单对象失败不中断整体（记为 `failed`），截断时提示 `--page N+1`。**分页的原因**：SAP quickSearch 端点的 `maxResults` 有上限（默认 `SEARCH_RESULT_LIMIT` = 20），一次请求拿不全整个包。实现上每次请求 `limit × page` 条结果、按包名过滤后取 `(page-1)*limit` 到 `page*limit` 的窗口——所以 `--limit` 越大单轮拉得越多，`--page` 递增继续拉下一批。单对象 pull（`abap pull ZCL_X`）无分页。
 3. **`--remote <id>`** — 走 ICF `/version-source`（TMS RFC destination `TMSADM@<id>.DOMAIN_<id>`）。CLI 类型 → VRSD 类型映射：`PROG → REPS`、`INTF → INTF`、`CLAS → CLSD`（类定义）。源码写入 AFF 标准文件名 `src/<name>.<type>.abap`（扁平布局，见下文）。对象从未传输到远端时后端返回空 `source`（成功）。
 4. **`--textpool`** — 拉取三个 `.properties` 文件，走混合模式路由（profile 缓存的能力决定走 ADT `getTextElements` 还是 ICF `/textpool/*`），JSON 结果带 `route` 字段（`adt`/`icf`）；文件落为 `src/<name>.<type>.<category>.<lang>.properties`。
-5. **DDIC 类型**（DOMA/DTEL/TABL/STRU/ENQU/NROB）— 走 ICF `GET /ddic/<type>/<name>`，`wireToLocal` 转成本地 JSON，写为 `src/<name>.<type>.json`（TABL/STRU 为三件套）。
+5. **DDIC 类型**（DOMA/DTEL/TABL/STRU/ENQU/NROB）— 走 ICF `GET /ddic/<type>/<name>`，`wireToLocal` 转成本地 JSON，写为 `src/<name>.<type>.json`（TABL/STRU 为三件套）。DOMA/DTEL 随后再 GET `/ddic/<type>/<name>/docu`，有长文本时写 `<name>.<type>.docu.json`（见「DOMA/DTEL 长文本伴生」）。
 6. **通道路由类型**（TTYP/MSAG/DDLS）— 见下节。
 7. **包（DEVC）** — 见下节「Package（DEVC）」：`GET /sap/bc/adt/packages/<name>`，单文件落盘，无批量选择器差异。
 
@@ -101,7 +101,7 @@ envelope 附加字段：
 
 - **源码对象（CLAS/INTF/PROG）**：`src/zcl_demo.clas.json` + `src/zcl_demo.clas.abap`；类 include 各一个文件（`src/zcl_demo.clas.definitions.abap` / `.clas.implementations.abap` / `.clas.macros.abap` / `.clas.testclasses.abap`）；include 程序落 `src/zinc.prog.include.abap`。
 - **FUGR**：`src/<group>.fugr.json` + `src/<group>.fugr.sapl<group>.reps.abap` + `src/<group>.fugr.l<group>top.reps.abap` + 每个 FM 的 `src/<group>.fugr.<fm>.func.abap`（元数据同名 `.json`）。
-- **DDIC**：TABL/STRU 三件套 `src/ztabl_demo.tabl.json` + `.tabl.ddic` + `.tabl.settings.json`（STRU 为 `.stru.*`）；DOMA/DTEL 单文件 `src/zmy_doma.doma.json` / `src/zmy_dtel.dtel.json`。
+- **DDIC**：TABL/STRU 三件套 `src/ztabl_demo.tabl.json` + `.tabl.ddic` + `.tabl.settings.json`（STRU 为 `.stru.*`）；DOMA/DTEL 单文件 `src/zmy_doma.doma.json` / `src/zmy_dtel.dtel.json`，有长文本时另有 0..1 伴生 `src/zmy_doma.doma.docu.json` / `src/zmy_dtel.dtel.docu.json`。
 - **textpool**：`src/zprog.prog.texts.en.properties`（另有 `.selections.<lang>.properties` / `.headings.<lang>.properties`）。
 - **命名空间**：AFF 规范把命名空间转为括号——`/UI2/CL_JSON` → `src/(ui2)cl_json.clas.abap`。旧 abapGit 风格 `#ui2#cl_json` 不再识别；旧文件需重新 `abap pull` 后才能 push。
 
@@ -116,6 +116,23 @@ envelope 附加字段：
 | 内容不同 | **抛 `OVERWRITE_REQUIRED`（exit 2）** | `skipped` | 覆盖写入 |
 
 注意差异：源码对象主路由（`pullObject`）会**先比较内容**再决定；DDIC / textpool / `--remote` 路由**不比较内容**，只要文件存在且两个 flag 都没给就直接抛 `OVERWRITE_REQUIRED`。
+
+### DOMA/DTEL 长文本伴生（`.docu.json`）
+
+DOMA/DTEL 的长文本不在对象 JSON 里，而是 0..1 伴生文件 `<name>.<type>.docu.json`（AFF `docu-v1.json`，`{formatVersion, lines:[{format,line}]}`）：
+
+| 远端状态 | 本地已有伴生 | 行为 |
+|---|---|---|
+| 有长文本 | 任意 | 写/覆盖伴生，`data.entries[]` 追加 `{file, status:'written', kind:'docu'}`，`written[]` 同步追加 |
+| `DOCU_NOT_FOUND` | 无 | 不写伴生（0..1，缺失不是错误） |
+| `DOCU_NOT_FOUND` | 有 | 默认**不动**本地陈旧伴生；`--overwrite` 时删除并在 `meta.warnings` 记 `DOCU_LOCAL_STALE_REMOVED`，`data.deleted[]` 列出被删路径 |
+| 端点 5xx / 网络错误 | 任意 | `meta.warnings` 记 `DOCU_PULL_FAILED`，**主对象文件照常写入、退出码不变** |
+| 旧 ICF 部署（无 docu 路由，回 `DDIC_OBJECT_NOT_FOUND` / `NOT_FOUND` / `METHOD_NOT_ALLOWED`） | 任意 | 静默视为无长文本（不告警），`abap deploy --yes` 刷新 handler 后恢复 |
+| 远端长文本过不了 `docu-v1.json` | 任意 | `meta.warnings` 记 `DOCU_PULL_INVALID`，不写伴生 |
+
+- 单语言：服务端按对象 TADIR 主语言读写；`line` ≤72、`format` ≤2，SAPscript 标记原样保留。
+- `--skip-existing` 且主文件已存在时整对象跳过，伴生同样不拉取。
+- 真机证据（S/4HANA profile `test`）：主文件 + 伴生 pull、push 后逐字节比对 EQUAL、`lines: []` 删除后 pull 不落盘并清理陈旧伴生、`validate:aff` PASS；详见 [doma](../objects/doma.md) / [dtel](../objects/dtel.md) 页。对象删除清理因 SAP 端 stateful 会话枯竭（`400`/stateful 错误）阻塞，恢复后补跑，证据在 `tests/261031004-realsap-docu/`（本地，不入库）。
 
 ### Package（DEVC）
 
@@ -155,7 +172,7 @@ abap pull ZPROG --type PROG
 # 整包批量下载（分页）
 abap pull --package Z_MY_PACKAGE --limit 50 --page 1
 
-# 拉取 DDIC 对象为本地 JSON
+# 拉取 DDIC 对象为本地 JSON（DOMA/DTEL 有长文本时连带 .docu.json）
 abap pull ZDOMA_TEST --type DOMA
 
 # 拉取 textpool 文本元素
@@ -198,6 +215,8 @@ abap pull --tr NDK123456
   }
 }
 ```
+
+DOMA/DTEL 提示：有长文本时 `data.entries[]` 额外出现 `{file:'src/<name>.<type>.docu.json', status:'written', kind:'docu'}` 且 `written[]` 计入该文件；`--overwrite` 清掉陈旧伴生时 `data.deleted[]` 列出路径。长文本拉取失败不改退出码，只进 `meta.warnings`（`DOCU_PULL_FAILED` / `DOCU_PULL_INVALID` / `DOCU_LOCAL_STALE_REMOVED`）。
 
 `--package` 模式下 `data` 额外含 `package`/`page`/`limit`/`truncated`（截断时含 `hint`）；`--textpool` 模式含 `route`；单对象普通模式含 `object`/`type`/`entries`/`written`/`skipped`/`failed`；`--tr` 模式含 `transport` / `requested` / `pulled` / `failed` / `deduplicated` / `entries[]`（`{object, type, status, [code, detail]}`）/ `written[]` / `skipped[]`，部分失败时 `partial: true`；`--user` 启用时额外含 `filtered` / `user`。
 

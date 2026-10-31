@@ -30,7 +30,9 @@ import {
   type TranObjectLocal,
 } from '../../formats/transport/json.js';
 import { resolveFile } from '../../formats/file-resolver.js';
+import { isDocuSupportedType } from '../../formats/docu/json.js';
 import { toRelativeOutputPath } from '../../core/path-output.js';
+import { pushDocuCompanion, readDocuCompanion, validateDocuCompanion } from './docu-companion.js';
 import type { JsonPushTarget, PushFileOptions, PushOneResult } from './push-types.js';
 
 /** Push a .json file via the self-built ICF service.
@@ -49,6 +51,11 @@ export async function pushDdicFile(
   // and maps a malformed DDL to TABL_DDL_INVALID. The caller
   // (`pushOne`) already rejected --check-only and handled --dry-run.
   const { local, wire } = await readValidatedDdic(file, type, resolved.objectName);
+
+  // DOMA/DTEL long-text companion (0..1). Read + validate it BEFORE the main
+  // object is written: an invalid `.docu.json` must not leave a half-pushed
+  // object on SAP. It is POSTed only after the main object POST succeeded.
+  const docu = await readDocuCompanion(file, type);
 
   // Transport: --tr > config > file's recorded request > ($TMP → none) > user's open request.
   const packageName = (wire.package ?? '').toUpperCase();
@@ -79,7 +86,13 @@ export async function pushDdicFile(
       ],
     });
   }
-  return { transport, status: 'written' };
+
+  // Main object is written; now stamp the long text (or delete it on `lines: []`).
+  let docuAction: 'saved' | 'deleted' | undefined;
+  if (docu && isDocuSupportedType(type)) {
+    docuAction = await pushDocuCompanion(icf, type, resolved.objectName, docu);
+  }
+  return { transport, status: 'written', ...(docuAction ? { docu: docuAction } : {}) };
 }
 
 /** Result of a local ICF-file validation: the parsed local doc (+ wire for DDIC). */
@@ -172,6 +185,9 @@ export async function validateDdicFile(file: string, type: string): Promise<void
   // objectName is only used to enrich error messages; --atomic re-resolves it
   // from the file, so pass the resolved name through when available.
   await readValidatedDdic(file, type as DdicSupportedType, resolveFile(file).objectName);
+  // The 0..1 long-text companion is validated together with the main file so
+  // `--atomic` never writes the object and then rejects its documentation.
+  await validateDocuCompanion(file, type);
 }
 
 /**

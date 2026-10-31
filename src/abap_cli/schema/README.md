@@ -24,6 +24,7 @@ The set is intentionally minimal — only the schemas abap-cli resolves through
 | `tabt-v1.json` | TABT | `file-formats/tabl/tabt-v1.json` | `.tabl.settings.json` / `.stru.settings.json` |
 | `doma-v1.json` | DOMA | `file-formats/doma/doma-v1.json` | |
 | `dtel-v1.json` | DTEL | `file-formats/dtel/dtel-v1.json` | |
+| `docu-v1.json` | — (companion) | `file-formats/docu-v1.json` | long-text companion `.doma.docu.json` / `.dtel.docu.json`; not an object type |
 | `enqu-v1.json` | ENQU | `file-formats/enqu/enqu-v1.json` | |
 | `nrob-v1.json` | NROB | `file-formats/nrob/nrob-v1.json` | |
 | `devc-v1.json` | DEVC | `file-formats/devc/devc-v1.json` | |
@@ -38,6 +39,11 @@ The set is intentionally minimal — only the schemas abap-cli resolves through
 | `dcls-v1.json` | DCLS | `file-formats/dcls/dcls-v1.json` | |
 | `ddlx-v1.json` | DDLX | `file-formats/ddlx/ddlx-v1.json` | |
 | `ddla-v1.json` | DDLA | `file-formats/ddla/ddla-v1.json` | |
+
+`docu-v1.json` is a **companion** schema, not an object type: it validates the
+0..1 long-text files `<name>.doma.docu.json` / `<name>.dtel.docu.json` that sit
+next to a DOMA/DTEL main document. `abap create` / `abap types` never list it,
+and DOMA/DTEL main files are still validated against their own schemas.
 
 ## Local deviations
 

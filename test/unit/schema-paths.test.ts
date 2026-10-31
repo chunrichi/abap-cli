@@ -69,6 +69,8 @@ describe('schema-paths priority chain', () => {
         'ENQU', 'NROB',
         // — package (DEVC) metadata document.
         'DEVC',
+        // — DOMA/DTEL long-text companion schema (not an object type).
+        'DOCU',
       ]),
     );
     // TABT is exposed as a schema key for the .settings.json override path.
@@ -76,7 +78,8 @@ describe('schema-paths priority chain', () => {
     // added SRVB / SRVD / BDEF / DCLS / DDLX / DDLA = 6 more = 22 total.
     // added ENQU / NROB = 24 total.
     // added DEVC = 25 total.
-    expect(types).toHaveLength(25);
+    // added DOCU (companion schema) = 26 total.
+    expect(types).toHaveLength(26);
   });
 
   it('bundled root contains every supported schema', () => {

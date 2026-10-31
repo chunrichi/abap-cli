@@ -4,7 +4,7 @@ title: 支持的对象类型
 description: abap CLI 支持的 ABAP 对象类型总览 — 22 个类型码 × create/pull/push 路由（ADT / ICF）与本地 AFF 文件布局
 tags: [abap-cli, object-types, ddic, http, sicf, reference]
 created at: 2026-08-29 10:00:00
-changed at: 2026-10-31 16:20:00
+changed at: 2026-10-31 17:05:00
 ---
 
 # 支持的对象类型
@@ -24,8 +24,8 @@ abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **22 个
 | `DEVC` | 包（Package） | ADT | 包参数（`--package` = 父包，无需 `--file`） | ✅ | ✅ | ❌（ADT 无更新端点） | ❌ | `<name>.devc.json` |
 | `TABL` | 透明表 | ICF | `--file` | ✅ | ✅ | ❌ | `<name>.tabl.{json,ddic,settings.json}` |
 | `STRU` | 结构 | ICF | `--file` | ✅ | ✅ | ❌ | `<name>.stru.{json,ddic,settings.json}` |
-| `DOMA` | 域 | ICF | `--file` | ✅ | ✅ | ❌ | `<name>.doma.json` |
-| `DTEL` | 数据元素 | ICF | `--file` | ✅ | ✅ | ❌ | `<name>.dtel.json` |
+| `DOMA` | 域 | ICF | `--file` | ✅ | ✅ | ❌ | `<name>.doma.json`（可选伴生 `<name>.doma.docu.json`，长文本 0..1） |
+| `DTEL` | 数据元素 | ICF | `--file` | ✅ | ✅ | ❌ | `<name>.dtel.json`（可选伴生 `<name>.dtel.docu.json`，长文本 0..1） |
 | `ENQU` | 锁对象 | ICF | `--file` | ✅ | ✅ | ❌ | `<name>.enqu.json` |
 | `NROB` | 编号范围对象 | ICF（pull 主 ADT + ICF 兜底） | `--file` | ✅ | ✅ | ❌ | `<name>.nrob.json` |
 | `HTTP` | **ICF / SICF 节点** | ICF | `--file` | ✅ | ✅ | ❌ | `<name>.http.json` |
@@ -45,6 +45,8 @@ abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **22 个
 > **`TRAN` 写路径已实现**：ABAP `/tran/<code>` 支持 GET / POST / PUT / DELETE，覆盖 dialog / report（含 report variant）/ parameter / variant 四种事务；OO 事务返回 `TRAN_OO_NOT_SUPPORTED`（规范 FM 没有 class/method 参数，仍用 SE93 维护）。`delete` 只支持 `$TMP` 事务（可传输事务请在 SE93 删除以便记录到请求）。类型页面：[tran](objects/tran.md)。
 
 本地产物一律平铺在 `src/` 下（无类型/对象子目录），文件名自带类型后缀；命名空间用 AFF 括号 token（`/UI2/CL_JSON` → `(ui2)cl_json`）。DDIC 三件套（TABL / STRU）与 DOMA / DTEL 的详细字段契约见 [create](commands/create.md) 与 [pull](commands/pull.md)。
+
+> **DOMA / DTEL 长文本是伴生文件，不是新对象类型**：`<name>.doma.docu.json` / `<name>.dtel.docu.json` 遵循 AFF `docu-v1.json`，0..1 可选；`abap types` / `abap create` 不列 `DOCU`，pull / push 自动带出（`lines: []` = 删除远端长文本）。字段与行约束见 [doma](objects/doma.md) / [dtel](objects/dtel.md)。
 
 ## HTTP —— 就是 SICF 节点
 

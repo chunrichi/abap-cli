@@ -50,6 +50,15 @@ export type WarningCode =
   | 'TEXTPOOL_CATEGORY_MISSING'
   // push — $TMP object is transport-free; an explicit --tr is ignored
   | 'PUSH_TR_IGNORED_TMP'
+  // pull DOMA/DTEL — the 0..1 long-text companion could not be pulled; the
+  // main object file was still written.
+  | 'DOCU_PULL_FAILED'
+  // pull DOMA/DTEL — the SAP-side long text did not validate against
+  // docu-v1.json; nothing was written locally.
+  | 'DOCU_PULL_INVALID'
+  // pull DOMA/DTEL --overwrite — the remote object has no long text and the
+  // stale local companion file was removed.
+  | 'DOCU_LOCAL_STALE_REMOVED'
   // stuck-reports writer
   | 'STUCK_REPORT_DEGRADED' // writeStuckReport encountered non-fatal issues
   | 'STEAMPUNK_ICF_MANUAL'  // deploy on Steampunk: ICF node must be wired via CF route
