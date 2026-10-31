@@ -131,9 +131,11 @@ export class AdtClientWrapper {
    * operations that require a lock surface the library's STATELESS error.
    */
   private applySessionMode(): void {
-    if (dropAnonymousContextCookies(this.client)) {
-      this.client.stateful = session_types.stateless;
-    }
+    // Drop the anonymous context cookie (replaying it makes the server answer
+    // `400 Session not found`) but keep stateful mode: the server creates the
+    // stateful session on the first real request, and locks need it.
+    dropAnonymousContextCookies(this.client);
+    this.client.stateful = session_types.stateful;
   }
 
   private async _loginNow(): Promise<void> {
