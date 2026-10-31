@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import { vi } from 'vitest';
+import { CliExit } from '../../src/abap_cli/output/exit.js';
 
 /** Thrown instead of process.exit so tests can capture the exit code. */
 export class ExitSignal extends Error {
@@ -43,6 +44,7 @@ export async function runCommand(
     await program.parseAsync(args, { from: 'user' });
   } catch (error) {
     if (error instanceof ExitSignal) exitCode = error.code;
+    else if (error instanceof CliExit) exitCode = error.exitCode;
     else throw error;
   } finally {
     logSpy.mockRestore();

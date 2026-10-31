@@ -58,6 +58,10 @@ abap session info --profile vhcala4hci
 4. **复用降级时的兜底关闭**：默认模式只保留"确实能被下一条命令复用"的会话。本进程新开的登录如果
    session key 不可持久化（`ABAP_CLI_KEYCHAIN_BACKEND=none|fixture` 等测试后端）或 jar 写不进任何
    候选路径，命令结束会主动 logout，避免退化成"每条命令各留一条会话"。
+5. **失败与探针路径同样释放**：`printError` 不直接 `process.exit()`，而是抛 `CliExit` 让顶层先跑
+   `runEndOfCommandCleanup` 再退出，所以失败命令不会留下会话。`profile test` / `init` 的裸 ADT 探针
+   （登录、discovery、ICF 根、能力矩阵、kernel release）共用一个会话并在 `finally` 释放——此前每个
+   探测步骤各登录一次（一次 `profile test` 最多 10 个会话），是 SM04 会话堆积的主要来源。
 
 ### 配置字段 `.abap.json#sap.sessionPolicy`
 
@@ -101,7 +105,7 @@ cloud / btp profile **不支持** cookie 复用：不读、不写、不删 jar�
 ## todo
 
 - [ ] 增加 orphan jar 清理能力：URL / username / client 任一变更新 jar，旧 jar 不主动回收
-- [ ] `always-logout` 只覆盖正常退出路径（SIGKILL 除外），异常终止后的残留会话清理策略待定
+- [ ] SIGKILL / OOM 等无法执行 finally 的终止仍会残留会话；需要时再评估会话账本 + 下条命令回收
 
 # references
 

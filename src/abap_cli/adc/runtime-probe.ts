@@ -3,6 +3,7 @@ import { getPassword } from '../config/secrets.js';
 import { readCaCertificate, type SapConfig } from '../config/project-config.js';
 import { CliError } from '../output/json.js';
 import { buildBasicAuth } from '../clients/basic-auth.js';
+import { withRawAdtSession } from '../clients/raw-adt-session.js';
 
 /** ADT runtime tier detected from public discovery endpoints.
  *  Drives deploy-flow branching and surfaces the runtime on `profile test`
@@ -112,34 +113,37 @@ export async function probeAdtRuntime(profileName: string): Promise<RuntimeProbe
   }
   const { password: authPassword, options } = built;
   try {
-    const { ADTClient } = await import('abap-adt-api');
-    const client = new ADTClient(
-      profile.url,
-      profile.username,
-      authPassword,
-      profile.client || '100',
-      profile.language || 'EN',
-      options,
+    // The probe opens a stateful SAP session (login) — `withRawAdtSession`
+    // releases it on every exit path, including the early returns below.
+    return await withRawAdtSession(
+      {
+        url: profile.url,
+        username: profile.username,
+        password: authPassword,
+        client: profile.client || '100',
+        language: profile.language || 'EN',
+        options,
+      },
+      async (client) => {
+        // Step 1: informationsystem Atom XML
+        let infoXml: string;
+        try {
+          const resp = await client.httpClient.request('/sap/bc/adt/repository/informationsystem', {
+            method: 'GET',
+            headers: { Accept: 'application/atomsvc+xml' },
+          });
+          infoXml = extractBody(resp);
+        } catch (error) {
+          // Step 2: discovery collection membership
+          return await probeFromDiscovery(client);
+        }
+        const infoVerdict = classifyInformationsystem(infoXml);
+        if (infoVerdict.runtime !== 'unknown') {
+          return infoVerdict;
+        }
+        return await probeFromDiscovery(client);
+      },
     );
-    await client.login();
-
-    // Step 1: informationsystem Atom XML
-    let infoXml: string;
-    try {
-      const resp = await client.httpClient.request('/sap/bc/adt/repository/informationsystem', {
-        method: 'GET',
-        headers: { Accept: 'application/atomsvc+xml' },
-      });
-      infoXml = extractBody(resp);
-    } catch (error) {
-      // Step 2: discovery collection membership
-      return await probeFromDiscovery(client);
-    }
-    const infoVerdict = classifyInformationsystem(infoXml);
-    if (infoVerdict.runtime !== 'unknown') {
-      return infoVerdict;
-    }
-    return await probeFromDiscovery(client);
   } catch (error) {
     return {
       runtime: 'unknown',

@@ -1,5 +1,5 @@
-import * as tls from 'tls';
-import type { ClientOptions } from 'abap-adt-api';
+import * as tls from 'node:tls';
+import type { ADTClient } from 'abap-adt-api';
 import { getSystem, upsertSystem } from '../config/user-config.js';
 import { getPassword } from '../config/secrets.js';
 import { readCaCertificate, type SapConfig } from '../config/project-config.js';
@@ -8,6 +8,7 @@ import { CliError } from '../output/json.js';
 import { classifyHttpError } from './http-error.js';
 import { buildBasicAuth } from './basic-auth.js';
 import { ICF_BASE_PATH } from './icf-version.js';
+import { withRawAdtSession } from './raw-adt-session.js';
 
 /** Per-layer result of `profile test <name>`. */
 export interface ProbeLayerResult {
@@ -84,33 +85,84 @@ export async function probeSystem(name: string): Promise<SystemProbe> {
   };
 
   const tlsResult = await probeTls(config);
-  const authResult = tlsResult.ok ? await probeAuth(name, config) : SKIP();
-  const adtResult = authResult.ok ? await probeAdt(name, config) : SKIP();
-  const icfResult = authResult.ok ? await probeIcf(name, config) : SKIP();
-  // per-type capability snapshot — only when ADT/ICF
-  // both finished probing (else we cannot tell "absent" from "skipped").
-  const probeOut = adtResult.ok || icfResult.ok
-    ? await probeCapabilities(config, { adtOk: adtResult.ok, icfOk: icfResult.ok })
-    : undefined;
-  const capabilities = probeOut?.capabilities;
-  // persist the discovered kernel release back into the profile so that
-  // channel-detect (which reads cfg.systemVersion) can route TTYP/MSAG/DDLS
-  // without re-probing. Best-effort: missing or unparseable release leaves
-  // the profile untouched. contract.
-  if (probeOut?.kernelRelease) {
-    try {
-      upsertSystem(name, { ...profile, systemVersion: probeOut.kernelRelease });
-    } catch {
-      // Persist is best-effort — probe output still surfaces below.
-    }
+  if (!tlsResult.ok) {
+    return { tls: tlsResult, auth: SKIP(), adt: SKIP(), icf: SKIP() };
   }
-  return {
-    tls: tlsResult,
-    auth: authResult,
-    adt: adtResult,
-    icf: icfResult,
-    ...(capabilities ? { capabilities, ddlSourceSupported: capabilities.ddls.supported } : {}),
-  };
+
+  // One stateful ADT session serves every layer below: the login is the auth
+  // probe, and the same client answers the adt/icf endpoint probes plus the
+  // per-type capability matrix. `withRawAdtSession` releases the SAP session
+  // on every exit path — a probe is the easiest place to leak an SM04 entry.
+  let auth: { password: string; options: import('abap-adt-api').ClientOptions };
+  try {
+    auth = buildBasicAuth(buildProbeSap(config));
+  } catch (error: unknown) {
+    const classified = classifyHttpError(error, { name });
+    return {
+      tls: tlsResult,
+      auth: { ok: false, error: { code: classified.code, message: classified.message }, nextSteps: classified.nextSteps },
+      adt: SKIP(),
+      icf: SKIP(),
+    };
+  }
+
+  try {
+    return await withRawAdtSession(
+      {
+        url: config.url,
+        username: config.username,
+        password: auth.password,
+        client: config.client,
+        language: config.language,
+        options: auth.options,
+      },
+      async (client) => {
+        const authResult: ProbeLayerResult = { ok: true };
+        const adtResult = await probeEndpoint(name, client, {
+          path: '/sap/bc/adt/discovery',
+          accept: 'application/atomsvc+xml',
+        });
+        const icfResult = await probeEndpoint(name, client, {
+          path: `${ICF_BASE_PATH}/`,
+          accept: 'application/json',
+        });
+        // per-type capability snapshot — only when ADT/ICF both finished
+        // probing (else we cannot tell "absent" from "skipped").
+        const probeOut = adtResult.ok || icfResult.ok
+          ? await probeCapabilities(client, { adtOk: adtResult.ok, icfOk: icfResult.ok })
+          : undefined;
+        const capabilities = probeOut?.capabilities;
+        // persist the discovered kernel release back into the profile so that
+        // channel-detect (which reads cfg.systemVersion) can route
+        // TTYP/MSAG/DDLS without re-probing. Best-effort: missing or
+        // unparseable release leaves the profile untouched.
+        if (probeOut?.kernelRelease) {
+          try {
+            upsertSystem(name, { ...profile, systemVersion: probeOut.kernelRelease });
+          } catch {
+            // Persist is best-effort — probe output still surfaces below.
+          }
+        }
+        return {
+          tls: tlsResult,
+          auth: authResult,
+          adt: adtResult,
+          icf: icfResult,
+          ...(capabilities ? { capabilities, ddlSourceSupported: capabilities.ddls.supported } : {}),
+        };
+      },
+    );
+  } catch (error: unknown) {
+    // Login (or session open) failed: report it as the auth layer and skip
+    // the dependent layers, exactly like a failed TLS handshake.
+    const classified = classifyHttpError(error, { name });
+    return {
+      tls: tlsResult,
+      auth: { ok: false, error: { code: classified.code, message: classified.message }, nextSteps: classified.nextSteps },
+      adt: SKIP(),
+      icf: SKIP(),
+    };
+  }
 }
 
 /** probe the four per-type endpoints.
@@ -126,22 +178,11 @@ export async function probeSystem(name: string): Promise<SystemProbe> {
  * make its decision without re-probing.
  */
 async function probeCapabilities(
-  config: ProbeConfig,
+  client: ADTClient,
   state: { adtOk: boolean; icfOk: boolean },
 ): Promise<{ capabilities: ProfileCapabilitySnapshot; kernelRelease?: string }> {
   const probeUrl = async (path: string): Promise<'ok' | 'absent'> => {
     try {
-      const { ADTClient } = await import('abap-adt-api');
-      const auth = buildBasicAuth(buildProbeSap(config));
-      const client = new ADTClient(
-        config.url,
-        config.username,
-        auth.password,
-        config.client,
-        config.language,
-        auth.options,
-      );
-      await client.login();
       // `request` returns a response with statusCode (4xx == present, 5xx/none == absent).
       const resp = await client.httpClient.request(path, {
         method: 'GET',
@@ -173,7 +214,7 @@ async function probeCapabilities(
   // `supported` is intrinsic to the system; for the heuristic we treat
   // modern kernels (>= 753) or S/4HANA as supporting DDLS. For the live
   // ADT endpoint to register "ok", we already trust the kernel.
-  const supportedByKernel = await readKernelRelease(config);
+  const supportedByKernel = await readKernelRelease(client);
   const ddlsIntrinsic = supportedByKernel === undefined
     ? false
     : supportedByKernel === 'S4' || !isEccOldRelease(supportedByKernel);
@@ -189,19 +230,8 @@ async function probeCapabilities(
 
 /** Best-effort kernel release probe without a runtime library dependency.
  *  Falls back to undefined when the SAP release isn't reachable. */
-async function readKernelRelease(config: ProbeConfig): Promise<string | undefined> {
+async function readKernelRelease(client: ADTClient): Promise<string | undefined> {
   try {
-    const { ADTClient } = await import('abap-adt-api');
-    const auth = buildBasicAuth(buildProbeSap(config));
-    const client = new ADTClient(
-      config.url,
-      config.username,
-      auth.password,
-      config.client,
-      config.language,
-      auth.options,
-    );
-    await client.login();
     // ADT /sap/bc/adt/system/information returns an Atom feed with one
     // <atom:entry> per system property; the KernelRelease entry carries
     // e.g. "793" or "S4". The older <app:release> tag in /sap/bc/adt/discovery
@@ -287,23 +317,20 @@ function buildProbeSap(config: ProbeConfig): SapConfig {
   };
 }
 
-/** Probe via ADTClient — shares basic-auth login with runtime. */
-async function probeWithAdtClient(name: string, config: ProbeConfig, endpoint: { path: string; accept: string }): Promise<ProbeLayerResult> {
+/**
+ * Hit one endpoint on the shared probe client.
+ *
+ * Uses `httpClient.request` directly so the probe does not depend on
+ * abap-adt-api's search/structure parser (which has a known bug on BTP trial
+ * when parsing wildcard search responses). Probe failures never throw — the
+ * layer reports them.
+ */
+async function probeEndpoint(
+  name: string,
+  client: ADTClient,
+  endpoint: { path: string; accept: string },
+): Promise<ProbeLayerResult> {
   try {
-    const { ADTClient } = await import('abap-adt-api');
-    const auth = buildBasicAuth(buildProbeSap(config));
-    const client = new ADTClient(
-      config.url,
-      config.username,
-      auth.password,
-      config.client,
-      config.language,
-      auth.options,
-    );
-    await client.login();
-    // Use httpClient.request directly so we hit the chosen endpoint without
-    // depending on abap-adt-api's search/structure parser (which has a known
-    // bug on BTP trial when parsing wildcard search responses).
     await client.httpClient.request(endpoint.path, {
       method: 'GET',
       headers: { Accept: endpoint.accept },
@@ -313,20 +340,4 @@ async function probeWithAdtClient(name: string, config: ProbeConfig, endpoint: {
     const classified = classifyHttpError(error, { name });
     return { ok: false, error: { code: classified.code, message: classified.message }, nextSteps: classified.nextSteps };
   }
-}
-
-/** Auth layer — compatibility graph reachable with the current credentials. */
-function probeAuth(name: string, config: ProbeConfig): Promise<ProbeLayerResult> {
-  return probeWithAdtClient(name, config, { path: '/sap/bc/adt/compatibility/graph', accept: 'application/xml' });
-}
-
-/** ADT layer — login + discovery endpoint as a lightweight ADT reachability
- * probe (avoids the library's search/structure parser bug on BTP trial). */
-function probeAdt(name: string, config: ProbeConfig): Promise<ProbeLayerResult> {
-  return probeWithAdtClient(name, config, { path: '/sap/bc/adt/discovery', accept: 'application/atomsvc+xml' });
-}
-
-/** ICF layer — reachability of the self-built ICF service root via ADTClient. */
-function probeIcf(name: string, config: ProbeConfig): Promise<ProbeLayerResult> {
-  return probeWithAdtClient(name, config, { path: `${ICF_BASE_PATH}/`, accept: 'application/json' });
 }

@@ -243,4 +243,20 @@ describe('AdtClientWrapper 401 fallback (reuse mode)', () => {
     await wrapper.searchObject('ZCL');
     expect(wrapper.sessionNeedsRelease).toBe(false);
   });
+
+  it('leaves the shared jar alone when this process never participated in reuse', async () => {
+    // always-logout: the wrapper never reads/writes the jar, so a jar left by a
+    // concurrent `reuse` command belongs to a different, still-open session.
+    h.loadConfigMock.mockResolvedValue(defaultConfig({ sessionPolicy: 'always-logout' }));
+    const wrapper = await AdtClientWrapper.create();
+    await wrapper.logout();
+    expect(h.clearJarMock).not.toHaveBeenCalled();
+  });
+
+  it('clears the jar after logging out a session this process reused', async () => {
+    h.loadJarMock.mockResolvedValue(jarFixture as never);
+    const wrapper = await AdtClientWrapper.create();
+    await wrapper.logout();
+    expect(h.clearJarMock).toHaveBeenCalledTimes(1);
+  });
 });

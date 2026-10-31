@@ -5,6 +5,7 @@ import './core/polyfill.js';
 import { createRequire } from 'node:module';
 import { Command } from 'commander';
 import { setProgram, buildMeta } from './output/meta.js';
+import { CliExit } from './output/exit.js';
 import { registerLazyCommands } from './registry/lazy.js';
 import { COMMAND_SPECS } from './registry/commands.js';
 import { handleTopLevelError } from './top-error.js';
@@ -78,11 +79,32 @@ program.hook('postAction', async (_thisCmd, actionCmd) => {
 // SIGINT/SIGTERM best-effort release of any live SAP session.
 installSignalHandlers();
 
+/**
+ * Release whatever SAP sessions this process opened but did not hand off.
+ *
+ * Runs on the failure path as well: commander's `postAction` hook only fires
+ * when the action resolved, so a command that threw (or called `printError`)
+ * never reached the normal cleanup and left its stateful session in SM04.
+ * Best-effort by contract — cleanup must never mask the real error.
+ */
+async function releaseSessionsBeforeExit(): Promise<void> {
+  try {
+    const config = await configPromise;
+    if (config) await runEndOfCommandCleanup(config);
+  } catch {
+    // Cleanup is best-effort; the original error is what the user sees.
+  }
+}
+
 try {
   // parseAsync: lazy commands dispatch through an async _parseCommand,
   // so commander's sync help/error throws surface as rejections that only
   // parseAsync (which awaits the chain) re-throws into this catch block.
   await program.parseAsync();
 } catch (error: unknown) {
+  await releaseSessionsBeforeExit();
+  // `printError` already wrote its envelope to stderr; only the exit code is
+  // left. Everything else is rendered by the shared top-level handler.
+  if (error instanceof CliExit) process.exit(error.exitCode);
   handleTopLevelError(error, { program, argv: process.argv, version });
 }

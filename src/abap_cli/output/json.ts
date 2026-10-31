@@ -8,7 +8,8 @@
  *  - renderResult / renderError: pure functions returning a RenderedOutput
  *    (stdout lines, stderr lines, exitCode). No stream writes, no process.exit.
  *  - printResult / printError: thin shims that call the renderers, write to
- *    the streams, and (in printError's case) call process.exit. The `meta`
+ *    the streams, and (in printError's case) throw a `CliExit` so the
+ *    top-level runner can release SAP sessions before exiting. The `meta`
  *    argument is optional — it defaults to buildMeta().
  *
  * Output envelope contract:
@@ -20,6 +21,7 @@
 import type { Command } from 'commander';
 import { categoryOf, type ErrorCode, type ErrorCategory } from './error-codes.js';
 import { exitCodeFor, EXIT_GENERIC_FALLBACK } from './exit-codes.js';
+import { CliExit } from './exit.js';
 import { buildMeta, buildSchemaMeta, deriveCommand, type OutputMeta } from './meta.js';
 /** Three-state output mode. */
 export type OutputMode = 'human' | 'json' | 'pretty-json';
@@ -172,11 +174,13 @@ export function printResult(mode: OutputMode, data: unknown, human: string, meta
   for (const line of out.stderr) console.error(line);
 }
 
-/** Shim — writes to stderr and exits with the category's exit code. */
+/** Shim — writes to stderr and requests a process exit with the category's
+ *  exit code. The throw (instead of `process.exit`) lets the top-level runner
+ *  release live SAP sessions first; see `output/exit.ts`. */
 export function printError(mode: OutputMode, error: unknown, meta?: OutputMeta): never {
   const out = renderError(mode, error, meta ?? buildMeta());
   for (const line of out.stderr) console.error(line);
-  process.exit(out.exitCode ?? EXIT_GENERIC_FALLBACK);
+  throw new CliExit(out.exitCode ?? EXIT_GENERIC_FALLBACK);
 }
 
 // --- Command parameter schema ---

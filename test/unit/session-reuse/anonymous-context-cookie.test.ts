@@ -8,7 +8,12 @@
  * session and when seeding a client from a saved jar.
  */
 import { describe, expect, it } from 'vitest';
-import { captureSessionFromAdt, dropAnonymousContextCookies, injectSessionIntoAdt } from '../../../src/abap_cli/session/reuse.js';
+import {
+  captureSessionFromAdt,
+  dropAnonymousContextCookies,
+  injectSessionIntoAdt,
+  shouldDegradeToStateless,
+} from '../../../src/abap_cli/session/reuse.js';
 import { makeEmptyJar } from '../../../src/abap_cli/session/jar.js';
 import type { SapConfig } from '../../../src/abap_cli/config/project-config.js';
 
@@ -44,6 +49,32 @@ function cookieNames(client: { httpClient: unknown }): string[] {
 }
 
 describe('anonymous ICM context cookies', () => {
+
+  it('keeps stateful mode when SAP also returned a stateful session cookie', () => {
+    // S/4HANA 8.134 returns an anonymous context AND SAP_SESSIONID on login.
+    const client = fakeClient([
+      ['SAP_SESSIONID_S4H_100', 'session-id'],
+      ['sap-contextid', ANON],
+      ['MYSAPSSO2', 'sso-ticket'],
+    ]);
+    expect(shouldDegradeToStateless(client)).toBe(false);
+    expect(cookieNames(client)).not.toContain('sap-contextid');
+  });
+
+  it('degrades to stateless only when no stateful session cookie exists', () => {
+    const client = fakeClient([
+      ['sap-contextid', ANON],
+      ['MYSAPSSO2', 'sso-ticket'],
+    ]);
+    expect(shouldDegradeToStateless(client)).toBe(true);
+  });
+
+  it('does not degrade when the login produced a real context', () => {
+    const client = fakeClient([['sap-contextid', REAL]]);
+    expect(shouldDegradeToStateless(client)).toBe(false);
+    expect(cookieNames(client)).toContain('sap-contextid');
+  });
+
   it('captureSessionFromAdt keeps real context cookies but drops ANON ones', () => {
     const client = fakeClient([
       ['sap-contextid', ANON],
