@@ -217,14 +217,26 @@ function isFsErrorCode(error: unknown): string | undefined {
   return undefined;
 }
 
-/** Delete the on-disk jar for a profile (best-effort; used on logout). */
+/**
+ * Delete the on-disk jar for a profile (best-effort; used on logout).
+ *
+ * Both candidate locations are removed: the home-dir jar and the `$TMPDIR`
+ * fallback that `markJarPersisted` promotes in sandboxed environments. Leaving
+ * the fallback behind kept a run whose session had just been logged out
+ * "reusable" — the next command injected dead cookies and re-logged-in, and
+ * nothing ever removed the stale file.
+ */
 export function clearJarFromDisk(profile: SapConfig): void {
-  const file = sessionJarPath(profile);
-  try {
-    fs.rmSync(file, { force: true });
-  } catch {
-    // best-effort — nothing to surface to the caller
+  const hash = computeSystemHash(profile);
+  const candidates = [sessionJarPath(profile), fallbackJarPaths.get(hash) ?? fallbackJarPath(profile)];
+  for (const file of candidates) {
+    try {
+      fs.rmSync(file, { force: true });
+    } catch {
+      // best-effort — nothing to surface to the caller
+    }
   }
+  fallbackJarPaths.delete(hash);
 }
 
 /**
@@ -253,9 +265,7 @@ function isAnonymousContextCookie(name: string, entry: string): boolean {
 
 /**
  * Drop anonymous ICM context cookies from the live ADT cookie map.
- * Returns true when an anonymous context was present — the caller then cannot
- * run in stateful mode (the server could not open a real session), so it must
- * fall back to stateless requests.
+ * Returns true when an anonymous context was present and removed.
  */
 export function dropAnonymousContextCookies(client: { httpClient: unknown }): boolean {
   const http = client.httpClient as AdtHttpLike;
@@ -268,6 +278,33 @@ export function dropAnonymousContextCookies(client: { httpClient: unknown }): bo
     }
   }
   return dropped;
+}
+
+/**
+ * True when the live client carries a real stateful session cookie.
+ *
+ * The ICM can return an anonymous `sap-contextid` *and* a stateful
+ * `SAP_SESSIONID_<sid>_<client>` in the same login response (observed on
+ * S/4HANA 8.134): the anonymous context must be dropped, but the session itself
+ * is perfectly usable for lock/write operations.
+ */
+export function hasStatefulSession(client: { httpClient: unknown }): boolean {
+  const http = client.httpClient as AdtHttpLike;
+  if (!http.cookie) return false;
+  return [...http.cookie.keys()].some((name) => /^SAP_SESSIONID_/i.test(name));
+}
+
+/**
+ * Decide whether a client must continue in stateless mode after a fresh login.
+ *
+ * Dropping the anonymous context is always required. Degrading the whole
+ * session to stateless is only correct when no stateful session cookie came
+ * back at all (true ICM session-table pressure): degraded clients make every
+ * lock-requiring command fail with abap-adt-api's `STATELESS` error, so it must
+ * not happen when SAP did open a session.
+ */
+export function shouldDegradeToStateless(client: { httpClient: unknown }): boolean {
+  return dropAnonymousContextCookies(client) && !hasStatefulSession(client);
 }
 
 /**

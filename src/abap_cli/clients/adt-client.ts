@@ -18,7 +18,14 @@ import { buildBasicAuth } from './basic-auth.js';
 import { makeEmptyJar, type SessionJar } from '../session/jar.js';
 import { effectivePolicy, isUnsupportedInContext, resolveSessionPolicy } from '../session/policy.js';
 import { loadOrCreateSessionKey } from '../session/key.js';
-import { captureSessionFromAdt, clearJarFromDisk, dropAnonymousContextCookies, injectSessionIntoAdt, loadJarFromDisk, markJarPersisted } from '../session/reuse.js';
+import {
+  captureSessionFromAdt,
+  clearJarFromDisk,
+  injectSessionIntoAdt,
+  loadJarFromDisk,
+  markJarPersisted,
+  shouldDegradeToStateless,
+} from '../session/reuse.js';
 import { registerAdtClient } from '../session/registry.js';
 import { buildCreateWire, type DevcCreateWireOptions } from '../formats/devc/json.js';
 
@@ -124,18 +131,22 @@ export class AdtClientWrapper {
   }
 
   /**
-   * Keep the SAP session mode in sync with the ICM: when login only produced an
-   * anonymous context cookie (the server could not open a stateful session —
-   * e.g. session table pressure), replaying it makes every stateful request
-   * fail with `400 Session not found`. Drop the cookie and continue stateless;
-   * operations that require a lock surface the library's STATELESS error.
+   * Keep the SAP session mode in sync with the ICM: an anonymous context cookie
+   * is never replayed (it makes the server answer `400 Session not found`), but
+   * the session only degrades to stateless when SAP did not hand out a real
+   * stateful session at all. Some systems return both an anonymous context and
+   * `SAP_SESSIONID_*` in the same login response; degrading there would break
+   * every lock-requiring command with the library's `STATELESS` error.
    */
   private applySessionMode(): void {
-    // Drop the anonymous context cookie (replaying it makes the server answer
-    // `400 Session not found`) but keep stateful mode: the server creates the
-    // stateful session on the first real request, and locks need it.
-    dropAnonymousContextCookies(this.client);
-    this.client.stateful = session_types.stateful;
+    if (shouldDegradeToStateless(this.client)) {
+      this.client.stateful = session_types.stateless;
+    } else {
+      // The login produced a real SAP session cookie: keep stateful mode even
+      // when the anonymous context cookie was dropped, otherwise every
+      // lock-requiring operation fails with the library's STATELESS error.
+      this.client.stateful = session_types.stateful;
+    }
   }
 
   private async _loginNow(): Promise<void> {
@@ -256,18 +267,22 @@ export class AdtClientWrapper {
   /**
    * Explicit logout — used by `always-logout` policy at command end and by
    * the SIGINT/SIGTERM handlers. Best-effort: never throws to the caller.
-   * After logout the SAP session is gone, so the on-disk jar for this
-   * profile is cleared unconditionally (its cookies are now dead) — even in
-   * `always-logout` mode where this wrapper never loaded a jar itself but a
-   * stale one from a previous `reuse` run may still exist.
+   *
+   * The on-disk jar is cleared only when this process actually participated in
+   * reuse (`this.jar` is set): those cookies are dead after the logout. Under
+   * `always-logout` the wrapper never reads or writes the jar, so a jar left by
+   * a concurrent `reuse` command belongs to a *different*, still-open session —
+   * deleting it orphaned that session in SM04 (and forced the next command into
+   * a fresh login). Mixed policies must not fight over the shared jar.
    */
   async logout(): Promise<void> {
+    const ownedJar = this.jar !== null;
     try {
       await this.client.logout();
       this.sessionReady = false;
       this.freshLogin = false;
       this.sessionReusable = false;
-      clearJarFromDisk(this.config.sap);
+      if (ownedJar) clearJarFromDisk(this.config.sap);
     } catch {
       // logout is best-effort — swallow transport/auth errors.
     }
