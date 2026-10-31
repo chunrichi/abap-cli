@@ -109,10 +109,10 @@ abap doctor [options]
 
 ## `abap transport`
 
-Manage SAP transport requests (list / create / show / resolve / assign).
+Manage SAP transport requests (list / create / show / resolve / assign / check / release).
 
 ```bash
-abap transport <list|create|show|resolve|assign> [options]
+abap transport <list|create|show|resolve|assign|check|release> [options]
 ```
 
 
