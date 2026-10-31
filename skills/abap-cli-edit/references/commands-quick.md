@@ -50,7 +50,7 @@ abap push [options] [files...]
 | --- | --- |
 | `--all` | Push all .abap files under the scan root (sourceDir or current dir; honours .abapignore). |
 | `--tr <transport>` | Transport number override for unbound objects. |
-| `--check-only` | Syntax check only; do not activate. Not supported for ICF-routed or channel-routed JSON files (DDIC / HTTP / TRAN / TTYP / MSAG / DDLS) — those are validated during push. |
+| `--check-only` | Syntax check only; do not activate. Not supported for ICF-routed or channel-routed JSON files (DDIC / HTTP / TRAN / XSLT / TTYP / MSAG / DDLS) — those are validated during push. |
 | `--no-activate` | Lock + write + skip check + skip activate + unlock. |
 | `--dry-run` | Plan only — no mutating ADT calls. |
 | `--fail-fast` | Stop at the first failing file (default: --keep-going). |
@@ -115,7 +115,7 @@ abap create <type> <name> [options]
 | `--check-only` | Validate the proposed object without creating it |
 | `--audit` | Include the before-checksum (extra SAP round-trip, off by default) |
 | `--overwrite` | When pulling the new object back, replace an existing local file (default: keep the local draft) |
-| `--file <path>` | abap-file-format JSON input (required for TABL/STRU/DOMA/DTEL/ENQU/VIEW/NROB/HTTP/TRAN/TTYP/MSAG/DDLS/SRVD/DCLS/DDLX/DDLA) |
+| `--file <path>` | abap-file-format JSON input (required for TABL/STRU/DOMA/DTEL/ENQU/VIEW/NROB/HTTP/TRAN/XSLT/TTYP/MSAG/DDLS/SRVD/DCLS/DDLX/DDLA) |
 | `--func <name>` | With FUGR: create a function module (FUGR/FF) inside the existing function group <name> |
 | `--software-component <swcomp>` | With DEVC: software component of the new package (default: inherited from the super package) |
 | `--transport-layer <layer>` | With DEVC: transport layer of the new package (default: inherited from the super package) |

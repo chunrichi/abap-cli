@@ -92,6 +92,11 @@ export async function runDelete(objectName: string, opts: DeleteOptions): Promis
   if (typeUpper === 'TRAN') {
     return runDeleteTran(objectName, opts);
   }
+  // XSLT (transformation programs) are O2 repository objects with no ADT
+  // delete endpoint; they are deleted through ICF `DELETE /xslt/<name>`.
+  if (typeUpper === 'XSLT') {
+    return runDeleteXslt(objectName, opts);
+  }
   const client = await AdtClientWrapper.create();
   const resolved = await resolveObject(client, objectName, typeUpper);
 
@@ -222,5 +227,79 @@ async function runDeleteTran(objectName: string, opts: DeleteOptions): Promise<D
       lockReleased: true,
     },
     human: `Deleted TRAN ${name}` + (opts.tr ? ` (transport ${opts.tr})` : ''),
+  };
+}
+
+/**
+ * Delete a transformation program through ICF `DELETE /xslt/<name>`.
+ *
+ * Transport rules mirror the ADT delete path: `$TMP` needs none, everything
+ * else needs `--tr`. The package comes from the ICF GET wire document (the
+ * local AFF JSON does not carry it).
+ */
+async function runDeleteXslt(objectName: string, opts: DeleteOptions): Promise<DeleteResult> {
+  const name = objectName.trim().toUpperCase();
+  const icf = await IcfClient.create();
+
+  let probe;
+  try {
+    probe = await icf.getXslt<{ package?: string }>(name);
+  } catch (error: unknown) {
+    if (error instanceof CliError && error.code === 'XSLT_OBJECT_NOT_FOUND') {
+      throw new CliError('OBJECT_NOT_FOUND', `XSLT ${name} does not exist`, {
+        object: name,
+        type: 'XSLT',
+        nextSteps: ['Verify the transformation exists in the target system (SE80 → XSLT Programs).'],
+      });
+    }
+    throw error;
+  }
+  if (probe.status !== 'success' || !probe.data) {
+    if (probe.error?.code === 'XSLT_OBJECT_NOT_FOUND') {
+      throw new CliError('OBJECT_NOT_FOUND', `XSLT ${name} does not exist`, {
+        object: name,
+        type: 'XSLT',
+        nextSteps: ['Verify the transformation exists in the target system (SE80 → XSLT Programs).'],
+      });
+    }
+    throw new CliError((probe.error?.code ?? 'SAP_ERROR') as ErrorCode, probe.error?.message ?? `Failed to read XSLT ${name}`, {
+      object: name,
+      type: 'XSLT',
+    });
+  }
+
+  const packageName = probe.data.package;
+  const isLocal = (packageName ?? '').trim().toUpperCase() === '$TMP';
+  if (!isLocal && !opts.tr) {
+    throw new CliError('MISSING_TRANSPORT', `XSLT ${name} is in package ${packageName ?? '?'}; --tr is required`, {
+      details: { object: name, type: 'XSLT', packageName },
+      nextSteps: [
+        'Pass --tr <request> to record the deletion in a transportable change.',
+        'Or recreate the transformation in $TMP if it is local scratch work.',
+      ],
+      example: `abap delete ${name} --type XSLT --tr NDK900123 --yes`,
+    });
+  }
+
+  const resp = await icf.deleteXslt<{ name: string; action: string }>(name, opts.tr ? { transportRequest: opts.tr } : {});
+  if (resp.status !== 'success' || !resp.data) {
+    throw new CliError((resp.error?.code ?? 'DELETE_FAILED') as ErrorCode, resp.error?.message ?? `Failed to delete XSLT ${name}`, {
+      object: name,
+      type: 'XSLT',
+      details: resp.error?.details,
+      nextSteps: ['Re-run after fixing the cause above.'],
+    });
+  }
+
+  return {
+    data: {
+      object: name,
+      type: 'XSLT',
+      ...(packageName ? { packageName } : {}),
+      deleted: true,
+      ...(opts.tr ? { transport: opts.tr } : {}),
+      lockReleased: true,
+    },
+    human: `Deleted XSLT ${name}` + (opts.tr ? ` (transport ${opts.tr})` : ''),
   };
 }

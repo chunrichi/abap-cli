@@ -40,6 +40,7 @@ The set is intentionally minimal — only the schemas abap-cli resolves through
 | `dcls-v1.json` | DCLS | `file-formats/dcls/dcls-v1.json` | |
 | `ddlx-v1.json` | DDLX | `file-formats/ddlx/ddlx-v1.json` | |
 | `ddla-v1.json` | DDLA | `file-formats/ddla/ddla-v1.json` | |
+| `xslt-v1.json` | XSLT | `file-formats/xslt/xslt-v1.json` | |
 
 `docu-v1.json` is a **companion** schema, not an object type: it validates the
 0..1 long-text files `<name>.doma.docu.json` / `<name>.dtel.docu.json` that sit

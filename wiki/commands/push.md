@@ -1,15 +1,15 @@
 ---
 type: command
 title: abap push
-description: 推送本地 ABAP 文件到 SAP — lock → set source → syntax check → activate → unlock，支持源码对象、FUGR、textpool、DDIC JSON 与 DOMA/DTEL 长文本伴生，按对象解析 transport（textpool 写受系统限制）
-tags: [abap-cli, command, push, upload, abap-file-format, ddic, docu, textpool, transport]
+description: 推送本地 ABAP 文件到 SAP — lock → set source → syntax check → activate → unlock，支持源码对象、FUGR、textpool、DDIC/HTTP/TRAN/XSLT JSON 与 DOMA/DTEL 长文本伴生，按对象解析 transport（textpool 写受系统限制）
+tags: [abap-cli, command, push, upload, abap-file-format, ddic, docu, xslt, textpool, transport]
 created at: 2026-08-07 00:11:03
-changed at: 2026-10-31 17:05:00
+changed at: 2026-10-31 18:06:00
 ---
 
 # abap push
 
-把本地 ABAP 文件推送到 SAP 系统，核心流程是 **lock → set source → syntax check → activate → unlock**。支持：普通源码对象（CLAS/PROG/INTF）、FUGR 子对象、textpool `.properties`，以及 ICF 路由的 `.json`（DDIC / HTTP / TRAN / VIEW，其中 DOMA/DTEL 同目录的 `<name>.<type>.docu.json` 长文本伴生会随主文件自动推送）与通道路由的 TTYP / MSAG / DDLS。文件级编排在 `flows/edit/push.ts`（`runPush` / `pushOne`），单对象核心在 `flows/edit/push-object.ts`（`pushObject`）。
+把本地 ABAP 文件推送到 SAP 系统，核心流程是 **lock → set source → syntax check → activate → unlock**。支持：普通源码对象（CLAS/PROG/INTF）、FUGR 子对象、textpool `.properties`，以及 ICF 路由的 `.json`（DDIC / HTTP / TRAN / VIEW / XSLT，其中 DOMA/DTEL 同目录的 `<name>.<type>.docu.json` 长文本伴生会随主文件自动推送，XSLT 则读 `.xslt.xml` 伴生）与通道路由的 TTYP / MSAG / DDLS。文件级编排在 `flows/edit/push.ts`（`runPush` / `pushOne`），单对象核心在 `flows/edit/push-object.ts`（`pushObject`）。
 
 > ⚠️ **textpool 写限制**：textpool `.properties` 的**读**（`abap pull --textpool`）在 ADT / ICF 两种路由都可用；**写**需要 ADT text-elements 写端点。在只提供非交互式 textpool API 的 release 上（vhcala4hci / A4H 实测），profile 缓存 `adtTextpool.write: false` → 写路由到 ICF `/textpool/*`，而自带 ICF handler 对 POST **无条件**返回 `TEXTPOOL_WRITE_UNSUPPORTED`（SAP_ERROR / exit 6）。此时选择屏幕标签改用 `SELECTION-SCREEN COMMENT <pos>(<len>) lbl_xxx` + `INITIALIZATION` 赋值，不要依赖 `push` 文本元素。
 
@@ -54,13 +54,14 @@ abap push [options] [files...]
 
 实现：[flows/edit/push-order.ts](../../src/abap_cli/flows/edit/push-order.ts) 提供 `orderTargetsByDependency(files: string[]): string[]`；`flows/edit/push.ts#runPush` 在 `resolveLocalTargets` 之后调用一次。同优先级保留输入顺序（稳定排序）。
 
-## Tabl/Stru artifact 去重（`--all`）
+## Tabl/Stru 与 XSLT 两件套去重（`--all` / 显式多文件）
 
 `abap push --all` 扫描会把 `.tabl.json` / `.tabl.ddic` / `.tabl.settings.json`（`.stru.*` 同理）三件套全部枚举出来，但它们描述**同一个 SAP 对象**——push 三次会写同一张表。PR3 引入去重：
 
 - [flows/edit/push-dedup.ts](../../src/abap_cli/flows/edit/push-dedup.ts) 提供 `deduplicateTablArtifactTargets(files: string[]): string[]`，在 `runPush` 的 `resolveLocalTargets` 之后、依赖排序之前接入；
 - 复用 [formats/ddic/tabl-artifact.ts](../../src/abap_cli/formats/ddic/tabl-artifact.ts) 的 `isTablArtifactFile` / `tablArtifactPaths` 判定 artifact 组与解析 main 路径；
 - key 以 main 路径的 `toLowerCase()` 计算（同组 `.JSON` / `.json` 等视为一组），迭代顺序中首次出现的文件保留；非 artifact 文件直通；
+- XSLT 的 AFF 两件套（`<name>.xslt.json` + `<name>.xslt.xml`）同样归并到 `.xslt.json` 一条（`deduplicateXsltArtifactTargets`）：显式 `abap push a.xslt.json a.xslt.xml` 只写一次 SAP；`--all` 扫描器只收 `.abap` / `.xml`，工作区里的 `.xslt.xml` 会被扫到并作为 pair 入口读取同名 JSON。
 - dedup 后再走 PR1 的依赖排序，所以 priority=30 的 canonical `.tabl.json`（保留者）会和其他 TABL 一起前移，但同表其它件套已经 drop 掉，不会重复写。
 
 ## 按对象 transport 解析（核心设计）
@@ -147,6 +148,19 @@ abap push src/zmy_dom.doma.json --dry-run
 | `VALIDATION_ERROR` | 7 | DDLS 缺 `.ddls.acds`，或 `sourceType` 与 `.acds` 顶部 `define` 不一致 |
 | `AFF_FIXTURE_INVALID` | 7 | push 前 AFF schema 校验失败 |
 
+### XSLT（两件套，只更新）
+
+`.xslt.json` / `.xslt.xml` 都命中 `TYPE_ROUTES.XSLT` 的 `icf-json` 路由（`push-xslt.ts`）：
+
+1. 从传入文件解析出 pair，读 `.xslt.json` 并做 `xslt-v1.json` schema 校验、读 `.xslt.xml` 作为源码（缺伴生 / 空源码 → 本地 `VALIDATION_ERROR`，exit 7）；
+2. `GET /xslt/<name>` 探测存在性，不存在 → `OBJECT_NOT_FOUND`（exit 8，`nextSteps` 指向 `abap create XSLT`）；push 不会隐式创建；
+3. `POST /xslt/<name>`（SAP 侧是删除后重建的 upsert），`transportRequest` 取 `--tr`；返回 `status: 'written'`。
+
+```bash
+abap push src/zmy_xslt.xslt.json --tr NDK900123 --yes
+abap push src/zmy_xslt.xslt.json src/zmy_xslt.xslt.xml --yes   # 两件一起给也只推一次
+```
+
 ### 支持的文件类型
 
 按 [file-resolver.ts](../../src/abap_cli/formats/file-resolver.ts) 的文件名解析规则，push 可处理的文件：
@@ -161,11 +175,12 @@ abap push src/zmy_dom.doma.json --dry-run
 | `zmy_dom.doma.docu.json` / `zmy_dom.dtel.docu.json` | icf（随主文件） | DOMA/DTEL 长文本伴生：不单独 push；主文件 push 成功后自动 POST/删除长文本（`lines: []` 删除） |
 | `zmy_service.http.json` | icf | HTTP 服务（SICF 节点），POST `/http/<name>`；**不探测存在性**（push 即创建/更新） |
 | `zmy_tran.tran.json` | icf | 事务码（SE93），POST `/tran/<code>`；push 前 GET 探测存在性。**SAP 侧写端点当前返回 501（`TRAN_WRITE_NOT_IMPLEMENTED`），写路径端到端不可用** |
+| `zmy_xslt.xslt.json` / `zmy_xslt.xslt.xml` | icf | XSLT 转换程序，POST `/xslt/<name>`；两件套任一文件都可作为入口（自动读同名伴生），push 前 GET 探测存在性；**push 只更新**，不创建 |
 | `zmy_ttyp.ttyp.json` / `zmy_msag.msag.json` / `zmy_view.ddls.json` / `zmy_nrob.nrob.json` | 通道路由（adt 或 icf 分支） | 双通道类型，`channel-detect` 决定 ADT / ICF；NROB 固定走 ICF |
 | `zprog.prog.texts.en.properties`（`texts`/`selections`/`headings`） | textpool | 文本元素，混合模式路由；写仅在 ADT text-elements 写端点可用时成功 |
 | `zmy_pkg.devc.json` | — | **被拒绝**：DEVC 是只读类型（ADT 资源控制器拒绝 `PUT /sap/bc/adt/packages/<name>`），`TYPE_NOT_SUPPORTED`（exit 7）。改包用 SAP GUI，或 `delete` 后重建 |
 
-**不支持的**：`.clas.json` 等源码对象的元数据 JSON — 被解析为 route `icf` 但对象类型既不在 `icf-json` 路由的五种 DDIC/HTTP/TRAN 之内、也不是 `aff-json` 路由的四类（TTYP/MSAG/DDLS/NROB），`validateLocalFile` 抛 `DDIC_NOT_SUPPORTED`（exit 7）。源码对象的创建/更新走 `abap create`，不是 push。
+**不支持的**：`.clas.json` 等源码对象的元数据 JSON — 被解析为 route `icf` 但对象类型既不在 `icf-json` 路由的 DDIC/HTTP/TRAN/XSLT 之内、也不是 `aff-json` 路由的四类（TTYP/MSAG/DDLS/NROB），`validateLocalFile` 抛 `DDIC_NOT_SUPPORTED`（exit 7）。源码对象的创建/更新走 `abap create`，不是 push。
 
 **文件位置约定（与 pull / create local 对齐）**：`file-resolver.ts#resolveFile` 只看 `path.basename`，所以文件放在哪一层目录不影响路由与解析——push 可以推 `src/` 下的 AFF 文件名，也可以推子目录里的同名文件。pull / create local 默认把产物平铺写入 `src/`（`--dir` 只对这两条命令生效），push 直接读文件名即可。但文件名本身必须是 AFF 命名 `<name>.<type>[.<sub_type>].<ext>`：旧 `#ns#name` 命名空间 token 会被拒绝（`FILE_PARSE_ERROR`，提示重新 `abap pull`）。
 
@@ -178,7 +193,7 @@ abap push src/zmy_dom.doma.json --dry-run
 | 场景 | 错误码 | 类别 / exit | 附带信息 |
 |------|--------|-------------|----------|
 | 对象被他人锁定 | `LOCK_FAILED` | LOCKED / 9 | `nextSteps`：`abap inspect <obj> --locks` 查锁 + SE03 手动释放；FUGR 额外带 `subtype` |
-| 对象不存在（ADT 源对象 / DDIC / TRAN） | `OBJECT_NOT_FOUND` | NOT_FOUND / 8 | `nextSteps`：`abap search <name>` 验证；**引导 `abap create <TYPE> <name> --file <path> --package ... --tr ...`**。push 不自动创建（创建走 `abap create`；HTTP 例外——push 会创建 SICF 节点） |
+| 对象不存在（ADT 源对象 / DDIC / TRAN / XSLT） | `OBJECT_NOT_FOUND` | NOT_FOUND / 8 | `nextSteps`：`abap search <name>` 验证；**引导 `abap create <TYPE> <name> --file <path> --package ... --tr ...`**。push 不自动创建（创建走 `abap create`；HTTP 例外——push 会创建 SICF 节点） |
 | push DEVC（`.devc.json`） | `TYPE_NOT_SUPPORTED` | VALIDATION_ERROR / 7 | `details.results[].code` 同为 `TYPE_NOT_SUPPORTED`；`nextSteps` 建议 `delete` 后重建或改用 SAP GUI |
 | 命名的 include part 不存在（如 `.macros.abap` 而对象无 macros） | `SAP_ERROR` | SAP_ERROR / 6 | `subtype` + `nextSteps`：`abap inspect <obj> --includes` 列出可用 include |
 | 激活失败 | `ACTIVATION_FAILED` | VALIDATION_ERROR / 7 | `stage: 'activate'` + 原始 `detail` |
@@ -187,6 +202,9 @@ abap push src/zmy_dom.doma.json --dry-run
 | 无可用 transport | `NO_TRANSPORT` | VALIDATION_ERROR / 7 | 提示 `--tr` 或 `abap transport create` |
 | 长文本伴生非法（行 >72 / format >2 / 非 docu-v1） | `AFF_FIXTURE_INVALID` | VALIDATION_ERROR / 7 | 主对象不写入；`details.results[].file` 为主文件，消息指明伴生路径与 schema 错误 |
 | 长文本 POST 失败 | `DOCU_PUSH_FAILED` | SAP_ERROR / 6 | 主对象已写入；`details.serverCode` 带服务端错误码，`nextSteps` 提示修因后重推主文件 |
+| XSLT 两件套缺失/为空 | `VALIDATION_ERROR` | VALIDATION_ERROR / 7 | `.xslt.xml` 伴生缺失或源码为空时在本地拒绝，不发 SAP |
+| XSLT 激活失败 | `XSLT_ACTIVATION_FAILED` | VALIDATION_ERROR / 7 | `details` 为 `O2XSLTERR` 行（行号 + 文本）；对象保留 inactive，修正后重推 |
+| XSLT 写/删除 API 失败 | `XSLT_PUSH_FAILED` / `XSLT_WRITE_CANCELLED` / `XSLT_DELETE_FAILED` | SAP_ERROR / 6 | `CL_O2_API_XSLTDESC` 调用错误原样透出 |
 
 **收尾保证**：lock 在任何路径（成功 / check-only / write-only / 激活失败）都会在 `finally` 释放；释放失败不报错，降级为 `UNLOCK_WARNING`（`meta.warnings`，exit 不变）。
 
@@ -231,6 +249,15 @@ abap push src/zthree.tabl.json --tr NDK900001 --yes
 
 # 推送 textpool（仅 ADT text-elements 写可用时；A4H 上报 TEXTPOOL_WRITE_UNSUPPORTED）
 abap push src/zprog.prog.texts.en.properties
+```
+
+
+```bash
+# 更新转换程序源码（push 只更新已存在的 XSLT）
+abap push src/zmy_xslt.xslt.json --tr NDK900123 --yes
+
+# 本地校验 AFF 两件套（--atomic 也支持）
+abap push src/zmy_xslt.xslt.json --atomic --yes
 ```
 
 ## Expected Output
@@ -292,7 +319,7 @@ abap push src/zprog.prog.texts.en.properties
 
 # references
 
-- 实现：`src/abap_cli/commands/push.ts`、`src/abap_cli/flows/edit/routing.ts`（`TYPE_ROUTES` 单一路由表）、`src/abap_cli/flows/edit/push.ts`（`runPush`/`pushOne`/`resolveObjectTransport`）、`push-icf.ts`（DDIC/HTTP/TRAN 的 ICF 写与校验）、`push-object.ts`、`push-fugr.ts`、`push-textpool.ts`、`push-{ttyp,msag,ddls,nrob}.ts`、`src/abap_cli/core/confirmation.ts`
+- 实现：`src/abap_cli/commands/push.ts`、`src/abap_cli/flows/edit/routing.ts`（`TYPE_ROUTES` 单一路由表）、`src/abap_cli/flows/edit/push.ts`（`runPush`/`pushOne`/`resolveObjectTransport`）、`push-icf.ts`（DDIC/HTTP/TRAN 的 ICF 写与校验）、`push-xslt.ts`（XSLT 两件套）、`push-object.ts`、`push-fugr.ts`、`push-textpool.ts`、`push-{ttyp,msag,ddls,nrob}.ts`、`src/abap_cli/core/confirmation.ts`
 - transport 解析：`src/abap_cli/core/transport.ts`（`resolveTransport`）、`src/abap_cli/core/resolve.ts`（`ResolvedObject.packageName`）
 - SAP 后端：`abap/src/zcl_abap_vibe_icf_ddic.clas.abap`（`dispatch_ddic`）· `abap/src/zcl_abap_vibe_icf_textpool.clas.abap`（`dispatch_textpool`）
 - 文档：`docs/commands.md`（`abap push` 一节）、`docs/configuration.md`（Transport Resolution Order）

@@ -4,7 +4,7 @@ title: abap delete
 description: "从 SAP 删除单个 ABAP 对象（lock → delete → unlock）：--type 必填消歧、--yes 显式确认、非 $TMP 对象必须用 --tr 指定传输请求。"
 tags: [abap-cli, command, delete, adt, lock, transport, cleanup]
 created at: 2026-10-29 14:30:14
-changed at: 2026-10-31 16:20:00
+changed at: 2026-10-31 18:06:00
 ---
 
 # abap delete
@@ -23,7 +23,7 @@ abap delete --schema --json
 ## Options
 
 - `<object>`: SAP 对象名（如 `ZCL_MY_CLASS`），不是本地文件名；内部走 ADT quickSearch 解析成对象 URL。
-- `--type <type>`: **必填**。对象类型码（`CLAS` / `PROG` / `INTF` / `FUGR` / `DEVC` / `TABL` / `VIEW` / `TRAN` / ...），大小写不敏感。`DEVC` 走独立删除路径（包资源按名字直接寻址，不依赖 quickSearch，也不加锁）；`VIEW` 走 ICF `DELETE /ddic/view/<name>`（仅 `$TMP`，先激活 inactive 版本再 `RS_DD_DELETE_OBJ`）。
+- `--type <type>`: **必填**。对象类型码（`CLAS` / `PROG` / `INTF` / `FUGR` / `DEVC` / `TABL` / `VIEW` / `TRAN` / ... / `XSLT`），大小写不敏感。`DEVC` 走独立删除路径（包资源按名字直接寻址，不依赖 quickSearch，也不加锁）；`VIEW` 走 ICF `DELETE /ddic/view/<name>`（仅 `$TMP`，先激活 inactive 版本再 `RS_DD_DELETE_OBJ`）；`TRAN` / `XSLT` 走 ICF（`DELETE /tran/<code>` / `DELETE /xslt/<name>`），其余类型走 ADT lock → DELETE → unlock。
 - `--tr <request>`: 传输请求号。`$TMP` 对象可省略；其它包必填。
 - `--yes`: **必填**。显式确认删除；无 TTY 时缺失直接报 `USAGE`。
 - `--schema`: 打印本命令参数 schema 并退出，不调用 SAP。
@@ -32,7 +32,7 @@ abap delete --schema --json
 ## 前置条件
 
 - 工作区已绑定 profile（`.abap.json`），SAP 可达且凭据有效。
-- 对象存在且名字、类型正确；`--tr` 必须是对象所属的打开请求（已释放 / 已关闭的请求会被 SAP 拒绝）。
+- 对象存在且名字、类型正确；`--tr` 必须是对象所属的打开请求（已释放 / 已关闭的请求会被 SAP 拒绝）。`XSLT` 的包从 ICF GET 读取，非 `$TMP` 缺 `--tr` 时在发 DELETE 前被 `MISSING_TRANSPORT`（exit 2）拦截。
 - 非 `$TMP` 对象需要一个可修改的 transport：先 `abap transport list --open` 或 `abap transport create`。
 - 对象没有被其他用户锁住。
 
@@ -53,6 +53,15 @@ abap delete ZPKG_SUB --type DEVC --tr NDK900123 --yes --json
 
 # 同名对象同时是 CLAS / PROG 时用 --type 消歧
 abap delete ZFOO --type PROG --tr NDK900123 --yes
+```
+
+
+```bash
+# $TMP 下的转换程序
+abap delete ZMY_XSLT --type XSLT --yes
+
+# 可传输包里的转换程序
+abap delete ZMY_XSLT --type XSLT --tr NDK900123 --yes
 ```
 
 ## Expected Output
@@ -102,6 +111,8 @@ lock/unlock）：
 | `AMBIGUOUS_OBJECT` | NOT_FOUND / 8 | 同名多类型且没给 `--type` | 用 `--type` 消歧 |
 | `TYPE_NOT_SUPPORTED` | VALIDATION_ERROR / 7 | 该类型没有 ADT delete 端点（如 CDS 视图类类型） | 换受支持的类型；映射以底层 ADT 响应为准 |
 | `MISSING_TRANSPORT` | USAGE / 2 | 非 `$TMP` 对象没给 `--tr` | 补 `--tr`，或把对象移到 `$TMP` |
+| `XSLT_DELETE_FAILED` | SAP_ERROR / 6 | XSLT 的 `delete` / `save` 调用失败 | 查看 `details`；对象可能仍保留，重试或到 SE80 手工删除 |
+| `XSLT_TRANSPORT_REQUIRED` | VALIDATION_ERROR / 7 | 非 `$TMP` XSLT 缺 transportRequest | 补 `--tr` |
 | `LOCK_FAILED` | LOCKED / 9 | SAP 没返回 `LOCK_HANDLE`，通常对象被他人锁住 | 让对方释放锁，或 SE11 检查锁条目后重试 |
 | `DELETE_FAILED` | SAP_ERROR / 6 | 加锁后的删除失败（请求已关闭、权限不足等） | 看 `error.details.sapErrorBody` 的 SAP 原文 |
 
@@ -110,6 +121,7 @@ lock/unlock）：
 - **VIEW（数据库视图）**：`abap delete <name> --type VIEW` 走 ICF `DELETE /ddic/view/<name>`；仅 `$TMP` 视图可删（可传输视图返回 `VIEW_DELETE_UNSUPPORTED`，exit 7，请在 SE11 删除）。已在 S/4HANA 8.134.214.7:44300（profile `test`）验证：`$TMP` 视图删除成功（`deleted + lockReleased`），DD25L/DD26S/DD27S/DD28S/TADIR 无残留；`V_T001`（package FBZ）被 `VIEW_DELETE_UNSUPPORTED` 拦截且未发起 DELETE。证据：`tests/261031006-realsap-view/`（本地，不入库）。
 - **DEVC（包）已在 S/4HANA 8.134.214.7:44300（profile `test`）验证**：`$TMP` 下真实创建 `$ZCLI_TC_PKG10` 后 `abap delete '$ZCLI_TC_PKG10' --type DEVC --yes --json` 成功（复用创建命令的会话时 SAP 先报「包已锁定」，命令自动 logout + 新会话重试后成功），随后 `pull` 返回 404；非 LOCAL 包（ZLOCAL）在缺 `--tr` 时被 `MISSING_TRANSPORT`（exit 2）拦截、未发起删除。证据：`tests/261031002-realsap-devc/`（本地，不入库）。
 - **TRAN（事务码）删除走 ICF `DELETE /tran/<tcode>`**（SE93 没有 ADT 端点）：S/4HANA 8.134.214.7:44300（profile `test`）上 `abap delete ZCLI_TC_T1 --type TRAN --yes` 成功，TSTC/TSTCT/TSTCP/TSTCC/TSTCA 与 TADIR 行一并清除，随后 `pull` 返回 404。仅 `$TMP` 事务可删；可传输事务返回 `TRAN_DELETE_UNSUPPORTED`（exit 7，请在 SE93 删除以便记录到请求）。证据：`tests/261031003-realsap-tran/`（本地，不入库）。
+- **XSLT（转换程序）未验证**：`DELETE /xslt/<name>` 已实现（`load → set_changeable → delete → save`，API 原语在 $TMP 探针中 rc=0），但端到端真机命令尚未执行（写作时目标系统 stateful 会话受限，`abap deploy` 未完成）。
 - **其它类型未验证**：本页没有记录 CLAS / PROG 等 `abap delete` 在 A4H / S/4HANA 上的真机执行结果。
 - 对象解析依赖的 ADT quickSearch quirk（裸名可能 0 命中，需要 `*NAME*` 回退）在 vhcala4hci（A4H）验证过，见 `src/abap_cli/core/resolve.ts` 注释；删除动作本身未验证。
 
@@ -129,6 +141,6 @@ lock/unlock）：
 
 # references
 
-- 实现：`src/abap_cli/commands/delete.ts`、`src/abap_cli/flows/edit/delete.ts`；对象解析 `src/abap_cli/core/resolve.ts`
+- 实现：`src/abap_cli/commands/delete.ts`、`src/abap_cli/flows/edit/delete.ts`；对象解析 `src/abap_cli/core/resolve.ts`；XSLT 删除的 ICF 端点：`abap/src/zcl_abap_vibe_icf_xslt.clas.abap`（`delete_xslt`）
 - 生成参数表：[docs/commands.md](../../docs/commands.md)；`--json` 契约：[agent-integration.md](../../docs/agent-integration.md)
 - 所属 skill：[skills/abap-cli-edit/SKILL.md](../../skills/abap-cli-edit/SKILL.md)

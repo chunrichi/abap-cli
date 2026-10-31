@@ -48,6 +48,9 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
       ENDTRY.
     ELSEIF lv_path CP '/mime/*'.
       zcl_abap_vibe_icf_mime=>dispatch_mime( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
+    ELSEIF lv_path CP '/xslt/*'.
+      " Transformation (XSLT) programs: metadata + source in one route.
+      zcl_abap_vibe_icf_xslt=>dispatch_xslt( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
     ELSEIF lv_path CP '/version-source*'.
       zcl_abap_vibe_icf_version=>dispatch_version_management( io_server = server iv_path = lv_path iv_method = lv_method ).
     ELSEIF lv_path CP '/_class-check*'.

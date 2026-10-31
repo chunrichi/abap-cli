@@ -40,6 +40,7 @@ export const SCHEMA: CommandSchema = {
     { code: 'TRANSPORT_NOT_FOUND', category: 'VALIDATION_ERROR', exitCode: 7 },
     { code: 'PULL_PARTIAL_FAILURE', category: 'VALIDATION_ERROR', exitCode: 7 },
     { code: 'INVALID_ARGUMENT', category: 'USAGE', exitCode: 2 },
+    { code: 'XSLT_OBJECT_NOT_FOUND', category: 'NOT_FOUND', exitCode: 8 },
   ],
 };
 

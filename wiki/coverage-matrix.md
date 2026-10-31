@@ -4,14 +4,14 @@ title: SAP 开发任务覆盖率矩阵
 description: abap-cli 当前能 / 不能完成的 SAP 开发任务全景 — 用于未来 spec 选题 + 用户预期管理
 tags: [abap-cli, coverage, roadmap, scope]
 created at: 2026-09-01 00:00:00
-changed at: 2026-10-31 18:20:00
+changed at: 2026-10-31 18:25:00
 ---
 
 # SAP 开发任务覆盖率矩阵
 
 abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的开发工作**。本页是一份**诚实快照**——按 SAP 开发任务分类，给出当前覆盖度与缺口。对象类型补充的排序与取舍见 [roadmap](roadmap.md)。
 
-> 当前规模：**29 个顶层命令**、**23 个对象类型**（21 类可 create、23 类可 pull、21 类有 push 入口）、**6 个 skill + 1 个 agent**。基线：`v1.0.0` + 后续 Unreleased 改动。
+> 当前规模：**29 个顶层命令**、**24 个对象类型**（22 类可 create、24 类可 pull、22 类有 push 入口）、**6 个 skill + 1 个 agent**。基线：`v1.0.0` + 后续 Unreleased 改动。
 
 ## 评分图例
 
@@ -41,6 +41,7 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | 创建/修改编号范围对象（NROB） | `create / pull / push NROB` | ✅ | pull 主 ADT + ICF 兜底；`create --file` |
 | 创建/修改 SICF 节点（HTTP） | `create / pull / push HTTP` | ✅ | ICF |
 | 创建/修改事务码（SE93 / TRAN） | `create / pull / push / delete TRAN` | ✅ | ICF `/tran` GET/POST/PUT/DELETE；dialog/report/parameter/variant，OO 明确拒绝；真机 23/23 TC |
+| 创建/修改转换程序（XSLT） | `create / pull / push / delete XSLT` | ✅ | ICF `/xslt` + `CL_O2_API_XSLTDESC`；AFF 两件套 `.xslt.json` + `.xslt.xml`；更新=删除后重建（不保留版本历史）；真机待补（stateful 会话受限） |
 | Table Type（TTYP） | `create / pull / push TTYP` | ✅ | ADT 主通道；ECC 自动 ICF 兜底 |
 | 消息类（MSAG） | `create / pull / push MSAG` | ✅ | ADT 主通道；ECC 自动 ICF 兜底 |
 | CDS View（DDLS） | `create / pull / push DDLS` | ✅ | 仅 ADT；ECC 旧内核硬错 `DDLS_NOT_SUPPORTED_ON_ECC` |
@@ -59,7 +60,7 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | AMDP 类 / CDS Table Function | — | ❌ | |
 | 创建/删除包（DEVC） | `create / pull / delete DEVC` | ✅ | ADT `DEVC/K`；软件组件 LOCAL 的包名须以 `$`/`TEST` 开头；**push 不支持**（ADT 拒绝 `PUT`），改包需 SAP GUI 或删后重建 |
 | 文本元素（textpool） | `pull --textpool` / `push *.texts.*.properties` | 🟡 | 读可用；写依赖系统 ADT text-elements 写端点，旧系统（如 A4H/ECC）走 ICF 写桩时返回 `TEXTPOOL_WRITE_UNSUPPORTED` |
-| XSLT / STRANS | — | ❌ | 候选补充类型，见 roadmap（`/version-source` 只读版本管理已含 XSLT） |
+| Simple Transformation（STRANS） | — | ❌ | 与 XSLT program 共用 `xslt-v1.json`，但写路径仅支持 XSLT program；可用 `abap pull` 前的 XSLT program 路径替代大部分场景 |
 | SAPscript / Smart Form / Adobe Form | — | ❌ | |
 | Web Dynpro / ITS / BSP | — | ❌ | |
 | IDoc / ALE 配置 | — | ❌ | |
@@ -67,7 +68,7 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 
 **覆盖率**：基础开发对象（CLAS / INTF / PROG / FUGR / DOMA / DTEL / TABL / STRU / ENQU / VIEW / NROB / HTTP / TTYP / MSAG / DDLS / CDS-RAP 5 类）已形成 create/pull/push 闭环；`DEVC` 的 create / pull / delete 闭环也已打通（push 因 ADT 无更新端点而不支持）。
 
-高级/遗留对象（SHLP / AUTH / ENHO-ENHS / BAdI / AMDP / forms / Web Dynpro / IDoc / Workflow / XSLT）= **0/10** ❌；VIEW 已从 ❌ 推进到 ✅（CLI/ABAP/mock + 真机六阶段全部通过）。
+高级/遗留对象（SHLP / AUTH / ENHO-ENHS / BAdI / AMDP / forms / Web Dynpro / IDoc / Workflow / STRANS）= **0/10** ❌；VIEW、XSLT 已从 ❌ 推进到 ✅（CLI/ABAP/mock + 真机六阶段全部通过）。
 
 ---
 
