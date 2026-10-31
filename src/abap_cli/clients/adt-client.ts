@@ -123,10 +123,23 @@ export class AdtClientWrapper {
     await this._loginNow();
   }
 
+  /**
+   * Keep the SAP session mode in sync with the ICM: when login only produced an
+   * anonymous context cookie (the server could not open a stateful session —
+   * e.g. session table pressure), replaying it makes every stateful request
+   * fail with `400 Session not found`. Drop the cookie and continue stateless;
+   * operations that require a lock surface the library's STATELESS error.
+   */
+  private applySessionMode(): void {
+    if (dropAnonymousContextCookies(this.client)) {
+      this.client.stateful = session_types.stateless;
+    }
+  }
+
   private async _loginNow(): Promise<void> {
     try {
       await this.client.login();
-      dropAnonymousContextCookies(this.client);
+      this.applySessionMode();
       this.freshLogin = true;
       this.sessionReady = true;
       if (this.jar && this.sessionKey) {
@@ -229,7 +242,7 @@ export class AdtClientWrapper {
   private async ensureSession(): Promise<void> {
     if (this.sessionReady) return;
     await this.client.login();
-    dropAnonymousContextCookies(this.client);
+    this.applySessionMode();
     this.freshLogin = true;
     this.sessionReady = true;
     if (this.jar && this.sessionKey) {
@@ -291,7 +304,7 @@ export class AdtClientWrapper {
         this.fallbackUsed = true;
         // Stale session: re-login, re-capture, persist, then retry the call.
         await this.client.login();
-        dropAnonymousContextCookies(this.client);
+        this.applySessionMode();
         this.freshLogin = true;
         captureSessionFromAdt(this.client, this.jar);
         if (this.sessionKey) {
