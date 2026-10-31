@@ -123,17 +123,40 @@ export interface RenderedOutput {
   exitCode?: number;
 }
 
+/** Rendering knobs for contract-fixed payload shapes. */
+export interface RenderOptions {
+  /** Top-level `data` keys whose empty `[]` / `{}` must survive `stripEmpty`.
+   *  Only for fields whose *presence* is part of the machine contract (e.g.
+   *  `doctor --fix` always reports `fixesApplied[]`). Omit for ordinary data:
+   *  agents do not consume empty collections. */
+  preserveEmpty?: string[];
+}
+
 /** Render a success payload. JSON (with meta) goes to stdout; human text goes
  *  to stdout with any warnings as `Warning:` lines on stderr.
  *
  *  Token-efficient design:
  *   - Compact JSON (`null`) by default for `json` mode; indent 2 only for `pretty-json`.
  *   - Recursively strip empty `{}`/`[]` from `data` to save LM agent tokens.
- *   - Top-level `data` object is always preserved, even if it becomes `{}`. */
-export function renderResult(mode: OutputMode, data: unknown, human: string, meta: OutputMeta): RenderedOutput {
+ *   - Top-level `data` object is always preserved, even if it becomes `{}`.
+ *   - Contract-fixed keys listed in `options.preserveEmpty` are exempt. */
+export function renderResult(
+  mode: OutputMode,
+  data: unknown,
+  human: string,
+  meta: OutputMeta,
+  options?: RenderOptions,
+): RenderedOutput {
   if (isJsonMode(mode)) {
+    const cleaned = stripEmpty(data) as Record<string, unknown>;
+    if (options?.preserveEmpty?.length && data !== null && typeof data === 'object' && !Array.isArray(data)) {
+      const source = data as Record<string, unknown>;
+      for (const key of options.preserveEmpty) {
+        if (key in source) cleaned[key] = source[key];
+      }
+    }
     return {
-      stdout: [JSON.stringify({ status: 'success', meta, data: stripEmpty(data) }, null, mode === 'pretty-json' ? 2 : undefined)],
+      stdout: [JSON.stringify({ status: 'success', meta, data: cleaned }, null, mode === 'pretty-json' ? 2 : undefined)],
       stderr: [],
       exitCode: undefined,
     };
@@ -168,8 +191,14 @@ export function renderError(mode: OutputMode, error: unknown, meta: OutputMeta):
 }
 
 /** Shim — writes to stdout/stderr and returns. `meta` defaults to buildMeta(). */
-export function printResult(mode: OutputMode, data: unknown, human: string, meta?: OutputMeta): void {
-  const out = renderResult(mode, data, human, meta ?? buildMeta());
+export function printResult(
+  mode: OutputMode,
+  data: unknown,
+  human: string,
+  meta?: OutputMeta,
+  options?: RenderOptions,
+): void {
+  const out = renderResult(mode, data, human, meta ?? buildMeta(), options);
   for (const line of out.stdout) console.log(line);
   for (const line of out.stderr) console.error(line);
 }

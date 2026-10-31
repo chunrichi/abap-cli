@@ -28,7 +28,7 @@ metadata:
 - 离线起一份草稿（`create local`）再 push
 - DDIC 定义 CRUD：`pull <name> --type DOMA|DTEL|TABL|STRU`、`create <type> <name> --file <json>`、`push <name>.<type>.json`。TABL/STRU 现在遵循 abap-file-format 三件套（`--file` 指向 main `.tabl.json` + 同目录 `.tabl.ddic` + 可选 `.tabl.settings.json`）；只有 main JSON 时回落 legacy wire-flat（详见 workflow.md 变体 2）。**写新 TABL/STRU 时直接 `cp` [assets/tabl-templates](./assets/tabl-templates/README.md) 里的 DDL 骨架**（5 个场景：透明表 / include / 货币金额 / 数量单位 / STRU），别凭空写 `@AbapCatalog.*` 注释
 - 上传 UI 资产（JavaScript / CSS / 图片 / 模板）到 SAP MIME Repository（SE80）→ `mime create / push`；删 MIME 目录走 `mime delete --recursive`
-- 写盘前用官方 AFF schema 严格校验本地 JSON（CLAS / INTF / PROG / FUGR / TABL / STRU / DOMA / DTEL / HTTP / TRAN / TTYP / MSAG / DDLS）→ `validate:aff <file-or-dir> --json`（纯本地 ajv + Draft 2020-12，**不进 SAP**；CI / pretest gate）
+- 写盘前用官方 AFF schema 严格校验本地 JSON（CLAS / INTF / PROG / FUGR / TABL / STRU / DOMA / DTEL / HTTP / TRAN / TTYP / MSAG / DDLS）→ `validate:aff <file-or-dir> --json`（纯本地 ajv + Draft 2020-12，**不进 SAP**；CI / pretest gate）。退出码即结论：`0` 通过（含 WARN）、`2` 参数/路径错误、`7` 校验失败（`error.details.files[]` 列出每个失败文件与 `missingCompanions`）
 - 清理或审计 SAP 上的对象：列出包内对象用 `list --package <pkg> [--type <type>]`（只读）；删除单个对象用 `delete <name> --type <type> [--tr <req>] --yes`（lock → delete → unlock，必传 `--yes`，非 `$TMP` 必传 `--tr`，与 `push` 语义一致）。常用于删除一次性探针类 / $TMP 草稿清理 / 批量接管前先看包
 
 ## 决策树
@@ -69,8 +69,8 @@ MIME Repository（SE80 / UI 资产）？
 
 AFF 写盘前 gate（纯本地，不进 SAP）
 ├── 单文件 → validate:aff <file>.tabl.json --json
-├── 目录递归 → validate:aff test/fixtures/ --json   # 默认路径；用于 pretest
-└── 多路径 → validate:aff test/fixtures/ --wire tmp/s4h/wire/ --json   # 同时扫 fixture + wire
+├── 目录递归 → validate:aff src/ --json
+└── 多路径 → validate:aff src/ --wire tmp/s4h/wire/ --json   # 同时扫 AFF 目录 + wire 目录
 ```
 
 ## 支持的对象类型（权威列表）

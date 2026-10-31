@@ -26,7 +26,7 @@ Agent 在 Windows / Linux / macOS 下消费同一份结构化输出时，看到�
 | Helper | Purpose |
 |---|---|
 | `toOutputPath(p)` | 字符串级规范化：`\` → `/`，strip leading `./`，保留 `..`，空值返回 `''`。 |
-| `toRelativeOutputPath(absPath, cwd?)` | 绝对 host 路径 → cwd-relative POSIX 路径（`path.relative(cwd, p)` 后 POSIX 化；`relative()` 为空时回退绝对 POSIX）。`cwd` 默认 `process.cwd()`，flow 内部使用自身 cwd 时显式传入。用于 `push` / `check` / `status` / `diff` 这类输入是 `path.resolve` 绝对路径的命令。 |
+| `toRelativeOutputPath(absPath, cwd?)` | 绝对 host 路径 → cwd-relative POSIX 路径（`path.relative(cwd, p)` 后 POSIX 化；`relative()` 为空时回退绝对 POSIX）。`cwd` 默认 `process.cwd()`，flow 内部使用自身 cwd 时显式传入。用于 `push` / `check` / `status` / `diff` / `validate:aff` 这类输入是 `path.resolve` 绝对路径的命令。 |
 | `normalizePullData(data)` | 范围化 helper：只动 `file` / `entries[].file` / `entries[].files` / `written` / `skipped` / `failed`，其它字段（`object` / `code` / `detail` 等）原样返回。`pull` flow 全部 6 条路径（单对象、textpool、DDIC 单文件、TABL/STRU three-piece、HTTP、remote、package 批量、transport 批量）都走它。 |
 | `isPathLike(p)` | 判别字符串是否为路径形态（避免把 `code: "FAILED"` 之类误转换）。 |
 
@@ -50,7 +50,8 @@ Agent 在 Windows / Linux / macOS 下消费同一份结构化输出时，看到�
 | `init --agent` | `data.written` / `data.skipped` |
 | `init` | `data.configPath`（`--show-config` / `--unset-*`）、`CONFIG_ERROR` 的 `details.file` |
 | `profile` | `profile export --file` 的 `data.file` + human、`PROFILE_MISMATCH` warning 中的相对路径 |
-| `doctor` | `config.active` verbose 文本中的相对路径 |
+| `doctor` | `config.active` verbose 文本中的相对路径；`--fix` 的 `fixesApplied[].target` 是 **home 锚定**（`~/.abap-cli`），不是 cwd-relative |
+| `validate:aff` | `data.files[].path` / `error.details.files[].path`（cwd-relative POSIX）；human 的 `PASS/WARN/FAIL <path>` 同一形态；`missingCompanions[]` 是 basename |
 | `status` / `diff` | `data.parts[].detail`（`local file: <cwd-relative POSIX>`） |
 
 ## 期望输出（任意平台下都形如）
