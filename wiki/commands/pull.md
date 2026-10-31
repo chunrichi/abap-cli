@@ -9,7 +9,7 @@ changed at: 2026-10-31 17:05:00
 
 # abap pull
 
-从 SAP 系统下载 ABAP 对象到本地文件，遵循 abap-file-format（AFF）原生扁平布局。支持五类入口：单个源码对象（CLAS/PROG/INTF/FUGR）、包批量下载、DDIC 对象（DOMA/DTEL/TABL/STRU，其中 DOMA/DTEL 会附带拉长文本伴生 `.docu.json`）、textpool 文本元素、以及远程系统版本源码。裸 `abap pull`（无对象名、无 `--package`）打印命令帮助（exit 0）。
+从 SAP 系统下载 ABAP 对象到本地文件，遵循 abap-file-format（AFF）原生扁平布局。支持五类入口：单个源码对象（CLAS/PROG/INTF/FUGR）、包批量下载、DDIC 对象（DOMA/DTEL/TABL/STRU/ENQU/VIEW/NROB，其中 DOMA/DTEL 会附带拉长文本伴生 `.docu.json`）、textpool 文本元素、以及远程系统版本源码。裸 `abap pull`（无对象名、无 `--package`）打印命令帮助（exit 0）。
 
 ## Usage
 
@@ -23,7 +23,7 @@ abap pull
 ## Options
 
 - `[object-name]`: 要下载的对象名（如 `ZCL_MY_CLASS`）
-- `--type <type>`: 对象类型（CLAS、PROG、INTF、FUGR、DOMA、DTEL、TABL、STRU 等）
+- `--type <type>`: 对象类型（CLAS、PROG、INTF、FUGR、DOMA、DTEL、TABL、STRU、VIEW 等）
 - `--package <package>`: 下载某包下的所有对象（分页，默认 limit 20）
 - `--limit <n>`: `--package` 的批量页大小（默认 `SEARCH_RESULT_LIMIT`）
 - `--page <n>`: `--package` 的批量页码（1 起，默认 1）
@@ -48,7 +48,7 @@ abap pull
 2. **`--package`** — `searchObject` 全量搜索 + 按 `adtcore:packageName` 过滤，分页（`limit × page`）逐对象拉取；单对象失败不中断整体（记为 `failed`），截断时提示 `--page N+1`。**分页的原因**：SAP quickSearch 端点的 `maxResults` 有上限（默认 `SEARCH_RESULT_LIMIT` = 20），一次请求拿不全整个包。实现上每次请求 `limit × page` 条结果、按包名过滤后取 `(page-1)*limit` 到 `page*limit` 的窗口——所以 `--limit` 越大单轮拉得越多，`--page` 递增继续拉下一批。单对象 pull（`abap pull ZCL_X`）无分页。
 3. **`--remote <id>`** — 走 ICF `/version-source`（TMS RFC destination `TMSADM@<id>.DOMAIN_<id>`）。CLI 类型 → VRSD 类型映射：`PROG → REPS`、`INTF → INTF`、`CLAS → CLSD`（类定义）。源码写入 AFF 标准文件名 `src/<name>.<type>.abap`（扁平布局，见下文）。对象从未传输到远端时后端返回空 `source`（成功）。
 4. **`--textpool`** — 拉取三个 `.properties` 文件，走混合模式路由（profile 缓存的能力决定走 ADT `getTextElements` 还是 ICF `/textpool/*`），JSON 结果带 `route` 字段（`adt`/`icf`）；文件落为 `src/<name>.<type>.<category>.<lang>.properties`。
-5. **DDIC 类型**（DOMA/DTEL/TABL/STRU/ENQU/NROB）— 走 ICF `GET /ddic/<type>/<name>`，`wireToLocal` 转成本地 JSON，写为 `src/<name>.<type>.json`（TABL/STRU 为三件套）。DOMA/DTEL 随后再 GET `/ddic/<type>/<name>/docu`，有长文本时写 `<name>.<type>.docu.json`（见「DOMA/DTEL 长文本伴生」）。
+5. **DDIC 类型**（DOMA/DTEL/TABL/STRU/ENQU/VIEW/NROB）— 走 ICF `GET /ddic/<type>/<name>`，`wireToLocal` 转成本地 JSON，写为 `src/<name>.<type>.json`（TABL/STRU 为三件套；VIEW 为单文件 `view-v1`）。DOMA/DTEL 随后再 GET `/ddic/<type>/<name>/docu`，有长文本时写 `<name>.<type>.docu.json`（见「DOMA/DTEL 长文本伴生」）。
 6. **通道路由类型**（TTYP/MSAG/DDLS）— 见下节。
 7. **包（DEVC）** — 见下节「Package（DEVC）」：`GET /sap/bc/adt/packages/<name>`，单文件落盘，无批量选择器差异。
 
@@ -101,7 +101,7 @@ envelope 附加字段：
 
 - **源码对象（CLAS/INTF/PROG）**：`src/zcl_demo.clas.json` + `src/zcl_demo.clas.abap`；类 include 各一个文件（`src/zcl_demo.clas.definitions.abap` / `.clas.implementations.abap` / `.clas.macros.abap` / `.clas.testclasses.abap`）；include 程序落 `src/zinc.prog.include.abap`。
 - **FUGR**：`src/<group>.fugr.json` + `src/<group>.fugr.sapl<group>.reps.abap` + `src/<group>.fugr.l<group>top.reps.abap` + 每个 FM 的 `src/<group>.fugr.<fm>.func.abap`（元数据同名 `.json`）。
-- **DDIC**：TABL/STRU 三件套 `src/ztabl_demo.tabl.json` + `.tabl.ddic` + `.tabl.settings.json`（STRU 为 `.stru.*`）；DOMA/DTEL 单文件 `src/zmy_doma.doma.json` / `src/zmy_dtel.dtel.json`，有长文本时另有 0..1 伴生 `src/zmy_doma.doma.docu.json` / `src/zmy_dtel.dtel.docu.json`。
+- **DDIC**：TABL/STRU 三件套 `src/ztabl_demo.tabl.json` + `.tabl.ddic` + `.tabl.settings.json`（STRU 为 `.stru.*`）；DOMA/DTEL/ENQU/VIEW/NROB 单文件 `src/zmy_doma.doma.json` / `src/zcl_tc_view.view.json` 等；DOMA/DTEL 有长文本时另有 0..1 伴生 `src/zmy_doma.doma.docu.json` / `src/zmy_dtel.dtel.docu.json`。
 - **textpool**：`src/zprog.prog.texts.en.properties`（另有 `.selections.<lang>.properties` / `.headings.<lang>.properties`）。
 - **命名空间**：AFF 规范把命名空间转为括号——`/UI2/CL_JSON` → `src/(ui2)cl_json.clas.abap`。旧 abapGit 风格 `#ui2#cl_json` 不再识别；旧文件需重新 `abap pull` 后才能 push。
 
@@ -172,7 +172,8 @@ abap pull ZPROG --type PROG
 # 整包批量下载（分页）
 abap pull --package Z_MY_PACKAGE --limit 50 --page 1
 
-# 拉取 DDIC 对象为本地 JSON（DOMA/DTEL 有长文本时连带 .docu.json）
+# 拉取 DDIC 对象为本地 JSON（DOMA/DTEL 有长文本时连带 .docu.json；VIEW 走 /ddic/view）
+abap pull ZCLI_TC_VIEW --type VIEW --overwrite --json
 abap pull ZDOMA_TEST --type DOMA
 
 # 拉取 textpool 文本元素

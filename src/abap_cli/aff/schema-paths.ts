@@ -45,6 +45,8 @@ const SCHEMA_FILE: Record<string, string> = {
   // ENQU (lock object) + NROB (number range object) schemas vendored
   // from the abap-file-format mirror.
   ENQU: 'enqu-v1.json',
+  // Database view — local extension (upstream AFF has no view schema).
+  VIEW: 'view-v1.json',
   NROB: 'nrob-v1.json',
   // Package (DEVC) metadata read from the ADT package resource.
   DEVC: 'devc-v1.json',

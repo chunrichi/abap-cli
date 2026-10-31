@@ -49,6 +49,8 @@ const ddicStore = new Map();
 // docu document `{ formatVersion, lines: [{ format, line }] }`.
 // Served by GET/POST /sap/abap_cli/ddic/<doma|dtel>/<name>/docu.
 const docuStore = new Map();
+// VIEW (database view) store — key = view name, value = view-v1 wire document.
+const viewStore = new Map();
 // 014: textpool store — key = `<TYPE>:<OBJ>:<CATEGORY>`, value = array of { id, text }.
 const textpoolStore = new Map();
 // 015: remote source store — key = `<TYPE>:<OBJ>`, value = source string served by /version-source.
@@ -1252,6 +1254,63 @@ const server = http.createServer(async (req, res) => {
       }
       return ok(res, JSON.stringify({ status: 'error', error: { code: 'METHOD_NOT_ALLOWED', message: `${req.method} not supported on /ddic/${docuType}/${docuName}/docu` } }), 'application/json');
     }
+
+    // VIEW (database view) — local-extension view-v1 document via ICF.
+    // Mirrors the ABAP handler contract for GET / POST|PUT / DELETE
+    // (/ddic/view/<name>), including the 16-character name limit and the
+    // $TMP-only delete rule.
+    const viewRoute = /^\/sap\/abap_cli\/ddic\/view(?:\/(.+))?$/.exec(path);
+    if (viewRoute) {
+      const viewName = viewRoute[1] ? decodeURIComponent(viewRoute[1]).toUpperCase() : '';
+      if (req.method === 'POST' || req.method === 'PUT') {
+        const body = await readBody(req);
+        let payload = {};
+        try { payload = JSON.parse(body); } catch (_e) { payload = {}; }
+        const objName = (payload.name || '').toUpperCase();
+        if (!objName) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'VIEW_NAME_INVALID', message: 'name is required' } }), 'application/json');
+        }
+        if (objName.length > 16) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'VIEW_NAME_INVALID', message: `name must not exceed 16 characters (got ${objName.length})` } }), 'application/json');
+        }
+        if (!payload.header || !payload.header.description) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'VIEW_REQUIRED_FIELD', message: 'header.description is required' } }), 'application/json');
+        }
+        if (!Array.isArray(payload.tables) || payload.tables.length === 0) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'VIEW_REQUIRED_FIELD', message: 'tables[] must contain at least the root table' } }), 'application/json');
+        }
+        if (!Array.isArray(payload.fields) || payload.fields.length === 0) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'VIEW_REQUIRED_FIELD', message: 'fields[] must contain at least one view field' } }), 'application/json');
+        }
+        const pkg = (payload.package || '').toUpperCase();
+        if (pkg && pkg !== '$TMP' && !payload.transportRequest) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'VIEW_TRANSPORT_REQUIRED', message: 'transportRequest is required for non-$TMP packages' } }), 'application/json');
+        }
+        const existed = viewStore.has(objName);
+        viewStore.set(objName, Object.assign({}, payload, { name: objName, type: 'VIEW', package: pkg || '$TMP' }));
+        return ok(res, JSON.stringify({ status: 'success', data: { name: objName, type: 'VIEW', action: existed ? 'updated' : 'created' } }), 'application/json');
+      }
+      if (req.method === 'GET') {
+        if (!viewName) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'NOT_FOUND', message: 'object name is required' } }), 'application/json');
+        }
+        if (!viewStore.has(viewName)) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'DDIC_OBJECT_NOT_FOUND', message: `VIEW ${viewName} not found in mock store` } }), 'application/json');
+        }
+        return ok(res, JSON.stringify({ status: 'success', data: viewStore.get(viewName) }), 'application/json');
+      }
+      if (req.method === 'DELETE') {
+        if (!viewStore.has(viewName)) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'DDIC_OBJECT_NOT_FOUND', message: `VIEW ${viewName} not found in mock store` } }), 'application/json');
+        }
+        const stored = viewStore.get(viewName);
+        if ((stored.package || '').toUpperCase() !== '$TMP') {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'VIEW_DELETE_UNSUPPORTED', message: `VIEW ${viewName} is in package ${stored.package}; delete it in SE11` } }), 'application/json');
+        }
+        viewStore.delete(viewName);
+        return ok(res, JSON.stringify({ status: 'success', data: { name: viewName, type: 'VIEW', action: 'deleted' } }), 'application/json');
+      }
+      return ok(res, JSON.stringify({ status: 'error', error: { code: 'METHOD_NOT_ALLOWED', message: `${req.method} not supported on /ddic/view` } }), 'application/json');    }
 
     // 014: /sap/abap_cli/ddic/<type> POST (create/overwrite) and GET /<name> (pull).
     const ddic = /^\/sap\/abap_cli\/ddic\/(doma|dtel|tabl|stru)(?:\/(.+))?$/.exec(path);

@@ -30,7 +30,7 @@ Every command supports `--json` (compact envelope, default for agents) and `--pr
 | `abap check` | sap | Validate ABAP source code (syntax / content / atc) |
 | `abap test` | sap | Run ABAP Unit tests for an object (read-only) |
 | `abap search` | sap | Search for ABAP objects in SAP system |
-| `abap create` | sap | Create a new ABAP object (CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, HTTP) |
+| `abap create` | sap | Create a new ABAP object (CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, VIEW, HTTP) |
 | `abap status` | sap | Show local vs SAP sync status |
 | `abap transport` | sap | Manage transport requests |
 | `abap deploy` | sap | Deploy bundled ICF ABAP service to SAP |
@@ -604,7 +604,7 @@ abap create <type> <name> [options]
 
 | Argument | Required | Values | Description |
 | --- | --- | --- | --- |
-| `type` | yes | CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, ENQU, NROB, HTTP, TRAN, TTYP, MSAG, DDLS, SRVB, SRVD, BDEF, DCLS, DDLX, DDLA | Object type |
+| `type` | yes | CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, ENQU, VIEW, NROB, HTTP, TRAN, TTYP, MSAG, DDLS, SRVB, SRVD, BDEF, DCLS, DDLX, DDLA | Object type |
 | `name` | yes |  | Object name |
 
 ### Options
@@ -620,7 +620,7 @@ abap create <type> <name> [options]
 | `--check-only` | no |  |  | Validate the proposed object without creating it |
 | `--audit` | no |  |  | Include the before-checksum (extra SAP round-trip, off by default) |
 | `--overwrite` | no |  |  | When pulling the new object back, replace an existing local file (default: keep the local draft) |
-| `--file` `<path>` | no |  |  | abap-file-format JSON input (required for TABL/STRU/DOMA/DTEL/ENQU/NROB/HTTP/TRAN/TTYP/MSAG/DDLS/SRVD/DCLS/DDLX/DDLA) |
+| `--file` `<path>` | no |  |  | abap-file-format JSON input (required for TABL/STRU/DOMA/DTEL/ENQU/VIEW/NROB/HTTP/TRAN/TTYP/MSAG/DDLS/SRVD/DCLS/DDLX/DDLA) |
 | `--func` `<name>` | no |  |  | With FUGR: create a function module (FUGR/FF) inside the existing function group <name> |
 | `--software-component` `<swcomp>` | no |  |  | With DEVC: software component of the new package (default: inherited from the super package) |
 | `--transport-layer` `<layer>` | no |  |  | With DEVC: transport layer of the new package (default: inherited from the super package) |

@@ -43,6 +43,7 @@ import { createSrvdHandler } from './create-srvd.js';
 import { createEnquHandler } from './create-enqu.js';
 import { createNrobHandler } from './create-nrob.js';
 import { createDevcHandler } from './create-devc.js';
+import { createViewHandler } from './create-view.js';
 import { pullDevcHandler } from './pull-devc.js';
 import { pullTtypHandler } from './pull-ttyp.js';
 import { pullMsagHandler } from './pull-msag.js';
@@ -52,6 +53,7 @@ import { pullBdefHandler } from './pull-bdef.js';
 import { pullCdsExtensionHandler } from './pull-cds-extension.js';
 import { pullEnquHandler } from './pull-enqu.js';
 import { pullNrobHandler } from './pull-nrob.js';
+import { runPullView } from './pull-view.js';
 import { runPullDdic } from './pull-ddic.js';
 import { runPullHttp } from './pull-http.js';
 import { runPullTran } from './pull-transport.js';
@@ -60,6 +62,7 @@ import { runPushMsag } from './push-msag.js';
 import { runPushDdls } from './push-ddls.js';
 import { runPushEnqu } from './push-enqu.js';
 import { runPushNrob } from './push-nrob.js';
+import { pushViewFile, validateViewFile } from './push-view.js';
 import {
   pushDdicFile,
   pushHttpFile,
@@ -232,6 +235,19 @@ export const TYPE_ROUTES: Readonly<Record<string, TypeRoute>> = {
     create: handler('icf', createNrobHandler),
     pull: handler('auto', pullNrobHandler),
     push: affPushRoute('icf', (file, opts) => runPushNrob(file, { transport: opts.tr })),
+  },
+
+  // Database view (SE11 view) — local-extension `view-v1` document, ICF only;
+  // ADT has no view resource, so all three operations go through /ddic/view.
+  VIEW: {
+    create: handler('icf', createViewHandler),
+    pull: handler('icf', ({ objectName, opts }) => runPullView(objectName, opts)),
+    push: {
+      kind: 'icf-json',
+      channel: 'icf',
+      run: ({ client, resolved, file, opts }) => pushViewFile(client, resolved, file, opts),
+      validate: (file) => validateViewFile(file),
+    },
   },
 
   // ICF service node / transaction code — one typed ICF endpoint each.

@@ -88,7 +88,7 @@ Endpoints exposed under `/sap/abap_cli/` (current service version `1.0.0`, see `
 | `/` (root: service id + version) | `abap deploy status`, `abap init` (ICF check), `abap doctor` |
 | `/ddic/<type>` (GET/POST) | `DOMA` / `DTEL` / `TABL` / `STRU` / `ENQU` / `NROB` (+ ICF fallback for `TTYP` / `MSAG`): `abap create` / `push` / `pull` |
 | `/ddic/<type>/<name>/docu` (GET/POST) | `DOMA` / `DTEL` long text (`<name>.doma.docu.json` / `<name>.dtel.docu.json`): `abap pull` / `abap push` companion; GET answers `DOCU_NOT_FOUND` when the object has no text, POST with `lines: []` deletes it |
-| `/http/<name>` (GET/POST) | HTTP service node (SICF): `abap create HTTP` / `abap push <file>.http.json` / `abap pull --type HTTP` |
+| `/ddic/view/<name>` (GET/POST/PUT/DELETE) | database view (SE11 view, local-extension `view-v1` document): `abap create` / `pull` / `push` / `delete` (delete is `$TMP`-only) || `/http/<name>` (GET/POST) | HTTP service node (SICF): `abap create HTTP` / `abap push <file>.http.json` / `abap pull --type HTTP` |
 | `/tran/<code>` (GET + POST/PUT/DELETE) | transaction code (SE93): `abap pull` / `abap tcode` read path; `create` / `push` upsert through `RS_CORR_INSERT` + `RPY_TRANSACTION_INSERT`; `delete` removes `$TMP` transactions |
 | `/tcode/<code>` (GET) | `abap tcode` (TSTC → TSTCT) |
 | `/textpool/<category>` (GET read; POST stub) | `abap pull --textpool` read. The POST branch returns `TEXTPOOL_WRITE_UNSUPPORTED`: textpool write needs the ADT text-elements write endpoint and is unavailable on releases that only expose the non-interactive API (verified on A4H) |

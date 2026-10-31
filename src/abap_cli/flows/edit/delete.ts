@@ -11,9 +11,10 @@
  * Supported types: anything reachable by `client.deleteObject` (CLAS, INTF,
  * PROG, FUGR, FUGR/FF, TABL, STRU, DOMA, DTEL, MSAG, TTYP, DDLS, DDLX, BDEF,
  * DCLS, SRVD, SRVB, HTTP, ENQU, NROB). DEVC takes the dedicated package branch
- * (`delete-devc.ts` — packages are deleted without a lock); TRAN goes through
- * the bundled ICF service (`DELETE /tran/<tcode>`). CDSV views and similar type
- * codes without an ADT delete endpoint surface as `TYPE_NOT_SUPPORTED`.
+ * (`delete-devc.ts` — packages are deleted without a lock); TRAN and VIEW go
+ * through the bundled ICF service (`DELETE /tran/<tcode>` / `/ddic/view/<name>`).
+ * CDSV views and similar type codes without an ADT delete endpoint surface as
+ * `TYPE_NOT_SUPPORTED`.
  */
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { IcfClient } from '../../clients/icf-client.js';
@@ -22,6 +23,7 @@ import type { ErrorCode } from '../../output/error-codes.js';
 import { resolveObject } from '../../core/resolve.js';
 import { normalizeTypeInput } from '../../cli/type-alias.js';
 import { runDeleteDevc } from './delete-devc.js';
+import { runDeleteView } from './delete-view.js';
 
 export interface DeleteOptions {
   /** Object type code (CLAS / PROG / ...). Required — `delete` without a type
@@ -78,6 +80,11 @@ export async function runDelete(objectName: string, opts: DeleteOptions): Promis
   // name directly).
   if (typeUpper === 'DEVC') {
     return runDeleteDevc(objectName, opts);
+  }
+  // VIEW (DDIC database view) has no ADT delete endpoint: deletion runs through
+  // the bundled ICF service (RS_DD_DELETE_OBJ, $TMP only).
+  if (typeUpper === 'VIEW') {
+    return runDeleteView(objectName, opts);
   }
   // TRAN (SE93 transaction codes) has no ADT delete endpoint: a transaction is
   // repository metadata spread over TSTC/TSTCT/TSTCP/TSTCC/TSTCA plus TADIR, so

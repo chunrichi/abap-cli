@@ -4,6 +4,7 @@ import { runCreate, type CreateOptions, type CreateLocalOptions } from '../flows
 import { runCreateLocal } from '../flows/edit/create-local.js';
 import { normalizeTypeInput } from '../cli/type-alias.js';
 import { getDdicJsonExample } from '../formats/ddic/examples.js';
+import { getViewJsonExample } from '../formats/view/json.js';
 import type { DdicSupportedType } from '../formats/ddic/types.js';
 import { listTemplates } from '../formats/templates.js';
 import {
@@ -20,9 +21,9 @@ import { schemaOption } from './schema-helpers.js';
 export function registerCreateCommand(program: Command): void {
   const createCmd = program
     .command('create')
-    .description('Create a new ABAP object (CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, HTTP)')
+    .description('Create a new ABAP object (CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, VIEW, HTTP)')
     // [type]/[name]（可选）是因为 --schema 模式下不需要 name；真实创建仍需两者。
-    .argument('[type]', 'Object type (CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, HTTP)')
+    .argument('[type]', 'Object type (CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, VIEW, HTTP)')
     .argument('[name]', 'Object name')
     .addHelpText('after', [
       '',
@@ -38,6 +39,7 @@ export function registerCreateCommand(program: Command): void {
       '  DTEL  Data element       (ICF /ddic/dtel — requires --file)',
       '  TABL  Database table     (ICF /ddic/tabl — requires --file)',
       '  STRU  Structure          (ICF /ddic/stru — requires --file)',
+      '  VIEW  Database view      (ICF /ddic/view — requires --file; view-v1)',
       '  ENQU  Lock object        (ICF /ddic/enqu — requires --file)',
       '  NROB  Number range obj.  (ICF /ddic/nrob — requires --file; no abap-adt-api endpoint)',
       '  HTTP  SICF service node  (ICF /http/<name> — requires --file)',
@@ -204,16 +206,23 @@ export function createSchema(type?: string): CreateCommandSchema {
   if (requiresFileFor(t)) {
     const route = sourceFor(t) === 'ICF' ? ('icf' as const) : undefined;
     const isDdic = isDdicSupportedType(t);
-    const message = isDdic
-      ? `DDIC type ${t} created via the self-built ICF service. Requires --file <abap-file-format JSON> with top-level fields: name, description, fields[].`
-      : `Type ${t} requires --file <abap-file-format JSON>. No local skeleton path exists; write the JSON first, then create.`;
+    const message = t === 'VIEW'
+      ? 'VIEW (DDIC database view) is created through the self-built ICF service (/ddic/view). Requires --file with a local-extension view-v1 JSON: header.description, viewClass, rootTable, tables[] and fields[]; joinConditions[] for a multi-table view.'
+      : isDdic
+        ? `DDIC type ${t} created via the self-built ICF service. Requires --file <abap-file-format JSON> with top-level fields: name, description, fields[].`
+        : `Type ${t} requires --file <abap-file-format JSON>. No local skeleton path exists; write the JSON first, then create.`;
+    const exampleJson = t === 'VIEW'
+      ? getViewJsonExample()
+      : isDdic
+        ? getDdicJsonExample(t as DdicSupportedType)
+        : undefined;
     return {
       ...base,
       type: t,
       supported: true,
       ...(route ? { route } : {}),
       message,
-      ...(isDdic ? { exampleJson: getDdicJsonExample(t as DdicSupportedType) } : {}),
+      ...(exampleJson !== undefined ? { exampleJson } : {}),
       options: [
         ...base.options,
         {

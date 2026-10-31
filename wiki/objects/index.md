@@ -2,9 +2,9 @@
 type: reference
 title: 对象类型详细文档索引
 description: 每个 SAP 对象类型的字段契约、命令路径、本地文件形态与示例
-tags: [abap-cli, object-types, reference, clas, intf, prog, fugr, devc, tabl, stru, doma, dtel, enqu, nrob, http, tran, ttyp, msag, ddls]
+tags: [abap-cli, object-types, reference, clas, intf, prog, fugr, devc, tabl, stru, doma, dtel, enqu, view, nrob, http, tran, ttyp, msag, ddls]
 created at: 2026-09-01 00:00:00
-changed at: 2026-10-31 16:20:00
+changed at: 2026-10-31 18:00:00
 ---
 
 # 对象类型详细文档
@@ -23,6 +23,7 @@ changed at: 2026-10-31 16:20:00
 | `DOMA` | ICF | `src/<name>.doma.json`（嵌套）+ 可选 `<name>.doma.docu.json`（长文本 0..1） | [doma.md](doma.md) |
 | `DTEL` | ICF | `src/<name>.dtel.json`（嵌套）+ 可选 `<name>.dtel.docu.json`（长文本 0..1） | [dtel.md](dtel.md) |
 | `ENQU` | ICF | `src/<name>.enqu.json`（锁对象） | [enqu.md](enqu.md) |
+| `VIEW` | ICF | `src/<name>.view.json`（数据库视图，本地扩展 `view-v1.json`） | [view.md](view.md) |
 | `NROB` | ICF | `src/<name>.nrob.json`（编号范围对象） | [nrob.md](nrob.md) |
 | `HTTP` | ICF | `src/<name>.http.json`（SICF 节点） | [http.md](http.md) |
 | `TRAN` | ICF | `src/<code>.tran.json`（SE93 事务码） | [tran.md](tran.md) |
@@ -33,7 +34,7 @@ changed at: 2026-10-31 16:20:00
 ## 路由速查
 
 - **ADT**（源对象）：无需 ICF 部署；直接打 SAP ADT REST API；走 `abap-adt-api` 库
-- **ICF** 自建（DDIC/HTTP/TRAN）：需要先 `abap deploy`；走 `/sap/abap_cli/<domain>/<type>/<name>`
+- **ICF** 自建（DDIC/HTTP/TRAN）：需要先 `abap deploy`；走 `/sap/abap_cli/<domain>/<type>/<name>`（VIEW 为 `/ddic/view/<name>`）
 - **ADT + ICF 兜底**（TTYP/MSAG）：优先 ADT；ECC EHP5/6 内核（< 753）自动切 ICF，envelope 写 `data.channel` + `data.fallbackReason`
 - **ADT 无兜底**（DDLS）：旧内核直接硬错 `DDLS_NOT_SUPPORTED_ON_ECC`（exit 64），不发起任何 SAP 调用
 

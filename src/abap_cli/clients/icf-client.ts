@@ -131,6 +131,11 @@ export class IcfClient {
     return this.post(`/ddic/${type}/${encodeURIComponent(name)}/docu`, body);
   }
 
+  /** DELETE /ddic/<type>/<name> — delete a VIEW through ICF. */
+  async deleteDdic<T>(type: string, name: string, body?: unknown): Promise<IcfResponse<T>> {
+    return this.request('delete', `/ddic/${type}/${encodeURIComponent(name)}`, body);
+  }
+
   /** POST /http/<name> — create/overwrite an HTTP service (SICF node). */
   async postHttp<T>(name: string, body: unknown): Promise<IcfResponse<T>> {
     return this.post(`/http/${encodeURIComponent(name)}`, body);

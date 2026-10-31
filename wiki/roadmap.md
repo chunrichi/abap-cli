@@ -65,7 +65,7 @@
 ## 六、对象类型补充路线（2026-10 评估）
 
 > 判据：**开发价值 × SAP 侧可行性（ADT / DDIC API）× AFF 成熟度 × agent 闭环收益**。
-> 对比依据：abap-cli 22 类 vs SAP abap-file-formats 上游 102 个类型格式（2026-10-30 HEAD）vs abapGit 168 个 TADIR handler（2026-10-29 HEAD）。
+> 对比依据：abap-cli 23 类 vs SAP abap-file-formats 上游 102 个类型格式（2026-10-30 HEAD）vs abapGit 168 个 TADIR handler（2026-10-29 HEAD）。
 > 本轮范围约定：**P0 不做 transport request 管理（release/delete）；P1 暂不做授权字段（AUTH）**。
 
 ### 6.1 P0：先在现有类型内补完
@@ -82,7 +82,7 @@
 
 | 类型 | SAP 侧路线 | 本地格式 | 状态 |
 |---|---|---|---|
-| `VIEW` | ICF `/ddic/view`：`DDIF_VIEW_GET` / `DDIF_VIEW_PUT` | 自建 `view-v1.json`（AFF 无此格式；按 AFF 命名/JSON 约定，README 标注 local extension） | - [ ] |
+| `VIEW` | ICF `/ddic/view`：`DDIF_VIEW_GET` / `DDIF_VIEW_PUT` | 自建 `view-v1.json`（AFF 无此格式；按 AFF 命名/JSON 约定，README 标注 local extension） | - [x] 已完成（ABAP/CLI/mock/unit/integration + 真机 17/17 TC） |
 | `SHLP` | ICF `/ddic/shlp`：`DDIF_SHLP_GET` / `DDIF_SHLP_PUT` | 自建 `shlp-v1.json`（同上） | - [ ] |
 | `DEVC` | ADT `createObject` `DEVC/K` + `GET /sap/bc/adt/packages/<name>` 读 | AFF `devc-v1.json` | - [x] 已完成（create/pull/delete；push 不支持——ADT 无包更新端点） |
 | `XSLT` | ICF + `CL_O2_API_XSLTDESC`（create/load） | AFF `xslt-v1.json` + `.xslt.xml` | - [ ] |
