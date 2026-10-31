@@ -163,10 +163,12 @@ export async function pushObject(
     locked = false;
     lockHandle = undefined;
 
-    // Activate — performs a complete syntax check server-side
+    // Activate — performs a complete syntax check server-side. `requireExecuted`
+    // makes an HTTP-200 silent no-op (activationExecuted=false) a failure: on
+    // the push path "nothing to activate" cannot be a legitimate answer.
     opts.onStage?.('activate');
     try {
-      await client.activate(object.objectUrl, object.type, object.name);
+      await client.activate(object.objectUrl, object.type, object.name, { requireExecuted: true });
     } catch (error: unknown) {
       // `clients/activation.ts` already raises a precise ACTIVATION_FAILED
       // carrying SAP's messages, the `lineScope` note and actionable

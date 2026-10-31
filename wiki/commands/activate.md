@@ -4,7 +4,7 @@ title: abap activate
 description: 激活一个对象的所有 inactive items（method/OSI 源层级），规避 root-URI 激活的静默 no-op
 tags: [abap-cli, command, activate, activation, adt]
 created at: 2026-08-07 00:21:57
-changed at: 2026-08-07 00:28:14
+changed at: 2026-11-01 00:30:00
 ---
 
 # abap activate
@@ -35,13 +35,22 @@ abap activate <object> [options]
 3. `client.inactiveObjects()` 拉取系统所有 inactive 项
 4. **过滤（精确匹配）**：`uri.split('#')[0] === resolved.objectUrl` — method/OSI 项的 URI 带 `#fragment`，只比对对象部分；**不用前缀 `startsWith`**，避免 `ZCL_FOO_BAR` 被误判为属于 `ZCL_FOO`
 5. 无匹配项 → 输出 `no inactive items to activate`（`activated: 0`）
-6. 有匹配项 → 构造 `{ uri, type, name, parentUri }` 列表（`parentUri = uri.split('#')[0]`），调 `client.activateAll(items)` 批量激活
+6. 有匹配项 → 构造 `{ uri, type, name, parentUri }` 列表（`parentUri = uri.split('#')[0]`），调 `client.activateAll(items)` 批量激活；`activationExecuted=false` 只记 warning，不把「对象本来已 active」误判成失败
 7. 输出 `Activated N inactive item(s) of <name>` 及 ADT 返回的 messages
 
 ## ADT 层细节（adt-client.ts）
 
-- `activate(objectUrl, ...)` **总是用数组重载**：字符串重载会追加 `?context=main`，真实 SAP 对 program 和 class 拒绝并报 `User X is currently editing Y`
-- `activateAll(items)`：每个 item 携带 `adtcore:uri/type/name/parentUri`，method/OSI 源层级批量激活
+- `activate(objectUrl, type, name, opts?)` **总是用数组重载**：字符串重载会追加 `?context=main`，真实 SAP 对 program 和 class 拒绝并报 `User X is currently editing Y`
+- `activateAll(items, opts?)`：API 接受每个 item 的 `adtcore:uri/type/name/parentUri`，但请求体只发送 `uri` + `name`——带 `type`/`parentUri` 的 objectReference 会让真实 SAP 返回 HTTP 200 + 三个 `*Executed=false` 的 **silent no-op**
+- `opts.requireExecuted`：`push` 路径传 `{ requireExecuted: true }`，HTTP 200 + 无 E/A/X 消息 + `activationExecuted=false` 时抛 `ACTIVATION_FAILED`（`details.silentNoop: true` + 三个 executed 布尔）。`abap activate` **不传**该选项：对象本来就可能已是 active，无法据此判定失败，改为在 `meta.warnings` 记 `ACTIVATION_NOT_EXECUTED`（`details.activationExecuted=false`），命令照常成功
+
+激活响应里的 `chkl:properties` 三个标志：
+
+| 标志 | 含义 |
+|---|---|
+| `checkExecuted` | 语法/一致性检查是否真的跑过 |
+| `activationExecuted` | 激活是否真的执行（**false + 无消息 = silent no-op**） |
+| `generationExecuted` | 运行时对象是否重新生成 |
 
 ## 相关命令
 
@@ -92,7 +101,8 @@ abap activate ZFOO --type CLAS --yes
 | 非 TTY 且无 `--yes` | `VALIDATION_ERROR` | VALIDATION_ERROR / 7 | `nextSteps`：加 `--yes` 或先 `abap inspect <object> --activation` |
 | 对象不存在 | `OBJECT_NOT_FOUND` | NOT_FOUND / 8 | `nextSteps`：`abap search <name>` 验证 |
 | 同名多类型且未给 `--type` | `AMBIGUOUS_OBJECT` | VALIDATION_ERROR / 7 | `types` 列出候选，用 `--type` 消歧 |
-| ADT 激活失败 | 透传底层错误 | — | `printError` 统一输出 |
+| ADT 激活失败（E/A/X 消息或 inactive 残留） | `ACTIVATION_FAILED` | VALIDATION_ERROR / 7 | `nextSteps` 指向 `abap inspect <object> --activation` |
+| HTTP 200 但 `activationExecuted=false`（不判失败） | warning `ACTIVATION_NOT_EXECUTED` | 成功，exit 0 | `meta.warnings[].details` 带三个 executed 布尔；改用 `abap inspect <object> --activation` 或重跑确认 |
 
 ## fixme
 

@@ -14,11 +14,18 @@
  * is read, so the coordinator resolves the file first and looks the object type
  * up in the routing table.
  */
+import * as path from 'node:path';
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError, toErrorShape } from '../../output/json.js';
 import { collectWarning, type Warning } from '../../output/meta.js';
 import type { ErrorCode } from '../../output/error-codes.js';
-import { affObjectToken, resolveFile, type ResolvedFile } from '../../formats/file-resolver.js';
+import {
+  affObjectToken,
+  buildFilename,
+  resolveFile,
+  sourceExtensionForObjectType,
+  type ResolvedFile,
+} from '../../formats/file-resolver.js';
 import { readAbapFile } from '../../formats/abap-source.js';
 import { resolveObject, getObjectParts, validateLocalFile, type ResolvedObject } from '../../core/resolve.js';
 import { resolveTransport } from '../../core/transport.js';
@@ -74,6 +81,47 @@ function rejectDocuCompanionTarget(resolved: ResolvedFile): void {
   });
 }
 
+/**
+ * A source object's `.json` artifact is the AFF *metadata* document, never ABAP
+ * source: `abap pull` writes `<name>.<type>.json` next to the real
+ * `<name>.<type>.abap` / `.acds` / `.abdl` file. Pushing the JSON used to fall
+ * through to the generic source path, which read the document text as source
+ * and wrote it into the object's main include — corrupting SAP while
+ * `--no-activate` still reported success. `--all` never scans `.json`, so only
+ * an explicit path can hit this.
+ */
+function rejectSourceMetadataJson(resolved: ResolvedFile): void {
+  // `.properties` textpool files also carry `format: 'json'`; they have their
+  // own route and are handled before dispatch.
+  if (resolved.route === 'textpool') return;
+  if (resolved.format !== 'json') return;
+  if (pushRouteFor(resolved.objectType)?.kind !== 'source') return;
+  const outFile = toRelativeOutputPath(resolved.filePath);
+  // Sibling source file in the same directory, with the type's canonical
+  // source extension (.abap / .acds / .abdl).
+  const sourceName = buildFilename(
+    resolved.objectName,
+    resolved.objectType,
+    undefined,
+    sourceExtensionForObjectType(resolved.objectType),
+  );
+  const outDir = path.posix.dirname(outFile);
+  const sourceFile = outDir === '.' ? sourceName : path.posix.join(outDir, sourceName);
+  throw new CliError(
+    'READONLY_METADATA',
+    `${outFile} is object metadata, not ABAP source; push ${sourceFile} instead`,
+    {
+      details: { file: outFile, object: resolved.objectName, type: resolved.objectType },
+      nextSteps: [
+        `Push the ABAP source file: abap push ${sourceFile}`,
+        `Validate the metadata document locally: abap validate:aff ${outFile}`,
+        'Metadata is written by `abap pull`; editing it locally does not change SAP.',
+      ],
+      example: `abap push ${sourceFile}`,
+    },
+  );
+}
+
 /** Flow outcome: JSON envelope data + human summary, printed by the command layer. */
 export interface PushResult {
   data: Record<string, unknown>;
@@ -123,10 +171,7 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
     const validationFailures: { file: string; code?: string; message: string }[] = [];
     for (const file of target.files) {
       try {
-        const resolved = resolveFile(file);
-        validateLocalFile(resolved);
-        rejectDocuCompanionTarget(resolved);
-        rejectUnsupportedPushType(resolved.objectType);
+        const resolved = preparePushTarget(file);
         const route = pushRouteFor(resolved.objectType);
         if (route && route.kind !== 'source') {
           // Artifact routes own their validators (DDIC / HTTP / TRAN / AFF
@@ -150,7 +195,12 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
   }
 
 
-  const client = await AdtClientWrapper.create();
+  // The client is created lazily, on the first target that actually reaches
+  // SAP: a batch of purely local failures (metadata JSON, parse errors) must
+  // fail with zero SAP traffic.
+  let clientPromise: Promise<AdtClientWrapper> | undefined;
+  const getClient = (): Promise<AdtClientWrapper> =>
+    (clientPromise ??= AdtClientWrapper.create());
   const results: PushFileResult[] = [];
   let failed = 0;
   const onWarning = (w: Warning) => collectWarning(w.code, w.message, w.details);
@@ -158,7 +208,9 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
     const stages: PushStage[] = [];
     const onStage = (s: PushStage) => stages.push(s);
     try {
-      const { transport, status, docu } = await pushOne(client, file, opts, onStage, onWarning);
+      const resolved = preparePushTarget(file);
+      const client = await getClient();
+      const { transport, status, docu } = await dispatchPushFile(client, resolved, file, opts, onStage, onWarning);
       if (opts.dryRun) {
         results.push({ file, status: 'dry-run', plan: stages, written: false, activated: false, ...(docu ? { docu } : {}) });
       } else {
@@ -309,16 +361,12 @@ async function resolveObjectTransport(
 }
 
 /**
- * Dispatch one file: textpool → routing table (ICF / AFF artifact) → generic
- * ADT source-object path.
+ * Static target preparation: filename resolution plus every rejection that can
+ * be decided from the local file alone. Kept apart from dispatch so a purely
+ * local rejection (metadata JSON, unparseable name, unsupported type) fails
+ * before an ADT client — and therefore any SAP call — is created.
  */
-async function pushOne(
-  client: AdtClientWrapper,
-  file: string,
-  opts: PushFileOptions,
-  onStage: (s: PushStage) => void,
-  onWarning: (w: Warning) => void,
-): Promise<PushOneResult> {
+function preparePushTarget(file: string): ResolvedFile {
   let resolved: ResolvedFile;
   try {
     resolved = resolveFile(file);
@@ -329,7 +377,22 @@ async function pushOne(
   validateLocalFile(resolved);
   rejectDocuCompanionTarget(resolved);
   rejectUnsupportedPushType(resolved.objectType);
+  rejectSourceMetadataJson(resolved);
+  return resolved;
+}
 
+/**
+ * Dispatch one resolved file: textpool → routing table (ICF / AFF artifact) →
+ * generic ADT source-object path.
+ */
+async function dispatchPushFile(
+  client: AdtClientWrapper,
+  resolved: ResolvedFile,
+  file: string,
+  opts: PushFileOptions,
+  onStage: (s: PushStage) => void,
+  onWarning: (w: Warning) => void,
+): Promise<PushOneResult> {
   // Textpool .properties files route via ADT/ICF (mixed mode, cache-decided).
   if (resolved.route === 'textpool') {
     await pushTextpoolFile(client, resolved, file, opts, onStage);

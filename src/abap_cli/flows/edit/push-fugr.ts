@@ -216,16 +216,22 @@ export async function pushFugrOne(
         // child (with parent URI = the group); non-FM pushes use the
         // existing single-object activate, which routes through the array
         // overload internally (see AdtClientWrapper#activate).
+        // `requireExecuted` hard-fails the HTTP-200 silent no-op on push.
         const activation = isFunc
-          ? await client.activateAll([
-              {
-                uri: target.objectUrl,
-                type: 'FUGR/FF',
-                name: requestedFunctionModule!.name,
-                parentUri: object.objectUrl,
-              },
-            ])
-          : await client.activate(object.objectUrl, object.type, object.name);
+          ? await client.activateAll(
+              [
+                {
+                  uri: target.objectUrl,
+                  type: 'FUGR/FF',
+                  name: requestedFunctionModule!.name,
+                  parentUri: object.objectUrl,
+                },
+              ],
+              { requireExecuted: true },
+            )
+          : await client.activate(object.objectUrl, object.type, object.name, {
+              requireExecuted: true,
+            });
         // Only fail when the activation result explicitly reports failure.
         // Some ADT builds return void / an empty string when activation
         // succeeded; treat those as success.

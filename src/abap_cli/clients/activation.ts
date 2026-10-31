@@ -1,5 +1,6 @@
 import { XMLParser } from 'fast-xml-parser';
 import { CliError } from '../output/json.js';
+import { collectWarning } from '../output/meta.js';
 
 /**
  * `/sap/bc/adt/activation` request building and response parsing.
@@ -76,6 +77,18 @@ export interface ActivationResult {
   checkExecuted: boolean;
   activationExecuted: boolean;
   generationExecuted: boolean;
+}
+
+/** How strictly the caller wants the execution flags enforced. */
+export interface ActivationEnforcementOptions {
+  /**
+   * Throw when SAP answers HTTP 200, reports no E/A/X message and leaves
+   * `activationExecuted=false` — the silent no-op. Enable on paths that just
+   * wrote new source, where "there was nothing to activate" cannot be a
+   * legitimate answer. Leave off for a standalone `abap activate`, where an
+   * already-active object may legitimately produce no-op flags.
+   */
+  requireExecuted?: boolean;
 }
 
 /** Message types that mean the object did not activate. */
@@ -221,6 +234,72 @@ export function throwOnActivationFailure(result: ActivationResult, label: string
         `Inspect the pending state: abap inspect ${label} --activation`,
         `Get line numbers relative to your local file: abap check syntax <file>`,
       ],
+    },
+  );
+}
+
+/**
+ * Throw when SAP answered HTTP 200 with no E/A/X message but did not execute
+ * activation (`activationExecuted=false`). That is the silent no-op: the
+ * response looks successful, yet nothing was checked, activated or generated
+ * and the previously active version keeps running.
+ *
+ * Callers on a write path (push) must treat this as a failure; a standalone
+ * `abap activate` may hit the same flags for an object that is already active,
+ * so it records a warning instead (see {@link enforceActivationOutcome}).
+ */
+export function assertActivationExecuted(result: ActivationResult, label: string): void {
+  if (result.activationExecuted) return;
+  throw new CliError(
+    'ACTIVATION_FAILED',
+    `Activation was silently skipped for ${label}: SAP answered HTTP 200 but activationExecuted=false, so the active version is unchanged`,
+    {
+      details: {
+        messages: result.messages,
+        inactive: result.inactive,
+        checkExecuted: result.checkExecuted,
+        activationExecuted: result.activationExecuted,
+        generationExecuted: result.generationExecuted,
+        silentNoop: true,
+        // The source WAS written before activation was attempted (F-08).
+        written: true,
+        activated: false,
+      },
+      nextSteps: [
+        `${label} was written to SAP but activation did not run — the active version is unchanged.`,
+        `Inspect the pending state: abap inspect ${label} --activation`,
+        `Re-run activation explicitly: abap activate ${label} --yes`,
+      ],
+    },
+  );
+}
+
+/**
+ * Single entry point for the activation outcome: report hard failures first,
+ * then handle the execution flags according to the caller's policy.
+ * `requireExecuted` throws the silent no-op (push path); otherwise it degrades
+ * to a `meta.warnings` entry so a standalone `activate` stays informative
+ * without failing on an object that was already active.
+ */
+export function enforceActivationOutcome(
+  result: ActivationResult,
+  label: string,
+  opts: ActivationEnforcementOptions = {},
+): void {
+  throwOnActivationFailure(result, label);
+  if (result.activationExecuted) return;
+  if (opts.requireExecuted) {
+    assertActivationExecuted(result, label);
+    return;
+  }
+  collectWarning(
+    'ACTIVATION_NOT_EXECUTED',
+    `SAP reported activationExecuted=false for ${label}; the activation may not have run`,
+    {
+      object: label,
+      checkExecuted: result.checkExecuted,
+      activationExecuted: result.activationExecuted,
+      generationExecuted: result.generationExecuted,
     },
   );
 }

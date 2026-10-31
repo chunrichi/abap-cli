@@ -88,11 +88,148 @@ interface ExtractedSapMessage {
   kind: SapBodyKind;
 }
 
+/** Fields of SAP's `<exc:exception>` error envelope (ADT / ICF error responses). */
+export interface SapExceptionInfo {
+  namespace?: string;
+  type?: string;
+  message?: string;
+  localizedMessage?: string;
+  properties?: Record<string, string>;
+}
+
+/** First text of `<tag>…</tag>`, preferring an English `lang` attribute. */
+function elementTextByLang(xml: string, tag: string): string | undefined {
+  const re = new RegExp(
+    `<(?:[A-Za-z_][\\w.-]*:)?${tag}\\b([^>]*)>([\\s\\S]*?)</(?:[A-Za-z_][\\w.-]*:)?${tag}\\s*>`,
+    'gi',
+  );
+  let fallback: string | undefined;
+  for (const match of xml.matchAll(re)) {
+    const text = htmlToText(match[2] ?? '');
+    if (!text) continue;
+    if (/lang\s*=\s*["']EN["']/i.test(match[1] ?? '')) return text;
+    fallback ??= text;
+  }
+  return fallback;
+}
+
+/** Attribute value of the first `<tag attr="…">` occurrence. */
+function attributeValue(xml: string, tag: string, attr: string): string | undefined {
+  const re = new RegExp(
+    `<(?:[A-Za-z_][\\w.-]*:)?${tag}\\b[^>]*\\b${attr}\\s*=\\s*(["'])(.*?)\\1`,
+    'i',
+  );
+  return re.exec(xml)?.[2]?.trim() || undefined;
+}
+
+/** `<properties><entry key="k">v</entry></properties>` → `{ k: "v" }`. */
+function exceptionProperties(xml: string): Record<string, string> | undefined {
+  const block = /<(?:[A-Za-z_][\w.-]*:)?properties\b[^>]*>([\s\S]*?)<\/(?:[A-Za-z_][\w.-]*:)?properties\s*>/i.exec(xml)?.[1];
+  if (!block) return undefined;
+  const props: Record<string, string> = {};
+  const re =
+    /<(?:[A-Za-z_][\w.-]*:)?entry\b[^>]*?\bkey\s*=\s*(["'])(.*?)\1[^>]*>([\s\S]*?)<\/(?:[A-Za-z_][\w.-]*:)?entry\s*>/gi;
+  for (const match of block.matchAll(re)) {
+    const key = match[2]?.trim();
+    if (key) props[key] = htmlToText(match[3] ?? '');
+  }
+  return Object.keys(props).length > 0 ? props : undefined;
+}
+
+/** True for an SAP `<exc:exception>` envelope (any namespace prefix). */
+function isExceptionEnvelope(body: string): boolean {
+  return /<(?:[A-Za-z_][\w.-]*:)?exception\b/i.test(body);
+}
+
+/**
+ * Parse the `<exc:exception>` envelope SAP returns for ADT/ICF failures:
+ *
+ *   <exc:exception xmlns:exc="…">
+ *     <namespace id="com.sap.adt"/>
+ *     <type id="ExceptionResourceLocked"/>
+ *     <message lang="EN">…</message>
+ *     <localizedMessage lang="EN">…</localizedMessage>
+ *     <properties><entry key="…">…</entry></properties>
+ *   </exc:exception>
+ *
+ * Returns undefined for bodies without an exception envelope (HTML pages,
+ * plain text, ICF JSON), so callers keep their existing fallback.
+ */
+export function parseSapException(body: string): SapExceptionInfo | undefined {
+  if (!body || !isExceptionEnvelope(body)) return undefined;
+  const namespace = attributeValue(body, 'namespace', 'id');
+  const type = attributeValue(body, 'type', 'id');
+  const message = elementTextByLang(body, 'message');
+  const localizedMessage = elementTextByLang(body, 'localizedMessage');
+  const properties = exceptionProperties(body);
+  const info: SapExceptionInfo = {
+    ...(namespace ? { namespace } : {}),
+    ...(type ? { type } : {}),
+    ...(message ? { message } : {}),
+    ...(localizedMessage ? { localizedMessage } : {}),
+    ...(properties ? { properties } : {}),
+  };
+  return Object.keys(info).length > 0 ? info : undefined;
+}
+
+/** Recovery hints keyed by the SAP exception type (first matching pattern wins). */
+const SAP_EXCEPTION_NEXT_STEPS: ReadonlyArray<{ match: RegExp; steps: string[] }> = [
+  {
+    match: /locked/i,
+    steps: [
+      'The object is locked by another user or by one of your own sessions.',
+      'Check who holds the lock: abap inspect <object> --locks',
+      'Release the lock in SE03 or wait for the other session, then retry.',
+    ],
+  },
+  {
+    match: /(noaccess|noauthoriz|notauthoriz|permission)/i,
+    steps: [
+      'Your SAP user is not authorized for this object or package.',
+      'Verify the profile user: abap profile test <profile> --json',
+      'If the user is correct, ask an administrator about S_DEVELOP / S_ADT_RES authorizations.',
+    ],
+  },
+  {
+    match: /(alreadyexist|alreadyexists)/i,
+    steps: [
+      'The object already exists on this system.',
+      'Inspect the existing object: abap inspect <object>',
+      'Use a different name, or pull → edit → push (or delete) the existing object.',
+    ],
+  },
+  {
+    match: /(notfound|notexist|notexists|doesnotexist)/i,
+    steps: [
+      'The object or resource does not exist on this system.',
+      'Verify the name and type: abap search <name>',
+      'Create it first: abap create <type> <name> --file <path> --package <pkg> --tr <transport>',
+    ],
+  },
+];
+
+/** "What now?" guidance for a recognised SAP exception type. */
+function nextStepsForSapException(info: SapExceptionInfo | undefined): string[] | undefined {
+  if (!info?.type) return undefined;
+  return SAP_EXCEPTION_NEXT_STEPS.find((entry) => entry.match.test(info.type!))?.steps;
+}
+
+/** Additive `details` fields for an exception envelope; `code`/`category` are untouched. */
+function sapExceptionDetails(info: SapExceptionInfo | undefined): Record<string, unknown> {
+  if (!info) return {};
+  return {
+    ...(info.type ? { sapErrorType: info.type } : {}),
+    ...(info.namespace ? { sapErrorNamespace: info.namespace } : {}),
+    ...(info.properties ? { sapErrorProperties: info.properties } : {}),
+  };
+}
+
 /** Extract the human-readable message from a SAP error body.
  *
  *  - HTML page (ICM 503 / ABAP dump / session timeout): the `msgText` and
  *    `errorTextHeader` spans, so a 9 KB page never becomes `error.message`.
- *  - XML `<exc:exception>` envelope: first `<message lang="EN">` child.
+ *  - XML `<exc:exception>` envelope: `<message lang="EN">`, falling back to
+ *    `<localizedMessage>` and then to any `<message>` language.
  *  - anything else: no message, so the caller keeps its legacy fallback.
  *
  *  The full (truncated) body stays available to callers via
@@ -101,13 +238,15 @@ function extractExcMessage(body: string, status?: number, statusText?: string): 
   if (isHtmlBody(body)) {
     return { kind: 'html', message: summarizeHtmlErrorPage(body, status, statusText) };
   }
-  const m = body.match(/<message\s+lang="EN"[^>]*>([\s\S]*?)<\/message>/i);
-  if (m) {
-    const message = m[1]?.replace(/<[^>]+>/g, '').trim();
-    return { kind: 'xml', ...(message ? { message } : {}) };
-  }
+  const exception = parseSapException(body);
+  const message =
+    exception?.message ??
+    exception?.localizedMessage ??
+    elementTextByLang(body, 'message') ??
+    elementTextByLang(body, 'localizedMessage');
+  if (message) return { kind: 'xml', message };
   // Markup that is not an HTML page is still XML (e.g. an exception envelope
-  // without an English message); everything else is plain text.
+  // without any message); everything else is plain text.
   return { kind: /^\s*</.test(body) ? 'xml' : 'text' };
 }
 
@@ -179,23 +318,29 @@ export function classifyHttpError(
         references: TLS_REFERENCE,
       });
     }
-    if (status === 401 || status === 403) {
-      return new CliError('AUTH_ERROR', httpEx.message || 'authentication failed', {
-        details: { httpStatus: status, ...(context?.name ? { system: context.name } : {}) },
-        nextSteps: BASIC_AUTH_NEXT_STEPS,
-        example: BASIC_AUTH_EXAMPLE,
-        references: AUTH_REFERENCE,
-      });
-    }
     // Pull the SAP response body out of the wrapped HttpClientException so
     // the user can see what the ABAP server actually said (mirrors the
     // AxiosError branch below; otherwise transport errors from
     // abap-adt-api lose their context entirely). abap-adt-api nests the
     // original HttpClientException under `.parent` for AdtHttpException;
-    // walk that chain so we never lose the body.
+    // walk that chain so we never lose the body. Extracted before the
+    // auth checks so an `<exc:exception>` type is exposed on 401/403 too.
     const wrapped = httpEx as { response?: { body?: unknown }; parent?: { response?: { body?: unknown }; status?: unknown } };
     const exBody = wrapped.response?.body ?? wrapped.parent?.response?.body;
     const rawBody = typeof exBody === 'string' ? exBody : '';
+    const exception = rawBody ? parseSapException(rawBody) : undefined;
+    if (status === 401 || status === 403) {
+      return new CliError('AUTH_ERROR', httpEx.message || 'authentication failed', {
+        details: {
+          httpStatus: status,
+          ...(context?.name ? { system: context.name } : {}),
+          ...sapExceptionDetails(exception),
+        },
+        nextSteps: BASIC_AUTH_NEXT_STEPS,
+        example: BASIC_AUTH_EXAMPLE,
+        references: AUTH_REFERENCE,
+      });
+    }
     // SAP returns "400 Session Timed Out" (plain text, not the usual XML
     // envelope) when a reused cookie jar has gone stale on the server.
     // Surface it as AUTH_ERROR so `_call`'s re-login fallback kicks in
@@ -212,9 +357,15 @@ export function classifyHttpError(
     const extracted = rawBody ? extractExcMessage(rawBody, status, wrappedStatusText) : undefined;
     const message = extracted?.message || rawBody || httpEx.message || `HTTP ${status}`;
     const opts: CliErrorOptions = {
-      details: { httpStatus: status, ...(context?.name ? { system: context.name } : {}) },
+      details: {
+        httpStatus: status,
+        ...(context?.name ? { system: context.name } : {}),
+        ...sapExceptionDetails(exception),
+      },
       references: SAP_ERROR_REFERENCE,
     };
+    const exceptionSteps = nextStepsForSapException(exception);
+    if (exceptionSteps) opts.nextSteps = exceptionSteps;
     if (rawBody && extracted) {
       opts.details = { ...opts.details, sapErrorBody: rawBody.slice(0, 400), errorKind: extracted.kind };
     }
@@ -245,9 +396,14 @@ export function classifyHttpError(
     }
     const status = error.response?.status;
     if (status === 401 || status === 403) {
-      const body = error.response?.data as { message?: string } | undefined;
-      return new CliError('AUTH_ERROR', body?.message || error.message, {
-        details: { httpStatus: status, ...(context?.name ? { system: context.name } : {}) },
+      const body = error.response?.data as { message?: string } | string | undefined;
+      const exception = typeof body === 'string' ? parseSapException(body) : undefined;
+      return new CliError('AUTH_ERROR', (typeof body === 'string' ? undefined : body?.message) || error.message, {
+        details: {
+          httpStatus: status,
+          ...(context?.name ? { system: context.name } : {}),
+          ...sapExceptionDetails(exception),
+        },
         nextSteps: BASIC_AUTH_NEXT_STEPS,
         example: BASIC_AUTH_EXAMPLE,
         references: AUTH_REFERENCE,
@@ -264,11 +420,18 @@ export function classifyHttpError(
       const raw = typeof body === 'string' ? body : body?.message;
       const extracted =
         typeof raw === 'string' ? extractExcMessage(raw, status, error.response?.statusText) : undefined;
+      const exception = typeof raw === 'string' ? parseSapException(raw) : undefined;
       const message = extracted?.message || raw || error.message;
       const opts: CliErrorOptions = {
-        details: { httpStatus: status, ...(context?.name ? { system: context.name } : {}) },
+        details: {
+          httpStatus: status,
+          ...(context?.name ? { system: context.name } : {}),
+          ...sapExceptionDetails(exception),
+        },
         references: SAP_ERROR_REFERENCE,
       };
+      const exceptionSteps = nextStepsForSapException(exception);
+      if (exceptionSteps) opts.nextSteps = exceptionSteps;
       if (error.response?.statusText) opts.details = { ...opts.details, httpStatusText: error.response.statusText };
       if (typeof body === 'string' && body.length > 0 && extracted) {
         opts.details = { ...opts.details, sapErrorBody: body.slice(0, 400), errorKind: extracted.kind };

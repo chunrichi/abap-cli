@@ -157,13 +157,14 @@ CLI 解析器（[tabl-artifact.ts:parseTablDdic](https://github.com/chunrichi/ab
 | `OBJECT_NOT_FOUND` (exit 8) | `search <name>` 校对；`push` 不自动创建（创建走 `create`）。**也可能是类型码写错**（如 `--type SICF` 应为 `HTTP`）——未知类型会被静默降级成这个错 |
 | `OBJECT_EXISTS` (exit 2) | 改用 `pull` + `push`；不要重复 `create` |
 | `LOCK_FAILED` (exit 9) | `inspect <obj> --locks`（[abap-cli-search]）查持有者；SE03 手动释放 |
-| `ACTIVATION_FAILED` (exit 7) | `data.errors` 含行号；修复后重推 |
+| `ACTIVATION_FAILED` (exit 7) | `data.errors` 含行号；修复后重推。HTTP 200 + `activationExecuted=false`（silent no-op）也报此码，看 `details.silentNoop` |
 | `SYNTAX_ERROR` (exit 7) | `data.errors[]` 含 `{line, offset, severity, text}` |
 | `NO_TRANSPORT` (exit 7) | 跳 `abap-cli-setup`：`transport list` / `transport create` → `--tr` 重试 |
 | `DDIC_NOT_SUPPORTED` (exit 7) | 类型不在白名单（DOMA/DTEL/TABL/STRU 之外）；看上方类型表 |
 | `FILE_EXISTS` (exit 2) | `pull --overwrite` 或 `--skip-existing` |
 | `TYPE_NOT_SUPPORTED` (exit 7) | 以上方类型表为准；未知类型的报错已列出全部 21 个注册类型。`create local` 只支持 CLAS/INTF/PROG/FUGR |
 | `PUSH_FAILED` (exit 7) | `data.stage` 指示失败环节（lock/write/activate/unlock） |
+| `READONLY_METADATA` (exit 7) | 推的是源码对象的元数据 `.json`；改推 `.abap` / `.acds` 源码文件（`validate:aff` 只校验元数据） |
 | `HTTP_CREATE_FAILED` (exit 6) | HTTP 服务（SICF 节点）写失败；看 `error.details`，校对 handlerClass / servicePath / 父节点是否存在 |
 | `OBJECT_NOT_ACTIVE` (exit 6) | `inspect --activation`（[abap-cli-search]）诊断 → `activate --yes` 修复 |
 | `INVALID_ARGUMENT` (exit 2) | 看 `error.nextSteps` / `error.references` |

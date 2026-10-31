@@ -67,6 +67,10 @@ export type WarningCode =
   // profile add/set/init — the pasted URL carried a path/query/fragment; only
   // the origin is persisted because the ADT client appends resource paths.
   | 'URL_NORMALIZED'
+  // activate — SAP answered HTTP 200 with activationExecuted=false; a
+  // standalone activate cannot tell an already-active object from a silent
+  // no-op, so it surfaces the flag instead of failing (push hard-fails).
+  | 'ACTIVATION_NOT_EXECUTED'
   ;
 
 export interface Warning {

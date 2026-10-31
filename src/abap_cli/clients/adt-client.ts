@@ -2,8 +2,9 @@ import { ADTClient, session_types, type ClientOptions, type TextElement, type Te
 import { parseServiceBinding, type ServiceBinding } from 'abap-adt-api/build/api/tablecontents.js';
 import {
   buildActivationRequest,
+  enforceActivationOutcome,
   parseActivationResponse,
-  throwOnActivationFailure,
+  type ActivationEnforcementOptions,
   type ActivationItem,
 } from './activation.js';
 import { fetchDumpsFeed } from './dumps-feed.js';
@@ -540,17 +541,20 @@ export class AdtClientWrapper {
 
   // --- Activation ---
 
-  activate(objectUrl: string, _objectType: string, objectName: string, _mainInclude?: string) {
-    // Only uri + name are sent; see postActivation. Object type / main-include
-    // are accepted for call-site compatibility but deliberately not emitted.
-    return this.postActivation([{ uri: objectUrl, name: objectName }]);
+  activate(objectUrl: string, _objectType: string, objectName: string, opts?: ActivationEnforcementOptions) {
+    // Only uri + name are sent; see postActivation. Object type is accepted for
+    // call-site compatibility but deliberately not emitted.
+    return this.postActivation([{ uri: objectUrl, name: objectName }], opts);
   }
 
   /**
    * Activate a full list of inactive items (method/OSI source level).
    */
-  activateAll(items: Array<{ uri: string; type: string; name: string; parentUri: string }>) {
-    return this.postActivation(items.map((i) => ({ uri: i.uri, name: i.name })));
+  activateAll(
+    items: Array<{ uri: string; type: string; name: string; parentUri: string }>,
+    opts?: ActivationEnforcementOptions,
+  ) {
+    return this.postActivation(items.map((i) => ({ uri: i.uri, name: i.name })), opts);
   }
 
   /**
@@ -559,9 +563,11 @@ export class AdtClientWrapper {
    * See `clients/activation.ts` for why `abap-adt-api`'s own `activate()` cannot
    * be used: it emits `adtcore:type` + `adtcore:parentUri`, which makes on-prem
    * SAP answer `activationExecuted="false"` — a silent no-op that leaves the
-   * source written-but-inactive while callers see success.
+   * source written-but-inactive while callers see success. `opts.requireExecuted`
+   * turns a remaining silent no-op into a hard failure (push path); without it
+   * the flag degrades to a warning (standalone `abap activate`).
    */
-  private postActivation(items: ActivationItem[]) {
+  private postActivation(items: ActivationItem[], opts?: ActivationEnforcementOptions) {
     return this._call(async () => {
       const response = await this.client.httpClient.request('/sap/bc/adt/activation', {
         body: buildActivationRequest(items),
@@ -569,7 +575,7 @@ export class AdtClientWrapper {
         qs: { method: 'activate', preauditRequested: true },
       });
       const result = parseActivationResponse(String(response.body ?? ''));
-      throwOnActivationFailure(result, items.map((i) => i.name).join(', '));
+      enforceActivationOutcome(result, items.map((i) => i.name).join(', '), opts);
       return result;
     });
   }
