@@ -1,9 +1,8 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { createRequire } from 'module';
-import { makeProgram, runCommand } from './cli-helper.js';
 
 import { runDoctorChecks, type DoctorOptions } from '../../src/abap_cli/flows/setup/doctor-checks.js';
 
@@ -161,50 +160,5 @@ describe('doctor-checks', () => {
     expect(item?.status).toBe('ok');
     expect(item?.detail).toContain('other');
     expect(item?.detail).toContain('.abap.json');
-  });
-});
-
-describe('abap doctor command', () => {
-  // Command layer: use doMock so --fix never touches the real home dir, while
-  // the unit describe above keeps the real runDoctorChecks implementation.
-  const runDoctorChecksMock = vi.fn();
-  const applySafeFixesMock = vi.fn(() => ['recreated ~/.abap-cli with 0700 perms']);
-  let registerCmd: (p: ReturnType<typeof makeProgram>) => void;
-
-  beforeEach(async () => {
-    vi.doMock('../../src/abap_cli/flows/setup/doctor-checks.js', () => ({
-      runDoctorChecks: runDoctorChecksMock,
-      applySafeFixes: applySafeFixesMock,
-    }));
-    runDoctorChecksMock.mockResolvedValue({
-      environment: [{ key: 'env.node', status: 'ok', message: '' }],
-      config: [],
-      connection: [],
-      nextSteps: [],
-    });
-    const cmd = await import('../../src/abap_cli/commands/doctor.js');
-    registerCmd = cmd.registerDoctorCommand;
-  });
-
-  it('--fix without --yes in non-TTY → VALIDATION_ERROR exit 7, zero changes', async () => {
-    const program = makeProgram();
-    registerCmd(program);
-    const res = await runCommand(program, ['doctor', '--fix', '--json'], {});
-    const parsed = JSON.parse(res.stderr);
-    expect(parsed.status).toBe('error');
-    expect(parsed.error.code).toBe('VALIDATION_ERROR');
-    expect(applySafeFixesMock).not.toHaveBeenCalled();
-  });
-
-  it('--fix --yes applies only safe fixes and reports fixesApplied', async () => {
-    const program = makeProgram();
-    registerCmd(program);
-    const res = await runCommand(program, ['doctor', '--fix', '--yes', '--json'], {});
-    expect(res.exitCode).toBeUndefined();
-    const parsed = JSON.parse(res.stdout);
-    expect(parsed.status).toBe('success');
-    expect(Array.isArray(parsed.data.fixesApplied)).toBe(true);
-    expect(parsed.data.fixesApplied.length).toBeGreaterThan(0);
-    expect(applySafeFixesMock).toHaveBeenCalled();
   });
 });

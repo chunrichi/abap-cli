@@ -5,32 +5,30 @@
  * Validates one file or every JSON file under a directory against the
  * abap-file-format schemas declared in `src/abap_cli/aff/schema-paths.ts`.
  *
- * Exit code:
+ * Exit codes follow the unified contract (`output/exit-codes.ts`):
  *   0  all files passed (or only WARN)
- *   1  at least one file failed validation or could not be parsed
- *   2  usage error (unknown option / missing argument)
+ *   2  USAGE — missing target, path does not exist, target is not JSON
+ *   7  VALIDATION_ERROR — at least one file failed schema validation or is
+ *      missing a required companion (AFF_SCHEMA_* failures are VALIDATION_ERROR
+ *      too, raised while loading a schema)
  *
- * Output:
- *   stdout, one line per file:
- *     PASS <path>
- *     WARN <path>: extra fields: <keys>
- *     FAIL <path>: <instancePath> <keyword>: <message>
- *   In `--json` mode, the same lines are aggregated into an envelope:
- *     { status, summary: { pass, warn, fail }, files: [...] }
+ * Output (unified envelope, see `output/json.ts`):
+ *   success → stdout `{ status, meta, data: { summary, files } }`
+ *   failure → stderr `{ status, meta, error: { code, category, message, details, nextSteps } }`
+ * `data.files[].path` is cwd-relative POSIX; `--json` is compact,
+ * `--pretty-json` indents.
  */
 
-import * as fs from 'node:fs';
 import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import { Command } from 'commander';
-import {
-  validateFile,
-  type ValidateResult,
-  type ValidateError,
-} from '../aff/schema-validator.js';
+import { validateFile, type ValidateResult } from '../aff/schema-validator.js';
 import { routeAffSchema } from '../aff/router.js';
 import { checkCompanions } from '../aff/companion-check.js';
-import { printSchema, jsonFromCommand, type CommandSchema } from '../output/json.js';
+import { toOutputPath, toRelativeOutputPath } from '../core/path-output.js';
+import { CliError, printError, printResult, printSchema, jsonFromCommand, isJsonMode, type CommandSchema } from '../output/json.js';
+import { categoryOf } from '../output/error-codes.js';
+import { exitCodeFor } from '../output/exit-codes.js';
 import { schemaOption } from './schema-helpers.js';
 
 export const SCHEMA: CommandSchema = {
@@ -51,178 +49,204 @@ export const SCHEMA: CommandSchema = {
     { description: 'Validate a wire payload directory', command: 'abap validate:aff src/zt_x.tabl.json --wire path/to/wire' },
   ],
   errors: [
+    { code: 'USAGE', category: 'USAGE', exitCode: 2 },
+    { code: 'VALIDATION_ERROR', category: 'VALIDATION_ERROR', exitCode: 7 },
     { code: 'AFF_SCHEMA_MISSING', category: 'VALIDATION_ERROR', exitCode: 7 },
     { code: 'AFF_SCHEMA_INVALID', category: 'VALIDATION_ERROR', exitCode: 7 },
     { code: 'AFF_SCHEMA_COMPILE_ERROR', category: 'VALIDATION_ERROR', exitCode: 7 },
   ],
 };
 
-interface RunOptions {
-  wire?: string;
-  json?: boolean;
-}
-
-interface JsonLine {
+/** One validated file in `data.files[]`. */
+export interface ValidateAffFile {
+  /** `fail` means schema errors OR a required companion is missing. */
   status: 'pass' | 'warn' | 'fail';
+  /** cwd-relative POSIX path. */
   path: string;
   type?: string;
   errors?: { path: string; keyword: string; message: string }[];
   extraFields?: string[];
+  /** Required companions that do not exist next to the main JSON (basenames). */
   missingCompanions?: string[];
+  /** Optional companions that do not exist (basenames). */
   optionalCompanions?: string[];
 }
 
-/** Collect *.json under a single file or recursively under a directory.
- *  A missing target yields no files rather than throwing — callers treat an
- *  empty result as "nothing to validate". */
-async function collectJsonFiles(root: string): Promise<string[]> {
-  let stat;
-  try {
-    stat = await fsp.stat(root);
-  } catch {
-    return [];
+export interface ValidateAffData {
+  summary: { pass: number; warn: number; fail: number };
+  files: ValidateAffFile[];
+}
+
+export interface ValidateAffOptions {
+  /** Extra directory of wire payloads to validate alongside the targets. */
+  wire?: string;
+  /** Directory relative paths are resolved against (defaults to process.cwd()). */
+  cwd?: string;
+}
+
+export interface ValidateAffResult {
+  data: ValidateAffData;
+  /** Per-file human lines (PASS / WARN / FAIL) for non-JSON output. */
+  lines: string[];
+  /** Present when at least one file failed — caller renders the unified error
+   *  envelope (`VALIDATION_ERROR`, exit 7) with `details` = `data`. */
+  failure?: CliError;
+}
+
+/** Collect the JSON files under one explicit target; an explicit target must
+ *  exist (a typo used to silently validate nothing and exit 0). */
+async function collectFromTarget(target: string, cwd: string): Promise<string[]> {
+  const raw = target.trim();
+  const usage = (message: string, nextSteps: string[]): CliError =>
+    new CliError('USAGE', message, { nextSteps, example: 'abap validate:aff src/ --json' });
+  if (!raw) {
+    throw usage('Empty path target.', ['Pass an AFF JSON file or a directory of AFF JSON files.']);
   }
-  if (stat.isFile()) return [path.resolve(root)];
+  const abs = path.resolve(cwd, raw);
+  let stat: Awaited<ReturnType<typeof fsp.stat>>;
+  try {
+    stat = await fsp.stat(abs);
+  } catch {
+    throw usage(`Path not found: ${toOutputPath(raw)}.`, [
+      'Check the path; it must be an AFF JSON file or a directory of AFF JSON files.',
+      'Validate the workspace fixtures: abap validate:aff test/fixtures --json',
+    ]);
+  }
+  if (stat.isFile()) {
+    if (!abs.endsWith('.json')) {
+      throw usage(`Not an AFF JSON file: ${toOutputPath(raw)}.`, [
+        'Pass a `.json` AFF file or a directory containing AFF JSON files.',
+      ]);
+    }
+    return [abs];
+  }
   const out: string[] = [];
-  async function walk(p: string): Promise<void> {
-    const entries = await fsp.readdir(p, { withFileTypes: true });
-    for (const e of entries) {
-      const full = path.join(p, e.name);
-      if (e.isDirectory()) await walk(full);
-      else if (e.isFile() && e.name.endsWith('.json')) out.push(full);
+  async function walk(dir: string): Promise<void> {
+    const entries = await fsp.readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) await walk(full);
+      else if (entry.isFile() && entry.name.endsWith('.json')) out.push(full);
     }
   }
-  await walk(path.resolve(root));
+  await walk(abs);
   out.sort();
   return out;
 }
 
-/** Shape an error into a stable human string. */
-function errorLine(e: ValidateError): string {
-  const where = e.instancePath || '/';
-  return `${where} ${e.keyword}: ${e.message}`;
-}
-
-/** Validate a single file with companion awareness. */
-async function validateOne(
-  filePath: string,
-  options: { reportCompanions: boolean },
-): Promise<{ result: ValidateResult; missing: string[]; optional: string[] }> {
+/** Validate a single file with companion awareness. Unknown (non-AFF) JSON is
+ *  skipped by the caller; nothing here is emitted for it. */
+async function validateOne(filePath: string): Promise<{
+  result: ValidateResult;
+  missing: string[];
+  optional: string[];
+}> {
   const route = routeAffSchema(filePath);
   if (!route || !route.isJson) {
-    // Not in scope — emit a synthetic PASS line so the caller can still see it.
-    return {
-      result: { type: 'UNKNOWN', filePath, status: 'pass', errors: [] },
-      missing: [],
-      optional: [],
-    };
+    return { result: { type: 'UNKNOWN', filePath, status: 'pass', errors: [] }, missing: [], optional: [] };
   }
   const result = await validateFile(filePath, route.type, route.schemaFile);
-  let missing: string[] = [];
-  let optional: string[] = [];
-  if (options.reportCompanions) {
-    const comp = await checkCompanions(filePath);
-    missing = comp.missing;
-    optional = comp.optional;
-  }
-  return { result, missing, optional };
+  const comp = await checkCompanions(filePath);
+  return { result, missing: comp.missing, optional: comp.optional };
 }
 
-/** Emit one line per file. */
-function emitHuman(r: { result: ValidateResult; missing: string[]; optional: string[] }): string {
-  const where = r.result.filePath ?? '<unknown>';
-  const companionNote =
-    r.missing.length > 0
-      ? ` [+missing companion: ${r.missing.join(', ')}]`
-      : r.optional.length > 0
-      ? ` [+optional companion missing: ${r.optional.join(', ')}]`
+/** Human line for one validated file (paths are already cwd-relative POSIX). */
+function humanLine(entry: ValidateAffFile): string {
+  const companionNote = entry.missingCompanions?.length
+    ? ` [+missing companion: ${entry.missingCompanions.join(', ')}]`
+    : entry.optionalCompanions?.length
+      ? ` [+optional companion missing: ${entry.optionalCompanions.join(', ')}]`
       : '';
-  if (r.result.status === 'pass' && r.missing.length === 0) return `PASS ${where}${companionNote}`;
-  if (r.result.status === 'warn' && r.missing.length === 0)
-    return `WARN ${where}: extra fields: ${(r.result.extraFields ?? []).join(', ')}${companionNote}`;
-  if (r.result.status === 'fail') {
-    const first = r.result.errors[0];
-    const head = first ? errorLine(first) : 'unspecified';
-    const more = r.result.errors.length > 1 ? ` (+${r.result.errors.length - 1} more)` : '';
-    return `FAIL ${where}: ${head}${more}${companionNote}`;
+  if (entry.status === 'pass') return `PASS ${entry.path}${companionNote}`;
+  if (entry.status === 'warn') return `WARN ${entry.path}: extra fields: ${(entry.extraFields ?? []).join(', ')}${companionNote}`;
+  const first = entry.errors?.[0];
+  if (first) {
+    const more = (entry.errors?.length ?? 0) > 1 ? ` (+${(entry.errors?.length ?? 1) - 1} more)` : '';
+    return `FAIL ${entry.path}: ${first.path || '/'} ${first.keyword}: ${first.message}${more}${companionNote}`;
   }
-  return `FAIL ${where}: missing companion${companionNote}`;
+  return `FAIL ${entry.path}: missing companion: ${(entry.missingCompanions ?? []).join(', ') || 'unknown'}`;
 }
 
+/**
+ * Validate the given targets (and optional wire directory).
+ *
+ * Throws `CliError('USAGE')` for missing / nonexistent targets and propagates
+ * `AFF_SCHEMA_*` schema-loading failures (both VALIDATION_ERROR, exit 7).
+ * File-level failures are returned as `result.failure` so the command layer can
+ * print the per-file lines in human mode before the unified error envelope.
+ */
 export async function runValidateAff(
   targets: string[],
-  options: RunOptions,
-): Promise<number> {
-  const allFiles: string[] = [];
-  for (const t of targets) {
-    const files = await collectJsonFiles(t);
-    allFiles.push(...files);
-  }
-  if (options.wire) {
-    const wireFiles = await collectJsonFiles(options.wire);
-    allFiles.push(...wireFiles);
+  options: ValidateAffOptions = {},
+): Promise<ValidateAffResult> {
+  const cwd = options.cwd ?? process.cwd();
+  if (targets.length === 0) {
+    throw new CliError('USAGE', 'A file or directory target is required.', {
+      nextSteps: [
+        'Pass an AFF JSON file or a directory to validate.',
+        'Validate the workspace fixtures: abap validate:aff test/fixtures --json',
+      ],
+      example: 'abap validate:aff src/zmy_basic.tabl.json --json',
+    });
   }
 
-  const lines: JsonLine[] = [];
-  let exitCode = 0;
+  const collected: string[] = [];
+  for (const target of targets) collected.push(...(await collectFromTarget(target, cwd)));
+  if (options.wire) collected.push(...(await collectFromTarget(options.wire, cwd)));
+  const allFiles = [...new Set(collected)];
+
+  const files: ValidateAffFile[] = [];
+  const lines: string[] = [];
 
   for (const file of allFiles) {
-    try {
-      const r = await validateOne(file, { reportCompanions: true });
-      const human = emitHuman(r);
-      const passedJson: JsonLine = {
-        status: r.result.status,
-        path: file,
-        type: r.result.type,
-        ...(r.result.errors.length > 0
-          ? {
-              errors: r.result.errors.map((e) => ({
-                path: e.instancePath,
-                keyword: e.keyword,
-                message: e.message,
-              })),
-            }
-          : {}),
-        ...(r.result.extraFields ? { extraFields: r.result.extraFields } : {}),
-        ...(r.missing.length ? { missingCompanions: r.missing } : {}),
-        ...(r.optional.length ? { optionalCompanions: r.optional } : {}),
-      };
-      // Skip synthetic "unknown-type" pass lines from the report.
-      if (r.result.type !== 'UNKNOWN') {
-        lines.push(passedJson);
-        const isHardFail =
-          r.result.status === 'fail' || r.missing.length > 0;
-        if (isHardFail) exitCode = 1;
-        if (options.json) {
-          // JSON mode prints to stdout one object per file (one JSON per line).
-          // The aggregator is built below.
-        } else {
-          const out = human.startsWith('FAIL') ? process.stderr : process.stdout;
-          out.write(human + '\n');
-        }
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (options.json) {
-        lines.push({ status: 'fail', path: file, errors: [{ path: '', keyword: 'exception', message: msg }] });
-      } else {
-        process.stderr.write(`FAIL ${file}: exception: ${msg}\n`);
-      }
-      exitCode = 1;
-    }
-  }
-
-  if (options.json) {
-    const summary = {
-      pass: lines.filter((l) => l.status === 'pass').length,
-      warn: lines.filter((l) => l.status === 'warn').length,
-      fail: lines.filter((l) => l.status === 'fail').length,
+    const r = await validateOne(file);
+    // Non-AFF JSON files are outside this command's scope: not validated and
+    // not reported (they must not pad the summary with fake passes).
+    if (r.result.type === 'UNKNOWN') continue;
+    const missingCompanion = r.missing.length > 0;
+    const entry: ValidateAffFile = {
+      status: r.result.status === 'fail' || missingCompanion ? 'fail' : r.result.status,
+      path: toRelativeOutputPath(file, cwd),
+      ...(r.result.type ? { type: r.result.type } : {}),
+      ...(r.result.errors.length > 0
+        ? {
+            errors: r.result.errors.map((e) => ({
+              path: e.instancePath,
+              keyword: e.keyword,
+              message: e.message,
+            })),
+          }
+        : {}),
+      ...(r.result.extraFields?.length ? { extraFields: r.result.extraFields } : {}),
+      ...(r.missing.length ? { missingCompanions: r.missing } : {}),
+      ...(r.optional.length ? { optionalCompanions: r.optional } : {}),
     };
-    const out = { status: exitCode === 0 ? 'success' : 'error', summary, files: lines };
-    process.stdout.write(JSON.stringify(out, null, 2) + '\n');
+    files.push(entry);
+    lines.push(humanLine(entry));
   }
 
-  return exitCode;
+  const summary = {
+    pass: files.filter((f) => f.status === 'pass').length,
+    warn: files.filter((f) => f.status === 'warn').length,
+    fail: files.filter((f) => f.status === 'fail').length,
+  };
+  const data: ValidateAffData = { summary, files };
+  const failed = summary.fail;
+  if (failed === 0) return { data, lines };
+
+  const missingCount = files.reduce((n, f) => n + (f.missingCompanions?.length ?? 0), 0);
+  const failure = new CliError(
+    'VALIDATION_ERROR',
+    `${failed} of ${files.length} file(s) failed AFF validation${missingCount > 0 ? ` (${missingCount} missing companion(s))` : ''}.`,
+    {
+      details: data,
+      nextSteps: [
+        'Inspect error.details.files[] where status is "fail" (schema instance paths and missing companions), fix the files, then re-run.',
+      ],
+      example: 'abap validate:aff src/ --json',
+    },
+  );
+  return { data, lines, failure };
 }
 
 export function registerValidateAffCommand(program: Command): void {
@@ -232,27 +256,37 @@ export function registerValidateAffCommand(program: Command): void {
       'Validate JSON files against official abap-file-format (AFF) canonical schemas (Draft 2020-12)',
     )
     .option('--wire <wire-dir>', 'also recursively validate all JSON under a wire directory')
-    .option('--json', 'emit a single JSON envelope instead of per-line PASS/FAIL/WARN')
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
-    .action(async (target: string, opts: { wire?: string; json?: boolean; schema?: boolean }, cmd) => {
-      // --schema: print the JSON parameter schema and exit (no validation, no SAP).
-      const allOpts = cmd.optsWithGlobals();
-      if (allOpts.schema) {
-        printSchema(SCHEMA, jsonFromCommand(cmd));
+    .action(async (target: string | undefined, opts: { wire?: string; schema?: boolean }, cmd) => {
+      const mode = jsonFromCommand(cmd);
+      if (cmd.optsWithGlobals().schema) {
+        printSchema(SCHEMA, mode);
         return;
       }
-      // The top-level --json / --pretty-json (added by index.ts) must also
-      // activate JSON mode; merge it into our local option.
-      const topOpts = (program.optsWithGlobals?.() ?? {}) as { json?: boolean; prettyJson?: boolean };
-      const wantJson = Boolean(opts.json) || Boolean(topOpts.json) || Boolean(topOpts.prettyJson);
-      const code = await runValidateAff([target], { wire: opts.wire, json: wantJson });
-      process.exit(code);
+      // `printError` throws `CliExit`; keep it out of a surrounding try so the
+      // top-level runner sees the original exit code instead of re-rendering it.
+      const result = await (async (): Promise<ValidateAffResult> => {
+        try {
+          return await runValidateAff(target ? [target] : [], { wire: opts.wire });
+        } catch (error: unknown) {
+          printError(mode, error);
+        }
+      })();
+      if (result.failure) {
+        // Human mode keeps the per-file PASS/WARN/FAIL lines readable on
+        // stderr; JSON mode sends exactly one envelope and nothing on stdout.
+        if (!isJsonMode(mode)) for (const line of result.lines) console.error(line);
+        printError(mode, result.failure);
+      }
+      // `files: []` survives stripEmpty: the field is part of the machine
+      // contract, and an empty list says "nothing matched", not "field absent".
+      printResult(mode, result.data, result.lines.join('\n'), undefined, { preserveEmpty: ['files'] });
     });
 }
 
 // Allow `npx tsx src/abap_cli/commands/validate-aff.ts <target> [--wire ...] [--json]`
 // invocation outside commander. Defaults to validating `test/fixtures/` when no
-// positional target is given (matches `npm run validate:aff` / `pretest` usage).
+// positional target is given (matches the historical `npm run validate:aff` usage).
 if (typeof process !== 'undefined' && process.argv[1] && process.argv[1].endsWith('validate-aff.ts')) {
   const argv = process.argv.slice(2);
   const jsonIdx = argv.indexOf('--json');
@@ -260,11 +294,21 @@ if (typeof process !== 'undefined' && process.argv[1] && process.argv[1].endsWit
   const wireVal = wireIdx >= 0 ? argv[wireIdx + 1] : undefined;
   const positional = argv.filter((a, i) => i !== wireIdx && i !== wireIdx + 1 && a !== '--json' && !a.startsWith('-'));
   const targets = positional.length > 0 ? positional : ['test/fixtures/'];
-  runValidateAff(targets, { wire: wireVal, json: jsonIdx >= 0 })
-    .then((code) => process.exit(code))
+  runValidateAff(targets, { wire: wireVal })
+    .then((result) => {
+      if (jsonIdx >= 0) {
+        process.stdout.write(JSON.stringify(result.data) + '\n');
+      } else {
+        for (const line of result.lines) process.stdout.write(line + '\n');
+      }
+      if (result.failure) {
+        process.stderr.write(`Error: ${result.failure.message}\n`);
+        process.exit(exitCodeFor(categoryOf(result.failure.code)));
+      }
+    })
     .catch((err: unknown) => {
       const msg = err instanceof Error ? err.message : String(err);
       process.stderr.write(`FAIL: ${msg}\n`);
-      process.exit(1);
+      process.exit(err instanceof CliError ? exitCodeFor(categoryOf(err.code)) : 1);
     });
 }

@@ -47,6 +47,10 @@ Top-level commander 错误（unknown command / missing arg / unknown option）�
 - **Token-efficient `stripEmpty()`**（025）：`renderResult` 的 json 分支递归
   删除 `data` 中的空 `{}` / 空 `[]`（保留 `null`、`false`、`0`、`''`）。Agent
   永远不会消费空集合，可节省 ~5–20% token。human 模式不调用。
+- **契约字段豁免 `preserveEmpty`**：`renderResult` / `printResult` 接受可选的
+  `RenderOptions { preserveEmpty?: string[] }`，只豁免列出的**顶层** `data` key。
+  仅用于"字段存在性本身是契约"的情况（如 `doctor --fix` 的 `fixesApplied: []`
+  与 `validate:aff` 的 `files: []`）；普通业务字段不要用它。
 - **`buildSchemaMeta()`**（025）：`--schema` 响应使用精简 meta（仅
   `command` / `version` / `durationMs`），不含 `timestamp` 与 `warnings`。
   让 schema introspection 跨运行稳定且最小。
