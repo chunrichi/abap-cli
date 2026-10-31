@@ -11,7 +11,7 @@ changed at: 2026-10-31 16:20:00
 
 abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **22 个对象类型**：4 个 ABAP 源对象、1 个 ADT 包（DEVC）、6 个 DDIC 对象、2 个 ICF/事务对象、2 个双通道 DDIC/CDS 对象、7 个 CDS/RAP 对象。分两条路由：**ADT**（`abap-adt-api` 走标准 ADT REST API）与 **ICF**（自建服务 `/sap/abap_cli`，需先 `abap deploy`）。
 
-`create <type>` 的 `--schema` 参数 `allowedValues` 即这 21 个类型码：`CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, ENQU, NROB, HTTP, TRAN, TTYP, MSAG, DDLS, SRVB, SRVD, BDEF, DCLS, DDLX, DDLA`。先查能力再动手：`abap create --schema <TYPE>` 会给出某个类型的字段契约。
+`create <type>` 的 `--schema` 参数 `allowedValues` 即这 22 个类型码：`CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, ENQU, NROB, HTTP, TRAN, TTYP, MSAG, DDLS, SRVB, SRVD, BDEF, DCLS, DDLX, DDLA`。先查能力再动手：`abap create --schema <TYPE>` 会给出某个类型的字段契约。
 
 ## 类型 × 命令矩阵
 
@@ -29,7 +29,7 @@ abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **22 个
 | `ENQU` | 锁对象 | ICF | `--file` | ✅ | ✅ | ❌ | `<name>.enqu.json` |
 | `NROB` | 编号范围对象 | ICF（pull 主 ADT + ICF 兜底） | `--file` | ✅ | ✅ | ❌ | `<name>.nrob.json` |
 | `HTTP` | **ICF / SICF 节点** | ICF | `--file` | ✅ | ✅ | ❌ | `<name>.http.json` |
-| `TRAN` | 事务码 (SE93) | ICF | `--file` | ✅ | ✅（写路径未实现，见下） | ❌ | `<code>.tran.json` |
+| `TRAN` | 事务码 (SE93) | ICF | `--file` | ✅ | ✅ | ❌ | `<code>.tran.json` |
 | `TTYP` | 表类型 | auto（ADT 主 / ECC ICF 兜底） | `--file` | ✅ | ✅ | ❌ | `<name>.ttyp.json` + 可选 `<name>.ttyp.type.abap` |
 | `MSAG` | 消息类 | auto（ADT 主 / ECC ICF 兜底） | `--file` | ✅ | ✅ | ❌ | `<name>.msag.json` |
 | `DDLS` | CDS 视图 | ADT | `--file` | ✅ | ✅ | ❌ | `<name>.ddls.{json,acds}` |
@@ -42,7 +42,7 @@ abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **22 个
 
 > **`create local` 只支持 `CLAS` / `INTF` / `PROG` / `FUGR`**（`formats/templates.ts` 只有这四类模板），其余类型一律 `TYPE_NOT_SUPPORTED`（exit 7）。`SRVD` / `DCLS` / `DDLX` / `DDLA` 在 SAP 侧可创建（`createObjtype`），但没有本地骨架模板；`create local` 会拒绝它们并提示改用 `abap create <type> --file <aff.json>`。
 > **`create` 的 `--file` 是数据驱动必填项**（`types/registry.ts` 的 `ObjectTypeEntry.requiresFile`）：`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `NROB` / `HTTP` / `TRAN` / `TTYP` / `MSAG` / `DDLS` / `SRVD` / `DCLS` / `DDLX` / `DDLA` 缺 `--file` 直接 `USAGE`（exit 2）。`BDEF` 是 pull-only（SAP 不接受 CLI 创建）；`SRVB` 仅 pull（SAP GUI 管理 binding）。
-> **`TRAN` 写路径的现状**：ABAP `/tran` 的 POST/PUT 仍返回 `TRAN_WRITE_NOT_IMPLEMENTED`（501），因此 `create TRAN` / `push *.tran.json` 端到端不可用；`pull` 与 `abap tcode` 的读取路径正常。实现计划见 [roadmap](roadmap.md)。
+> **`TRAN` 写路径已实现**：ABAP `/tran/<code>` 支持 GET / POST / PUT / DELETE，覆盖 dialog / report（含 report variant）/ parameter / variant 四种事务；OO 事务返回 `TRAN_OO_NOT_SUPPORTED`（规范 FM 没有 class/method 参数，仍用 SE93 维护）。`delete` 只支持 `$TMP` 事务（可传输事务请在 SE93 删除以便记录到请求）。类型页面：[tran](objects/tran.md)。
 
 本地产物一律平铺在 `src/` 下（无类型/对象子目录），文件名自带类型后缀；命名空间用 AFF 括号 token（`/UI2/CL_JSON` → `(ui2)cl_json`）。DDIC 三件套（TABL / STRU）与 DOMA / DTEL 的详细字段契约见 [create](commands/create.md) 与 [pull](commands/pull.md)。
 
@@ -116,7 +116,7 @@ abap push src/zmy_service.http.json --tr <TR>
 | Web Dynpro / ITS / BSP | 不支持 | — |
 | IDoc / ALE 配置、Workflow | 不支持 | — |
 | Package（`DEVC`）更新/推送 | 不支持 | ADT 资源控制器拒绝 `PUT /sap/bc/adt/packages/<name>`；`create DEVC` / `pull DEVC` / `delete` 已支持，改包请在 SAP GUI 操作或删除后重建 |
-| `TRAN` 写入 | 未实现（501） | 读取用 `pull TRAN` / `abap tcode` |
+| `TRAN` 写入 | OO 事务不支持 | 其余 4 类支持 `create` / `push` / `delete`（`$TMP`）；见 [tran](objects/tran.md) |
 | Pool / Cluster Table | 不支持 | 仅 TABL / STRU |
 
 > 注：原 0.2.x 文档中曾把 `TTYP`/`DDLS` 列为"显式 deferred"或"无实现"。实际后续演进中两者已完整支持 `pull` + `create`（`--file`）；但 **`create local` 从未支持过它们**——`create local` 仅 `CLAS` / `INTF` / `PROG` / `FUGR`。

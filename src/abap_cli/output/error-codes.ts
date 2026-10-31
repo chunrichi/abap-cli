@@ -98,6 +98,33 @@ export type ErrorCode =
   // tcode: ICF /tcode/<code> transaction lookup
   | 'TCODE_NOT_FOUND'           // TSTC entry does not exist (NOT_FOUND/exit 8)
   | 'TCODE_NOT_AUTHORIZED'      // S_TCODE authority check failed (AUTH_ERROR/exit 5)
+  // TRAN (SE93 transaction code) ICF /tran route
+  | 'TRAN_OBJECT_NOT_FOUND'      // TSTC/TADIR entry does not exist (NOT_FOUND/exit 8)
+  | 'TRAN_INVALID_PAYLOAD'       // malformed wire JSON body (VALIDATION_ERROR)
+  | 'TRAN_NAME_MISMATCH'         // payload name differs from the URL transaction (VALIDATION_ERROR)
+  | 'TRAN_SERVICE_INVALID'       // path/name malformed (VALIDATION_ERROR)
+  | 'TRAN_TYPE_INVALID'          // unknown transactionType / illegal_type from the insert FM (VALIDATION_ERROR)
+  | 'TRAN_DESCRIPTION_REQUIRED'  // header.description missing (VALIDATION_ERROR)
+  | 'TRAN_DESCRIPTION_TOO_LONG'  // header.description above the AFF limit (VALIDATION_ERROR)
+  | 'TRAN_PROGRAM_REQUIRED'      // dialog/report transaction without a program (VALIDATION_ERROR)
+  | 'TRAN_DYNNR_INVALID'         // dynpro value is not 1-4 digits (VALIDATION_ERROR)
+  | 'TRAN_PARENT_REQUIRED'       // parameter/variant transaction without a core transaction (VALIDATION_ERROR)
+  | 'TRAN_VARIANT_REQUIRED'      // variant transaction without a variant name (VALIDATION_ERROR)
+  | 'TRAN_TRANSPORT_REQUIRED'    // transportable package write/delete without a request (VALIDATION_ERROR)
+  | 'TRAN_OO_NOT_SUPPORTED'      // OO transactions cannot be written through RPY_TRANSACTION_INSERT (VALIDATION_ERROR)
+  | 'TRAN_DELETE_UNSUPPORTED'    // transported transactions must be deleted in SE93 (VALIDATION_ERROR)
+  | 'TRAN_NOT_AUTHORIZED'        // RS_CORR_INSERT permission_failure (AUTH_ERROR/exit 5)
+  | 'TRAN_WRITE_CANCELLED'       // insert FM cancelled by a SAP dialog (SAP_ERROR)
+  | 'TRAN_PACKAGE_INVALID'       // RS_CORR_INSERT unknown object class/package (VALIDATION_ERROR)
+  | 'TRAN_PACKAGE_ASSIGN_FAILED' // RS_CORR_INSERT failed (SAP_ERROR)
+  | 'TRAN_NAME_NOT_ALLOWED'      // insert FM name_not_allowed (VALIDATION_ERROR)
+  | 'TRAN_NAME_CONFLICT'         // insert FM name_conflict (VALIDATION_ERROR)
+  | 'TRAN_OBJECT_INCONSISTENT'   // insert FM object_inconsistent (SAP_ERROR)
+  | 'TRAN_DB_ACCESS_ERROR'       // insert FM db_access_error (SAP_ERROR)
+  | 'TRAN_WRITE_FAILED'          // insert FM failed / row not persisted (SAP_ERROR)
+  | 'TRAN_TSTCC_WRITE_FAILED'    // TSTCC user-interface attributes not persisted (SAP_ERROR)
+  | 'TRAN_AUTH_WRITE_FAILED'     // TSTCA start authorization not persisted (SAP_ERROR)
+  | 'TRAN_TADIR_DELETE_FAILED'   // TADIR entry not removed on delete (SAP_ERROR)
   // AFF validator/CLI errors
   | 'AFF_SCHEMA_MISSING'        // canonical schema file not found for a type (VALIDATION_ERROR/exit 7)
   | 'AFF_SCHEMA_INVALID'        // canonical schema file present but unparseable (VALIDATION_ERROR/exit 7)
@@ -195,6 +222,33 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   // tcode
   TCODE_NOT_FOUND: 'NOT_FOUND',
   TCODE_NOT_AUTHORIZED: 'AUTH_ERROR',
+  // TRAN
+  TRAN_OBJECT_NOT_FOUND: 'NOT_FOUND',
+  TRAN_INVALID_PAYLOAD: 'VALIDATION_ERROR',
+  TRAN_NAME_MISMATCH: 'VALIDATION_ERROR',
+  TRAN_SERVICE_INVALID: 'VALIDATION_ERROR',
+  TRAN_TYPE_INVALID: 'VALIDATION_ERROR',
+  TRAN_DESCRIPTION_REQUIRED: 'VALIDATION_ERROR',
+  TRAN_DESCRIPTION_TOO_LONG: 'VALIDATION_ERROR',
+  TRAN_PROGRAM_REQUIRED: 'VALIDATION_ERROR',
+  TRAN_DYNNR_INVALID: 'VALIDATION_ERROR',
+  TRAN_PARENT_REQUIRED: 'VALIDATION_ERROR',
+  TRAN_VARIANT_REQUIRED: 'VALIDATION_ERROR',
+  TRAN_TRANSPORT_REQUIRED: 'VALIDATION_ERROR',
+  TRAN_OO_NOT_SUPPORTED: 'VALIDATION_ERROR',
+  TRAN_DELETE_UNSUPPORTED: 'VALIDATION_ERROR',
+  TRAN_NOT_AUTHORIZED: 'AUTH_ERROR',
+  TRAN_WRITE_CANCELLED: 'SAP_ERROR',
+  TRAN_PACKAGE_INVALID: 'VALIDATION_ERROR',
+  TRAN_PACKAGE_ASSIGN_FAILED: 'SAP_ERROR',
+  TRAN_NAME_NOT_ALLOWED: 'VALIDATION_ERROR',
+  TRAN_NAME_CONFLICT: 'VALIDATION_ERROR',
+  TRAN_OBJECT_INCONSISTENT: 'SAP_ERROR',
+  TRAN_DB_ACCESS_ERROR: 'SAP_ERROR',
+  TRAN_WRITE_FAILED: 'SAP_ERROR',
+  TRAN_TSTCC_WRITE_FAILED: 'SAP_ERROR',
+  TRAN_AUTH_WRITE_FAILED: 'SAP_ERROR',
+  TRAN_TADIR_DELETE_FAILED: 'SAP_ERROR',
   // AFF
   AFF_SCHEMA_MISSING: 'VALIDATION_ERROR',
   AFF_SCHEMA_INVALID: 'VALIDATION_ERROR',

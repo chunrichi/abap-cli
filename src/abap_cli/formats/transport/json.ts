@@ -318,19 +318,33 @@ export function wireToLocal(wire: TranWirePayload): TranObjectLocal {
     description: wireHeader?.description ?? '',
     originalLanguage: wireHeader?.originalLanguage ?? '',
   };
-  if (wireHeader?.abapLanguageVersion !== undefined) {
+  // The wire payload always carries every AFF grouping (the ICF GET serializes
+  // the full ABAP structure), so optional-but-enumerated fields can be empty
+  // strings. Drop them instead of writing a document that fails validation.
+  if (wireHeader?.abapLanguageVersion) {
     header.abapLanguageVersion = wireHeader.abapLanguageVersion as TranAbapLanguageVersion;
   }
 
-  const generalInformation: TranGeneralInformation = {
-    transactionType: wireGeneral?.transactionType ?? 'dialogTransaction',
-  };
-  if (wireGeneral?.lockStatus !== undefined) generalInformation.lockStatus = wireGeneral.lockStatus;
-  if (wireGeneral?.dialogTransaction) generalInformation.dialogTransaction = wireGeneral.dialogTransaction;
-  if (wireGeneral?.parameterTransaction) generalInformation.parameterTransaction = wireGeneral.parameterTransaction;
-  if (wireGeneral?.reportTransaction) generalInformation.reportTransaction = wireGeneral.reportTransaction;
-  if (wireGeneral?.ooTransaction) generalInformation.ooTransaction = wireGeneral.ooTransaction;
-  if (wireGeneral?.variantTransaction) generalInformation.variantTransaction = wireGeneral.variantTransaction;
+  const transactionType = wireGeneral?.transactionType ?? 'dialogTransaction';
+  const generalInformation: TranGeneralInformation = { transactionType };
+  if (wireGeneral?.lockStatus) generalInformation.lockStatus = wireGeneral.lockStatus;
+  // Keep only the type block that belongs to the transaction type; the others
+  // are ABAP-side defaults and would be rejected by the AFF schema.
+  if (transactionType === 'dialogTransaction' && wireGeneral?.dialogTransaction) {
+    generalInformation.dialogTransaction = wireGeneral.dialogTransaction;
+  }
+  if (transactionType === 'parameterTransaction' && wireGeneral?.parameterTransaction) {
+    generalInformation.parameterTransaction = wireGeneral.parameterTransaction;
+  }
+  if (transactionType === 'reportTransaction' && wireGeneral?.reportTransaction) {
+    generalInformation.reportTransaction = wireGeneral.reportTransaction;
+  }
+  if (transactionType === 'ooTransaction' && wireGeneral?.ooTransaction) {
+    generalInformation.ooTransaction = wireGeneral.ooTransaction;
+  }
+  if (transactionType === 'variantTransaction' && wireGeneral?.variantTransaction) {
+    generalInformation.variantTransaction = wireGeneral.variantTransaction;
+  }
 
   const local: TranObjectLocal = {
     name: wire.name,
@@ -338,11 +352,22 @@ export function wireToLocal(wire: TranWirePayload): TranObjectLocal {
     header,
     generalInformation,
   };
-  if (wire.transactionServices) local.transactionServices = wire.transactionServices;
-  if (wire.transactionRelationships) local.transactionRelationships = wire.transactionRelationships;
-  if (wire.serviceRelationships) local.serviceRelationships = wire.serviceRelationships;
+  if (wire.package) local.package = wire.package;
+  if (wire.transportRequest) local.transportRequest = wire.transportRequest;
+  if (wire.transactionServices?.length) local.transactionServices = wire.transactionServices;
+  if (wire.transactionRelationships?.length) local.transactionRelationships = wire.transactionRelationships;
+  if (wire.serviceRelationships?.length) local.serviceRelationships = wire.serviceRelationships;
   if (wire.userInterface) local.userInterface = wire.userInterface;
-  if (wire.authorizations) local.authorizations = wire.authorizations;
+  if (wire.authorizations) {
+    const auth = { ...wire.authorizations };
+    if (auth.startAuthorizationObject && !auth.startAuthorizationObject.authObjectName) {
+      delete auth.startAuthorizationObject;
+    }
+    // Authorization defaults without any auth object carry no information.
+    if (auth.startAuthorizationObject || (auth.authorizationDefaults?.authObjects?.length ?? 0) > 0) {
+      local.authorizations = auth;
+    }
+  }
   return local;
 }
 

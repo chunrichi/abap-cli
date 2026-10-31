@@ -40,7 +40,7 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | 创建/修改锁对象（ENQU） | `create / pull / push ENQU` | ✅ | ICF；`create --file` |
 | 创建/修改编号范围对象（NROB） | `create / pull / push NROB` | ✅ | pull 主 ADT + ICF 兜底；`create --file` |
 | 创建/修改 SICF 节点（HTTP） | `create / pull / push HTTP` | ✅ | ICF |
-| 创建/修改事务码（SE93 / TRAN） | `create / pull TRAN` | 🟡 | 读通；**ABAP `/tran` 写端点仍返回 501，create/push 端到端不可用** |
+| 创建/修改事务码（SE93 / TRAN） | `create / pull / push / delete TRAN` | ✅ | ICF `/tran` GET/POST/PUT/DELETE；dialog/report/parameter/variant，OO 明确拒绝；真机 23/23 TC |
 | Table Type（TTYP） | `create / pull / push TTYP` | ✅ | ADT 主通道；ECC 自动 ICF 兜底 |
 | 消息类（MSAG） | `create / pull / push MSAG` | ✅ | ADT 主通道；ECC 自动 ICF 兜底 |
 | CDS View（DDLS） | `create / pull / push DDLS` | ✅ | 仅 ADT；ECC 旧内核硬错 `DDLS_NOT_SUPPORTED_ON_ECC` |
@@ -178,14 +178,14 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | DDIC CRUD（DOMA/DTEL/TABL/STRU/ENQU/NROB） | `pull / create / push` | ✅ | ICF；`/ddic/<type>` |
 | 双通道 DDIC（TTYP/MSAG） | `pull / create / push` | ✅ | ADT 主 + ECC ICF 兜底 |
 | 解析 SICF 节点（HTTP 类型） | `pull / create / push HTTP` | ✅ | ICF |
-| 解析事务码（TRAN 类型） | `pull / create / push TRAN` | 🟡 | 读通；写入 501（见 §1） |
+| 解析事务码（TRAN 类型） | `pull / create / push / delete TRAN` | ✅ | 读写闭环；删除仅 `$TMP`（见 §1） |
 | 数据查询（SELECT） | `select` / `fields` | ✅ | ICF |
 | 报表运行 | `run-report` | ✅ | ICF；经典 list，5000 行/200k 字符 |
 | classrun wrapper | `deploy` | ✅ | ZCL_ABAP_VIBE_RUNNER |
 | tcode wrapper | `tcode` | ✅ | ICF |
 | MIME Repository | `mime create / delete / push` | ✅ | ICF；当前只有 folder/resources 两类端点 |
 
-**覆盖率**：10/11（TRAN 写路径 501）。
+**覆盖率**：11/11（TRAN 写路径已实现；OO 事务按规范拒绝）。
 
 ---
 
@@ -216,7 +216,7 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | XSLT（转换） | 中 | 中 | 候选补充类型（ICF `CL_O2_API_XSLTDESC` 路线），见 roadmap |
 | ENHO / ENHS（增强） | 中-高 | 大 | 先只读 pull，再 push；见 roadmap |
 | AUTH / SUSO 授权对象 | 中 | 中-大 | 本轮按约定暂不做；见 roadmap |
-| TRAN 写路径（501） | 中 | 中 | 需 ABAP 侧 ICF 实现（`RPY_TRANSACTION_INSERT`）+ 真机验证 |
+| TRAN OO 事务写入 | 中 | 中 | 规范 FM `RPY_TRANSACTION_INSERT` 无 class/method 参数；需 SE93 BDC，ICF 上下文不可用，继续走 SE93 |
 | DOMA/DTEL `.docu.json` 长文本 | 中 | 中 | AFF `docu-v1` 未 vendor；需 ICF 长文本读写 + 真机验证 |
 | Cross-reference / where-used 全集 | 中 | 中-大 | 需 REPS 全文扫描 |
 | Transport release / delete | 低 | 小 | 本轮按约定不做 |

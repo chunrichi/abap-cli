@@ -140,6 +140,11 @@ export class IcfClient {
     return this.get(`/tran/${encodeURIComponent(tcode)}`);
   }
 
+  /** DELETE /tran/<tcode> — delete a transaction code (SE93). */
+  async deleteTran<T>(tcode: string, body?: { transportRequest?: string }): Promise<IcfResponse<T>> {
+    return this.request('delete', `/tran/${encodeURIComponent(tcode)}`, body);
+  }
+
   /** GET /tcode/<tcode> — resolve a transaction code to its entry program (read-only). */
   async getTcode<T>(tcode: string): Promise<IcfResponse<T>> {
     return this.get(`/tcode/${encodeURIComponent(tcode)}`);
@@ -222,7 +227,7 @@ export class IcfClient {
   }
 
   /** Run one HTTP call and normalize transport errors into a CliError. */
-  private async request<T>(method: 'get' | 'post' | 'put', path: string, body?: unknown): Promise<IcfResponse<T>> {
+  private async request<T>(method: 'get' | 'post' | 'put' | 'delete', path: string, body?: unknown): Promise<IcfResponse<T>> {
     let resp: AxiosResponse<IcfResponse<T>>;
     try {
       resp = await this.send<T>(method, path, body);
@@ -245,9 +250,10 @@ export class IcfClient {
   }
 
   /** Low-level send used by `request` (single attempt, no cookie fallback). */
-  private async send<T>(method: 'get' | 'post' | 'put', path: string, body?: unknown): Promise<AxiosResponse<IcfResponse<T>>> {
+  private async send<T>(method: 'get' | 'post' | 'put' | 'delete', path: string, body?: unknown): Promise<AxiosResponse<IcfResponse<T>>> {
     if (method === 'get') return this.http.get<IcfResponse<T>>(path);
     if (method === 'post') return this.http.post<IcfResponse<T>>(path, body);
+    if (method === 'delete') return this.http.delete<IcfResponse<T>>(path, { data: body });
     return this.http.put<IcfResponse<T>>(path, body);
   }
 

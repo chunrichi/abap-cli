@@ -11,12 +11,14 @@
  * Supported types: anything reachable by `client.deleteObject` (CLAS, INTF,
  * PROG, FUGR, FUGR/FF, TABL, STRU, DOMA, DTEL, MSAG, TTYP, DDLS, DDLX, BDEF,
  * DCLS, SRVD, SRVB, HTTP, ENQU, NROB). DEVC takes the dedicated package branch
- * (`delete-devc.ts` — packages are deleted without a lock). CDSV views and
- * similar type codes without an ADT delete endpoint surface as
- * `TYPE_NOT_SUPPORTED`.
+ * (`delete-devc.ts` — packages are deleted without a lock); TRAN goes through
+ * the bundled ICF service (`DELETE /tran/<tcode>`). CDSV views and similar type
+ * codes without an ADT delete endpoint surface as `TYPE_NOT_SUPPORTED`.
  */
 import { AdtClientWrapper } from '../../clients/adt-client.js';
+import { IcfClient } from '../../clients/icf-client.js';
 import { CliError } from '../../output/json.js';
+import type { ErrorCode } from '../../output/error-codes.js';
 import { resolveObject } from '../../core/resolve.js';
 import { normalizeTypeInput } from '../../cli/type-alias.js';
 import { runDeleteDevc } from './delete-devc.js';
@@ -76,6 +78,12 @@ export async function runDelete(objectName: string, opts: DeleteOptions): Promis
   // name directly).
   if (typeUpper === 'DEVC') {
     return runDeleteDevc(objectName, opts);
+  }
+  // TRAN (SE93 transaction codes) has no ADT delete endpoint: a transaction is
+  // repository metadata spread over TSTC/TSTCT/TSTCP/TSTCC/TSTCA plus TADIR, so
+  // it is deleted through the bundled ICF service instead.
+  if (typeUpper === 'TRAN') {
+    return runDeleteTran(objectName, opts);
   }
   const client = await AdtClientWrapper.create();
   const resolved = await resolveObject(client, objectName, typeUpper);
@@ -146,4 +154,66 @@ export async function runDelete(objectName: string, opts: DeleteOptions): Promis
     if (result) result.data.lockReleased = lockReleased;
   }
   return result!;
+}
+
+/**
+ * Delete a transaction code through ICF `DELETE /tran/<tcode>`.
+ *
+ * The ICF handler removes the transaction tables and the TADIR entry (recording
+ * the deletion in the transport request when one is passed). Transport rules
+ * mirror the ADT delete path: `$TMP` needs none, everything else needs `--tr`.
+ */
+async function runDeleteTran(objectName: string, opts: DeleteOptions): Promise<DeleteResult> {
+  const name = objectName.trim().toUpperCase();
+  const icf = await IcfClient.create();
+
+  const probe = await icf.getTran<{ package?: string }>(name);
+  if (probe.status !== 'success' || !probe.data) {
+    if (probe.error?.code === 'TRAN_OBJECT_NOT_FOUND') {
+      throw new CliError('OBJECT_NOT_FOUND', `Transaction ${name} does not exist`, {
+        object: name,
+        type: 'TRAN',
+        nextSteps: ['Verify the transaction code exists in the target system.'],
+      });
+    }
+    throw new CliError((probe.error?.code ?? 'SAP_ERROR') as ErrorCode, probe.error?.message ?? `Failed to read TRAN ${name}`, {
+      object: name,
+      type: 'TRAN',
+    });
+  }
+
+  const packageName = probe.data.package;
+  const isLocal = (packageName ?? '').trim().toUpperCase() === '$TMP';
+  if (!isLocal && !opts.tr) {
+    throw new CliError('MISSING_TRANSPORT', `Transaction ${name} is in package ${packageName ?? '?'}; --tr is required`, {
+      details: { object: name, type: 'TRAN', packageName },
+      nextSteps: [
+        'Pass --tr <request> to record the deletion in a transportable change.',
+        'Or recreate the transaction in $TMP if it is local scratch work.',
+      ],
+      example: `abap delete ${name} --type TRAN --tr NDK900123 --yes`,
+    });
+  }
+
+  const resp = await icf.deleteTran<{ name: string; type: string; action: string }>(name, opts.tr ? { transportRequest: opts.tr } : {});
+  if (resp.status !== 'success' || !resp.data) {
+    throw new CliError((resp.error?.code ?? 'DELETE_FAILED') as ErrorCode, resp.error?.message ?? `Failed to delete TRAN ${name}`, {
+      object: name,
+      type: 'TRAN',
+      details: resp.error?.details,
+      nextSteps: ['Re-run after fixing the cause above.'],
+    });
+  }
+
+  return {
+    data: {
+      object: name,
+      type: 'TRAN',
+      ...(packageName ? { packageName } : {}),
+      deleted: true,
+      ...(opts.tr ? { transport: opts.tr } : {}),
+      lockReleased: true,
+    },
+    human: `Deleted TRAN ${name}` + (opts.tr ? ` (transport ${opts.tr})` : ''),
+  };
 }

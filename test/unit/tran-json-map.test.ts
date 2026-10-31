@@ -106,6 +106,60 @@ describe('TRAN JSON helpers', () => {
       expect(local.transactionServices).toBeUndefined();
       expect(local.authorizations).toBeUndefined();
     });
+
+    it('keeps only the type block that matches transactionType', () => {
+      // The ICF GET serializes the full ABAP grouping, so every block arrives
+      // (with schema-valid defaults). A pulled document must keep just one.
+      const wire: TranWirePayload = {
+        name: 'ZTRAN_PARAM',
+        formatVersion: '1',
+        header: { description: 'Parameter tcode', originalLanguage: 'EN', abapLanguageVersion: 'standard' },
+        generalInformation: {
+          transactionType: 'parameterTransaction',
+          lockStatus: 'notLocked',
+          dialogTransaction: { programName: '', programDynnr: '0000', stvMaintenanceMode: 'notAllowed' },
+          parameterTransaction: {
+            parParentTransactionCode: 'SE16',
+            skipInitialScreenMode: 'skip',
+            parameterValues: [{ parameterName: 'DATABROWSE-TABLENAME', parameterValue: 'TSTC' }],
+          },
+          ooTransaction: { className: '', methodName: '', updateMode: 'notSet' },
+        },
+        authorizations: {
+          authorizationDefaults: { maintenanceMode: 'manual', defaultValuesRequired: 'yes', inheritanceMode: 'inactive' },
+        },
+      };
+      const local = wireToLocal(wire);
+      expect(local.generalInformation.parameterTransaction?.parParentTransactionCode).toBe('SE16');
+      expect(local.generalInformation.dialogTransaction).toBeUndefined();
+      expect(local.generalInformation.ooTransaction).toBeUndefined();
+      // No start authorization object and no auth objects => nothing to persist.
+      expect(local.authorizations).toBeUndefined();
+    });
+
+    it('keeps the start authorization object and the package envelope', () => {
+      const wire: TranWirePayload = {
+        name: 'ZTRAN_AUTH',
+        formatVersion: '1',
+        header: { description: 'Authorized tcode', originalLanguage: 'EN' },
+        generalInformation: {
+          transactionType: 'dialogTransaction',
+          dialogTransaction: { programName: 'SAPMSETB', programDynnr: '0230', stvMaintenanceMode: 'notAllowed' },
+        },
+        authorizations: {
+          startAuthorizationObject: {
+            authObjectName: 'S_TCODE',
+            authObjectFieldValues: [{ authFieldName: 'TCD', authFieldValue: '' }],
+          },
+          authorizationDefaults: { maintenanceMode: 'manual', defaultValuesRequired: 'yes', inheritanceMode: 'inactive' },
+        },
+        package: '$TMP',
+      };
+      const local = wireToLocal(wire);
+      expect(local.package).toBe('$TMP');
+      expect(local.authorizations?.startAuthorizationObject?.authObjectName).toBe('S_TCODE');
+      expect(local.generalInformation.dialogTransaction?.programName).toBe('SAPMSETB');
+    });
   });
 
   describe('validateTranObject', () => {

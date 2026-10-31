@@ -29,6 +29,9 @@ export async function runPullTran(objectName: string, opts: PullOptions): Promis
   }
 
   const local = tranArtifact.fromWire(resp.data);
+  // The object name lives in the file name, so the pulled document has to
+  // carry it for `abap push` (the wire GET has no name of its own).
+  local.name = objectName.toUpperCase();
   const filename = buildFilename(objectName, 'TRAN', 'main', '.json');
   const relPath = path.join(opts.dir, filename);
   const targetPath = path.resolve(process.cwd(), relPath);
