@@ -4,7 +4,7 @@ title: abap deploy
 description: 部署内置 ICF ABAP 服务 — `abap deploy` 默认推送发布形态（helper 合并为 handler 内 `lcl_*` 本地类，SAP 上只装 3 个全局类）；`--dev` 安装开发形态的全部全局类；`abap deploy status` 只读探测版本匹配
 tags: [abap-cli, command, deploy, icf, steampunk, btp, merge]
 created at: 2026-09-05 00:00:00
-changed at: 2026-10-30 21:45:00
+changed at: 2026-10-31 17:00:00
 ---
 
 # abap deploy
@@ -35,6 +35,8 @@ abap deploy status [options]          # 只读探测：是否已安装？版本�
 发布形态的合并器是纯函数模块 `src/abap_cli/flows/edit/deploy-merge.ts`：读 `abap/deploy.json`（`handler` / `merged[{global,local}]` / `standalone`）、把 helper 类头降级为 `lcl_*`、按 definition 引用做稳定拓扑排序、拼接出两个 include，并校验生成结果没有残留的全局类名。生成的两个 include 不进仓库——`abap/src` 只放开发形态源码（handler 仅有 main；merged helper 仅有 main + 可选 definitions prelude）。
 
 **共存与切换**：两种形态可在同一 SAP 系统共存（发布形态用 `lcl_*` 本地类，开发形态用 `zcl_*` 全局类；handler 同名，后部署者覆盖它的三个 part）。dev → release 直接 `abap deploy`，dev 全局类留在系统里但不再被引用（无害，不必删除）；release → dev 直接 `abap deploy --dev`，上一次生成的两个 include 里是 `lcl_*` 死代码，能自洽编译、不阻塞激活。**不要**把已部署的 handler `abap pull` 回来再 push：pull 会落 `definitions` / `implementations` include 文件，deploy 会把它们当成违规源码拒绝（`DEPLOY_MANIFEST_INVALID`）。形态切换不改变 ICF 节点、端点或服务版本。
+
+**部署后的会话缓存**：SICF 节点重载只刷新新会话的 handler class load；复用的 CLI 会话可能继续执行部署前的 handler 代码，表现为「部署成功但端点行为没变」。真机验证部署结果时用 `ABAP_CLI_SESSION_POLICY=always-logout` 让每条命令新登录，或等旧会话过期。
 
 ### Options
 
