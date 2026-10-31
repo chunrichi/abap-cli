@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deduplicateTablArtifactTargets } from '../../src/abap_cli/flows/edit/push-dedup.js';
+import { deduplicateTablArtifactTargets, deduplicateXsltArtifactTargets } from '../../src/abap_cli/flows/edit/push-dedup.js';
 
 describe('push TABL/STRU artifact dedup', () => {
   it('collapses the full artifact trio to a single file (first seen wins)', () => {
@@ -81,5 +81,41 @@ describe('push TABL/STRU artifact dedup', () => {
     const out = deduplicateTablArtifactTargets(input);
 
     expect(out).toEqual(['src/Types/zstr.stru.ddic']);
+  });
+});
+
+describe('push XSLT pair dedup', () => {
+  it('collapses a pushed .xslt.json + .xslt.xml pair to the JSON metadata file', () => {
+    const input = ['src/zmy_xslt.xslt.xml', 'src/zmy_xslt.xslt.json'];
+    expect(deduplicateXsltArtifactTargets(input)).toEqual(['src/zmy_xslt.xslt.json']);
+    // Input order is preserved for the surviving entry.
+    expect(deduplicateXsltArtifactTargets([...input].reverse())).toEqual([
+      'src/zmy_xslt.xslt.json',
+    ]);
+  });
+
+  it('keeps a lone .xslt.xml (source-side push is supported)', () => {
+    expect(deduplicateXsltArtifactTargets(['src/zmy_xslt.xslt.xml'])).toEqual([
+      'src/zmy_xslt.xslt.xml',
+    ]);
+  });
+
+  it('dedups multiple independent pairs and passes non-XSLT files through', () => {
+    const input = [
+      'src/zmy_a.xslt.json',
+      'src/zmy_a.xslt.xml',
+      'src/zcl_x.clas.abap',
+      'src/zmy_b.xslt.xml',
+    ];
+    expect(deduplicateXsltArtifactTargets(input)).toEqual([
+      'src/zmy_a.xslt.json',
+      'src/zcl_x.clas.abap',
+      'src/zmy_b.xslt.xml',
+    ]);
+  });
+
+  it('is case-insensitive for the extension only', () => {
+    const input = ['src/Zmy_Xslt.XSLT.XML', 'src/Zmy_Xslt.XSLT.JSON'];
+    expect(deduplicateXsltArtifactTargets(input)).toEqual(['src/Zmy_Xslt.XSLT.JSON']);
   });
 });

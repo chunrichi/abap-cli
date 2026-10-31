@@ -4,7 +4,7 @@ title: abap pull
 description: 从 SAP 下载对象到本地文件 — 支持源码对象、包批量、DDIC JSON（含 DOMA/DTEL 长文本伴生）、textpool 与远程版本拉取
 tags: [abap-cli, command, pull, download, abap-file-format, ddic, docu, textpool, version-management]
 created at: 2026-08-06 23:21:15
-changed at: 2026-10-31 17:05:00
+changed at: 2026-10-31 18:06:00
 ---
 
 # abap pull
@@ -23,7 +23,7 @@ abap pull
 ## Options
 
 - `[object-name]`: 要下载的对象名（如 `ZCL_MY_CLASS`）
-- `--type <type>`: 对象类型（CLAS、PROG、INTF、FUGR、DOMA、DTEL、TABL、STRU、VIEW 等）
+- `--type <type>`: 对象类型（CLAS、PROG、INTF、FUGR、DOMA、DTEL、TABL、STRU、VIEW、TRAN、XSLT 等）
 - `--package <package>`: 下载某包下的所有对象（分页，默认 limit 20）
 - `--limit <n>`: `--package` 的批量页大小（默认 `SEARCH_RESULT_LIMIT`）
 - `--page <n>`: `--package` 的批量页码（1 起，默认 1）
@@ -78,6 +78,24 @@ envelope 附加字段：
 | `AFF_FIXTURE_INVALID` | 7 | 落盘前 / push 前 schema 校验失败 |
 
 源码对象（CLAS/PROG/INTF）布局：`<name>.<type>.json` 元数据 + 每个 include part 一个 `.abap`；`--include-all-parts` 控制是否包含 testclasses。FUGR 为多文件布局（`.fugr.json`、`sapl<name>.reps.*`、`l<name>top.reps.*`、每个 FM 一个 `.func.*`）。这些文件全部平铺在输出目录下，没有类型或对象子目录。
+
+### XSLT（两件套）
+
+`--type XSLT` 走 ICF `GET /sap/abap_cli/xslt/<name>`，写 **两个文件**：
+
+```
+src/<name>.xslt.json   # AFF 元数据：formatVersion + header{description, originalLanguage}
+src/<name>.xslt.xml    # 源码，LF 行尾 + 单个结尾换行
+```
+
+- SAP 读回源码是 CRLF 拼接且**末尾多一个 CRLF**（`get_source_string()` 的行为）；CLI 统一 `normalizeXsltSource()` 规范化，因此 pull 两次不会产生 diff。
+- 两件套任一已存在又没给 `--overwrite` → `OVERWRITE_REQUIRED`（exit 2）；`--skip-existing` 在**两件都齐全**时跳过。
+- 转换不存在 → `OBJECT_NOT_FOUND`（exit 8）。`--type XSLT` 也接受 `--dir` 输出目录。
+
+```bash
+abap pull ZMY_XSLT --type XSLT            # 首次
+abap pull ZMY_XSLT --type XSLT --overwrite  # 覆盖本地修改前请确认
+```
 
 ### Function modules（FUGR/FF）— PR4 归一化
 
@@ -267,7 +285,7 @@ DOMA/DTEL 提示：有长文本时 `data.entries[]` 额外出现 `{file:'src/<na
 
 # references
 
-- 实现：`src/abap_cli/commands/pull.ts`、`src/abap_cli/flows/edit/pull.ts`、`src/abap_cli/flows/edit/routing.ts`（`TYPE_ROUTES` 单一路由表）、`src/abap_cli/formats/pull-strategy.ts`、`pull-fugr.ts`、`fugr-layout.ts`、`src/abap_cli/clients/icf-client.ts`
-- SAP 后端：`abap/src/zcl_abap_vibe_icf_ddic.clas.abap`（`dispatch_ddic`）· `abap/src/zcl_abap_vibe_icf_textpool.clas.abap`（`dispatch_textpool`）· `abap/src/zcl_abap_vibe_icf_version.clas.abap`（`dispatch_version_management`）
+- 实现：`src/abap_cli/commands/pull.ts`、`src/abap_cli/flows/edit/pull.ts`、`src/abap_cli/flows/edit/routing.ts`（`TYPE_ROUTES` 单一路由表）、`src/abap_cli/formats/pull-strategy.ts`、`pull-fugr.ts`、`pull-xslt.ts`、`fugr-layout.ts`、`src/abap_cli/clients/icf-client.ts`
+- SAP 后端：`abap/src/zcl_abap_vibe_icf_ddic.clas.abap`（`dispatch_ddic`）· `abap/src/zcl_abap_vibe_icf_textpool.clas.abap`（`dispatch_textpool`）· `abap/src/zcl_abap_vibe_icf_version.clas.abap`（`dispatch_version_management`）· `abap/src/zcl_abap_vibe_icf_xslt.clas.abap`（`dispatch_xslt`）
 - 文档：`docs/commands.md`（`abap pull` 一节）；规范参考：[abap-file-formats specification](https://github.com/SAP/abap-file-formats/blob/main/docs/specification.md)
 - 设计决策：[010 — AFF 原生扁平布局](../design-decisions/010-aff-flat-layout.md)

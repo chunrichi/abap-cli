@@ -4,7 +4,7 @@ title: abap create
 description: 在 SAP 创建新对象并激活 — 源对象（CLAS/INTF/PROG/FUGR，ADT REST）、DDIC（DOMA/DTEL/TABL/STRU/ENQU/VIEW/NROB，--file 走 ICF）、HTTP/SICF 节点、事务码、TTYP/MSAG/DDLS 及 CDS/RAP 配套对象；FUGR 配 --func 可在既有函数组内新建函数模块（FUGR/FF）；--no-activate / --template / --no-pull / --check-only / --audit；--schema 提供 agent 参数自省；create local 为离线草稿（仅 4 类源对象）
 tags: [abap-cli, command, create, clas, intf, prog, fugr, fugr-ff, doma, dtel, tabl, stru, ddic, icf, template, schema]
 created at: 2026-08-07 00:00:00
-changed at: 2026-10-31 16:20:00
+changed at: 2026-10-31 18:06:00
 ---
 
 # abap create
@@ -24,7 +24,7 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 
 ## Options
 
-- `<type>`: 支持 23 个类型码（完整矩阵见 [object-types](../object-types.md)）：4 个源对象 `CLAS` / `INTF` / `PROG` / `FUGR` 走 ADT 骨架；`DEVC` 走独立 ADT handler（`--package` 是**父包**，无需 `--file`，见 [DEVC（Package）](#devcpackage)）；`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `VIEW` / `NROB` / `HTTP` / `TRAN` / `TTYP` / `MSAG` / `DDLS` / `SRVD` / `DCLS` / `DDLX` / `DDLA` 必须配 `--file`（AFF JSON，VIEW 为本地扩展 `view-v1.json`）；`BDEF` 是 pull-only、`SRVB` 仅 pull。未知类型 → `TYPE_NOT_SUPPORTED`（exit 7）。
+- `<type>`: 支持 24 个类型码（完整矩阵见 [object-types](../object-types.md)）：4 个源对象 `CLAS` / `INTF` / `PROG` / `FUGR` 走 ADT 骨架；`DEVC` 走独立 ADT handler（`--package` 是**父包**，无需 `--file`，见 [DEVC（Package）](#devcpackage)）；`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `VIEW` / `NROB` / `HTTP` / `TRAN` / `XSLT` / `TTYP` / `MSAG` / `DDLS` / `SRVD` / `DCLS` / `DDLX` / `DDLA` 必须配 `--file`（AFF JSON，VIEW 为本地扩展 `view-v1.json`）；`BDEF` 是 pull-only、`SRVB` 仅 pull。未知类型 → `TYPE_NOT_SUPPORTED`（exit 7）。
 - `<name>`: 对象名（自动转大写；命名空间名如 `/UI2/CL_JSON` 在磁盘上用 AFF 括号 token `(ui2)cl_json`）。本地预校验：≤30 字符、仅 `A-Z 0-9 _`、命名空间形如 `/NS/NAME`（NS ≤10，总长 ≤30），违规 → `VALIDATION_ERROR`（exit 7）
 - `--package <package>`: 目标 SAP 包（必填）
 - `--description <desc>`: 对象描述（必填；有 `--file` 时可选，由 JSON 提供）
@@ -34,7 +34,7 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 - `--no-pull`: 跳过 create-then-pull 本地副本（默认拉取）
 - `--check-only`: 只校验对象可行性（`validateNewObject`），不创建
 - `--audit`: 额外一次 SAP 往返记录 before-checksum（默认关）
-- `--file <path>`: abap-file-format JSON 输入（`types/registry.ts` 的 `requiresFile` 类型必填：TABL/STRU/DOMA/DTEL/ENQU/VIEW/NROB/HTTP/TRAN/TTYP/MSAG/DDLS/SRVD/DCLS/DDLX/DDLA）。TABL/STRU 是三件套：`--file` 指向 main `.tabl.json`，CLI 自动读同目录 `.tabl.ddic`（DDL 源）与 `.tabl.settings.json`；只有 main JSON 时回落 legacy wire-flat 单文件（顶层 `name` / `fields[]`）。DDL 解析失败 → `TABL_DDL_INVALID`（exit 7）
+- `--file <path>`: abap-file-format JSON 输入（`types/registry.ts` 的 `requiresFile` 类型必填：TABL/STRU/DOMA/DTEL/ENQU/VIEW/NROB/HTTP/TRAN/XSLT/TTYP/MSAG/DDLS/SRVD/DCLS/DDLX/DDLA）。XSLT 是两件套：`--file` 指向 `.xslt.json`，同目录 `.xslt.xml` 源码必须同时存在。TABL/STRU 是三件套：`--file` 指向 main `.tabl.json`，CLI 自动读同目录 `.tabl.ddic`（DDL 源）与 `.tabl.settings.json`；只有 main JSON 时回落 legacy wire-flat 单文件（顶层 `name` / `fields[]`）。DDL 解析失败 → `TABL_DDL_INVALID`（exit 7）
 - `--func <module>`: 仅 `FUGR` 类型可用 — 在**既有函数组 `<name>`** 内新建函数模块（`FUGR/FF` 子对象）。组不存在 → `OBJECT_NOT_FOUND`（exit 8，附建组指引）；组内同名模块已存在 → `OBJECT_EXISTS`（exit 2）；模块名同样过本地预校验（≤30、`A-Z 0-9 _`）。`--check-only` 不支持该形态
 - `--software-component <swcomp>`: 仅 `DEVC` — 新包的软件组件；缺省从父包继承（`$TMP` → `LOCAL`）。LOCAL 包名必须 `$`/`TEST` 开头
 - `--transport-layer <layer>`: 仅 `DEVC` — 新包的传输层；缺省从父包继承（`$TMP` → 空）
@@ -44,14 +44,14 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 
 ### `create local` 专属
 
-- `<type>` / `<name>`: 同主命令；但 **`create local` 只支持 `CLAS` / `INTF` / `PROG` / `FUGR`**（只有这四类有本地骨架模板）。DDIC / HTTP / TRAN / TTYP / MSAG / DDLS / CDS/RAP 类型没有本地骨架：`SRVD` / `DCLS` / `DDLX` / `DDLA` 会被显式拒绝（`TYPE_NOT_SUPPORTED`），请改用 `abap create <type> <name> --file <aff.json>` 或先 `abap pull` 一个同类对象再改。
+- `<type>` / `<name>`: 同主命令；但 **`create local` 只支持 `CLAS` / `INTF` / `PROG` / `FUGR`**（只有这四类有本地骨架模板）。DDIC / HTTP / TRAN / XSLT / TTYP / MSAG / DDLS / CDS/RAP 类型没有本地骨架：`SRVD` / `DCLS` / `DDLX` / `DDLA` 会被显式拒绝（`TYPE_NOT_SUPPORTED`），请改用 `abap create <type> <name> --file <aff.json>` 或先 `abap pull` 一个同类对象再改。
 - `--template <template>`: skeleton 模板
 - `--dir <path>`: 输出目录（默认 `src/`；仅 `create local` 读这个 flag）
 
 ## 行为规则
 
-- **三条路由**：源对象 → ADT REST `createObject`；DDIC（`--file`）→ ICF `POST /sap/abap_cli/ddic/<type>`；`local` → 仅写本地文件（零 SAP 调用、不读凭据）
-- **本地名称预校验**（快失败，零 SAP 往返，先于任何路由/`assertNotExists`）：所有带 `<name>` 的入口（源对象 / DDIC `--file` / HTTP / TRAN / `--check-only` / `create local`）先校验规范化（大写）后的名字——≤30 字符，仅 `A-Z 0-9 _`；命名空间形如 `/NS/NAME`（NS ≤10 且仅 `A-Z 0-9 _`，含斜杠总长 ≤30）；空名同样拒绝。**不强制 Z/Y 前缀**（`$TMP` 接受 `A123`）。违规 → `VALIDATION_ERROR`（exit 7），避免超长/非法名拨号 SAP 后报误导性的 `OBJECT_NOT_FOUND`；与 DDIC 客户端命名校验（exit 7）保持一致
+- **三条路由**：源对象 → ADT REST `createObject`；DDIC / HTTP / TRAN / TTYP / MSAG / DDLS / CDS-RAP（`--file`）→ 各自 ICF/ADT handler（XSLT 走 ICF `POST /sap/abap_cli/xslt/<name>`）；`local` → 仅写本地文件（零 SAP 调用、不读凭据）
+- **本地名称预校验**（快失败，零 SAP 往返，先于任何路由/`assertNotExists`）：所有带 `<name>` 的入口（源对象 / DDIC `--file` / HTTP / TRAN / XSLT / `--check-only` / `create local`）先校验规范化（大写）后的名字——≤30 字符，仅 `A-Z 0-9 _`；命名空间形如 `/NS/NAME`（NS ≤10 且仅 `A-Z 0-9 _`，含斜杠总长 ≤30）；空名同样拒绝。**不强制 Z/Y 前缀**（`$TMP` 接受 `A123`）。违规 → `VALIDATION_ERROR`（exit 7），避免超长/非法名拨号 SAP 后报误导性的 `OBJECT_NOT_FOUND`；与 DDIC 客户端命名校验（exit 7）保持一致
 - **防覆盖**：创建前 `assertNotExists`；已存在 → `OBJECT_EXISTS`（不覆盖）
 - **创建即激活**：复用 push 流程（lock → 写 skeleton → activate → unlock）；`--no-activate` 跳过激活
 - **FUGR 与源对象的差异**：新 FUGR 用 `objectStructure` 取 parts（立即可读）；CLAS/INTF/PROG 对新建对象 objectStructure 有就绪延迟（真机 "wrong input data"），回退到稳定 `<objectUrl>/source/main`
@@ -85,6 +85,26 @@ envelope 附加 `data.channel`（`"adt"` / `"icf"`）。
 | `CHANNEL_DETECTION_FAILED` | 65 | system profile 缺 `kernelRelease` 且缺 `ddlsSupported` |
 | `VALIDATION_ERROR` | 7 | AFF schema 不合规，或 DDLS 缺 `.ddls.acds` 侧车 |
 | `FILE_PARSE_ERROR` | 2 | `--file` 指向的文件读不出 / 不是合法 JSON |
+| `XSLT_*`（`XSLT_SOURCE_REQUIRED` / `XSLT_TRANSPORT_REQUIRED` / `XSLT_ACTIVATION_FAILED` 等） | 7 | XSLT 两件套 / 激活失败；SAP 侧错误码原样透传 |
+| `XSLT_CREATE_FAILED` / `XSLT_LOAD_FAILED` / `XSLT_WRITE_CANCELLED` | 6 | XSLT 的 O2 API 调用失败 |
+
+### XSLT（转换程序）
+
+`XSLT` 走 **ICF `POST /sap/abap_cli/xslt/<name>`**，SAP 侧用 `CL_O2_API_XSLTDESC` 创建 + 激活。
+
+- **两件套必填**：`--file` 指向 `<name>.xslt.json`（AFF `xslt-v1.json` 元数据），同目录必须有 `<name>.xslt.xml`（源码）。缺 XML → `VALIDATION_ERROR`（exit 7，提示补伴生文件）；XML 为空同样拒绝。
+- **`--package` 缺省 `$TMP`**；非 `$TMP` 包必须 `--tr`（否则本地 `VALIDATION_ERROR`，SAP 侧还有 `XSLT_TRANSPORT_REQUIRED` 双保险）。
+- **`--description` 覆盖 `header.description`**；`header.originalLanguage` 是 ISO 2 位，ABAP 侧用 T002 换算成 SAP 1 位语言码。
+- **`--check-only` 是本地校验**（读两件套 + schema，不调 SAP），与 DDIC 的 SAP 预检不同。
+- **文件名必须等于对象名**：`--file` 的 basename 必须是 AFF token 形式 `<token>.xslt.json`（命名空间 `(zns)my_xslt.xslt.json`），否则 `INVALID_ARGUMENT`（exit 2）。
+- **单行源码 ≤255 字符**：SAP O2 行表 `O2PAGELINE-LINE` 是 CHAR 255，超长行返回 `XSLT_SOURCE_LINE_TOO_LONG`（exit 7），不会静默截断；请在 XML 里拆行。
+- **对象语言**：`create_new` 内部固定 `attribs-langu = sy-langu`，payload 的 `originalLanguage` 不改变 SAP 对象语言。
+- 已存在同名转换时创建走 **upsert**（删除后重建，返回 `action: 'updated'`；`create` 不拒绝覆盖，若要严格新建请先 `abap delete`）。
+- 激活失败 → `XSLT_ACTIVATION_FAILED`（exit 7，`details` 带 `O2XSLTERR` 行号/文本），对象保留 inactive 版本，修正源码后重新 `push`。
+
+```bash
+abap create XSLT ZMY_XSLT --file src/zmy_xslt.xslt.json --package '$TMP' --yes
+```
 
 ### VIEW（DDIC 数据库视图）
 
@@ -297,12 +317,12 @@ abap create local CLAS ZCL_DRAFT --template public-method --dir src/
 
 ## todo
 
-- [x] `TTYP` / `MSAG` / `DDLS` / `ENQU` / `NROB` 等 `--file` 类型已接入（`create` 的 `--schema.allowedValues` 全 21 类）
+- [x] `TTYP` / `MSAG` / `DDLS` / `ENQU` / `NROB` / `XSLT` 等 `--file` 类型已接入（`create` 的 `--schema.allowedValues` 全 23 类）
 - [x] `TRAN` 写路径已实现（`/tran` POST/PUT，dialog/report/parameter/variant；OO 事务明确拒绝）
 - [ ] `create local` 为实验性命令，待与 `create` 主流程的落库闭环稳定后转正
 
 # references
 
-- 实现：`src/abap_cli/commands/create.ts`、`src/abap_cli/flows/edit/create.ts` + `src/abap_cli/flows/edit/routing.ts`（`TYPE_ROUTES` 单一路由表）+ `create-{ddic,http,tran,ttyp,msag,ddls,srvd,enqu,nrob}.ts`（per-type handler）、`src/abap_cli/formats/templates.ts`、`src/abap_cli/formats/ddic/{types,io,wire,validate,examples}.ts`、`src/abap_cli/types/registry.ts`、`src/abap_cli/core/confirmation.ts`
+- 实现：`src/abap_cli/commands/create.ts`、`src/abap_cli/flows/edit/create.ts` + `src/abap_cli/flows/edit/routing.ts`（`TYPE_ROUTES` 单一路由表）+ `create-{ddic,http,tran,xslt,ttyp,msag,ddls,srvd,enqu,nrob}.ts`（per-type handler）、`src/abap_cli/formats/xslt/{json,companion}.ts`、`src/abap_cli/formats/templates.ts`、`src/abap_cli/formats/ddic/{types,io,wire,validate,examples}.ts`、`src/abap_cli/types/registry.ts`、`src/abap_cli/core/confirmation.ts`
 - 文档：`docs/commands.md`（`## abap create` 章节）
 - 设计：见 wiki 顶层 `create-command` / `create-local` / `ddic-crud-textpool` 历史回顾

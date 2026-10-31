@@ -61,6 +61,8 @@ export const SCHEMA = {
     { code: 'MISSING_TRANSPORT', category: 'USAGE', exitCode: 2 },
     { code: 'LOCK_FAILED', category: 'LOCKED', exitCode: 9 },
     { code: 'DELETE_FAILED', category: 'SAP_ERROR', exitCode: 6 },
+    { code: 'XSLT_DELETE_FAILED', category: 'SAP_ERROR', exitCode: 6 },
+    { code: 'XSLT_TRANSPORT_REQUIRED', category: 'VALIDATION_ERROR', exitCode: 7 },
   ],
 };
 

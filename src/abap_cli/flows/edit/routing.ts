@@ -45,6 +45,9 @@ import { createNrobHandler } from './create-nrob.js';
 import { createDevcHandler } from './create-devc.js';
 import { createViewHandler } from './create-view.js';
 import { pullDevcHandler } from './pull-devc.js';
+import { createXsltHandler } from './create-xslt.js';
+import { runPullXslt } from './pull-xslt.js';
+import { pushXsltFile, validateXsltFile } from './push-xslt.js';
 import { pullTtypHandler } from './pull-ttyp.js';
 import { pullMsagHandler } from './pull-msag.js';
 import { pullDdlsHandler } from './pull-ddls.js';
@@ -269,6 +272,18 @@ export const TYPE_ROUTES: Readonly<Record<string, TypeRoute>> = {
       channel: 'icf',
       run: ({ client, resolved, file, opts }) => pushTranFile(client, resolved, file, opts),
       validate: (file) => validateTranFile(file),
+    },
+  },
+  // Transformation (XSLT program) — ICF `/xslt/<name>`; AFF pair
+  // (<name>.xslt.json + <name>.xslt.xml) on the local side.
+  XSLT: {
+    create: handler('icf', createXsltHandler),
+    pull: handler('icf', ({ objectName, opts }) => runPullXslt(objectName, opts)),
+    push: {
+      kind: 'icf-json',
+      channel: 'icf',
+      run: ({ client, resolved, file, opts }) => pushXsltFile(client, resolved, file, opts),
+      validate: (file) => validateXsltFile(file),
     },
   },
 

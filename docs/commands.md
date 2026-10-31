@@ -30,7 +30,7 @@ Every command supports `--json` (compact envelope, default for agents) and `--pr
 | `abap check` | sap | Validate ABAP source code (syntax / content / atc) |
 | `abap test` | sap | Run ABAP Unit tests for an object (read-only) |
 | `abap search` | sap | Search for ABAP objects in SAP system |
-| `abap create` | sap | Create a new ABAP object (CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, VIEW, HTTP) |
+| `abap create` | sap | Create a new ABAP object (CLAS, INTF, PROG, FUGR, DEVC, DDIC, HTTP, TRAN, VIEW, XSLT, CDS) |
 | `abap status` | sap | Show local vs SAP sync status |
 | `abap transport` | sap | Manage transport requests |
 | `abap deploy` | sap | Deploy bundled ICF ABAP service to SAP |
@@ -438,7 +438,7 @@ abap push [options] [files...]
 | --- | --- | --- | --- | --- |
 | `--all` | no |  |  | Push all .abap files under the scan root (sourceDir or current dir; honours .abapignore). |
 | `--tr` `<transport>` | no |  |  | Transport number override for unbound objects. |
-| `--check-only` | no |  |  | Syntax check only; do not activate. Not supported for ICF-routed or channel-routed JSON files (DDIC / HTTP / TRAN / TTYP / MSAG / DDLS) — those are validated during push. |
+| `--check-only` | no |  |  | Syntax check only; do not activate. Not supported for ICF-routed or channel-routed JSON files (DDIC / HTTP / TRAN / XSLT / TTYP / MSAG / DDLS) — those are validated during push. |
 | `--no-activate` | no |  |  | Lock + write + skip check + skip activate + unlock. |
 | `--dry-run` | no |  |  | Plan only — no mutating ADT calls. |
 | `--fail-fast` | no |  |  | Stop at the first failing file (default: --keep-going). |
@@ -604,7 +604,7 @@ abap create <type> <name> [options]
 
 | Argument | Required | Values | Description |
 | --- | --- | --- | --- |
-| `type` | yes | CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, ENQU, VIEW, NROB, HTTP, TRAN, TTYP, MSAG, DDLS, SRVB, SRVD, BDEF, DCLS, DDLX, DDLA | Object type |
+| `type` | yes | CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, ENQU, VIEW, NROB, HTTP, TRAN, XSLT, TTYP, MSAG, DDLS, SRVB, SRVD, BDEF, DCLS, DDLX, DDLA | Object type |
 | `name` | yes |  | Object name |
 
 ### Options
@@ -620,7 +620,7 @@ abap create <type> <name> [options]
 | `--check-only` | no |  |  | Validate the proposed object without creating it |
 | `--audit` | no |  |  | Include the before-checksum (extra SAP round-trip, off by default) |
 | `--overwrite` | no |  |  | When pulling the new object back, replace an existing local file (default: keep the local draft) |
-| `--file` `<path>` | no |  |  | abap-file-format JSON input (required for TABL/STRU/DOMA/DTEL/ENQU/VIEW/NROB/HTTP/TRAN/TTYP/MSAG/DDLS/SRVD/DCLS/DDLX/DDLA) |
+| `--file` `<path>` | no |  |  | abap-file-format JSON input (required for TABL/STRU/DOMA/DTEL/ENQU/VIEW/NROB/HTTP/TRAN/XSLT/TTYP/MSAG/DDLS/SRVD/DCLS/DDLX/DDLA) |
 | `--func` `<name>` | no |  |  | With FUGR: create a function module (FUGR/FF) inside the existing function group <name> |
 | `--software-component` `<swcomp>` | no |  |  | With DEVC: software component of the new package (default: inherited from the super package) |
 | `--transport-layer` `<layer>` | no |  |  | With DEVC: transport layer of the new package (default: inherited from the super package) |
@@ -1233,3 +1233,8 @@ Aggregated from the per-command schemas. The authoritative TypeScript source is 
 | `USAGE` | USAGE | 2 |
 | `VALIDATION_ERROR` | VALIDATION_ERROR | 7 |
 | `WRAPPER_NOT_DEPLOYED` | NOT_FOUND | 8 |
+| `XSLT_ACTIVATION_FAILED` | VALIDATION_ERROR | 7 |
+| `XSLT_DELETE_FAILED` | SAP_ERROR | 6 |
+| `XSLT_OBJECT_NOT_FOUND` | NOT_FOUND | 8 |
+| `XSLT_PUSH_FAILED` | SAP_ERROR | 6 |
+| `XSLT_TRANSPORT_REQUIRED` | VALIDATION_ERROR | 7 |

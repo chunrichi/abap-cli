@@ -93,6 +93,9 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
   { type: 'HTTP', source: 'ICF', affSchemaFile: 'http-v1.json', requiresFile: true },
   // Transaction code (SE93) via ICF
   { type: 'TRAN', source: 'ICF', affSchemaFile: 'tran-v1.json', requiresFile: true },
+  // Transformation (XSLT program) via ICF `/xslt/<name>`. The AFF layout is a
+  // pair: `<name>.xslt.json` (metadata) + `<name>.xslt.xml` (source).
+  { type: 'XSLT', source: 'ICF', affSchemaFile: 'xslt-v1.json', requiresFile: true },
   // dual-channel DDIC + CDS.
   // TTYP — handcrafted schema (upstream type-v1.json is type-pool, not table-type).
   {

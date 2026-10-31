@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import { isTablArtifactFile, tablArtifactPaths } from '../../formats/ddic/tabl-artifact.js';
 
 /**
@@ -23,3 +24,33 @@ export function deduplicateTablArtifactTargets(files: string[]): string[] {
     return true;
   });
 }
+
+/**
+ * XSLT is an AFF pair (`<name>.xslt.json` + `<name>.xslt.xml`). Both files
+ * describe the same transformation, so an explicit `abap push` of both would
+ * write it twice. Collapse each group to the `.xslt.json` metadata document
+ * (the canonical entry point); a lone `.xslt.xml` is kept as-is because
+ * pushing the source side alone is supported.
+ */
+export function deduplicateXsltArtifactTargets(files: string[]): string[] {
+  const groups = new Map<string, { json?: string; xml?: string; firstIndex: number }>();
+  const passthrough: Array<{ file: string; index: number }> = [];
+  files.forEach((file, index) => {
+    const lower = file.toLowerCase();
+    const isJson = lower.endsWith('.xslt.json');
+    const isXml = lower.endsWith('.xslt.xml');
+    if (!isJson && !isXml) {
+      passthrough.push({ file, index });
+      return;
+    }
+    const base = isJson ? file.slice(0, -'.xslt.json'.length) : file.slice(0, -'.xslt.xml'.length);
+    const key = path.resolve(base).toLowerCase();
+    const group = groups.get(key) ?? { firstIndex: index };
+    if (isJson) group.json = file;
+    else group.xml = file;
+    groups.set(key, group);
+  });
+  const kept = [...groups.values()].map((g) => ({ file: g.json ?? g.xml!, index: g.firstIndex }));
+  return [...passthrough, ...kept].sort((a, b) => a.index - b.index).map((entry) => entry.file);
+}
+

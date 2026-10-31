@@ -156,6 +156,21 @@ export class IcfClient {
     return this.get(`/tran/${encodeURIComponent(tcode)}`);
   }
 
+  /** POST /xslt/<name> — create/update an XSLT transformation program. */
+  async postXslt<T>(name: string, body: unknown): Promise<IcfResponse<T>> {
+    return this.post(`/xslt/${encodeURIComponent(name)}`, body);
+  }
+
+  /** GET /xslt/<name> — pull an XSLT transformation program as wire JSON. */
+  async getXslt<T>(name: string): Promise<IcfResponse<T>> {
+    return this.get(`/xslt/${encodeURIComponent(name)}`);
+  }
+
+  /** DELETE /xslt/<name> — delete an XSLT transformation program. */
+  async deleteXslt<T>(name: string, body?: { transportRequest?: string }): Promise<IcfResponse<T>> {
+    return this.request('delete', `/xslt/${encodeURIComponent(name)}`, body);
+  }
+
   /** DELETE /tran/<tcode> — delete a transaction code (SE93). */
   async deleteTran<T>(tcode: string, body?: { transportRequest?: string }): Promise<IcfResponse<T>> {
     return this.request('delete', `/tran/${encodeURIComponent(tcode)}`, body);

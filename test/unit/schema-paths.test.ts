@@ -58,7 +58,7 @@ describe('schema-paths priority chain', () => {
     const types = affSupportedTypes();
     expect(types).toEqual(
       expect.arrayContaining([
-        'CLAS', 'INTF', 'PROG', 'FUGR', 'TABL', 'STRU', 'TABT', 'DOMA', 'DTEL', 'HTTP', 'TRAN',
+        'CLAS', 'INTF', 'PROG', 'FUGR', 'TABL', 'STRU', 'TABT', 'DOMA', 'DTEL', 'HTTP', 'TRAN', 'XSLT',
         // channel-routed types.
         'TTYP', 'MSAG', 'DDLS',
         // FUGR companion schemas for.reps.json and.func.json files.
@@ -67,7 +67,8 @@ describe('schema-paths priority chain', () => {
         'SRVB', 'SRVD', 'BDEF', 'DCLS', 'DDLX', 'DDLA',
         // — lock object + number range object.
         'ENQU', 'NROB',
-        // — database view local-extension schema.
+        // — database view local-extension schema (VIEW is a DDIC object type
+        //   whose AFF document is a local extension).
         'VIEW',
         // — package (DEVC) metadata document.
         'DEVC',
@@ -82,7 +83,8 @@ describe('schema-paths priority chain', () => {
     // added DEVC = 25 total.
     // added DOCU (companion schema) = 26 total.
     // added VIEW (local extension) = 27 total.
-    expect(types).toHaveLength(27);
+    // added XSLT = 28 total.
+    expect(types).toHaveLength(28);
   });
 
   it('bundled root contains every supported schema', () => {

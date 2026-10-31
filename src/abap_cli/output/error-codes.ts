@@ -163,6 +163,25 @@ export type ErrorCode =
   // bundled-service deploy: dev-class merge into the handler class
   | 'DEPLOY_MANIFEST_INVALID'   // abap/deploy.json missing or inconsistent with abap/src (VALIDATION_ERROR)
   | 'DEPLOY_MERGE_FAILED'       // source split / dependency cycle / rename leftover (VALIDATION_ERROR)
+  // XSLT (transformation program) ICF /xslt/<name> route
+  | 'XSLT_OBJECT_NOT_FOUND'     // GET/DELETE unknown transformation (NOT_FOUND)
+  | 'XSLT_CREATE_FAILED'        // create_new_from_string failed (SAP_ERROR)
+  | 'XSLT_PUSH_FAILED'          // ICF POST failure during push (SAP_ERROR)
+  | 'XSLT_DELETE_FAILED'        // delete/save cycle failed (SAP_ERROR)
+  | 'XSLT_LOAD_FAILED'          // load/attributes failure (SAP_ERROR)
+  | 'XSLT_WRITE_CANCELLED'      // save/lock cancelled (SAP_ERROR)
+  | 'XSLT_NOT_AUTHORIZED'       // create_new_from_string not_authorized (AUTH_ERROR)
+  | 'XSLT_ACTIVATION_FAILED'    // activate reported syntax/generation errors (VALIDATION_ERROR)
+  | 'XSLT_INVALID_PAYLOAD'      // malformed wire JSON body (VALIDATION_ERROR)
+  | 'XSLT_SERVICE_INVALID'      // missing/invalid transformation name in the URL (VALIDATION_ERROR)
+  | 'XSLT_NAME_INVALID'         // transformation name longer than 30 chars / contains blanks (VALIDATION_ERROR)
+  | 'XSLT_NAME_MISMATCH'        // payload name differs from the URL transformation (VALIDATION_ERROR)
+  | 'XSLT_DESCRIPTION_REQUIRED' // header.description missing (VALIDATION_ERROR)
+  | 'XSLT_DESCRIPTION_TOO_LONG' // header.description above the AFF limit (VALIDATION_ERROR)
+  | 'XSLT_SOURCE_REQUIRED'      // source (the .xslt.xml content) missing (VALIDATION_ERROR)
+  | 'XSLT_SOURCE_LINE_TOO_LONG' // source line above O2PAGELINE-LINE CHAR 255 (VALIDATION_ERROR)
+  | 'XSLT_TRANSPORT_REQUIRED'   // transportable package write/delete without a request (VALIDATION_ERROR)
+  | 'XSLT_OBJECT_EXISTS'        // create_new_from_string object_already_existing (SAP_ERROR)
   ;
 
 const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
@@ -297,6 +316,25 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   // bundled-service deploy merge
   DEPLOY_MANIFEST_INVALID: 'VALIDATION_ERROR',
   DEPLOY_MERGE_FAILED: 'VALIDATION_ERROR',
+  // XSLT
+  XSLT_OBJECT_NOT_FOUND: 'NOT_FOUND',
+  XSLT_CREATE_FAILED: 'SAP_ERROR',
+  XSLT_PUSH_FAILED: 'SAP_ERROR',
+  XSLT_DELETE_FAILED: 'SAP_ERROR',
+  XSLT_LOAD_FAILED: 'SAP_ERROR',
+  XSLT_WRITE_CANCELLED: 'SAP_ERROR',
+  XSLT_NOT_AUTHORIZED: 'AUTH_ERROR',
+  XSLT_ACTIVATION_FAILED: 'VALIDATION_ERROR',
+  XSLT_INVALID_PAYLOAD: 'VALIDATION_ERROR',
+  XSLT_SERVICE_INVALID: 'VALIDATION_ERROR',
+  XSLT_NAME_INVALID: 'VALIDATION_ERROR',
+  XSLT_NAME_MISMATCH: 'VALIDATION_ERROR',
+  XSLT_DESCRIPTION_REQUIRED: 'VALIDATION_ERROR',
+  XSLT_DESCRIPTION_TOO_LONG: 'VALIDATION_ERROR',
+  XSLT_SOURCE_REQUIRED: 'VALIDATION_ERROR',
+  XSLT_SOURCE_LINE_TOO_LONG: 'VALIDATION_ERROR',
+  XSLT_TRANSPORT_REQUIRED: 'VALIDATION_ERROR',
+  XSLT_OBJECT_EXISTS: 'SAP_ERROR',
 };
 
 export function categoryOf(code: ErrorCode): ErrorCategory {

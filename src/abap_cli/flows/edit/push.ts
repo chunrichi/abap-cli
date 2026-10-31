@@ -28,7 +28,7 @@ import { pushObject, type PushStage } from './push-object.js';
 import { pushFugrOne } from './push-fugr.js';
 import { pushTextpoolFile } from './push-textpool.js';
 import { orderTargetsByDependency } from './push-order.js';
-import { deduplicateTablArtifactTargets } from './push-dedup.js';
+import { deduplicateTablArtifactTargets, deduplicateXsltArtifactTargets } from './push-dedup.js';
 import { toRelativeOutputPath } from '../../core/path-output.js';
 import { pushRouteFor } from './routing.js';
 import { isDocuSupportedType } from '../../formats/docu/json.js';
@@ -109,6 +109,8 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
   // the same object three times. Runs before the dependency sort so the
   // canonical (priority 30) wins over the sidecar path.
   target.files = deduplicateTablArtifactTargets(target.files);
+  // Same for the XSLT pair (`.xslt.json` + `.xslt.xml`): one SAP object.
+  target.files = deduplicateXsltArtifactTargets(target.files);
 
   // dependency order so DDIC prerequisites push before the objects that
   // reference them (DOMA → DTEL → TABL → ... → HTTP). Stable for same priority.

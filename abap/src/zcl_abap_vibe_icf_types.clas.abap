@@ -673,6 +673,45 @@ TYPES:
     status TYPE string,
     data   TYPE ty_mime_resource_data,
   END OF ty_mime_resource_write.
+
+" ----- Transformation (XSLT) CRUD over abap-file-format xslt-v1 -----
+" Wire payloads are camelCase (via /ui2/cl_json pretty_mode-camel_case):
+"   GET  response: { status, data: { name, description, originalLanguage, source } }
+"   POST body:     { name, header: { description, originalLanguage }, source,
+"                    package, transportRequest }
+" The `.xslt.xml` companion file carries `source` verbatim.
+TYPES:
+  BEGIN OF ty_xslt_header,
+    description       TYPE string,
+    original_language TYPE string,
+  END OF ty_xslt_header,
+  BEGIN OF ty_xslt_data,
+    name              TYPE string,
+    description       TYPE string,
+    original_language TYPE string,
+    source            TYPE string,
+    " Wire-only: package that owns the transformation (TADIR / O2XSLTATTR-DEVCLASS).
+    package           TYPE string,
+  END OF ty_xslt_data,
+  BEGIN OF ty_xslt_get,
+    status TYPE string,
+    data   TYPE ty_xslt_data,
+  END OF ty_xslt_get,
+  BEGIN OF ty_xslt_write_request,
+    name              TYPE string,
+    header            TYPE ty_xslt_header,
+    source            TYPE string,
+    package           TYPE string,
+    transport_request TYPE string,
+  END OF ty_xslt_write_request,
+  BEGIN OF ty_xslt_write_data,
+    name   TYPE string,
+    action TYPE string,
+  END OF ty_xslt_write_data,
+  BEGIN OF ty_xslt_write,
+    status TYPE string,
+    data   TYPE ty_xslt_write_data,
+  END OF ty_xslt_write.
 ENDCLASS.
 
 CLASS zcl_abap_vibe_icf_types IMPLEMENTATION.

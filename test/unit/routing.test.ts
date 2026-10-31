@@ -40,6 +40,7 @@ const EXPECTED: Record<string, ExpectedRoute> = {
   NROB: { create: 'icf', pull: 'auto', push: 'icf' },
   HTTP: { create: 'icf', pull: 'icf', push: 'icf' },
   TRAN: { create: 'icf', pull: 'icf', push: 'icf' },
+  XSLT: { create: 'icf', pull: 'icf', push: 'icf' },
   TTYP: { create: 'auto', pull: 'auto', push: 'auto' },
   MSAG: { create: 'auto', pull: 'auto', push: 'auto' },
   DDLS: { create: 'auto', pull: 'auto', push: 'auto' },

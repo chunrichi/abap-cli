@@ -64,6 +64,10 @@
     {
       "global": "ZCL_ABAP_VIBE_NROB_FORMAT",
       "local": "lcl_nrob_format"
+    },
+    {
+      "global": "ZCL_ABAP_VIBE_ICF_XSLT",
+      "local": "lcl_xslt"
     }
   ],
   "standalone": [

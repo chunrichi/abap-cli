@@ -86,6 +86,13 @@ export async function checkCompanions(filePath: string): Promise<CompanionCheckR
     return { missing, optional, severity: missing.length === 0 ? 'ok' : 'structural' };
   }
 
+  if (type === 'XSLT') {
+    // The AFF layout is a pair: metadata JSON + source XML companion.
+    const xmlPath = path.join(dir, `${baseNoJson}.xml`);
+    const missing = (await fileExists(xmlPath)) ? [] : [path.basename(xmlPath)];
+    return { missing, optional: [], severity: missing.length === 0 ? 'ok' : 'structural' };
+  }
+
   if (type === 'FUGR') {
     // No static required companion set; the main JSON declares its members.
     return { missing: [], optional: [], severity: 'ok' };

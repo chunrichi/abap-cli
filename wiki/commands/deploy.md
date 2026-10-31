@@ -4,18 +4,18 @@ title: abap deploy
 description: 部署内置 ICF ABAP 服务 — `abap deploy` 默认推送发布形态（helper 合并为 handler 内 `lcl_*` 本地类，SAP 上只装 3 个全局类）；`--dev` 安装开发形态的全部全局类；`abap deploy status` 只读探测版本匹配
 tags: [abap-cli, command, deploy, icf, steampunk, btp, merge]
 created at: 2026-09-05 00:00:00
-changed at: 2026-10-31 17:00:00
+changed at: 2026-10-31 18:06:00
 ---
 
 # abap deploy
 
-部署内置 ICF ABAP 服务（自建 `/sap/abap_cli`），承载 DDIC CRUD / textpool **读** / `select` / `tcode` / `run` 等旁路 ADT 的能力。服务源码以**开发期全局类树**维护在 `abap/src`（19 个类，清单 `abap/deploy.json`），deploy 提供发布形态与开发形态两种产物。
+部署内置 ICF ABAP 服务（自建 `/sap/abap_cli`），承载 DDIC CRUD / textpool **读** / `select` / `tcode` / `run` 等旁路 ADT 的能力。服务源码以**开发期全局类树**维护在 `abap/src`（20 个类，清单 `abap/deploy.json`），deploy 提供发布形态与开发形态两种产物。
 
 ## Usage
 
 ```bash
 abap deploy [options]                 # 发布形态（默认）：SAP 上 3 个全局类
-abap deploy --dev [options]           # 开发形态：SAP 上 19 个全局类（维护者）
+abap deploy --dev [options]           # 开发形态：SAP 上 20 个全局类（维护者）
 abap deploy status [options]          # 只读探测：是否已安装？版本匹配？
 ```
 
@@ -27,8 +27,8 @@ abap deploy status [options]          # 只读探测：是否已安装？版本�
 
 | | 发布形态（`abap deploy`，默认） | 开发形态（`abap deploy --dev`） |
 |---|---|---|
-| SAP 对象 | 3 个全局类：`ZCL_ABAP_VIBE_ICF`（handler）+ `ZCL_ABAP_VIBE_ICF_SETUP` + `ZCL_ABAP_VIBE_RUNNER` | 19 个全局类：handler + 共享类型 + 10 个域 helper + 5 个 format + setup/runner |
-| handler 内容 | main + 由 16 个 helper 合并生成的 definitions / implementations：helper 类头降级为 `lcl_*`，`zcl_*` 引用改名为 `lcl_*` | 只有 main；definitions / implementations 不写 |
+| SAP 对象 | 3 个全局类：`ZCL_ABAP_VIBE_ICF`（handler）+ `ZCL_ABAP_VIBE_ICF_SETUP` + `ZCL_ABAP_VIBE_RUNNER` | 20 个全局类：handler + 共享类型 + 11 个域 helper + 5 个 format + setup/runner |
+| handler 内容 | main + 由 17 个 helper 合并生成的 definitions / implementations：helper 类头降级为 `lcl_*`，`zcl_*` 引用改名为 `lcl_*` | 只有 main；definitions / implementations 不写 |
 | 用途 | 分发给用户；`abap deploy` 的唯一发布产物 | 维护者在真机上单类迭代（语法检查 / 激活 / ABAP Unit / 端点） |
 | 顺序 | handler 先、standalone 后 | 依赖拓扑序：共享类型最先、format 先于 ddic、handler 在全部 helper 之后、setup/runner 最后 |
 
@@ -40,7 +40,7 @@ abap deploy status [options]          # 只读探测：是否已安装？版本�
 
 ### Options
 
-- `--dev`: 安装开发形态（19 个全局类，跳过发布合并）；发布形态是默认
+- `--dev`: 安装开发形态（20 个全局类，跳过发布合并）；发布形态是默认
 - `--tr <transport>`: transport 号（`--package` 非 `$TMP` 时必填）
 - `--package <package>`: 目标包（默认 `$TMP`——本地对象，无需 transport）
 - `--dry-run`: 仅计划，零 SAP 变更调用
@@ -81,7 +81,7 @@ abap deploy status [options]          # 只读探测：是否已安装？版本�
 # 发布形态（$TMP，无需 transport）
 abap deploy --yes
 
-# 开发形态（维护者：全部 19 个全局类，按依赖顺序）
+# 开发形态（维护者：全部 20 个全局类，按依赖顺序）
 abap deploy --dev --yes
 
 # 预览 + 差异
@@ -125,7 +125,7 @@ abap deploy status --json
 }
 ```
 
-`files[].file` 是相对 `abap/src` 的路径；发布形态里 handler 的两个 include 是 deploy 时生成的，不来自仓库文件。`--dev` 时 `mode: "dev"`、没有 `mergedClasses`，`objects` / `files` 列出全部 19 个类。
+`files[].file` 是相对 `abap/src` 的路径；发布形态里 handler 的两个 include 是 deploy 时生成的，不来自仓库文件。`--dev` 时 `mode: "dev"`、没有 `mergedClasses`，`objects` / `files` 列出全部 20 个类。
 
 `deploy status`：
 

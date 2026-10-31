@@ -10,7 +10,7 @@ export const SCHEMA: CommandSchema = {
   options: [
     { name: '--all', type: 'boolean', description: 'Push all .abap files under the scan root (sourceDir or current dir; honours .abapignore).' },
     { name: '--tr', type: 'string', valuePlaceholder: '<transport>', description: 'Transport number override for unbound objects.' },
-    { name: '--check-only', type: 'boolean', description: 'Syntax check only; do not activate. Not supported for ICF-routed or channel-routed JSON files (DDIC / HTTP / TRAN / TTYP / MSAG / DDLS) — those are validated during push.' },
+    { name: '--check-only', type: 'boolean', description: 'Syntax check only; do not activate. Not supported for ICF-routed or channel-routed JSON files (DDIC / HTTP / TRAN / XSLT / TTYP / MSAG / DDLS) — those are validated during push.' },
     { name: '--no-activate', type: 'boolean', description: 'Lock + write + skip check + skip activate + unlock.' },
     { name: '--dry-run', type: 'boolean', description: 'Plan only — no mutating ADT calls.' },
     { name: '--fail-fast', type: 'boolean', description: 'Stop at the first failing file (default: --keep-going).' },
@@ -32,6 +32,9 @@ export const SCHEMA: CommandSchema = {
     { code: 'ACTIVATION_FAILED', category: 'VALIDATION_ERROR', exitCode: 7 },
     { code: 'FILE_PARSE_ERROR', category: 'USAGE', exitCode: 2 },
     { code: 'VALIDATION_ERROR', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'OBJECT_NOT_FOUND', category: 'NOT_FOUND', exitCode: 8 },
+    { code: 'XSLT_PUSH_FAILED', category: 'SAP_ERROR', exitCode: 6 },
+    { code: 'XSLT_ACTIVATION_FAILED', category: 'VALIDATION_ERROR', exitCode: 7 },
   ],
 };
 

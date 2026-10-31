@@ -72,6 +72,8 @@ FILES=(
   "dcls/dcls-v1.json"
   "ddlx/ddlx-v1.json"
   "ddla/ddla-v1.json"
+  # transformation / XSLT program.
+  "xslt/xslt-v1.json"
 )
 
 echo ">> Copying ${#FILES[@]} schema files"
