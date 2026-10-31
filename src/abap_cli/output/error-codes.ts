@@ -125,6 +125,22 @@ export type ErrorCode =
   | 'TRAN_TSTCC_WRITE_FAILED'    // TSTCC user-interface attributes not persisted (SAP_ERROR)
   | 'TRAN_AUTH_WRITE_FAILED'     // TSTCA start authorization not persisted (SAP_ERROR)
   | 'TRAN_TADIR_DELETE_FAILED'   // TADIR entry not removed on delete (SAP_ERROR)
+  // VIEW (database view) ICF route — local-extension view-v1 document
+  | 'VIEW_INVALID_PAYLOAD'      // malformed JSON body / not a view-v1 document (VALIDATION_ERROR)
+  | 'VIEW_NAME_INVALID'         // name empty, >16 chars, whitespace, or payload/URL mismatch (VALIDATION_ERROR)
+  | 'VIEW_TYPE_INVALID'         // unknown viewClass (VALIDATION_ERROR)
+  | 'VIEW_REQUIRED_FIELD'       // missing header.description / tables / fields / join fields (VALIDATION_ERROR)
+  | 'VIEW_TABLE_NOT_FOUND'      // tables[] references a table that does not exist (NOT_FOUND)
+  | 'VIEW_FIELD_INVALID'        // field does not exist in its table or is not declared (VALIDATION_ERROR)
+  | 'VIEW_INCONSISTENT'         // DDIF_VIEW_PUT view_inconsistent (VALIDATION_ERROR)
+  | 'VIEW_WRITE_REFUSED'        // DDIF_VIEW_PUT put_refused — illegal projection/name conflict (VALIDATION_ERROR)
+  | 'VIEW_WRITE_FAILED'         // DDIF_VIEW_PUT failure / package assignment failure (SAP_ERROR)
+  | 'VIEW_ACTIVATION_FAILED'    // DDIF_VIEW_ACTIVATE failed (SAP_ERROR)
+  | 'VIEW_NOT_AUTHORIZED'       // RS_CORR_INSERT permission_failure / delete permission (AUTH_ERROR)
+  | 'VIEW_TRANSPORT_REQUIRED'   // non-$TMP write without a valid transport request (VALIDATION_ERROR)
+  | 'VIEW_PACKAGE_ASSIGN_FAILED'// RS_CORR_INSERT failed for another reason (SAP_ERROR)
+  | 'VIEW_DELETE_UNSUPPORTED'   // delete of a transported view via ICF (VALIDATION_ERROR)
+  | 'VIEW_DELETE_FAILED'        // RS_DD_DELETE_OBJ failure (SAP_ERROR)
   // AFF validator/CLI errors
   | 'AFF_SCHEMA_MISSING'        // canonical schema file not found for a type (VALIDATION_ERROR/exit 7)
   | 'AFF_SCHEMA_INVALID'        // canonical schema file present but unparseable (VALIDATION_ERROR/exit 7)
@@ -250,6 +266,22 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   TRAN_TSTCC_WRITE_FAILED: 'SAP_ERROR',
   TRAN_AUTH_WRITE_FAILED: 'SAP_ERROR',
   TRAN_TADIR_DELETE_FAILED: 'SAP_ERROR',
+  // VIEW
+  VIEW_INVALID_PAYLOAD: 'VALIDATION_ERROR',
+  VIEW_NAME_INVALID: 'VALIDATION_ERROR',
+  VIEW_TYPE_INVALID: 'VALIDATION_ERROR',
+  VIEW_REQUIRED_FIELD: 'VALIDATION_ERROR',
+  VIEW_TABLE_NOT_FOUND: 'NOT_FOUND',
+  VIEW_FIELD_INVALID: 'VALIDATION_ERROR',
+  VIEW_INCONSISTENT: 'VALIDATION_ERROR',
+  VIEW_WRITE_REFUSED: 'VALIDATION_ERROR',
+  VIEW_WRITE_FAILED: 'SAP_ERROR',
+  VIEW_ACTIVATION_FAILED: 'SAP_ERROR',
+  VIEW_NOT_AUTHORIZED: 'AUTH_ERROR',
+  VIEW_TRANSPORT_REQUIRED: 'VALIDATION_ERROR',
+  VIEW_PACKAGE_ASSIGN_FAILED: 'SAP_ERROR',
+  VIEW_DELETE_UNSUPPORTED: 'VALIDATION_ERROR',
+  VIEW_DELETE_FAILED: 'SAP_ERROR',
   // AFF
   AFF_SCHEMA_MISSING: 'VALIDATION_ERROR',
   AFF_SCHEMA_INVALID: 'VALIDATION_ERROR',

@@ -68,6 +68,8 @@ const SUFFIX_RULES: ReadonlyArray<{ suffix: string; type: string; schemaFile?: s
   { suffix: '.dtel.json', type: 'DTEL' },
   { suffix: '.http.json', type: 'HTTP' },
   { suffix: '.tran.json', type: 'TRAN' },
+  // Database view local-extension document (upstream AFF has no view format).
+  { suffix: '.view.json', type: 'VIEW' },
   // dual-channel DDIC + CDS companions.
   { suffix: '.ttyp.json', type: 'TTYP' },
   { suffix: '.ttyp.type.abap', type: 'TTYP' },

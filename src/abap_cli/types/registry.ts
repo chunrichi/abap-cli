@@ -83,6 +83,9 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
   // 2026-09-17. pull-nrob.ts hardcodes the literal reason
   // string, so the registry cleanup is safe.
   { type: 'ENQU', source: 'ICF', affSchemaFile: 'enqu-v1.json', requiresFile: true },
+  // Database view (SE11 view). Upstream abap-file-formats has no view
+  // schema, so `view-v1.json` is a local extension (see schema/README.md).
+  { type: 'VIEW', source: 'ICF', affSchemaFile: 'view-v1.json', requiresFile: true },
   { type: 'NROB', source: 'ADT', affSchemaFile: 'nrob-v1.json', requiresFile: true },
   // HTTP service (SICF node) via ICF. originally wrote a local
   // skeleton when --file was absent; that path was removed (refactor decision

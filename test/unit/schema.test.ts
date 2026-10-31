@@ -104,7 +104,7 @@ describe('abap create --schema (introspection)', () => {
       'CLAS', 'INTF', 'PROG', 'FUGR',
       'DEVC',
       'TABL', 'STRU', 'DOMA', 'DTEL',
-      'ENQU', 'NROB',
+      'ENQU', 'VIEW', 'NROB',
       'HTTP', 'TRAN',
       'TTYP', 'MSAG', 'DDLS',
       'SRVB', 'SRVD', 'BDEF', 'DCLS', 'DDLX', 'DDLA',
