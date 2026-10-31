@@ -26,6 +26,7 @@ vi.mock('node:os', async (importOriginal) => {
 });
 
 import {
+  clearJarFromDisk,
   getFallbackJarPath,
   loadJarFromDisk,
   markJarPersisted,
@@ -186,6 +187,23 @@ describe('session jar fallback', () => {
     const warnings = stderr.filter((line) => line.includes('WARN session jar'));
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain('re-logging in');
+  });
+
+  it('clearJarFromDisk removes the fallback jar too and re-derives the path', async () => {
+    const key = Buffer.alloc(32, 1);
+    await markJarPersisted(jar, profile, key);
+    const fallbackPath = getFallbackJarPath(profile);
+    expect(fallbackPath).toBeDefined();
+    expect(fs.existsSync(fallbackPath!)).toBe(true);
+
+    clearJarFromDisk(profile);
+
+    expect(fs.existsSync(fallbackPath!)).toBe(false);
+    // The cached fallback path is dropped as well, so a later run re-derives
+    // and re-writes it instead of trusting a path whose file just went away.
+    expect(getFallbackJarPath(profile)).toBeUndefined();
+    await expect(markJarPersisted(jar, profile, key)).resolves.toBe(true);
+    expect(fs.existsSync(getFallbackJarPath(profile)!)).toBe(true);
   });
 
   it('resolves false when neither the home dir nor the TMPDIR fallback can be written', async () => {
