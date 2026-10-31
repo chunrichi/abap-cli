@@ -23,7 +23,7 @@ vi.mock('../../src/abap_cli/config/project-config.js', () => ({
   readCaCertificate: () => undefined,
 }));
 
-import { checkIcfDeployment } from '../../src/abap_cli/clients/icf-version.js';
+import { checkIcfDeployment, ICF_SERVICE_VERSION } from '../../src/abap_cli/clients/icf-version.js';
 import { CliError } from '../../src/abap_cli/output/json.js';
 import { registerDeployCommand } from '../../src/abap_cli/commands/deploy.js';
 import { makeProgram, runCommand } from './cli-helper.js';
@@ -73,7 +73,7 @@ describe('checkIcfDeployment — probe failure vs confirmed absence (F-19)', () 
   });
 
   it('200 + version → current, probeFailed unset', async () => {
-    mockGet.mockResolvedValueOnce({ status: 'success', data: { version: '1.0.0' } });
+    mockGet.mockResolvedValueOnce({ status: 'success', data: { version: ICF_SERVICE_VERSION } });
     const info = await checkIcfDeployment();
     expect(info.status).toBe('current');
     expect(info.probeFailed).not.toBe(true);

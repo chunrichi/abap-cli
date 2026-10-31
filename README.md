@@ -52,7 +52,7 @@ If you would otherwise script the ADT REST API yourself, `abap-cli` packages the
 ## What you can do
 
 - **Edit in place** — `pull` any object into an abap-file-format tree, edit it with your editor, `push` it back with lock → write → activate → unlock. `check` and `diff` before you write.
-- **Cover 22 object types** — classes, interfaces, programs and function groups; packages; DDIC tables, structures, domains, data elements, lock objects and number ranges; SICF nodes and transaction codes; table types, message classes, CDS views and the CDS / RAP companions. Twenty support create / pull / push; `DEVC` supports create / pull / delete (no push), `BDEF` is pull / push and `SRVB` metadata-only.
+- **Cover 25 object types** — classes, interfaces, programs and function groups; packages; DDIC tables, structures, domains, data elements, database views, search helps, lock objects and number ranges; SICF nodes, transaction codes and XSLT transformations; table types, message classes, CDS views and the CDS / RAP companions. 23 support create, all 25 support pull, and 23 have a push path; `DEVC` supports create / pull / delete (no push), `BDEF` is pull / push and `SRVB` metadata-only.
 - **Read SAP safely** — `search`, `inspect`, `where-used`, `tcode`, `list`, `dumps`, `fields`, `select` and `run-report` never change the system.
 - **Run and verify** — `abap run` executes a class (classrun) or a PUBLIC STATIC method; `abap run-report` returns list output; `abap select` is the SE16N equivalent.
 - **Manage transports** — `transport list / create / show / resolve / assign`, with per-object resolution during `push`.
@@ -201,21 +201,23 @@ All commands support `--json` (compact) and `--pretty-json` (indented). Every to
 
 ## Supported object types
 
-22 type codes, routed through ADT or the bundled ICF service:
+25 type codes, routed through ADT or the bundled ICF service:
 
 | Types | create | pull | push | Notes |
 |---|---|---|---|---|
 | `CLAS` `INTF` `PROG` `FUGR` | ✅ | ✅ | ✅ | ABAP source; `create local` drafts available offline |
 | `DEVC` | ✅ | ✅ | — | ABAP package (`DEVC/K`) via ADT; `--package` is the super package; delete supported, no push (ADT has no package update endpoint) |
 | `TABL` `STRU` `DOMA` `DTEL` | ✅ | ✅ | ✅ | DDIC via ICF; TABL / STRU use the three-piece AFF layout |
+| `VIEW` `SHLP` | ✅ | ✅ | ✅ | DDIC database view / search help via ICF, `create --file`; delete is `$TMP`-only |
 | `ENQU` `NROB` | ✅ | ✅ | ✅ | Lock object / number range object, `create --file` |
 | `HTTP` `TRAN` | ✅ | ✅ | ✅ | SICF service node / transaction code (SE93), `create --file` |
+| `XSLT` | ✅ | ✅ | ✅ | XSLT transformation program via ICF, AFF pair `.xslt.json` + `.xslt.xml`, `create --file` |
 | `TTYP` `MSAG` `DDLS` | ✅ | ✅ | ✅ | `create --file`; TTYP / MSAG fall back to ICF on older ECC, DDLS is ADT-only |
 | `SRVD` `DCLS` `DDLX` `DDLA` | ✅ | ✅ | ✅ | CDS / RAP companions, `create --file`, ADT only |
 | `BDEF` | — | ✅ | ✅ | RAP behavior definition cannot be created (no ADT create endpoint); pull / push only |
 | `SRVB` | — | ✅ | — | Service binding is metadata-only (managed in SAP GUI) |
 
-`create` for DDIC, HTTP, TRAN, TTYP, MSAG and the CDS / RAP types requires an `--file <aff.json>` input; `abap create --schema <type>` prints the per-type contract, and TABL / STRU / DOMA / DTEL include an example JSON. The full type × command matrix lives in [wiki/object-types.md](wiki/object-types.md).
+`create` for DDIC (including VIEW / SHLP), HTTP, TRAN, XSLT, TTYP, MSAG and the CDS / RAP types requires an `--file <aff.json>` input; `abap create --schema <type>` prints the per-type contract, and TABL / STRU / DOMA / DTEL / VIEW / SHLP include an example JSON. The full type × command matrix lives in [wiki/object-types.md](wiki/object-types.md).
 
 ---
 
@@ -225,7 +227,7 @@ All commands support `--json` (compact) and `--pretty-json` (indented). Every to
 
 ```jsonc
 // success — stdout, exit 0
-{ "status": "success", "meta": { "command": "abap pull", "version": "1.0.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { /* ... */ } }
+{ "status": "success", "meta": { "command": "abap pull", "version": "1.1.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { /* ... */ } }
 
 // failure — stderr, non-zero exit, stdout stays empty
 { "status": "error", "meta": { /* ... */ }, "error": { "code": "NO_TRANSPORT", "category": "VALIDATION_ERROR", "message": "..." } }

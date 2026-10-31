@@ -5,6 +5,8 @@
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-31
+
 ### Added
 
 - **`DOMA` / `DTEL` 长文本伴生文件（`.docu.json`）**：vendored AFF `docu-v1.json`，本地 0..1 伴生文件为 `<name>.doma.docu.json` / `<name>.dtel.docu.json`（`{ formatVersion, lines: [{ format, line }] }`，单语言=对象主语言，SAPscript 标记原样保留）。`abap pull <name> --type DOMA|DTEL` 在主文件落盘后经 ICF `GET /ddic/<type>/<name>/docu` 拉长文本并写伴生：有文档才写，`DOCU_NOT_FOUND` 不写；默认不动本地陈旧伴生，`--overwrite` 时远端无文本则删除本地伴生并给 `DOCU_LOCAL_STALE_REMOVED` warning；docu 端点失败只记 `DOCU_PULL_FAILED` warning，主对象 pull 照常成功（没有该路由的旧 ICF 部署静默视为无文档）。`abap push <name>.<type>.json` 在主对象成功后自动推送同目录伴生：先按 `docu-v1.json` 校验（`line` ≤72、`format` ≤2，超限 `AFF_FIXTURE_INVALID` 且主对象不写），`lines: []` 删除远端长文本（`data.results[].docu = "deleted"`），`--dry-run` 的 plan 追加 `docu-icf` stage，`--atomic` 一并校验伴生；直接 push 伴生文件会以 `INVALID_ARGUMENT` 拒绝并指向主文件。`abap validate:aff` 识别两种伴生后缀（`DOCU` 只是 companion schema，`abap types` / `abap create` 不新增类型）。ICF handler 新增 `/ddic/<type>/<name>/docu` GET/POST，空 `lines` 删除长文本。**Migration**：旧 ICF 部署需 `abap deploy --yes` 刷新 handler 后才有长文本端点；旧本地目录无需迁移（伴生文件缺省即 0..1 可选）。CLI 细节：docu 拉取失败只记 `DOCU_PULL_FAILED` warning（主对象 pull 照常成功，无该路由的旧 ICF 部署静默视为无文档），`--overwrite` 清理陈旧伴生时记 `DOCU_LOCAL_STALE_REMOVED`；`lines: []` push 后 `data.results[].docu = "deleted"`，`--dry-run` 的 plan 追加 `docu-icf`，`--atomic` 一并校验伴生，直接 push 伴生文件以 `INVALID_ARGUMENT` 拒绝并指向主文件；`abap validate:aff` 识别两种伴生后缀（`DOCU` 只是 companion schema，`abap types` / `abap create` 不新增类型）。真机补充：行首 TAB 的文本行经 `DOCU_GET` 读回为空行（SAP 侧行为，缩进请用空格）。
@@ -17,6 +19,7 @@
 
 ### Changed
 
+- **ICF 服务版本提高到 `1.1.0`**：npm 包版本、CLI `--version`、ICF service（`ICF_SERVICE_VERSION` / ABAP `gc_version`）单线对齐；本次新增的 `/ddic/view`、`/ddic/shlp`、`/xslt`、`/tran` 写路径与 `/ddic/<type>/<name>/docu` 路由都在新 handler 里。**Migration**：升级 CLI 后执行一次 `abap deploy --yes` 刷新 ICF 服务；`abap deploy status` 会报告版本不匹配，旧部署缺端点时相关命令返回结构化错误。
 - **vendored AFF schema 对齐上游最新 HEAD**：`src/abap_cli/schema/` 的 24 个上游 schema 现在是 `SAP/abap-file-formats` 的字节级副本（`enqu` 补末尾换行，`http` / `msag` / `tabt` / `tran` 升级到上游新版）；手写的 `ttyp-v1.json` 是唯一本地变体。`nrob-v1.json` 去掉本地加严的 `originalLanguage` `pattern`/`maxLength` 与 `percentWarning` `multipleOf`，回到上游版本——这些约束没有测试或文档依赖，却可能拒绝 SAP 自己产出的 AFF 文档。`msag` 现在要求每条消息带 `number`；`tabt` 的 `sizeCategory` 由 enum 改为等价的 pattern。同步脚本的 `FILES` 列表补上 `ddls` / `msag`，`src/abap_cli/schema/README.md` 重写为逐文件溯源表。
 
 ### Fixed
@@ -41,6 +44,7 @@
 
 **Migration**：
 
+- **ICF 服务**：升级到 1.1.0 后执行一次 `abap deploy --yes` 刷新 handler；旧服务缺 `/ddic/view`、`/ddic/shlp`、`/xslt`、`/tran` 写路径或 docu 路由时，对应命令按结构化错误暴露，先重新部署。
 - **Node.js 运行时**：升级到 22.23.4+ / 24.22.1+ / 26.12.1+（或更新的受支持版本线），然后重新运行；`abap doctor` 会指出不合规的运行时并给出升级建议。
 - **反馈链路**：脚本 / 文档中的 `abap feedback ...` 调用改为直接建 GitHub issue —— `gh issue create --repo chunrichi/abap-cli --title "..." --body "..."`（或 GitHub MCP 的建 issue 工具、`POST /repos/chunrichi/abap-cli/issues`）；没有 GitHub 凭据时用 `https://github.com/chunrichi/abap-cli/issues/new?title=...&body=...` 预填 URL 交给用户手动提交。退出码 66–68 不再出现。
 - **HTTP 本地文件**：把 `.http.json` 的 `generalInformation.url` / 顶层 `url` 改名为 `servicePath`（值不变），或 `abap pull <name> --type HTTP --overwrite` 重新生成；`generalInformation.tokenHandling` 可选，当前 ICF handler 未实现该开关。

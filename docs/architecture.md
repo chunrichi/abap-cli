@@ -82,7 +82,7 @@ The bundled ICF service under `/sap/abap_cli` is maintained in two forms generat
 
 **Development form** — `abap deploy --dev` installs all 20 classes as global objects in dependency order (shared types first, format renderers before the DDIC helper, the handler after every helper, setup / runner last) and skips the merge. Maintainers use it to iterate on a single class on a real system, where each class can be syntax-checked, activated and run on its own. The two forms coexist on one system: the release form uses `lcl_*` locals, the development form uses `zcl_*` globals, and only the handler name is shared — whichever form was deployed last owns its three parts.
 
-Endpoints exposed under `/sap/abap_cli/` (current service version `1.0.0`, see `src/abap_cli/clients/icf-version.ts`):
+Endpoints exposed under `/sap/abap_cli/` (current service version `1.1.0`, see `src/abap_cli/clients/icf-version.ts`):
 
 | Endpoint | Used by |
 |---|---|

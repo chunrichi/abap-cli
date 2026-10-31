@@ -22,6 +22,7 @@ vi.mock('../../src/abap_cli/config/project-config.js', () => ({
 import { Command } from 'commander';
 import { registerDeployCommand } from '../../src/abap_cli/commands/deploy.js';
 import { CliError } from '../../src/abap_cli/output/json.js';
+import { ICF_SERVICE_VERSION } from '../../src/abap_cli/clients/icf-version.js';
 
 async function run(args: string[]): Promise<{ data: unknown; exitCode: number | undefined }> {
   const { data, meta, exitCode } = await runWithMeta(args);
@@ -86,12 +87,12 @@ describe('abap deploy status', () => {
   it('returns installed=true and match=true when remote version equals expected', async () => {
     mockGet.mockReset();
     probeAdtRuntime.mockResolvedValueOnce({ runtime: 'netweaver750', source: 'informationsystem', icfSetupBlocked: false });
-    mockGet.mockResolvedValueOnce({ status: 'success', data: { version: '1.0.0' } });
+    mockGet.mockResolvedValueOnce({ status: 'success', data: { version: ICF_SERVICE_VERSION } });
     const { data } = await run(['deploy', 'status', '--json']);
     const d = data as { installed: boolean; match: boolean; remoteVersion: string; expectedVersion: string; runtime: string };
     expect(d.installed).toBe(true);
     expect(d.match).toBe(true);
-    expect(d.remoteVersion).toBe('1.0.0');
+    expect(d.remoteVersion).toBe(ICF_SERVICE_VERSION);
     expect(d.runtime).toBe('netweaver750');
   });
 

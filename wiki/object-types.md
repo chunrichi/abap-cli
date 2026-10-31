@@ -1,7 +1,7 @@
 ---
 type: reference
 title: 支持的对象类型
-description: abap CLI 支持的 ABAP 对象类型总览 — 24 个类型码 × create/pull/push 路由（ADT / ICF）与本地 AFF 文件布局
+description: abap CLI 支持的 ABAP 对象类型总览 — 25 个类型码 × create/pull/push 路由（ADT / ICF）与本地 AFF 文件布局
 tags: [abap-cli, object-types, ddic, http, sicf, reference]
 created at: 2026-08-29 10:00:00
 changed at: 2026-10-31 19:10:00

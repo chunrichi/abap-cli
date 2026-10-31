@@ -65,7 +65,7 @@ abap test --schema
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap test", "version": "1.0.0", "timestamp": "2026-10-31T06:30:00.000Z", "durationMs": 431, "warnings": [] },
+  "meta": { "command": "abap test", "version": "1.1.0", "timestamp": "2026-10-31T06:30:00.000Z", "durationMs": 431, "warnings": [] },
   "data": {
     "object": { "name": "ZCL_MY_THING", "type": "CLAS/OC" },
     "riskLevels": ["harmless"],
@@ -80,7 +80,7 @@ abap test --schema
 ```json
 {
   "status": "error",
-  "meta": { "command": "abap test", "version": "1.0.0", "timestamp": "2026-10-31T06:31:00.000Z", "durationMs": 398, "warnings": [] },
+  "meta": { "command": "abap test", "version": "1.1.0", "timestamp": "2026-10-31T06:31:00.000Z", "durationMs": 398, "warnings": [] },
   "error": {
     "code": "TEST_FAILED",
     "category": "VALIDATION_ERROR",
