@@ -49,6 +49,8 @@ const ddicStore = new Map();
 const textpoolStore = new Map();
 // 015: remote source store — key = `<TYPE>:<OBJ>`, value = source string served by /version-source.
 const remoteSourceStore = new Map();
+// 014: TRAN (SE93 transaction code) store — key = TCODE, value = wire document.
+const tranStore = new Map();
 // 016: read-only table data store — key = <TABLE>, value = { tabclass, fields, rows }.
 // Seeded below with ZTAB_FIXTURE (150 rows, clientDependent, mixed types).
 const tableStore = new Map();
@@ -1268,6 +1270,60 @@ const server = http.createServer(async (req, res) => {
         return ok(res, JSON.stringify({ status: 'success', data: ddicStore.get(key) }), 'application/json');
       }
       return ok(res, JSON.stringify({ status: 'error', error: { code: 'METHOD_NOT_ALLOWED', message: `${req.method} not supported on /ddic/${ddicType}` } }), 'application/json');
+    }
+
+    // 014: /sap/abap_cli/tran/<tcode> (GET pull / POST|PUT upsert / DELETE).
+    // Mirrors the ABAP handler contract: 200 + envelope for SAP-side errors,
+    // package/transport envelope at the top level of the wire document.
+    const tran = /^\/sap\/abap_cli\/tran\/([^/]+)$/.exec(path);
+    if (tran) {
+      const tcode = decodeURIComponent(tran[1]).toUpperCase();
+      if (req.method === 'GET') {
+        if (!tranStore.has(tcode)) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'TRAN_OBJECT_NOT_FOUND', message: `Transaction ${tcode} not found` } }), 'application/json');
+        }
+        return ok(res, JSON.stringify({ status: 'success', data: tranStore.get(tcode) }), 'application/json');
+      }
+      if (req.method === 'POST' || req.method === 'PUT') {
+        const body = await readBody(req);
+        let payload = {};
+        try { payload = JSON.parse(body); } catch (_e) { payload = {}; }
+        const bodyName = (payload.name || '').toUpperCase();
+        if (bodyName && bodyName !== tcode) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'TRAN_NAME_MISMATCH', message: `payload name ${bodyName} does not match URL transaction ${tcode}` } }), 'application/json');
+        }
+        const type = payload.generalInformation && payload.generalInformation.transactionType;
+        if (!type) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'TRAN_TYPE_INVALID', message: 'generalInformation.transactionType is required' } }), 'application/json');
+        }
+        if (!payload.header || !payload.header.description) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'TRAN_DESCRIPTION_REQUIRED', message: 'header.description is required' } }), 'application/json');
+        }
+        const pkg = (payload.package || '').toUpperCase();
+        if (pkg && pkg !== '$TMP' && !payload.transportRequest) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'TRAN_TRANSPORT_REQUIRED', message: 'transportRequest is required for non-$TMP packages' } }), 'application/json');
+        }
+        if (type === 'ooTransaction') {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'TRAN_OO_NOT_SUPPORTED', message: 'OO transactions cannot be written through RPY_TRANSACTION_INSERT' } }), 'application/json');
+        }
+        const existed = tranStore.has(tcode);
+        const stored = Object.assign({}, payload, {
+          name: tcode,
+          // The real GET infers the package from TADIR; the mock keeps whatever
+          // the write carried (defaulting to $TMP like the ABAP handler).
+          package: pkg || '$TMP',
+        });
+        tranStore.set(tcode, stored);
+        return ok(res, JSON.stringify({ status: 'success', data: { name: tcode, type: 'TRAN', action: existed ? 'updated' : 'created' } }), 'application/json');
+      }
+      if (req.method === 'DELETE') {
+        if (!tranStore.has(tcode)) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'TRAN_OBJECT_NOT_FOUND', message: `Transaction ${tcode} not found` } }), 'application/json');
+        }
+        tranStore.delete(tcode);
+        return ok(res, JSON.stringify({ status: 'success', data: { name: tcode, type: 'TRAN', action: 'deleted' } }), 'application/json');
+      }
+      return ok(res, JSON.stringify({ status: 'error', error: { code: 'METHOD_NOT_ALLOWED', message: `${req.method} not supported on /tran/${tcode}` } }), 'application/json');
     }
 
     // 014: /sap/abap_cli/textpool/<category>?object=<name>&type=<type> (GET read / POST write).
