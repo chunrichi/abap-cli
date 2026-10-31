@@ -28,7 +28,6 @@ Per-command knowledge pages (prerequisites, gotchas, real-system evidence) live 
 | `abap diff` | [diff.md](diff.md) | Compare local files against SAP |
 | `abap dumps` | [dumps.md](dumps.md) | List recent ST22 ABAP runtime dumps (read-only) |
 | `abap types` | [types.md](types.md) | Print the CLI type ↔ TADIR / DDIC mapping (no SAP call) |
-| `abap feedback` | [feedback.md](feedback.md) | Send CLI feedback to upstream tracker |
 | `abap report-stuck` | [report-stuck.md](report-stuck.md) | Write a stuck-operation report for offline triage |
 | `abap mime` | [mime.md](mime.md) | Create, delete, or upload MIME Repository resources (create \| delete \| push) |
 | `abap validate:aff` | [validate-aff.md](validate-aff.md) | Validate JSON files against official abap-file-format (AFF) canonical schemas (Draft 2020-12) |

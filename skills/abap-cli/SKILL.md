@@ -1,10 +1,10 @@
 ---
 name: abap-cli
-description: abap-cli 用户的 agent 路由层 — 根据用户意图分发到 4 个领域 skill（abap-cli-setup / -search / -edit / -data）与 1 个方法论 skill（abap-cli-performance）；并代理 2 个 agent 元命令（`feedback` 提交 issue / `report-stuck` 卡死本地 triage）。use when asking "这个查询该看哪个 skill" 或 agent 收到模糊意图需要先做路由决策；agent 自身做完一轮任务想提交反馈或遇到不可恢复卡死想留痕。
+description: abap-cli 用户的 agent 路由层 — 根据用户意图分发到 4 个领域 skill（abap-cli-setup / -search / -edit / -data）与 1 个方法论 skill（abap-cli-performance）；并处理 agent 元任务：卡死用 `report-stuck` 本地留痕，CLI 反馈 / bug 直接提 GitHub issue（无内置命令）。use when asking "这个查询该看哪个 skill" 或 agent 收到模糊意图需要先做路由决策；agent 自身做完一轮任务想提交反馈或遇到不可恢复卡死想留痕。
 metadata:
   version: "1.0.0"
   scope: meta
-  commands: [feedback, report-stuck]
+  commands: [report-stuck]
 ---
 
 # abap-cli — 入口路由层（meta-skill）
@@ -13,7 +13,7 @@ metadata:
 
 1. **路由表**：把用户意图映射到唯一目标领域 skill（4 选 1）+ 1 个方法论 skill
 2. **边界说明**：说明与仓库本地技能（`.agents/skills/`）的关系（用户机器上不存在时跳过）
-3. **agent 元命令**：直接代理 2 个反馈链路命令（`feedback` / `report-stuck`），不依赖任何领域 skill
+3. **agent 元任务**：卡死 → `abap report-stuck` 本地留痕；反馈 / bug → 直接建 GitHub issue（没有 CLI 命令）
 4. **意图模糊回退**：当其他 5 个 skill 都不命中时，本 skill 处理"该看哪个 skill"的问题
 
 加载本 skill 后，**第一步是查路由表**；命中目标后，**只加载那一个领域 skill 的 SKILL.md 全文**，不要把 4 棵决策树都读进上下文。
@@ -27,10 +27,11 @@ metadata:
 | 拉对象 / 改 / 推 / 语法检查 / 激活 / 创建 / 删除 / 列举 / MIME / AFF 校验 | `abap-cli-edit` | `pull` `push` `check` `create` `activate` `delete` `list` `mime` `validate:aff` |
 | 跑类 / 查表 / 列表字段 / 跑报表 / 翻页 select | `abap-cli-data` | `select` `fields` `run` `run-report` |
 | ABAP 性能 review / 慢路径诊断 / 优化建议 | `abap-cli-performance` | （方法论 skill，不直接管命令） |
-| Agent 提交反馈 / 卡死留痕（不依赖 SAP） | `abap-cli`（meta） | `feedback` `report-stuck` |
+| Agent 卡死留痕（不依赖 SAP） | `abap-cli`（meta） | `report-stuck` |
+| Agent 提交反馈 / bug | `abap-cli`（meta） | GitHub Issues（无 CLI 命令，见下） |
 | 意图模糊 / 不确定归哪类 | `abap-cli`（meta） | （路由查询本身） |
 
-> **同一命令唯一归属**：4 个领域 skill 的 `metadata.commands` 集合互不相交，合计 27 条；再加 meta 的 2 条，共 29 个 CLI 命令（详见 `skills/README.md`）。
+> **同一命令唯一归属**：4 个领域 skill 的 `metadata.commands` 集合互不相交，合计 27 条；再加 meta 的 1 条（`report-stuck`），共 28 个 CLI 命令（详见 `skills/README.md`）。
 >
 > **`abap-cli-performance` 例外**：它是方法论 skill，不声明 `metadata.commands`；它触发的只读命令（`search / inspect / pull / check / select`）归属上表 4 个领域 skill。本 skill 全程不写对象。
 
@@ -43,42 +44,32 @@ metadata:
 ├── 关键词含 "拉 / 改 / 推 / 语法 / 激活 / 创建 / DDIC / MIME / AFF" → abap-cli-edit
 ├── 关键词含 "跑 / 查表数据 / select / run / 翻页" → abap-cli-data
 ├── 关键词含 "慢 / 性能 / 优化 / N² / FOR ALL ENTRIES / 内表 / HASHED / AMDP / CDS" → abap-cli-performance
-├── 关键词含 "反馈 / bug / 反馈 issue / stuck / 卡死" → 本 meta skill（不走领域）
-│   ├── 提交反馈给上游 → abap feedback --feature-key ... --title ... --description ... --json
-│   └── 卡死留痕 → abap report-stuck --goal ... --tried ... --where ... --json
+├── 关键词含 "反馈 / bug / issue / 提 issue" → 本 meta skill → 建 GitHub issue（见下）
+├── 关键词含 "stuck / 卡死" → 本 meta skill → abap report-stuck --goal ... --tried ... --where ... --json
 └── 模糊 / 无法分类 → 留在 abap-cli（meta），先问用户 1 个澄清问题，再路由
 ```
 
-### `feedback`（提交 issue）
+### 提交反馈（GitHub Issues，无 CLI 命令）
 
-完成任务但发现 CLI 行为不对？提交给上游（反馈服务）。**不需要 SAP 连接**（纯 HTTP），但需要网络；离线场景用 `report-stuck`。
+CLI 行为不对 / 缺功能时，直接建 GitHub issue，**默认仓库 `chunrichi/abap-cli`**（用户明确指定别的仓库时优先用户指定）。不要再用已删除的反馈命令。
 
-```bash
-abap feedback \
-    --feature-key abap.push \
-    --title "Push reports unclear error after syntax check" \
-    --description "A valid class push fails after syntax check with no actionable detail." \
-    --priority NORMAL \
-    --session-id session-123 \
-    --json
+**先探测当前环境有什么能力，按优先级使用：**
 
-abap feedback --feature-key abap.cli --title "Example" --description "..." --dry-run --json   # 不真发，看请求体
-```
+1. **GitHub MCP / issue 工具**：工具列表里有创建 issue 的能力（如 `create_issue`）→ 直接调用，仓库 `chunrichi/abap-cli`。
+2. **`gh` CLI**：`gh auth status` 成功 → `gh issue create --repo chunrichi/abap-cli --title "..." --body-file <file>`。
+3. **`GITHUB_TOKEN` / `GH_TOKEN`**：调 GitHub REST `POST /repos/chunrichi/abap-cli/issues`。
+4. **都没有 / 认证被拒**：不要反复重试；把预填链接交给用户手动提交，并明确说明 **未提交**：
+   `https://github.com/chunrichi/abap-cli/issues/new?title=<urlencoded-title>&body=<urlencoded-body>`
 
-| flag | 含义 | 必填 |
-|---|---|---|
-| `--feature-key <key>` | 稳定 feature / 功能标识 | ✅ |
-| `--title <text>` | 简短标题 | ✅ |
-| `--description <text>` | 纯文本观察（≤255 字符） | ✅ |
-| `--priority <level>` | `LOW` / `NORMAL` / `HIGH` / `URGENT` | NORMAL |
-| `--username <name>` | 业务用户名；默认按 `$USERNAME` / `$USER` / OS 用户 / `git config user.name` 解析 | — |
-| `--email <address>` | 联系邮箱 | — |
-| `--source-system <name>` | 调用客户端 / 系统名；默认 `abap-cli` | — |
-| `--agent-id <id>` | agent / 产品标识 | — |
-| `--session-id <id>` | 已完成的 agent session 标识 | — |
-| `--idempotency-key <key>` | 稳定重试 key；缺省自动生成 | — |
-| `--correlation-id <id>` | 追踪 ID（作 `X-Correlation-ID` header） | — |
-| `--dry-run` | 校验 + 打印规范化请求，不真发 | false |
+**issue 正文模板**（缺什么写 unknown，不要编）：
+
+- CLI 与 Node 版本：`abap --version`、`node -v`
+- 失败命令的完整参数、期望 vs 实际、错误码 / 退出码（附 `--json` 错误信封更有用）
+- 环境：on-prem / BTP、SAP release（与问题相关时）
+- 最小复现步骤
+- **脱敏**：不含密码、`.abap.json` 内容、业务数据、内网地址
+
+连不上 GitHub 或需要离线留档时，用下面的 `report-stuck`。
 
 ### `report-stuck`（卡死留痕）
 
@@ -98,19 +89,15 @@ abap report-stuck \
 | `--tried <text>` | 已尝试的动作 | ✅ |
 | `--where <cmd>` | 卡死点（具体卡在哪条命令） | ✅ |
 
-输出落在 `userConfigDir()/reports/STUCK-<ts>-<rand>.json`（即 `~/.abap-cli/reports/`）；agent 后续可读这些报告聚类重复问题。
+输出落在 `userConfigDir()/reports/STUCK-<ts>-<rand>.json`（即 `~/.abap-cli/reports/`）；agent 后续可读这些报告聚类重复问题。报告只存本地，不会自动上传——要同步上游就按上面的 GitHub issue 流程。
 
 ### 错误码（meta 专属）
 
+meta 没有专属错误码：`report-stuck` 只用公共错误码。
+
 | 错误 | 触发 | 修复 |
 |---|---|---|
-| `USAGE` (exit 2) | `feedback` / `report-stuck` 缺必填 | 看 `error.nextSteps` |
-| `INVALID_ARGUMENT` (exit 2) | `--priority` / `--feature-key` 取值不合法 | 看 `error.nextSteps` |
-| `VALIDATION_ERROR` (exit 7) | `feedback` 标题 / 描述超长 / 字段格式错 | 压缩 description（≤255 字符） |
-| `CONFLICT` (exit 66, reserved) | 同 `--idempotency-key` 已发过 → 视为重复，**不**报错；返回上次结果 | 通常无影响 |
-| `PERSISTENCE_ERROR` (exit 67, reserved) | `report-stuck` 写本地失败（权限 / 磁盘满） | 看 `error.nextSteps` 改 CLI 报告目录 |
-| `HTTP_ERROR` (exit 68, reserved) | `feedback` 提交服务端错（5xx） | 等 1 分钟重试；或转用 `report-stuck` |
-| `AUTH_ERROR` (exit 5) | `feedback` 服务端拒绝（认证） | 不太可能发生，bug 则上报 |
+| `USAGE` (exit 2) | `report-stuck` 缺 `--goal` / `--tried` / `--where` | 补齐三个必填参数 |
 
 > ⚠️ **`pull` 归 `abap-cli-edit` 而非 `abap-cli-search`**：虽然 `pull` 写本地文件，但它是"修改 SAP 对象的中间步骤"（`pull → 编辑 → push`），归 edit 的写路径决策树。
 >
