@@ -1,7 +1,13 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { getRevisionLink } from 'abap-adt-api/build/api/revisions.js';
+import type { AbapObjectStructure, classIncludes } from 'abap-adt-api/build/api/objectstructure.js';
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError } from '../../output/json.js';
 import { resolveObject } from '../../core/resolve.js';
 import { SEARCH_RESULT_LIMIT } from '../../core/limits.js';
+import { toRelativeOutputPath } from '../../core/path-output.js';
+import { parseVersionsFeed } from '../../formats/versions-feed.js';
 
 /** Base object metadata — always returned. */
 export interface ObjectMetadata {
@@ -83,12 +89,69 @@ export interface ActivationInfo {
   hasPendingInactiveVersion?: boolean;
 }
 
+/** One entry of an object's version history (ADT versions Atom feed). */
+export interface ObjectVersionEntry {
+  /** ADT version id (`atom:id`), e.g. "00000". */
+  version: string;
+  /** Feed `updated` timestamp (ISO 8601, as returned by SAP). */
+  date: string;
+  author: string;
+  /** Feed title — usually the version description / transport text. */
+  title: string;
+  /** Content URI of this version; pass to `getObjectSource` to read it. */
+  uri: string;
+  /** Transport request carrying this version, when SAP exposes the link. */
+  transport?: string;
+}
+
+/** Version history for `--versions`. */
+export interface ObjectVersionsInfo {
+  /** Include part the versions were read for (`main` for non-class objects). */
+  include: string;
+  /** Number of returned entries (kept even when the list is empty). */
+  count: number;
+  versions: ObjectVersionEntry[];
+  /** Present with `--show <version>`: the selected version + its source. */
+  shown?: { version: string; source?: string; out?: string };
+}
+
+/** One flattened symbol of an object structure tree. */
+export interface ObjectSymbol {
+  name: string;
+  /** Normalized kind (class / interface / method / attribute / …). */
+  kind: string;
+  /** Raw ADT structure element type, kept for machine use. */
+  type: string;
+  visibility?: string;
+  level?: string;
+  /** 1-based start line in the owning include; null when the backend omits it. */
+  startLine: number | null;
+  /** 1-based end line; null when the backend omits it. */
+  endLine: number | null;
+  constructor?: boolean;
+  final?: boolean;
+  redefinition?: boolean;
+  testmethod?: boolean;
+}
+
+/** Flattened symbol table for `--symbols`. */
+export interface ObjectSymbolsInfo {
+  /** false when the object type has no ADT object-structure endpoint. */
+  supported: boolean;
+  reason?: string;
+  /** Number of returned symbols (kept even when the list is empty). */
+  count: number;
+  symbols: ObjectSymbol[];
+}
+
 export interface InspectResult {
   metadata: ObjectMetadata;
   structure?: ObjectStructureElement[];
   includes?: ObjectInclude[];
   locks?: ObjectLock[];
   activation?: ActivationInfo;
+  versions?: ObjectVersionsInfo;
+  symbols?: ObjectSymbolsInfo;
 }
 
 export interface InspectFlags {
@@ -98,6 +161,22 @@ export interface InspectFlags {
   package?: boolean;
   /** Compare active vs latest source to verify real activation (read-only). */
   activation?: boolean;
+  /** Read the ADT versions feed (read-only). */
+  versions?: boolean;
+  /** Include part for --versions (default main; only for CLAS / INTF). */
+  include?: string;
+  /** Show the source of one version (requires --versions). */
+  show?: string;
+  /** Write the shown version source to this file instead of returning it. */
+  out?: string;
+  /** Max number of version entries to return (default 50). */
+  limit?: number;
+  /** Flatten the object structure into symbols with source line ranges. */
+  symbols?: boolean;
+  /** Comma-separated symbol kinds to keep (method, attribute, …). */
+  kinds?: string;
+  /** Case-insensitive regex filter on symbol names. */
+  namePattern?: string;
 }
 
 /**
@@ -165,6 +244,10 @@ export async function inspectObject(client: AdtClientWrapper, name: string, flag
   if (flags.activation && 'includes' in structure && Array.isArray(structure.includes)) {
     result.activation = await checkActivation(client, resolved.objectUrl, structure.includes, resolved.type);
   }
+
+  const target = { name: resolved.name, type: metadata.type, objectUrl: resolved.objectUrl };
+  if (flags.symbols) result.symbols = await readSymbols(client, target, flags);
+  if (flags.versions) result.versions = await readVersions(client, target, flags, structure);
 
   return result;
 }
@@ -298,6 +381,40 @@ export async function runInspect(
       example: 'abap inspect ZCL_MY_CLASS',
     });
   }
+  if (flags.out && !flags.show) {
+    throw new CliError('USAGE', '--out requires --show <version>.', {
+      nextSteps: ['Pick a version first: abap inspect <object> --versions'],
+      example: `abap inspect ${object} --versions --show <version> --out <file>`,
+    });
+  }
+  if (flags.show && !flags.versions) {
+    throw new CliError('USAGE', '--show requires --versions.', {
+      nextSteps: ['List versions first: abap inspect <object> --versions'],
+      example: `abap inspect ${object} --versions --show <version>`,
+    });
+  }
+  if (flags.include && !flags.versions) {
+    throw new CliError('USAGE', '--include requires --versions.', {
+      nextSteps: ['Add --versions to inspect one include part of the version history.'],
+      example: `abap inspect ${object} --versions --include implementations`,
+    });
+  }
+  if (flags.limit !== undefined && (!Number.isInteger(flags.limit) || flags.limit < 1 || flags.limit > 200)) {
+    throw new CliError('INVALID_ARGUMENT', '--limit must be an integer between 1 and 200.', {
+      details: { limit: flags.limit },
+      example: `abap inspect ${object} --versions --limit 20`,
+    });
+  }
+  if (flags.namePattern) {
+    try {
+      new RegExp(flags.namePattern);
+    } catch {
+      throw new CliError('INVALID_ARGUMENT', `Invalid --name-pattern '${flags.namePattern}': not a valid regular expression.`, {
+        details: { namePattern: flags.namePattern },
+        example: `abap inspect ${object} --symbols --name-pattern '^RUN'`,
+      });
+    }
+  }
   const client = await AdtClientWrapper.create();
   const result = await inspectObject(client, object, flags);
   const human = [
@@ -314,6 +431,283 @@ export async function runInspect(
           ...result.activation.parts.map((p) => `    ${p.includeType}: ${p.active ? 'active' : 'stale'} (${p.sourceUri})`),
         ]
       : []),
+    ...(result.versions
+      ? [
+          `  versions: ${result.versions.versions.length} entry(ies) (include: ${result.versions.include})`,
+          ...(result.versions.shown
+            ? [`    shown: ${result.versions.shown.version}${result.versions.shown.out ? ` → ${result.versions.shown.out}` : ''}`]
+            : []),
+        ]
+      : []),
+    ...(result.symbols
+      ? [
+          result.symbols.supported
+            ? `  symbols: ${result.symbols.symbols.length} symbol(s)`
+            : `  symbols: unsupported (${result.symbols.reason ?? 'object type has no structure endpoint'})`,
+        ]
+      : []),
   ].join('\n');
   return { data: result, human };
+}
+
+// --- Version history (`--versions`) ---
+
+const CLASS_INCLUDE_VALUES = ['main', 'definitions', 'implementations', 'macros', 'testclasses'] as const;
+type ClassIncludeValue = (typeof CLASS_INCLUDE_VALUES)[number];
+
+interface VersionTarget {
+  name: string;
+  type: string;
+  objectUrl: string;
+}
+
+function isClassLike(type: string): boolean {
+  const upper = type.toUpperCase();
+  return upper.startsWith('CLAS') || upper.startsWith('INTF');
+}
+
+function normalizeInclude(raw: string | undefined): ClassIncludeValue {
+  const value = (raw ?? 'main').trim().toLowerCase();
+  if (!(CLASS_INCLUDE_VALUES as readonly string[]).includes(value)) {
+    throw new CliError('INVALID_ARGUMENT', `Unknown include '${raw}'.`, {
+      details: { allowed: [...CLASS_INCLUDE_VALUES] },
+      nextSteps: [`Use one of: ${CLASS_INCLUDE_VALUES.join(', ')}`],
+      example: 'abap inspect ZCL_MY_CLASS --versions --include implementations',
+    });
+  }
+  return value as ClassIncludeValue;
+}
+
+async function readVersions(
+  client: AdtClientWrapper,
+  target: VersionTarget,
+  flags: InspectFlags,
+  structure: AbapObjectStructure,
+): Promise<ObjectVersionsInfo> {
+  if (!isClassLike(target.type) && (flags.include || flags.show)) {
+    throw new CliError('INVALID_ARGUMENT', `--include / --show are only available for classes and interfaces (got ${target.type}).`, {
+      details: { type: target.type },
+      example: `abap inspect ${target.name} --versions`,
+    });
+  }
+  const include = normalizeInclude(flags.include);
+  const feedPath = getRevisionLink(structure, isClassLike(target.type) ? (include as classIncludes) : undefined);
+  if (!feedPath) {
+    throw new CliError('TYPE_NOT_SUPPORTED', `Version history is not available for ${target.name} (${target.type}).`, {
+      details: { object: target.name, type: target.type },
+      nextSteps: [
+        'Version history needs an ADT versions feed; objects created outside versioning (for example $TMP-only objects) may not have one.',
+        `Verify the activation state instead: abap inspect ${target.name} --activation`,
+      ],
+      example: `abap inspect ${target.name} --activation`,
+    });
+  }
+  const xml = await client.adtFeed(feedPath);
+  const raw = parseVersionsFeed(xml);
+  const limit = flags.limit ?? 50;
+  const versions: ObjectVersionEntry[] = raw.slice(0, limit).map((entry) => ({
+    version: entry.version,
+    date: entry.date,
+    author: entry.author,
+    title: entry.title,
+    uri: entry.uri,
+    ...(entry.transport ? { transport: entry.transport } : {}),
+  }));
+  const info: ObjectVersionsInfo = { include, count: versions.length, versions };
+  if (flags.show) {
+    const wanted = flags.show.trim();
+    const revision =
+      raw.find((r) => r.version === wanted) ?? raw.find((r) => r.version.toLowerCase() === wanted.toLowerCase());
+    if (!revision) {
+      throw new CliError('INVALID_ARGUMENT', `Version '${wanted}' not found for ${target.name}.`, {
+        details: { object: target.name, available: versions.map((v) => v.version) },
+        nextSteps: ['List the available versions first: abap inspect <object> --versions'],
+        example: `abap inspect ${target.name} --versions`,
+      });
+    }
+    const source = await client.getObjectSource(revision.uri);
+    if (flags.out) {
+      const absolute = path.resolve(flags.out);
+      fs.mkdirSync(path.dirname(absolute), { recursive: true });
+      fs.writeFileSync(absolute, source, 'utf8');
+      info.shown = { version: revision.version, out: toRelativeOutputPath(absolute) };
+    } else {
+      info.shown = { version: revision.version, source };
+    }
+  }
+  return info;
+}
+
+// --- Symbols (`--symbols`) ---
+
+const LINE_RANGE_PATTERN = /[#&]start=(\d+),(\d+);end=(\d+),(\d+)/;
+
+interface StructureLinkLike {
+  href?: string;
+  rel?: string;
+}
+
+interface StructureElementLike {
+  name?: string;
+  type?: string;
+  visibility?: string;
+  level?: string;
+  constructor?: boolean;
+  final?: boolean;
+  redefinition?: boolean;
+  testmethod?: boolean;
+  links?: StructureLinkLike[];
+  children?: StructureElementLike[];
+}
+
+/**
+ * Normalized kind per ADT object-structure element type (authoritative
+ * `CO_*` constants from the official ADT OO plugin, plus bare names returned
+ * by older backends). Unknown types fall back to the lower-cased raw type.
+ */
+const KIND_BY_ADT_TYPE: Record<string, string> = {
+  // Global class members.
+  'CLAS/OC': 'class',
+  'CLAS/OCI': 'class-implementation',
+  'CLAS/OR': 'interface-implementation',
+  'CLAS/OB': 'alias',
+  'CLAS/OO': 'method-definition',
+  'CLAS/OM': 'method',
+  'CLAS/OA': 'attribute',
+  'CLAS/OE': 'event',
+  'CLAS/OT': 'type',
+  'CLAS/OF': 'friend',
+  'CLAS/OK': 'macro',
+  'CLAS/I': 'include',
+  'CLAS/OCX': 'text-elements',
+  'CLAS/OSU': 'public-section',
+  'CLAS/OSK': 'package-section',
+  'CLAS/OSO': 'protected-section',
+  'CLAS/OSI': 'private-section',
+  // Local classes / interfaces inside a global class.
+  'CLAS/OCL': 'local-class',
+  'CLAS/ON': 'local-interface',
+  'CLAS/ONB': 'local-interface-alias',
+  'CLAS/OLB': 'local-class-alias',
+  'CLAS/OLN': 'local-class-interface-implementation',
+  'CLAS/OLD': 'local-class-method',
+  'CLAS/OLI': 'local-class-method-implementation',
+  'CLAS/OLA': 'local-class-attribute',
+  'CLAS/ONE': 'local-interface-event',
+  'CLAS/OLE': 'local-class-event',
+  'CLAS/OOV': 'local-variable',
+  'CLAS/OND': 'local-interface-method',
+  'CLAS/ONT': 'local-interface-type',
+  'CLAS/ONA': 'local-interface-attribute',
+  'CLAS/OLT': 'local-class-type',
+  'CLAS/OLF': 'local-class-friend',
+  'CLAS/OQ': 'test-seam',
+  // Global interface members.
+  'INTF/OI': 'interface',
+  'INTF/IO': 'method',
+  'INTF/IA': 'attribute',
+  'INTF/IE': 'event',
+  'INTF/IT': 'type',
+  'INTF/IB': 'alias',
+  'INTF/I': 'include',
+  'INTF/IOV': 'local-variable',
+  // Bare names (mock / older backends).
+  METHOD: 'method',
+  ATTRIBUTE: 'attribute',
+  EVENT: 'event',
+  TYPE: 'type',
+  CLASS: 'class',
+  INTERFACE: 'interface',
+};
+
+/** Normalize the visibility suffix (`CLAS/OM/public`) before the kind lookup. */
+function baseAdtType(type: string): string {
+  const segments = type.split('/');
+  if (segments.length >= 3 && /^(public|private|protected)$/i.test(segments[2] ?? '')) {
+    return segments.slice(0, 2).join('/');
+  }
+  return type;
+}
+
+function kindFor(type: string): string {
+  const base = baseAdtType(type);
+  return KIND_BY_ADT_TYPE[base.toUpperCase()] ?? base.toLowerCase();
+}
+
+/** Parse the `#start=12,4;end=40,7` fragment of an ADT atom link. */
+export function parseLineRange(href: string | undefined): { startLine: number; endLine: number } | null {
+  if (!href) return null;
+  const match = LINE_RANGE_PATTERN.exec(href);
+  if (!match) return null;
+  return { startLine: Number(match[1]), endLine: Number(match[3]) };
+}
+
+/** Flatten a nested ADT object structure into a stable symbol list. */
+export function flattenSymbols(elements: StructureElementLike[]): ObjectSymbol[] {
+  const symbols: ObjectSymbol[] = [];
+  const walk = (items: StructureElementLike[]): void => {
+    for (const element of items) {
+      const range = (element.links ?? []).map((link) => parseLineRange(link.href)).find((r) => r !== null) ?? null;
+      symbols.push({
+        name: element.name ?? '',
+        kind: kindFor(element.type ?? ''),
+        type: element.type ?? '',
+        ...(element.visibility ? { visibility: element.visibility } : {}),
+        ...(element.level ? { level: element.level } : {}),
+        startLine: range?.startLine ?? null,
+        endLine: range?.endLine ?? null,
+        ...(element.constructor ? { constructor: true } : {}),
+        ...(element.final ? { final: true } : {}),
+        ...(element.redefinition ? { redefinition: true } : {}),
+        ...(element.testmethod ? { testmethod: true } : {}),
+      });
+      if (element.children && element.children.length > 0) walk(element.children);
+    }
+  };
+  walk(elements);
+  return symbols;
+}
+
+/** Apply `--kinds` / `--name-pattern` filters to a flattened symbol list. */
+export function filterSymbols(symbols: ObjectSymbol[], kinds?: string, namePattern?: string): ObjectSymbol[] {
+  let filtered = symbols;
+  if (kinds) {
+    const wanted = new Set(
+      kinds
+        .split(',')
+        .map((kind) => kind.trim().toLowerCase())
+        .filter(Boolean),
+    );
+    filtered = filtered.filter((symbol) => wanted.has(symbol.kind.toLowerCase()));
+  }
+  if (namePattern) {
+    let pattern: RegExp;
+    try {
+      pattern = new RegExp(namePattern, 'i');
+    } catch {
+      throw new CliError('INVALID_ARGUMENT', `Invalid --name-pattern '${namePattern}': not a valid regular expression.`, {
+        details: { namePattern },
+      });
+    }
+    filtered = filtered.filter((symbol) => pattern.test(symbol.name));
+  }
+  return filtered;
+}
+
+async function readSymbols(
+  client: AdtClientWrapper,
+  target: VersionTarget,
+  flags: InspectFlags,
+): Promise<ObjectSymbolsInfo> {
+  if (!isClassLike(target.type)) {
+    return {
+      supported: false,
+      reason: `symbols are only available for classes and interfaces (got ${target.type})`,
+      count: 0,
+      symbols: [],
+    };
+  }
+  const raw = (await client.objectStructureElements(target.objectUrl)) as StructureElementLike[];
+  const symbols = filterSymbols(flattenSymbols(raw), flags.kinds, flags.namePattern);
+  return { supported: true, count: symbols.length, symbols };
 }

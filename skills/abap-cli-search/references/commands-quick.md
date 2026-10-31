@@ -73,6 +73,14 @@ abap inspect [options] <object>
 | `--locks` | Include lock / transport ownership (read-only). |
 | `--package` | Include the object package name. |
 | `--activation` | Verify active vs latest source per part (read-only; detect stale activation). |
+| `--versions` | Read the version history (ADT versions feed; read-only). |
+| `--include <part>` | Include part for --versions: main \| definitions \| implementations \| macros \| testclasses (default main). |
+| `--limit <n>` | Max version entries to return (default 50, max 200). |
+| `--show <version>` | Return the source of one version (requires --versions). |
+| `--out <path>` | Write the shown version source to a file instead of returning it. |
+| `--symbols` | Flatten the class/interface structure into symbols with source line ranges. |
+| `--kinds <list>` | Filter --symbols by kind, comma separated (method, attribute, …). |
+| `--name-pattern <regex>` | Filter --symbols by name (case-insensitive regular expression). |
 
 - Inspect a class
 

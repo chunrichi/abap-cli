@@ -781,6 +781,24 @@ export class AdtClientWrapper {
     return this._call(() => this.client.transportDetails(transportNumber));
   }
 
+  /** Release a transport request. Destructive — a released request cannot be undone. */
+  transportRelease(transportNumber: string, ignoreLocks?: boolean, ignoreATC?: boolean) {
+    return this._call(() => this.client.transportRelease(transportNumber, ignoreLocks, ignoreATC));
+  }
+
+  /**
+   * Raw GET of an ADT Atom feed (versions etc.) using the wrapper's
+   * authenticated session; returns the XML body for the caller to parse.
+   */
+  adtFeed(feedPath: string) {
+    return this._call(async () => {
+      const response = await this.client.httpClient.request(feedPath, {
+        headers: { Accept: 'application/atom+xml;type=feed' },
+      });
+      return response.body;
+    });
+  }
+
   // --- Object creation ---
 
   /**

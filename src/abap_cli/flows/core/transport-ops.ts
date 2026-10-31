@@ -1,6 +1,7 @@
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError } from '../../output/json.js';
 import { resolveObject, getObjectParts } from '../../core/resolve.js';
+import { requireWriteConfirmation } from '../../core/confirmation.js';
 
 export interface TransportObjectInfo {
   name: string;
@@ -382,4 +383,197 @@ function formatAssign(data: { object: string; transport: string; assigned: boole
   return data.assigned
     ? `Assigned ${data.object} to transport ${data.transport}.`
     : `${data.object} is already assigned to transport ${data.transport} (no-op).`;
+}
+
+// --- Transport check / release ---
+
+export interface TransportCheckTransport {
+  number: string;
+  status: string;
+  owner: string;
+  text: string;
+}
+
+export interface TransportCheckMessage {
+  severity: string;
+  text: string;
+}
+
+export interface TransportCheckResult {
+  object: string;
+  ok: boolean;
+  /** `X` when SAP expects the change to be recorded on a request. */
+  recording: string;
+  korrflag: string;
+  transports: TransportCheckTransport[];
+  messages: TransportCheckMessage[];
+}
+
+export interface TransportCheckOptions {
+  package?: string;
+}
+
+interface RawTransportInfo {
+  RECORDING?: string;
+  KORRFLAG?: string;
+  MESSAGES?: { SEVERITY?: string; TEXT?: string }[];
+  TRANSPORTS?: { TRKORR?: string; TRSTATUS?: string; AS4USER?: string; AS4TEXT?: string }[];
+}
+
+function formatTransportCheck(data: TransportCheckResult): string {
+  const lines = [`Transport check for ${data.object}:`, `  result: ${data.ok ? 'ok' : 'blocked'}`];
+  if (data.recording) lines.push(`  recording: ${data.recording}`);
+  if (data.korrflag) lines.push(`  korrflag: ${data.korrflag}`);
+  for (const t of data.transports) lines.push(`  transport: ${t.number}  ${t.status}  ${t.owner}  ${t.text}`);
+  for (const m of data.messages) lines.push(`  ${m.severity || 'E'}: ${m.text}`);
+  return lines.join('\n');
+}
+
+/**
+ * Read-only transport check for an object: which request would record the
+ * change and whether SAP blocks it. SAP reports blocking messages (severity
+ * E/A/X) as an exception from the transport-checks endpoint, so a thrown SAP
+ * error becomes `ok: false` with the message instead of an ad-hoc failure.
+ */
+export async function runTransportCheck(
+  objectName: string,
+  opts: TransportCheckOptions = {},
+): Promise<TransportEnvelope<TransportCheckResult>> {
+  const client = await AdtClientWrapper.create();
+  const object = await resolveObject(client, objectName);
+  const parts = await getObjectParts(client, object);
+  const mainUrl = (parts.find((p) => p.subtype === 'main') ?? parts[0]!).sourceUrl;
+  const devClass = opts.package?.trim().toUpperCase() || undefined;
+
+  let raw: RawTransportInfo;
+  try {
+    raw = (await client.transportInfo(mainUrl, devClass)) as RawTransportInfo;
+  } catch (error: unknown) {
+    if (error instanceof CliError && error.code === 'SAP_ERROR') {
+      const data: TransportCheckResult = {
+        object: object.name,
+        ok: false,
+        recording: '',
+        korrflag: '',
+        transports: [],
+        messages: [{ severity: 'E', text: error.message }],
+      };
+      return { data, human: formatTransportCheck(data) };
+    }
+    throw error;
+  }
+
+  const messages = (raw.MESSAGES ?? []).map((m) => ({ severity: m.SEVERITY ?? '', text: m.TEXT ?? '' }));
+  const data: TransportCheckResult = {
+    object: object.name,
+    ok: !messages.some((m) => /[EAX]/.test(m.severity)),
+    recording: raw.RECORDING ?? '',
+    korrflag: raw.KORRFLAG ?? '',
+    transports: (raw.TRANSPORTS ?? []).map((t) => ({
+      number: t.TRKORR ?? '',
+      status: t.TRSTATUS ?? '',
+      owner: t.AS4USER ?? '',
+      text: t.AS4TEXT ?? '',
+    })),
+    messages,
+  };
+  return { data, human: formatTransportCheck(data) };
+}
+
+export interface TransportReleaseMessage {
+  severity: string;
+  text: string;
+}
+
+export interface TransportReleaseReportInfo {
+  reporter: string;
+  status: string;
+  statusText: string;
+  messages: TransportReleaseMessage[];
+}
+
+export interface TransportReleaseResult {
+  transport: string;
+  dryRun?: boolean;
+  released: boolean;
+  reports: TransportReleaseReportInfo[];
+}
+
+export interface TransportReleaseOptions {
+  ignoreLocks?: boolean;
+  ignoreAtc?: boolean;
+  dryRun?: boolean;
+  yes?: boolean;
+}
+
+interface RawReleaseReport {
+  'chkrun:reporter'?: string;
+  'chkrun:status'?: string;
+  'chkrun:statusText'?: string;
+  messages?: { 'chkrun:type'?: string; 'chkrun:shortText'?: string }[];
+}
+
+function formatTransportRelease(data: TransportReleaseResult): string {
+  const lines = [`Transport release ${data.transport}:`, `  released: ${data.released ? 'yes' : 'no'}`];
+  for (const r of data.reports) {
+    lines.push(`  ${r.reporter || r.status}: ${r.status} — ${r.statusText}`);
+    for (const m of r.messages) lines.push(`    ${m.severity || 'E'}: ${m.text}`);
+  }
+  return lines.join('\n');
+}
+
+/**
+ * Release a transport request. Destructive and irreversible: a released
+ * request can no longer be changed. `--dry-run` never touches SAP; any run
+ * that reports `abortrelapifail` throws with the per-object reports in
+ * `error.details` so an agent can branch on the failure without parsing prose.
+ */
+export async function runTransportRelease(
+  request: string,
+  opts: TransportReleaseOptions = {},
+): Promise<TransportEnvelope<TransportReleaseResult>> {
+  const transport = request.trim().toUpperCase();
+  if (!transport) {
+    throw new CliError('INVALID_ARGUMENT', 'transport release requires a transport request number', {
+      nextSteps: ["List open requests: 'abap transport list --open'"],
+      example: 'abap transport release DEVK900001 --yes',
+    });
+  }
+  requireWriteConfirmation(`transport release ${transport}`, opts, `abap transport release ${transport} --yes`);
+
+  if (opts.dryRun) {
+    return {
+      data: { transport, dryRun: true, released: false, reports: [] },
+      human: `Would release transport ${transport} (dry-run)`,
+    };
+  }
+
+  const client = await AdtClientWrapper.create();
+  let raw: RawReleaseReport[];
+  try {
+    raw = (await client.transportRelease(transport, opts.ignoreLocks, opts.ignoreAtc)) as unknown as RawReleaseReport[];
+  } catch (error: unknown) {
+    throw mapTransportError(error, transport);
+  }
+
+  const reports = (raw ?? []).map((r) => ({
+    reporter: r['chkrun:reporter'] ?? '',
+    status: r['chkrun:status'] ?? '',
+    statusText: r['chkrun:statusText'] ?? '',
+    messages: (r.messages ?? []).map((m) => ({ severity: m['chkrun:type'] ?? '', text: m['chkrun:shortText'] ?? '' })),
+  }));
+  const released = reports.length === 0 || reports.every((r) => r.status === 'released');
+  const data: TransportReleaseResult = { transport, released, reports };
+  if (!released) {
+    throw new CliError('SAP_ERROR', `Transport ${transport} release did not complete`, {
+      details: { transport, reports },
+      nextSteps: [
+        'Read the per-object report in error.details.reports to see which object blocked the release.',
+        'Fix the blocking object, or retry with --ignore-locks / --ignore-atc when intentional.',
+        `Check the current request state: abap transport show ${transport}`,
+      ],
+      example: `abap transport show ${transport}`,
+    });
+  }
+  return { data, human: formatTransportRelease(data) };
 }
