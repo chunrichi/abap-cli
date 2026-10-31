@@ -6,15 +6,18 @@ abap-cli is designed to be driven by AI agents. Every command supports `--json` 
 
 ```jsonc
 // Success — written to stdout
-{ "status": "success", "meta": { "command": "abap pull", "version": "0.2.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { ... } }
+{ "status": "success", "meta": { "command": "abap pull", "version": "1.2.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { ... } }
 
 // Failure — written to stderr (stdout empty), exit code non-zero
 { "status": "error", "meta": { ... }, "error": { "code": "NO_TRANSPORT", "category": "VALIDATION_ERROR", "message": "...", ... } }
 ```
 
 - Success goes to **stdout**; errors go to **stderr**. Capture them separately.
-- Exit code `0` = success, `1` = unknown/unmapped failure, `2`–`9` = categorized (usage / config / TLS / auth / SAP / validation / not-found / locked), plus reserved-range codes `64` DDLS not supported on this release, `65` channel detection, `66` conflict, `67` persistence and `68` HTTP error. The mapping is stable and 1:1 with `error.category`.
+- In `--json` mode a failure writes **exactly one** JSON envelope to stderr and nothing to stdout — do not expect a help block appended to the error, and `JSON.parse(stderr)` always succeeds.
+- Human-readable help is only printed by `--help` (and `abap help <command>`). A bare invocation (for example `abap pull` with no object/`--package`/`--tr`) or a missing required argument is a `USAGE` failure (`exit 2`); its envelope points at the full option list through `error.details.help`.
+- Exit code `0` = success, `1` = unknown/unmapped failure, `2`–`9` = categorized (usage / config / TLS / auth / SAP / validation / not-found / locked), plus reserved-range codes `64` DDLS not supported on this release and `65` channel detection. The mapping is stable and 1:1 with `error.category`.
 - `error.code` is stable and machine-readable; `error.category` is explicit (see [Commands → Error Codes](commands.md#error-codes)). Non-fatal warnings live in `meta.warnings` and never change the exit code.
+- Recovery metadata is structured, not prose: `error.nextSteps` (ordered actions), `error.example` (one canonical invocation), `error.references` (repo-relative skill doc) and, where a value is missing, `error.details.missing`. A first run in an unconfigured workspace therefore reports `CONFIG_ERROR` with `details.missing: ["system"]` instead of a message-only error.
 
 ## Non-Interactive Operation
 

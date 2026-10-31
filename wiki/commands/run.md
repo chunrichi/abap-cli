@@ -4,7 +4,7 @@ title: abap run
 description: 在 SAP 端执行 ABAP 类（classrun）或静态方法（runner wrapper），返回 stdout、业务退出码与耗时 — Agent 的 push → run → 验证闭环
 tags: [abap-cli, command, run, classrun, execute, verification, runner, agent-loop]
 created at: 2026-08-07 22:30:00
-changed at: 2026-09-18 22:05:00
+changed at: 2026-11-01 00:27:00
 ---
 
 # abap run
@@ -23,7 +23,10 @@ changed at: 2026-09-18 22:05:00
 ```bash
 abap run [options] <class-name>
 abap run --schema [--json]
+abap run --help                 # 唯一的 help 入口
 ```
+
+裸 `abap run`（无 `<class-name>`）是 `USAGE` 失败（exit 2）：`--json` 下 stdout 为空、stderr 单条错误信封（`error.details.help` 指向 `abap run --help`），不会再以 exit 0 打印 help。
 
 ## Options
 

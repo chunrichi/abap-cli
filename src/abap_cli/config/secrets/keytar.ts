@@ -9,6 +9,7 @@
  */
 import { createRequire } from 'node:module';
 import { CliError } from '../../output/json.js';
+import { CONFIG_ERROR_REFERENCE } from '../recovery.js';
 import type { SecretKind, SecretsBackend } from '../secrets-types.js';
 
 const require = createRequire(import.meta.url);
@@ -82,7 +83,14 @@ export function createKeytarBackend(): SecretsBackend {
   if (!backend) {
     throw new CliError('CONFIG_ERROR',
       "keytar backend requested (ABAP_CLI_KEYCHAIN_BACKEND=keytar) but 'keytar' is not installed. " +
-      "Install it with `npm install keytar` or unset the env var to use the native OS keychain.");
+      "Install it with `npm install keytar` or unset the env var to use the native OS keychain.", {
+        nextSteps: [
+          'Unset ABAP_CLI_KEYCHAIN_BACKEND to use the native OS keychain.',
+          'Or install the optional dependency: npm install keytar.',
+        ],
+        example: 'abap profile set <name> --password <password>',
+        references: CONFIG_ERROR_REFERENCE,
+      });
   }
   return backend;
 }

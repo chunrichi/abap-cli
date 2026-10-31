@@ -43,10 +43,10 @@ Every command supports `--json` (compact envelope, default for agents) and `--pr
 | `abap diff` | sap | Compare local files against SAP |
 | `abap dumps` | sap | List recent ST22 ABAP runtime dumps (read-only) |
 | `abap types` | local | Print the CLI type ↔ TADIR / DDIC mapping (no SAP call) |
-| `abap report-stuck` | sap | Write a stuck-operation report for offline triage |
+| `abap report-stuck` | local | Write a stuck-operation report for offline triage |
 | `abap mime` | sap | Create, delete, or upload MIME Repository resources (create \| delete \| push) |
-| `abap validate:aff` | sap | Validate JSON files against official abap-file-format (AFF) canonical schemas (Draft 2020-12) |
-| `abap session` | sap | Inspect / manage session cookie reuse state |
+| `abap validate:aff` | local | Validate JSON files against official abap-file-format (AFF) canonical schemas (Draft 2020-12) |
+| `abap session` | local | Inspect / manage session cookie reuse state |
 
 ## `abap init`
 

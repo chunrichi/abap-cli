@@ -2,14 +2,16 @@
  * Top-level commander-error handler.
  *
  * Every commander error thrown by `program.parseAsync` flows through
- * `handleTopLevelError`. The handler is responsible for the stream-separation
+ * `handleTopLevelError`. The handler is responsible for the stream separation
  * contract:
- *  - Real help exits (`--help`, `--version`, no-args root): plain text on
- *    stdout, no stderr, exit 0.
- *  - USAGE / unknown-command / unknown-option exits: stdout carries the
- *    subcommand's help in human mode; in `--json` mode stdout stays empty and
- *    the help body accompanies the JSON envelope on stderr so the JSON
- *    contract (stdout empty on failure) is preserved.
+ *  - Real help exits (`--help`, `--version`, `abap help <cmd>`): plain text on
+ *    stdout, no stderr, exit 0. `--help` (and the `help` command) is the only
+ *    path that prints human help.
+ *  - USAGE / missing-argument / unknown-command / unknown-option exits: stdout
+ *    stays empty in every mode; failures render the standard error contract on
+ *    stderr. In `--json` mode that is exactly one envelope line, with a
+ *    one-line `details.help` pointer instead of a spliced help block; human
+ *    mode renders the `Error:` / `Try:` / `See:` lines only.
  *  - Any other thrown error: routes through `renderError` so the standard
  *    envelope / exit-code mapping applies.
  *
@@ -17,8 +19,9 @@
  */
 
 import { CommanderError, type Command } from 'commander';
-import { CliError, isJsonMode, renderError, type OutputMode } from './output/json.js';
-import { buildMeta, deriveCommand } from './output/meta.js';
+import { renderError, type OutputMode } from './output/json.js';
+import { buildMeta } from './output/meta.js';
+import { commandPath, missingInvocationError } from './output/usage.js';
 
 export interface TopErrorContext {
   program: Command;
@@ -30,6 +33,11 @@ export interface TopErrorContext {
 /** First non-flag argv token; the subcommand the user addressed. */
 export function firstSubcommandArg(argv: readonly string[]): string | undefined {
   return argv.slice(2).find((a) => !a.startsWith('-'));
+}
+
+/** All non-flag argv tokens (user tokens, in order). */
+function nonFlagArgs(argv: readonly string[]): string[] {
+  return argv.slice(2).filter((a) => !a.startsWith('-'));
 }
 
 /** Walk the program tree to find the deepest registered subcommand for argv.
@@ -66,11 +74,6 @@ export function isJson(argv: readonly string[]): OutputMode {
   return 'human';
 }
 
-/** Back-compat boolean predicate (true when any JSON mode is requested). */
-export function isAnyJson(argv: readonly string[]): boolean {
-  return isJsonMode(isJson(argv));
-}
-
 /** Stream handles for the handler; injected so unit tests can capture them. */
 export interface Streams {
   stdout: { write: (s: string) => unknown };
@@ -94,6 +97,16 @@ export function handleTopLevelError(
 ): never {
   const json: OutputMode = isJson(ctx.argv);
 
+  /** Emit one USAGE failure: stdout stays empty, stderr carries the standard
+   *  error rendering, and `details.help` points at the one-line help command
+   *  instead of splicing the multi-line help body into the output. */
+  const usageFailure = (message: string, sub: Command): never => {
+    const usage = missingInvocationError(commandPath(sub), message);
+    const out = renderError(json, usage, buildMeta());
+    writeBlock(streams.stderr, out.stderr.join('\n'));
+    exit(out.exitCode ?? 2);
+  };
+
   if (error instanceof CommanderError) {
     if (error.code === 'commander.helpDisplayed') {
       // Real help exit (--help/--version/no-args root): commander has already
@@ -102,109 +115,36 @@ export function handleTopLevelError(
       exit(0);
     }
     if (error.code === 'commander.help') {
-      // commander.help fires for bare subcommands (e.g. `abap transport` with
-      // no subcommand). commander has already written the subcommand help
-      // (via outputHelp({ error: true })) to writeErr. We only need to emit
-      // the JSON envelope in --json mode and a stderr hint in human mode.
-      const firstArg = firstSubcommandArg(ctx.argv);
-      if (isJsonMode(json)) {
-        const usage = new CliError('USAGE', 'Missing required subcommand or argument.', {
-          nextSteps: ['Check the command usage: abap <command> --help.'],
-          example: `abap ${firstArg ?? '<command>'} --help`,
-        });
-        const out = renderError(json, usage, buildMeta());
-        writeBlock(streams.stderr, out.stderr.join('\n'));
-        exit(out.exitCode ?? 2);
+      // commander.help(0) is an explicit help request (`abap help <cmd>`):
+      // commander wrote the help to stdout, so it is a real help exit.
+      if (error.exitCode === 0) exit(0);
+      // Otherwise commander stopped on a command group without a subcommand
+      // (or a help request for an unknown command): a USAGE failure.
+      const args = nonFlagArgs(ctx.argv);
+      if (args[0] === 'help') {
+        const target = args[1];
+        usageFailure(
+          target ? `unknown command '${target}'` : 'Missing required subcommand or argument.',
+          ctx.program,
+        );
       }
-      streams.stderr.write('Missing required argument(s). See the usage above.\n');
-      exit(2);
+      const firstArg = firstSubcommandArg(ctx.argv);
+      usageFailure(
+        'Missing required subcommand or argument.',
+        resolveSubcommand(ctx.program, firstArg, ctx.argv),
+      );
     }
     if (error.exitCode === 0) exit(0);
-    if (
-      error.code === 'commander.missingArgument' ||
-      error.code === 'commander.missingMandatoryOptionValue' ||
-      error.code === 'commander.optionMissingArgument'
-    ) {
-      // Missing-argument path: commander has already written the subcommand
-      // usage to writeErr (via _displayError → outputHelp({ error: true })).
-      // In human mode we mirror a plain help body to stdout so the user sees
-      // the full options; helpInformation() omits addHelpText sections, which
-      // is acceptable on this error path. JSON mode keeps stdout empty (envelope contract on failure).
-      const firstArg = firstSubcommandArg(ctx.argv);
-      const sub = resolveSubcommand(ctx.program, firstArg, ctx.argv);
-      const helpBody = sub.helpInformation();
-      if (isJsonMode(json)) {
-        const usage = new CliError('USAGE', error.message.replace(/^error: /, ''), {
-          nextSteps: ['Check the command usage: abap <command> --help.'],
-          example: `abap ${firstArg ?? '<command>'} --help`,
-        });
-        const out = renderError(json, usage, buildMeta());
-        writeBlock(streams.stderr, out.stderr.join('\n'));
-        streams.stderr.write('\n');
-        writeBlock(streams.stderr, helpBody);
-        exit(out.exitCode ?? 2);
-      }
-      writeBlock(streams.stdout, helpBody);
-      const usage = new CliError('USAGE', error.message.replace(/^error: /, ''), {
-        nextSteps: ['Check the command usage: abap <command> --help.'],
-        example: 'abap <command> --help',
-      });
-      const out = renderError(json, usage, buildMeta());
-      writeBlock(streams.stderr, out.stderr.join('\n'));
-      exit(out.exitCode ?? 2);
-    }
-    const usage = new CliError('USAGE', error.message.replace(/^error: /, ''), {
-      nextSteps: ['Check the command usage: abap <command> --help.'],
-      example: 'abap <command> --help',
-    });
-    const out = renderError(json, usage, buildMeta());
-    writeBlock(streams.stderr, out.stderr.join('\n'));
-    exit(out.exitCode ?? 2);
+    // USAGE paths (missing argument / missing mandatory option value / unknown
+    // option / unknown command) share one rendering: commander already wrote
+    // its own text to the suppressed writeErr, so only the envelope remains.
+    const firstArg = firstSubcommandArg(ctx.argv);
+    const sub = resolveSubcommand(ctx.program, firstArg, ctx.argv);
+    usageFailure(error.message.replace(/^error: /, ''), sub);
   }
 
   const out = renderError(json, error, buildMeta());
   writeBlock(streams.stderr, out.stderr.join('\n'));
 
-  // Fire onError lifecycle hooks without blocking the exit path (failures swallowed)
-
   exit(out.exitCode ?? 1);
-}
-
-/**
- * Derive the `onError` hook payload from the first rendered stderr line.
- *
- * `renderError` emits a serialized envelope in JSON mode but plain text
- * (`Error: <message>`) in human mode. A bare `JSON.parse` here therefore threw
- * a `SyntaxError` for every human-mode failure, replacing the real error with
- * an unrelated one and hiding the actual cause (feedback F-01: a missing `ajv`
- * dependency surfaced as `SyntaxError: Unexpected token 'E'`).
- *
- * Parsing is best-effort by contract: on any failure we synthesize a shape from
- * the text. This function must never throw — the caller is already on the error
- * path and must not be interrupted by hook bookkeeping.
- */
-function errorContextFromStderr(firstLine: string | undefined): {
-  code: string;
-  message: string;
-  category: string;
-} {
-  if (!firstLine) return { code: 'UNKNOWN', message: 'Unknown error', category: 'UNKNOWN' };
-  try {
-    const parsed = JSON.parse(firstLine) as {
-      error?: { code?: unknown; message?: unknown; category?: unknown };
-    };
-    const err = parsed?.error;
-    if (err && typeof err === 'object') {
-      return {
-        code: typeof err.code === 'string' ? err.code : 'UNKNOWN',
-        message: typeof err.message === 'string' ? err.message : firstLine,
-        category: typeof err.category === 'string' ? err.category : 'UNKNOWN',
-      };
-    }
-  } catch {
-    // Human-mode stderr is not JSON — fall through to the synthesized shape.
-  }
-  // Human mode prefixes message lines with "Error: " (renderError); drop it so
-  // hooks receive the bare message, matching JSON-mode semantics.
-  return { code: 'UNKNOWN', message: firstLine.replace(/^Error:\s*/, ''), category: 'UNKNOWN' };
 }

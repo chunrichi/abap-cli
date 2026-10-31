@@ -3,6 +3,7 @@ import { createMimeFolder, deleteMimeFolder, type CreateMimeFolderOptions, type 
 import { pushMimeResources, type PushMimeResourcesOptions } from '../flows/mime/mime-push.js';
 import { jsonFromCommand, printError, printResult, printSchema, type OutputMode, type CommandSchema } from '../output/json.js';
 import { schemaOption } from './schema-helpers.js';
+import { failMissingInvocation } from '../output/usage.js';
 
 export const SCHEMA: CommandSchema = {
   schemaVersion: 1,
@@ -37,7 +38,13 @@ export function registerMimeCommand(program: Command): void {
         printSchema(SCHEMA, jsonFromCommand(cmd));
         return;
       }
-      console.log(cmd.helpInformation());
+      // Bare `abap mime` is a USAGE failure; help is only printed by
+      // `abap mime --help`.
+      failMissingInvocation(
+        cmd,
+        "Missing subcommand: use 'mime create', 'mime delete', or 'mime push'.",
+        'abap mime create /zntf_ui --package $TMP --yes',
+      );
     });
 
   mime

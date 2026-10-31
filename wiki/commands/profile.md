@@ -4,7 +4,7 @@ title: abap profile
 description: 管理全局连接 profile — add / list / show / set / test / delete / export / import；绑定工作区用 abap init --profile。登录方式只有 basic auth
 tags: [abap-cli, command, profile, connection, keychain]
 created at: 2026-08-17 00:00:00
-changed at: 2026-10-31 22:35:00
+changed at: 2026-11-01 00:27:00
 ---
 
 # abap profile
@@ -76,7 +76,7 @@ abap profile add <name> --url <url> --username <user> --password '<pwd>'
 
 ## 行为规则
 
-- **裸 `abap profile`** 打印子命令 help（exit 0）
+- **裸 `abap profile`**（无子命令）是 `USAGE` 失败（exit 2）：`--json` 下 stdout 为空、stderr 单条错误信封（`error.details.help` 指向 `abap profile --help`）；human help 只在 `--help`
 - **`add` 已存在** → `CONFIG_ERROR`（exit 3），提示 `set` 或 `delete` 后重建
 - **`add`/`set` 无字段选项 + 非 TTY** → `USAGE`（exit 2）
 - **`add` 不连接、不验证密码**：`data.verified: false` + `nextSteps`（`profile test` → `init --profile`）；连通性由 `profile test` 负责

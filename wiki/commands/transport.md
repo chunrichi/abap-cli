@@ -4,7 +4,7 @@ title: abap transport
 description: 管理 SAP 传输请求（CTS）— list 列当前用户请求 / create 新建（写操作）/ show 查看请求元数据 / resolve 解析对象所属请求 / assign 把对象挂到请求（写操作，已挂则 no-op）；create 与 assign 在非 TTY 需 --yes 或 --dry-run
 tags: [abap-cli, command, transport, cts, trkorr, list, create, show, resolve, assign, dry-run]
 created at: 2026-08-07 00:39:21
-changed at: 2026-08-07 00:39:21
+changed at: 2026-11-01 00:27:00
 ---
 
 # abap transport
@@ -20,7 +20,10 @@ abap transport show <req> [--json]
 abap transport resolve <object> [--json]
 abap transport assign <object> --tr <transport> [--dry-run] [--yes] [--json]
 abap transport --schema                              # 参数自省（unified envelope，无 SAP 调用）
+abap transport --help                                # 唯一的 help 入口
 ```
+
+裸 `abap transport`（无子命令）是 `USAGE` 失败（exit 2）：`--json` 下 stdout 为空、stderr 单条错误信封（`error.details.help` 指向 `abap transport --help`）。子命令缺必填参数（如 `transport create` 缺 `<description>`、`transport assign` 缺 `--tr`）同样是 `USAGE`，不拼接 help 文本。
 
 ## Options
 

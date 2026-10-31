@@ -8,6 +8,7 @@ import {
   runTransportShow,
 } from '../flows/core/transport-ops.js';
 import { baseSchema, schemaOption } from './schema-helpers.js';
+import { failMissingInvocation } from '../output/usage.js';
 
 export const SCHEMA: CommandSchema = {
   ...baseSchema('transport', 'Manage SAP transport requests (list / create / show / resolve / assign).', 'abap transport <list|create|show|resolve|assign> [options]', 'sap'),
@@ -36,7 +37,13 @@ export function registerTransportCommand(program: Command): void {
         printSchema(SCHEMA, jsonFromCommand(cmd));
         return;
       }
-      cmd.help();
+      // Bare `abap transport` is a USAGE failure; help is only printed by
+      // `abap transport --help`.
+      failMissingInvocation(
+        cmd,
+        "Missing subcommand: use 'transport list', 'create', 'show', 'resolve', or 'assign'.",
+        'abap transport list --json',
+      );
     });
 
   transportCmd

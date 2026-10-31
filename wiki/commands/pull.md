@@ -4,20 +4,20 @@ title: abap pull
 description: 从 SAP 下载对象到本地文件 — 支持源码对象、包批量、DDIC JSON（含 DOMA/DTEL 长文本伴生）、textpool 与远程版本拉取
 tags: [abap-cli, command, pull, download, abap-file-format, ddic, docu, textpool, version-management]
 created at: 2026-08-06 23:21:15
-changed at: 2026-10-31 18:06:00
+changed at: 2026-11-01 00:26:00
 ---
 
 # abap pull
 
-从 SAP 系统下载 ABAP 对象到本地文件，遵循 abap-file-format（AFF）原生扁平布局。支持五类入口：单个源码对象（CLAS/PROG/INTF/FUGR）、包批量下载、DDIC 对象（DOMA/DTEL/TABL/STRU/ENQU/VIEW/SHLP/NROB，其中 DOMA/DTEL 会附带拉长文本伴生 `.docu.json`）、textpool 文本元素、以及远程系统版本源码。裸 `abap pull`（无对象名、无 `--package`）打印命令帮助（exit 0）。
+从 SAP 系统下载 ABAP 对象到本地文件，遵循 abap-file-format（AFF）原生扁平布局。支持五类入口：单个源码对象（CLAS/PROG/INTF/FUGR）、包批量下载、DDIC 对象（DOMA/DTEL/TABL/STRU/ENQU/VIEW/SHLP/NROB，其中 DOMA/DTEL 会附带拉长文本伴生 `.docu.json`）、textpool 文本元素、以及远程系统版本源码。裸 `abap pull`（无对象名、无 `--package`、无 `--tr`）是 `USAGE` 失败（exit 2）：`--json` 下 stdout 为空、stderr 只有单条错误信封；人类 help 只在 `abap pull --help`。
 
 ## Usage
 
 ```bash
 abap pull [options] [object-name]
 
-# 裸命令打印帮助
-abap pull
+# 裸命令 = USAGE（exit 2），不打印 help；要看参数用 --help
+abap pull --help
 ```
 
 ## Options

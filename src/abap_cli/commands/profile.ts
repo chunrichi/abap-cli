@@ -8,6 +8,7 @@ import { runList, runShow, runTest, runDelete } from '../flows/setup/profile.js'
 import { runAdd, runSet } from '../flows/setup/profile.js';
 import { toOutputPath } from '../core/path-output.js';
 import { baseSchema, schemaOption } from './schema-helpers.js';
+import { failMissingInvocation } from '../output/usage.js';
 
 export const SCHEMA: CommandSchema = {
   ...baseSchema('profile', 'Manage global connection profiles (list / show / add / set / test / delete / export / import).', 'abap profile <command> [options]', 'local'),
@@ -156,8 +157,13 @@ export function registerProfileCommand(program: Command): void {
         printSchema(SCHEMA, jsonFromCommand(cmd));
         return;
       }
-      // Bare `abap profile` prints the subcommand help (exit 0), like bare `abap`.
-      console.log(cmd.helpInformation());
+      // Bare `abap profile` is a USAGE failure; human help is only printed by
+      // `abap profile --help`.
+      failMissingInvocation(
+        cmd,
+        "Missing subcommand: use 'profile list', 'show', 'add', 'set', 'test', 'delete', 'export', or 'import'.",
+        'abap profile list --json',
+      );
     });
 
   profile

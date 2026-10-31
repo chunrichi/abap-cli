@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import { printError, printResult, printSchema, jsonFromCommand } from '../output/json.js';
+import { failMissingInvocation } from '../output/usage.js';
 import {
   buildDryRun,
   runRun,
@@ -137,9 +138,13 @@ export function registerRunCommand(program: Command): void {
         }
 
         if (!className) {
-          // Bare `abap run` — print command help (mirrors pull/config behaviour).
-          process.stdout.write(cmd.helpInformation());
-          return;
+          // Bare `abap run` is a USAGE failure; human help is only printed by
+          // `abap run --help`.
+          failMissingInvocation(
+            cmd,
+            'Missing required argument: <class-name> is required.',
+            'abap run ZCL_MY_CLASS --json',
+          );
         }
 
         try {
