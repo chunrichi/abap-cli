@@ -52,7 +52,7 @@ abap types STRU --tadir-object
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap types", "version": "1.1.0", "timestamp": "2026-10-30T12:00:00.000Z", "durationMs": 2, "warnings": [] },
+  "meta": { "command": "abap types", "version": "1.2.0", "timestamp": "2026-10-30T12:00:00.000Z", "durationMs": 2, "warnings": [] },
   "data": [
     { "cliType": "CLAS", "pgmid": "R3TR", "tadirObject": "CLAS", "ddicTabclass": "", "channel": "ADT", "affSchema": "clas-v1.json", "description": "Global ABAP class" },
     { "cliType": "STRU", "pgmid": "R3TR", "tadirObject": "TABL", "ddicTabclass": "INTTAB", "channel": "ICF", "affSchema": "tabl-v1.json", "description": "Structure (DDIC) — TADIR OBJECT is also TABL; disambiguate via DD02L-TABCLASS=INTTAB" }

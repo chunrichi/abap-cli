@@ -37,7 +37,7 @@ abap fields --schema --json
 
 ## 前置条件
 
-- 已绑定 profile，SAP 可达；ICF 服务已部署且版本匹配（当前 bundled 版本 `1.1.0`，含 `/data/find-tables-by-fields`）。旧服务缺端点时反向模式报 `QUERY_FAILED`，先 `abap deploy --yes`。
+- 已绑定 profile，SAP 可达；ICF 服务已部署且版本匹配（当前 bundled 版本 `1.2.0`，含 `/data/find-tables-by-fields`）。旧服务缺端点时反向模式报 `QUERY_FAILED`，先 `abap deploy --yes`。
 - 对 `DD03L` / `DD02L`（以及 `--with-text` 时的 `DD03T` / `DD04T`）有读权限。
 
 ## Examples
@@ -60,7 +60,7 @@ abap fields --find UNAM --with-text --limit 50 --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap fields", "version": "1.1.0", "timestamp": "2026-10-31T05:30:12.310Z", "durationMs": 286, "warnings": [] },
+  "meta": { "command": "abap fields", "version": "1.2.0", "timestamp": "2026-10-31T05:30:12.310Z", "durationMs": 286, "warnings": [] },
   "data": {
     "table": "VRSD", "count": 2, "truncated": false,
     "fields": [
@@ -75,7 +75,7 @@ abap fields --find UNAM --with-text --limit 50 --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap fields", "version": "1.1.0", "timestamp": "2026-10-31T05:31:40.872Z", "durationMs": 391, "warnings": [] },
+  "meta": { "command": "abap fields", "version": "1.2.0", "timestamp": "2026-10-31T05:31:40.872Z", "durationMs": 391, "warnings": [] },
   "data": {
     "total": 2, "truncated": false, "mode": "all", "requestedCount": 2,
     "matches": [ { "table": "VRSD", "tabclass": "TRANSP", "hitCount": 2, "fields": [

@@ -4,7 +4,7 @@ description: Review or improve ABAP performance through abap-cli's read-only com
 argument-hint: "Describe the ABAP code path, observed bottleneck, data volume, and available platform evidence"
 user-invocable: true
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
   scope: abap-performance-review
   tags: [read-only-first, no-mutation, no-transport]
 ---

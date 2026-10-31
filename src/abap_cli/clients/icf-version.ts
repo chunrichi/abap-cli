@@ -26,7 +26,7 @@ export const ICF_BASE_PATH = '/sap/abap_cli';
  *  bumped 0.6.0 → 1.0.0 with the 1.0.0 CLI release (versions are unified:
  *  package.json == ICF service == CHANGELOG).
  *  Root version check stays backward compatible. */
-export const ICF_SERVICE_VERSION = '1.1.0';
+export const ICF_SERVICE_VERSION = '1.2.0';
 
 export type IcfDeploymentStatus = 'not_deployed' | 'current' | 'outdated' | 'unreachable';
 
