@@ -4,7 +4,7 @@ title: HTTP — SICF 服务节点（ICF Tree Node）
 description: HTTP 类型的 SICF 节点管理；走 ICF 自建通道
 tags: [abap-cli, object-type, http, sicf, icf, abap-file-format]
 created at: 2026-09-01 00:00:00
-changed at: 2026-10-31 15:05:00
+changed at: 2026-10-31 15:25:00
 ---
 
 # HTTP — SICF 服务节点（ICF Tree Node）
@@ -90,7 +90,8 @@ abap push src/zmy_service.http.json --tr DEVK900001 --json
 ## 已知坑
 
 - **本地文件从 `url` 改名为 `servicePath`**：上游 AFF 重写了 `http-v1.json`（`url` → `servicePath`，新增 `tokenHandling`）。旧文件的 `generalInformation.url` / 顶层 `url` 现在会被 `validate:aff` / `push` / `create` 以 VALIDATION_ERROR 拒绝，迁移即改名。
-- **`serviceId` / `descriptionByLang[]` 不落盘**：ABAP handler 的 `GET /http/<name>` 会回传 `service_id`（节点 URL）与 `description_by_lang`（ICFDOCU 多语言行），但 `http-v1.json` 是 `additionalProperties:false`，把它们写进本地文件会让 pull 的写前校验报 `AFF_FIXTURE_INVALID`。现在本地 `.http.json` 只保留 AFF 字段（`servicePath` / `tokenHandling` 等）；旧文件里若残留这两个字段，push/`validate:aff` 会拒绝，删掉或重新 `abap pull --overwrite` 即可。
+- **SICF 描述超过 AFF 60 字符上限会被截断**：`ICFDOCU.ICF_DOCU` 是定长 CHAR（尾部空格），且真实 SICF 节点的描述可能是 `节点名 + GUID + 文本` 的长串（真机 `test` 环境实测 >60）。`pull` 会 `trim` 后截断到 60 字符以满足 `http-v1.json` 的 `header.description` `maxLength`；若 push 回去，SAP 侧描述会变成截断后的文本，需要修改节点描述时请先在本地编辑 `header.description`（≤60）。
+- **`serviceId` / `descriptionByLang[]` 不落盘**：ABAP handler 的 `GET /http/<name>` 会回传 `service_id`（节点 URL）与 `description_by_lang`（ICFDOCU 多语言行），但 `http-v1.json` 是 `additionalProperties:false`，把它们写进本地文件会让 pull 的写前校验报 `AFF_FIXTURE_INVALID`。现在本地 `.http.json` 只保留 AFF 字段（`servicePath` / `tokenHandling` 等）；旧文件里若残留这些字段（含 CLI 信封 `name`），push/`validate:aff` 会拒绝，删掉或重新 `abap pull --overwrite` 即可。
 - **pull 落盘 `originalLanguage` 取登录语言**：ABAP GET 按 `sy-langu` 推导（如登录语言 ZH 则落 `ZH`），不一定等于创建时的值；两次 pull 间一致，不影响 push/pull 幂等闭环。
 - **`create HTTP` 必须带 `--file`**：032 US10 曾支持"无 `--file` 落最小骨架（`action: local`，不调 SAP，已有同名文件返回 `OVERWRITE_REQUIRED`）"，该路径已按重构决策 1A 删除，与 DDIC / DDLS 行为对齐。要起本地草稿请手写 `.http.json`（见 `abap create --schema HTTP` 的 `exampleJson`），或先 `abap pull` 一个同类节点再改；`abap create local HTTP` 不支持 HTTP。
 - **`servicePath` 必须以 `/` 开头**：不写 `/` 时 SAP 端会拒；CLI 不做前缀校验

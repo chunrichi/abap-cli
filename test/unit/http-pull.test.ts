@@ -69,7 +69,8 @@ describe('022 pull HTTP service', () => {
     const parsed = JSON.parse(written);
     // The local shape is the abap-file-format nested one (header + generalInformation);
     // the ICF GET payload still names the SICF path `url`, the local file uses AFF `servicePath`.
-    expect(parsed.name).toBe('ZHTTP_TEST');
+    // Pulled files are strictly AFF-shaped: no CLI envelope `name` member.
+    expect(parsed.name).toBeUndefined();
     expect(parsed.formatVersion).toBe('1');
     expect(parsed.header.description).toBe('HTTP service');
     expect(parsed.header.originalLanguage).toBe('EN');
@@ -86,7 +87,7 @@ describe('022 pull HTTP service', () => {
     const res = await runCommand(program, ['pull', 'ZHTTP_TEST', '--type', 'HTTP', '--dir', 'src', '--overwrite', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     const written = JSON.parse(fs.readFileSync(path.join(cwd, 'src/zhttp_test.http.json'), 'utf-8'));
-    expect(written.name).toBe('ZHTTP_TEST');
+    expect(written.name).toBeUndefined();
   });
 
   it('maps HTTP_OBJECT_NOT_FOUND to OBJECT_NOT_FOUND (exit 8)', async () => {
