@@ -189,6 +189,7 @@ src/(ui2)cl_json.clas.abap                # 命名空间对象 /UI2/CL_JSON
 | `abap status` | 看哪些对象与 SAP 有差异（`--remote-only`、`--local-only`、`--since`、`--all`） |
 | `abap run <class>` | 通过 classrun 或 PUBLIC STATIC 方法执行类（`--method`、`--args`、`--timeout`、`--dry-run`） |
 | `abap run-report <report>` | 执行已激活报表并返回列表输出（`--variant`、`--param NAME=VALUE`、`--format raw / tsv / csv`） |
+| `abap test <object>` | 跑 ABAP Unit 单测，返回摘要与失败用例（`--type`、`--risk`、`--duration`、`--all`、`--strict`） |
 | `abap select --table <name>` | 只读查表，SE16N 等价物（`--fields`、`--where`、`--limit`、`--offset`、`--order-by`、`--group-by`、`--count-only`） |
 | `abap fields <table>` | 从 DD03L 列表 / 视图字段，`--find` 反查（`--with-text`、`--as4local`、`--limit`） |
 | `abap types` | 打印 CLI 类型 ↔ TADIR / DDIC 映射，纯本地（`<type>`、`--tadir-object`） |

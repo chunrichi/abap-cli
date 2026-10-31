@@ -1,4 +1,4 @@
-import { ADTClient, session_types, type ClientOptions, type TextElement, type TextElementCategory, type DumpsFeed } from 'abap-adt-api';
+import { ADTClient, session_types, type ClientOptions, type TextElement, type TextElementCategory, type DumpsFeed, type UnitTestClass, type UnitTestRunFlags } from 'abap-adt-api';
 import { parseServiceBinding, type ServiceBinding } from 'abap-adt-api/build/api/tablecontents.js';
 import {
   buildActivationRequest,
@@ -742,6 +742,21 @@ export class AdtClientWrapper {
         ? this.client.atcWorklists(runResultId)
         : this.client.atcWorklists(runResultId, timestamp, usedObjectSet ?? '', includeExemptedFindings),
     );
+  }
+
+  // --- ABAP Unit (test) ---
+
+  /**
+   * Run ABAP Unit for one object via the ADT ABAP Unit endpoint
+   * (`POST /sap/bc/adt/abapunit/testruns`).
+   *
+   * `objectUrl` is the semantic object reference returned by
+   * `resolveObject` (e.g. `/sap/bc/adt/oo/classes/zcl_foo`); `flags` selects
+   * the risk + duration levels of the run configuration. Read-only: an ABAP
+   * Unit run neither locks objects nor creates transports.
+   */
+  unitTestRun(objectUrl: string, flags?: UnitTestRunFlags): Promise<UnitTestClass[]> {
+    return this._call(() => this.client.unitTestRun(objectUrl, flags));
   }
 
   // --- Runtime dumps (read-only) ---
