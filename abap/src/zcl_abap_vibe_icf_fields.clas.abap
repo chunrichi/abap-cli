@@ -14,7 +14,7 @@ CLASS zcl_abap_vibe_icf_fields DEFINITION PUBLIC FINAL CREATE PUBLIC.
         as4local      TYPE string,
         " Maximum number of matching tables to return. Default 200, hard cap 5000.
         limit         TYPE i,
-        " S-1: when true, the SAP-side handler joins DD03T (table field text)
+        " when true, the SAP-side handler joins DD03T (table field text)
         " and DD04T (data element text) so each match field carries the
         " short description. Adds ~2 left-joins per result set; default false.
         includeText   TYPE abap_bool,
@@ -23,7 +23,7 @@ CLASS zcl_abap_vibe_icf_fields DEFINITION PUBLIC FINAL CREATE PUBLIC.
         name        TYPE string,
         rollname    TYPE string,
         position    TYPE i,
-        " S-1: DDIC short text from DD03T (per table field) or DD04T
+        " DDIC short text from DD03T (per table field) or DD04T
         " (per data element). One of these is typically populated; the
         " data element wins when both exist. Empty when includeText=false
         " or no master/maintenance language text is available.
@@ -176,7 +176,7 @@ CLASS zcl_abap_vibe_icf_fields IMPLEMENTATION.
     IF es_req-limit > 5000.
       es_req-limit = 5000.
     ENDIF.
-    es_req-includetext = ls_raw-includetext. " default false (S-1)
+    es_req-includetext = ls_raw-includetext. " default false
 
     " Normalize fields: uppercase, strip blanks.
     LOOP AT ls_raw-fields INTO DATA(lv_fname).
@@ -254,7 +254,7 @@ CLASS zcl_abap_vibe_icf_fields IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Step 1.5 (S-1): when `includeText` is set, fetch DDIC short text
+    " Step 1.5: when `includeText` is set, fetch DDIC short text
     " from DD03T (per (TABNAME, FIELDNAME, AS4LOCAL, DDLANGUAGE)) and
     " DD04T (per (ROLLNAME, DDLANGUAGE)). Session language is used as
     " the preferred DDLANGUAGE; an empty DDLANGUAGE row in DD03T/DD04T
@@ -333,7 +333,7 @@ CLASS zcl_abap_vibe_icf_fields IMPLEMENTATION.
       ENDIF.
       INSERT lv_key INTO TABLE lt_seen.
 
-      " Resolve DDIC short text (S-1) when includeText is requested.
+      " Resolve DDIC short text when includeText is requested.
       " fieldText wins over elementText when both exist: DD03T is the
       " per-table field override (e.g. short label "Changed By" might
       " differ from the data element's "User Name"), so a non-empty

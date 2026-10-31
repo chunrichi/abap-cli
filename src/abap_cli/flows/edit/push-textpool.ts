@@ -18,7 +18,7 @@ interface TextpoolResolved {
  * Push a single textpool .properties file via the mixed-mode route
  * (ADT text-elements API when the cached capability allows, otherwise the
  * self-built ICF /textpool endpoint). Route is decided from the recorded
- * profile — no runtime fallback (Q1).
+ * profile — no runtime fallback.
  */
 export async function pushTextpoolFile(
   client: AdtClientWrapper,

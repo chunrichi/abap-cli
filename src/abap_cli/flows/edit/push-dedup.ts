@@ -1,7 +1,7 @@
 import { isTablArtifactFile, tablArtifactPaths } from '../../formats/ddic/tabl-artifact.js';
 
 /**
- * PR3 (C1): when a workspace holds the full TABL/STRU artifact trio
+ * (C1): when a workspace holds the full TABL/STRU artifact trio
  * (`.tabl.json` + `.tabl.ddic` [+ optional `.tabl.settings.json`]), the
  * scanner / explicit `abap push --all` invocation naturally enumerates all
  * three. They refer to a single SAP object, so pushing each one in turn

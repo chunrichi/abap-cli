@@ -1,5 +1,5 @@
 /**
- * 014 US4: textpool capability probe persistence + mixed-mode router.
+ * textpool capability probe persistence + mixed-mode router.
  * TDD — written before textpool-capability.ts / textpool-router.ts.
  * The capability is recorded once at connect/init time (Q1: one-shot, reuse),
  * and the router reads the cached SystemProfile result with NO runtime fallback.
@@ -36,7 +36,7 @@ vi.mock('../../src/abap_cli/config/user-config.js', () => ({
 
 const validCap: TextpoolCapability = { read: true, write: true, checkedAt: '2026-08-06T00:00:00Z' };
 
-describe('014/textpool-capability (probe + persist)', () => {
+describe('textpool-capability (probe + persist)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -84,7 +84,7 @@ describe('014/textpool-capability (probe + persist)', () => {
   });
 });
 
-describe('014/textpool-router (read cache, no runtime fallback)', () => {
+describe('textpool-router (read cache, no runtime fallback)', () => {
   it('routes writes to ADT when cached write=true', () => {
     getSystem.mockReturnValue({ url: 'x', client: '100', username: 'u', language: 'EN', adtTextpool: { read: true, write: true } });
     expect(routeTextpool('mock', 'write')).toBe('adt');

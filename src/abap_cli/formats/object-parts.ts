@@ -27,7 +27,7 @@ export interface ObjectMetadata {
   /** abapLanguageVersion — "standard" | "cloudDevelopment" | "keyUser" | undefined. */
   abapLanguageVersion?: string;
 
-  // --- T1.1 extensions: PROG fields ---
+  // --- extensions: PROG fields ---
   /** ADT program:programStatus — enum (sapProductionProgram / customerProductionProgram / systemProgram / testProgram / unknown). */
   programStatus?: string;
   fixPointArithmetic?: boolean;
@@ -40,7 +40,7 @@ export interface ObjectMetadata {
   /** Selection-screen number paired with the logical database. */
   selectionScreen?: string;
 
-  // --- T1.1 extensions: CLAS / INTF fields ---
+  // --- extensions: CLAS / INTF fields ---
   /** CLAS category (16 enum values) / INTF category (7 enum values). */
   category?: string;
   /** INTF proxy flag. */
@@ -48,11 +48,11 @@ export interface ObjectMetadata {
   /** CLAS message class. */
   messageClass?: string;
 
-  // --- T1.1 extensions: CDS source marker fields ---
+  // --- extensions: CDS source marker fields ---
   sourceOrigin?: string;
   sourceType?: string;
 
-  // --- T1.1 extensions: CLAS / INTF method/type descriptions ---
+  // --- extensions: CLAS / INTF method/type descriptions ---
   descriptions?: ObjectDescriptions;
 }
 

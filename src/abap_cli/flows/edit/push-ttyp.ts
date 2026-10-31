@@ -1,12 +1,12 @@
 /**
- * Spec 036 US2 + spec 035: TTYP push flow.
+ * +: TTYP push flow.
  *
  * Pushes a `*.ttyp.json` document back to SAP. Flow:
  *   1. detectChannel() picks ADT or ICF.
  *   2. Validate the local doc against `ttyp-v1.json` (handcrafted).
  *   3. ADT: PUT `/sap/bc/adt/ddic/tabletypes/<name>` (lock-first).
  *      ICF: POST `/sap/abap_cli/ddic/ttyp/<name>`.
- *   4. Spec 035: missing object → OBJECT_NOT_FOUND; user must re-run as create.
+ * 4.: missing object → OBJECT_NOT_FOUND; user must re-run as create.
  */
 import * as path from 'node:path';
 import { AdtClientWrapper } from '../../clients/adt-client.js';
@@ -44,7 +44,7 @@ function deriveNameFromPath(file: string): string {
 
 async function pushAdt(name: string, xml: string, transport: string | undefined): Promise<void> {
   const client = await AdtClientWrapper.create();
-  // 035: detect existence first; missing → OBJECT_NOT_FOUND.
+  // detect existence first; missing → OBJECT_NOT_FOUND.
   try {
     await client.getTtyp(name);
   } catch {

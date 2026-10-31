@@ -1,9 +1,9 @@
 /**
- * PR2 — `--user <sap-user>` filter for `abap pull --tr`.
+ * — `--user <sap-user>` filter for `abap pull --tr`.
  *
  * Owner comes from `showTransport` (direct objects inherit transport owner;
  * task objects inherit their task's owner). The filter is case-insensitive.
- * Objects without owner are kept (silent-drop avoidance — see PR2 rationale
+ * Objects without owner are kept (silent-drop avoidance — see rationale
  * in this PR's design rationale).
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';

@@ -21,7 +21,7 @@ changed at: 2026-10-30 20:00:00
 | [2](#剧本-2加一个新域--表) | 加一个新域 + 元素 + 表 | `create DOMA → create DTEL → create TABL → activate TABL → select` |
 | [3](#剧本-3跨系统同步) | 跨系统同步（PRD → DEV） | `pull → diff → push --tr` |
 | [4](#剧本-4批量改-transport-内全部对象) | 批量改 transport 内全部对象 | `pull --tr NDK1 → sed → push --all --tr NDK1` |
-| [5](#剧本-5试运行--不污染) | 试运行 + 不污染 transport | `create $TMP → push --tr $TMP → run → activate --tr 正式` |
+| [5](#剧本-5试运行--不污染) | 试运行 + 不污染 transport | `create $TMP → push --tr $TMP → run → activate --type CLAS --yes` |
 | [6](#剧本-6紧急回滚) | 紧急回滚（生产事故） | `inspect --activation → transport list → 手动释放` |
 | [7](#剧本-7新类--完整开发循环) | 新类（完整开发循环） | `create → pull → write body → check → push → run` |
 | [8](#剧本-8删除对象) | 删除对象（极少用） | `abap delete <obj> --type <type> --yes` |
@@ -192,7 +192,7 @@ abap inspect ZCL_BAD --activation --json
 # data.activation.active 列出当前激活版本；data.activation.inactive 列出未激活
 
 # 2. 看 ST22 dump（如果关联）
-abap dumps --since 1h --json
+abap dumps --limit 20 --json
 
 # 3. 查找上一个 transport
 abap transport list --recent --json

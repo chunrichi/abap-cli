@@ -1,5 +1,5 @@
 /**
- * IcfClient cookie reuse (FR-010) + stale-cookie 401 fallback.
+ * IcfClient cookie reuse + stale-cookie 401 fallback.
  *
  * - reuse mode injects the jar Cookie header into axios defaults.
  * - a 401/403 on a reused cookie drops the header and retries once with

@@ -1,5 +1,5 @@
 /**
- * T2.6 — generic writePullFile helper + AFF pre-write validation.
+ * — generic writePullFile helper + AFF pre-write validation.
  *
  * Drives `writePullFile` directly (no ADT client) so we can assert:
  *  - identical content ⇒ 'skipped' (already matches)
@@ -25,7 +25,7 @@ afterEach(async () => {
   await fs.rm(cwd, { recursive: true, force: true });
 });
 
-describe('T2.6 writePullFile', () => {
+describe('writePullFile', () => {
   it('writes a schema-valid PROG .json file', async () => {
     const filePath = path.join(cwd, 'zprog_valid.prog.json');
     const content = JSON.stringify({

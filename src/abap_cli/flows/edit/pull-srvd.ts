@@ -1,5 +1,5 @@
 /**
- * T3.1 — SRVD (service definition) pull.
+ * SRVD (service definition) pull.
  *
  * Output:
  *   <rootDir>/srvd/<lower>/<lower>.srvd.json   ← AFF metadata

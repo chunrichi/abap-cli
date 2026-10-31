@@ -1,5 +1,5 @@
 /**
- * T3.3 — BDEF (behavior definition) pull.
+ * BDEF (behavior definition) pull.
  *
  * Output:
  *   <rootDir>/bdef/<lower>/<lower>.bdef.json   ← AFF metadata
@@ -8,7 +8,7 @@
  * BDEF objects live in `sourceObjectStrategy()` via the
  * `sourceExtensionForObjectType('BDEF') → '.abdl'` extension map.
  * Metadata is schema-validated against `bdef-v1.json` inside
- * `writePullFile` (T2.6 `affTypeFromFilename` now returns 'BDEF' for
+ * `writePullFile` ( `affTypeFromFilename` now returns 'BDEF' for
  * `*.bdef.json`).
  */
 import { AdtClientWrapper } from '../../clients/adt-client.js';

@@ -8,13 +8,13 @@ export type PushStage =
   | 'check'
   | 'activate'
   | 'unlock'
-  // 014 textpool stages (mixed-mode route).
+  // textpool stages (mixed-mode route).
   | 'read'
   | 'textpool-adt'
   | 'textpool-icf'
-  // 014 DDIC stages (ICF route).
+  // DDIC stages (ICF route).
   | 'ddic-icf'
-  // 036 TTYP/MSAG/DDLS stages (channel-detect route).
+  // TTYP/MSAG/DDLS stages (channel-detect route).
   | 'channel-adt'
   | 'channel-icf';
 
@@ -40,7 +40,7 @@ export interface PushOptions {
   dryRun?: boolean;
   /** Per-stage callback for --json result reporting. */
   onStage?: (stage: PushStage) => void;
-  /** Non-fatal warning (e.g. unlock failed after a successful push) — US-5. */
+  /** Non-fatal warning (e.g. unlock failed after a successful push) — U. */
   onWarning?: (warning: Warning) => void;
 }
 

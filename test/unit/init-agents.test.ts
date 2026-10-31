@@ -36,8 +36,8 @@ describe('init --agent (scaffoldAgents)', () => {
       const result = await scaffoldAgents(target, false);
       expect(result.skipped).toEqual([]);
 
-      // 025 重构: 5 个 skill 全拷（meta + 4 领域）
-      const expectedSkills = ['abap-cli', 'abap-cli-setup', 'abap-cli-search', 'abap-cli-edit', 'abap-cli-data'];
+      // 6 个 skill 全拷（meta + 4 领域 + 1 方法论）
+      const expectedSkills = ['abap-cli', 'abap-cli-setup', 'abap-cli-search', 'abap-cli-edit', 'abap-cli-data', 'abap-cli-performance'];
       for (const s of expectedSkills) {
         expectFile(path.join(cwd, vendorDir, 'skills', s, 'SKILL.md'));
       }

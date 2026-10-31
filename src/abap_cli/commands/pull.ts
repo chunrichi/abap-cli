@@ -72,7 +72,7 @@ export function registerPullCommand(program: Command): void {
         printSchema(SCHEMA, jsonFromCommand(cmd));
         return;
       }
-      // PR2: --user only makes sense with --tr — reject before the bare-help short-circuit.
+      // --user only makes sense with --tr — reject before the bare-help short-circuit.
       if (opts.user && !opts.tr) {
         const mode = jsonFromCommand(cmd);
         try {

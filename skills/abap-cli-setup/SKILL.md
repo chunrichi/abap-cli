@@ -11,6 +11,11 @@ metadata:
 
 `workspace-and-sap` scope — 7 个命令管工作区配置、profile 凭证、本地诊断、SAP 传输请求、ICF 服务部署、session cookie 探查。本 skill **不**管对象操作（拉 / 推 / 查 / 跑）—— 那走 `abap-cli-search` / `abap-cli-edit` / `abap-cli-data`。
 
+## 接入前提
+
+- agent skills 由 `abap init --agent <copilot|claude|cursor|generic>` 安装（随 npm 包分发），无需手工拷贝。
+- 1.0.0 只支持 basic auth（SAP 用户名 + OS keychain 密码）：依赖 OAuth（BTP ABAP Environment / trial）、SAML SSO 或 X.509 证书认证的系统无法连接。
+
 ## 何时用
 
 - 第一次使用 abap-cli，需要配置 SAP 系统
@@ -21,7 +26,7 @@ metadata:
 - 第一次跑 `abap-cli-data` 的 `run` / `select` 之前，要部署 bundled ICF 服务
 - 升级 CLI 后 ICF 服务版本过期（`deploy status` 报 `outdated`）
 - 看到 `400 Session Timed Out` 想确认本地 cookie jar 是否有效 → `session info`
-- debug `AUTH_ERROR` 报"400 而非 401"（其实是 SAP 端 cookie 过期被踢，0.2.5+ 修复自动分类）
+- debug `AUTH_ERROR` 报"400 而非 401"（其实是 SAP 端 cookie 过期被踢，已修复自动分类）
 
 ## 决策树
 
@@ -76,7 +81,7 @@ metadata:
 
 ## references（按需加载）
 
-- [references/commands-quick.md](./references/commands-quick.md) — 5 命令完整速查
+- [references/commands-quick.md](./references/commands-quick.md) — 7 命令完整速查
 - [references/errors.md](./references/errors.md) — 本 skill 错误码全表
 
 ## scripts / assets

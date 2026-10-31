@@ -1,5 +1,5 @@
 /**
- * Spec 036 US4 + T3.5: DDLS `.ddls.acds` companion file parser.
+ * +: DDLS `.ddls.acds` companion file parser.
  *
  * Recognises all 11 top-level CDS shapes defined by abap-file-format:
  *   1.  `define view entity ...`              → "viewEntity"
@@ -22,7 +22,7 @@
 
 const EXTEND_PARENT_RE = /extend\s+(?:view\s+(?:entity\s+)?)?\[?\s*([^\s;\]]+)/i;
 
-// Lowercase → canonical sourceType for the 6 secondary forms. T3.5 keeps
+// Lowercase → canonical sourceType for the 6 secondary forms. keeps
 // this map as the single source of truth so the fallback branch does not
 // need to format a `${kind}${entity}` string and risk mis-cased output.
 const SECONDARY_SOURCE_TYPE: Record<string, AcdsShape['sourceType']> = {

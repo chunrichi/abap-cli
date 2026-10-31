@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { routeAffSchema, routeType, schemaFileFor } from '../../src/abap_cli/aff/router.js';
 
-describe('aff-router (T033-004)', () => {
+describe('aff-router', () => {
   it('routes each of the 10 main JSON types', () => {
     expect(routeType('foo.clas.json')).toBe('CLAS');
     expect(routeType('foo.intf.json')).toBe('INTF');

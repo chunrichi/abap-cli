@@ -1,5 +1,5 @@
 /**
- * 014 US4: textpool push/pull via the CLI (mixed-mode route).
+ * textpool push/pull via the CLI (mixed-mode route).
  * TDD — written before the pushTextpoolFile / runPullTextpool wiring.
  * The route is read from the cached SystemProfile capability (no runtime probe).
  */
@@ -61,7 +61,7 @@ beforeEach(() => {
   loadConfig.mockResolvedValue({ systemName: 'mock', sap: {}, transport: '', package: '$TMP' });
 });
 
-describe('014/US4 textpool push (ICF route — write=false cached)', () => {
+describe('textpool push (ICF route — write=false cached)', () => {
   beforeEach(() => {
     getSystem.mockReturnValue({ url: 'x', client: '100', username: 'u', language: 'EN', adtTextpool: { read: true, write: false } });
   });
@@ -102,13 +102,13 @@ describe('014/US4 textpool push (ICF route — write=false cached)', () => {
   });
 });
 
-describe('014/US4 textpool pull (ADT route — read=true cached)', () => {
+describe('textpool pull (ADT route — read=true cached)', () => {
   beforeEach(() => {
     getSystem.mockReturnValue({ url: 'x', client: '100', username: 'u', language: 'EN', adtTextpool: { read: true, write: true } });
   });
 
   it('pulls the three .properties files via ADT getTextElements', async () => {
-    // Per-category data so headings validation passes (001 is a symbol key, not a heading).
+    // Per-category data so headings validation passes.
     getTextElements.mockImplementation(async (_type: string, _name: string, category: string) => {
       if (category === 'headings') return { textElements: [{ id: 'LISTHEADER', text: 'Report header' }] };
       if (category === 'selections') return { textElements: [{ id: 'SEL1', text: 'Choice one' }] };

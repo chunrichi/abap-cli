@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readJsonFixture } from './_helpers.js';
 import { validateAff } from '../../../src/abap_cli/aff/schema-validator.js';
 
-describe('schema-compliance / stru (T033-033)', () => {
+describe('schema-compliance / stru', () => {
   it('zmy_stru.stru.json passes tabl-v1.json (schema alias)', async () => {
     const doc = await readJsonFixture('zmy_stru.stru.json');
     const r = await validateAff('STRU', doc);

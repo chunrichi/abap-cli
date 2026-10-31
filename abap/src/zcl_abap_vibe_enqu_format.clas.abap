@@ -1,6 +1,6 @@
 CLASS zcl_abap_vibe_enqu_format DEFINITION PUBLIC FINAL CREATE PUBLIC.
   PUBLIC SECTION.
-    " PR5: the ICF dispatcher serialises this structure with
+    " the ICF dispatcher serialises this structure with
     " /ui2/cl_json=>serialize( pretty_name = camel_case ), so snake_case
     " component names below become the camelCase JSON keys the CLI reads
     " (formats/enqu/json.ts#wireToLocal). No JSON string building here.

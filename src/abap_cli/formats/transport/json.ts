@@ -6,11 +6,11 @@ import { defineWireArtifact } from '../artifact.js';
 // Known Transaction Code object extension (abap-file-format).
 export const TRAN_EXTENSIONS = ['.tran.json'];
 
-/** Re-exported from `types/registry.ts` (T050, US11). */
+/** Re-exported from `types/registry.ts`. */
 export { TRAN_TYPES, type TranSupportedType };
 
 // ---------------------------------------------------------------------------
-// T2.3 AFF schema integration
+// AFF schema integration
 // ---------------------------------------------------------------------------
 // The hand-rolled `validateTranObject` below predates the AFF schema validator
 // and duplicates all length / enum checks already declared in
@@ -24,7 +24,7 @@ export { TRAN_TYPES, type TranSupportedType };
  * Validate a Transaction document against the vendored AFF `tran-v1.json`
  * schema. Returns an array of human-readable error strings (empty when valid).
  *
- * T2.3: this is the AFF-schema-based replacement for the hand-rolled
+ * this is the AFF-schema-based replacement for the hand-rolled
  * `validateTranObject`. The CLI / SICF integration layer should migrate to
  * this entry point over time; for now `validateTranObject` is preserved.
  */
@@ -250,7 +250,7 @@ export interface TranObjectLocal {
 /**
  * ICF wire representation (camelCase + transport envelope).
  *
- * 037 US2 (S07): matches SAP `ty_tran_data` (nested `header / generalInformation`
+ * (S07): matches SAP `ty_tran_data` (nested `header / generalInformation`
  * etc.) one-to-one. SAP-side `build_tran_payload` returns nested; CLI used to
  * send a flat wire (description / originalLanguage / transactionType at top
  * level), which the ABAP deserialize mapped to empty nested slots.

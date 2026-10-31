@@ -1,6 +1,6 @@
 # abap-file-format 官方 JSON Schema
 
-直接 copy 自 [SAP/abap-file-formats `tabl/`](https://github.com/SAP/abap-file-formats/tree/main/file-formats/tabl)，版本对应 main branch `2026-08-28`（项目 mirror 在 `tmp/abap-file-formats/file-formats/tabl/`）。
+本目录的 schema 是 [src/abap_cli/schema/](https://github.com/chunrichi/abap-cli/tree/main/src/abap_cli/schema) 中 `tabl-v1.json` / `tabt-v1.json` 的副本（随 CLI 包分发；上游来自 [SAP/abap-file-formats `tabl/`](https://github.com/SAP/abap-file-formats/tree/main/file-formats/tabl)）。
 
 ## 文件
 
@@ -38,12 +38,12 @@ Agent 可以在写完三件套后跑这条命令自我验证 main / settings 合
 
 ## 与本仓库其它位置的关系
 
-- **CLI 客户端校验**：[`validateDdicObject()`](https://github.com/chunrichi/abap-cli/blob/main/src/abap_cli/formats/ddic/json.ts) 是 hand-rolled 的子集校验（`name` namespace + TABL `fields[]` / DOMA `dataType+length` / DTEL `description+domain`），只覆盖 abap-file-format 的「CLI 能用」子集，**不**做 schema-level 全字段校验。Agent 需要严格字段校验就上 ajv 跑这两个 schema。
-- **SAP 端最终校验**：`zcl_abap_vibe_ddic` 会按 abap-file-format 规范完整校验（含 settings / buffering / dbSpecificSettings）；所以**通过了 ajv 不等于 SAP 一定接受**（SAP 还有 DDL-side、ABAP runtime-side 的检查），通过了 SAP 校验才是 ground truth。
-- **同步策略**：本目录下的 schema 是从官方仓库 copy，**手动**同步。当 `tmp/abap-file-formats/` 拉新版本时跑：
+- **CLI 客户端校验**：[`validateDdicObject()`](https://github.com/chunrichi/abap-cli/blob/main/src/abap_cli/formats/ddic/validate.ts) 是 hand-rolled 的子集校验（`name` namespace + TABL `fields[]` / DOMA `format.dataType+length` / DTEL `description+dataTypeInformation`），只覆盖 abap-file-format 的「CLI 能用」子集，**不**做 schema-level 全字段校验。Agent 需要严格字段校验就上 ajv 跑这两个 schema。
+- **SAP 端最终校验**：`zcl_abap_vibe_icf_ddic` 会按 abap-file-format 规范完整校验（含 settings / buffering / dbSpecificSettings）；所以**通过了 ajv 不等于 SAP 一定接受**（SAP 还有 DDL-side、ABAP runtime-side 的检查），通过了 SAP 校验才是 ground truth。
+- **同步策略**：本目录 schema 与 `src/abap_cli/schema/` 是两份手工维护的副本，无自动同步机制（`scripts/sync-aff-schema.sh` 只更新 CLI 侧）。升级 CLI 的 vendored schema 后，从仓库根目录同步这两份文件并 diff 复核：
 
 ```bash
-cp ../../../../tmp/abap-file-formats/file-formats/tabl/tabl-v1.json .
-cp ../../../../tmp/abap-file-formats/file-formats/tabl/tabt-v1.json .
+cp src/abap_cli/schema/tabl-v1.json src/abap_cli/schema/tabt-v1.json \
+  skills/abap-cli-edit/assets/tabl-templates/schemas/
 git diff  # 看 schema 字段增减
 ```

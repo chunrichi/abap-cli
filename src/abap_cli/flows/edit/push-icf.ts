@@ -46,7 +46,7 @@ export async function pushDdicFile(
 ): Promise<PushOneResult> {
   // DDIC abap-file-format JSON, read + validated by the shared helper. For
   // TABL/STRU the helper honors sibling `.tabl.ddic` / `.tabl.settings.json`
-  // (spec 032 US5) and maps a malformed DDL to TABL_DDL_INVALID. The caller
+  // and maps a malformed DDL to TABL_DDL_INVALID. The caller
   // (`pushOne`) already rejected --check-only and handled --dry-run.
   const { local, wire } = await readValidatedDdic(file, type, resolved.objectName);
 
@@ -59,7 +59,7 @@ export async function pushDdicFile(
   wire.transportRequest = transport || undefined;
 
   const icf = await IcfClient.create();
-  // 035: push updates existing objects only — never let the ICF upsert create one.
+  // push updates existing objects only — never let the ICF upsert create one.
   await requirePushTargetExists(
     'DDIC_OBJECT_NOT_FOUND',
     () => icf.getDdic(type.toLowerCase(), resolved.objectName),
@@ -141,7 +141,7 @@ async function readValidatedDdic(
 
   const wire = localToWire(type, local);
 
-  // P3.1: TABT schema validation — gate the wire payload against tabt-v1.json
+  // TABT schema validation — gate the wire payload against tabt-v1.json
   // enum values so the CLI rejects invalid buffering/state/storageType before
   // posting to SAP (where apply_ddic_table_settings would raise
   // DDIC_FIELD_UNSUPPORTED instead).
@@ -236,7 +236,7 @@ export async function validateTranFile(file: string): Promise<void> {
  * Push a HTTP service .json file via ICF POST /http/<name>.
  * The SAP-side handler creates/updates a SICF node with the given handler class + URL.
  *
- * 035 exception: HTTP push KEEPS create-on-push — the SAP-side handler
+ * exception: HTTP push KEEPS create-on-push — the SAP-side handler
  * creates/updates the SICF node, so no existence probe here (unlike DDIC/TRAN).
  * `abap create HTTP` requires `--file`; push remains the create path when the
  * JSON was authored by hand or produced by `abap pull`.
@@ -297,7 +297,7 @@ export async function pushTranFile(
   wire.transportRequest = transport || undefined;
 
   const icf = await IcfClient.create();
-  // 035: push updates existing objects only; a missing tcode goes through `create TRAN`.
+  // push updates existing objects only; a missing tcode goes through `create TRAN`.
   await requirePushTargetExists(
     'TRAN_OBJECT_NOT_FOUND',
     () => icf.getTran(resolved.objectName),
@@ -321,7 +321,7 @@ export async function pushTranFile(
 }
 
 /**
- * 035: push updates existing objects only. Probe DDIC/TRAN targets over the
+ * push updates existing objects only. Probe DDIC/TRAN targets over the
  * same ICF GET pull uses, so a missing object surfaces as OBJECT_NOT_FOUND
  * (with a `create` pointer) instead of the ICF POST silently creating one.
  * HTTP is exempt — pushing a `.http.json` creates/updates the SICF node, so a

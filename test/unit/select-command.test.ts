@@ -34,7 +34,7 @@ describe('select human rendering — native-typed values (017 Q1 B)', () => {
   });
 });
 
-describe('select command — schema ()', () => {
+describe('select command — schema', () => {
   it('--schema prints a JSON document with options + errors + examples', () => {
     const program = new Command();
     const log: string[] = [];
@@ -71,7 +71,7 @@ describe('select command — schema ()', () => {
   });
 });
 
-describe('select command — lazy registration ()', () => {
+describe('select command — lazy registration', () => {
   it('does not eagerly import commands/select when index.ts is loaded', () => {
     // The presence of a CommandSchema (256+ lines) in commands/select.ts would
     // balloon any single-file import. The lazy loader gate in

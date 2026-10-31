@@ -1,5 +1,5 @@
 /**
- * Phase 2/3 — `runPull` dispatcher coverage.
+ * /3 — `runPull` dispatcher coverage.
  *
  * The per-type pull flows (`runPullTtyp`, `runPullMsag`, ...) are covered by
  * their own tests, but those import the per-type function directly and never

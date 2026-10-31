@@ -129,10 +129,10 @@ export type CreateCommandSchema = CommandSchema & {
 };
 
 /**
- * Machine-readable parameter contract for `abap create --schema [type]` (P0.1).
+ * Machine-readable parameter contract for `abap create --schema [type]`.
  * 无 type → 通用 schema（列出支持的类型）；DDIC/未知类型 → supported:false。
  *
- * T051 (US11): all 10 supported types come from `types/registry.ts`.
+ * all 10 supported types come from `types/registry.ts`.
  */
 export function createSchema(type?: string): CreateCommandSchema {
   const t = type?.trim().toUpperCase();

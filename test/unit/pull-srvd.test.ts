@@ -1,5 +1,5 @@
 /**
- * T3.1 — `runPullSrvd` end-to-end: SRVD pull writes
+ * — `runPullSrvd` end-to-end: SRVD pull writes
  *   <root>/srvd/<lower>/<lower>.srvd.json
  *   <root>/srvd/<lower>/<lower>.srvd.acds
  *
@@ -57,7 +57,7 @@ async function load() {
   return import('../../src/abap_cli/flows/edit/pull-srvd.js');
 }
 
-describe('runPullSrvd (T3.1)', () => {
+describe('runPullSrvd', () => {
   it('writes the .srvd.json + .srvd.acds pair', async () => {
     const { runPullSrvd } = await load();
     const result = await runPullSrvd('zsd_test', { rootDir: root });

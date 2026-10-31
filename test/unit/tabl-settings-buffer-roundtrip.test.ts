@@ -1,9 +1,9 @@
 /**
- * TABT three-piece settings round-trip tests for P1.1/P1.2 (TABT writeback plan).
+ * TABT three-piece settings round-trip tests for / (TABT writeback plan).
  *
  * Verifies:
  * - DdicTableGeneralInformationWire / DdicTableBufferingWire /
- *   DdicTableDbSpecificSettingsWire compile-time presence after P1.2
+ * DdicTableDbSpecificSettingsWire compile-time presence after
  * - TS localToWire<TABL> / wireToLocal<TABL> accepts the new nested
  *   buffering + dbSpecificSettings fields (schema-faithful).
  * - JSON-string round-trip from an ABAP-style settingsJson payload
@@ -18,7 +18,7 @@ import { describe, it, expect } from 'vitest';
 import { localToWire, wireToLocal } from '../../src/abap_cli/formats/ddic/wire.js';
 import { type DdicTableSettingsWire, type DdicTableGeneralInformationWire, type DdicTableBufferingWire, type DdicTableDbSpecificSettingsWire } from '../../src/abap_cli/formats/ddic/types.js';
 
-describe('P1.1/P1.2 — TABT buffering + dbSpecificSettings round-trip', () => {
+describe('/ — TABT buffering + dbSpecificSettings round-trip', () => {
   it('DdicTableGeneralInformationWire compiles with nested buffering + dbSpecificSettings', () => {
     const gi: DdicTableGeneralInformationWire = {
       dataClassCategory: 'TRANSP',
@@ -107,7 +107,7 @@ describe('P1.1/P1.2 — TABT buffering + dbSpecificSettings round-trip', () => {
   });
 
   it('localToWire<TABL> + wireToLocal<TABL> round-trips generalInformation buffering through WireForDdicType', () => {
-    // P1.2 contracts: localToWire<TABL> forwards the nested
+    // contracts: localToWire<TABL> forwards the nested
     // generalInformation block (including buffering + dbSpecificSettings)
     // onto the wire. settingsJson lives in an external artifact file and
     // is NOT forwarded here - that's tabl-artifact.ts's job.
@@ -150,7 +150,7 @@ describe('P1.1/P1.2 — TABT buffering + dbSpecificSettings round-trip', () => {
   });
 
 
-  it('wire.generalInformation accepts nullable fields (early P1.1 ABAP output)', () => {
+  it('wire.generalInformation accepts nullable fields (early ABAP output)', () => {
     // When zcl_abap_vibe_tabl_format fails the settings_supported check,
     // it returns without emitting buffering/dbSpecificSettings. The TS
     // wire shape must accept these as optional.

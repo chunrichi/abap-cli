@@ -43,14 +43,13 @@ export type WarningCode =
   | 'PAGINATION_LIMITED'    // search --page-all hit the page cap; result truncated
   | 'ICF_CHECK_DEGRADED'    // init ICF deployment check degraded (non-blocking)
   | 'ICF_OUTDATED_DEADLOCK' // deploy status reports outdated gc_version (likely user transport holds the new source)
-  // 032 US12 textpool pull — per-category soft warning when object has no
+  // textpool pull — per-category soft warning when object has no
   // elements of that category (CLAS has no selections, FUGR has no headings, etc.)
   | 'TEXTPOOL_CATEGORY_MISSING'
-  // 035 push — $TMP object is transport-free; an explicit --tr is ignored
+  // push — $TMP object is transport-free; an explicit --tr is ignored
   | 'PUSH_TR_IGNORED_TMP'
-  // P3.3: stuck-reports writer
+  // stuck-reports writer
   | 'STUCK_REPORT_DEGRADED' // writeStuckReport encountered non-fatal issues
-  // 030-runtime-deploy
   | 'STEAMPUNK_ICF_MANUAL'  // deploy on Steampunk: ICF node must be wired via CF route
   // bundled-service deploy — manifest missing, deployed as-is without the release merge
   | 'DEPLOY_MANIFEST_MISSING'
@@ -149,7 +148,7 @@ export function buildMeta(): OutputMeta {
   };
 }
 
-/** Reduced metadata used by the agent-facing `--schema` response (025 US3):
+/** Reduced metadata used by the agent-facing `--schema` response
  *  excludes timestamp and warnings so the contract stays stable and minimal. */
 export type SchemaOutputMeta = Pick<OutputMeta, 'command' | 'version' | 'durationMs'>;
 

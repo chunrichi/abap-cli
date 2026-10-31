@@ -48,7 +48,7 @@ function parseData(res: { stdout: string }) {
   return JSON.parse(res.stdout).data;
 }
 
-describe('abap transport metadata (US5..017)', () => {
+describe('abap transport metadata', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('show returns structured metadata with objects', async () => {
@@ -103,7 +103,7 @@ describe('abap transport metadata (US5..017)', () => {
   });
 });
 
-describe('abap transport write protection (P0.3)', () => {
+describe('abap transport write protection', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('create without --yes in non-TTY mode rejects with VALIDATION_ERROR', async () => {

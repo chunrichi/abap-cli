@@ -8,7 +8,7 @@ interface PullResolvedObject {
 }
 
 /**
- * PR4 (C3): when the user pulls a FUGR/FF (a function module), the
+ * (C3): when the user pulls a FUGR/FF (a function module), the
  * `resolveObject` result points at the FM's own ADT URL. Without
  * normalization, downstream `fugrStrategy` would call `objectStructure` on
  * the FM URL and search `*<fm>*` — neither of which yields the parent

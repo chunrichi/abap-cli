@@ -10,8 +10,8 @@
  *
  * This module accepts either form, parses to a structured
  * {@link FuncPseudoSyntax}, and can re-emit it as the canonical AFF form
- * (so pull → push round-trips stay stable). Created in T1.4 (Phase 1) to
- * unblock T1.5 FUGR pull (which writes `.func.json` metadata describing
+ * (so pull → push round-trips stay stable). Created in to
+ * unblock FUGR pull (which writes `.func.json` metadata describing
  * IMPORTING / EXPORTING / CHANGING / TABLES / RAISING components).
  */
 import { CliError } from '../output/json.js';

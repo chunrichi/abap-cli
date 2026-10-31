@@ -1,5 +1,5 @@
 /**
- * 032 US10 (T041/T042): HTTP `serviceId` + `descriptionByLang[]` round-trip.
+ * HTTP `serviceId` + `descriptionByLang` round-trip.
  *
  * Wire shape (SAP ICF /http/<name> — nested abap-file-format payload):
  *   `generalInformation.serviceId`   → '/sap/zfoo'
@@ -14,7 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import { localToWire, wireToLocal } from '../../src/abap_cli/formats/http/json.js';
 
-describe('032/http-service-id', () => {
+describe('http-service-id', () => {
   describe('wireToLocal', () => {
     it('maps wire generalInformation.serviceId → local generalInformation.serviceId', () => {
       const local = wireToLocal({

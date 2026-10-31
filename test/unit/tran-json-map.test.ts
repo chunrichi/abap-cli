@@ -314,7 +314,7 @@ describe('TRAN JSON helpers', () => {
     });
   });
 
-  // ----- T2.3 AFF schema-based validation -----
+  // ----- AFF schema-based validation -----
 
   describe('validateTranJson (AFF schema)', () => {
     it('passes a minimal valid document (name is stripped as CLI envelope)', () => {

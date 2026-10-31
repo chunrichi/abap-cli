@@ -3,7 +3,7 @@ import { readJsonFixture } from './schema-compliance/_helpers.js';
 import { localToWire, wireToLocal } from '../../src/abap_cli/formats/ddic/wire.js';
 import { localToWire as httpLocalToWire, wireToLocal as httpWireToLocal } from '../../src/abap_cli/formats/http/json.js';
 
-describe('wire ↔ local AFF round-trip (T033-038)', () => {
+describe('wire ↔ local AFF round-trip', () => {
   it('DOMA wire ↔ local round-trips byte-identically', async () => {
     const local = await readJsonFixture('zdmy_sign_flag.doma.json');
     const wire = localToWire('DOMA', local as any);

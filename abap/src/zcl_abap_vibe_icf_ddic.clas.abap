@@ -31,7 +31,7 @@ CLASS zcl_abap_vibe_icf_ddic DEFINITION PUBLIC FINAL CREATE PUBLIC.
                 iv_start_pos  TYPE i DEFAULT 1
       EXPORTING et_object_new TYPE comt_gox_def_header
                 et_bapireturn TYPE bapirettab.
-    " P2.1: TABT writeback - apply buffering/storageType/loadUnit/logChanges/translation
+    " TABT writeback - apply buffering/storageType/loadUnit/logChanges/translation
     " to an existing TABL via DDIF_TABL_GET + DDIF_TABL_PUT. The wire payload
     " nested `is_settings-general_information-*` paths; this type keeps them flat.
     CLASS-METHODS apply_ddic_table_settings
@@ -102,7 +102,7 @@ CLASS zcl_abap_vibe_icf_ddic DEFINITION PUBLIC FINAL CREATE PUBLIC.
       EXPORTING es_payload TYPE REF TO data
                 ev_error   TYPE zcl_abap_vibe_icf_types=>ty_error.
 
-    " 036: ICF fallback writes for the two types ECC EHP5/6 cannot serve via ADT.
+    " ICF fallback writes for the two types ECC EHP5/6 cannot serve via ADT.
     CLASS-METHODS write_ddic_table_type
       IMPORTING iv_name    TYPE ttypename
                 iv_payload TYPE string
@@ -145,7 +145,7 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
 
     DATA lv_package TYPE devclass.
     DATA lv_request TYPE trkorr.
-    " 036: TTYP/MSAG accept both POST (create) and PUT (update) through the
+    " TTYP/MSAG accept both POST (create) and PUT (update) through the
     " same DDIF/table write path — the SAP APIs are upsert-shaped.
     IF ( iv_method = 'POST' OR iv_method = 'PUT' ) AND ( lv_type = 'TTYP' OR lv_type = 'MSAG' ).
       FIND FIRST OCCURRENCE OF REGEX '"package"\s*:\s*"([^"]+)"' IN iv_body IGNORING CASE
@@ -235,7 +235,7 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
                                 IMPORTING es_payload = ls_create
                                           ev_error   = ls_create_err ).
         WHEN 'ENQU'.
-          " PR5: ENQU (lock object) goes through ICF. The wire body is the
+          " ENQU (lock object) goes through ICF. The wire body is the
           " AFF JSON document (formats/enqu/json.ts); the ABAP side translates
           " to DDIF_ENQU_PUT to persist primaryTable / lockParameters /
           " lockModules. See create_ddic_enqu for the implementation.
@@ -246,7 +246,7 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
                             IMPORTING es_payload = ls_create
                                       ev_error   = ls_create_err ).
         WHEN 'NROB'.
-          " PR5: NROB (number range object) — same ICF path. Wire body is
+          " NROB (number range object) — same ICF path. Wire body is
           " the AFF JSON (interval.* + configuration.*). Persists via
           " NRIV writes. See create_ddic_nrob for the implementation.
           create_ddic_nrob( EXPORTING iv_name    = CONV nrobj( lv_name )
@@ -373,7 +373,7 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
   ENDMETHOD.
   METHOD apply_ddic_table_settings.
 
-    " P2.1: TABT writeback - apply buffering/storageType/loadUnit/logChanges/
+    " TABT writeback - apply buffering/storageType/loadUnit/logChanges
     " translation to an existing TABL. Read current DD09L via DDIF_TABL_GET,
     " mutate the requested fields, and persist via DDIF_TABL_PUT. Each field
     " is gated by an `iv_payload CS '"<key>"'` substring check so partial
@@ -551,7 +551,7 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
     DATA ls_header_local TYPE coms_gox_def_header.
     DATA lt_field_entries TYPE comt_gox_def_header.
 
-    " 037 US1: AFF nested wire. CLI emits generalInformation.deliveryClass
+    " AFF nested wire. CLI emits generalInformation.deliveryClass
     " etc. under the generalInformation object; the flat top-level
     " deliveryClass/dataClass/sizeCategory/clientDependent are gone.
     DATA: BEGIN OF ls_attr,
@@ -637,7 +637,7 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
                                                               details = lt_details ) ).
       RETURN.
     ENDIF.
-      " P2.1: TABT writeback. When payload carries logChanges/translation/
+      " TABT writeback. When payload carries logChanges/translation
       " buffering/dbSpecificSettings, deserialize into a dedicated settings
       " struct (avoids nesting all TABT keys under zcl_abap_vibe_icf_types=>ty_tabl_general_information
       " which only carries create-time fields) and forward to apply_ddic_table_settings.
@@ -672,7 +672,7 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
     DATA ls_header_local TYPE coms_gox_def_header.
     DATA lt_field_entries TYPE comt_gox_def_header.
 
-    " 037 US1: AFF nested — STRU has no deliveryClass/dataClass/sizeCategory;
+    " AFF nested — STRU has no deliveryClass/dataClass/sizeCategory
     " only header.description carries the description.
     DATA: BEGIN OF ls_attr,
             name   TYPE string,
@@ -750,7 +750,7 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
     DATA ls_object_new TYPE coms_gox_def_header.
     DATA ls_details    TYPE coms_gox_table_entry_fields.
 
-    " 037 US1: AFF nested — category drives which DDIC fields are populated.
+    " AFF nested — category drives which DDIC fields are populated.
     " Five categories (per dtel-v1.json):
     "   'domain'                    → DOMNAME = data_type_info.type_name
     "   'predefinedType'            → DATATYPE / LENG / DECIMALS from
@@ -931,7 +931,7 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
     DATA ls_object_new TYPE coms_gox_def_header.
     DATA ls_details    TYPE coms_gox_table_entry_fields.
 
-    " 037 US1: AFF nested — dataType/length/decimals/signFlag/lowercase/
+    " AFF nested — dataType/length/decimals/signFlag/lowercase
     " convExit all live under format.*. signFlag is a wire string ('X' / '');
     " any non-empty value is treated as 'X' for back-compat with hand-crafted
     " boolean true values.
@@ -1017,7 +1017,7 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
                                                                          action = 'created' ) ).
   ENDMETHOD.
   METHOD create_ddic_enqu.
-    " PR5: ENQU create. The CLI posts the AFF enqu-v1 document (camelCase) plus
+    " ENQU create. The CLI posts the AFF enqu-v1 document (camelCase) plus
     " the lock object name (which the document itself does not carry — its
     " primaryTable.name is the table being locked, not the object).
     "
@@ -1266,7 +1266,7 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
     ENDCASE.
   ENDMETHOD.
   METHOD create_ddic_nrob.
-    " PR5: NROB (number range object) create. Persists via the canonical
+    " NROB (number range object) create. Persists via the canonical
     " NUMBER_RANGE_OBJECT_UPDATE FM with indicator='I' (insert). There is no
     " GOX_GEN_NROB_STD, so transport binding has to be done by hand via
     " TR_TADIR_INTERFACE after a successful insert. For now, mirrors ENQU:
@@ -1524,7 +1524,7 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
         ENDIF.
         CREATE DATA es_payload TYPE zcl_abap_vibe_icf_types=>ty_ddic_get_doma_data.
         ASSIGN es_payload->* TO <ls_doma_payload>.
-        " 037 US1: read-side returns AFF nested wire so CLI `wireToLocal` can
+        " read-side returns AFF nested wire so CLI `wireToLocal` can
         " populate the local `format.*` block from the same field names.
         <ls_doma_payload>-name        = iv_name.
         <ls_doma_payload>-type        = 'DOMA'.
@@ -1557,7 +1557,7 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
         ENDIF.
         CREATE DATA es_payload TYPE zcl_abap_vibe_icf_types=>ty_ddic_get_dtel_data.
         ASSIGN es_payload->* TO <ls_dtel_payload>.
-        " 037 US1: read-side returns AFF nested wire so CLI `wireToLocal` can
+        " read-side returns AFF nested wire so CLI `wireToLocal` can
         " populate `dataTypeInformation.{category,typeName,...}`. Pick category
         " from DD04L-DOMNAME: DOMNAME set → 'domain', else 'predefinedType'.
         <ls_dtel_payload>-name        = iv_name.
@@ -1609,7 +1609,7 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
         ASSIGN es_payload->* TO FIELD-SYMBOL(<ls_stru_payload>).
         <ls_stru_payload> = ls_stru_artifact.
       WHEN 'TTYP'.
-        " 036: ECC EHP5/6 has no ADT tabletypes endpoint — this is the fallback.
+        " ECC EHP5/6 has no ADT tabletypes endpoint — this is the fallback.
         DATA(ls_ttyp_artifact) = zcl_abap_vibe_ttyp_format=>generate(
           iv_name        = CONV ttypename( iv_name )
           iv_object_type = 'TTYP' ).
@@ -1625,7 +1625,7 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
         ASSIGN es_payload->* TO FIELD-SYMBOL(<ls_ttyp_payload>).
         <ls_ttyp_payload> = ls_ttyp_artifact.
       WHEN 'MSAG'.
-        " 036: ECC EHP5/6 has no ADT messageclass endpoint — this is the fallback.
+        " ECC EHP5/6 has no ADT messageclass endpoint — this is the fallback.
         DATA(ls_msag_artifact) = zcl_abap_vibe_msag_format=>generate( iv_name = CONV arbgb( iv_name ) ).
         IF ls_msag_artifact-success = abap_false.
           ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
@@ -1639,7 +1639,7 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
         ASSIGN es_payload->* TO FIELD-SYMBOL(<ls_msag_payload>).
         <ls_msag_payload> = ls_msag_artifact.
       WHEN 'ENQU'.
-        " PR5: ENQU (lock object). The CLI's wire shape is the AFF JSON
+        " ENQU (lock object). The CLI's wire shape is the AFF JSON
         " document (formats/enqu/json.ts). Read via DDIF_ENQU_GET and
         " serialize to the same shape so the CLI round-trips lossless.
         DATA(ls_enqu_artifact) = zcl_abap_vibe_enqu_format=>generate( iv_name = CONV viewname( iv_name ) ).
@@ -1655,7 +1655,7 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
         ASSIGN es_payload->* TO FIELD-SYMBOL(<ls_enqu_payload>).
         <ls_enqu_payload> = ls_enqu_artifact.
       WHEN 'NROB'.
-        " PR5: NROB (number range object). Read NRIV and serialise to the
+        " NROB (number range object). Read NRIV and serialise to the
         " AFF JSON document the CLI expects (interval.* + configuration.*).
         DATA(ls_nrob_artifact) = zcl_abap_vibe_nrob_format=>generate( iv_name = CONV nrobj( iv_name ) ).
         IF ls_nrob_artifact-success = abap_false.
@@ -1676,7 +1676,7 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
     ENDCASE.
   ENDMETHOD.
   METHOD write_ddic_table_type.
-    " 036 ICF fallback write. DDIF_TTYP_PUT is the only supported API on ECC
+    " ICF fallback write. DDIF_TTYP_PUT is the only supported API on ECC
     " EHP5/6; the SAP LUW is lock → PUT → activate → unlock, with unlock in
     " every exit path so a failed activation never leaves a stale enqueue.
     DATA ls_dd40v TYPE dd40v.
@@ -1780,8 +1780,8 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
                                                                          action = 'updated' ) ).
   ENDMETHOD.
   METHOD write_ddic_message_class.
-    " 036 ICF fallback write. T100A/T100 are plain tables; the SAP-sanctioned
-    " write path is RS_CORR_INSERT for the header + direct MODIFY of T100.
+    " ICF fallback write. A/ are plain tables; the SAP-sanctioned
+    " write path is RS_CORR_INSERT for the header + direct MODIFY of.
     DATA lv_rc TYPE sy-subrc.
     DATA lv_description TYPE string.
     DATA lt_t100 TYPE STANDARD TABLE OF t100 WITH EMPTY KEY.

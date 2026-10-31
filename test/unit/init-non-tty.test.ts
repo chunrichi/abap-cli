@@ -22,7 +22,7 @@ vi.mock('../../src/abap_cli/config/user-config.js', () => ({
   saveUserConfig: vi.fn(),
 }));
 
-describe('abap init non-interactive ', () => {
+describe('abap init non-interactive', () => {
   let cwd: string;
 
   beforeEach(() => {
@@ -43,7 +43,7 @@ describe('abap init non-interactive ', () => {
     expect(upsertSystem).not.toHaveBeenCalled();
   });
 
-  it('non-TTY abap init with full params rejects profile creation () and never mutates profiles', async () => {
+  it('non-TTY abap init with full params rejects profile creation and never mutates profiles', async () => {
     const program = makeProgram();
     registerInitCommand(program);
     const res = await runCommand(

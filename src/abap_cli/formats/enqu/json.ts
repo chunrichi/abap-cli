@@ -1,5 +1,5 @@
 /**
- * PR5 (B1): ENQU (lock object) local ↔ wire mapping.
+ * (B1): ENQU (lock object) local ↔ wire mapping.
  *
  * Local shape mirrors the upstream `enqu-v1.json` AFF schema (vendored under
  * `src/abap_cli/schema/enqu-v1.json`):

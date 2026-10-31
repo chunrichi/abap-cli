@@ -60,7 +60,7 @@ const SUFFIX_RULES: ReadonlyArray<{ suffix: string; type: string; schemaFile?: s
   { suffix: '.dtel.json', type: 'DTEL' },
   { suffix: '.http.json', type: 'HTTP' },
   { suffix: '.tran.json', type: 'TRAN' },
-  // 036-ttyp-msag-ddls: dual-channel DDIC + CDS companions.
+  // dual-channel DDIC + CDS companions.
   { suffix: '.ttyp.json', type: 'TTYP' },
   { suffix: '.ttyp.type.abap', type: 'TTYP' },
   { suffix: '.msag.json', type: 'MSAG' },

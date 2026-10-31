@@ -3,7 +3,7 @@ import { buildDryRun } from '../../src/abap_cli/flows/data/run.js';
 import { registerRunCommand } from '../../src/abap_cli/commands/run.js';
 import { makeProgram, runCommand } from './cli-helper.js';
 
-// FR-005 decision — --dry-run prints the envelope without any SAP call.
+// decision — --dry-run prints the envelope without any SAP call.
 
 describe('run-flow dry-run', () => {
   it('buildDryRun returns wouldRun=true, dryRun=true, empty output, no SAP', () => {

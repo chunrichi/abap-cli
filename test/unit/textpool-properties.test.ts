@@ -1,5 +1,5 @@
 /**
- * 014 US4: .properties parsing / serialization / validation for textpool
+ * .properties parsing / serialization / validation for textpool
  * (texts / selections / headings). TDD — written before the formats/textpool/properties.ts
  * implementation.
  */
@@ -12,7 +12,7 @@ import {
   TextElementCategory,
 } from '../../src/abap_cli/formats/textpool/properties.js';
 
-describe('014/textpool-properties', () => {
+describe('textpool-properties', () => {
   describe('parseTextpoolProperties', () => {
     it('parses symbols with @MaxLength applying to the next entry (ADT reference)', () => {
       const elements = parseTextpoolProperties('texts', '@MaxLength:10\n001=Example\n002=Another\n');

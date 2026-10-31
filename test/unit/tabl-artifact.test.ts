@@ -34,7 +34,7 @@ define structure zstruexample {
 }
 `;
 
-describe('024/tabl-artifact: file helpers', () => {
+describe('tabl-artifact: file helpers', () => {
   it('matches the canonical three-piece file names', () => {
     expect(isTablArtifactFile('zfoo.tabl.json')).toBe(true);
     expect(isTablArtifactFile('zfoo.tabl.ddic')).toBe(true);
@@ -56,7 +56,7 @@ describe('024/tabl-artifact: file helpers', () => {
   });
 });
 
-describe('024/tabl-artifact: parseTablDdic', () => {
+describe('tabl-artifact: parseTablDdic', () => {
   it('parses the canonical TABL example with keys, notNull, semantics', () => {
     const parsed = parseTablDdic(ZAFF);
     expect(parsed.type).toBe('TABL');
@@ -121,7 +121,7 @@ define table (ui2)cl_json {
   });
 });
 
-describe('024/tabl-artifact: extractTablArtifactWire', () => {
+describe('tabl-artifact: extractTablArtifactWire', () => {
   it('returns the three canonical strings when present', () => {
     const wire: DdicWirePayload = {
       name: 'ZAFFEXAMPLE',

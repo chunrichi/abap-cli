@@ -2,7 +2,7 @@
  * Throw-on-fail wrapper around the AFF canonical schema validator.
  *
  * Replaces the manual `validateAff` + `formatError` dance that ad-hoc
- * callers were repeating before T1.5 (FUGR pull) and T2.2/T2.3 (HTTP/TRAN
+ * callers were repeating before (FUGR pull) and (HTTP/TRAN
  * ajv) wired it in. Pull/push call sites use `assertAffMetadata(type, doc)`
  * before writing a metadata file to disk; a schema mismatch surfaces as
  * `CliError('AFF_FIXTURE_INVALID', …)` so the exit-code map can map it to

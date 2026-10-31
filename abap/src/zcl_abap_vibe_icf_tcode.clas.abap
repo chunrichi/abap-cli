@@ -203,7 +203,7 @@ CLASS zcl_abap_vibe_icf_tcode IMPLEMENTATION.
         INTO @ls_tstct.
     ENDIF.
     DATA(lv_description)   = ls_tstct-ttext.
-    " 037 US2 (S07): map SAP sy-langu 1-char code to ISO 639-1 alpha-2 (matches
+    " (S07): map SAP sy-langu 1-char code to ISO 639-1 alpha-2 (matches
     " dispatch_http mapping so CLI wire round-trips cleanly).
     DATA(lv_original_lang) = SWITCH string( ls_tstct-sprsl
       WHEN '1' THEN 'ZH' WHEN '2' THEN 'KO' WHEN 'D' THEN 'DE'

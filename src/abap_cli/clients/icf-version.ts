@@ -42,9 +42,9 @@ export interface IcfDeploymentInfo {
    * by `status:'not_deployed'` (an explicit 404 / not-found).
    */
   probeFailed?: boolean;
-  /** 030: detected ADT runtime tier (steampunk → icfSetupBlocked=true). */
+  /** detected ADT runtime tier (steampunk → icfSetupBlocked=true). */
   runtime?: AdtRuntime;
-  /** 030: true when system blocks cl_icf_tree (Steampunk whitelist). */
+  /** true when system blocks cl_icf_tree (Steampunk whitelist). */
   icfSetupBlocked?: boolean;
 }
 

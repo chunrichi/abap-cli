@@ -51,7 +51,7 @@
 | `INVALID_ARGUMENT` | USAGE/2 | `transport create` 描述为空等 | 看 `error.nextSteps` |
 | `USAGE` | USAGE/2 | 缺必填参数 | `error.nextSteps` / `error.references`（help 已不再含错误恢复表） |
 
-### 写操作保护（P0.3）
+### 写操作保护
 
 `transport create` 与 `transport assign` 是写操作：
 
@@ -85,4 +85,4 @@
 
 ## JSON 输出契约参考
 
-- 契约规范：见本仓库 `wiki/json-generation.md`（POSIX 路径是该契约的一部分）
+- `--json` 中的路径字段统一使用 `/` 分隔（POSIX 风格），不随运行平台变化；以 `abap <cmd> --schema --json` 为准。

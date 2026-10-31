@@ -1,5 +1,5 @@
 /**
- * S-8 — session jar writes transparently fall back to `$TMPDIR/abap-cli/...`
+ * — session jar writes transparently fall back to `$TMPDIR/abap-cli/...`
  * when the canonical `~/.abap-cli/sessions/<hash>.json` path is not
  * writable (sandboxed environments, read-only filesystems, $HOME pointing
  * at a regular file, etc).
@@ -98,7 +98,7 @@ afterEach(() => {
   }
 });
 
-describe('session jar fallback (S-8)', () => {
+describe('session jar fallback', () => {
   it('writes to $TMPDIR/abap-cli/sessions/<hash>.json when the home-dir path is unwritable', async () => {
     const key = Buffer.alloc(32, 1);
     await expect(markJarPersisted(jar, profile, key)).resolves.toBe(true);

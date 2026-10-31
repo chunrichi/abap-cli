@@ -25,7 +25,7 @@ export async function runPullDdic(objectName: string, type: DdicSupportedType, o
   try {
     resp = await icf.getDdic<Record<string, unknown>>(type.toLowerCase(), objectName);
   } catch (err) {
-    // 037 US4: SAP-side DDL parser bug surfaces as HTTP 500 with an ABAP
+    // SAP-side DDL parser bug surfaces as HTTP 500 with an ABAP
     // short dump carrying `abap.string(N)` (e.g. `abap.string(000000)` for
     // empty .INCLUDE fragments). Convert to a structured TABL_DDL_PARSE_FAILED
     // so the agent can recognise the failure mode and try an alternate path.
@@ -118,7 +118,7 @@ export async function runPullDdic(objectName: string, type: DdicSupportedType, o
   };
 }
 
-/** 024: write the abap-file-format three-piece layout for TABL/STRU. */
+/** write the abap-file-format three-piece layout for TABL/STRU. */
 async function writePullDdicTabl(
   objectName: string,
   type: DdicSupportedType,

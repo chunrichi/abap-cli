@@ -1,5 +1,5 @@
 /**
- * 037 US4: pull TABL graceful fallback when SAP can't parse the DDL source.
+ * pull TABL graceful fallback when SAP can't parse the DDL source.
  *
  * When the SAP-side DDIC DDL parser hits an unsupported fragment (real bug
  * observed against vhcala4hci 2026-09-04: `abap.string(000000)` after empty
@@ -56,7 +56,7 @@ const SAP_500_BODY =
   'Type "abap.string(000000)" is not supported by DDL parser\n' +
   'CX_DD_DDL_PARSE_ERROR';
 
-describe('037 US4 — TABL graceful fallback', () => {
+describe('037 — TABL graceful fallback', () => {
   it('returns TABL_DDL_PARSE_FAILED when SAP 500 contains abap.string(N)', async () => {
     icfGetDdic.mockRejectedValueOnce(
       new CliError('SAP_ERROR', 'ICF request failed: HTTP 500', {

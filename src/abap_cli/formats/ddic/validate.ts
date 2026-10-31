@@ -29,9 +29,9 @@ export function validateDdicObject(data: DdicObject, objectType: string): string
 
   switch (objectType) {
     case 'DOMA': {
-      // 033: AFF canonical — `format.dataType` / `format.length`. Legacy flat
+      // AFF canonical — `format.dataType` / `format.length`. Legacy flat
       // top-level dataType/length are still accepted as a back-compat shim
-      // for pre-014 scripts; the error message keeps the user pointed at the
+      // for pre- scripts; the error message keeps the user pointed at the
       // AFF canonical shape so the migration path is clear.
       const format = (data as Record<string, unknown>).format as Record<string, unknown> | undefined;
       const fmtDataType = format?.dataType;
@@ -48,7 +48,7 @@ export function validateDdicObject(data: DdicObject, objectType: string): string
       break;
     }
     case 'DTEL': {
-      // 033: AFF canonical — `dataTypeInformation.{category, typeName}`.
+      // AFF canonical — `dataTypeInformation.{category, typeName}`.
       const dti = (data as Record<string, unknown>).dataTypeInformation as Record<string, unknown> | undefined;
       const flatDomain = (data as Record<string, unknown>).domain;
       const flatDataType = (data as Record<string, unknown>).dataType;
@@ -61,7 +61,7 @@ export function validateDdicObject(data: DdicObject, objectType: string): string
         dti.category === 'referenceToPredefinedType' ||
         dti.category === 'referenceDictionaryType' ||
         dti.category === 'referenceClasIntType' ||
-        dti.category === 'typeRef' // 032 legacy alias
+        dti.category === 'typeRef' // legacy alias
       );
       const hasLegacy = !!flatDomain || !!flatDataType;
       if (!hasCanonical && !hasLegacy) {
@@ -107,7 +107,7 @@ export function validateDdicObject(data: DdicObject, objectType: string): string
       }
       break;
     case 'TTYP':
-      // Q2: out of scope for this phase; existing diagnostics retained.
+      // Out of scope for this phase; existing diagnostics retained.
       if (!(data as Record<string, unknown>).rowType) errors.push('TableType missing: rowType');
       break;
   }
@@ -115,7 +115,7 @@ export function validateDdicObject(data: DdicObject, objectType: string): string
 }
 
 /**
- * P3.1: TABT settings valid enums - mirrors `tabt-v1.json` enum values.
+ * TABT settings valid enums - mirrors `tabt-v1.json` enum values.
  * Kept in sync with `src/abap_cli/schema/tabt-v1.json` (the AFF schema is
  * the source of truth; this map is a synchronous shortcut for the CLI push
  * path so we can validate without the AJV overhead).
@@ -130,7 +130,7 @@ const TABT_VALID_ENUMS = {
 } as const;
 
 /**
- * P3.1: validate a TABL/STRU `generalInformation` payload against the
+ * validate a TABL/STRU `generalInformation` payload against the
  * `tabt-v1.json` enum values. Synchronous (no AJV dependency) so it can
  * run inline in push.ts / create.ts without an `await` boundary.
  *

@@ -1,5 +1,5 @@
 /**
- * Spec 036 US3: MSAG (message class) pull.
+ * MSAG (message class) pull.
  *
  * Flow:
  *   1. channel-detect → ADT (EHP7+) or ICF (EHP5/6).

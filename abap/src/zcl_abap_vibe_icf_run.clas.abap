@@ -9,7 +9,7 @@ CLASS zcl_abap_vibe_icf_run DEFINITION PUBLIC FINAL CREATE PUBLIC.
       BEGIN OF ty_run_report_data,
         report      TYPE string,
         variant     TYPE string,
-        " S-4: selection-screen params forwarded by the CLI. Currently
+        " selection-screen params forwarded by the CLI. Currently
         " acknowledged but not applied to the SUBMIT (dynamic WITH
         " is rejected by NetWeaver's static parser — see the comment
         " in execute_report); instead the handler echoes them back
@@ -101,7 +101,7 @@ CLASS zcl_abap_vibe_icf_run IMPLEMENTATION.
 
     DATA ls_payload TYPE ty_run_report.
     DATA ls_error   TYPE zcl_abap_vibe_icf_types=>ty_error.
-    " S-4: forward --param entries to the executor. The handler echoes
+    " forward --param entries to the executor. The handler echoes
     " them back in the response so the CLI can confirm the round trip
     " even though dynamic WITH is rejected by the static SUBMIT parser
     " (the actual limitation is documented in execute_report).
@@ -131,7 +131,7 @@ CLASS zcl_abap_vibe_icf_run IMPLEMENTATION.
     " so params currently surface as metadata only — the same content the
     " CLI emits in `data.params`. Future work could SET PARAMETER ID + use
     " a generated subroutine pool to apply them; see execute_report's
-    " long-form comment block in feedback S-4.
+    " long-form comment block in feedback.
     IF it_params IS NOT INITIAL.
       es_payload-data-params = it_params.
     ENDIF.

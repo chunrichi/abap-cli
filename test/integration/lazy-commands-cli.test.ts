@@ -55,7 +55,7 @@ async function withFakeProject(args: string[]): Promise<{ stdout: string; stderr
   }
 }
 
-describe('lazy loading at the process level (P1.6)', () => {
+describe('lazy loading at the process level', () => {
   it.skipIf(!hasBuiltCli)('--help lists commands without any SAP call', async () => {
     const { stdout } = await withFakeProject(['--help']);
     for (const name of ['init', 'pull', 'transport', 'profile']) {
@@ -75,11 +75,11 @@ describe('lazy loading at the process level (P1.6)', () => {
   });
 });
 
-// --- root --help groups local commands under a dedicated section (P2.9) ---
+// --- root --help groups local commands under a dedicated section ---
 const LOCAL_NAMES = ['init', 'profile', 'doctor'];
 const SAP_NAMES = ['pull', 'push', 'check', 'search', 'create', 'status', 'transport', 'deploy', 'inspect', 'diff'];
 
-describe('lazy command scope grouping (P2.9)', () => {
+describe('lazy command scope grouping', () => {
   it.skipIf(!hasBuiltCli)('built CLI root --help groups init/profile/doctor as local', async () => {
     const { stdout } = await withFakeProject(['--help']);
     expect(stdout).toContain('Local commands (no SAP connection required):');

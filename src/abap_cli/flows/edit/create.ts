@@ -44,7 +44,7 @@ export interface CreateOptions {
   checkOnly?: boolean;
   audit?: boolean;
   yes?: boolean;
-  /** 014: DDIC abap-file-format JSON input path. */
+  /** DDIC abap-file-format JSON input path. */
   file?: string;
   /** With type FUGR: create a function module (FUGR/FF) inside the existing function group <name>. */
   func?: string;
@@ -207,7 +207,7 @@ export async function runCreate(type: string | undefined, name: string | undefin
   );
 
   // Create-then-pull default: write the local file so the agent has it.
-  // 032: FUGR must go through pullObject so the standard abap-file-format
+  // FUGR must go through pullObject so the standard abap-file-format
   // layout is written (sapl/l<group>top/.func.* + .fugr.json), not a stale
   // single `<group>.fugr.abap` file the spec never defined.
   let localFile: string | undefined;

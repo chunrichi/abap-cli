@@ -108,17 +108,17 @@ WARN 不影响退出码（exit 0 仍然视为通过）。`--json` 模式下 WARN
 ## Examples
 
 ```bash
-# 校验一个 fixture
-abap validate:aff test/fixtures/zmy_basic.tabl.json
+# 校验单个 AFF 文件
+abap validate:aff src/zmy_basic.tabl.json
 
-# 校验整个 fixtures 目录（含 STRU/TABL settings.json 走 tabt-v1.json）
-abap validate:aff test/fixtures/
+# 校验目录下全部 AFF 文件（含 STRU/TABL settings.json 走 tabt-v1.json）
+abap validate:aff src/
 
-# 校验一个 wire payload 目录
-abap validate:aff --wire tmp/s4h/260903001/wire/
+# 同时校验一个 wire payload 目录
+abap validate:aff src/zt_x.tabl.json --wire path/to/wire
 
 # JSON 信封输出（Agent 友好）
-abap validate:aff --json test/fixtures/
+abap validate:aff --json src/
 
 # 打印命令参数 schema（无 SAP 调用）
 abap validate:aff --schema

@@ -35,7 +35,7 @@
 | `ddic-icf` | 所有 ICF/通道 JSON 推送的统一进入 stage（DDIC / HTTP / TRAN / TTYP / MSAG / DDLS）；`--dry-run` 也记录 | 视类型而定（DDIC: `INVALID_FIELD` / `VALIDATION_ERROR`；HTTP: `HTTP_CREATE_FAILED`；TRAN: `TRAN_CREATE_FAILED`） |
 | `textpool-adt` / `textpool-icf` | textpool 写 | 视 mode 而定；ICF 写为 stub（无 ADT 写端点时 `TEXTPOOL_WRITE_UNSUPPORTED`，见 [workflow.md 变体 8](workflow.md)） |
 
-## 写操作保护（P0.3）
+## 写操作保护
 
 `push` / `create` / `activate` 是写操作：
 
@@ -45,4 +45,4 @@
 
 ## JSON 输出契约参考
 
-- 契约规范：见本仓库 `wiki/json-generation.md`（POSIX 路径是该契约的一部分）
+- `--json` 中的路径字段统一使用 `/` 分隔（POSIX 风格），不随运行平台变化；以 `abap <cmd> --schema --json` 为准。

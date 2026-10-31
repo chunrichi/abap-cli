@@ -19,11 +19,11 @@ export interface SapConfig {
   caPath: string;
   /** Base directory for whole-workspace scans (`push --all`, `check --all|--changed`, `status`, `diff`); falls back to cwd. */
   sourceDir: string;
-  /** 034: Optional system flavour tag (e.g. 'on-prem', 'cloud', 'btp', 'mock').
+  /** Optional system flavour tag (e.g. 'on-prem', 'cloud', 'btp', 'mock').
    *  When omitted the CLI treats the profile as on-prem for session reuse
    *  purposes. */
   systemType?: 'on-prem' | 'cloud' | 'btp' | 'mock';
-  /** 034: Session policy override at the profile level. Equivalent to
+  /** Session policy override at the profile level. Equivalent to
    *  `.abap.json#sap.sessionPolicy` and overridden by env var. */
   sessionPolicy?: 'reuse' | 'always-logout' | 'default';
 }
@@ -32,9 +32,9 @@ export interface ProjectConfig {
   sap: SapConfig;
   transport: string;
   package: string;
-  /** 014: current system name (for capability reads / route decisions). */
+  /** current system name (for capability reads / route decisions). */
   systemName: string;
-  /** 014: ADT text-element capability recorded at connect/init (Q1, optional). */
+  /** ADT text-element capability recorded at connect/init (optional). */
   adtTextpool?: { read: boolean; write: boolean; checkedAt: string };
   systemVersion?: string;
 }

@@ -1,5 +1,5 @@
 /**
- * 033 + 032: DTEL dataTypeInformation categories per AFF dtel-v1.json.
+ * +: DTEL dataTypeInformation categories per AFF dtel-v1.json.
  *
  * AFF canonical categories:
  *   - 'domain'                     — typeName is the domain.
@@ -9,14 +9,14 @@
  *   - 'referenceClasIntType'       — referencedTypeName is a class/interface.
  *
  * Wire and local mirror the AFF nested shape (no flat `typeRef` envelope).
- * Legacy 032 alias `typeRef` on local is mapped to `referenceDictionaryType`
+ * Legacy alias `typeRef` on local is mapped to `referenceDictionaryType`
  * on the wire and accepted on the wire-side read.
  */
 import { describe, it, expect } from 'vitest';
 import { localToWire, wireToLocal } from '../../src/abap_cli/formats/ddic/wire.js';
 import { CliError } from '../../src/abap_cli/output/json.js';
 
-describe('033/dtel-dataTypeInformation', () => {
+describe('dtel-dataTypeInformation', () => {
   describe('wireToLocal', () => {
     it('maps wire dataTypeInformation (category: referenceDictionaryType) → local', () => {
       const local = wireToLocal('DTEL', {
@@ -67,7 +67,7 @@ describe('033/dtel-dataTypeInformation', () => {
           typeName: 'ZMY_TTYP',
         },
       } as Record<string, unknown>);
-      // 032 legacy alias `typeRef` → AFF canonical `referenceDictionaryType`.
+      // legacy alias `typeRef` → AFF canonical `referenceDictionaryType`.
       expect(wire.typeRef).toBeUndefined();
       const dti = wire.dataTypeInformation as Record<string, unknown>;
       expect(dti.category).toBe('referenceDictionaryType');

@@ -3,13 +3,24 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'node:url';
 
-// --- 025 Skill 路由覆盖测试（SC-002 / SC-005 / FR-002 / FR-008 / FR-009 / FR-010）---
+// --- Skill 路由覆盖测试（命令归属 / references 隔离 / agent 编排契约）---
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const skillsRoot = path.join(repoRoot, 'skills');
 const agentsRoot = path.join(repoRoot, 'agents');
 
-const SKILL_NAMES = ['abap-cli', 'abap-cli-setup', 'abap-cli-search', 'abap-cli-edit', 'abap-cli-data'];
+const SKILL_NAMES = [
+  'abap-cli',
+  'abap-cli-setup',
+  'abap-cli-search',
+  'abap-cli-edit',
+  'abap-cli-data',
+  'abap-cli-performance',
+];
+
+// 方法论 skill 不拥有命令所有权（无 metadata.commands），并用相对链接 handoff 到
+// 兄弟 skill；因此不参与「领域命令唯一归属」与「SKILL.md 无兄弟引用」断言。
+const METHODOLOGY_SKILLS = new Set(['abap-cli-performance']);
 
 interface SkillFrontmatter {
   name?: string;
@@ -65,34 +76,36 @@ function loadAllSkills(): { name: string; fm: SkillFrontmatter }[] {
   });
 }
 
-describe('025 routing coverage (SC-002: metadata.commands 互不相交)', () => {
+describe('routing coverage (metadata.commands 互不相交)', () => {
   const skills = loadAllSkills();
   const commandToSkill = new Map<string, string>();
 
   it('每个领域 skill 的 metadata.commands 已声明且非空', () => {
     for (const s of skills) {
       if (s.name === 'abap-cli') continue; // meta 允许空数组
+      if (METHODOLOGY_SKILLS.has(s.name)) continue; // 方法论 skill 不拥有命令
       const cmds = s.fm.metadata?.commands ?? [];
       expect(Array.isArray(cmds), `${s.name}: metadata.commands 必须是数组`).toBe(true);
       expect(cmds.length, `${s.name}: metadata.commands 不能为空`).toBeGreaterThan(0);
     }
   });
 
-  it('meta skill (abap-cli) 的 metadata.commands 仅含 agent 元命令（FR-009）', () => {
+  it('meta skill (abap-cli) 的 metadata.commands 仅含 agent 元命令', () => {
     const meta = skills.find((s) => s.name === 'abap-cli')!;
     const cmds = meta.fm.metadata?.commands ?? [];
     // meta skill 允许有 commands，但这些必须是 agent 元命令（feedback / report-stuck 等），
     // 不允许混入任何领域 skill 已声明的命令（互不相交）。
-    // 与 0.2.6+ P3.3 spec 对齐：feedback / report-stuck 不操作 SAP 对象，归属 meta。
+    // 与 0.2.6+ 对齐：feedback / report-stuck 不操作 SAP 对象，归属 meta。
     expect(cmds, 'meta skill 必须有 metadata.commands 字段').toBeDefined();
     for (const cmd of cmds) {
       expect(commandToSkill.has(cmd), `meta 命令 ${cmd} 与领域 skill 重名`).toBe(false);
     }
   });
 
-  it('同一命令不出现于多个领域 skill 的 metadata.commands（SC-002 / FR-002 / FR-010）', () => {
+  it('同一命令不出现于多个领域 skill 的 metadata.commands', () => {
     for (const s of skills) {
       if (s.name === 'abap-cli') continue;
+      if (METHODOLOGY_SKILLS.has(s.name)) continue; // 其 commands 是触发集合，不是所有权
       for (const cmd of s.fm.metadata?.commands ?? []) {
         const prev = commandToSkill.get(String(cmd));
         expect(prev, `命令 ${cmd} 重复：${prev} 与 ${s.name}`).toBeUndefined();
@@ -103,7 +116,7 @@ describe('025 routing coverage (SC-002: metadata.commands 互不相交)', () => 
     expect(commandToSkill.size, '至少应有 22 条领域命令（不含 create local 子命令）').toBeGreaterThanOrEqual(22);
   });
 
-  it('4 领域 skill 的 metadata.commands 并集覆盖全部 CLI 命令（SC-002）', () => {
+  it('4 领域 skill 的 metadata.commands 并集覆盖全部 CLI 命令', () => {
     // The four domain skills must cover every top-level command except the
     // meta-skill commands (feedback / report-stuck). Derived from the registry.
     const registrySrc = fs.readFileSync(path.join(repoRoot, 'src/abap_cli/registry/commands.ts'), 'utf8');
@@ -118,13 +131,13 @@ describe('025 routing coverage (SC-002: metadata.commands 互不相交)', () => 
     for (const cmd of commandToSkill.keys()) {
       expect(
         expected.includes(cmd) || allowedExtra.has(cmd),
-        `命令 ${cmd} 不在 025 路由表`,
+        `命令 ${cmd} 不在路由表`,
       ).toBe(true);
     }
   });
 });
 
-describe('025 references 隔离（SC-005: 零 cross-reference 到其他 skill 的 references）', () => {
+describe('references 隔离（零 cross-reference 到其他 skill 的 references）', () => {
   const skills = loadAllSkills();
 
   it.each(skills.map((s) => s.name))(
@@ -143,6 +156,8 @@ describe('025 references 隔离（SC-005: 零 cross-reference 到其他 skill �
   it.each(skills.map((s) => s.name))(
     '%s: SKILL.md 不引用 ../abap-cli-* 兄弟 skill（仅可引用 GitHub URL）',
     (name) => {
+      // 方法论 skill 的 Handoff 规则用相对链接指向兄弟 SKILL.md（安装后同目录结构成立）
+      if (METHODOLOGY_SKILLS.has(name)) return;
       const content = fs.readFileSync(path.join(skillsRoot, name, 'SKILL.md'), 'utf-8');
       const crossRefs = content.match(/\.\.\/abap-cli-[a-z-]+\//g);
       expect(crossRefs, `${name}/SKILL.md 含兄弟 skill 引用: ${crossRefs?.join(', ')}`).toBeNull();

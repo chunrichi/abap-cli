@@ -17,7 +17,7 @@ interface FugrResolved {
  * Push a single FUGR file. FUGR sub-objects (function modules, includes) are
  * independently locked ADT objects, so each file locks its own target
  * object, writes its source, then (for `.func`) verifies the parent group's
- * activation. As of T1.6, the post-write flow no longer trusts a single
+ * activation. As of, the post-write flow no longer trusts a single
  * `activate` call — it now uses `activateAll` for function modules and
  * verifies that the latest and active source match before declaring success.
  *
@@ -268,7 +268,7 @@ export async function pushFugrOne(
         );
       }
 
-      // T1.6: post-activation verification — read latest and active sources
+      // post-activation verification — read latest and active sources
       // in parallel and ensure they match. A mismatch means SAP accepted the
       // activate call but did not actually commit the source.
       let latest: string;

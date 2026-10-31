@@ -18,7 +18,7 @@ function structure(
   return { metaData: meta, ...(includes ? { includes } : {}) };
 }
 
-describe('getObjectPartsWithMeta — extended capture (T1.1)', () => {
+describe('getObjectPartsWithMeta — extended capture', () => {
   it('captures PROG programStatus / fixPointArithmetic / editLocked / authorizationGroup', async () => {
     objectStructure.mockResolvedValueOnce(
       structure({

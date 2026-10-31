@@ -1,5 +1,5 @@
 /**
- * PR5 (B1): NROB (number range object) push via the ICF `/ddic/nrob` route.
+ * (B1): NROB (number range object) push via the ICF `/ddic/nrob` route.
  *
  * Mirrors `push-enqu.ts`: existence check first (GET), then POST. NROB has
  * no abap-adt-api endpoint so the channel is hard-coded to `icf`.

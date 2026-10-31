@@ -127,7 +127,7 @@ export class AdtClientWrapper {
    * Decide whether to reuse a persisted SAP session or fall back to a fresh
    * login on the first real request.
    *
-   *  - cloud / btp: never touch the cookie jar (FR-005) — fresh login.
+   * cloud / btp: never touch the cookie jar — fresh login.
    *  - `always-logout`: fresh login every command; no jar read/write.
    *  - non-durable key store (test/CI backends): no jar read/write — fresh
    *    login, released again at command end.
@@ -288,7 +288,7 @@ export class AdtClientWrapper {
     return this._call(() => this.client.setObjectSource(objectSourceUrl, source, lockHandle, transport));
   }
 
-  // --- 036-ttyp-msag-ddls: dual-channel ADT endpoints (TTYP / MSAG / DDLS) ---
+  // --- dual-channel ADT endpoints (TTYP / MSAG / DDLS) ---
 
   /** GET /sap/bc/adt/ddic/tabletypes/<name> — retrieve a TTYP (table type).
    *  Returns the XML body verbatim; the caller (formats/ttyp/json.ts#wireToLocal)
@@ -296,7 +296,7 @@ export class AdtClientWrapper {
   getTtyp(name: string): Promise<string> {
     return this._call(async () => {
       const url = `/sap/bc/adt/ddic/tabletypes/${name.toUpperCase()}`;
-      // 036: DDIC atom endpoints reject narrow Accept types (406); fall back
+      // DDIC atom endpoints reject narrow Accept types (406); fall back
       // to a wildcard that the SAP gateway accepts while we wait for the
       // canonical vnd.sap.adt.* content type registration.
       const resp = await this.client.httpClient.request(url, {
@@ -555,7 +555,7 @@ export class AdtClientWrapper {
   }
 
   /**
-   * T3.2 — Fetch the nested service-binding metadata omitted by
+   * Fetch the nested service-binding metadata omitted by
    * `objectStructure()`. Returns the parsed `ServiceBinding` payload
    * (services, binding type / category, packageRef, …) — the consumer
    * is responsible for projecting it into the AFF `<name>.srvb.json`
@@ -577,7 +577,7 @@ export class AdtClientWrapper {
   }
 
   /**
-   * T3.1 — Fetch the source DDL for a service definition (SRVD).
+   * Fetch the source DDL for a service definition (SRVD).
    * SRVD objects carry a DDL-like body (define service …) wrapped in
    * the standard ADT source envelope. abap-adt-api exposes the same
    * `getObjectSource` for every type, so this is a thin convenience
@@ -589,7 +589,7 @@ export class AdtClientWrapper {
 
   /**
    * Run an ABAP class as an application (ADT classrun, e.g. ICF setup).
-   * 015-abap-run: optional second `params` argument forwards classrun input
+   * optional second `params` argument forwards classrun input
    * as JSON body — the underlying abap-adt-api 8.4.1 `runClass(name)` does
    * not accept body params, so this wrapper goes through `AdtHTTP.request`
    * with a JSON body when `params` is provided. The SAP-side wrapper reads
@@ -625,7 +625,7 @@ export class AdtClientWrapper {
     });
   }
 
-  // --- Text elements (textpool; 014 US4) ---
+  // --- Text elements ---
 
   /** Read text elements (symbols/selections/headings) for an object. */
   getTextElements(objectType: string, objectName: string, category: TextElementCategory = 'symbols') {

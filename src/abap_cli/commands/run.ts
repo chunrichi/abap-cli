@@ -185,7 +185,7 @@ function formatHuman(result: ReturnType<typeof buildDryRun>): string {
   lines.push(`exit:    ${result.exitCode}`);
   lines.push(`time:    ${result.durationMs}ms`);
   if (result.method) lines.push(`method:  ${result.method}`);
-  // S-7: surface which version of the class SAP actually executed.
+  // surface which version of the class SAP actually executed.
   // `hasInactiveVersion: true` is the F-02 red flag — a `push` left an
   // inactive copy that this `run` did NOT pick up.
   const fp = (result as { sourceFingerprint?: { hasInactiveVersion: boolean; activeChangedAt: string | null; activeChangedBy: string | null; unavailable?: boolean } }).sourceFingerprint;

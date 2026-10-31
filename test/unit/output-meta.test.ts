@@ -21,7 +21,7 @@ function makeTree(): Command {
   return program;
 }
 
-describe('output meta (FR-003, US-1)', () => {
+describe('output meta (, U )', () => {
   afterEach(() => {
     resetWarnings();
     vi.restoreAllMocks();
@@ -79,7 +79,7 @@ describe('output meta (FR-003, US-1)', () => {
     expect(buildMeta().warnings).toEqual([]);
   });
 
-  it('envelope top-level keys are identical across heterogeneous commands (US-1)', () => {
+  it('envelope top-level keys are identical across heterogeneous commands', () => {
     setProgram(makeTree());
     const payloads = [
       { object: 'ZCL_DEMO', type: 'CLAS', entries: [] }, // pull
@@ -96,7 +96,7 @@ describe('output meta (FR-003, US-1)', () => {
     expect(Object.keys(JSON.parse(failOut.stderr[0]!)).sort()).toEqual(['error', 'meta', 'status']);
   });
 
-  it('warnings live only in meta.warnings and never affect exit codes (US-2)', () => {
+  it('warnings live only in meta.warnings and never affect exit codes', () => {
     collectWarning('LOCAL_FILE_KEPT', 'local draft kept');
     const success = renderResult('json', { ok: 1 }, '', buildMeta());
     const successJson = JSON.parse(success.stdout[0]!);
@@ -112,7 +112,7 @@ describe('output meta (FR-003, US-1)', () => {
     expect(fail.exitCode).toBe(2); // USAGE → 2, unaffected by the warning
   });
 
-  it('every WarningCode is collectable and surfaces in meta.warnings (US-5)', () => {
+  it('every WarningCode is collectable and surfaces in meta.warnings', () => {
     const codes = [
       'UNLOCK_WARNING',
       'LOCAL_FILE_KEPT',
@@ -132,7 +132,7 @@ describe('output meta (FR-003, US-1)', () => {
     }
   });
 
-  it('buildSchemaMeta returns only command/version/durationMs (US3, 025)', () => {
+  it('buildSchemaMeta returns only command/version/durationMs', () => {
     setProgram(makeTree());
     vi.spyOn(process, 'argv', 'get').mockReturnValue(['node', 'index.js', 'search', 'Z'] as never);
     collectWarning('LOCAL_FILE_KEPT', 'should not appear in schema meta');
@@ -146,7 +146,7 @@ describe('output meta (FR-003, US-1)', () => {
     expect((schemaMeta as Record<string, unknown>).warnings).toBeUndefined();
   });
 
-  it('getOriginalArgv returns process.argv slice lazily (US4, 025)', () => {
+  it('getOriginalArgv returns process.argv slice lazily', () => {
     const initial = process.argv;
     const slice = getOriginalArgv();
     expect(Array.isArray(slice)).toBe(true);

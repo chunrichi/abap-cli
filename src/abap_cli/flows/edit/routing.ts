@@ -119,7 +119,7 @@ export interface JsonPushRoute {
   kind: 'icf-json' | 'aff-json';
   channel: RouteChannel;
   run: (args: PushRunArgs) => Promise<PushOneResult>;
-  /** Local structural validation, used by `--atomic` phase 1. */
+  /** Local structural validation, used by `--atomic`. */
   validate: (file: string, objectType: string) => Promise<void>;
 }
 export type PushRoute = SourceRoute | JsonPushRoute;

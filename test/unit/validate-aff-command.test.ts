@@ -15,7 +15,7 @@ function clean(): void {
   fs.rmSync(TMP, { recursive: true, force: true });
 }
 
-describe('validate-aff command (T033-005)', () => {
+describe('validate-aff command', () => {
   beforeEach(() => {
     clean();
     mkDir(TMP);

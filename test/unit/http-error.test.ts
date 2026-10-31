@@ -4,14 +4,14 @@ import { AxiosError } from 'axios';
 import { classifyHttpError, isTlsErrorCode, TLS_ERROR_CODE_LIST } from '../../src/abap_cli/clients/http-error.js';
 import { toErrorShape } from '../../src/abap_cli/output/json.js';
 
-describe('http-error classifier ()', () => {
+describe('http-error classifier', () => {
   it('TLS_ERROR_CODE_LIST contains the documented Node codes', () => {
     expect(TLS_ERROR_CODE_LIST).toContain('UNABLE_TO_VERIFY_LEAF_SIGNATURE');
     expect(TLS_ERROR_CODE_LIST).toContain('SELF_SIGNED_CERT_IN_CHAIN');
     expect(TLS_ERROR_CODE_LIST).toContain('CERT_HAS_EXPIRED');
   });
 
-  it('classified errors carry the explicit category via toErrorShape (US-2)', () => {
+  it('classified errors carry the explicit category via toErrorShape', () => {
     const ax = new AxiosError('Unauthorized', '401', undefined, undefined, {
       status: 401,
       statusText: 'Unauthorized',
@@ -104,7 +104,7 @@ describe('http-error classifier ()', () => {
     expect(cli.details?.httpStatus).toBe(500);
   });
 
-  it('classifies an HttpClientException-style TLS error (status=0 + TLS code) as TLS_ERROR, not SAP_ERROR (SC-004)', () => {
+  it('classifies an HttpClientException-style TLS error (status=0 + TLS code) as TLS_ERROR, not SAP_ERROR', () => {
     // Real SAP: abap-adt-api surfaces TLS handshake failures as AdtHttpException
     // with status=0 and the Node TLS code on `code` (e.g. DEPTH_ZERO_SELF_SIGNED_CERT).
     const httpClientEx = Object.assign(

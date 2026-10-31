@@ -29,7 +29,7 @@ function fakeClient(
   } as unknown as IcfClient;
 }
 
-describe('select-flow-basic-success ()', () => {
+describe('select-flow-basic-success', () => {
   it('returns success envelope with rows + rowCount + truncated', async () => {
     const client = fakeClient(
       {
@@ -58,7 +58,7 @@ describe('select-flow-basic-success ()', () => {
     expect(result.rows).toHaveLength(2);
     expect(result.fields).toEqual(['MANDT', 'ID', 'STATUS', 'CREATED']);
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
-    // 017 Q1 B: cell values are native-typed (number / string / YYYY-MM-DD).
+    // Cell values are native-typed (number / string / YYYY-MM-DD).
     expect(result.rows[0]).toEqual({ MANDT: '001', ID: 1, STATUS: 'X', CREATED: '2026-01-01' });
     expect(result.rows[1]!.ID).toBe(2);
   });
@@ -77,7 +77,7 @@ describe('select-flow-basic-success ()', () => {
   });
 });
 
-describe('select-flow-empty-result ()', () => {
+describe('select-flow-empty-result', () => {
   it('returns empty rows + rowCount=0 + truncated=false', async () => {
     const client = fakeClient(
       {
@@ -93,7 +93,7 @@ describe('select-flow-empty-result ()', () => {
   });
 });
 
-describe('select-flow-default-limit ()', () => {
+describe('select-flow-default-limit', () => {
   it('defaults limit to 100 when not specified', async () => {
     let capturedBody: unknown;
     const client = fakeClient(
@@ -109,7 +109,7 @@ describe('select-flow-default-limit ()', () => {
   });
 });
 
-describe('select-flow-truncation ()', () => {
+describe('select-flow-truncation', () => {
   it('returns truncated=true when rowCount equals limit (probe fetched limit+1)', async () => {
     const client = fakeClient(
       {
@@ -132,7 +132,7 @@ describe('select-flow-truncation ()', () => {
   });
 });
 
-describe('select-flow-dry-run ()', () => {
+describe('select-flow-dry-run', () => {
   it('returns a dry-run envelope without invoking the ICF client', () => {
     const dry: SelectResult = buildDryRun('ZTAB_FIXTURE', { limit: 10, where: "STATUS = 'X'" });
     expect(dry.dryRun).toBe(true);
@@ -144,7 +144,7 @@ describe('select-flow-dry-run ()', () => {
   });
 });
 
-describe('select validateLimit / validateOffset ()', () => {
+describe('select validateLimit / validateOffset', () => {
   it('accepts integer in [1, 10000]', () => {
     expect(validateLimit('100')).toBe(100);
     expect(validateLimit(1)).toBe(1);
@@ -184,7 +184,7 @@ describe('select validateLimit / validateOffset ()', () => {
   });
 });
 
-describe('select error mapping ()', () => {
+describe('select error mapping', () => {
   it('maps TABLE_NOT_FOUND to CliError with NOT_FOUND category', async () => {
     const client = fakeClient(
       {

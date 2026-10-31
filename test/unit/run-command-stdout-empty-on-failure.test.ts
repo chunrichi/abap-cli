@@ -3,7 +3,7 @@ import { registerRunCommand } from '../../src/abap_cli/commands/run.js';
 import { makeProgram, runCommand } from './cli-helper.js';
 import { CliError } from '../../src/abap_cli/output/json.js';
 
-// US4 acceptance 5 / FR-011 — --json failure leaves stdout strictly empty.
+// acceptance 5 / — --json failure leaves stdout strictly empty.
 
 const failingClient = vi.fn(async () => {
   throw new CliError('METHOD_NOT_SUPPORTED', 'method signature contains CHANGING/TABLES');
@@ -15,7 +15,7 @@ vi.mock('../../src/abap_cli/clients/adt-client.js', () => ({
   },
 }));
 
-describe('abap run --json failure separation (P1.7)', () => {
+describe('abap run --json failure separation', () => {
   it('stdout is strictly empty on failure; JSON envelope goes to stderr', async () => {
     const program = makeProgram();
     registerRunCommand(program);

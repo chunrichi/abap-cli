@@ -1,5 +1,5 @@
 /**
- * T3.5 — DDLS metadata normalisation.
+ * — DDLS metadata normalisation.
  *
  * Verifies the new `enumOrDefault` + `normaliseDdlsMetadata` helpers
  * added on top of the existing `ddls/json.ts` module. These close

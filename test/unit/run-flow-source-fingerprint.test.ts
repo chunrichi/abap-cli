@@ -1,5 +1,5 @@
 /**
- * S-7 — `abap run` source fingerprint.
+ * — `abap run` source fingerprint.
  *
  * The fingerprint surfaces which SAP-side version of a class was
  * actually executed. Without it, callers could not detect the F-02
@@ -20,7 +20,7 @@ function fakeClient(stdout: string, inactiveObjects: unknown): AdtClientWrapper 
   } as unknown as AdtClientWrapper;
 }
 
-describe('run-flow source fingerprint (S-7)', () => {
+describe('run-flow source fingerprint', () => {
   it('reports no inactive version when the inactive-objects feed is empty', async () => {
     const client = fakeClient('{"ok":true,"exit":0,"output":"hello"}', []);
     const result = await runRun('ZCL_FOO', { method: undefined }, client);

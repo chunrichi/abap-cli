@@ -13,7 +13,7 @@ export const SCHEMA = {
   description:
     'List the DDIC fields of a table or view (read-only). ' +
     'Two modes: `abap fields <table>` enumerates the fields of one object; ' +
-    '`abap fields --find <f1>,<f2>...` returns every table that contains those fields (S-2 reverse lookup).',
+    '`abap fields --find <f1>,<f2>...` returns every table that contains those fields (reverse lookup).',
   usage: 'abap fields <table> [--json] | abap fields --find <f1>,<f2>,...',
   scope: 'sap',
   arguments: [
@@ -89,8 +89,8 @@ export const SCHEMA = {
     { code: 'LIMIT_EXCEEDED', category: 'VALIDATION_ERROR', exitCode: 7 },
   ],
   notes: [
-    // S-6: surface the DDIC version-filter conventions so callers do not
-    // have to discover them by trial and error (feedback §10 / S-6).
+    // surface the DDIC version-filter conventions so callers do not
+    // have to discover them by trial and error.
     "DDIC version/status column conventions (active vs inactive rows):",
     "  - DD03L/AS4LOCAL  'A' (active) vs 'I' (inactive / changed). Default 'A'.",
     "  - DD02L/AS4VERS   ' ' (empty = current), 'S' (customer), 'O' (original). Default ' '.",

@@ -2,7 +2,7 @@
  * Pull textpool `.properties` files (texts / selections / headings) for an object
  * via the mixed-mode route (ADT or ICF, decided by the recorded profile).
  *
- * Q1: route is decided once per profile, no runtime fallback. See
+ * Route is decided once per profile, no runtime fallback. See
  * `clients/textpool-router.ts`.
  */
 import * as path from 'path';
@@ -19,7 +19,7 @@ import { toOutputPath, normalizePullData } from '../../core/path-output.js';
 import type { PullEntry, PullOptions, PullResult } from './pull-shared.js';
 
 export async function runPullTextpool(objectName: string, type: string | undefined, opts: PullOptions): Promise<PullResult> {
-  // 032 US12: textpool pull requires explicit --type (was previously defaulting
+  // textpool pull requires explicit --type (was previously defaulting
   // to PROG, which made CLAS/INTF/FUGR/TABL/STRU textpool pulls silently miss).
   // Per-type support list (texts/selections/headings all attempted on every
   // type; mock or real-SAP TEXTPOOL_OBJECT_NOT_FOUND is treated as a warning
@@ -75,7 +75,7 @@ export async function runPullTextpool(objectName: string, type: string | undefin
     } else {
       const resp = await icf.getTextpool<{ elements?: Array<{ id: string; text: string }> }>(fileCat, objectName, objType);
       if (resp.status !== 'success' || !resp.data) {
-        // 032 US12 AC3: missing text elements on a per-type/per-category basis
+        // AC3: missing text elements on a per-type/per-category basis
         // is a soft warning (TEXTPOOL_OBJECT_NOT_FOUND), not a hard failure.
         // Different types carry different categories (CLAS typically has no
         // selections; FUGR typically has no headings, etc.). Only non-404

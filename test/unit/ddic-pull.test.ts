@@ -1,7 +1,7 @@
 /**
- * 014 US3: pull DDIC objects (DOMA/DTEL/TABL/STRU) via the ICF route.
+ * pull DDIC objects (DOMA/DTEL/TABL/STRU) via the ICF route.
  * Drives `abap pull <name> --type <T>` → GET /ddic/<type>/<name> → local abap-file-format JSON.
- * TDD: written before the T018/T019 wiring.
+ * TDD: written before the / wiring.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import * as fs from 'fs';
@@ -58,7 +58,7 @@ beforeEach(() => {
   fs.mkdirSync(path.join(cwd, 'src'), { recursive: true });
 });
 
-describe('014/US3 pull DDIC', () => {
+describe('pull DDIC', () => {
   it('pulls a DOMA object via GET /ddic/doma/<name> and writes local JSON', async () => {
     const program = makeProgram();
     registerPullCommand(program);
@@ -74,7 +74,7 @@ describe('014/US3 pull DDIC', () => {
     const written = fs.readFileSync(path.join(cwd, 'src/zdoma_test.doma.json'), 'utf-8');
     const parsed = JSON.parse(written);
     expect(parsed.name).toBe('ZDOMA_TEST');
-    // 033: AFF canonical — dataType/length live under format.*, no flat top-level.
+    // AFF canonical — dataType/length live under format.*, no flat top-level.
     expect((parsed as Record<string, unknown>).dataType).toBeUndefined();
     expect(parsed.format).toEqual({
       dataType: 'QUAN',
@@ -111,7 +111,7 @@ describe('014/US3 pull DDIC', () => {
     expect(out.error.code).toBe('OBJECT_NOT_FOUND');
   });
 
-  it('no longer rejects TTYP — spec 036 routes it through channel-detect', async () => {
+  it('no longer rejects TTYP — routes it through channel-detect', async () => {
     const program = makeProgram();
     registerPullCommand(program);
     const res = await runCommand(program, ['pull', 'ZTYP', '--type', 'TTYP', '--dir', 'src', '--json'], { cwd });

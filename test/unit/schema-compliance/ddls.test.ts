@@ -1,10 +1,10 @@
 /**
- * Spec 036 T036-038: DDLS schema-compliance tests.
+ * DDLS schema-compliance tests.
  */
 import { describe, it } from 'vitest';
 import { expectSchemaPass, expectSchemaFail } from './_helpers.js';
 
-describe('DDLS schema compliance (036)', () => {
+describe('DDLS schema compliance', () => {
   it('zmy_ddls.ddls.json PASSes ddls-v1.json', async () => {
     await expectSchemaPass('zmy_ddls.ddls.json', 'DDLS');
   });

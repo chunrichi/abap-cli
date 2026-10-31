@@ -1,5 +1,5 @@
 /**
- * PR5 (B1): ENQU (lock object) create flow via the ICF `/ddic/enqu` route.
+ * (B1): ENQU (lock object) create flow via the ICF `/ddic/enqu` route.
  *
  * Mirrors `create-ddic.ts`: read --file → validate against `enqu-v1.json` →
  * convert local → wire → POST. ENQU namespaces must start with `EZ` / `EY` /

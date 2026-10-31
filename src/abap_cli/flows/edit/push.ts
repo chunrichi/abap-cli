@@ -63,17 +63,17 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
       example: 'abap push src/foo.abap --tr NDK123456',
     });
   }
-  // PR3: collapse TABL/STRU artifact groups (`.tabl.json` + `.tabl.ddic` [+
+  // collapse TABL/STRU artifact groups (`.tabl.json` + `.tabl.ddic` [
   // `.tabl.settings.json`]) to a single canonical file so --all does not push
   // the same object three times. Runs before the dependency sort so the
   // canonical (priority 30) wins over the sidecar path.
   target.files = deduplicateTablArtifactTargets(target.files);
 
-  // PR1: dependency order so DDIC prerequisites push before the objects that
+  // dependency order so DDIC prerequisites push before the objects that
   // reference them (DOMA → DTEL → TABL → ... → HTTP). Stable for same priority.
   target.files = orderTargetsByDependency(target.files);
 
-  // --atomic phase 1: structural validation of every file (NO content syntax
+  // --atomic: structural validation of every file (NO content syntax
   // check — it establishes an SAP edit session that breaks the later activate,
   // per real-SAP findings). Any failure → zero writes.
   if (opts.atomic) {
@@ -216,7 +216,7 @@ async function resolveObjectTransport(
     return opts.tr ?? client.getConfig().transport ?? 'DRY_RUN';
   }
 
-  // 035 FR-1: $TMP objects are transport-free — an explicit --tr is ignored
+  // FR-1: $TMP objects are transport-free — an explicit --tr is ignored
   // (warn instead of silently dropping, so agents don't assume it applied).
   // Checked before transportInfo so $TMP objects skip the bound-request lookup.
   if (object.packageName === '$TMP') {
@@ -336,7 +336,7 @@ async function pushSourceFile(
     throw new CliError('FILE_PARSE_ERROR', `Cannot read ${outFile}: ${message(error)}`, { details: { file: outFile } });
   }
 
-  // 035: a missing ADT object must not silently fall through to a write that
+  // a missing ADT object must not silently fall through to a write that
   // creates it — surface OBJECT_NOT_FOUND with a `create` pointer.
   let object: ResolvedObject;
   try {

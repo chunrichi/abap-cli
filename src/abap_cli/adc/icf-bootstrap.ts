@@ -1,4 +1,4 @@
-/** 034: side-effect aggregator that wires the built-in ICF register strategies
+/** side-effect aggregator that wires the built-in ICF register strategies
  *  into the global registry. Imported by `flows/deploy-flow.ts` so the
  *  registration happens exactly once at module load. New strategies land
  *  by adding a register call here — deploy-flow stays unchanged. */

@@ -1,5 +1,5 @@
 /**
- * Spec 036 T036-019 + T036-047: TTYP pull — ADT primary channel and the
+ * +: TTYP pull — ADT primary channel and the
  * ICF fallback path selected by channel-detect.
  */
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
@@ -69,7 +69,7 @@ afterEach(() => {
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-describe('runPullTtyp — ADT channel (036 US2)', () => {
+describe('runPullTtyp — ADT channel', () => {
   it('pulls via ADT and writes the json + type.abap pair', async () => {
     const { runPullTtyp } = await import('../../src/abap_cli/flows/edit/pull-ttyp.js');
     const { clearChannelCache } = await import('../../src/abap_cli/flows/edit/channel-detect.js');
@@ -117,7 +117,7 @@ describe('runPullTtyp — ADT channel (036 US2)', () => {
   });
 });
 
-describe('runPullTtyp — ICF fallback (036 US5 / SC-003)', () => {
+describe('runPullTtyp — ICF fallback (036 / )', () => {
   it('routes to ICF on an ECC EHP6 kernel and reports the fallback reason', async () => {
     const { runPullTtyp } = await import('../../src/abap_cli/flows/edit/pull-ttyp.js');
     const { clearChannelCache } = await import('../../src/abap_cli/flows/edit/channel-detect.js');

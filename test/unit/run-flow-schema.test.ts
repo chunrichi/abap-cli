@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { registerRunCommand } from '../../src/abap_cli/commands/run.js';
 import { makeProgram, runCommand, type RunResult } from './cli-helper.js';
 
-// FR-015 — --schema prints the full command schema without any SAP call.
+// — --schema prints the full command schema without any SAP call.
 // P1 — --schema emits the unified JSON envelope (success) with the schema in
 // `data` and reduced meta (command/version/durationMs only).
 

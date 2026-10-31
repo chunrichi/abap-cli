@@ -37,11 +37,11 @@ beforeEach(() => {
   fs.writeFileSync(path.join(cwd, 'src/zcl_ok.clas.abap'), 'CLASS zcl_ok DEFINITION PUBLIC.\nENDCLASS.\n');
 });
 
-describe('abap push --atomic ()', () => {
+describe('abap push --atomic', () => {
   it('a file that fails validation writes nothing (zero mutating calls)', async () => {
     // A DDIC-route file with an unregistered type (UNKN) hits the legacy
     // extension fallback (`.json` → `icf`), then validateLocalFile rejects
-    // it with DDIC_NOT_SUPPORTED. 037 changed TTYP/MSAG/DDLS to ADT routing
+    // it with DDIC_NOT_SUPPORTED. changed TTYP/MSAG/DDLS to ADT routing
     // so we use a deliberately unregistered type code that keeps the
     // icf-route branch alive.
     fs.writeFileSync(path.join(cwd, 'src/zlocal.unkn.json'), '{"any":"payload"}');

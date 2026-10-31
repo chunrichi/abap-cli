@@ -1,7 +1,7 @@
 /**
- * 036-ttyp-msag-ddls: dual-channel route classifier.
+ * dual-channel route classifier.
  *
- * Spec 036 US1: every pull/create/push for TTYP / MSAG / DDLS consults this
+ * every pull/create/push for TTYP / MSAG / DDLS consults this
  * module first to pick ADT vs. ICF. The decision is pure: it inspects the
  * already-loaded `SystemProfile` (no SAP round-trip), then caches it
  * in-process for the remaining lifetime.
@@ -11,7 +11,7 @@
  *   - `{ channel: 'icf', fallbackReason: ... }`  — ECC EHP5/6 for TTYP/MSAG
  *   - DDLS on ECC → throws `DDLS_NOT_SUPPORTED_ON_ECC` (no fallback exists)
  *
- * Cache key = profileHash + type; TTL = process lifetime (per spec Q3 — SAP
+ * Cache key = profileHash + type; TTL = process lifetime (SAP
  * profiles don't change inside one CLI invocation, and we deliberately avoid
  * cache-busting logic so tests stay deterministic).
  */
@@ -57,7 +57,7 @@ export function clearChannelCache(): void {
  *   "793"   → 793
  *   undefined → NaN
  *
- * Spec 036 US1-AS2: anything < 753 is ECC EHP6 or earlier — TTYP/MSAG ADT
+ * anything < 753 is ECC EHP6 or earlier — TTYP/MSAG ADT
  * endpoints were introduced in EHP7 / 7.40+.
  */
 export function isEccOldRelease(kernelRelease: string | undefined): boolean {
@@ -118,8 +118,8 @@ export function detectChannel(profile: SystemProfile, subject: ChannelSubject): 
   }
 
   // DDLS path: ECC EHP6 and below simply lack DDL source support — no ICF
-  // substitute exists (DDL source is SAP-internal). Spec 036 US1-AS4 +
-  // US4-AS4: hard-error rather than silent fallback.
+  // substitute exists (DDL source is SAP-internal).
+  // hard-error rather than silent fallback.
   if (subject === 'ddls') {
     if (!isEccOldRelease(profile.kernelRelease)) {
       const decision: ChannelDecision = { channel: 'adt' };

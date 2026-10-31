@@ -77,10 +77,10 @@ afterEach(() => {
   process.stderr.write = originalWrite;
 });
 
-describe('session jar write warning (F-17 + S-8)', () => {
+describe('session jar write warning (F-17 + )', () => {
   it('falls back to TMPDIR when the home-dir path is unwritable, then stays silent', async () => {
     // The mock sets h.home to a regular file, so mkdirSync(<home>/.abap-cli/...)
-    // fails with ENOTDIR. S-8 promotes the fallback under os.tmpdir() and
+    // fails with ENOTDIR. promotes the fallback under os.tmpdir and
     // emits a one-time hint; the original "reuse disabled" message must NOT
     // appear because the write actually succeeded on the fallback path.
     const key = Buffer.alloc(32, 1);

@@ -1,5 +1,5 @@
 /**
- * US11 (T052): single registry covers all 10 supported object types;
+ * single registry covers all 10 supported object types
  * legacy `TYPE_FOLDER` / `TYPE_MAP` / `*_SUPPORTED_TYPES` constants are gone.
  */
 import { describe, it, expect } from 'vitest';
@@ -17,19 +17,19 @@ import {
   TRAN_TYPES,
 } from '../../src/abap_cli/types/registry.js';
 
-describe('types/registry.ts (US11 — single source of truth)', () => {
-  it('contains exactly 21 supported types (4 source + 4 DDIC + ENQU + NROB + HTTP + TRAN + 3 dual-channel + 6 Phase 3)', () => {
-    // Phase 3 added: SRVB (metadata-only), SRVD, BDEF, DCLS, DDLX, DDLA.
-    // PR5 added: ENQU (lock object, ICF) and NROB (number range object, ICF).
+describe('types/registry.ts (single source of truth)', () => {
+  it('contains exactly 21 supported types (4 source + 4 DDIC + ENQU + NROB + HTTP + TRAN + 3 dual-channel + 6 )', () => {
+    // added: SRVB (metadata-only), SRVD, BDEF, DCLS, DDLX, DDLA.
+    // added: ENQU (lock object, ICF) and NROB (number range object, ICF).
     expect(allSupportedTypes()).toHaveLength(21);
     expect(allSupportedTypes()).toEqual([
       'CLAS', 'INTF', 'PROG', 'FUGR',         // ADT source
       'TABL', 'STRU', 'DOMA', 'DTEL',         // ICF DDIC
-      'ENQU', 'NROB',                          // PR5 — ICF DDIC family
+      'ENQU', 'NROB',                          // — ICF DDIC family
       'HTTP', 'TRAN',                          // ICF
-      'TTYP', 'MSAG', 'DDLS',                  // 036 dual-channel
-      'SRVB', 'SRVD', 'BDEF',                  // T3.2 / T3.1 / T3.3
-      'DCLS', 'DDLX', 'DDLA',                  // T3.4
+      'TTYP', 'MSAG', 'DDLS',                  // dual-channel
+      'SRVB', 'SRVD', 'BDEF',                  // /
+      'DCLS', 'DDLX', 'DDLA',
     ]);
   });
 
@@ -46,7 +46,7 @@ describe('types/registry.ts (US11 — single source of truth)', () => {
     expect(createObjtypeFor('TTYP')).toBeUndefined();
     expect(createObjtypeFor('MSAG')).toBeUndefined();
     expect(createObjtypeFor('DDLS')).toBeUndefined();
-    // Phase 3 (post-review): SRVD / DCLS / DDLX / DDLA carry their own
+    // (post-review): SRVD / DCLS / DDLX / DDLA carry their own
     // objtype string for create(); SRVB / BDEF are pull-only because either
     // `abap-adt-api`'s typed `createObject` doesn't accept them (BDEF) or
     // SAP GUI owns the lifecycle (SRVB).
@@ -66,7 +66,7 @@ describe('types/registry.ts (US11 — single source of truth)', () => {
     expect(sourceFor('TABL')).toBe('ICF');
     expect(sourceFor('HTTP')).toBe('ICF');
     expect(sourceFor('TRAN')).toBe('ICF');
-    // 036: TTYP/MSAG/DDLS are ADT by default with optional ICF fallback.
+    // TTYP/MSAG/DDLS are ADT by default with optional ICF fallback.
     expect(sourceFor('TTYP')).toBe('ADT');
     expect(sourceFor('MSAG')).toBe('ADT');
     expect(sourceFor('DDLS')).toBe('ADT');

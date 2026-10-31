@@ -1,5 +1,5 @@
 /**
- * Shared helper for parsing ADT classrun stdout (015-abap-run).
+ * Shared helper for parsing ADT classrun stdout.
  *
  * ADT classrun returns the wrapper's `out->write(...)` output verbatim.
  * Both bundled classes (`ZCL_ABAP_VIBE_ICF_SETUP`, `ZCL_ABAP_VIBE_RUNNER`)
@@ -123,7 +123,7 @@ export function parseClassrunOutput(raw: string): ClassrunOutput {
 
 /**
  * Detect whether a plain-text classrun output looks like a SAP exception
- * trace. Used by run-flow's US-4 acceptance 2 fallback (CX_ROOT / CX_SY /
+ * trace. Used by run-flow's acceptance 2 fallback (CX_ROOT / CX_SY /
  * RAISE markers).
  */
 export function looksLikeException(raw: string): boolean {

@@ -1,5 +1,5 @@
 /**
- * Spec 036 US4: DDLS (CDS view) pull.
+ * DDLS (CDS view) pull.
  *
  * Three-piece output:
  *   <rootDir>/ddls/<lower>/<lower>.ddls.json   ← AFF nested metadata

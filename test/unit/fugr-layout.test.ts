@@ -11,7 +11,7 @@ import {
   type FugrLayout,
 } from '../../src/abap_cli/formats/fugr-layout.js';
 
-describe('fugrFileToken / isFugrTopInclude / isFugrUxxInclude (T1.3)', () => {
+describe('fugrFileToken / isFugrTopInclude / isFugrUxxInclude', () => {
   it('fugrFileToken keeps simple names lowercased', () => {
     expect(fugrFileToken('LZFG_TOP')).toBe('lzfg_top');
     expect(fugrFileToken('ZFN_ONE')).toBe('zfn_one');
@@ -50,7 +50,7 @@ function structure(name: string, type: string, sourceUri = 'source/main', descri
   };
 }
 
-describe('enumerateFugr — preserve FXX/OXX/IXX (T1.3)', () => {
+describe('enumerateFugr — preserve FXX/OXX/IXX', () => {
   it('returns all FUGR/I includes (FXX/OXX/IXX preserved, UXX included)', async () => {
     const client = {
       objectStructure: vi.fn(async (uri: string) => {

@@ -1,5 +1,5 @@
 /**
- * T3.4 — DCLS / DDLX / DDLA pull end-to-end.
+ * — DCLS / DDLX / DDLA pull end-to-end.
  *
  * Each of the three CDS-extension types shares the same sourceObjectStrategy
  * layout; only the AFF type token + ADT endpoint differ. The tests exercise
@@ -72,7 +72,7 @@ async function loadPullModule() {
 }
 
 describe.each(PULL_ARGS)('T3.4 — pull $type', (args) => {
-  it(`writes the .${args.type.toLowerCase()}.json + .acds pair`, async () => {
+  it(`writes the .${args.type.toLowerCase}.json + .acds pair`, async () => {
     getObjectSourceMock.mockResolvedValueOnce(args.body);
     const mod = await loadPullModule();
     const runPull = (mod as Record<string, (name: string, opts: { rootDir: string }) => Promise<{ object: string; files: string[] }>>)[
@@ -96,7 +96,7 @@ describe.each(PULL_ARGS)('T3.4 — pull $type', (args) => {
     expect(acds).toBe(args.body);
   });
 
-  it(`passes AFF pre-validation against ${args.type.toLowerCase()}-v1.json`, async () => {
+  it(`passes AFF pre-validation against ${args.type.toLowerCase}-v1.json`, async () => {
     getObjectSourceMock.mockResolvedValueOnce(args.body);
     const mod = await loadPullModule();
     const runPull = (mod as Record<string, (name: string, opts: { rootDir: string }) => Promise<{ object: string }>>)[

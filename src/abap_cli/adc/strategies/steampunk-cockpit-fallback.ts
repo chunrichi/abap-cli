@@ -3,7 +3,7 @@ import type { AdtClientWrapper } from '../../clients/adt-client.js';
 import type { IcfRegisterStrategy, IcfRegisterOutcome, IcfServiceSpec } from '../icf-register-strategy.js';
 import type { RuntimeProbeResult } from '../runtime-probe.js';
 
-/** 034: Steampunk Cockpit fallback — preserves the 030 behaviour of
+/** Steampunk Cockpit fallback — preserves the behaviour of
  *  emitting a Cloud Foundry destination hint instead of attempting a
  *  mutation. This is the safe default when no SAP-side API is available
  *  (current BTP trial state — `cl_swb_object` whitelist unknown). */

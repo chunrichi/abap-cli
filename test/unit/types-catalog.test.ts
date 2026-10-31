@@ -1,5 +1,5 @@
 /**
- * S-5 — `abap types` static catalog.
+ * — `abap types` static catalog.
  *
  * The catalog is pure local data; it must not call SAP. These tests
  * pin down the gotchas the field report called out:
@@ -16,7 +16,7 @@ import {
 import { registerTypesCommand } from '../../src/abap_cli/commands/types.js';
 import { makeProgram, runCommand } from './cli-helper.js';
 
-describe('types-catalog (S-5)', () => {
+describe('types-catalog', () => {
   it('contains every supported CLI type code from the registry', () => {
     const codes = typeCatalog().map((r) => r.cliType);
     // Sanity: at least one entry per main family.

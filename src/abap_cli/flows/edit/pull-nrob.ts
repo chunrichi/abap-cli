@@ -1,5 +1,5 @@
 /**
- * PR5 (B1): NROB (number range object) pull flow.
+ * (B1): NROB (number range object) pull flow.
  *
  * NROB is an ADT-managed repository object (`/sap/bc/adt/numberranges/objects`)
  * whose *source is the abap-file-format `nrob-v1.json` document* — the system

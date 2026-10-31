@@ -1,5 +1,5 @@
 /**
- * SessionPolicy resolution (SC-007 c) + cloud/BTP opt-out.
+ * SessionPolicy resolution + cloud/BTP opt-out.
  *
  * Precedence:
  *   1. ABAP_CLI_SESSION_POLICY env var (reuse / always-logout) — wins.

@@ -10,7 +10,7 @@ const fugrFiles = [
   'zmy_group.fugr.zfm_second.func.json',
 ];
 
-describe('schema-compliance / fugr (T033-042)', () => {
+describe('schema-compliance / fugr', () => {
   for (const rel of fugrFiles) {
     it(`${rel} passes fugr-v1.json`, async () => {
       await expectSchemaPass(rel, 'FUGR');

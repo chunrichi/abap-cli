@@ -18,7 +18,7 @@ export interface ProbeLayerResult {
   nextSteps?: string[];
 }
 
-/** 036-ttyp-msag-ddls: per-type capability snapshot surfaced in `profile test`.
+/** per-type capability snapshot surfaced in `profile test`.
  *  Each subject has three orthogonal bits: ADT reachability, ICF reachability,
  *  and whether the system is *intrinsically* able to host that object type. */
 export interface ProfileCapabilitySnapshot {
@@ -32,12 +32,12 @@ export interface SystemProbe {
   auth: ProbeLayerResult;
   adt: ProbeLayerResult;
   icf: ProbeLayerResult;
-  /** 036-ttyp-msag-ddls: per-type capability matrix. Empty only when adt.icf
+  /** per-type capability matrix. Empty only when adt.icf
    *  both failed and we couldn't run any type-level probe. */
   capabilities?: ProfileCapabilitySnapshot;
-  /** 036: shortcut for DDLS — `true` iff the system can host CDS / DDL sources.
-   *  Mirrors `capabilities.ddls.supported` but is promoted to top-level per
-   *  SC-008 so agent-side greppers have a one-stop field. */
+  /** shortcut for DDLS — `true` iff the system can host CDS / DDL sources.
+   *  Mirrors `capabilities.ddls.supported` but is promoted to top-level so
+   *  agent-side greppers have a one-stop field. */
   ddlSourceSupported?: boolean;
 }
 
@@ -87,16 +87,16 @@ export async function probeSystem(name: string): Promise<SystemProbe> {
   const authResult = tlsResult.ok ? await probeAuth(name, config) : SKIP();
   const adtResult = authResult.ok ? await probeAdt(name, config) : SKIP();
   const icfResult = authResult.ok ? await probeIcf(name, config) : SKIP();
-  // 036-ttyp-msag-ddls: per-type capability snapshot — only when ADT/ICF
+  // per-type capability snapshot — only when ADT/ICF
   // both finished probing (else we cannot tell "absent" from "skipped").
   const probeOut = adtResult.ok || icfResult.ok
     ? await probeCapabilities(config, { adtOk: adtResult.ok, icfOk: icfResult.ok })
     : undefined;
   const capabilities = probeOut?.capabilities;
-  // 036: persist the discovered kernel release back into the profile so that
+  // persist the discovered kernel release back into the profile so that
   // channel-detect (which reads cfg.systemVersion) can route TTYP/MSAG/DDLS
   // without re-probing. Best-effort: missing or unparseable release leaves
-  // the profile untouched. SC-008 contract.
+  // the profile untouched. contract.
   if (probeOut?.kernelRelease) {
     try {
       upsertSystem(name, { ...profile, systemVersion: probeOut.kernelRelease });
@@ -113,7 +113,7 @@ export async function probeSystem(name: string): Promise<SystemProbe> {
   };
 }
 
-/** 036-ttyp-msag-ddls: probe the four per-type endpoints.
+/** probe the four per-type endpoints.
  *
  * Strategy: hit each ADT/ICF endpoint with a HEAD-ish GET and watch the
  * HTTP status code (401 / 404 are fine — they prove the endpoint exists on

@@ -14,12 +14,12 @@ export type ErrorCategory =
   | 'VALIDATION_ERROR' // exit 7 — semantic rejection (see below)
   | 'NOT_FOUND'        // exit 8 — OBJECT_NOT_FOUND, AMBIGUOUS_OBJECT
   | 'LOCKED'           // exit 9 — LOCK_FAILED
-  // 036-ttyp-msag-ddls: reserved-range categories with explicit exit codes.
+  // reserved-range categories with explicit exit codes.
   // Split from VALIDATION_ERROR so the agent/exit-channel tells the user
   // *which* validation failure happened (capability gap vs. semantic rejection).
   | 'DDLS_NOT_SUPPORTED' // exit 64 - DDLS requested on ECC release that lacks DDL sources
   | 'CHANNEL_DETECT'    // exit 65 - channel-detect could not classify the system profile
-  // P3.3: feedback service error categories
+  // feedback service error categories
   | 'CONFLICT'          // 409: idempotency key reused with different payload
   | 'PERSISTENCE_ERROR' // 5xx: feedback service unavailable
   | 'HTTP_ERROR';       // generic transport failure
@@ -59,7 +59,7 @@ export type ErrorCode =
   | 'DDIC_OBJECT_NOT_FOUND' // ICF /ddic/<type>/<name> GET 404 (NOT_FOUND)
   | 'DDIC_TABL_FORMAT_UNSUPPORTED' // canonical TABL projection cannot represent the object (VALIDATION_ERROR)
   | 'DTEL_CATEGORY_UNSUPPORTED'    // DTEL dataTypeInformation.category not in {domain, predefinedType, typeRef} (VALIDATION_ERROR)
-  | 'TABT_VALIDATION_FAILED'       // P3.1: .tabl.settings.json failed tabt-v1.json enum validation (VALIDATION_ERROR)
+  | 'TABT_VALIDATION_FAILED'       // .tabl.settings.json failed tabt-v1.json enum validation (VALIDATION_ERROR)
   | 'TYPE_NOT_SUPPORTED'
   | 'OVERWRITE_REQUIRED'   // NEW
   | 'MISSING_TRANSPORT'    // NEW — delete requires --tr for non-$TMP packages
@@ -98,22 +98,22 @@ export type ErrorCode =
   // abap-file-format three-piece TABL/STRU pull diagnostics
   | 'TABL_DDL_INVALID'          // DDL parse failure (VALIDATION_ERROR/exit 7)
   | 'TABL_ARTIFACT_INCOMPLETE'  // wire missing mainJson or ddicSource (VALIDATION_ERROR/exit 7)
-  | 'TABL_DDL_PARSE_FAILED'     // 037: SAP 500 + abap.string(N) DDL parser bug (NOT_FOUND/exit 8)
+  | 'TABL_DDL_PARSE_FAILED'     // SAP 500 + abap.string(N) DDL parser bug (NOT_FOUND/exit 8)
   // tcode: ICF /tcode/<code> transaction lookup
   | 'TCODE_NOT_FOUND'           // TSTC entry does not exist (NOT_FOUND/exit 8)
   | 'TCODE_NOT_AUTHORIZED'      // S_TCODE authority check failed (AUTH_ERROR/exit 5)
-  // 033-aff-canonical-validator: AFF validator/CLI errors
+  // AFF validator/CLI errors
   | 'AFF_SCHEMA_MISSING'        // canonical schema file not found for a type (VALIDATION_ERROR/exit 7)
   | 'AFF_SCHEMA_INVALID'        // canonical schema file present but unparseable (VALIDATION_ERROR/exit 7)
   | 'AFF_SCHEMA_COMPILE_ERROR'  // ajv compile raised (VALIDATION_ERROR/exit 7)
-  | 'AFF_FIXTURE_INVALID'       // a fixture failed schema validation (VALIDATION_ERROR/exit 7)  // 034-session-cookie-reuse
+  | 'AFF_FIXTURE_INVALID'       // a fixture failed schema validation (VALIDATION_ERROR/exit 7)
   | 'SESSION_JAR_DECRYPT_FAILED' // AES-GCM tag mismatch / corrupt blob / wrong system hash (VALIDATION_ERROR)
   | 'SESSION_INVALID'            // SAP 401/403/440 after cookie inject — caller should re-login (VALIDATION_ERROR)
   | 'SESSION_REUSE_UNSUPPORTED'  // cloud/BTP system: cookie reuse not applicable (VALIDATION_ERROR)
-  // 036-ttyp-msag-ddls: channel detection failure / DDLS not supported on ECC
-  | 'CHANNEL_DETECTION_FAILED'   // system profile could not be parsed (CONFIG_ERROR/exit 3) → see spec 036 FR-008 / US1-AS5
-  | 'DDLS_NOT_SUPPORTED_ON_ECC'  // DDLS has no ICF fallback; ECC releases before DDL sources cannot serve CDS (VALIDATION_ERROR/exit 64 per spec 036 FR-008 / US4-AS4)
-  // PR5: ENQU (lock object) / NROB (number range object) ICF routes
+  // channel detection failure / DDLS not supported on ECC
+  | 'CHANNEL_DETECTION_FAILED'   // system profile could not be parsed (CONFIG_ERROR/exit 3)
+  | 'DDLS_NOT_SUPPORTED_ON_ECC'  // DDLS has no ICF fallback; ECC releases before DDL sources cannot serve CDS
+  // ENQU (lock object) / NROB (number range object) ICF routes
   | 'ENQU_CREATE_FAILED'         // ICF /ddic/enqu POST failure (SAP_ERROR)
   | 'ENQU_PUSH_FAILED'           // ICF /ddic/enqu POST failure during push (SAP_ERROR)
   | 'NROB_CREATE_FAILED'         // ICF /ddic/nrob POST failure (SAP_ERROR)
@@ -123,7 +123,7 @@ export type ErrorCode =
   // bundled-service deploy: dev-class merge into the handler class
   | 'DEPLOY_MANIFEST_INVALID'   // abap/deploy.json missing or inconsistent with abap/src (VALIDATION_ERROR)
   | 'DEPLOY_MERGE_FAILED'       // source split / dependency cycle / rename leftover (VALIDATION_ERROR)
-  // P3.3: feedback service error codes
+  // feedback service error codes
   | 'CONFLICT'                  // 409: idempotency key reused with different payload
   | 'PERSISTENCE_ERROR'         // 5xx: feedback service unavailable
   | 'HTTP_ERROR'                // generic transport failure
@@ -165,7 +165,7 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   FILE_EXISTS: 'USAGE',
   PUSH_FAILED: 'VALIDATION_ERROR',
   COMMAND_MOVED: 'VALIDATION_ERROR',
-  // 015-abap-run mappings
+  // mappings
   METHOD_FAILED: 'VALIDATION_ERROR',
   METHOD_NOT_SUPPORTED: 'VALIDATION_ERROR',
   CLASS_NOT_RUNNABLE: 'VALIDATION_ERROR',
@@ -174,7 +174,7 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   WRAPPER_NOT_DEPLOYED: 'NOT_FOUND',
   TIMEOUT: 'SAP_ERROR',
   WRAPPER_INPUT_UNAVAILABLE: 'SAP_ERROR',
-  // 016-abap-select mappings
+  // mappings
   TABLE_NOT_FOUND: 'NOT_FOUND',
   REPORT_NOT_FOUND: 'NOT_FOUND',
   REPORT_NOT_EXECUTABLE: 'VALIDATION_ERROR',
@@ -186,39 +186,37 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   LIMIT_EXCEEDED: 'VALIDATION_ERROR',
   OFFSET_EXCEEDED: 'VALIDATION_ERROR',
   QUERY_FAILED: 'SAP_ERROR',
-  // 022-http mappings
+  // mappings
   HTTP_CREATE_FAILED: 'SAP_ERROR',
   HTTP_OBJECT_NOT_FOUND: 'NOT_FOUND',
-  // PR5 — ENQU / NROB ICF routes
+  // — ENQU / NROB ICF routes
   ENQU_CREATE_FAILED: 'SAP_ERROR',
   ENQU_PUSH_FAILED: 'SAP_ERROR',
   NROB_CREATE_FAILED: 'SAP_ERROR',
   NROB_PUSH_FAILED: 'SAP_ERROR',
   ENQU_NOT_IMPLEMENTED: 'SAP_ERROR',
   NROB_NOT_IMPLEMENTED: 'SAP_ERROR',
-  // 024-tabl-aff-pull
   TABL_DDL_INVALID: 'VALIDATION_ERROR',
   TABL_ARTIFACT_INCOMPLETE: 'VALIDATION_ERROR',
   TABL_DDL_PARSE_FAILED: 'NOT_FOUND',
   // tcode
   TCODE_NOT_FOUND: 'NOT_FOUND',
   TCODE_NOT_AUTHORIZED: 'AUTH_ERROR',
-  // 033 AFF
+  // AFF
   AFF_SCHEMA_MISSING: 'VALIDATION_ERROR',
   AFF_SCHEMA_INVALID: 'VALIDATION_ERROR',
   AFF_SCHEMA_COMPILE_ERROR: 'VALIDATION_ERROR',
   AFF_FIXTURE_INVALID: 'VALIDATION_ERROR',
-  // 034-session-cookie-reuse
   SESSION_JAR_DECRYPT_FAILED: 'VALIDATION_ERROR',
   SESSION_INVALID: 'VALIDATION_ERROR',
   SESSION_REUSE_UNSUPPORTED: 'VALIDATION_ERROR',
-  // 036-ttyp-msag-ddls: 2 reserved-range categories
+  // 2 reserved-range categories
   CHANNEL_DETECTION_FAILED: 'CHANNEL_DETECT',
   DDLS_NOT_SUPPORTED_ON_ECC: 'DDLS_NOT_SUPPORTED',
   // bundled-service deploy merge
   DEPLOY_MANIFEST_INVALID: 'VALIDATION_ERROR',
   DEPLOY_MERGE_FAILED: 'VALIDATION_ERROR',
-  // P3.3: feedback service error codes
+  // feedback service error codes
   CONFLICT: 'CONFLICT',
   PERSISTENCE_ERROR: 'PERSISTENCE_ERROR',
   HTTP_ERROR: 'HTTP_ERROR',

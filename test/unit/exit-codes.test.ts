@@ -8,7 +8,7 @@ import {
 } from '../../src/abap_cli/output/exit-codes.js';
 import { categoryOf, type ErrorCode } from '../../src/abap_cli/output/error-codes.js';
 
-describe('exit codes ', () => {
+describe('exit codes', () => {
   it('every ErrorCategory has a unique exit code (UNKNOWN=1, categories 2..9, reserved ≥64)', () => {
     const codes = Object.values(EXIT_CODES);
     expect(new Set(codes).size).toBe(codes.length);

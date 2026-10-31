@@ -2,7 +2,7 @@ import type { AdtClientWrapper } from '../../clients/adt-client.js';
 import type { IcfRegisterStrategy, IcfRegisterOutcome, IcfServiceSpec } from '../icf-register-strategy.js';
 import type { RuntimeProbeResult } from '../runtime-probe.js';
 
-/** 034: Steampunk SWB strategy — placeholder for the future path that
+/** Steampunk SWB strategy — placeholder for the future path that
  *  goes through `cl_swb_object` (either via a new ABAP classrun wrapper or
  *  directly via `/sap/bc/adt/ucon/httpservices` once SAP documents the
  *  request body schema). Today the strategy matches nothing — BTP trial

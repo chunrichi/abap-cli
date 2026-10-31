@@ -31,7 +31,7 @@ describe('renderObjectMetadataJson programType', () => {
   });
 });
 
-describe('renderObjectMetadataJson — PROG extended fields (T1.2)', () => {
+describe('renderObjectMetadataJson — PROG extended fields', () => {
   it('emits all generalInformation fields when set', () => {
     const json = JSON.parse(
       renderObjectMetadataJson({
@@ -95,7 +95,7 @@ describe('renderObjectMetadataJson — PROG extended fields (T1.2)', () => {
     ).toBe('systemProgram');
   });
 
-  it('does NOT emit abapLanguageVersion for PROG (CLAS/INTF only — T1.2 spec change)', () => {
+  it('does NOT emit abapLanguageVersion for PROG (CLAS/INTF only — spec change)', () => {
     const json = JSON.parse(
       renderObjectMetadataJson({
         objectType: 'PROG/P',
@@ -107,7 +107,7 @@ describe('renderObjectMetadataJson — PROG extended fields (T1.2)', () => {
   });
 });
 
-describe('renderObjectMetadataJson — CLAS branch (T1.2)', () => {
+describe('renderObjectMetadataJson — CLAS branch', () => {
   it('renders category (16 enum values) verbatim', () => {
     const categories = [
       'generalObjectType',
@@ -179,7 +179,7 @@ describe('renderObjectMetadataJson — CLAS branch (T1.2)', () => {
   });
 });
 
-describe('renderObjectMetadataJson — INTF branch (T1.2)', () => {
+describe('renderObjectMetadataJson — INTF branch', () => {
   it('renders category (7 enum values) verbatim', () => {
     const categories = [
       'general',

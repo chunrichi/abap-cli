@@ -22,7 +22,7 @@ export interface CapabilityAwareProfile {
 }
 
 /**
- * One-shot probe (Q1: record once at connect/init, reuse afterwards).
+ * One-shot probe (record once at connect/init, reuse afterwards).
  * - read: getTextElements succeeds (all SAP systems; author-doc confirmed).
  * - write: setTextElements succeeds; unsupported systems (ECC) throw → write=false.
  * Never throws: any probe failure degrades to read=false/write=false rather than

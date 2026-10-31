@@ -38,7 +38,7 @@ export interface ObjectLock {
   text: string;
 }
 
-/** Per-part activation state from `--activation` (013 dogfooding). */
+/** Per-part activation state from `--activation`. */
 export interface ActivationPart {
   includeType: string;
   sourceUri: string;
@@ -171,7 +171,7 @@ export async function inspectObject(client: AdtClientWrapper, name: string, flag
 
 /**
  * Compare active vs latest source for each part and cross-check the ADT
- * inactive-objects list (013 dogfooding lesson: an activate that reports
+ * inactive-objects list (dogfooding lesson: an activate that reports
  * success may leave active == stale skeleton). Read-only.
  *
  * For OO classes/interfaces (CLAS/OC, INTF/OI) the `source/main` INCLUDE may

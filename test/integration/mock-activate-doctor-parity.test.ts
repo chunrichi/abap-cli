@@ -2,7 +2,7 @@
  * Mock-parity contract tests.
  *
  * The mock ADT server historically lacked two endpoints that real SAP
- * exposes — see `tests/260902001-all-commands-fugr-e2e/summary.md`:
+ * exposes — see `tests/260902001-all-commands-fugr-e2e/summary.md`
  *   - GET /sap/bc/adt/activation/inactiveobjects  (consumed by `abap activate`)
  *   - GET /sap/bc/adt/discovery                   (consumed by `abap doctor`)
  *

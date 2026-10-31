@@ -75,7 +75,7 @@ program.hook('postAction', async (_thisCmd, actionCmd) => {
   }
 });
 
-// 034: SIGINT/SIGTERM best-effort release of any live SAP session.
+// SIGINT/SIGTERM best-effort release of any live SAP session.
 installSignalHandlers();
 
 try {

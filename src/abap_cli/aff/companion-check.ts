@@ -64,7 +64,7 @@ export async function checkCompanions(filePath: string): Promise<CompanionCheckR
     const missing: string[] = [];
     const optional: string[] = [];
     if (!(await fileExists(ddlPath))) missing.push(path.basename(ddlPath));
-    // STRU settings.json is optional per spec 033 US5.
+    // STRU settings.json is optional per.
     if (type === 'STRU') {
       if (!(await fileExists(settingsPath))) optional.push(path.basename(settingsPath));
     } else if (!(await fileExists(settingsPath))) {

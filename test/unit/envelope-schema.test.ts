@@ -8,7 +8,7 @@
  *  3. Validates the extension-meta variant and the reduced --schema meta.
  *  4. Runs EVERY registered command (scan of src/abap_cli/commands/*.ts):
  *       - failure path (unknown option): error envelope on stderr, stdout empty,
- *         exit 2, schema-valid — the stream-separation contract (P1.7).
+ * exit 2, schema-valid — the stream-separation contract.
  *       - success path (commands with --schema): success envelope on stdout,
  *         schema-valid with reduced meta.
  *  5. Asserts extension errors use dedicated EXTENSION_* codes and never

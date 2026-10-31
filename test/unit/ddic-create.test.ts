@@ -1,8 +1,8 @@
 /**
- * 014 US1: create DDIC table (TABL) end-to-end tests. Drives the full CLI pipeline
+ * create DDIC table (TABL) end-to-end tests. Drives the full CLI pipeline
  * (create → file → wire → POST /ddic/tabl) against the mock-adt server.
  * Written TDD-style — tests exercise the create command's DDIC path with the
- * client pointed at the mock; they fail without the T011/T012 wiring.
+ * client pointed at the mock; they fail without the / wiring.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import * as fs from 'fs';
@@ -54,7 +54,7 @@ beforeEach(() => {
 });
 
 function writeTableJson(name: string, fields: any[] = [{ fieldName: 'FIELD1', dataType: 'CHAR', length: 20, keyFlag: true }]) {
-  // 033: AFF canonical — table-level metadata lives under
+  // AFF canonical — table-level metadata lives under
   // `generalInformation.*`. The flat top-level fields (`deliveryClass` etc.)
   // are legacy014 and only accepted on read.
   const json = {
@@ -72,7 +72,7 @@ function writeTableJson(name: string, fields: any[] = [{ fieldName: 'FIELD1', da
   fs.writeFileSync(path.join(cwd, 'src/ztab_test.tabl.json'), JSON.stringify(json, null, 2));
 }
 
-describe('014/US1 create TABL', () => {
+describe('create TABL', () => {
   it('creates a transparent table via POST /ddic/tabl and returns action', async () => {
     writeTableJson('ZTAB_TEST');
     const program = makeProgram();
@@ -414,7 +414,7 @@ describe('014/US1 create TABL', () => {
   });
 });
 
-describe('014/US2 create STRU/DTEL/DOMA', () => {
+describe('create STRU/DTEL/DOMA', () => {
   function writeFile(rel: string, data: unknown) {
     fs.writeFileSync(path.join(cwd, rel), JSON.stringify(data, null, 2));
   }

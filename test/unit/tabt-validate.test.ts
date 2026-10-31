@@ -1,5 +1,5 @@
 /**
- * P3.1: TABT settings payload enum validation tests.
+ * TABT settings payload enum validation tests.
  *
  * Validates that `validateTabtPayload` (synchronous, in `formats/ddic/validate.ts`)
  * correctly enforces the enum values declared by `src/abap_cli/schema/tabt-v1.json`:
@@ -14,7 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import { validateTabtPayload } from '../../src/abap_cli/formats/ddic/validate.js';
 
-describe('P3.1 — validateTabtPayload enum checks', () => {
+describe('validateTabtPayload enum checks', () => {
   it('returns null (valid) for a complete payload', () => {
     expect(validateTabtPayload({
       translation: 'standard',

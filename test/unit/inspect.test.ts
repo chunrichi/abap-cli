@@ -57,10 +57,10 @@ function parseData(res: { stdout: string }) {
   return JSON.parse(res.stdout).data;
 }
 
-describe('abap inspect (US3..014)', () => {
+describe('abap inspect', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('metadata always present (object/type/uri) — no flags → concise default (FR-011/FR-012)', async () => {
+  it('metadata always present (object/type/uri) — no flags → concise default', async () => {
     const program = makeProgram();
     registerInspectCommand(program);
     const res = await runCommand(program, ['inspect', 'ZCL_MULTI', '--json']);
@@ -74,7 +74,7 @@ describe('abap inspect (US3..014)', () => {
     expect(data.locks).toBeUndefined();
   });
 
-  it('--structure adds structure elements ()', async () => {
+  it('--structure adds structure elements', async () => {
     const program = makeProgram();
     registerInspectCommand(program);
     const res = await runCommand(program, ['inspect', 'ZCL_MULTI', '--structure', '--json']);
@@ -84,7 +84,7 @@ describe('abap inspect (US3..014)', () => {
     expect(objectStructureElements).toHaveBeenCalled();
   });
 
-  it('--includes lists main + definitions + implementations with sourceUri ()', async () => {
+  it('--includes lists main + definitions + implementations with sourceUri', async () => {
     const program = makeProgram();
     registerInspectCommand(program);
     const res = await runCommand(program, ['inspect', 'ZCL_MULTI', '--includes', '--json']);
@@ -94,7 +94,7 @@ describe('abap inspect (US3..014)', () => {
     expect(data.includes[0].sourceUri).toContain('/source/main');
   });
 
-  it('--locks returns transport ownership ()', async () => {
+  it('--locks returns transport ownership', async () => {
     const program = makeProgram();
     registerInspectCommand(program);
     const res = await runCommand(program, ['inspect', 'ZCL_MULTI', '--locks', '--json']);
@@ -104,7 +104,7 @@ describe('abap inspect (US3..014)', () => {
     expect(transportInfo).toHaveBeenCalled();
   });
 
-  it('--package returns packageName ()', async () => {
+  it('--package returns packageName', async () => {
     const program = makeProgram();
     registerInspectCommand(program);
     const res = await runCommand(program, ['inspect', 'ZCL_MULTI', '--package', '--json']);
@@ -112,7 +112,7 @@ describe('abap inspect (US3..014)', () => {
     expect(data.metadata.packageName).toBe('ZPKG');
   });
 
-  it('unknown object → OBJECT_NOT_FOUND exit 8 with nextSteps ()', async () => {
+  it('unknown object → OBJECT_NOT_FOUND exit 8 with nextSteps', async () => {
     const program = makeProgram();
     registerInspectCommand(program);
     const res = await runCommand(program, ['inspect', 'ZNOPE', '--json']);
@@ -122,14 +122,14 @@ describe('abap inspect (US3..014)', () => {
     expect(parsed.error.code).toBe('OBJECT_NOT_FOUND');
   });
 
-  it('read-only — never calls lock() ()', async () => {
+  it('read-only — never calls lock', async () => {
     const program = makeProgram();
     registerInspectCommand(program);
     await runCommand(program, ['inspect', 'ZCL_MULTI', '--structure', '--includes', '--locks', '--package', '--json']);
     expect(lock).not.toHaveBeenCalled();
   });
 
-  it('missing object arg → USAGE error ()', async () => {
+  it('missing object arg → USAGE error', async () => {
     const program = makeProgram();
     registerInspectCommand(program);
     const res = await runCommand(program, ['inspect', '--json']);

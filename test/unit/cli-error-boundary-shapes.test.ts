@@ -2,12 +2,12 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { resolveFile } from '../../src/abap_cli/formats/file-resolver.js';
 
 /**
- * P0.2 — verify the raw-Error → CliError conversions keep the contract shape.
+ * — verify the raw-Error → CliError conversions keep the contract shape.
  * The lint test (cli-error-boundary.test.ts) ensures no raw throws slip in;
  * this file asserts the CliError shape itself.
  */
 
-describe('P0.2 — CliError shape for previously-raw throws', () => {
+describe('CliError shape for previously-raw throws', () => {
   describe('file-resolver.ts', () => {
     it('resolveFile throws CliError FILE_PARSE_ERROR for files with no extension', () => {
       try {

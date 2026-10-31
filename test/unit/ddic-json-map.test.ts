@@ -1,7 +1,7 @@
 /**
   ddic-json.ts mapping round-trip tests. Written TDD-style — these tests
  * targeted the abap-file-format ↔ wire schema conversion before the SAP-side
- * ZCL_ABAP_VIBE_DDIC class was completed (Validates T005).
+ * ZCL_ABAP_VIBE_DDIC class was completed.
  */
 import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
@@ -13,7 +13,7 @@ import { DDIC_TYPES } from '../../src/abap_cli/formats/ddic/types.js';
 import { getDdicJsonExample, getDdicFlatJsonExample } from '../../src/abap_cli/formats/ddic/examples.js';
 import { readDdicObjectForCreate } from '../../src/abap_cli/formats/ddic/io.js';
 
-describe('014/ddic-json-map', () => {
+describe('ddic-json-map', () => {
   describe('supported types', () => {
     it('exposes DOMA/DTEL/TABL/STRU (TTYP deferred per Q2)', () => {
       expect(DDIC_TYPES).toEqual(['DOMA', 'DTEL', 'TABL', 'STRU']);
@@ -347,7 +347,7 @@ describe('014/ddic-json-map', () => {
         const local = await readDdicObjectForCreate(path.join(dir, 'ztabx.tabl.json'), 'TABL');
         expect(local.name).toBe('ZTABX');
         expect(local.description).toBe('three-piece TABL');
-        // 033: AFF canonical — settings live under generalInformation.*.
+        // AFF canonical — settings live under generalInformation.*.
         expect((local as Record<string, unknown>).generalInformation).toMatchObject({
           deliveryClass: 'L',
           dataClassCategory: 'APPL1',
@@ -485,9 +485,9 @@ describe('014/ddic-json-map', () => {
     });
   });
 
-  // ----- T2.1 wire payload split -----
+  // ----- wire payload split -----
 
-  describe('T2.1 per-type wire payloads', () => {
+  describe('per-type wire payloads', () => {
     it('localToWire<DOMA> returns a DdicDomaWire carrying format.* fields', () => {
       const wire = localToWire('DOMA', {
         name: 'ZDOMA_SPLIT',

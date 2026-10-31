@@ -4,10 +4,10 @@ import { CliError } from '../../src/abap_cli/output/json.js';
 import { handleTopLevelError, isJson, type Streams } from '../../src/abap_cli/top-error.js';
 
 /**
- * P1.7 — stdout/stderr separation audit. The CLI must never silently drop
+ * — stdout/stderr separation audit. The CLI must never silently drop
  * output, and `--json` mode must never emit plain text on stdout (the JSON
  * envelope contract: success on stdout, failure on stderr, stdout empty on
- * failure). Real `--help`/`--version` exits are exempt by contract §1.4.
+ * failure). Real `--help`/`--version` exits are exempt by contract.4.
  *
  * The handler is exercised directly: feed it a `CommanderError` or `CliError`
  * with captured streams + a fake exit so we can assert on the actual bytes
@@ -69,14 +69,14 @@ function run(
   };
 }
 
-describe('P1.7 stdout/stderr separation audit (handleTopLevelError)', () => {
+describe('stdout/stderr separation audit (handleTopLevelError)', () => {
   describe('isJson helper', () => {
     it('detects --json anywhere in argv', () => {
       expect(isJson(['node', 'abap', '--json', 'pull'])).toBe('json');
       expect(isJson(['node', 'abap', 'pull', '--json'])).toBe('json');
       expect(isJson(['node', 'abap', 'pull'])).toBe('human');
     });
-    it('--pretty-json wins over --json (025 US1)', () => {
+    it('--pretty-json wins over --json', () => {
       expect(isJson(['node', 'abap', 'pull', '--pretty-json'])).toBe('pretty-json');
       expect(isJson(['node', 'abap', '--json', '--pretty-json', 'pull'])).toBe('pretty-json');
     });
@@ -211,7 +211,7 @@ describe('P1.7 stdout/stderr separation audit (handleTopLevelError)', () => {
     });
   });
 
-  describe('true help exits follow contract §1.4: plain text on stdout, exit 0', () => {
+  describe('true help exits follow contract.4: plain text on stdout, exit 0', () => {
     // commander already wrote the help (incl. addHelpText sections like
     // "Local commands") to stdout BEFORE throwing CommanderError. The handler
     // must NOT re-emit it — that was the source of the `--help` duplication
@@ -236,7 +236,7 @@ describe('P1.7 stdout/stderr separation audit (handleTopLevelError)', () => {
       expect(res.stderr).toBe('');
     });
 
-    it('--json --help (commander.helpDisplayed): still no re-emit per contract §1.4', () => {
+    it('--json --help (commander.helpDisplayed): still no re-emit per contract.4', () => {
       const program = new Command().name('abap-cli');
       const err = new CommanderError(0, 'commander.helpDisplayed', '(outputHelp)');
       const res = run(err, ['--json', '--help'], program);

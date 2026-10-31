@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseTablDdic } from '../../src/abap_cli/formats/ddic/tabl-artifact.js';
 
-describe('032 US6: TABL DDL parser extensions', () => {
+describe('032: TABL DDL parser extensions', () => {
   it('parses `.INCLUDE` with suffix into includeSuffix', () => {
     const ddl = [
       'define table ztab_inc {',

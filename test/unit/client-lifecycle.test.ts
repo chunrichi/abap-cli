@@ -115,7 +115,7 @@ describe('client-lifecycle (timeout-bounded shutdown)', () => {
     expect(DEFAULT_TIMEOUT_MS).toBe(5_000);
   });
 
-  it('swallows a rejecting close() and never surfaces it as unhandledRejection', async () => {
+  it('swallows a rejecting close and never surfaces it as unhandledRejection', async () => {
     // Real timers here: this asserts on a Node-level event, not on the budget.
     vi.useRealTimers();
     const onUnhandled = vi.fn();

@@ -25,7 +25,7 @@ const SCHEMA = {
     { name: '--json', type: 'boolean', global: true, description: 'Emit the unified JSON envelope on stdout.' },
     { name: '--pretty-json', type: 'boolean', global: true, description: 'Emit formatted JSON instead of compact JSON.' },
   ],
-  globalOptions: ['--json', '--pretty-json', '--report-stuck'],
+  globalOptions: ['--json', '--pretty-json'],
   examples: [
     {
       description: 'Submit a concise issue from a completed session',

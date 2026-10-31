@@ -24,7 +24,7 @@ import { fetchPullSource, type OutputFile, type PullContext, type PullStrategy }
  *   `<name>.fugr.sapl<name>.reps.json`       — reps metadata (REPS schema, includeType: functionGroup)
  *   `<name>.fugr.l<name>top.reps.abap`       — TOP include source
  *   `<name>.fugr.l<name>top.reps.json`       — reps metadata (includeType: include)
- *   `<name>.fugr.<include>.reps.abap`        — FXX/OXX/IXX etc. (T1.5: previously dropped silently)
+ * `<name>.fugr.<include>.reps.abap` — FXX/OXX/IXX etc.
  *   `<name>.fugr.<include>.reps.json`        — reps metadata
  *   `<name>.fugr.<fm>.func.abap`             — canonical FUNC pseudo syntax
  *   `<name>.fugr.<fm>.func.json`             — FUNC metadata (parameters / exceptions / interface props)
@@ -196,7 +196,7 @@ export function fugrStrategy(): PullStrategy {
         });
       }
 
-      // FXX / OXX / IXX (and any other non-TOP, non-UXX FUGR/I include) — T1.5
+      // FXX / OXX / IXX (and any other non-TOP, non-UXX FUGR/I include)
       for (const include of layout.includes.filter(
         (candidate) =>
           !isFugrTopInclude(candidate.name, layout.group) &&

@@ -1,5 +1,5 @@
 /**
- * End-to-end TABT settings round-trip (P2.3 verification).
+ * End-to-end TABT settings round-trip.
  *
  * Verifies the full CLI ↔ SAP wire shape for TABT technical settings:
  *
@@ -15,7 +15,7 @@
  *      guard: logChanges / translation / state / type / nrOfKeyFlds4GenericBuff /
  *      storageType / loadUnit.
  *
- * If this test passes, P1.1 + P1.2 + P2.1 + P2.3 are wired together; the
+ * If this test passes, the
  * only remaining check is the actual SAP `DDIF_TABL_PUT` side effect.
  */
 import { describe, it, expect } from 'vitest';
@@ -26,7 +26,7 @@ import { extractTablArtifactWire, localToWire, wireToLocal } from '../../src/aba
 import { readDdicObjectForCreate } from '../../src/abap_cli/formats/ddic/io.js';
 import { type DdicTableSettingsWire } from '../../src/abap_cli/formats/ddic/types.js';
 
-/** Simulate ABAP build_settings_json output (P1.1 reference). */
+/** Simulate ABAP build_settings_json output. */
 const ABAP_SETTINGS_JSON = `{
   "formatVersion": "1",
   "generalInformation": {
@@ -67,7 +67,7 @@ define table zbuff_test {
 }
 `;
 
-describe('P2.3 — end-to-end TABT settings round-trip', () => {
+describe('end-to-end TABT settings round-trip', () => {
   it('pull path: SAP wire -> extractTablArtifactWire.settingsJson is verbatim ABAP output', () => {
     const wire = {
       name: 'ZBUFF_TEST',
@@ -98,7 +98,7 @@ describe('P2.3 — end-to-end TABT settings round-trip', () => {
       await fs.writeFile(settingsAbs, ABAP_SETTINGS_JSON, 'utf-8');
 
       // 2. CLI readDdicObjectForCreate reads all three pieces and assembles
-      //    local.generalInformation from .tabl.settings.json (P2.3 merges
+      // local.generalInformation from .tabl.settings.json merges
       //    top-level buffering + dbSpecificSettings under generalInformation).
       const local = await readDdicObjectForCreate(mainAbs, 'TABL');
       expect((local as any).generalInformation).toBeDefined();
@@ -156,7 +156,7 @@ describe('P2.3 — end-to-end TABT settings round-trip', () => {
     } as any) as DdicTableSettingsWire;
     const payloadForSap = JSON.stringify(wire);
 
-    // ABAP P2.1 gate fires (buffering/dbSpecificSettings present):
+    // ABAP gate fires (buffering/dbSpecificSettings present)
     expect(payloadForSap).toContain('"buffering"');
     expect(payloadForSap).toContain('"dbSpecificSettings"');
     // Per-field gates that fire:

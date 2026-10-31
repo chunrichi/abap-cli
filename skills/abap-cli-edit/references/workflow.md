@@ -1,6 +1,6 @@
 # abap-cli-edit — 详细工作流
 
-> 按需加载。本文件展开 SKILL.md 决策树，处理各种变体（FUGR / DDIC / 包批量 / 远程 / stale 激活修复 / where-used）。select 翻页走 [abap-cli-data] 的 `scripts/pages-select.mjs`。
+> 按需加载。本文件展开 SKILL.md 决策树，处理各种变体（FUGR / DDIC / 包批量 / 远程 / stale 激活修复 / where-used）。select 翻页走 `skills/abap-cli-data/scripts/pages-select.mjs`。
 
 ## 变体 1 — FUGR（Function Group）
 
@@ -12,7 +12,7 @@ abap pull ZFG --type FUGR
 # → src/zfg.fugr.json                         # 函数组元数据
 # → src/zfg.fugr.saplzfg.reps.abap            # function-pool main（+ .reps.json）
 # → src/zfg.fugr.lzfgtop.reps.abap            # TOP include（+ .reps.json）
-# → src/zfg.fugr.lfzfgfXX.reps.abap           # 每个 FXX（function include）— 0.2.6+
+# → src/zfg.fugr.lfzfgfXX.reps.abap           # 每个 FXX（function include）
 # → src/zfg.fugr.lzfgOXX.reps.abap            # 每个 OXX（output include，按需）
 # → src/zfg.fugr.lzfgIXX.reps.abap            # 每个 IXX（input include，按需）
 # → src/zfg.fugr.<fm>.func.abap               # 每个 FM；canonical pseudo syntax
@@ -21,7 +21,7 @@ abap pull ZFG --type FUGR
 
 `.reps.json` 是 `.reps.abap` 的 AFF canonical 骨架，CLI 写盘前走 `assertAffMetadata` 校验（schema = `func-v1.json` / `reps-v1.json`）。
 
-**0.2.6 修复**：旧版 `enumerateFugr` 静默丢弃所有非 TOP、非 UXX include；新版 FXX / OXX / IXX 全部保留。push 时各 include 走 child lock（`fugrPushTargetFor` 解析 `FUGR/<sub>` 子目标），最后 `activateAll` 父 group；push 后比对 latest vs active source，不一致抛 `ACTIVATION_FAILED` 而非虚假 success。
+**include 枚举**：旧版 `enumerateFugr` 静默丢弃所有非 TOP、非 UXX include；新版 FXX / OXX / IXX 全部保留。push 时各 include 走 child lock（`fugrPushTargetFor` 解析 `FUGR/<sub>` 子目标），最后 `activateAll` 父 group；push 后比对 latest vs active source，不一致抛 `ACTIVATION_FAILED` 而非虚假 success。
 
 `readFuncIncludeNumbers` 支持 CRLF 双行 `INCLUDE L<group>U01.\r\n  "FM_NAME"` 形式（真实 SAP 行为）；单行老格式仍兼容。
 
@@ -89,7 +89,7 @@ abap push src/zt_x.tabl.json --tr DEVK900001 --yes   # DDIC 的 .json 必须显�
 
 ### TABL/STRU 兼容：legacy wire-flat 单文件
 
-只有 main `<name>.tabl.json`（无 `.tabl.ddic` sidecar）时，CLI 回落 014 既有的 wire-flat 解析（顶层 `name` / `description` / `fields[]`）。**新文件应统一用三件套**（DDL 是字段源真值、`dataClassCategory` / `sizeCategory` 在 settings.json 里）。
+只有 main `<name>.tabl.json`（无 `.tabl.ddic` sidecar）时，CLI 回落既有的 wire-flat 解析（顶层 `name` / `description` / `fields[]`）。**新文件应统一用三件套**（DDL 是字段源真值、`dataClassCategory` / `sizeCategory` 在 settings.json 里）。
 
 ### DOMA / DTEL：单文件 wire-flat
 
@@ -145,7 +145,7 @@ abap pull ZCL_FOO --remote PRD
 
 ## 变体 5 — Stale 激活修复
 
-`push` 报 activated 但 `inspect --activation` 报 `ok: false`——method/OSI 层级没激活（013 落地经验，root-URI `activate` 在真实 SAP 上静默 no-op）。
+`push` 报 activated 但 `inspect --activation` 报 `ok: false`——method/OSI 层级没激活（真机经验，root-URI `activate` 在真实 SAP 上静默 no-op）。
 
 ```bash
 # 1. 诊断
@@ -246,7 +246,7 @@ abap select --table ZT_FOO --fields "ID,STATUS" --order-by "ID:ASC" --limit 100 
 abap select --table ZT_FOO --fields "ID,STATUS" --order-by "ID:ASC" --limit 100 --offset 100
 
 # 全量（用辅助脚本）
-node ./scripts/pages-select.mjs ZT_FOO --where "STATUS = 'X'" --order-by "ID:ASC" --page-size 200
+node skills/abap-cli-data/scripts/pages-select.mjs ZT_FOO --where "STATUS = 'X'" --order-by "ID:ASC" --page-size 200
 
 # 仅计数（最快）
 abap select --table ZT_FOO --where "AMOUNT > 100" --count-only

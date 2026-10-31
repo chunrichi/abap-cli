@@ -1,5 +1,5 @@
 /**
- * TABT writeback wire-shape tests for P2.1 (apply_ddic_table_settings).
+ * TABT writeback wire-shape tests for (apply_ddic_table_settings).
  *
  * The ABAP apply_ddic_table_settings itself runs on SAP and is exercised
  * end-to-end by `abap deploy` + manual smoke. Here we cover the TS-side
@@ -32,7 +32,7 @@ function toAbapCamelCaseJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
-describe('P2.1 — TABT apply_ddic_table_settings wire shape', () => {
+describe('TABT apply_ddic_table_settings wire shape', () => {
   it('"logChanges" key in payload matches ABAP substring check', () => {
     const payload = toAbapCamelCaseJson({ logChanges: true });
     expect(payloadContains(payload, 'logChanges')).toBe(true);

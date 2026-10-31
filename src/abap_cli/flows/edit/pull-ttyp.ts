@@ -1,5 +1,5 @@
 /**
- * Spec 036 US2 / US5: TTYP pull flow.
+ * /: TTYP pull flow.
  *
  * Coordinates:
  *   1. `detectChannel` — picks ADT (EHP7+) or ICF fallback (EHP5/6).
@@ -8,7 +8,7 @@
  *   4. Writes `<rootDir>/<lower>.ttyp.json` (+ `.type.abap` source sidecar).
  *   5. Writes the optional sidecar `*.type.abap` (DDL `define type ...: ...`).
  *
- * Spec 035 push semantics: pull never auto-creates; if the object is missing
+ * push semantics: pull never auto-creates; if the object is missing
  * on the ADT path we surface OBJECT_NOT_FOUND so the agent can route to
  * `create`.
  */

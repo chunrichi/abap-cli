@@ -137,7 +137,7 @@ CLASS zcl_abap_vibe_icf_http IMPLEMENTATION.
         WHEN OTHERS. lv_original_language = 'EN'.
       ENDCASE.
 
-      " 037 US2 (S06): Read all language rows from ICFDOCU for descriptionByLang[].
+      " (S06): Read all language rows from ICFDOCU for descriptionByLang.
       " ICFDOCU stores one row per (node, parentGuid, language); sy-langu row
       " is already in ls_docu — we add the remaining languages to the response.
       DATA lt_docu_all TYPE TABLE OF icfdocu.

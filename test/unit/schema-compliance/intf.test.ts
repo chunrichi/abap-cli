@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { expectSchemaPass, expectSchemaFail, readJsonFixture } from './_helpers.js';
 import { validateAff } from '../../../src/abap_cli/aff/schema-validator.js';
 
-describe('schema-compliance / intf (T033-015)', () => {
+describe('schema-compliance / intf', () => {
   it('upstream example z_aff_example_intf.intf.json passes', async () => {
     await expectSchemaPass('z_aff_example_intf.intf.json');
   });

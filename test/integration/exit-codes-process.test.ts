@@ -1,5 +1,5 @@
 /**
- * Process-level exit-code contract (US-3).
+ * Process-level exit-code contract.
  *
  * These tests spawn the built CLI binary, so they live in the integration
  * suite: `npm test` (unit) must pass on a checkout that has not been built.
@@ -16,7 +16,7 @@ const cliEntry = path.join(repoRoot, 'dist/index.js');
 const run = promisify(execFile);
 const hasBuiltCli = fs.existsSync(cliEntry);
 
-describe('process-level help/version (US-3)', () => {
+describe('process-level help/version', () => {
   it.skipIf(!hasBuiltCli)('--help exits 0 with text output and no envelope JSON', async () => {
     const { stdout, stderr } = await run(process.execPath, [cliEntry, '--help']);
     expect(stdout).toContain('Usage');

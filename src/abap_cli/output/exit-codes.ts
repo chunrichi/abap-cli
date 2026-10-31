@@ -16,12 +16,12 @@ export const EXIT_CODES: Record<ErrorCategory, number> = {
   VALIDATION_ERROR: 7,
   NOT_FOUND: 8,
   LOCKED: 9,
-  // 036-ttyp-msag-ddls: reserved-range slots. These explicit values are part
+  // reserved-range slots. These explicit values are part
   // of the public contract so agents / CI greppers can identify the failure
   // shape unambiguously without diffing envelope data.
   DDLS_NOT_SUPPORTED: 64,
   CHANNEL_DETECT: 65,
-  // P3.3: feedback service error categories - reserved range.
+  // feedback service error categories - reserved range.
   CONFLICT: 66,
   PERSISTENCE_ERROR: 67,
   HTTP_ERROR: 68,

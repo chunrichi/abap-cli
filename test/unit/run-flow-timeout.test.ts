@@ -117,7 +117,7 @@ describe('run-flow timeout', () => {
       expect(result).toBe('ok');
     });
 
-    it('calls AbortController.abort() when the guard fires', async () => {
+    it('calls AbortController.abort when the guard fires', async () => {
       const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
       const hanging = new Promise<string>(() => {});
       try {
@@ -129,7 +129,7 @@ describe('run-flow timeout', () => {
       abortSpy.mockRestore();
     });
 
-    it('does NOT call abort() when the promise resolves in time', async () => {
+    it('does NOT call abort when the promise resolves in time', async () => {
       const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
       const result = await withTimeout(Promise.resolve('fast'), 1000, { className: 'ZCL_FAST' });
       expect(result).toBe('fast');

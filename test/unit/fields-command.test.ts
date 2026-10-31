@@ -1,6 +1,6 @@
 /**
- * F-25 / S-2 — `abap fields` family: forward field inventory (F-25) and
- * reverse field lookup (S-2). The forward path is a thin projection over
+ * F-25 / — `abap fields` family: forward field inventory (F-25) and
+ * reverse field lookup. The forward path is a thin projection over
  * the existing `/data/query` channel (DD03L), so the select flow is mocked
  * here; the reverse path uses a dedicated `/data/find-tables-by-fields`
  * ICF route that we mock directly.
@@ -40,7 +40,7 @@ beforeEach(() => {
   );
   mocks.icfCreate.mockResolvedValue({ postFindTablesByFields: mocks.postFindTablesByFields });
   // Default mock: no DDIC short text (matches the "withText: false"
-  // default; the S-1 tests override with text fields populated).
+  // default; the tests override with text fields populated).
   mocks.postFindTablesByFields.mockResolvedValue({
     status: 'success',
     data: {
@@ -117,7 +117,7 @@ describe('runFields (F-25)', () => {
   });
 });
 
-describe('runFindTablesByFields (S-2)', () => {
+describe('runFindTablesByFields', () => {
   it('uppercases, trims, and validates field names client-side', async () => {
     const res = await runFindTablesByFields({ fields: [' changed_by ', 'CHANGED_ON'] });
     expect(mocks.postFindTablesByFields).toHaveBeenCalledTimes(1);
@@ -142,7 +142,7 @@ describe('runFindTablesByFields (S-2)', () => {
     expect(mocks.postFindTablesByFields.mock.calls[0]?.[0].tabclass).toBe('TRANSP');
   });
 
-  it('passes as4local through to the SAP-side filter (S-6)', async () => {
+  it('passes as4local through to the SAP-side filter', async () => {
     await runFindTablesByFields({ fields: ['UNAM'], as4local: 'I' });
     expect(mocks.postFindTablesByFields.mock.calls[0]?.[0].as4local).toBe('I');
     // The default 'A' is applied on the SAP side; the client should NOT
@@ -186,7 +186,7 @@ describe('runFindTablesByFields (S-2)', () => {
     expect(human).toContain('UNAME');
   });
 
-  it('surfaces DDIC short text (S-1) when --with-text is requested', async () => {
+  it('surfaces DDIC short text when --with-text is requested', async () => {
     // Override the default mock to include DD03T/DD04T text.
     mocks.postFindTablesByFields.mockResolvedValueOnce({
       status: 'success',

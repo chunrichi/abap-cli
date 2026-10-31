@@ -1,12 +1,12 @@
 /**
- * 017 US1 (T004): JSON wire-contract guard for the ICF /textpool endpoint.
+ * JSON wire-contract guard for the ICF /textpool endpoint.
  *
  * Seeds special-character text elements (POST), reads them back (GET), and
  * asserts the response is standard-parseable JSON with lossless values — the
  * exact wire shape the ABAP handler must preserve after the /ui2/cl_json
- * unification (contracts/json-generation.md §4). The mock uses JSON.stringify
+ * unification. The mock uses JSON.stringify
  * (correct escaping), so this guards the CONTRACT; the real-ABAP /ui2/cl_json
- * escaping path is verified on real SAP in T024.
+ * escaping path is verified on real SAP in.
  */
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { spawn, type ChildProcess } from 'node:child_process';

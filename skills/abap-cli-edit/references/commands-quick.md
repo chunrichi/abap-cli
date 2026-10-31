@@ -185,15 +185,15 @@ abap validate:aff <file-or-dir> [--wire <wire-dir>]
 | --- | --- |
 | `--wire <wire-dir>` | Also recursively validate every JSON under a wire directory. |
 
-- Validate a single fixture
+- Validate a single AFF file
 
   ```bash
-  abap validate:aff test/fixtures/zmy_basic.tabl.json
+  abap validate:aff src/zmy_basic.tabl.json
   ```
-- Validate all fixtures
+- Validate every AFF file under a directory
 
   ```bash
-  abap validate:aff test/fixtures/
+  abap validate:aff src/
   ```
 
 ## `abap delete`

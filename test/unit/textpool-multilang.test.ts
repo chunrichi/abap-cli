@@ -1,5 +1,5 @@
 /**
- * 032 US12 (T053-T056): textpool `.properties` pull works for the 5 supported
+ * textpool `.properties` pull works for the 5 supported
  * object types — CLAS / INTF / PROG / FUGR / TABL / STRU. Per-type:
  *   - mock fixture stores TYPE:NAME:category keys; categories that are
  *     intentionally absent (CLAS has no selections, FUGR has no headings,
@@ -108,7 +108,7 @@ function readOutput(res: { stdout: string; stderr: string }) {
   return { stdout: parsedStdout, stderr: parsedStderr };
 }
 
-describe('032/textpool-multilang', () => {
+describe('textpool-multilang', () => {
   it('CLAS pulls texts (.texts.en.properties) with content from mock', async () => {
     const { res } = await runTextpool('CLAS', 'ZCL_DEMO');
     expect(res.exitCode).toBeUndefined();
