@@ -115,7 +115,7 @@ abap create <type> <name> [options]
 | `--check-only` | Validate the proposed object without creating it |
 | `--audit` | Include the before-checksum (extra SAP round-trip, off by default) |
 | `--overwrite` | When pulling the new object back, replace an existing local file (default: keep the local draft) |
-| `--file <path>` | abap-file-format JSON input (required for TABL/STRU/DOMA/DTEL/ENQU/VIEW/NROB/HTTP/TRAN/XSLT/TTYP/MSAG/DDLS/SRVD/DCLS/DDLX/DDLA) |
+| `--file <path>` | abap-file-format JSON input (required for TABL/STRU/DOMA/DTEL/ENQU/VIEW/SHLP/NROB/HTTP/TRAN/XSLT/TTYP/MSAG/DDLS/SRVD/DCLS/DDLX/DDLA) |
 | `--func <name>` | With FUGR: create a function module (FUGR/FF) inside the existing function group <name> |
 | `--software-component <swcomp>` | With DEVC: software component of the new package (default: inherited from the super package) |
 | `--transport-layer <layer>` | With DEVC: transport layer of the new package (default: inherited from the super package) |

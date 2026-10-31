@@ -51,6 +51,8 @@ const ddicStore = new Map();
 const docuStore = new Map();
 // VIEW (database view) store — key = view name, value = view-v1 wire document.
 const viewStore = new Map();
+// SHLP (search help) store — key = shlp name, value = shlp-v1 wire document.
+const shlpStore = new Map();
 // 014: textpool store — key = `<TYPE>:<OBJ>:<CATEGORY>`, value = array of { id, text }.
 const textpoolStore = new Map();
 // 015: remote source store — key = `<TYPE>:<OBJ>`, value = source string served by /version-source.
@@ -1316,6 +1318,87 @@ const server = http.createServer(async (req, res) => {
         return ok(res, JSON.stringify({ status: 'success', data: { name: viewName, type: 'VIEW', action: 'deleted' } }), 'application/json');
       }
       return ok(res, JSON.stringify({ status: 'error', error: { code: 'METHOD_NOT_ALLOWED', message: `${req.method} not supported on /ddic/view` } }), 'application/json');    }
+
+    // SHLP (search help) — local-extension shlp-v1 document via ICF.
+    // Mirrors the ABAP handler contract for GET / POST|PUT / DELETE
+    // (/ddic/shlp/<name>): elementary needs selectionMethod, collective needs
+    // includedSearchHelps + parameterMappings, and the included search helps
+    // must exist (as in DD30L).
+    const shlpRoute = /^\/sap\/abap_cli\/ddic\/shlp(?:\/(.+))?$/.exec(path);
+    if (shlpRoute) {
+      const shlpName = shlpRoute[1] ? decodeURIComponent(shlpRoute[1]).toUpperCase() : '';
+      if (req.method === 'POST' || req.method === 'PUT') {
+        const body = await readBody(req);
+        let payload = {};
+        try { payload = JSON.parse(body); } catch (_e) { payload = {}; }
+        const objName = (payload.name || '').toUpperCase();
+        if (!objName) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'SHLP_NAME_INVALID', message: 'name is required' } }), 'application/json');
+        }
+        if (objName.length > 30) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'SHLP_NAME_INVALID', message: `name must not exceed 30 characters (got ${objName.length})` } }), 'application/json');
+        }
+        if (!payload.header || !payload.header.description) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'SHLP_REQUIRED_FIELD', message: 'header.description is required' } }), 'application/json');
+        }
+        const kind = String(payload.kind || '').toLowerCase();
+        if (kind !== 'elementary' && kind !== 'collective') {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'SHLP_KIND_INVALID', message: `unsupported kind '${payload.kind}'` } }), 'application/json');
+        }
+        if (!Array.isArray(payload.parameters) || payload.parameters.length === 0) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'SHLP_REQUIRED_FIELD', message: 'parameters[] must contain at least one interface parameter' } }), 'application/json');
+        }
+        if (kind === 'elementary') {
+          if (!payload.selectionMethod) {
+            return ok(res, JSON.stringify({ status: 'error', error: { code: 'SHLP_REQUIRED_FIELD', message: 'selectionMethod is required for an elementary search help' } }), 'application/json');
+          }
+          if (Array.isArray(payload.includedSearchHelps) && payload.includedSearchHelps.length > 0) {
+            return ok(res, JSON.stringify({ status: 'error', error: { code: 'SHLP_FIELD_INVALID', message: 'includedSearchHelps[] only applies to a collective search help' } }), 'application/json');
+          }
+        } else {
+          if (!Array.isArray(payload.includedSearchHelps) || payload.includedSearchHelps.length === 0) {
+            return ok(res, JSON.stringify({ status: 'error', error: { code: 'SHLP_REQUIRED_FIELD', message: 'includedSearchHelps[] must contain at least one included search help' } }), 'application/json');
+          }
+          if (!Array.isArray(payload.parameterMappings) || payload.parameterMappings.length === 0) {
+            return ok(res, JSON.stringify({ status: 'error', error: { code: 'SHLP_REQUIRED_FIELD', message: 'parameterMappings[] must map the interface parameters' } }), 'application/json');
+          }
+          for (const included of payload.includedSearchHelps) {
+            const sub = String(included.searchHelp || '').toUpperCase();
+            if (sub && !shlpStore.has(sub)) {
+              return ok(res, JSON.stringify({ status: 'error', error: { code: 'SHLP_INCLUDED_NOT_FOUND', message: `included search help ${sub} does not exist` } }), 'application/json');
+            }
+          }
+        }
+        const pkg = (payload.package || '').toUpperCase();
+        if (pkg && pkg !== '$TMP' && !payload.transportRequest) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'SHLP_TRANSPORT_REQUIRED', message: 'transportRequest is required for non-$TMP packages' } }), 'application/json');
+        }
+        const existed = shlpStore.has(objName);
+        shlpStore.set(objName, Object.assign({}, payload, { name: objName, type: 'SHLP', package: pkg || '$TMP' }));
+        return ok(res, JSON.stringify({ status: 'success', data: { name: objName, type: 'SHLP', action: existed ? 'updated' : 'created' } }), 'application/json');
+      }
+      if (req.method === 'GET') {
+        if (!shlpName) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'NOT_FOUND', message: 'object name is required' } }), 'application/json');
+        }
+        if (!shlpStore.has(shlpName)) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'DDIC_OBJECT_NOT_FOUND', message: `SHLP ${shlpName} not found in mock store` } }), 'application/json');
+        }
+        return ok(res, JSON.stringify({ status: 'success', data: shlpStore.get(shlpName) }), 'application/json');
+      }
+      if (req.method === 'DELETE') {
+        if (!shlpStore.has(shlpName)) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'DDIC_OBJECT_NOT_FOUND', message: `SHLP ${shlpName} not found in mock store` } }), 'application/json');
+        }
+        const stored = shlpStore.get(shlpName);
+        if ((stored.package || '').toUpperCase() !== '$TMP') {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'SHLP_DELETE_UNSUPPORTED', message: `SHLP ${shlpName} is in package ${stored.package}; delete it in SE11` } }), 'application/json');
+        }
+        shlpStore.delete(shlpName);
+        return ok(res, JSON.stringify({ status: 'success', data: { name: shlpName, type: 'SHLP', action: 'deleted' } }), 'application/json');
+      }
+      return ok(res, JSON.stringify({ status: 'error', error: { code: 'METHOD_NOT_ALLOWED', message: `${req.method} not supported on /ddic/shlp` } }), 'application/json');
+    }
 
     // 014: /sap/abap_cli/ddic/<type> POST (create/overwrite) and GET /<name> (pull).
     const ddic = /^\/sap\/abap_cli\/ddic\/(doma|dtel|tabl|stru)(?:\/(.+))?$/.exec(path);

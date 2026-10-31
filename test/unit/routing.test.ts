@@ -37,6 +37,7 @@ const EXPECTED: Record<string, ExpectedRoute> = {
   DTEL: { create: 'icf', pull: 'icf', push: 'icf' },
   ENQU: { create: 'icf', pull: 'icf', push: 'icf' },
   VIEW: { create: 'icf', pull: 'icf', push: 'icf' },
+  SHLP: { create: 'icf', pull: 'icf', push: 'icf' },
   NROB: { create: 'icf', pull: 'auto', push: 'icf' },
   HTTP: { create: 'icf', pull: 'icf', push: 'icf' },
   TRAN: { create: 'icf', pull: 'icf', push: 'icf' },

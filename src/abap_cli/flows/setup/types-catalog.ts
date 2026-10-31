@@ -74,6 +74,7 @@ const TADIR_OBJECT_BY_CLI: Record<string, Omit<TadirMapping, 'cliType'>> = {
   DOMA: { pgmid: 'R3TR', tadirObject: 'DOMA', ddicTabclass: '', channel: 'ICF', affSchema: 'doma-v1.json', description: 'Domain (DDIC)' },
   DTEL: { pgmid: 'R3TR', tadirObject: 'DTEL', ddicTabclass: '', channel: 'ICF', affSchema: 'dtel-v1.json', description: 'Data element (DDIC)' },
   VIEW: { pgmid: 'R3TR', tadirObject: 'VIEW', ddicTabclass: 'VIEW', channel: 'ICF', affSchema: 'view-v1.json', description: 'Database view (DDIC) — local-extension view-v1 document; TADIR OBJECT is VIEW' },
+  SHLP: { pgmid: 'R3TR', tadirObject: 'SHLP', ddicTabclass: '', channel: 'ICF', affSchema: 'shlp-v1.json', description: 'Search help (DDIC) — local-extension shlp-v1 document; elementary or collective' },
   ENQU: { pgmid: 'R3TR', tadirObject: 'ENQU', ddicTabclass: '', channel: 'ICF', affSchema: 'enqu-v1.json', description: 'Lock object (DDIC)' },
   NROB: { pgmid: 'R3TR', tadirObject: 'NROB', ddicTabclass: '', channel: 'ADT', affSchema: 'nrob-v1.json', description: 'Number range object' },
 

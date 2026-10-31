@@ -141,6 +141,23 @@ export type ErrorCode =
   | 'VIEW_PACKAGE_ASSIGN_FAILED'// RS_CORR_INSERT failed for another reason (SAP_ERROR)
   | 'VIEW_DELETE_UNSUPPORTED'   // delete of a transported view via ICF (VALIDATION_ERROR)
   | 'VIEW_DELETE_FAILED'        // RS_DD_DELETE_OBJ failure (SAP_ERROR)
+  // SHLP (search help) ICF route — local-extension shlp-v1 document
+  | 'SHLP_INVALID_PAYLOAD'      // malformed JSON body / not a shlp-v1 document (VALIDATION_ERROR)
+  | 'SHLP_NAME_INVALID'         // name empty, >30 chars, whitespace, or payload/URL mismatch (VALIDATION_ERROR)
+  | 'SHLP_KIND_INVALID'         // kind is neither elementary nor collective (VALIDATION_ERROR)
+  | 'SHLP_REQUIRED_FIELD'       // missing header.description / parameters / includedSearchHelps / mappings (VALIDATION_ERROR)
+  | 'SHLP_SELECTION_METHOD_NOT_FOUND' // elementary selectionMethod does not exist in DD02L (NOT_FOUND)
+  | 'SHLP_FIELD_INVALID'        // parameter/mapping field invalid or not derivable (VALIDATION_ERROR)
+  | 'SHLP_INCLUDED_NOT_FOUND'   // included search help does not exist (NOT_FOUND)
+  | 'SHLP_INCONSISTENT'         // DDIF_SHLP_PUT shlp_inconsistent (VALIDATION_ERROR)
+  | 'SHLP_WRITE_REFUSED'        // DDIF_SHLP_PUT put_refused (VALIDATION_ERROR)
+  | 'SHLP_WRITE_FAILED'         // DDIF_SHLP_PUT failure / package assignment failure (SAP_ERROR)
+  | 'SHLP_ACTIVATION_FAILED'    // DDIF_SHLP_ACTIVATE failed (SAP_ERROR)
+  | 'SHLP_NOT_AUTHORIZED'       // RS_CORR_INSERT permission_failure / delete permission (AUTH_ERROR)
+  | 'SHLP_TRANSPORT_REQUIRED'   // non-$TMP write without a valid transport request (VALIDATION_ERROR)
+  | 'SHLP_PACKAGE_ASSIGN_FAILED'// RS_CORR_INSERT failed for another reason (SAP_ERROR)
+  | 'SHLP_DELETE_UNSUPPORTED'   // delete of a transported search help via ICF (VALIDATION_ERROR)
+  | 'SHLP_DELETE_FAILED'        // RS_DD_DELETE_OBJ failure (SAP_ERROR)
   // AFF validator/CLI errors
   | 'AFF_SCHEMA_MISSING'        // canonical schema file not found for a type (VALIDATION_ERROR/exit 7)
   | 'AFF_SCHEMA_INVALID'        // canonical schema file present but unparseable (VALIDATION_ERROR/exit 7)
@@ -301,6 +318,23 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   VIEW_PACKAGE_ASSIGN_FAILED: 'SAP_ERROR',
   VIEW_DELETE_UNSUPPORTED: 'VALIDATION_ERROR',
   VIEW_DELETE_FAILED: 'SAP_ERROR',
+  // SHLP
+  SHLP_INVALID_PAYLOAD: 'VALIDATION_ERROR',
+  SHLP_NAME_INVALID: 'VALIDATION_ERROR',
+  SHLP_KIND_INVALID: 'VALIDATION_ERROR',
+  SHLP_REQUIRED_FIELD: 'VALIDATION_ERROR',
+  SHLP_SELECTION_METHOD_NOT_FOUND: 'NOT_FOUND',
+  SHLP_FIELD_INVALID: 'VALIDATION_ERROR',
+  SHLP_INCLUDED_NOT_FOUND: 'NOT_FOUND',
+  SHLP_INCONSISTENT: 'VALIDATION_ERROR',
+  SHLP_WRITE_REFUSED: 'VALIDATION_ERROR',
+  SHLP_WRITE_FAILED: 'SAP_ERROR',
+  SHLP_ACTIVATION_FAILED: 'SAP_ERROR',
+  SHLP_NOT_AUTHORIZED: 'AUTH_ERROR',
+  SHLP_TRANSPORT_REQUIRED: 'VALIDATION_ERROR',
+  SHLP_PACKAGE_ASSIGN_FAILED: 'SAP_ERROR',
+  SHLP_DELETE_UNSUPPORTED: 'VALIDATION_ERROR',
+  SHLP_DELETE_FAILED: 'SAP_ERROR',
   // AFF
   AFF_SCHEMA_MISSING: 'VALIDATION_ERROR',
   AFF_SCHEMA_INVALID: 'VALIDATION_ERROR',

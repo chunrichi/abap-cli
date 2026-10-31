@@ -3,7 +3,7 @@
 These JSON schemas are vendored from the SAP `abap-file-formats` repository
 (https://github.com/SAP/abap-file-formats), commit `5bd63fdecb8b4a03c73b1433a36b779c0c9b1121`.
 
-Every file except `ttyp-v1.json` and `view-v1.json` is a byte-for-byte copy of
+Every file except `ttyp-v1.json`, `view-v1.json` and `shlp-v1.json` is a byte-for-byte copy of
 the upstream schema with the same name. Those two are local extensions:
 upstream has no TTYP schema and no view schema at this commit, so the files are
 handcrafted here and `scripts/sync-aff-schema.sh` never overwrites them.
@@ -32,6 +32,7 @@ The set is intentionally minimal — only the schemas abap-cli resolves through
 | `tran-v1.json` | TRAN | `file-formats/tran/tran-v1.json` | |
 | `ttyp-v1.json` | TTYP | — | **local variant**, handcrafted |
 | `view-v1.json` | VIEW | — | **local extension**, handcrafted from DD25V / DD26V / DD27P / DD28J / DD28V |
+| `shlp-v1.json` | SHLP | — | **local extension**, handcrafted from DD30V / DD31V / DD32P / DD33V |
 | `msag-v1.json` | MSAG | `file-formats/msag/msag-v1.json` | |
 | `ddls-v1.json` | DDLS | `file-formats/ddls/ddls-v1.json` | |
 | `srvb-v1.json` | SRVB | `file-formats/srvb/srvb-v1.json` | |
@@ -50,11 +51,11 @@ and DOMA/DTEL main files are still validated against their own schemas.
 ## Local deviations
 
 `ttyp-v1.json` stays a local variant until upstream publishes a TTYP schema.
-`view-v1.json` is a local extension because upstream abap-file-formats has no
-DDIC view format; its field names and value ranges are derived from the DDIC
+`view-v1.json` / `shlp-v1.json` are local extensions because upstream
+abap-file-formats has no DDIC view or search-help format; its field names and value ranges are derived from the DDIC
 maintenance structures (`DD25V` header, `DD26V` tables, `DD27P` fields, `DD28J`
 join conditions, `DD28V` selection conditions) and mirrored by the ICF
-`/ddic/view` wire document. Both are excluded from the sync script's `FILES`
+`/ddic/view` wire document. All three are excluded from the sync script's `FILES`
 list; treat them like source code (review edits, add tests).
 
 `nrob-v1.json` used to be a hand-edited copy that added

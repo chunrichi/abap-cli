@@ -1,0 +1,233 @@
+{
+  "$comment": "Local extension: upstream SAP abap-file-formats has no search-help schema. Field names and value ranges are derived from the DDIC maintenance structures DD30V (header), DD31V (included search helps), DD32P (parameters) and DD33V (parameter mapping), verified on S/4HANA with DDIF_SHLP_GET / DDIF_SHLP_PUT.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Search Help Properties",
+  "description": "ABAP DDIC search help (SE11 search help) properties",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["formatVersion", "header", "name", "kind", "parameters"],
+  "properties": {
+    "formatVersion": {
+      "title": "ABAP File Format Version",
+      "type": "string",
+      "const": "1"
+    },
+    "header": {
+      "title": "Header",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "originalLanguage"],
+      "properties": {
+        "description": {
+          "title": "Short Description",
+          "description": "Search help short text (DD30V-DDTEXT)",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "originalLanguage": {
+          "title": "Original Language",
+          "description": "Two-letter ISO language code of the original definition (DD30V-DDLANGUAGE)",
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 2
+        },
+        "abapLanguageVersion": {
+          "title": "ABAP Language Version",
+          "type": "string",
+          "enum": ["standard", "keyUser", "cloudDevelopment"],
+          "default": "standard"
+        }
+      }
+    },
+    "name": {
+      "title": "Search Help Name",
+      "description": "DDIC search help name (DD30V-SHLPNAME); at most 30 characters.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 30,
+      "pattern": "^[A-Za-z0-9_/]+$"
+    },
+    "package": {
+      "title": "Package",
+      "description": "Package recorded for the search help in TADIR (read-side only; create/push take the package from the command line).",
+      "type": "string",
+      "maxLength": 30
+    },
+    "kind": {
+      "title": "Kind",
+      "description": "elementary = ISSIMPLE (selection method + field list); collective = ELEMEXI (includes other search helps + parameter mapping).",
+      "type": "string",
+      "enum": ["elementary", "collective"]
+    },
+    "selectionMethod": {
+      "title": "Selection Method",
+      "description": "DD30V-SELMETHOD: table / view / maintenance view used by an elementary search help.",
+      "type": "string",
+      "maxLength": 30
+    },
+    "selectionMethodType": {
+      "title": "Selection Method Type",
+      "description": "DD30V-SELMTYPE: table (X/T) or view (V).",
+      "type": "string",
+      "enum": ["table", "view"],
+      "default": "table"
+    },
+    "textTable": {
+      "title": "Text Table",
+      "description": "DD30V-TEXTTAB: text table supplying the descriptive text of the selection method.",
+      "type": "string",
+      "maxLength": 30
+    },
+    "dialogType": {
+      "title": "Dialog Type",
+      "description": "DD30V-DIALOGTYPE: displayValuesList (D) or dialog (C).",
+      "type": "string",
+      "enum": ["displayValuesList", "dialog"],
+      "default": "displayValuesList"
+    },
+    "hotkey": {
+      "title": "Hotkey",
+      "description": "DD30V-HOTKEY: the single-character allocation hotkey.",
+      "type": "string",
+      "maxLength": 1
+    },
+    "parameters": {
+      "title": "Interface Parameters",
+      "description": "Parameters of the search help (DD32P), in interface order.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["fieldName"],
+        "properties": {
+          "fieldName": {
+            "title": "Field Name",
+            "description": "DD32P-FIELDNAME",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30
+          },
+          "position": {
+            "title": "Position",
+            "description": "DD32P-FLPOSITION, 1-based. Derived from the array order when omitted.",
+            "type": "integer",
+            "minimum": 1
+          },
+          "rollName": {
+            "title": "Data Element",
+            "description": "DD32P-ROLLNAME. Derived from the selection method (elementary) or the mapped sub-search-help parameter (collective) when omitted.",
+            "type": "string",
+            "maxLength": 30
+          },
+          "input": {
+            "title": "Input",
+            "description": "DD32P-SHLPINPUT: parameter can be used as a selection criterion.",
+            "type": "boolean"
+          },
+          "output": {
+            "title": "Output",
+            "description": "DD32P-SHLPOUTPUT: parameter is shown in the result list.",
+            "type": "boolean"
+          },
+          "selectionPosition": {
+            "title": "Selection Position",
+            "description": "DD32P-SHLPSELPOS: position in the selection area (0 = hidden). Defaults to the parameter position when input is true.",
+            "type": "integer",
+            "minimum": 0
+          },
+          "listPosition": {
+            "title": "List Position",
+            "description": "DD32P-SHLPLISPOS: position in the result list (0 = hidden). Defaults to the parameter position when output is true.",
+            "type": "integer",
+            "minimum": 0
+          },
+          "defaultValue": {
+            "title": "Default Value",
+            "description": "DD32P-DEFAULTVAL",
+            "type": "string"
+          }
+        }
+      }
+    },
+    "includedSearchHelps": {
+      "title": "Included Search Helps",
+      "description": "Search helps included by a collective search help (DD31V).",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["searchHelp"],
+        "properties": {
+          "searchHelp": {
+            "title": "Included Search Help",
+            "description": "DD31V-SUBSHLP",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30
+          },
+          "position": {
+            "title": "Position",
+            "description": "DD31V-SHPOSITION, 1-based. Derived from the array order when omitted.",
+            "type": "integer",
+            "minimum": 1
+          },
+          "viaSearchHelp": {
+            "title": "Via Search Help",
+            "description": "DD31V-VIASHLP: parent search help for nested includes (defaults to the collective search help itself).",
+            "type": "string",
+            "maxLength": 30
+          },
+          "hide": {
+            "title": "Hide",
+            "description": "DD31V-HIDEFLAG: hide the included search help in the selection list.",
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "parameterMappings": {
+      "title": "Parameter Mappings",
+      "description": "Maps collective interface parameters to included-search-help fields (DD33V).",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["fieldName", "subSearchHelp", "subFieldName"],
+        "properties": {
+          "fieldName": {
+            "title": "Interface Field",
+            "description": "DD33V-FIELDNAME: the collective interface parameter.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30
+          },
+          "subSearchHelp": {
+            "title": "Sub Search Help",
+            "description": "DD33V-SUBSHLP",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30
+          },
+          "subFieldName": {
+            "title": "Sub Field",
+            "description": "DD33V-SUBFIELD",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30
+          },
+          "valueDirection": {
+            "title": "Value Direction",
+            "description": "DD33V-VALUEDIREC: import (input / check, I or C) or export (E).",
+            "type": "string",
+            "enum": ["import", "export"],
+            "default": "import"
+          }
+        }
+      }
+    }
+  }
+}

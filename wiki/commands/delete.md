@@ -23,7 +23,7 @@ abap delete --schema --json
 ## Options
 
 - `<object>`: SAP 对象名（如 `ZCL_MY_CLASS`），不是本地文件名；内部走 ADT quickSearch 解析成对象 URL。
-- `--type <type>`: **必填**。对象类型码（`CLAS` / `PROG` / `INTF` / `FUGR` / `DEVC` / `TABL` / `VIEW` / `TRAN` / ... / `XSLT`），大小写不敏感。`DEVC` 走独立删除路径（包资源按名字直接寻址，不依赖 quickSearch，也不加锁）；`VIEW` 走 ICF `DELETE /ddic/view/<name>`（仅 `$TMP`，先激活 inactive 版本再 `RS_DD_DELETE_OBJ`）；`TRAN` / `XSLT` 走 ICF（`DELETE /tran/<code>` / `DELETE /xslt/<name>`），其余类型走 ADT lock → DELETE → unlock。
+- `--type <type>`: **必填**。对象类型码（`CLAS` / `PROG` / `INTF` / `FUGR` / `DEVC` / `TABL` / `VIEW` / `SHLP` / `TRAN` / ... / `XSLT`），大小写不敏感。`DEVC` 走独立删除路径（包资源按名字直接寻址，不依赖 quickSearch，也不加锁）；`VIEW` / `SHLP` 走 ICF `DELETE /ddic/view|shlp/<name>`（仅 `$TMP`，先激活 inactive 版本再 `RS_DD_DELETE_OBJ`）。
 - `--tr <request>`: 传输请求号。`$TMP` 对象可省略；其它包必填。
 - `--yes`: **必填**。显式确认删除；无 TTY 时缺失直接报 `USAGE`。
 - `--schema`: 打印本命令参数 schema 并退出，不调用 SAP。
@@ -120,6 +120,7 @@ lock/unlock）：
 
 - **VIEW（数据库视图）**：`abap delete <name> --type VIEW` 走 ICF `DELETE /ddic/view/<name>`；仅 `$TMP` 视图可删（可传输视图返回 `VIEW_DELETE_UNSUPPORTED`，exit 7，请在 SE11 删除）。已在 S/4HANA 8.134.214.7:44300（profile `test`）验证：`$TMP` 视图删除成功（`deleted + lockReleased`），DD25L/DD26S/DD27S/DD28S/TADIR 无残留；`V_T001`（package FBZ）被 `VIEW_DELETE_UNSUPPORTED` 拦截且未发起 DELETE。证据：`tests/261031006-realsap-view/`（本地，不入库）。
 - **DEVC（包）已在 S/4HANA 8.134.214.7:44300（profile `test`）验证**：`$TMP` 下真实创建 `$ZCLI_TC_PKG10` 后 `abap delete '$ZCLI_TC_PKG10' --type DEVC --yes --json` 成功（复用创建命令的会话时 SAP 先报「包已锁定」，命令自动 logout + 新会话重试后成功），随后 `pull` 返回 404；非 LOCAL 包（ZLOCAL）在缺 `--tr` 时被 `MISSING_TRANSPORT`（exit 2）拦截、未发起删除。证据：`tests/261031002-realsap-devc/`（本地，不入库）。
+- **SHLP（搜索帮助）删除走 ICF `DELETE /ddic/shlp/<name>`**：仅 `$TMP` 搜索帮助可删（先激活 inactive 版本，再 `RS_DD_DELETE_OBJ(objtype='H', no_ask='X')`）；可传输搜索帮助返回 `SHLP_DELETE_UNSUPPORTED`（exit 7，请在 SE11 删除以便记录到请求）。证据：`tests/261031007-realsap-shlp/`（本地，不入库）。
 - **TRAN（事务码）删除走 ICF `DELETE /tran/<tcode>`**（SE93 没有 ADT 端点）：S/4HANA 8.134.214.7:44300（profile `test`）上 `abap delete ZCLI_TC_T1 --type TRAN --yes` 成功，TSTC/TSTCT/TSTCP/TSTCC/TSTCA 与 TADIR 行一并清除，随后 `pull` 返回 404。仅 `$TMP` 事务可删；可传输事务返回 `TRAN_DELETE_UNSUPPORTED`（exit 7，请在 SE93 删除以便记录到请求）。证据：`tests/261031003-realsap-tran/`（本地，不入库）。
 - **XSLT（转换程序）未验证**：`DELETE /xslt/<name>` 已实现（`load → set_changeable → delete → save`，API 原语在 $TMP 探针中 rc=0），但端到端真机命令尚未执行（写作时目标系统 stateful 会话受限，`abap deploy` 未完成）。
 - **其它类型未验证**：本页没有记录 CLAS / PROG 等 `abap delete` 在 A4H / S/4HANA 上的真机执行结果。
