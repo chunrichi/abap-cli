@@ -279,7 +279,7 @@ abap create HTTP ZMY_SERVICE --file src/zmy_service.http.json \
 abap push src/zmy_service.http.json --tr <TR>
 ```
 
-`.http.json` 遵循 abap-file-format（`http-v1.json`）嵌套结构；CLI 同时接受扁平写法（`description` / `handlerClass` / `url` 提到顶层）：
+`.http.json` 遵循 abap-file-format（`http-v1.json`）嵌套结构；CLI 同时接受扁平写法（`description` / `handlerClass` / `servicePath` 提到顶层）：
 
 ```json
 {
@@ -290,10 +290,12 @@ abap push src/zmy_service.http.json --tr <TR>
   },
   "generalInformation": {
     "handlerClass": "ZCL_MY_HANDLER",
-    "url": "/sap/zmy_service"
+    "servicePath": "/sap/zmy_service"
   }
 }
 ```
 
-写失败报 `HTTP_CREATE_FAILED`（exit 6，SAP_ERROR 类）——看 `error.details`，校对 handlerClass 是否存在、url 是否冲突、父节点是否已建。
+SICF 路径在本地文件里叫 `generalInformation.servicePath`（上游 AFF 的重命名）；ICF handler 的 POST/GET 载荷仍用旧成员名 `url`，CLI 在 `formats/http/json.ts` 里做双向转换。可选的 `generalInformation.tokenHandling` 是 AFF 字段，当前 ICF handler 没有对应实现，不会被下发。
+
+写失败报 `HTTP_CREATE_FAILED`（exit 6，SAP_ERROR 类）——看 `error.details`，校对 handlerClass 是否存在、servicePath 是否冲突、父节点是否已建。
 

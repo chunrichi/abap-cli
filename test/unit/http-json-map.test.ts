@@ -23,13 +23,14 @@ describe('022 HTTP JSON helpers', () => {
         name: 'zhttp_test',
         formatVersion: '1',
         header: { description: 'HTTP service', originalLanguage: 'en', abapLanguageVersion: 'standard' },
-        generalInformation: { handlerClass: 'ZCL_HTTP_HANDLER', url: '/sap/zhttp_test' },
+        generalInformation: { handlerClass: 'ZCL_HTTP_HANDLER', servicePath: '/sap/zhttp_test' },
       };
       const wire = localToWire(local);
       expect(wire).toEqual({
         name: 'ZHTTP_TEST',
         formatVersion: '1',
         header: { description: 'HTTP service', originalLanguage: 'en', abapLanguageVersion: 'standard' },
+        // AFF `servicePath` is the ICF handler's `url` member.
         generalInformation: { handlerClass: 'ZCL_HTTP_HANDLER', url: '/sap/zhttp_test' },
       });
     });
@@ -40,7 +41,7 @@ describe('022 HTTP JSON helpers', () => {
         description: 'Flat shape',
         originalLanguage: 'EN',
         handlerClass: 'ZCL_FLAT_HANDLER',
-        url: '/sap/flat',
+        servicePath: '/sap/flat',
       };
       const wire = localToWire(local);
       expect(wire).toMatchObject({
@@ -49,6 +50,15 @@ describe('022 HTTP JSON helpers', () => {
         header: { description: 'Flat shape', originalLanguage: 'EN' },
         generalInformation: { handlerClass: 'ZCL_FLAT_HANDLER', url: '/sap/flat' },
       });
+    });
+
+    it('does not forward the AFF-only tokenHandling flag to the ICF wire', () => {
+      const local: HttpObjectLocal = {
+        name: 'ZHTTP_TOKEN',
+        header: { description: 'd', originalLanguage: 'EN' },
+        generalInformation: { handlerClass: 'ZCL_X', servicePath: '/sap/x', tokenHandling: true },
+      };
+      expect(localToWire(local).generalInformation).toEqual({ handlerClass: 'ZCL_X', url: '/sap/x' });
     });
 
     it('uppercases the name', () => {
@@ -63,7 +73,7 @@ describe('022 HTTP JSON helpers', () => {
       const local = {
         name: 'ZHTTP_TRN',
         header: { description: 'd', originalLanguage: 'EN' },
-        generalInformation: { url: '/sap/zhttp_trn' },
+        generalInformation: { servicePath: '/sap/zhttp_trn' },
         package: '$TMP',
         transportRequest: 'A4HK900148',
       };
@@ -84,7 +94,8 @@ describe('022 HTTP JSON helpers', () => {
       expect(local.name).toBeUndefined();
       expect(local.formatVersion).toBe('1');
       expect(local.header).toEqual({ description: 'HTTP service', originalLanguage: 'EN', abapLanguageVersion: 'standard' });
-      expect(local.generalInformation).toEqual({ handlerClass: 'ZCL_HTTP_HANDLER', url: '/sap/zhttp_test' });
+      // ICF wire `url` becomes AFF `servicePath` in the local file.
+      expect(local.generalInformation).toEqual({ handlerClass: 'ZCL_HTTP_HANDLER', servicePath: '/sap/zhttp_test' });
     });
   });
 
@@ -93,7 +104,7 @@ describe('022 HTTP JSON helpers', () => {
       const local: HttpObjectLocal = {
         name: 'ZHTTP_TEST',
         header: { description: 'd', originalLanguage: 'EN' },
-        generalInformation: { handlerClass: 'ZCL_X', url: '/x' },
+        generalInformation: { handlerClass: 'ZCL_X', servicePath: '/x' },
       };
       expect(validateHttpObject(local)).toEqual([]);
     });
@@ -115,6 +126,16 @@ describe('022 HTTP JSON helpers', () => {
       expect(errors.some((e) => e.includes('originalLanguage'))).toBe(true);
     });
 
+    it('rejects a document that only carries the pre-upstream url member', () => {
+      const local = {
+        name: 'ZHTTP_TEST',
+        header: { description: 'd', originalLanguage: 'EN' },
+        generalInformation: { handlerClass: 'ZCL_X', url: '/x' },
+      } as unknown as HttpObjectLocal;
+      const errors = validateHttpObject(local);
+      expect(errors.some((e) => e.includes('servicePath'))).toBe(true);
+    });
+
     it('rejects invalid abapLanguageVersion', () => {
       const local: HttpObjectLocal = {
         name: 'ZHTTP_TEST',
@@ -128,7 +149,7 @@ describe('022 HTTP JSON helpers', () => {
       const local: HttpObjectLocal = {
         name: 'ZHTTP_TEST',
         header: { description: 'd', originalLanguage: 'EN' },
-        generalInformation: { handlerClass: longName, url: '/x' },
+        generalInformation: { handlerClass: longName, servicePath: '/x' },
       };
       expect(validateHttpObject(local).some((e) => e.includes('handlerClass too long'))).toBe(true);
     });
@@ -137,7 +158,7 @@ describe('022 HTTP JSON helpers', () => {
       const local: HttpObjectLocal = {
         name: 'ZHTTP_TEST',
         header: { description: 'd'.repeat(61), originalLanguage: 'EN' },
-        generalInformation: { handlerClass: 'ZCL_X', url: '/x' },
+        generalInformation: { handlerClass: 'ZCL_X', servicePath: '/x' },
       };
       expect(validateHttpObject(local).some((e) => e.includes('description too long'))).toBe(true);
     });
@@ -146,7 +167,7 @@ describe('022 HTTP JSON helpers', () => {
       const local: HttpObjectLocal = {
         name: 'ZHTTP_TEST',
         header: { description: 'd'.repeat(60), originalLanguage: 'EN' },
-        generalInformation: { handlerClass: 'ZCL_X', url: '/x' },
+        generalInformation: { handlerClass: 'ZCL_X', servicePath: '/x' },
       };
       expect(validateHttpObject(local)).toEqual([]);
     });
@@ -159,9 +180,29 @@ describe('022 HTTP JSON helpers', () => {
       const doc = {
         formatVersion: '1',
         header: { description: 'HTTP service', originalLanguage: 'EN' },
-        generalInformation: { handlerClass: 'ZCL_HTTP_HANDLER', url: '/sap/zhttp_test' },
+        generalInformation: { handlerClass: 'ZCL_HTTP_HANDLER', servicePath: '/sap/zhttp_test' },
       };
       expect(validateHttpService(doc)).toEqual([]);
+    });
+
+    it('accepts the optional tokenHandling flag', () => {
+      const doc = {
+        formatVersion: '1',
+        header: { description: 'HTTP service', originalLanguage: 'EN' },
+        generalInformation: { handlerClass: 'ZCL_HTTP_HANDLER', servicePath: '/sap/zhttp_test', tokenHandling: true },
+      };
+      expect(validateHttpService(doc)).toEqual([]);
+    });
+
+    it('rejects the pre-upstream url member (http-v1.json additionalProperties:false)', () => {
+      const doc = {
+        formatVersion: '1',
+        header: { description: 'HTTP service', originalLanguage: 'EN' },
+        generalInformation: { handlerClass: 'ZCL_HTTP_HANDLER', url: '/sap/zhttp_test' },
+      };
+      const errors = validateHttpService(doc);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors.join('\n')).toMatch(/url|additional/);
     });
 
     it('rejects documents missing formatVersion (AFF schema)', () => {
@@ -212,11 +253,22 @@ describe('022 HTTP JSON helpers', () => {
       const doc = {
         formatVersion: '1' as const,
         header: { description: 'round-trip', originalLanguage: 'EN' },
-        generalInformation: { handlerClass: 'ZCL_RT', url: '/sap/zrt' },
+        generalInformation: { handlerClass: 'ZCL_RT', servicePath: '/sap/zrt' },
       };
       await httpArtifact.write(filePath, doc);
       const back = await httpArtifact.read(filePath);
       expect(back).toEqual(doc);
+    });
+
+    it('rejects a document that still carries url before writing', async () => {
+      const filePath = path.join(tmpDir, 'zhttp_legacy.http.json');
+      const legacy = {
+        formatVersion: '1' as const,
+        header: { description: 'legacy', originalLanguage: 'EN' },
+        generalInformation: { handlerClass: 'ZCL_RT', url: '/sap/zrt' },
+      };
+      await expect(httpArtifact.write(filePath, legacy as unknown as HttpObjectLocal)).rejects.toThrow(/AFF HTTP fixture invalid/);
+      await expect(fs.stat(filePath)).rejects.toThrow();
     });
 
     it('throws on an invalid document before writing', async () => {

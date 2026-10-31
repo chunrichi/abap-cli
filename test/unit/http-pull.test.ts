@@ -67,13 +67,15 @@ describe('022 pull HTTP service', () => {
     });
     const written = fs.readFileSync(path.join(cwd, 'src/zhttp_test.http.json'), 'utf-8');
     const parsed = JSON.parse(written);
-    // The local shape is the abap-file-format nested one (header + generalInformation).
+    // The local shape is the abap-file-format nested one (header + generalInformation);
+    // the ICF GET payload still names the SICF path `url`, the local file uses AFF `servicePath`.
     expect(parsed.name).toBe('ZHTTP_TEST');
     expect(parsed.formatVersion).toBe('1');
     expect(parsed.header.description).toBe('HTTP service');
     expect(parsed.header.originalLanguage).toBe('EN');
     expect(parsed.generalInformation.handlerClass).toBe('ZCL_HTTP_HANDLER');
-    expect(parsed.generalInformation.url).toBe('/sap/zhttp_test');
+    expect(parsed.generalInformation.servicePath).toBe('/sap/zhttp_test');
+    expect(parsed.generalInformation.url).toBeUndefined();
   });
 
   it('uses --overwrite to replace an existing file', async () => {

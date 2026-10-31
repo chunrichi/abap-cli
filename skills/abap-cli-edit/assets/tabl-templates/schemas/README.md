@@ -7,7 +7,7 @@
 | Schema | 用途 | 大小 |
 |---|---|---|
 | `tabl-v1.json` | main `.tabl.json` / `.stru.json` 校验（`formatVersion` + `header`） | 1.8 KB |
-| `tabt-v1.json` | `.tabl.settings.json` 校验（`generalInformation` + 可选 `buffering` + `dbSpecificSettings`） | 6.6 KB |
+| `tabt-v1.json` | `.tabl.settings.json` 校验（`generalInformation` + 可选 `buffering` + `dbSpecificSettings`） | 5.5 KB |
 
 `.tabl.ddic` / `.stru.ddic` 是 ABAP DDL 源码，**没有** JSON schema（CLI 解析器 [src/abap_cli/formats/ddic/tabl-artifact.ts:parseTablDdic](https://github.com/chunrichi/abap-cli/blob/main/src/abap_cli/formats/ddic/tabl-artifact.ts) 是手写 lexer）。
 

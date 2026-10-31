@@ -70,7 +70,7 @@ abap push src/zmy_service.http.json --tr <TR>
   },
   "generalInformation": {
     "handlerClass": "ZCL_MY_HANDLER",
-    "url": "/sap/zmy_service"
+    "servicePath": "/sap/zmy_service"
   }
 }
 ```

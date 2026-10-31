@@ -101,7 +101,7 @@ const HTTP_DOC = {
   formatVersion: '1',
   name: 'ZHTTP_DISPATCH',
   header: { description: 'HTTP dispatch', originalLanguage: 'EN' },
-  generalInformation: { handlerClass: 'ZCL_HTTP_HANDLER', url: '/sap/zhttp' },
+  generalInformation: { handlerClass: 'ZCL_HTTP_HANDLER', servicePath: '/sap/zhttp' },
 };
 
 const TABL_DOC = {

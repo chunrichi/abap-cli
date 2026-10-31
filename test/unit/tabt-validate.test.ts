@@ -2,7 +2,9 @@
  * TABT settings payload enum validation tests.
  *
  * Validates that `validateTabtPayload` (synchronous, in `formats/ddic/validate.ts`)
- * correctly enforces the enum values declared by `src/abap_cli/schema/tabt-v1.json`:
+ * correctly enforces the value sets declared by `src/abap_cli/schema/tabt-v1.json`
+ * (`sizeCategory` moved from `enum` to an equivalent `pattern` upstream; the
+ * accepted set is unchanged):
  *
  *   - generalInformation.translation: noLanguageKey|standard|loadTable|objectSpecific|notRelevant
  *   - generalInformation.sizeCategory: undefined|0..9

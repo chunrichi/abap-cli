@@ -4,7 +4,7 @@ title: HTTP — SICF 服务节点（ICF Tree Node）
 description: HTTP 类型的 SICF 节点管理；走 ICF 自建通道
 tags: [abap-cli, object-type, http, sicf, icf, abap-file-format]
 created at: 2026-09-01 00:00:00
-changed at: 2026-10-30 20:00:00
+changed at: 2026-10-31 14:40:00
 ---
 
 # HTTP — SICF 服务节点（ICF Tree Node）
@@ -36,7 +36,7 @@ src/
   },
   "generalInformation": {
     "handlerClass": "ZCL_MY_HANDLER",
-    "url": "/sap/zmy_service"
+    "servicePath": "/sap/zmy_service"
   }
 }
 ```
@@ -49,11 +49,11 @@ CLI 同时接受**扁平写法**（方便手写）：
   "description": "My service",
   "originalLanguage": "en",
   "handlerClass": "ZCL_MY_HANDLER",
-  "url": "/sap/zmy_service"
+  "servicePath": "/sap/zmy_service"
 }
 ```
 
-`localToWire` / `wireToLocal` 在 `src/abap_cli/formats/http/json.ts` 内做 abap-file-format → wire 双向兼容。**wire 即文件本身的嵌套形态**（真实 SAP ICF handler 按 `ty_http_service_data` 契约反序列化）；`package` / `transportRequest` 只作为 POST 顶层信封，不落盘。
+`localToWire` / `wireToLocal` 在 `src/abap_cli/formats/http/json.ts` 内做 abap-file-format → wire 双向兼容。SICF 路径在 AFF 里叫 `servicePath`，而真实 SAP ICF handler 按 `ty_http_service_data` 契约仍用 `url`，转换只在 CLI 侧发生；`package` / `transportRequest` 只作为 POST 顶层信封，不落盘。
 
 ## 关键字段
 
@@ -61,7 +61,8 @@ CLI 同时接受**扁平写法**（方便手写）：
 |---|---|---|
 | `name` | ✅ | SICF 节点名（自动大写） |
 | `handlerClass` | ✅ | 处理类，必须存在并实现 IF_HTTP_EXTENSION |
-| `url` | ✅ | 完整 URL 路径（须 `/` 开头） |
+| `servicePath` | ✅ | 完整 SICF 路径（须 `/` 开头；上游 AFF 的 `url` 重命名而来） |
+| `tokenHandling` | 可选 | AFF 的 CSRF token 开关；当前 ICF handler 未实现，不下发 |
 | `description` | ✅ | 描述（SE80 显示） |
 | `originalLanguage` | 推荐 | 原始语言（`EN` / `DE` / ...） |
 | `abapLanguageVersion` | 可选 | `standard` / `cloudDevelopment` |
@@ -84,14 +85,15 @@ abap push src/zmy_service.http.json --tr DEVK900001 --json
 
 ## abap-file-format 合规性
 
-✅ 与 `http-v1.json` 对齐；CLI 接受两种写法。wire 已对齐嵌套 abap-file-format 形态（真实 SAP create 曾报 `HTTP_SERVICE_INVALID`，commit `7fd13ec`）。
+✅ 与上游 `http-v1.json` 对齐（本地文件用 AFF 的 `servicePath`；wire 侧的 `url` 转换见上）。真实 SAP create 曾报 `HTTP_SERVICE_INVALID`，commit `7fd13ec` 修复了嵌套形态。
 
 ## 已知坑
 
+- **本地文件从 `url` 改名为 `servicePath`**：上游 AFF 重写了 `http-v1.json`（`url` → `servicePath`，新增 `tokenHandling`）。旧文件的 `generalInformation.url` / 顶层 `url` 现在会被 `validate:aff` / `push` / `create` 以 VALIDATION_ERROR 拒绝，迁移即改名。
 - **`serviceId` / `descriptionByLang[]` 读路径已闭环**：ABAP handler 的 `GET /http/<name>` 从 SICF 节点回传 `service_id`（节点 URL）与 `description_by_lang`（ICFDOCU 多语言行）；写路径仍以 SICF 节点数据为准（CLI 的 POST 不改这两字段）。
 - **pull 落盘 `originalLanguage` 取登录语言**：ABAP GET 按 `sy-langu` 推导（如登录语言 ZH 则落 `ZH`），不一定等于创建时的值；两次 pull 间一致，不影响 push/pull 幂等闭环。
 - **`create HTTP` 必须带 `--file`**：032 US10 曾支持"无 `--file` 落最小骨架（`action: local`，不调 SAP，已有同名文件返回 `OVERWRITE_REQUIRED`）"，该路径已按重构决策 1A 删除，与 DDIC / DDLS 行为对齐。要起本地草稿请手写 `.http.json`（见 `abap create --schema HTTP` 的 `exampleJson`），或先 `abap pull` 一个同类节点再改；`abap create local HTTP` 不支持 HTTP。
-- **`url` 必须以 `/` 开头**：不写 `/` 时 SAP 端会拒；CLI 不做前缀校验
+- **`servicePath` 必须以 `/` 开头**：不写 `/` 时 SAP 端会拒；CLI 不做前缀校验
 - **`handlerClass` 必须存在**：push 时 SAP 端会校验；不存在的类会报 `CLASS_NOT_FOUND`
 - **BTP Steampunk 上 ICF 节点不在本地**：Steampunk SaaS 的 ICF 服务由 BTP 平台管理；CLI 走 source-only + CF destination 提示
 
