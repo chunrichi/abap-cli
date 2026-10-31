@@ -512,32 +512,37 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " Persist via DDIF_TABL_PUT. Foreign-key/index/text tables are forwarded
-    " unchanged so we don't lose metadata the read pulled in.
-    CALL FUNCTION 'DDIF_TABL_PUT'
-      EXPORTING
-        name     = iv_name
-        dd02v_wa = ls_header
-        dd09l_wa = ls_technical
-      TABLES
-        dd03p_tab = lt_dd03p
-        dd05m_tab = lt_dd05m
-        dd08v_tab = lt_dd08v
-        dd35v_tab = lt_dd35v
-        dd36m_tab = lt_dd36m
-      EXCEPTIONS
-        tabl_not_found     = 1
-        name_inconsistent  = 2
-        tabl_inconsistent  = 3
-        put_failure        = 4
-        put_refused        = 5
-        OTHERS             = 6.
-    IF sy-subrc <> 0.
+    " Persist the technical settings straight into the active DD09L row.
+    " DDIF_TABL_PUT + DDIF_TABL_ACTIVATE cannot switch an existing table's
+    " technical settings here: the PUT only stages a DD09L 'L' record, the
+    " subsequent DDIF_TABL_ACTIVATE/DD_TABL_ACTIVATE returns result=8 because
+    " no inactive DD02L version exists (verified on S/4HANA 8.134). Writing the
+    " active record keeps SE11/DDIF_TABL_GET readbacks consistent; buffering
+    " changes become effective for the table buffer on the next activation /
+    " application-server restart.
+    UPDATE dd09l
+       SET protokoll    = ls_technical-protokoll
+           bufallow     = ls_technical-bufallow
+           pufferung    = ls_technical-pufferung
+           schfeldanz   = ls_technical-schfeldanz
+           roworcolst   = ls_technical-roworcolst
+           load_unit    = ls_technical-load_unit
+           uebersetz    = ls_technical-uebersetz
+           as4user      = sy-uname
+           as4date      = sy-datum
+           as4time      = sy-uzeit
+     WHERE tabname = iv_name
+       AND as4local = 'A'.
+    IF sy-subrc <> 0 AND sy-dbcnt = 0.
       ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
                                  error = VALUE zcl_abap_vibe_icf_types=>ty_error_body(
                                    code = 'DDIC_SETTINGS_WRITE_FAILED'
                                    message = |Could not apply technical settings to TABL { iv_name }| ) ).
+      RETURN.
     ENDIF.
+    " Drop the half-written inactive DD09L record left by older builds.
+    DELETE FROM dd09l WHERE tabname = iv_name AND as4local <> 'A'.
+    COMMIT WORK.
 
   ENDMETHOD.
   METHOD create_ddic_table.
@@ -560,8 +565,9 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
             general_information   TYPE zcl_abap_vibe_icf_types=>ty_tabl_general_information,
             fields                TYPE zcl_abap_vibe_icf_types=>tt_field,
           END OF ls_attr.
-    /ui2/cl_json=>deserialize( EXPORTING json = iv_payload
-                               CHANGING data = ls_attr ).
+    /ui2/cl_json=>deserialize( EXPORTING json        = iv_payload
+                                         pretty_name = /ui2/cl_json=>pretty_mode-camel_case
+                               CHANGING  data        = ls_attr ).
     IF ls_attr-name IS INITIAL.
       ls_attr-name = iv_name.
     ENDIF.
@@ -637,6 +643,11 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
                                                               details = lt_details ) ).
       RETURN.
     ENDIF.
+      " Flush the create (GOX_GEN_TABLE_STD writes the active version) before
+      " DDIF_TABL_PUT + DDIF_TABL_ACTIVATE read/write the DD09L records; without
+      " the commit the activation sees the object as not yet created (rc=8).
+      COMMIT WORK.
+
       " TABT writeback. When payload carries logChanges/translation
       " buffering/dbSpecificSettings, deserialize into a dedicated settings
       " struct (avoids nesting all TABT keys under zcl_abap_vibe_icf_types=>ty_tabl_general_information
@@ -646,9 +657,11 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
          OR iv_payload CS '"buffering"'
          OR iv_payload CS '"dbSpecificSettings"'.
         DATA ls_settings TYPE zcl_abap_vibe_icf_types=>ty_ddic_table_settings.
-        /ui2/cl_json=>deserialize( EXPORTING json = iv_payload
-                                     pretty_name = /ui2/cl_json=>pretty_mode-camel_case
-                               CHANGING data = ls_settings ).
+        ls_settings-log_changes          = ls_attr-general_information-log_changes.
+        ls_settings-writable_by_amdp     = ls_attr-general_information-writable_by_amdp.
+        ls_settings-translation          = ls_attr-general_information-translation.
+        ls_settings-buffering            = ls_attr-general_information-buffering.
+        ls_settings-db_specific_settings = ls_attr-general_information-db_specific_settings.
         apply_ddic_table_settings( EXPORTING iv_name     = CONV tabname( ls_attr-name )
                                              iv_payload  = iv_payload
                                              is_settings = ls_settings
@@ -679,7 +692,9 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
             header TYPE zcl_abap_vibe_icf_types=>ty_ddic_header,
             fields TYPE zcl_abap_vibe_icf_types=>tt_field,
           END OF ls_attr.
-    /ui2/cl_json=>deserialize( EXPORTING json = iv_payload CHANGING data = ls_attr ).
+    /ui2/cl_json=>deserialize( EXPORTING json        = iv_payload
+                                         pretty_name = /ui2/cl_json=>pretty_mode-camel_case
+                               CHANGING  data        = ls_attr ).
     IF ls_attr-name IS INITIAL.
       ls_attr-name = iv_name.
     ENDIF.
@@ -767,8 +782,9 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
             long_text             TYPE string,
             header_text           TYPE string,
           END OF ls_attr.
-    /ui2/cl_json=>deserialize( EXPORTING json = iv_payload
-                               CHANGING data = ls_attr ).
+    /ui2/cl_json=>deserialize( EXPORTING json        = iv_payload
+                                         pretty_name = /ui2/cl_json=>pretty_mode-camel_case
+                               CHANGING  data        = ls_attr ).
     IF ls_attr-name IS INITIAL.
       ls_attr-name = iv_name.
     ENDIF.
@@ -785,19 +801,19 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
           APPEND ls_details TO ls_object_new-details.
         ENDIF.
       WHEN 'predefinedType'.
-        IF ls_attr-data_type_information-predefined_data_type IS NOT INITIAL.
+        IF ls_attr-data_type_information-predefined_type-data_type IS NOT INITIAL.
           ls_details-fieldname = 'DATATYPE'.
-          ls_details-fieldvalue = ls_attr-data_type_information-predefined_data_type.
+          ls_details-fieldvalue = ls_attr-data_type_information-predefined_type-data_type.
           APPEND ls_details TO ls_object_new-details.
         ENDIF.
-        IF ls_attr-data_type_information-predefined_length IS NOT INITIAL.
+        IF ls_attr-data_type_information-predefined_type-length > 0.
           ls_details-fieldname = 'LENG'.
-          ls_details-fieldvalue = ls_attr-data_type_information-predefined_length.
+          ls_details-fieldvalue = |{ ls_attr-data_type_information-predefined_type-length }|.
           APPEND ls_details TO ls_object_new-details.
         ENDIF.
-        IF ls_attr-data_type_information-predefined_decimals IS NOT INITIAL.
+        IF ls_attr-data_type_information-predefined_type-decimals > 0.
           ls_details-fieldname = 'DECIMALS'.
-          ls_details-fieldvalue = ls_attr-data_type_information-predefined_decimals.
+          ls_details-fieldvalue = |{ ls_attr-data_type_information-predefined_type-decimals }|.
           APPEND ls_details TO ls_object_new-details.
         ENDIF.
       WHEN 'referenceToPredefinedType'.
@@ -808,11 +824,6 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
         ENDIF.
         ls_details-fieldname = 'REFTYPE'. ls_details-fieldvalue = 'P'.
         APPEND ls_details TO ls_object_new-details.
-        IF ls_attr-data_type_information-predefined_length IS NOT INITIAL.
-          ls_details-fieldname = 'LENG'.
-          ls_details-fieldvalue = ls_attr-data_type_information-predefined_length.
-          APPEND ls_details TO ls_object_new-details.
-        ENDIF.
       WHEN 'referenceDictionaryType'.
         " TATYPE + TAPR encode a dictionary-type reference (e.g. TTYP).
         ls_details-fieldname = 'TATYPE'. ls_details-fieldvalue = '1'.
@@ -834,11 +845,6 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
         ls_details-fieldname = 'REFCLSNAME'.
         ls_details-fieldvalue = ls_attr-data_type_information-type_name.
         APPEND ls_details TO ls_object_new-details.
-        IF ls_attr-data_type_information-predefined_length IS NOT INITIAL.
-          ls_details-fieldname = 'LENG'.
-          ls_details-fieldvalue = ls_attr-data_type_information-predefined_length.
-          APPEND ls_details TO ls_object_new-details.
-        ENDIF.
       WHEN OTHERS.
         ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
                                    error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'DTEL_CATEGORY_UNSUPPORTED'
@@ -942,8 +948,9 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
             output_characteristics TYPE zcl_abap_vibe_icf_types=>ty_doma_output,
             fixed_values           TYPE zcl_abap_vibe_icf_types=>tt_doma_fixed_value,
           END OF ls_attr.
-    /ui2/cl_json=>deserialize( EXPORTING json = iv_payload
-                               CHANGING data = ls_attr ).
+    /ui2/cl_json=>deserialize( EXPORTING json        = iv_payload
+                                         pretty_name = /ui2/cl_json=>pretty_mode-camel_case
+                               CHANGING  data        = ls_attr ).
     IF ls_attr-name IS INITIAL.
       ls_attr-name = iv_name.
     ENDIF.
@@ -1567,12 +1574,10 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
           <ls_dtel_payload>-data_type_information-category  = 'domain'.
           <ls_dtel_payload>-data_type_information-type_name = ls_dtel-domname.
         ELSE.
-          <ls_dtel_payload>-data_type_information-category             = 'predefinedType'.
-          <ls_dtel_payload>-data_type_information-predefined_data_type = ls_dtel-datatype.
-          <ls_dtel_payload>-data_type_information-predefined_length    = CONV string( ls_dtel-leng ).
-          IF ls_dtel-decimals IS NOT INITIAL.
-            <ls_dtel_payload>-data_type_information-predefined_decimals = ls_dtel-decimals.
-          ENDIF.
+          <ls_dtel_payload>-data_type_information-category = 'predefinedType'.
+          <ls_dtel_payload>-data_type_information-predefined_type-data_type = ls_dtel-datatype.
+          <ls_dtel_payload>-data_type_information-predefined_type-length    = ls_dtel-leng.
+          <ls_dtel_payload>-data_type_information-predefined_type-decimals  = ls_dtel-decimals.
         ENDIF.
         <ls_dtel_payload>-short_text  = ls_dtel-scrtext_s.
         <ls_dtel_payload>-medium_text = ls_dtel-scrtext_m.
