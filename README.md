@@ -116,10 +116,10 @@ For a transported install into your own package, pass `--package <pkg> --tr <req
 ### Give an AI agent the context
 
 ```bash
-abap init --agent claude    # copilot | claude | cursor | generic
+abap init --agent agents    # agents | copilot | claude | cursor | generic
 ```
 
-This copies the 6 skills and the `abap-developer` agent definition into the matching vendor directory (`.github/`, `.claude/`, `.cursor/`, `.agents/`), plus a `CLAUDE.md` or `.cursor/rules/abap.mdc` overlay where the vendor needs one. See [skills/README.md](skills/README.md) for the layout and the skill routing table.
+This copies the 6 skills and the `abap-developer` agent definition into the target directory — `.agents/` for the vendor-neutral `agents` target, or `.github/`, `.claude/`, `.cursor/` for the vendor targets — plus a `CLAUDE.md` or `.cursor/rules/abap.mdc` overlay where the vendor needs one (`generic` is the earlier name for `agents`). See [skills/README.md](skills/README.md) for the layout and the skill routing table.
 
 ---
 
@@ -164,7 +164,7 @@ No type or object subdirectories, and namespaced objects use the AFF bracket tok
 
 | Command | What it does |
 |---|---|
-| `abap init` | Bind the workspace to a profile (writes `.abap.json`), set default transport / package / source dir, inspect (`--show-config`) or clear fields, scaffold agent context (`--agent copilot / claude / cursor / generic`) |
+| `abap init` | Bind the workspace to a profile (writes `.abap.json`), set default transport / package / source dir, inspect (`--show-config`) or clear fields, scaffold agent context (`--agent agents / copilot / claude / cursor / generic`) |
 | `abap profile` | Manage global connection profiles: `list` / `show` / `add` / `set` / `test` / `delete` / `export` / `import` |
 | `abap doctor` | Diagnose environment and configuration (read-only and offline — use `abap profile test` for connectivity); `--fix` applies safe fixes |
 | `abap session` | Inspect the session cookie jar for the active profile (`session info`) |

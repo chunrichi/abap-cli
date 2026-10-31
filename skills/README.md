@@ -38,17 +38,18 @@ progressive loading 三阶段：
 ### 方式 A — `abap init --agent`（推荐）
 
 ```bash
-npx abap-cli init --agent copilot   # 或 claude / cursor / generic
+npx abap-cli init --agent agents    # 或 copilot / claude / cursor / generic
 ```
 
-把 `skills/` 与 `agents/` 拷到对应 vendor 目录（`--force` 覆盖已有文件）：
+把 `skills/` 与 `agents/` 拷到对应 target 目录（`--force` 覆盖已有文件）。`agents` 是 vendor 中立的通用目标：
 
 | target | skills 目录 | agent 目录 | 额外 |
 |---|---|---|---|
+| `agents` | `.agents/skills/` | `.agents/agents/` | — |
 | `copilot` | `.github/skills/` | `.github/agents/` | — |
 | `claude` | `.claude/skills/` | `.claude/agents/` | 根 `CLAUDE.md` |
 | `cursor` | `.cursor/skills/` | `.cursor/agents/` | `.cursor/rules/abap.mdc` |
-| `generic` | `.agents/skills/` | `.agents/agents/` | — |
+| `generic` | `.agents/skills/` | `.agents/agents/` | 同 `agents`（早期名称） |
 
 ### 方式 B — 手动拷贝
 

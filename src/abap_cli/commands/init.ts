@@ -27,7 +27,7 @@ export const SCHEMA: CommandSchema = {
     { name: '--test-connection', type: 'boolean', description: 'Probe TLS + auth and report results (implies --test-tls --test-auth).' },
     { name: '--test-tls', type: 'boolean', description: 'Probe the TLS handshake.' },
     { name: '--test-auth', type: 'boolean', description: 'Probe authentication (after TLS).' },
-    { name: '--agent', type: 'string', valuePlaceholder: '<target>', description: 'Scaffold agent context files. One of: copilot | claude | cursor | generic.', allowedValues: ['generic', 'copilot', 'claude', 'cursor'] },
+    { name: '--agent', type: 'string', valuePlaceholder: '<target>', description: 'Scaffold agent context files. One of: agents | copilot | claude | cursor | generic.', allowedValues: ['agents', 'copilot', 'claude', 'cursor', 'generic'] },
     { name: '--force', type: 'boolean', description: 'Overwrite existing files when scaffolding --agent (default: skip).' },
     { name: '--yes', type: 'boolean', description: 'Skip all prompts; fail if required input is missing.' },
     { name: '--non-interactive', type: 'boolean', description: 'Alias of --yes.' },
@@ -39,7 +39,7 @@ export const SCHEMA: CommandSchema = {
   examples: [
     { description: 'First-time bind', command: 'abap init --profile DEV --tr DEVK900001 --package Z_MY_PACKAGE --yes' },
     { description: 'Inspect current config', command: 'abap init --show-config' },
-    { description: 'Scaffold agent context', command: 'abap init --agent copilot' },
+    { description: 'Scaffold vendor-neutral agent context', command: 'abap init --agent agents' },
   ],
   errors: [
     { code: 'CONFIG_ERROR', category: 'CONFIG_ERROR', exitCode: 3 },
@@ -63,7 +63,9 @@ function initParamHelp(): string {
     '  Direct fields:    --url, --client, --username, --password, --language, --insecure, --ca',
     '                    (TTY mode only — non-interactive refuses)',
     '  Test/verify:      --test-connection, --test-tls, --test-auth',
-    '  Agent scaffold:   --agent copilot|claude|cursor|generic [--force]',
+    '  Agent scaffold:   --agent agents|generic|copilot|claude|cursor [--force]',
+    '                    (agents / generic write the neutral .agents/ tree; copilot/claude/cursor',
+    '                     add the vendor skills/agents dirs and any vendor overlay file)',
     '  Non-interactive:  --yes / --non-interactive',
     '',
     'Examples:',
@@ -84,8 +86,9 @@ function initParamHelp(): string {
     '  abap init --profile CI --yes',
     '',
     '  # Scaffold agent context (idempotent)',
-    '  abap init --agent copilot',
-    '  abap init --agent copilot --force    # overwrite existing files',
+    '  abap init --agent agents              # vendor-neutral .agents/ tree',
+    '  abap init --agent copilot             # vendor-specific tree (.github/)',
+    '  abap init --agent agents --force      # overwrite existing files',
     '',
     'Connection profiles:',
     '  --url / --username / --password are accepted only in interactive (TTY) mode.',
@@ -99,7 +102,7 @@ function initParamHelp(): string {
   ].join('\n');
 }
 
-const AGENT_VALUES: AgentTarget[] = ['generic', 'copilot', 'claude', 'cursor'];
+const AGENT_VALUES: AgentTarget[] = ['agents', 'copilot', 'claude', 'cursor', 'generic'];
 
 export function registerInitCommand(program: Command): void {
   const init = program
@@ -144,7 +147,7 @@ export function registerInitCommand(program: Command): void {
         if (!AGENT_VALUES.includes(target)) {
           printError(mode, new CliError('USAGE',
             `Unknown --agent value '${target}'. Allowed: ${AGENT_VALUES.join(', ')}`,
-            { nextSteps: ['Run `abap init --agent copilot` (or claude/cursor/generic).'], example: 'abap init --agent copilot' }));
+            { nextSteps: ['Run `abap init --agent agents` (or copilot/claude/cursor/generic).'], example: 'abap init --agent agents' }));
           return;
         }
         const result = await scaffoldAgents(target, opts.force === true);
@@ -183,7 +186,7 @@ export function registerInitCommand(program: Command): void {
         if (!process.stdin.isTTY) {
           printError(mode, new CliError('USAGE',
             'Non-interactive environment detected. Provide flags: --profile/--tr/--package (or --agent).',
-            { nextSteps: ["Run 'abap init --profile <name> --yes'.", "Or 'abap init --agent copilot'."], example: 'abap init --profile DEV --yes' }));
+            { nextSteps: ["Run 'abap init --profile <name> --yes'.", "Or 'abap init --agent agents'."], example: 'abap init --profile DEV --yes' }));
           return;
         }
         try {

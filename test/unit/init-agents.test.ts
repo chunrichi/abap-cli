@@ -4,6 +4,16 @@ import * as os from 'os';
 import * as path from 'path';
 import { scaffoldAgents } from '../../src/abap_cli/flows/setup/init-agents.js';
 
+/** Every accepted `--agent` target; `agents` and `generic` share the neutral `.agents/` tree. */
+const ALL_TARGETS = ['agents', 'generic', 'copilot', 'claude', 'cursor'] as const;
+const VENDOR_OF: Record<(typeof ALL_TARGETS)[number], string> = {
+  agents: '.agents',
+  generic: '.agents',
+  copilot: '.github',
+  claude: '.claude',
+  cursor: '.cursor',
+};
+
 /**
  * Each test gets a tmp dir we point `process.cwd()` at (init-agents uses
  * `process.cwd()` as the destination root).
@@ -28,6 +38,7 @@ describe('init --agent (scaffoldAgents)', () => {
 
   describe('path layout per vendor', () => {
     it.each([
+      ['agents', '.agents'],
       ['copilot', '.github'],
       ['claude', '.claude'],
       ['cursor', '.cursor'],
@@ -69,7 +80,7 @@ describe('init --agent (scaffoldAgents)', () => {
 
   describe('forbidden files (user requirement + repo layout)', () => {
     it('never writes AGENTS.md (user requirement)', async () => {
-      for (const target of ['generic', 'copilot', 'claude', 'cursor'] as const) {
+      for (const target of ALL_TARGETS) {
         // fresh tmp per iteration
         cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'init-agents-'));
         cwdSpy.mockReturnValue(cwd);
@@ -79,7 +90,7 @@ describe('init --agent (scaffoldAgents)', () => {
     });
 
     it('never writes copilot-instructions.md (user requirement)', async () => {
-      for (const target of ['generic', 'copilot', 'claude', 'cursor'] as const) {
+      for (const target of ALL_TARGETS) {
         cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'init-agents-'));
         cwdSpy.mockReturnValue(cwd);
         await scaffoldAgents(target, false);
@@ -89,15 +100,14 @@ describe('init --agent (scaffoldAgents)', () => {
     });
 
     it('never copies skills/README.md but keeps the template READMEs the skills link to', async () => {
-      const vendor: Record<string, string> = { generic: '.agents', copilot: '.github', claude: '.claude', cursor: '.cursor' };
-      for (const target of ['generic', 'copilot', 'claude', 'cursor'] as const) {
+      for (const target of ALL_TARGETS) {
         cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'init-agents-'));
         cwdSpy.mockReturnValue(cwd);
         const result = await scaffoldAgents(target, false);
         // Repo-internal layering doc: must not reach the user.
-        expectNoFile(path.join(cwd, vendor[target], 'skills', 'README.md'));
+        expectNoFile(path.join(cwd, VENDOR_OF[target], 'skills', 'README.md'));
         // Template docs linked from skills/abap-cli-edit/SKILL.md: must be copied.
-        expectFile(path.join(cwd, vendor[target], 'skills', 'abap-cli-edit', 'assets', 'tabl-templates', 'README.md'));
+        expectFile(path.join(cwd, VENDOR_OF[target], 'skills', 'abap-cli-edit', 'assets', 'tabl-templates', 'README.md'));
         expect(result.written.some((p) => p.endsWith('assets/tabl-templates/README.md'))).toBe(true);
       }
     });
@@ -105,7 +115,7 @@ describe('init --agent (scaffoldAgents)', () => {
     it('never pollutes the workspace root with skills/ or agents/ directories', async () => {
       // Critical: init used to dump skills/ and agents/ at the workspace root.
       // That was the user-reported bug. Now everything goes under the vendor dir.
-      for (const target of ['generic', 'copilot', 'claude', 'cursor'] as const) {
+      for (const target of ALL_TARGETS) {
         cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'init-agents-'));
         cwdSpy.mockReturnValue(cwd);
         await scaffoldAgents(target, false);
@@ -140,6 +150,7 @@ describe('init --agent (scaffoldAgents)', () => {
 
   describe('JSON output is vendor-prefixed (token-efficient)', () => {
     it.each([
+      ['agents', '.agents'],
       ['copilot', '.github'],
       ['generic', '.agents'],
     ] as const)('%s: every written/skipped path is vendor-prefixed', async (target, vendorDir) => {
@@ -168,6 +179,26 @@ describe('init --agent (scaffoldAgents)', () => {
       // .cursor/rules/abap.mdc is the overlay (already vendor-prefixed; not double-prefixed).
       expect(result.written).toContain('.cursor/rules/abap.mdc');
       expect(result.written.some((p) => p.startsWith('.cursor/.cursor/'))).toBe(false);
+    });
+  });
+
+  describe('agents target (vendor-neutral)', () => {
+    it('writes the same tree as generic (both use .agents/)', async () => {
+      const agents = await scaffoldAgents('agents', false);
+      cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'init-agents-'));
+      cwdSpy.mockReturnValue(cwd);
+      const generic = await scaffoldAgents('generic', false);
+      expect(agents).toEqual(generic);
+    });
+
+    it('does not write an AGENTS.md entry file or vendor overlays', async () => {
+      const result = await scaffoldAgents('agents', false);
+      expect(result.written.every((p) => p.startsWith('.agents/'))).toBe(true);
+      expectNoFile(path.join(cwd, 'AGENTS.md'));
+      expectNoFile(path.join(cwd, 'CLAUDE.md'));
+      expectNoFile(path.join(cwd, 'copilot-instructions.md'));
+      expectNoFile(path.join(cwd, '.github'));
+      expectNoFile(path.join(cwd, '.cursor'));
     });
   });
 

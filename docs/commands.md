@@ -78,7 +78,7 @@ abap init [options]
 | `--test-connection` | no |  |  | Probe TLS + auth and report results (implies --test-tls --test-auth). |
 | `--test-tls` | no |  |  | Probe the TLS handshake. |
 | `--test-auth` | no |  |  | Probe authentication (after TLS). |
-| `--agent` `<target>` | no |  | generic, copilot, claude, cursor | Scaffold agent context files. One of: copilot \| claude \| cursor \| generic. |
+| `--agent` `<target>` | no |  | agents, copilot, claude, cursor, generic | Scaffold agent context files. One of: agents \| copilot \| claude \| cursor \| generic. |
 | `--force` | no |  |  | Overwrite existing files when scaffolding --agent (default: skip). |
 | `--yes` | no |  |  | Skip all prompts; fail if required input is missing. |
 | `--non-interactive` | no |  |  | Alias of --yes. |
@@ -95,10 +95,10 @@ abap init [options]
   ```bash
   abap init --show-config
   ```
-- Scaffold agent context
+- Scaffold vendor-neutral agent context
 
   ```bash
-  abap init --agent copilot
+  abap init --agent agents
   ```
 
 ## `abap pull`
