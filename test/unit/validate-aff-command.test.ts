@@ -45,13 +45,45 @@ describe('validate-aff command', () => {
     expect(code).toBe(1);
   });
 
-  it('exits 1 when a TABL .json has no companion .ddic / .settings.json', async () => {
+  it('exits 1 when a TABL .json has no companion .ddic', async () => {
     const f = path.join(TMP, 'zmy.tabl.json');
     writeJson(f, {
       formatVersion: '1',
       header: { description: 'x', originalLanguage: 'EN' },
     });
     const code = await runValidateAff([f], { json: false });
+    expect(code).toBe(1);
+  });
+
+  it('TABL .settings.json missing is OK (optional), exits 0 if ddl present', async () => {
+    const f = path.join(TMP, 'zmy.tabl.json');
+    writeJson(f, {
+      formatVersion: '1',
+      header: { description: 'x', originalLanguage: 'EN' },
+    });
+    fs.writeFileSync(path.join(TMP, 'zmy.tabl.ddic'), 'define table zmy { key mandt : abap.clnt; }');
+    const code = await runValidateAff([f], { json: true });
+    expect(code).toBe(0);
+  });
+
+  it('CLAS include files are optional: main source is enough, exits 0', async () => {
+    const f = path.join(TMP, 'zmy_class.clas.json');
+    writeJson(f, {
+      formatVersion: '1',
+      header: { description: 'x', originalLanguage: 'EN' },
+    });
+    fs.writeFileSync(path.join(TMP, 'zmy_class.clas.abap'), 'CLASS zmy_class DEFINITION PUBLIC.\nENDCLASS.');
+    const code = await runValidateAff([f], { json: true });
+    expect(code).toBe(0);
+  });
+
+  it('CLAS without the main source reports the structural missing companion', async () => {
+    const f = path.join(TMP, 'zmy_class.clas.json');
+    writeJson(f, {
+      formatVersion: '1',
+      header: { description: 'x', originalLanguage: 'EN' },
+    });
+    const code = await runValidateAff([f], { json: true });
     expect(code).toBe(1);
   });
 

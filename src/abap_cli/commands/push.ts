@@ -26,6 +26,7 @@ export const SCHEMA: CommandSchema = {
   ],
   errors: [
     { code: 'PUSH_FAILED', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'READONLY_METADATA', category: 'VALIDATION_ERROR', exitCode: 7 },
     { code: 'NO_TRANSPORT', category: 'VALIDATION_ERROR', exitCode: 7 },
     { code: 'LOCK_FAILED', category: 'LOCKED', exitCode: 9 },
     { code: 'SYNTAX_ERROR', category: 'VALIDATION_ERROR', exitCode: 7 },

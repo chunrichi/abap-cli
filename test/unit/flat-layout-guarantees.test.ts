@@ -256,19 +256,22 @@ describe('TABL/STRU companion checks in a flat directory', () => {
     expect(isTablArtifactFile('zfoo.clas.json')).toBe(false);
   });
 
-  it('TABL requires .ddic + .settings.json; STRU only requires .ddic', async () => {
+  it('TABL/STRU require only the .ddic DDL; .settings.json is optional', async () => {
     fs.writeFileSync(src('zfoo.tabl.json'), '{}');
     fs.writeFileSync(src('zfoo.tabl.ddic'), 'define table zfoo { }\n');
     fs.writeFileSync(src('zfoo.tabl.settings.json'), '{}');
 
     const tablOk = await checkCompanions(src('zfoo.tabl.json'));
     expect(tablOk.missing).toEqual([]);
+    expect(tablOk.optional).toEqual([]);
     expect(tablOk.severity).toBe('ok');
 
+    // Technical settings only exist when the object carries them.
     fs.rmSync(src('zfoo.tabl.settings.json'));
     const tablMissingSettings = await checkCompanions(src('zfoo.tabl.json'));
-    expect(tablMissingSettings.missing).toEqual(['zfoo.tabl.settings.json']);
-    expect(tablMissingSettings.severity).toBe('structural');
+    expect(tablMissingSettings.missing).toEqual([]);
+    expect(tablMissingSettings.optional).toEqual(['zfoo.tabl.settings.json']);
+    expect(tablMissingSettings.severity).toBe('ok');
 
     fs.writeFileSync(src('zfoo.stru.json'), '{}');
     fs.writeFileSync(src('zfoo.stru.ddic'), 'define structure zfoo { }\n');
@@ -276,6 +279,12 @@ describe('TABL/STRU companion checks in a flat directory', () => {
     expect(struOk.missing).toEqual([]);
     expect(struOk.optional).toEqual(['zfoo.stru.settings.json']);
     expect(struOk.severity).toBe('ok');
+
+    // The DDL source is the one required companion.
+    fs.rmSync(src('zfoo.tabl.ddic'));
+    const tablMissingDdl = await checkCompanions(src('zfoo.tabl.json'));
+    expect(tablMissingDdl.missing).toEqual(['zfoo.tabl.ddic']);
+    expect(tablMissingDdl.severity).toBe('structural');
   });
 
   it('does not read companions from a same-named object of another type', async () => {
@@ -301,6 +310,7 @@ describe('CLAS include companion checks in a flat directory', () => {
 
   function writeClasParts(prefix: string) {
     fs.writeFileSync(src(`${prefix}.clas.json`), '{}');
+    fs.writeFileSync(src(`${prefix}.clas.abap`), 'CLASS ' + prefix + ' DEFINITION PUBLIC.\nENDCLASS.\n');
     for (const part of PARTS) fs.writeFileSync(src(`${prefix}.clas.${part}.abap`), '');
   }
 
@@ -317,14 +327,27 @@ describe('CLAS include companion checks in a flat directory', () => {
     expect(r.severity).toBe('ok');
   });
 
-  it('reports a single missing include as structural and ignores the TABL lookalike', async () => {
+  it('treats include files as optional, requires the main source, ignores TABL lookalikes', async () => {
     writeClasParts('zfoo');
     fs.writeFileSync(src('zfoo.tabl.implementations.abap'), 'not a class include');
-    fs.rmSync(src('zfoo.clas.implementations.abap'));
 
-    const r = await checkCompanions(src('zfoo.clas.json'));
-    expect(r.missing).toEqual(['zfoo.clas.implementations.abap']);
-    expect(r.severity).toBe('structural');
+    // A pulled class may have any subset of the optional includes.
+    fs.rmSync(src('zfoo.clas.macros.abap'));
+    fs.rmSync(src('zfoo.clas.testclasses.abap'));
+    const partial = await checkCompanions(src('zfoo.clas.json'));
+    expect(partial.missing).toEqual([]);
+    expect(partial.optional).toEqual([
+      'zfoo.clas.macros.abap',
+      'zfoo.clas.testclasses.abap',
+      'zfoo.clas.texts.en.properties',
+    ]);
+    expect(partial.severity).toBe('ok');
+
+    // Only the main source is structural.
+    fs.rmSync(src('zfoo.clas.abap'));
+    const noMain = await checkCompanions(src('zfoo.clas.json'));
+    expect(noMain.missing).toEqual(['zfoo.clas.abap']);
+    expect(noMain.severity).toBe('structural');
   });
 
   it('handles namespaced class artifacts flat', async () => {
