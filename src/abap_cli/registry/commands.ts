@@ -145,8 +145,9 @@ export const COMMAND_SPECS: LazyCommandSpec[] = [
     load: () => import('../commands/types.js').then((m) => ({ register: m.registerTypesCommand })),
   },
   {
-    // report-stuck command
+    // report-stuck writes a local report file; no SAP call.
     name: 'report-stuck',
+    scope: 'local',
     description: 'Write a stuck-operation report for offline triage',
     load: () => import('../commands/report-stuck.js').then((m) => ({ register: m.registerReportStuckCommand })),
   },
@@ -160,12 +161,14 @@ export const COMMAND_SPECS: LazyCommandSpec[] = [
     // Two-segment command name: `abap validate:aff <file-or-dir> ...`.
     // Lazy-loaded like any other command so it doesn't bloat startup.
     name: 'validate:aff',
+    scope: 'local',
     description: 'Validate JSON files against official abap-file-format (AFF) canonical schemas (Draft 2020-12)',
     load: () => import('../commands/validate-aff.js').then((m) => ({ register: m.registerValidateAffCommand })),
   },
   {
     // session reuse inspector — read-only, no SAP traffic.
     name: 'session',
+    scope: 'local',
     description: 'Inspect / manage session cookie reuse state',
     load: () => import('../commands/session.js').then((m) => ({ register: m.registerSessionCommand })),
   },

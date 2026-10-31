@@ -4,7 +4,7 @@ title: abap mime
 description: 创建、删除、上传 MIME Repository 资源（SAP SE80 MIME 存储库；走自建 ICF handler `dispatch_mime`）
 tags: [abap-cli, command, mime, mime-repository, icf, se80]
 created at: 2026-09-03 17:00:00
-changed at: 2026-10-30 01:14:53
+changed at: 2026-11-01 00:27:00
 ---
 
 # abap mime
@@ -28,7 +28,10 @@ abap mime create <path> [--package <pkg>] [--description <text>] [--tr <request>
 abap mime delete <path> [--recursive] [--tr <request>] [--dry-run] [--yes]
 abap mime push <local> --root <mime-path> [--tr <request>] [--dry-run] [--yes]
 abap mime --schema   # 参数自省，无 SAP 调用
+abap mime --help     # 唯一的 help 入口
 ```
+
+裸 `abap mime`（无子命令）是 `USAGE` 失败（exit 2）：`--json` 下 stdout 为空、stderr 单条错误信封（`error.details.help` 指向 `abap mime --help`）。子命令缺必填参数（如 `mime create` 缺 `<path>`）同样是 `USAGE`，不会把 help 拼进 stdout/stderr。
 
 ## Options
 

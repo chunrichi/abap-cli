@@ -276,13 +276,14 @@ describe('abap check modes (021: subcommands — syntax / content / atc)', () =>
     expect(res.exitCode).not.toBe(0);
   });
 
-  it('bare `abap check` (no subcommand, no target) prints subcommand help (exit 0)', async () => {
+  it('bare `abap check` (no subcommand, no target) is a USAGE failure (exit 2)', async () => {
     const program = makeProgram();
     registerCheckCommand(program);
     const res = await runCommand(program, ['check', '--json'], { cwd });
-    expect(res.exitCode).toBeUndefined();
-    expect(res.stdout).toContain('Usage:');
-    expect(res.stdout).toMatch(/syntax|content|atc/);
+    expect(res.exitCode).toBe(2);
+    expect(res.stdout).toBe('');
+    expect(res.stderr).toContain('USAGE');
+    expect(res.stderr).toContain('check syntax');
   });
 
   it('check syntax --all skips stray unparseable files (no FILE_PARSE_ERROR issue)', async () => {

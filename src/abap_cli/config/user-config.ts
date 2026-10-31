@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { CliError } from '../output/json.js';
+import { CONFIG_ERROR_REFERENCE } from './recovery.js';
 
 /**
  * Canonical user-level SystemProfile. Profiles created by older versions may
@@ -87,8 +88,10 @@ export function loadUserConfig(): UserConfig {
       file: CONFIG_PATH,
       nextSteps: [
         `Open ${CONFIG_PATH} and fix the JSON, or delete it (your system profiles will need to be re-added).`,
+        'Then re-create the profile: abap profile add <name> --url <url> --username <user>',
       ],
       example: `abap profile add <name> --url <url> --username <user> --password <pwd>`,
+      references: CONFIG_ERROR_REFERENCE,
     });
   }
   const raw = (parsed ?? {}) as { systems?: Record<string, unknown> };
@@ -105,6 +108,8 @@ function normaliseStoredProfile(name: string, raw: unknown): SystemProfile {
     throw new CliError('CONFIG_ERROR', `Profile '${name}' in ${CONFIG_PATH} is not an object.`, {
       file: CONFIG_PATH,
       nextSteps: [`Delete or re-add the profile: abap profile add ${name} --url <url> --username <user>`],
+      example: `abap profile add ${name} --url https://sap.example.com --username DEV`,
+      references: CONFIG_ERROR_REFERENCE,
     });
   }
   const r = raw as Record<string, unknown>;
@@ -114,12 +119,18 @@ function normaliseStoredProfile(name: string, raw: unknown): SystemProfile {
     throw new CliError('CONFIG_ERROR', `Profile '${name}' is missing required 'url'.`, {
       file: CONFIG_PATH,
       nextSteps: [`Re-add the profile: abap profile set ${name} --url <url>`],
+      example: `abap profile set ${name} --url https://sap.example.com`,
+      references: CONFIG_ERROR_REFERENCE,
+      details: { missing: ['url'], profile: name },
     });
   }
   if (!username) {
     throw new CliError('CONFIG_ERROR', `Profile '${name}' is missing required 'username'.`, {
       file: CONFIG_PATH,
       nextSteps: [`Re-add the profile: abap profile set ${name} --username <user>`],
+      example: `abap profile set ${name} --username DEV`,
+      references: CONFIG_ERROR_REFERENCE,
+      details: { missing: ['username'], profile: name },
     });
   }
   const unsupportedAuth = detectUnsupportedAuth(r);

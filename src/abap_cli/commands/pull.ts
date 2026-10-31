@@ -4,6 +4,7 @@ import { CliError, printError, printResult, printSchema, jsonFromCommand, type C
 import { SEARCH_RESULT_LIMIT } from '../core/limits.js';
 import { normalizeTypeInput } from '../cli/type-alias.js';
 import { baseSchema, schemaOption } from './schema-helpers.js';
+import { failMissingInvocation } from '../output/usage.js';
 
 export const SCHEMA: CommandSchema = {
   ...baseSchema('pull', 'Download ABAP objects from SAP to local files.', 'abap pull [options] [object-name]', 'sap'),
@@ -85,10 +86,15 @@ export function registerPullCommand(program: Command): void {
           printError(mode, error);
         }
       }
-      // Bare `abap pull` (no object, no --package, no --tr) prints the command help, like `abap pull --help`.
+      // Bare `abap pull` (no object, no --package, no --tr) is a USAGE failure:
+      // a missing argument must never look like success, and human help is
+      // only printed by `abap pull --help`.
       if (!objectName && !opts.package && !opts.tr) {
-        console.log(cmd.helpInformation());
-        return;
+        failMissingInvocation(
+          cmd,
+          'Missing required argument: provide an object name, --package, or --tr.',
+          'abap pull ZCL_MY_CLASS --json',
+        );
       }
       const mode = jsonFromCommand(cmd);
       try {

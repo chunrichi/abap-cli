@@ -6,6 +6,7 @@ import { getSystem, listSystemNames, type SystemProfile } from '../../config/use
 import { upsertProfileWithPems } from '../../config/profile-pems.js';
 import { assertSupportedAuth, assertValidProfile, assertValidProfileName, normalizeProfileUrl } from '../../config/validation.js';
 import { writeProjectConfig } from '../../config/project-config.js';
+import { CONFIG_ERROR_REFERENCE } from '../../config/recovery.js';
 import { CliError, printResult, type OutputMode } from '../../output/json.js';
 import { collectWarning } from '../../output/meta.js';
 import { toOutputPath } from '../../core/path-output.js';
@@ -514,7 +515,16 @@ async function useExistingSystem(
   if (!config.password) {
     throw new CliError(
       'CONFIG_ERROR',
-      `No password stored for profile '${profileName}'. Re-run with --password or update the profile: abap profile set ${profileName} --password <new>.`,
+      `No password stored for profile '${profileName}'.`,
+      {
+        nextSteps: [
+          `Store the password: abap profile set ${profileName} --password <password>`,
+          `Then re-run: abap init --profile ${profileName}`,
+        ],
+        example: `abap init --profile ${profileName} --password <password>`,
+        references: CONFIG_ERROR_REFERENCE,
+        details: { missing: ['password'], profile: profileName },
+      },
     );
   }
 

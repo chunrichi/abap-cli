@@ -4,7 +4,7 @@ title: abap session
 description: 查看 / 管理 SAP session cookie 复用状态 —— 会话 jar 路径、上次登录时间、cookie 数、CSRF 是否存在（只读，不发起 SAP 调用）
 tags: [abap-cli, command, session, cookie, csrf, reuse, keychain, sap-sessionid, logout]
 created at: 2026-09-03 00:00:00
-changed at: 2026-10-30 01:14:53
+changed at: 2026-11-01 00:27:00
 ---
 
 # abap session
@@ -15,7 +15,10 @@ changed at: 2026-10-30 01:14:53
 
 ```bash
 abap session info [--profile <name>] [--json]
+abap session --help                      # 唯一的 help 入口
 ```
+
+裸 `abap session`（无子命令）是 `USAGE` 失败（exit 2）：`--json` 下 stdout 为空、stderr 单条错误信封（`error.details.help` 指向 `abap session --help`）。本命令在命令清单中标记为 `scope: local`——不发起 SAP 调用。
 
 ## Options
 

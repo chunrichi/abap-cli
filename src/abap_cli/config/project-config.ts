@@ -6,6 +6,7 @@ import { readCa } from './ca-store.js';
 import { assertSupportedAuth } from './validation.js';
 import { CliError } from '../output/json.js';
 import { userConfigPath } from './paths.js';
+import { CONFIG_ERROR_REFERENCE, profileExample, profileRecovery } from './recovery.js';
 
 export interface SapConfig {
   url: string;
@@ -190,20 +191,37 @@ async function loadFileConfig(configPath: string | null): Promise<LoadedConfig> 
     throw new CliError(
       'CONFIG_ERROR',
       systemName
-        ? `System profile '${systemName}' not found. Run 'abap init --profile <name>' to configure it.`
-        : 'Missing "system" in .abap.json. Run \'abap init --profile <name>\' to set up.',
+        ? `System profile '${systemName}' not found.`
+        : 'Missing "system" in .abap.json.',
+      {
+        nextSteps: profileRecovery(systemName || undefined),
+        example: profileExample(systemName || undefined),
+        references: CONFIG_ERROR_REFERENCE,
+        details: systemName
+          ? { missing: ['system profile'], profile: systemName }
+          : { missing: ['system'] },
+      },
     );
   }
   assertSupportedAuth(systemName, profile);
 
   // Validate required fields
-  const missing: string[] = [];
-  if (!profile.url) missing.push('url in system profile');
-  if (!profile.username) missing.push('username in system profile');
-  if (missing.length > 0) {
+  const missingFields: string[] = [];
+  if (!profile.url) missingFields.push('url');
+  if (!profile.username) missingFields.push('username');
+  if (missingFields.length > 0) {
     throw new CliError(
       'CONFIG_ERROR',
-      `Missing required configuration: ${missing.join(', ')}. Run 'abap init --profile <name>' to set up.`,
+      `Missing required profile configuration: ${missingFields.join(', ')}.`,
+      {
+        nextSteps: [
+          `Update the profile: abap profile set ${systemName} --url <url> --username <user>`,
+          `Or re-bind the workspace: abap init --profile ${systemName}`,
+        ],
+        example: `abap profile set ${systemName} --url https://sap.example.com --username DEV`,
+        references: CONFIG_ERROR_REFERENCE,
+        details: { missing: missingFields, profile: systemName },
+      },
     );
   }
 

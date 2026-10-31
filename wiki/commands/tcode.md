@@ -4,7 +4,7 @@ title: abap tcode
 description: 只读解析事务码到其配置的 ABAP 入口程序与屏幕 — 走 ICF /tcode/<code> 端点（TSTC → TSTCT）
 tags: [abap-cli, command, tcode, tstc, icf, read-only, agent-loop]
 created at: 2026-08-19 23:00:00
-changed at: 2026-10-30 01:14:53
+changed at: 2026-11-01 00:27:00
 ---
 
 # abap tcode
@@ -22,7 +22,7 @@ abap tcode --schema [--json]
 
 ## Options
 
-- `<tcode>`（必填）: SAP 事务码，≤ 20 字符（TCODE 域为 CHAR20）。自动 trim + 大写。命名空间事务码（含 `/`，如 `/ABC/MYTCODE`）合法。不传则打印 help。
+- `<tcode>`（必填）: SAP 事务码，≤ 20 字符（TCODE 域为 CHAR20）。自动 trim + 大写。命名空间事务码（含 `/`，如 `/ABC/MYTCODE`）合法。不传 → `USAGE`（exit 2；`--json` 下 stdout 为空、stderr 单条错误信封，`error.details.help` 指向 `abap tcode --help`）。
 - `--schema`: 打印机器可读命令 schema（arguments / options / errors）为 JSON 并 exit 0，**零 SAP 调用**。
 - `--json`: 全局 flag——输出 012 统一 JSON 信封；失败时 stdout 严格为空。
 

@@ -23,6 +23,7 @@
  * adding it to the resolver below.
  */
 import { CliError } from '../output/json.js';
+import { CONFIG_ERROR_REFERENCE } from './recovery.js';
 import { createNativeBackend } from './secrets/native.js';
 import { createKeytarBackend, tryCreateKeytarBackend } from './secrets/keytar.js';
 import type { SecretsBackend, SecretKind } from './secrets-types.js';
@@ -144,7 +145,14 @@ export async function resolveBackend(): Promise<SecretsBackend> {
   }
 
   throw new CliError('CONFIG_ERROR',
-    'No keychain backend available. Install libsecret-tools (Linux) or set ABAP_CLI_KEYCHAIN_BACKEND=keytar with the keytar dependency installed.');
+    'No keychain backend available. Install libsecret-tools (Linux) or set ABAP_CLI_KEYCHAIN_BACKEND=keytar with the keytar dependency installed.', {
+      nextSteps: [
+        'Install the platform keychain helper (libsecret-tools on Linux) and retry.',
+        'Or force a backend: ABAP_CLI_KEYCHAIN_BACKEND=native (platform helper) / keytar (optional npm dependency).',
+      ],
+      example: 'abap profile set <name> --password <password>',
+      references: CONFIG_ERROR_REFERENCE,
+    });
 }
 
 /** Test-only: forget the cached backend. */

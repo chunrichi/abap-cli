@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import { printError, printResult, printSchema, jsonFromCommand, type CommandSchema } from '../output/json.js';
 import { runCheck, type CheckMode, type CheckRunOptions } from '../flows/core/check.js';
 import { baseSchema, schemaOption } from './schema-helpers.js';
+import { failMissingInvocation } from '../output/usage.js';
 
 export const SCHEMA: CommandSchema = {
   ...baseSchema('check', 'Validate ABAP source code (syntax / content / atc).', 'abap check [syntax|content|atc] [options]', 'sap'),
@@ -47,11 +48,15 @@ export function registerCheckCommand(program: Command): void {
         printSchema(SCHEMA, jsonFromCommand(cmd));
         return;
       }
-      // Bare `abap check` (no subcommand, no --files) prints subcommand help.
+      // Bare `abap check` (no subcommand, no --files) is a USAGE failure:
+      // human help is only printed by `abap check --help`.
       const hasShortcut = Array.isArray(opts.files) && opts.files.length > 0;
       if (!hasShortcut) {
-        console.log(cmd.helpInformation());
-        return;
+        failMissingInvocation(
+          cmd,
+          "Missing subcommand: use 'check syntax', 'check content', or 'check atc'.",
+          'abap check syntax src/zcl_demo.clas.abap --json',
+        );
       }
       const files = opts.files as string[];
       await execute(files, opts, 'syntax', cmd);

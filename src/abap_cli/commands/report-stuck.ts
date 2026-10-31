@@ -41,8 +41,12 @@ export function registerReportStuckCommand(program: Command): void {
       try {
         if (!opts.goal || !opts.tried || !opts.where) {
           throw new CliError('USAGE', 'report-stuck requires --goal, --tried and --where.', {
-            nextSteps: ['Provide all three: --goal <text> --tried <text> --where <cmd>'],
+            nextSteps: [
+              'Provide all three: --goal <text> --tried <text> --where <cmd>',
+              "Run 'abap report-stuck --help' for the full option list.",
+            ],
             example: 'abap report-stuck --goal "push zcl_demo" --tried "retried 3x" --where "abap push"',
+            details: { help: 'abap report-stuck --help' },
           });
         }
         const result = writeStuckReport({ goal: opts.goal, tried: opts.tried, where: opts.where });
