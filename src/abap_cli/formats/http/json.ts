@@ -103,6 +103,9 @@ export interface HttpObjectLocal {
 /** Wire payload type alias kept for the existing CLI / SICF integration layer. */
 export type HttpWirePayload = HttpServiceDefinition;
 
+/** `http-v1.json` header.description maxLength. */
+const AFF_HTTP_DESCRIPTION_MAX = 60;
+
 /**
  * AFF HTTP service artifact: file plumbing plus the local↔wire mapping.
  *
@@ -197,7 +200,13 @@ export function wireToLocal(wire: HttpWirePayload): HttpObjectLocal {
     : undefined;
 
   const header: Record<string, unknown> = {};
-  if (headerObj?.description !== undefined) header.description = headerObj.description;
+  // `ICFDOCU.ICF_DOCU` is a fixed-length CHAR field (trailing spaces) and some
+  // SICF nodes carry a description longer than the AFF `http-v1.json`
+  // maxLength of 60 (e.g. node name + GUID prefix). Both would make the local
+  // document fail its own pre-write validation, so normalise to the AFF limit.
+  if (typeof headerObj?.description === 'string') {
+    header.description = headerObj.description.trim().slice(0, AFF_HTTP_DESCRIPTION_MAX);
+  }
   if (headerObj?.originalLanguage !== undefined) header.originalLanguage = headerObj.originalLanguage;
   if (headerObj?.abapLanguageVersion !== undefined) header.abapLanguageVersion = headerObj.abapLanguageVersion;
 

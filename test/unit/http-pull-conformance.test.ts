@@ -56,6 +56,30 @@ describe('http pull AFF conformance', () => {
     expect(wire.header?.descriptionByLang).toBeUndefined();
   });
 
+  it('trims the fixed-length CHAR description reported by the ICF GET path', () => {
+    const padded = wireToLocal({
+      formatVersion: '1',
+      header: { description: 'ABAP Vibe - ICF Services'.padEnd(120, ' '), originalLanguage: 'EN' },
+      generalInformation: { handlerClass: 'ZCL_MY_HANDLER', url: '/sap/abap_cli' },
+    } as any);
+    const header = (padded as Record<string, unknown>).header as Record<string, unknown>;
+    expect(header.description).toBe('ABAP Vibe - ICF Services');
+    expect(validateHttpService(padded)).toEqual([]);
+  });
+
+  it('truncates descriptions longer than the AFF maxLength (60) so pull stays writable', () => {
+    const longDescription = `${'abap_cli       DFFAEATGKMFLCDXQ04F0J7FXK1'}ABAP Vibe - ICF Services`;
+    expect(longDescription.length).toBeGreaterThan(60);
+    const local = wireToLocal({
+      formatVersion: '1',
+      header: { description: longDescription, originalLanguage: 'EN' },
+      generalInformation: { handlerClass: 'ZCL_MY_HANDLER', url: '/sap/abap_cli' },
+    } as any);
+    const header = (local as Record<string, unknown>).header as Record<string, unknown>;
+    expect((header.description as string).length).toBe(60);
+    expect(validateHttpService(local)).toEqual([]);
+  });
+
   it('still rejects documents that carry non-AFF SICF members', () => {
     const withExtensions = {
       formatVersion: '1',
