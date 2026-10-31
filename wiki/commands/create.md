@@ -4,7 +4,7 @@ title: abap create
 description: 在 SAP 创建新对象并激活 — 源对象（CLAS/INTF/PROG/FUGR，ADT REST）、DDIC（DOMA/DTEL/TABL/STRU/ENQU/NROB，--file 走 ICF）、HTTP/SICF 节点、事务码、TTYP/MSAG/DDLS 及 CDS/RAP 配套对象；FUGR 配 --func 可在既有函数组内新建函数模块（FUGR/FF）；--no-activate / --template / --no-pull / --check-only / --audit；--schema 提供 agent 参数自省；create local 为离线草稿（仅 4 类源对象）
 tags: [abap-cli, command, create, clas, intf, prog, fugr, fugr-ff, doma, dtel, tabl, stru, ddic, icf, template, schema]
 created at: 2026-08-07 00:00:00
-changed at: 2026-09-02 00:00:00
+changed at: 2026-10-31 16:20:00
 ---
 
 # abap create
@@ -24,7 +24,7 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 
 ## Options
 
-- `<type>`: 支持 21 个类型码（完整矩阵见 [object-types](../object-types.md)）：4 个源对象 `CLAS` / `INTF` / `PROG` / `FUGR` 走 ADT 骨架；`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `NROB` / `HTTP` / `TRAN` / `TTYP` / `MSAG` / `DDLS` / `SRVD` / `DCLS` / `DDLX` / `DDLA` 必须配 `--file`（AFF JSON）；`BDEF` 是 pull-only、`SRVB` 仅 pull。未知类型 → `TYPE_NOT_SUPPORTED`（exit 7）。
+- `<type>`: 支持 22 个类型码（完整矩阵见 [object-types](../object-types.md)）：4 个源对象 `CLAS` / `INTF` / `PROG` / `FUGR` 走 ADT 骨架；`DEVC` 走独立 ADT handler（`--package` 是**父包**，无需 `--file`，见 [DEVC（Package）](#devcpackage)）；`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `NROB` / `HTTP` / `TRAN` / `TTYP` / `MSAG` / `DDLS` / `SRVD` / `DCLS` / `DDLX` / `DDLA` 必须配 `--file`（AFF JSON）；`BDEF` 是 pull-only、`SRVB` 仅 pull。未知类型 → `TYPE_NOT_SUPPORTED`（exit 7）。
 - `<name>`: 对象名（自动转大写；命名空间名如 `/UI2/CL_JSON` 在磁盘上用 AFF 括号 token `(ui2)cl_json`）。本地预校验：≤30 字符、仅 `A-Z 0-9 _`、命名空间形如 `/NS/NAME`（NS ≤10，总长 ≤30），违规 → `VALIDATION_ERROR`（exit 7）
 - `--package <package>`: 目标 SAP 包（必填）
 - `--description <desc>`: 对象描述（必填；有 `--file` 时可选，由 JSON 提供）
@@ -36,6 +36,9 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 - `--audit`: 额外一次 SAP 往返记录 before-checksum（默认关）
 - `--file <path>`: abap-file-format JSON 输入（`types/registry.ts` 的 `requiresFile` 类型必填：TABL/STRU/DOMA/DTEL/ENQU/NROB/HTTP/TRAN/TTYP/MSAG/DDLS/SRVD/DCLS/DDLX/DDLA）。TABL/STRU 是三件套：`--file` 指向 main `.tabl.json`，CLI 自动读同目录 `.tabl.ddic`（DDL 源）与 `.tabl.settings.json`；只有 main JSON 时回落 legacy wire-flat 单文件（顶层 `name` / `fields[]`）。DDL 解析失败 → `TABL_DDL_INVALID`（exit 7）
 - `--func <module>`: 仅 `FUGR` 类型可用 — 在**既有函数组 `<name>`** 内新建函数模块（`FUGR/FF` 子对象）。组不存在 → `OBJECT_NOT_FOUND`（exit 8，附建组指引）；组内同名模块已存在 → `OBJECT_EXISTS`（exit 2）；模块名同样过本地预校验（≤30、`A-Z 0-9 _`）。`--check-only` 不支持该形态
+- `--software-component <swcomp>`: 仅 `DEVC` — 新包的软件组件；缺省从父包继承（`$TMP` → `LOCAL`）。LOCAL 包名必须 `$`/`TEST` 开头
+- `--transport-layer <layer>`: 仅 `DEVC` — 新包的传输层；缺省从父包继承（`$TMP` → 空）
+- `--package-type <type>`: 仅 `DEVC` — `development`（默认）/ `main` / `structure`；非法值 → `INVALID_ARGUMENT`
 - `--schema`: 打印参数 schema 为 JSON 并退出（无 SAP 调用；`<type>`/`<name>` 可不传）
 - `--yes`: 非交互确认写操作；非 TTY 且无 `--yes` → `VALIDATION_ERROR`（exit 7）。`create` 本身暂无 `--dry-run` flag（014 走的是 `--check-only`），但 `requireWriteConfirmation` 仍识别 `dryRun` 字段作为 future flag 占位
 
@@ -54,6 +57,7 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 - **FUGR 与源对象的差异**：新 FUGR 用 `objectStructure` 取 parts（立即可读）；CLAS/INTF/PROG 对新建对象 objectStructure 有就绪延迟（真机 "wrong input data"），回退到稳定 `<objectUrl>/source/main`
 - **FUGR/FF（组内建函数模块）**：`--func` 形态不改组、只建模块。组须先存在（`resolveObject` 校验）；模块经 `createObject({objtype:'FUGR/FF', parentName:<group>, parentPath:<group URL>})` 打到 `/sap/bc/adt/functions/groups/<group>/fmodules`（abap-adt-api objectcreator 内建类型，真机 $TMP 下直接产出激活态模块）；随后按 `--no-activate` 决定是否显式 activate。create-then-pull 只补写 `src/<group>.fugr.<fm>.func.{abap,json}`（`skipExisting`，绝不覆盖用户已编辑的组文件）；`includeNumber`（UXX 编号）由 SAP 创建时自动分配、pull 时从 UXX include 读取（如 FF01→01、FF02→02）
 - **DDIC 客户端校验**（快失败，零 SAP 往返）：命名空间（Z/Y/slash）与必需字段 → `VALIDATION_ERROR`；非 `$TMP` 包必须 `--tr`
+- **DEVC 的差异**：包没有源码 / 激活步骤。名字走包规则（可带前导 `$`、命名空间 `/NS/NAME`，≤30），软件组件 LOCAL 时包名必须 `$`/`TEST` 开头；`--check-only` 调 SAP 的 `POST /sap/bc/adt/packages/validation` 并把名字/组件类错误的 SAP 原文回显（`valid:false` 仍是 success envelope）；create-then-pull 写 `src/<name>.devc.json`。`--file` / `--template` / `--func` 对 DEVC 无效（显式拒绝）
 - **DDIC TABL/STRU 三件套解析**：`readDdicObjectForCreate(filePath, type)` 探测同目录 `.tabl.ddic`（或 `.stru.ddic`）与 `.tabl.settings.json`；三件齐全走 `readTablArtifact`，否则回落 `readDdicJson`（legacy wire-flat）。DDL 解析失败 → `TABL_DDL_INVALID`（exit 7）；main JSON 缺 `header.description` 等必填 → `VALIDATION_ERROR`，`error.example` 字段附 wire-flat 最小模板
 - **CLI flag 覆盖文件值**：`--description` / `--package` / `--tr` 优先于 `--file` JSON 内字段；`--description` 覆盖 `header.description`
 - **`--check-only` 仅源对象**：DDIC 路由不接受（走 `--file` 校验）
@@ -81,6 +85,29 @@ envelope 附加 `data.channel`（`"adt"` / `"icf"`）。
 | `CHANNEL_DETECTION_FAILED` | 65 | system profile 缺 `kernelRelease` 且缺 `ddlsSupported` |
 | `VALIDATION_ERROR` | 7 | AFF schema 不合规，或 DDLS 缺 `.ddls.acds` 侧车 |
 | `FILE_PARSE_ERROR` | 2 | `--file` 指向的文件读不出 / 不是合法 JSON |
+
+### DEVC（Package）
+
+包是 ADT 单资源（`DEVC/K`），create 的 body 是 `pak:package` XML：
+
+| 操作 | 端点 |
+|---|---|
+| create | `POST /sap/bc/adt/packages` |
+| preflight（`--check-only`） | `POST /sap/bc/adt/packages/validation` |
+| 父包读取（软件组件 / 传输层缺省值 + 存在性预检） | `GET /sap/bc/adt/packages/<parent>` |
+
+```bash
+# $TMP 下的本地子包（LOCAL 软件组件 → 名字必须以 $ 或 TEST 开头）
+abap create DEVC '$MY_PACKAGE' --package '$TMP' --description "Scratch package" --yes --json
+
+# 非 LOCAL 的可传输包（显式软件组件 + 传输层 + transport）
+abap create DEVC ZPKG_SUB --package ZPKG_MAIN --description "Sub package" \
+  --software-component HOME --transport-layer SAP --package-type main --tr NDK900123 --yes --json
+```
+
+`--check-only` 是零副作用预检（SAP 返回 `SEVERITY=OK/ERROR`）；`--package` 是父包，`--tr` 只对
+transportable 包有意义（`$TMP` 下忽略）。包创建后没有 push 通道（ADT 不支持更新包），详见
+[devc.md](../objects/devc.md)。
 
 ## Examples
 

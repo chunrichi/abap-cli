@@ -52,6 +52,9 @@ const remoteSourceStore = new Map();
 // 016: read-only table data store — key = <TABLE>, value = { tabclass, fields, rows }.
 // Seeded below with ZTAB_FIXTURE (150 rows, clientDependent, mixed types).
 const tableStore = new Map();
+// DEVC: package store — key = package name (upper), value = package metadata.
+// Served by GET/POST/DELETE /sap/bc/adt/packages and the search endpoint.
+const packages = new Map();
 // Tracks whether the DDIC POST handler saw a pre-existing entry (used to derive
 // data.action = 'updated' vs 'created'). Local to the request handler.
 let ddicStore_existed_before = false;
@@ -861,6 +864,144 @@ function validateXml(severity, shortText, checkResult) {
   );
 }
 
+// ---------- DEVC (package) fixtures ----------
+
+/**
+ * Seed the fixture package tree. Mirrors the real S/4HANA shapes captured from
+ * `/sap/bc/adt/packages/<name>`:
+ *   $TMP   → LOCAL software component, development, no super package
+ *   ZLOCAL → ZLOCAL software component, cloud ABAP language version (5)
+ *   ZDEV   → sub package of ZLOCAL (superPackage + inherited software component)
+ *   /MOCK/SWITCHED → namespaced, switch assignment, application component and
+ *                    two use accesses
+ */
+function addPackage(pkg) {
+  const name = pkg.name.toUpperCase();
+  packages.set(name, {
+    name,
+    description: pkg.description,
+    packageType: pkg.packageType ?? 'development',
+    superPackage: pkg.superPackage ?? '',
+    switchName: pkg.switchName ?? '',
+    applicationComponent: pkg.applicationComponent ?? '',
+    softwareComponent: pkg.softwareComponent ?? 'LOCAL',
+    transportLayer: pkg.transportLayer ?? '',
+    languageVersion: pkg.languageVersion ?? '',
+    recordChanges: pkg.recordChanges ?? true,
+    addingObjectsAllowed: pkg.addingObjectsAllowed ?? true,
+    encapsulated: pkg.encapsulated ?? false,
+    masterLanguage: pkg.masterLanguage ?? 'EN',
+    useAccesses: pkg.useAccesses ?? [],
+  });
+  return packages.get(name);
+}
+
+addPackage({
+  name: '$TMP',
+  description: 'Temporary Objects (never transported!)',
+  packageType: 'development',
+  softwareComponent: 'LOCAL',
+  recordChanges: false,
+  addingObjectsAllowed: false,
+  masterLanguage: 'ZH',
+});
+addPackage({
+  name: 'ZLOCAL',
+  description: 'local mock package',
+  packageType: 'development',
+  softwareComponent: 'ZLOCAL',
+  languageVersion: '5',
+  encapsulated: true,
+});
+addPackage({
+  name: 'ZDEV',
+  description: 'mock dev package',
+  packageType: 'development',
+  superPackage: 'ZLOCAL',
+  softwareComponent: 'ZLOCAL',
+  languageVersion: '5',
+  encapsulated: true,
+});
+addPackage({
+  name: '/MOCK/SWITCHED',
+  description: 'mock switched package',
+  packageType: 'main',
+  superPackage: '/MOCK/MAIN',
+  switchName: '/MOCK/SWITCH_ECC',
+  applicationComponent: 'BC-SRV',
+  softwareComponent: 'HOME',
+  transportLayer: 'SAP',
+  useAccesses: [
+    { packageInterface: 'SABP_MAIN_PUBLIC', severity: 'none' },
+    { packageInterface: 'SABP_UNIT_PUBLIC', severity: 'warning' },
+  ],
+});
+addPackage({
+  name: '/MOCK/MAIN',
+  description: 'mock main package',
+  packageType: 'main',
+  softwareComponent: 'HOME',
+  transportLayer: 'SAP',
+});
+
+/** Render the `pak:package` wire XML for one fixture package. */
+function packageXml(pkg) {
+  const useAccesses = pkg.useAccesses.length
+    ? `<pak:useAccesses pak:isVisible="true">` +
+      pkg.useAccesses
+        .map(
+          (u) =>
+            `<pak:useAccess pak:severity="${esc(u.severity)}">` +
+            `<pak:packageInterfaceRef adtcore:type="PINF/KI" adtcore:name="${esc(u.packageInterface)}"/>` +
+            `</pak:useAccess>`,
+        )
+        .join('') +
+      '</pak:useAccesses>'
+    : '<pak:useAccesses pak:isVisible="false"/>';
+  return (
+    '<?xml version="1.0" encoding="utf-8"?>' +
+    `<pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" ` +
+    `adtcore:responsible="${CURRENT_USER}" adtcore:masterLanguage="${pkg.masterLanguage}" ` +
+    `adtcore:name="${esc(pkg.name)}" adtcore:type="DEVC/K" adtcore:version="active" ` +
+    `adtcore:description="${esc(pkg.description)}" adtcore:descriptionTextLimit="60" adtcore:language="${pkg.masterLanguage}" ` +
+    `adtcore:createdAt="${NOW}" adtcore:changedAt="${NOW}" adtcore:createdBy="${CURRENT_USER}" adtcore:changedBy="${CURRENT_USER}">` +
+    `<adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/${encodeURIComponent(pkg.name.toLowerCase())}" adtcore:type="DEVC/K" adtcore:name="${esc(pkg.name)}" adtcore:description="${esc(pkg.description)}"/>` +
+    `<pak:attributes pak:packageType="${pkg.packageType}" pak:isAddingObjectsAllowed="${pkg.addingObjectsAllowed ? 'true' : 'false'}" ` +
+    `pak:isEncapsulated="${pkg.encapsulated ? 'true' : 'false'}" pak:recordChanges="${pkg.recordChanges ? 'true' : 'false'}" ` +
+    `pak:isSwitchVisible="${pkg.switchName ? 'true' : 'false'}" pak:languageVersion="${pkg.languageVersion}"/>` +
+    (pkg.superPackage
+      ? `<pak:superPackage adtcore:type="DEVC/K" adtcore:name="${esc(pkg.superPackage)}"/>`
+      : '<pak:superPackage/>') +
+    (pkg.switchName
+      ? `<pak:switch adtcore:type="SFSW/6S" adtcore:name="${esc(pkg.switchName)}" adtcore:description="mock switch"/>`
+      : '') +
+    (pkg.applicationComponent
+      ? `<pak:applicationComponent pak:name="${esc(pkg.applicationComponent)}" pak:description="Mock component"/>`
+      : '<pak:applicationComponent pak:name=""/>') +
+    `<pak:transport>` +
+    `<pak:softwareComponent pak:name="${esc(pkg.softwareComponent)}"/>` +
+    `<pak:transportLayer pak:name="${esc(pkg.transportLayer)}"/>` +
+    `</pak:transport>` +
+    '<pak:translation/>' +
+    useAccesses +
+    '<pak:packageInterfaces pak:isVisible="false"/>' +
+    '<pak:subPackages/>' +
+    '</pak:package>'
+  );
+}
+
+/** Real-SAP package validation rules (verified against S/4HANA). */
+function packageValidationError(name, softwareComponent) {
+  if (!name) return 'No package name specified';
+  if (!softwareComponent) return 'No software component specified';
+  if (softwareComponent.toUpperCase() === 'LOCAL' && !/^(\$|TEST)/.test(name.toUpperCase())) {
+    return "Names of LOCAL packages must start with '$' or 'TEST'";
+  }
+  if (packages.has(name.toUpperCase())) return `Package ${name.toUpperCase()} already exists`;
+  return undefined;
+}
+
+
 // ---------- server ----------
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
@@ -898,6 +1039,67 @@ const server = http.createServer(async (req, res) => {
         '  </app:workspace>\n' +
         '</app:service>';
       return ok(res, xml, 'application/atomsvc+xml');
+    }
+
+    // ---------- DEVC (package) endpoints ----------
+    // Shapes mirror the real S/4HANA package resource: GET returns
+    // `pak:package`, create is POST /sap/bc/adt/packages, the name preflight is
+    // POST /sap/bc/adt/packages/validation, delete is a bare DELETE (no lock),
+    // and PUT is rejected by the resource controller.
+    if (path === '/sap/bc/adt/packages/validation' && req.method === 'POST') {
+      const name = (q.get('objname') || '').toUpperCase();
+      const softwareComponent = q.get('swcomp') || '';
+      const error = packageValidationError(name, softwareComponent);
+      return ok(res, validateXml(error ? 'ERROR' : 'OK', error ?? '', ''), 'application/xml');
+    }
+
+    if (path === '/sap/bc/adt/packages' && req.method === 'POST') {
+      const body = await readBody(req);
+      const attrOf = (tag, attribute) => {
+        const tagMatch = new RegExp(`<(?:pak|adtcore):${tag}\\b([^>]*)`).exec(body);
+        const value = tagMatch ? new RegExp(`${attribute}="([^"]*)"`).exec(tagMatch[1]) : null;
+        return value ? value[1] : '';
+      };
+      const name = attrOf('package', 'adtcore:name').toUpperCase();
+      const description = attrOf('package', 'adtcore:description');
+      const superPackage = (attrOf('packageRef', 'adtcore:name') || '').toUpperCase();
+      const softwareComponent = attrOf('softwareComponent', 'pak:name').toUpperCase();
+      const transportLayer = attrOf('transportLayer', 'pak:name').toUpperCase();
+      const packageType = (attrOf('attributes', 'pak:packageType') || 'development').toLowerCase();
+      const error = packageValidationError(name, softwareComponent);
+      if (error) return adtError(res, 400, error);
+      const created = addPackage({
+        name,
+        description,
+        packageType,
+        superPackage,
+        softwareComponent,
+        transportLayer,
+        masterLanguage: 'EN',
+        addingObjectsAllowed: false,
+      });
+      res.writeHead(201, { 'Content-Type': 'application/vnd.sap.adt.packages.v2+xml; charset=utf-8' });
+      return res.end(packageXml(created));
+    }
+
+    if (path.startsWith('/sap/bc/adt/packages/') && req.method !== 'POST') {
+      const rawName = decodeURIComponent(path.slice('/sap/bc/adt/packages/'.length));
+      const pkg = packages.get(rawName.toUpperCase());
+      if (req.method === 'GET') {
+        if (!pkg) return adtError(res, 404, `从数据库导入对象 ${rawName} 时出错`);
+        return ok(res, packageXml(pkg), 'application/vnd.sap.adt.packages.v2+xml');
+      }
+      if (req.method === 'PUT') {
+        // Real SAP: resource controller rejects PUT for packages outright.
+        return adtError(res, 405, 'Resource controller does not support method PUT');
+      }
+      if (req.method === 'DELETE') {
+        if (!pkg) return adtError(res, 404, `包 ${rawName} 不存在`);
+        const hasChildren = [...packages.values()].some((p) => p.superPackage === pkg.name);
+        if (hasChildren) return adtError(res, 400, `包 ${pkg.name} 含有子包，无法删除`);
+        packages.delete(pkg.name);
+        return ok(res, '', 'application/xml');
+      }
     }
 
     // self-built ICF service root (probeIcf target for `profile test` / `doctor`)
@@ -1429,13 +1631,29 @@ const server = http.createServer(async (req, res) => {
       const query = (q.get('query') || '').toUpperCase();
       const type = (q.get('objectType') || '').toUpperCase();
       const max = Math.max(1, Number(q.get('maxResults')) || 100);
-      const matches = [...objects.values()]
-        .filter((o) => {
+      const packageHit = !type || type === 'DEVC' || 'DEVC/K'.startsWith(type);
+      const packageMatches = packageHit
+        ? [...packages.values()]
+            .filter((p) => {
+              const name = p.name.toUpperCase();
+              return !query || name.includes(query) || query.includes(name);
+            })
+            .map((p) => ({
+              name: p.name,
+              type: 'DEVC/K',
+              objectUrl: `/sap/bc/adt/packages/${encodeURIComponent(p.name.toLowerCase())}`,
+              description: p.description,
+              packageName: p.name,
+            }))
+        : [];
+      const matches = [
+        ...packageMatches,
+        ...[...objects.values()].filter((o) => {
           const nameOk = !query || o.name.includes(query) || query.includes(o.name);
           const typeOk = !type || o.type === type || o.type.startsWith(type);
           return nameOk && typeOk;
-        })
-        .slice(0, max);
+        }),
+      ].slice(0, max);
       const refs = matches
         .map(
           (o) =>

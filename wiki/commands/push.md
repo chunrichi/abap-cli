@@ -4,7 +4,7 @@ title: abap push
 description: 推送本地 ABAP 文件到 SAP — lock → set source → syntax check → activate → unlock，支持源码对象、FUGR、textpool 与 DDIC JSON，按对象解析 transport（textpool 写受系统限制）
 tags: [abap-cli, command, push, upload, abap-file-format, ddic, textpool, transport]
 created at: 2026-08-07 00:11:03
-changed at: 2026-09-18 22:05:00
+changed at: 2026-10-31 16:20:00
 ---
 
 # abap push
@@ -142,6 +142,7 @@ DDIC 的存在性探测（`GET /ddic/<type>/<name>`）与 TRAN 的探测（`GET 
 | `zmy_tran.tran.json` | icf | 事务码（SE93），POST `/tran/<code>`；push 前 GET 探测存在性。**SAP 侧写端点当前返回 501（`TRAN_WRITE_NOT_IMPLEMENTED`），写路径端到端不可用** |
 | `zmy_ttyp.ttyp.json` / `zmy_msag.msag.json` / `zmy_view.ddls.json` / `zmy_nrob.nrob.json` | 通道路由（adt 或 icf 分支） | 双通道类型，`channel-detect` 决定 ADT / ICF；NROB 固定走 ICF |
 | `zprog.prog.texts.en.properties`（`texts`/`selections`/`headings`） | textpool | 文本元素，混合模式路由；写仅在 ADT text-elements 写端点可用时成功 |
+| `zmy_pkg.devc.json` | — | **被拒绝**：DEVC 是只读类型（ADT 资源控制器拒绝 `PUT /sap/bc/adt/packages/<name>`），`TYPE_NOT_SUPPORTED`（exit 7）。改包用 SAP GUI，或 `delete` 后重建 |
 
 **不支持的**：`.clas.json` 等源码对象的元数据 JSON — 被解析为 route `icf` 但对象类型既不在 `icf-json` 路由的五种 DDIC/HTTP/TRAN 之内、也不是 `aff-json` 路由的四类（TTYP/MSAG/DDLS/NROB），`validateLocalFile` 抛 `DDIC_NOT_SUPPORTED`（exit 7）。源码对象的创建/更新走 `abap create`，不是 push。
 
@@ -157,6 +158,7 @@ DDIC 的存在性探测（`GET /ddic/<type>/<name>`）与 TRAN 的探测（`GET 
 |------|--------|-------------|----------|
 | 对象被他人锁定 | `LOCK_FAILED` | LOCKED / 9 | `nextSteps`：`abap inspect <obj> --locks` 查锁 + SE03 手动释放；FUGR 额外带 `subtype` |
 | 对象不存在（ADT 源对象 / DDIC / TRAN） | `OBJECT_NOT_FOUND` | NOT_FOUND / 8 | `nextSteps`：`abap search <name>` 验证；**引导 `abap create <TYPE> <name> --file <path> --package ... --tr ...`**。push 不自动创建（创建走 `abap create`；HTTP 例外——push 会创建 SICF 节点） |
+| push DEVC（`.devc.json`） | `TYPE_NOT_SUPPORTED` | VALIDATION_ERROR / 7 | `details.results[].code` 同为 `TYPE_NOT_SUPPORTED`；`nextSteps` 建议 `delete` 后重建或改用 SAP GUI |
 | 命名的 include part 不存在（如 `.macros.abap` 而对象无 macros） | `SAP_ERROR` | SAP_ERROR / 6 | `subtype` + `nextSteps`：`abap inspect <obj> --includes` 列出可用 include |
 | 激活失败 | `ACTIVATION_FAILED` | VALIDATION_ERROR / 7 | `stage: 'activate'` + 原始 `detail` |
 | 写源码失败 | `SAP_ERROR` | SAP_ERROR / 6 | `stage: 'write'` + `subtype` |

@@ -15,6 +15,12 @@ export const OBJECT_NAME_MAX_LENGTH = 30;
 export const OBJECT_NAME_SEGMENT = /^[A-Z0-9_]+$/;
 /** Namespaced object names: /<NS up to 10>/<name>; total length ≤ 30 (incl. slashes). */
 export const NAMESPACED_OBJECT_NAME = /^\/[A-Z0-9_]{1,10}\/[A-Z0-9_]+$/;
+/**
+ * Package (DEVC) name segment. Packages may start with `$` (local packages)
+ * and otherwise use the ABAP name character set. Namespaces are handled by
+ * {@link NAMESPACED_OBJECT_NAME}.
+ */
+export const PACKAGE_NAME_SEGMENT = /^\$?[A-Z][A-Z0-9_]*$/;
 
 /** Uppercase + trim an object name (SAP names are case-insensitive). */
 export function normalizeName(name: string): string {
@@ -49,6 +55,35 @@ export function validateObjectName(objectName: string, example = 'ZCL_MY_CLASS')
     details: [reason],
     nextSteps: [
       `Use at most ${OBJECT_NAME_MAX_LENGTH} characters from A-Z 0-9 _ (namespaced: /<NS>/<NAME>), e.g. ${example}.`,
+    ],
+  });
+}
+
+/**
+ * Validate a package (DEVC) name: at most 30 characters, `$`-prefixed local
+ * names or /<NS>/<NAME> namespaces. The software-component rule (LOCAL names
+ * must start with `$` or `TEST`) is enforced separately by the create flow
+ * because it depends on the resolved software component.
+ */
+export function validatePackageName(packageName: string): void {
+  const namespaced = packageName.startsWith('/');
+  let reason: string;
+  if (!packageName) {
+    reason = 'name is empty';
+  } else if (packageName.length > OBJECT_NAME_MAX_LENGTH) {
+    reason = `name is ${packageName.length} characters; SAP object names are at most ${OBJECT_NAME_MAX_LENGTH}`;
+  } else if (namespaced ? !NAMESPACED_OBJECT_NAME.test(packageName) : !PACKAGE_NAME_SEGMENT.test(packageName)) {
+    reason = namespaced
+      ? 'namespaced names must look like /<NS>/<NAME> with a namespace of up to 10 characters and only A-Z 0-9 _'
+      : 'name must start with a letter or $ and contain only A-Z, 0-9 and _';
+  } else {
+    return;
+  }
+  throw new CliError('VALIDATION_ERROR', `Invalid package name '${packageName}': ${reason}`, {
+    object: packageName,
+    details: [reason],
+    nextSteps: [
+      `Use at most ${OBJECT_NAME_MAX_LENGTH} characters, e.g. ZPKG_MY_PACKAGE (local: $MY_PACKAGE or TEST_MY_PACKAGE).`,
     ],
   });
 }

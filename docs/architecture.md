@@ -32,7 +32,8 @@ src/abap_cli/
 │   ├── search/ data/ mime/   # search, SE16N-style data, MIME repository
 │   └── core/             # cross-flow helpers: ATC, check, transport ops, stuck reports
 ├── formats/              # abap-file-format: file resolver + pull strategies + shared AFF artifact contract
-│   └── ddic/             # DDIC wire / io / validate / examples (split from the former 880-line json.ts)
+│   ├── ddic/             # DDIC wire / io / validate / examples (split from the former 880-line json.ts)
+│   └── devc/             # DEVC (package) wire → AFF devc-v1.json mapping + create request body
 ├── types/                # TYPE_REGISTRY — object-type metadata single source of truth
 ├── clients/              # AdtClientWrapper (abap-adt-api), ICF client + version check, connection probe, basic auth
 ├── config/               # .abap.json + user system profiles, keychain (secrets.ts), CA, profile export/import
@@ -53,9 +54,11 @@ src/abap_cli/
 - **AFF JSON artifacts share one contract** — `formats/artifact.ts` defines `JsonArtifact<TLocal>` (read / write / validate / load) and `WireArtifact<TLocal, TWire>` (+ `toWire` / `fromWire`), with optional `beforeWrite` (pre-write schema gate) and `validate` overrides.
   The seven AFF JSON format modules (TTYP / MSAG / DDLS / ENQU / NROB / HTTP / TRAN) declare their artifact with `defineJsonArtifact` / `defineWireArtifact` instead of repeating the same file+schema plumbing; HTTP/TRAN use `beforeWrite` to keep their validate-before-write contract (CLI envelope stripped first).
   DDLS keeps a bespoke asymmetric wire mapping (the source lives in the sibling `.acds`); DDIC is the remaining format module with custom sidecar I/O. The routing table's `aff-json` validator consumes the same artifacts.
+- **DEVC (package) is one ADT resource, not an AFF artifact** — `formats/devc/json.ts#wireToLocal` maps the `pak:package` XML (`GET /sap/bc/adt/packages/<name>`) onto `devc-v1.json`; `buildCreateWire` assembles the `POST /sap/bc/adt/packages` body. The package has no include / source / activation, so create and pull are dedicated handlers (`flows/edit/{create,pull}-devc.ts`) instead of the generic ADT source path, and delete is a lock-free `DELETE` with a one-shot fresh-session retry when a stale ADT session holds the enqueue lock (`delete-devc.ts`). ADT exposes no package update endpoint, so push is rejected via the registry's `pushUnsupportedReason` (`TYPE_NOT_SUPPORTED`).
 - **Type routing is one explicit table** — `flows/edit/routing.ts` holds `TYPE_ROUTES`, one row per supported type, with the create / pull / push route and the channel each operation uses (`adt`, `icf`, or `auto` = channel detection picks ADT vs ICF per SAP release). `kind: 'source'` means the coordinator's generic ABAP-source path handles the operation; `kind: 'handler'` carries the per-type flow function. `types/registry.ts` stays the single source for object-type capability metadata (`createObjtype` / AFF schema / `requiresFile`); local file paths are not registered there — AFF artifacts are written flat as `<rootDir>/<name>.<type>.<ext>`. A consistency test (`test/unit/routing.test.ts`) fails when the two tables drift.
   - `create` / `pull` / `push` dispatchers do exactly one table lookup instead of if-chains. Artifact pushes are split by file kind: `icf-json` routes post through the ICF service (`push-icf.ts`, DDIC / HTTP / TRAN), `aff-json` routes are AFF documents whose flow runs channel detection (TTYP / MSAG / DDLS / NROB), `source` routes use the generic ADT source push.
   - `create` fail-fast for `--file`-only types and the `create --schema` contract both read `ObjectTypeEntry.requiresFile` (`requiresFileFor` / `typesRequiringFile`).
+  - `DEVC` is a handler route on ADT for create / pull; it intentionally has no push row, and `ObjectTypeEntry.pushUnsupportedReason` supplies the rejection text the push flow emits.
 
 ## SAP Layer (`abap/`)
 
@@ -91,6 +94,8 @@ Endpoints exposed under `/sap/abap_cli/` (current service version `1.0.0`, see `
 | `/mime/folder` (POST/PUT), `/mime/resources` (POST) | `abap mime create` / `delete` / `push` |
 | `/version-source` (GET) | `abap pull --remote <system>` (TMS RFC destination) |
 | `/_class-check` (GET) | diagnostic / activation probe (no CLI caller in this repo) |
+
+DEVC does not use the ICF service: packages are created / read / deleted through the standard ADT package resource (`POST /sap/bc/adt/packages`, `GET`/`DELETE /sap/bc/adt/packages/<name>`, preflight `POST /sap/bc/adt/packages/validation`), so `abap create/pull/delete DEVC` works without `abap deploy`.
 
 `abap deploy` pushes the release form then triggers the setup class; `abap deploy --dev` pushes the development form and skips the merge; `abap deploy --diff` reports whether the installed form already matches (idempotency check). `abap deploy status` / `abap init` check deployment state/version. JSON generation on the SAP side is unified on `/ui2/cl_json=>serialize` — about 74 handcrafted JSON concatenations across the ICF handler / runner / setup classes were replaced. Development of this layer follows the **Dogfooding** principle — it is itself developed via the CLI's create → pull → edit → push loop, with `abap deploy --dev` providing the single-class development form on a real system.
 

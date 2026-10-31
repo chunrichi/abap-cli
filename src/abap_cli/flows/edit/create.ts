@@ -48,6 +48,12 @@ export interface CreateOptions {
   file?: string;
   /** With type FUGR: create a function module (FUGR/FF) inside the existing function group <name>. */
   func?: string;
+  /** With type DEVC: software component of the new package (default: inherited from the super package). */
+  softwareComponent?: string;
+  /** With type DEVC: transport layer of the new package (default: inherited from the super package). */
+  transportLayer?: string;
+  /** With type DEVC: package type (development / main / structure; default development). */
+  packageType?: string;
 }
 
 export interface CreateLocalOptions {
@@ -97,7 +103,9 @@ export async function runCreate(type: string | undefined, name: string | undefin
   const skipActivate = opts.activate === false;
   // Local fail-fast (zero SAP round-trip) before routing: an oversized or
   // illegal name must not reach SAP as a misleading OBJECT_NOT_FOUND.
-  validateObjectName(objectName);
+  // DEVC has its own name rules (leading `$`, namespaced packages) and
+  // validates inside its handler once the software component is known.
+  if (typeUpper !== 'DEVC') validateObjectName(objectName);
 
   // Per-type create handlers (DDIC / HTTP / TRAN / TTYP / MSAG / DDLS / CDS
   // companions / ENQU / NROB) come from the explicit routing table.

@@ -52,7 +52,7 @@ If you would otherwise script the ADT REST API yourself, `abap-cli` packages the
 ## What you can do
 
 - **Edit in place** — `pull` any object into an abap-file-format tree, edit it with your editor, `push` it back with lock → write → activate → unlock. `check` and `diff` before you write.
-- **Cover 21 object types** — classes, interfaces, programs and function groups; DDIC tables, structures, domains, data elements, lock objects and number ranges; SICF nodes and transaction codes; table types, message classes, CDS views and the CDS / RAP companions. Nineteen support create / pull / push; `BDEF` is pull / push and `SRVB` metadata-only.
+- **Cover 22 object types** — classes, interfaces, programs and function groups; packages; DDIC tables, structures, domains, data elements, lock objects and number ranges; SICF nodes and transaction codes; table types, message classes, CDS views and the CDS / RAP companions. Twenty support create / pull / push; `DEVC` supports create / pull / delete (no push), `BDEF` is pull / push and `SRVB` metadata-only.
 - **Read SAP safely** — `search`, `inspect`, `where-used`, `tcode`, `list`, `dumps`, `fields`, `select` and `run-report` never change the system.
 - **Run and verify** — `abap run` executes a class (classrun) or a PUBLIC STATIC method; `abap run-report` returns list output; `abap select` is the SE16N equivalent.
 - **Manage transports** — `transport list / create / show / resolve / assign`, with per-object resolution during `push`.
@@ -201,11 +201,12 @@ All commands support `--json` (compact) and `--pretty-json` (indented). Every to
 
 ## Supported object types
 
-21 type codes, routed through ADT or the bundled ICF service:
+22 type codes, routed through ADT or the bundled ICF service:
 
 | Types | create | pull | push | Notes |
 |---|---|---|---|---|
 | `CLAS` `INTF` `PROG` `FUGR` | ✅ | ✅ | ✅ | ABAP source; `create local` drafts available offline |
+| `DEVC` | ✅ | ✅ | — | ABAP package (`DEVC/K`) via ADT; `--package` is the super package; delete supported, no push (ADT has no package update endpoint) |
 | `TABL` `STRU` `DOMA` `DTEL` | ✅ | ✅ | ✅ | DDIC via ICF; TABL / STRU use the three-piece AFF layout |
 | `ENQU` `NROB` | ✅ | ✅ | ✅ | Lock object / number range object, `create --file` |
 | `HTTP` `TRAN` | ✅ | ✅ | ✅ | SICF service node / transaction code (SE93), `create --file` |

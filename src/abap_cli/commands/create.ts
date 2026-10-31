@@ -20,9 +20,9 @@ import { schemaOption } from './schema-helpers.js';
 export function registerCreateCommand(program: Command): void {
   const createCmd = program
     .command('create')
-    .description('Create and activate a new ABAP object (CLAS, INTF, PROG, FUGR, TABL, STRU, DOMA, DTEL, HTTP)')
+    .description('Create a new ABAP object (CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, HTTP)')
     // [type]/[name]（可选）是因为 --schema 模式下不需要 name；真实创建仍需两者。
-    .argument('[type]', 'Object type (CLAS, INTF, PROG, FUGR, TABL, STRU, DOMA, DTEL, HTTP)')
+    .argument('[type]', 'Object type (CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, HTTP)')
     .argument('[name]', 'Object name')
     .addHelpText('after', [
       '',
@@ -32,6 +32,8 @@ export function registerCreateCommand(program: Command): void {
       '  PROG  Program            (ADT route)',
       '  FUGR  Function group     (ADT route)',
       '        + --func <name>    Create a function module inside an existing group (FUGR/FF)',
+      '  DEVC  Package            (ADT route; --package is the super package)',
+      '        + --software-component / --transport-layer / --package-type',
       '  DOMA  Domain             (ICF /ddic/doma — requires --file)',
       '  DTEL  Data element       (ICF /ddic/dtel — requires --file)',
       '  TABL  Database table     (ICF /ddic/tabl — requires --file)',
@@ -61,6 +63,9 @@ export function registerCreateCommand(program: Command): void {
     .option('--audit', 'Include the before-checksum (extra SAP round-trip, off by default)')
     .option('--file <path>', `abap-file-format JSON input (required for ${typesRequiringFile().join('/')})`)
     .option('--func <name>', 'With FUGR: create a function module (FUGR/FF) inside the existing function group <name>')
+    .option('--software-component <swcomp>', 'With DEVC: software component of the new package (default: inherited from the super package)')
+    .option('--transport-layer <layer>', 'With DEVC: transport layer of the new package (default: inherited from the super package)')
+    .option('--package-type <type>', 'With DEVC: package type — development (default), main, or structure')
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .option('--yes', 'Confirm in non-interactive mode')
     .action(async (type, name, opts, cmd) => {
@@ -119,8 +124,8 @@ function registerCreateLocalCommand(createCmd: Command): void {
 export type CreateCommandSchema = CommandSchema & {
   type?: string;
   supported?: boolean;
-  /** 'icf' for DDIC types created via the self-built ICF service. */
-  route?: 'icf';
+  /** SAP channel: 'icf' for DDIC types, 'adt' for ADT-handler types (DEVC). */
+  route?: 'icf' | 'adt';
   reason?: 'DDIC_NOT_SUPPORTED' | 'TYPE_NOT_SUPPORTED';
   message?: string;
   templates?: { name: string; description: string }[];
@@ -158,6 +163,9 @@ export function createSchema(type?: string): CreateCommandSchema {
       { name: '--overwrite', type: 'boolean', description: 'When pulling the new object back, replace an existing local file (default: keep the local draft)' },
       { name: '--file', type: 'string', valuePlaceholder: '<path>', description: `abap-file-format JSON input (required for ${typesRequiringFile().join('/')})` },
       { name: '--func', type: 'string', valuePlaceholder: '<name>', description: 'With FUGR: create a function module (FUGR/FF) inside the existing function group <name>' },
+      { name: '--software-component', type: 'string', valuePlaceholder: '<swcomp>', description: 'With DEVC: software component of the new package (default: inherited from the super package)' },
+      { name: '--transport-layer', type: 'string', valuePlaceholder: '<layer>', description: 'With DEVC: transport layer of the new package (default: inherited from the super package)' },
+      { name: '--package-type', type: 'string', valuePlaceholder: '<type>', description: 'With DEVC: package type', allowedValues: ['development', 'main', 'structure'] },
       schemaOption(),
       { name: '--yes', type: 'boolean', default: false, description: 'Confirm in non-interactive environments.' },
       { name: '--non-interactive', type: 'boolean', default: false, description: 'Alias of --yes.' },
@@ -167,6 +175,29 @@ export function createSchema(type?: string): CreateCommandSchema {
   };
 
   if (!t) return base;
+  // Package (DEVC) is flag-driven: the ADT package resource has no source
+  // include and no skeleton, and `--package` names the super package.
+  if (t === 'DEVC') {
+    return {
+      ...base,
+      type: t,
+      supported: true,
+      route: 'adt',
+      message:
+        'DEVC packages are created as an ADT `DEVC/K` object. `--package` is the super package; ' +
+        'software component and transport layer default to the super package\'s values. ' +
+        'LOCAL packages must be named `$...` or `TEST...`.',
+      options: base.options.map((o) =>
+        o.name === '--package'
+          ? { ...o, description: 'Super package of the new package (required)' }
+          : o,
+      ),
+      examples: [
+        "abap create DEVC $MY_PACKAGE --package '$TMP' --description \"Scratch package\"",
+        'abap create DEVC ZPKG_SUB --package ZPKG_MAIN --description "Sub package" --software-component HOME --tr NDK900123',
+      ],
+    };
+  }
   // Types whose `create` has no skeleton path require `--file`; the registry
   // is the single source of truth (`requiresFile`), so this branch covers the
   // former DDIC / HTTP / TRAN special cases plus TTYP / MSAG / DDLS.

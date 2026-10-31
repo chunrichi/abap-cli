@@ -167,7 +167,7 @@ function affTypeFromFilename(fileName: string): string | undefined {
   // (SRVB is metadata-only, validated inline at the strategy layer).
   const KNOWN = new Set([
     'CLAS', 'INTF', 'PROG', 'DDLS', 'TABL', 'STRU', 'DOMA', 'DTEL', 'TTYP', 'MSAG',
-    'SRVD', 'BDEF', 'DCLS', 'DDLX', 'DDLA',
+    'SRVD', 'BDEF', 'DCLS', 'DDLX', 'DDLA', 'DEVC',
   ]);
   return KNOWN.has(t) ? t : undefined;
 }
