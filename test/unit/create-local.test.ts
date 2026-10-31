@@ -190,6 +190,23 @@ describe('abap create local', () => {
     expect(fs.readdirSync(cwd)).toHaveLength(0);
   });
 
+  it.each(['SRVD', 'DCLS', 'DDLX', 'DDLA'])(
+    'TYPE_NOT_SUPPORTED: %s has no local skeleton and writes no bogus draft, exit 7',
+    async (type) => {
+      const program = makeProgram();
+      registerCreateCommand(program);
+      const res = await runCommand(program, ['create', 'local', type, 'ZCDS_DRAFT', '--json'], { cwd });
+      expect(res.exitCode).toBe(7);
+      const err = parseError(res);
+      expect(err.code).toBe('TYPE_NOT_SUPPORTED');
+      expect(err.message).toMatch(/no local skeleton/);
+      expect(err.message).toContain('--file');
+      // Regression: the old fallback wrote `<name>.<type>.abap` with a REPORT
+      // skeleton, which is neither an AFF draft nor pushable.
+      expect(fs.readdirSync(cwd)).toHaveLength(0);
+    },
+  );
+
   it('INVALID_ARGUMENT: unknown template, zero files, exit 2', async () => {
     const program = makeProgram();
     registerCreateCommand(program);

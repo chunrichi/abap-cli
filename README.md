@@ -174,7 +174,7 @@ No type or object subdirectories, and namespaced objects use the AFF bracket tok
 | `abap push <files...>` | Push local files back: lock → write → activate → unlock (`--tr`, `--all`, `--atomic`, `--check-only`, `--dry-run`, `--no-activate`, `--fail-fast`) |
 | `abap check` | `syntax` (against SAP) / `content` (local only) / `atc` (`--variant`, `--out`), each with `--all`, `--changed`, `--strict` |
 | `abap create <type> <name>` | Create and activate an object (`--package`, `--description`, `--tr`, `--file`, `--template`, `--check-only`, `--audit`); `--func <name>` adds a function module to an existing function group |
-| `abap create local <type> <name>` | Generate an offline AFF draft skeleton for CLAS / INTF / PROG / FUGR and the SRVD / DCLS / DDLX / DDLA companions, no SAP connection |
+| `abap create local <type> <name>` | Generate an offline AFF draft skeleton for CLAS / INTF / PROG / FUGR, no SAP connection |
 | `abap activate <object>` | Activate all inactive items of an object (repairs stale activation) |
 | `abap delete <object>` | Delete an object: lock → delete → unlock (`--type`, `--tr`, `--yes`) |
 | `abap mime` | `create` / `delete` (`--recursive`) / `push` MIME repository folders and files |

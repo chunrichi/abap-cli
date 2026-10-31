@@ -92,8 +92,8 @@ function registerCreateLocalCommand(createCmd: Command): void {
     .addHelpText('after', [
       '',
       'This command is experimental and creates a local draft only — nothing is sent to SAP.',
-      'It supports the source-object types (CLAS, INTF, PROG, FUGR) and their CDS/RAP',
-      'companions; DDIC / HTTP / TRAN types have no local skeleton path and require',
+      'It supports the source-object types (CLAS, INTF, PROG, FUGR) only; DDIC /',
+      'HTTP / TRAN / CDS / RAP types have no local skeleton and require',
       '`abap create <type> <name> --file <path>` with an abap-file-format JSON instead.',
       'To land a draft in SAP, run:',
       '  abap create <type> <name> --package <pkg> --description <desc> --no-pull',
