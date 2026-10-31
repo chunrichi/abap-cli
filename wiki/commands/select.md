@@ -55,7 +55,7 @@ abap select --table ZTABLE --where "FIELD = 'X'" --dry-run --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap select", "version": "1.0.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 42, "warnings": [] },
+  "meta": { "command": "abap select", "version": "1.1.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 42, "warnings": [] },
   "data": {
     "table": "ZTAB_FIXTURE",
     "objectType": "TABL",
@@ -80,7 +80,7 @@ abap select --table ZTABLE --where "FIELD = 'X'" --dry-run --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap select", "version": "1.0.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 18, "warnings": [] },
+  "meta": { "command": "abap select", "version": "1.1.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 18, "warnings": [] },
   "data": {
     "table": "ZTAB_FIXTURE",
     "objectType": "TABL",
@@ -97,7 +97,7 @@ abap select --table ZTABLE --where "FIELD = 'X'" --dry-run --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap select", "version": "1.0.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 3, "warnings": [] },
+  "meta": { "command": "abap select", "version": "1.1.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 3, "warnings": [] },
   "data": {
     "table": "ZTAB_FIXTURE",
     "objectType": "TABL",

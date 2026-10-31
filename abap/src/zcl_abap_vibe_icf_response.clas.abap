@@ -1,7 +1,7 @@
 CLASS zcl_abap_vibe_icf_response DEFINITION PUBLIC FINAL CREATE PUBLIC.
   PUBLIC SECTION.
     CONSTANTS gc_service TYPE string VALUE 'abap_cli'.
-    CONSTANTS gc_version TYPE string VALUE '1.0.0'.
+    CONSTANTS gc_version TYPE string VALUE '1.1.0'.
 
     CLASS-METHODS handle_root
       IMPORTING io_server TYPE REF TO if_http_server

@@ -104,7 +104,7 @@ abap deploy status --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap deploy", "version": "1.0.0", "timestamp": "2026-10-30T00:00:00.000Z", "durationMs": 8400, "warnings": [] },
+  "meta": { "command": "abap deploy", "version": "1.1.0", "timestamp": "2026-10-30T00:00:00.000Z", "durationMs": 8400, "warnings": [] },
   "data": {
     "mode": "release",
     "mergedClasses": 16,

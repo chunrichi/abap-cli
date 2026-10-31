@@ -2,7 +2,7 @@
 name: abap-cli-edit
 description: abap-cli 写路径 — 拉（`pull`）/ 推（`push`）/ 语法检查（`check`）/ 创建（`create` / `create local`）/ 激活（`activate`）/ 删除（`delete`）/ 列举（`list`）/ MIME Repository CRUD（`mime create` / `mime delete` / `mime push`）/ AFF 校验（`validate:aff`），含 DDIC CRUD（DOMA / DTEL / TABL / STRU）与 ICF/SICF 服务节点（类型码 `HTTP`），经 `pull --type` / `create --file` / `push *.json`。use when asking how to change a SAP object / download an ABAP class / push a local file / run syntax check / create or delete an object / activate inactive parts / audit a package for scratch work / edit a DDIC definition / create or edit an ICF SICF HTTP service node / upload or delete MIME resources in SE80 / validate an AFF canonical JSON before pushing / which object types the CLI supports.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
   scope: sap
   commands: [pull, push, check, create, activate, "create local", mime, "validate:aff", delete, list]
   tags: [write, lock, transport, ddic, http, sicf, mime, aff, cleanup, audit]
