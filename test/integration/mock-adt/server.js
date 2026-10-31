@@ -45,6 +45,10 @@ let putCount = 0; // global PUT counter (MOCK_ATOMIC_FAIL fails on the 2nd write
 const objects = new Map();
 // 014: temporary in-memory store for DDIC create/overwrite payloads (round-trip tests).
 const ddicStore = new Map();
+// DOMA/DTEL long-text companion store — key = `<TYPE>:<OBJ>`, value = AFF
+// docu document `{ formatVersion, lines: [{ format, line }] }`.
+// Served by GET/POST /sap/abap_cli/ddic/<doma|dtel>/<name>/docu.
+const docuStore = new Map();
 // 014: textpool store — key = `<TYPE>:<OBJ>:<CATEGORY>`, value = array of { id, text }.
 const textpoolStore = new Map();
 // 015: remote source store — key = `<TYPE>:<OBJ>`, value = source string served by /version-source.
@@ -1209,6 +1213,46 @@ const server = http.createServer(async (req, res) => {
       return ok(res, JSON.stringify({ status: 'success' }), 'application/json');
     }
 
+    // DOMA/DTEL long text: GET/POST /sap/abap_cli/ddic/<type>/<name>/docu.
+    // Mirrors the ABAP handler contract: an object without a long text answers
+    // `DOCU_NOT_FOUND` in a 200 envelope; POST with `lines: []` deletes it.
+    // Like SAPscript, over-long lines are truncated to CHAR72 silently (the
+    // CLI validates before POST so this must never be the mechanism relied on).
+    const ddicDocu = /^\/sap\/abap_cli\/ddic\/(doma|dtel)\/([^/]+)\/docu$/.exec(path);
+    if (ddicDocu) {
+      const docuType = ddicDocu[1].toUpperCase();
+      const docuName = decodeURIComponent(ddicDocu[2]).toUpperCase();
+      const objectKey = `${docuType}:${docuName}`;
+      if (!ddicStore.has(objectKey)) {
+        return ok(res, JSON.stringify({ status: 'error', error: { code: 'DDIC_OBJECT_NOT_FOUND', message: `${docuType} ${docuName} not found in mock store` } }), 'application/json');
+      }
+      if (req.method === 'GET') {
+        if (!docuStore.has(objectKey)) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'DOCU_NOT_FOUND', message: `${docuType} ${docuName} has no documentation` } }), 'application/json');
+        }
+        return ok(res, JSON.stringify({ status: 'success', data: docuStore.get(objectKey) }), 'application/json');
+      }
+      if (req.method === 'POST') {
+        const body = await readBody(req);
+        let payload = {};
+        try { payload = JSON.parse(body); } catch (_e) { payload = {}; }
+        const lines = Array.isArray(payload.lines)
+          ? payload.lines.map((line) => ({
+              format: String(line.format ?? '').slice(0, 2),
+              line: String(line.line ?? '').slice(0, 72),
+            }))
+          : [];
+        if (lines.length === 0) {
+          docuStore.delete(objectKey);
+          return ok(res, JSON.stringify({ status: 'success', data: { name: docuName, type: 'DOCU', action: 'deleted' } }), 'application/json');
+        }
+        const stored = { formatVersion: String(payload.formatVersion || '1'), lines };
+        docuStore.set(objectKey, stored);
+        return ok(res, JSON.stringify({ status: 'success', data: { name: docuName, type: 'DOCU', action: 'saved' } }), 'application/json');
+      }
+      return ok(res, JSON.stringify({ status: 'error', error: { code: 'METHOD_NOT_ALLOWED', message: `${req.method} not supported on /ddic/${docuType}/${docuName}/docu` } }), 'application/json');
+    }
+
     // 014: /sap/abap_cli/ddic/<type> POST (create/overwrite) and GET /<name> (pull).
     const ddic = /^\/sap\/abap_cli\/ddic\/(doma|dtel|tabl|stru)(?:\/(.+))?$/.exec(path);
     if (ddic) {
@@ -1238,16 +1282,18 @@ const server = http.createServer(async (req, res) => {
           }
         }
         if (ddicType === 'DOMA') {
-          if (!payload.dataType || payload.length === undefined) {
-            return ok(res, JSON.stringify({ status: 'error', error: { code: 'DDIC_REQUIRED_FIELD', message: 'dataType and length are required' } }), 'application/json');
+          // AFF wire carries dataType/length under `format.*`.
+          const format = payload.format || {};
+          if (!format.dataType || format.length === undefined) {
+            return ok(res, JSON.stringify({ status: 'error', error: { code: 'DDIC_REQUIRED_FIELD', message: 'format.dataType and format.length are required' } }), 'application/json');
           }
         }
         if (ddicType === 'DTEL') {
           if (!payload.description) {
             return ok(res, JSON.stringify({ status: 'error', error: { code: 'DDIC_REQUIRED_FIELD', message: 'description is required' } }), 'application/json');
           }
-          if (!payload.domain && !payload.dataType) {
-            return ok(res, JSON.stringify({ status: 'error', error: { code: 'DDIC_INVALID_FIELD', message: 'domain or built-in dataType is required' } }), 'application/json');
+          if (!payload.dataTypeInformation && !payload.domain && !payload.dataType) {
+            return ok(res, JSON.stringify({ status: 'error', error: { code: 'DDIC_INVALID_FIELD', message: 'dataTypeInformation, domain or built-in dataType is required' } }), 'application/json');
           }
         }
         // Mirror of the wire payload so round-trip is consistent.

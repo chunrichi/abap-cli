@@ -31,6 +31,8 @@ import { orderTargetsByDependency } from './push-order.js';
 import { deduplicateTablArtifactTargets } from './push-dedup.js';
 import { toRelativeOutputPath } from '../../core/path-output.js';
 import { pushRouteFor } from './routing.js';
+import { isDocuSupportedType } from '../../formats/docu/json.js';
+import { hasDocuCompanion } from './docu-companion.js';
 import { pushUnsupportedReasonFor } from '../../types/registry.js';
 import type { PushFileOptions, PushFileResult, PushOneResult } from './push-types.js';
 
@@ -48,6 +50,27 @@ function rejectUnsupportedPushType(objectType: string): void {
       `Type ${objectType} is read-only in abap-cli; edit the object in SAP GUI if supported there.`,
       'Re-create the object instead: pull, edit, `abap delete`, `abap create`.',
     ],
+  });
+}
+
+/**
+ * `src/zmy.doma.docu.json` is a long-text companion, not an object document:
+ * it has no `name` / `format` / `fields`, so running it through the object
+ * route would fail confusingly. The companion is pushed automatically by its
+ * main document's push, so reject the direct target with that pointer.
+ */
+function rejectDocuCompanionTarget(resolved: ResolvedFile): void {
+  if (resolved.subtype !== 'docu' || !isDocuSupportedType(resolved.objectType)) return;
+  const outFile = toRelativeOutputPath(resolved.filePath);
+  const mainFile = outFile.replace(/\.docu\.json$/, `.${resolved.objectType.toLowerCase()}.json`);
+  throw new CliError('INVALID_ARGUMENT', `${outFile} is a long-text companion; push its main document instead`, {
+    file: outFile,
+    type: resolved.objectType,
+    nextSteps: [
+      `Push ${mainFile}; a sibling <name>.<type>.docu.json is sent automatically.`,
+      'Delete the companion file to leave the SAP-side long text unchanged.',
+    ],
+    example: `abap push ${mainFile}`,
   });
 }
 
@@ -100,6 +123,7 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
       try {
         const resolved = resolveFile(file);
         validateLocalFile(resolved);
+        rejectDocuCompanionTarget(resolved);
         rejectUnsupportedPushType(resolved.objectType);
         const route = pushRouteFor(resolved.objectType);
         if (route && route.kind !== 'source') {
@@ -132,9 +156,9 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
     const stages: PushStage[] = [];
     const onStage = (s: PushStage) => stages.push(s);
     try {
-      const { transport, status } = await pushOne(client, file, opts, onStage, onWarning);
+      const { transport, status, docu } = await pushOne(client, file, opts, onStage, onWarning);
       if (opts.dryRun) {
-        results.push({ file, status: 'dry-run', plan: stages, written: false, activated: false });
+        results.push({ file, status: 'dry-run', plan: stages, written: false, activated: false, ...(docu ? { docu } : {}) });
       } else {
         const resolvedStatus =
           status ?? (opts.checkOnly ? 'checked-only' : (opts.activate === false ? 'written' : 'activated'));
@@ -145,6 +169,7 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
           stage: stages[stages.length - 1],
           written: !opts.checkOnly,
           activated: resolvedStatus === 'activated',
+          ...(docu ? { docu } : {}),
         });
       }
       if (opts.failFast && failed > 0) break;
@@ -300,6 +325,7 @@ async function pushOne(
     throw new CliError('FILE_PARSE_ERROR', `Cannot parse ${outFile}: ${message(error)}`, { details: { file: outFile } });
   }
   validateLocalFile(resolved);
+  rejectDocuCompanionTarget(resolved);
   rejectUnsupportedPushType(resolved.objectType);
 
   // Textpool .properties files route via ADT/ICF (mixed mode, cache-decided).
@@ -322,6 +348,8 @@ async function pushOne(
     }
     if (opts.dryRun) {
       onStage('ddic-icf');
+      // DOMA/DTEL long text is a second ICF call, so it shows up in the plan.
+      if (await hasDocuCompanion(file, resolved.objectType)) onStage('docu-icf');
       return { transport: opts.tr ?? client.getConfig().transport ?? 'DRY_RUN', status: 'dry-run' };
     }
     if (route.kind === 'icf-json') onStage('ddic-icf');

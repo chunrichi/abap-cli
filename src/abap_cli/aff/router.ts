@@ -16,11 +16,14 @@
  *   *.stru.json / *.stru.*.json        → STRU
  *   *.doma.json / *.doma.*.json        → DOMA
  *   *.dtel.json / *.dtel.*.json        → DTEL
+ *   *.doma.docu.json / *.dtel.docu.json → DOCU (companion schema, not a type)
  *   *.http.json / *.http.*.json        → HTTP
  *   *.tran.json / *.tran.*.json        → TRAN
  *   *.devc.json                        → DEVC
  *
  * STRU is routed to `tabl-v1.json` at runtime via schemaPathFor().
+ * DOCU is the 0..1 long-text companion of DOMA/DTEL, validated against
+ * `docu-v1.json`; it is a schema identifier only and has no registry entry.
  */
 
 import * as path from 'node:path';
@@ -57,6 +60,10 @@ const SUFFIX_RULES: ReadonlyArray<{ suffix: string; type: string; schemaFile?: s
   { suffix: '.stru.json', type: 'STRU', schemaFile: 'tabl-v1.json' },
   { suffix: '.stru.settings.json', type: 'STRU', schemaFile: 'tabt-v1.json' },
   { suffix: '.stru.ddic', type: 'STRU' },
+  // DOMA/DTEL long-text companions — 0..1 documentation files validated
+  // against the dedicated `docu-v1.json` (not the object's own schema).
+  { suffix: '.doma.docu.json', type: 'DOCU' },
+  { suffix: '.dtel.docu.json', type: 'DOCU' },
   { suffix: '.doma.json', type: 'DOMA' },
   { suffix: '.dtel.json', type: 'DTEL' },
   { suffix: '.http.json', type: 'HTTP' },

@@ -1,15 +1,15 @@
 ---
 type: command
 title: abap push
-description: 推送本地 ABAP 文件到 SAP — lock → set source → syntax check → activate → unlock，支持源码对象、FUGR、textpool 与 DDIC JSON，按对象解析 transport（textpool 写受系统限制）
-tags: [abap-cli, command, push, upload, abap-file-format, ddic, textpool, transport]
+description: 推送本地 ABAP 文件到 SAP — lock → set source → syntax check → activate → unlock，支持源码对象、FUGR、textpool、DDIC JSON 与 DOMA/DTEL 长文本伴生，按对象解析 transport（textpool 写受系统限制）
+tags: [abap-cli, command, push, upload, abap-file-format, ddic, docu, textpool, transport]
 created at: 2026-08-07 00:11:03
-changed at: 2026-10-31 16:20:00
+changed at: 2026-10-31 17:05:00
 ---
 
 # abap push
 
-把本地 ABAP 文件推送到 SAP 系统，核心流程是 **lock → set source → syntax check → activate → unlock**。支持：普通源码对象（CLAS/PROG/INTF）、FUGR 子对象、textpool `.properties`，以及 ICF 路由的 `.json`（DDIC / HTTP / TRAN）与通道路由的 TTYP / MSAG / DDLS。文件级编排在 `flows/edit/push.ts`（`runPush` / `pushOne`），单对象核心在 `flows/edit/push-object.ts`（`pushObject`）。
+把本地 ABAP 文件推送到 SAP 系统，核心流程是 **lock → set source → syntax check → activate → unlock**。支持：普通源码对象（CLAS/PROG/INTF）、FUGR 子对象、textpool `.properties`，以及 ICF 路由的 `.json`（DDIC / HTTP / TRAN，其中 DOMA/DTEL 同目录的 `<name>.<type>.docu.json` 长文本伴生会随主文件自动推送）与通道路由的 TTYP / MSAG / DDLS。文件级编排在 `flows/edit/push.ts`（`runPush` / `pushOne`），单对象核心在 `flows/edit/push-object.ts`（`pushObject`）。
 
 > ⚠️ **textpool 写限制**：textpool `.properties` 的**读**（`abap pull --textpool`）在 ADT / ICF 两种路由都可用；**写**需要 ADT text-elements 写端点。在只提供非交互式 textpool API 的 release 上（vhcala4hci / A4H 实测），profile 缓存 `adtTextpool.write: false` → 写路由到 ICF `/textpool/*`，而自带 ICF handler 对 POST **无条件**返回 `TEXTPOOL_WRITE_UNSUPPORTED`（SAP_ERROR / exit 6）。此时选择屏幕标签改用 `SELECTION-SCREEN COMMENT <pos>(<len>) lbl_xxx` + `INITIALIZATION` 赋值，不要依赖 `push` 文本元素。
 
@@ -92,7 +92,7 @@ DDIC/TRAN 的探测在 `--dry-run` 之后（plan-only 不做多余 round-trip）
 | 普通源码（adt） | `pushObject` | 锁对象 → 写每个 part 源码 → check/activate → 解锁（`finally` 保证） |
 | FUGR | `push-fugr.ts` | 子对象（FM/include）是独立 ADT 锁对象，逐文件锁自己的目标、写源，最后激活整个 function group |
 | Textpool | `push-textpool.ts` | 混合模式：profile 缓存能力决定走 ADT `setTextElements`（lock→write→unlock）还是 ICF `/textpool/*`；`--check-only` 不支持（`VALIDATION_ERROR`）。**ICF 写为 stub**——`adtTextpool.write: false` 的系统上 POST 无条件报 `TEXTPOOL_WRITE_UNSUPPORTED`（见上方限制说明） |
-| ICF JSON（`route: 'icf'`） | `TYPE_ROUTES`（`icf-json`）→ `push-icf.ts` | DDIC（`.doma/.dtel/.tabl/.stru/.enqu.json`）、HTTP（`.http.json`）、TRAN（`.tran.json`）。`pushOne` 查 `routing.ts` 的 `TYPE_ROUTES[objectType]` 取到具体 handler，不再有 per-type `if` 分支 |
+| ICF JSON（`route: 'icf'`） | `TYPE_ROUTES`（`icf-json`）→ `push-icf.ts` | DDIC（`.doma/.dtel/.tabl/.stru/.enqu.json`）、HTTP（`.http.json`）、TRAN（`.tran.json`）。`pushOne` 查 `routing.ts` 的 `TYPE_ROUTES[objectType]` 取到具体 handler，不再有 per-type `if` 分支。DOMA/DTEL 额外处理同目录长文本伴生（见下节） |
 | TTYP / MSAG / DDLS / NROB（`route: 'adt'` 或 `icf`） | `TYPE_ROUTES`（`aff-json`）→ `push-{ttyp,msag,ddls,nrob}.ts` | 路由表里这几类 `channel: 'auto'`（NROB 为 `icf`），`resolveFile` 给的是 `route: 'adt'`，但文件是 AFF `.json` 而非 ABAP 源码，所以 `pushOne` 必须在通用源码分支**之前**拦截；每个 flow 自己跑 `channel-detect` |
 
 **JSON 文件的两类拦截**（都由 `routing.ts` 的 `TYPE_ROUTES` 声明，在 `readAbapFile` 之前）：
@@ -103,6 +103,24 @@ DDIC/TRAN 的探测在 `--dry-run` 之后（plan-only 不做多余 round-trip）
 两类共用同一套闸门语义：`--check-only` 抛 `VALIDATION_ERROR`（`--check-only is not supported for AFF JSON artifact files`）；`--dry-run` 返回 `status: dry-run` / `stage: ddic-icf` 且**零 SAP 调用**（通道路由类同样不会去连 ADT/ICF，也不会记录 `channel-*`）。
 
 DDIC 的存在性探测（`GET /ddic/<type>/<name>`）与 TRAN 的探测（`GET /tran/<code>`）在各自 ICF handler 内；HTTP 不探测（push 即创建）。`--atomic` 阶段对 ICF JSON 走各自 format 模块的结构校验，对通道路由四类走 AFF schema 校验（`validateAffFile` / `validate{Ttyp,Msag,Ddls,Nrob}Object`）——都不是只读文本。
+
+### DOMA/DTEL 长文本伴生（`.docu.json`）
+
+DOMA/DTEL 主文件 push 时，若同目录存在 `<name>.doma.docu.json` / `<name>.dtel.docu.json`，CLI 把它作为第二次 ICF 调用推送：
+
+1. **先校验、后写主对象**：伴生必须满足 AFF `docu-v1.json`（`formatVersion: "1"`，`line` ≤72、`format` ≤2、无额外字段）。非法 → `AFF_FIXTURE_INVALID`（exit 7），主对象**不写**（不留下半推送状态）；`--atomic` 也把伴生纳入 phase-1 校验。
+2. **主对象成功后** POST `/ddic/<type>/<name>/docu`：非空 `lines` → 写入（SAP 端按对象 TADIR 主语言落 DOKIL/DOKTL）；`lines: []`（或省略 `lines`）→ **删除**远端长文本。
+3. 结果：`data.results[].docu = "saved" | "deleted"`（无伴生时不出现该字段）；伴生推送失败 → `DOCU_PUSH_FAILED`（SAP_ERROR / exit 6），错误信息注明主对象已写入。
+4. `--dry-run` 只出计划：主文件 plan 为 `["ddic-icf"]`，有伴生时为 `["ddic-icf", "docu-icf"]`（零 SAP 调用）。
+5. **不要直接 push 伴生文件**：`abap push src/zmy.doma.docu.json` → `INVALID_ARGUMENT`（exit 2），提示推送主文件；伴生没有 `name` / `format` 等对象字段，不属于对象路由。
+
+```bash
+# 主文件 + 同目录伴生（有则推 / 空 lines 则删）
+abap push src/zmy_dom.doma.json --yes
+
+# 只看计划
+abap push src/zmy_dom.doma.json --dry-run
+```
 
 ### TTYP / MSAG / DDLS（双通道）
 
@@ -138,6 +156,7 @@ DDIC 的存在性探测（`GET /ddic/<type>/<name>`）与 TRAN 的探测（`GET 
 | `zprog.prog.abap` | adt | 程序 main |
 | `zfg.fugr.saplzfg.reps.abap` / `.fugr.lzfgtop.reps.abap` / `.fugr.<include>.reps.abap` / `.fugr.<fm>.func.abap` | adt | 函数组（含 include 与 FM 子对象，各自独立加锁） |
 | `zmy_table.tabl.json` / `.doma.json` / `.dtel.json` / `.stru.json` / `.enqu.json` | icf | 五种 DDIC 对象（`TYPE_ROUTES` 的 `icf-json` 行，POST `/ddic/<type>`，push 前 GET 探测存在性） |
+| `zmy_dom.doma.docu.json` / `zmy_dom.dtel.docu.json` | icf（随主文件） | DOMA/DTEL 长文本伴生：不单独 push；主文件 push 成功后自动 POST/删除长文本（`lines: []` 删除） |
 | `zmy_service.http.json` | icf | HTTP 服务（SICF 节点），POST `/http/<name>`；**不探测存在性**（push 即创建/更新） |
 | `zmy_tran.tran.json` | icf | 事务码（SE93），POST `/tran/<code>`；push 前 GET 探测存在性。**SAP 侧写端点当前返回 501（`TRAN_WRITE_NOT_IMPLEMENTED`），写路径端到端不可用** |
 | `zmy_ttyp.ttyp.json` / `zmy_msag.msag.json` / `zmy_view.ddls.json` / `zmy_nrob.nrob.json` | 通道路由（adt 或 icf 分支） | 双通道类型，`channel-detect` 决定 ADT / ICF；NROB 固定走 ICF |
@@ -164,6 +183,8 @@ DDIC 的存在性探测（`GET /ddic/<type>/<name>`）与 TRAN 的探测（`GET 
 | 写源码失败 | `SAP_ERROR` | SAP_ERROR / 6 | `stage: 'write'` + `subtype` |
 | 语法检查失败（`--check-only`） | `SYNTAX_ERROR` | VALIDATION_ERROR / 7 | `errors` 数组（`{line, offset, severity, text, uri}`，仅 `E`） |
 | 无可用 transport | `NO_TRANSPORT` | VALIDATION_ERROR / 7 | 提示 `--tr` 或 `abap transport create` |
+| 长文本伴生非法（行 >72 / format >2 / 非 docu-v1） | `AFF_FIXTURE_INVALID` | VALIDATION_ERROR / 7 | 主对象不写入；`details.results[].file` 为主文件，消息指明伴生路径与 schema 错误 |
+| 长文本 POST 失败 | `DOCU_PUSH_FAILED` | SAP_ERROR / 6 | 主对象已写入；`details.serverCode` 带服务端错误码，`nextSteps` 提示修因后重推主文件 |
 
 **收尾保证**：lock 在任何路径（成功 / check-only / write-only / 激活失败）都会在 `finally` 释放；释放失败不报错，降级为 `UNLOCK_WARNING`（`meta.warnings`，exit 不变）。
 
@@ -189,8 +210,11 @@ abap push src/zcl_foo.clas.abap --tr NDK123456 --no-activate
 # 推送整个目录（遵循 .abapignore）
 abap push --all --tr NDK123456
 
-# 计划模式（零变更）
+# 计划模式（零变更；DOMA/DTEL 有伴生时 plan 追加 docu-icf）
 abap push src/zcl_foo.clas.abap --tr NDK123456 --dry-run
+
+# DOMA 主文件 + 同目录长文本伴生（有则写 / lines: [] 则删）
+abap push src/zmy_dom.doma.json --yes
 
 # 原子推送：任一文件校验失败则零写入
 abap push src/a.clas.abap src/b.clas.abap --tr NDK123456 --atomic

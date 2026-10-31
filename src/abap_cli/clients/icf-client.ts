@@ -120,6 +120,17 @@ export class IcfClient {
     return this.get(`/ddic/${type}/${encodeURIComponent(name)}`);
   }
 
+  /** GET /ddic/<type>/<name>/docu — read the object's long text (DOKIL/DOKTL).
+   *  Returns `DOCU_NOT_FOUND` when the object carries no documentation. */
+  async getDdicDocu<T>(type: 'doma' | 'dtel', name: string): Promise<IcfResponse<T>> {
+    return this.get(`/ddic/${type}/${encodeURIComponent(name)}/docu`);
+  }
+
+  /** POST /ddic/<type>/<name>/docu — write the long text; `lines: []` deletes it. */
+  async postDdicDocu<T>(type: 'doma' | 'dtel', name: string, body: unknown): Promise<IcfResponse<T>> {
+    return this.post(`/ddic/${type}/${encodeURIComponent(name)}/docu`, body);
+  }
+
   /** POST /http/<name> — create/overwrite an HTTP service (SICF node). */
   async postHttp<T>(name: string, body: unknown): Promise<IcfResponse<T>> {
     return this.post(`/http/${encodeURIComponent(name)}`, body);

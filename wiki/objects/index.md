@@ -20,8 +20,8 @@ changed at: 2026-10-31 16:20:00
 | `DEVC` | ADT | `src/<name>.devc.json`（包；pull / create-then-pull，push 不支持） | [devc.md](devc.md) |
 | `TABL` | ICF | `src/<name>.tabl.{json,ddic,settings.json}` 三件套 | [tabl.md](tabl.md) |
 | `STRU` | ICF | `src/<name>.stru.{json,ddic,settings.json}` 三件套 | [stru.md](stru.md) |
-| `DOMA` | ICF | `src/<name>.doma.json`（嵌套） | [doma.md](doma.md) |
-| `DTEL` | ICF | `src/<name>.dtel.json`（嵌套） | [dtel.md](dtel.md) |
+| `DOMA` | ICF | `src/<name>.doma.json`（嵌套）+ 可选 `<name>.doma.docu.json`（长文本 0..1） | [doma.md](doma.md) |
+| `DTEL` | ICF | `src/<name>.dtel.json`（嵌套）+ 可选 `<name>.dtel.docu.json`（长文本 0..1） | [dtel.md](dtel.md) |
 | `ENQU` | ICF | `src/<name>.enqu.json`（锁对象） | [enqu.md](enqu.md) |
 | `NROB` | ICF | `src/<name>.nrob.json`（编号范围对象） | [nrob.md](nrob.md) |
 | `HTTP` | ICF | `src/<name>.http.json`（SICF 节点） | [http.md](http.md) |
