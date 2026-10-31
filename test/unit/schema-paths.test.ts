@@ -54,7 +54,7 @@ describe('schema-paths priority chain', () => {
     );
   });
 
-  it('affSupportedTypes matches the router table (16 + 6 + 2 types)', () => {
+  it('affSupportedTypes matches the router table (16 + 6 + 2 + VIEW + DOCU types)', () => {
     const types = affSupportedTypes();
     expect(types).toEqual(
       expect.arrayContaining([
@@ -67,6 +67,8 @@ describe('schema-paths priority chain', () => {
         'SRVB', 'SRVD', 'BDEF', 'DCLS', 'DDLX', 'DDLA',
         // — lock object + number range object.
         'ENQU', 'NROB',
+        // — database view local-extension schema.
+        'VIEW',
         // — package (DEVC) metadata document.
         'DEVC',
         // — DOMA/DTEL long-text companion schema (not an object type).
@@ -79,7 +81,8 @@ describe('schema-paths priority chain', () => {
     // added ENQU / NROB = 24 total.
     // added DEVC = 25 total.
     // added DOCU (companion schema) = 26 total.
-    expect(types).toHaveLength(26);
+    // added VIEW (local extension) = 27 total.
+    expect(types).toHaveLength(27);
   });
 
   it('bundled root contains every supported schema', () => {

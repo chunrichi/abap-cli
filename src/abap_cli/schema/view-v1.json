@@ -1,0 +1,219 @@
+{
+  "$comment": "Local extension: upstream SAP abap-file-formats has no view schema. Field names and value ranges are derived from the DDIC maintenance structures DD25V (header), DD26V (included tables), DD27P (view fields), DD28J (join conditions) and DD28V (selection conditions), verified on S/4HANA with DDIF_VIEW_GET / DDIF_VIEW_PUT.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Database View Properties",
+  "description": "ABAP DDIC database view (SE11 view) properties",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "formatVersion",
+    "header",
+    "name",
+    "viewClass",
+    "rootTable",
+    "tables",
+    "fields"
+  ],
+  "properties": {
+    "formatVersion": {
+      "title": "ABAP File Format Version",
+      "type": "string",
+      "const": "1"
+    },
+    "header": {
+      "title": "Header",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "originalLanguage"],
+      "properties": {
+        "description": {
+          "title": "Short Description",
+          "description": "View short text (DD25V-DDTEXT)",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "originalLanguage": {
+          "title": "Original Language",
+          "description": "Two-letter ISO language code of the original definition (DD25V-DDLANGUAGE)",
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 2
+        },
+        "abapLanguageVersion": {
+          "title": "ABAP Language Version",
+          "type": "string",
+          "enum": ["standard", "keyUser", "cloudDevelopment"],
+          "default": "standard"
+        }
+      }
+    },
+    "name": {
+      "title": "View Name",
+      "description": "DDIC view name (DD25V-VIEWNAME). At most 16 characters, like the DDIC view object name limit.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 16,
+      "pattern": "^[A-Za-z0-9_/]+$"
+    },
+    "package": {
+      "title": "Package",
+      "description": "Package recorded for the view in TADIR (read-side only; create/push take the package from the command line).",
+      "type": "string",
+      "maxLength": 30
+    },
+    "viewClass": {
+      "title": "View Class",
+      "description": "DD25V-VIEWCLASS: databaseView (D), maintenanceView (C), helpView (H), projectionView (P).",
+      "type": "string",
+      "enum": ["databaseView", "maintenanceView", "helpView", "projectionView"]
+    },
+    "rootTable": {
+      "title": "Root Table",
+      "description": "Root table of the view (DD25V-ROOTTAB). Must equal the first tables[] entry.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 30
+    },
+    "tables": {
+      "title": "Included Tables",
+      "description": "Tables the view is built on (DD26V), in join order.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["tableName"],
+        "properties": {
+          "tableName": {
+            "title": "Table Name",
+            "description": "DD26V-TABNAME",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30
+          },
+          "tablePosition": {
+            "title": "Table Position",
+            "description": "DD26V-TABPOS, 1-based. Derived from the array order when omitted.",
+            "type": "integer",
+            "minimum": 1
+          },
+          "foreignTableName": {
+            "title": "Foreign Table Name",
+            "description": "DD26V-FORTABNAME: root table for outer joins (SE11 fills the root table for every non-root entry).",
+            "type": "string",
+            "maxLength": 30
+          },
+          "forField": {
+            "title": "Foreign Key Field",
+            "description": "DD26V-FORFIELD: foreign-key field, used by help views.",
+            "type": "string",
+            "maxLength": 30
+          },
+          "forDirection": {
+            "title": "Foreign Key Direction",
+            "description": "DD26V-FORDIR: foreign-key direction, used by help views.",
+            "type": "string",
+            "maxLength": 1
+          }
+        }
+      }
+    },
+    "fields": {
+      "title": "View Fields",
+      "description": "Fields of the view (DD27P), in selection order.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["tableName", "fieldName"],
+        "properties": {
+          "viewFieldName": {
+            "title": "View Field Name",
+            "description": "DD27P-VIEWFIELD. Defaults to fieldName.",
+            "type": "string",
+            "maxLength": 30
+          },
+          "tableName": {
+            "title": "Table Name",
+            "description": "DD27P-TABNAME: table the field comes from.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30
+          },
+          "fieldName": {
+            "title": "Field Name",
+            "description": "DD27P-FIELDNAME: field of the underlying table.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30
+          },
+          "keyFlag": {
+            "title": "Key Flag",
+            "description": "DD27P-KEYFLAG. Derived from the underlying table field on write.",
+            "type": "boolean"
+          },
+          "rollName": {
+            "title": "Data Element",
+            "description": "DD27P-ROLLNAME. Derived from the underlying table field on write.",
+            "type": "string",
+            "maxLength": 30
+          },
+          "viewFieldRollName": {
+            "title": "View Field Data Element",
+            "description": "DD27P-ROLLNAMEVI. Defaults to rollName.",
+            "type": "string",
+            "maxLength": 30
+          }
+        }
+      }
+    },
+    "joinConditions": {
+      "title": "Join Conditions",
+      "description": "Inner-join conditions of the view (DD28J). Required for a view built on more than one table.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["leftTable", "leftField", "rightTable", "rightField"],
+        "properties": {
+          "leftTable": { "title": "Left Table", "type": "string", "minLength": 1, "maxLength": 30 },
+          "leftField": { "title": "Left Field", "type": "string", "minLength": 1, "maxLength": 30 },
+          "operator": {
+            "title": "Operator",
+            "type": "string",
+            "enum": ["EQ", "NE", "LT", "LE", "GT", "GE"],
+            "default": "EQ"
+          },
+          "rightTable": { "title": "Right Table", "type": "string", "minLength": 1, "maxLength": 30 },
+          "rightField": { "title": "Right Field", "type": "string", "minLength": 1, "maxLength": 30 },
+          "source": {
+            "title": "Condition Source",
+            "description": "DD28J-SOURCE. 'S' is what SE11 writes for database views.",
+            "type": "string",
+            "maxLength": 1,
+            "default": "S"
+          }
+        }
+      }
+    },
+    "selectionConditions": {
+      "title": "Selection Conditions",
+      "description": "Fixed value conditions of the view (DD28V). Database views normally have none.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["fieldName"],
+        "properties": {
+          "fieldName": { "title": "Field Name", "type": "string", "minLength": 1, "maxLength": 30 },
+          "operator": { "title": "Operator", "type": "string", "maxLength": 2 },
+          "constants": { "title": "Constants", "type": "string" },
+          "andOr": { "title": "AND/OR", "type": "string", "maxLength": 3 },
+          "negation": { "title": "Negation", "type": "string", "maxLength": 1 }
+        }
+      }
+    }
+  }
+}

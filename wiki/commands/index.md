@@ -16,7 +16,7 @@ Per-command knowledge pages (prerequisites, gotchas, real-system evidence) live 
 | `abap check` | [check.md](check.md) | Validate ABAP source code (syntax / content / atc) |
 | `abap test` | [test.md](test.md) | Run ABAP Unit tests for an object (read-only) |
 | `abap search` | [search.md](search.md) | Search for ABAP objects in SAP system |
-| `abap create` | [create.md](create.md) | Create a new ABAP object (CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, HTTP) |
+| `abap create` | [create.md](create.md) | Create a new ABAP object (CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, VIEW, HTTP) |
 | `abap status` | [status.md](status.md) | Show local vs SAP sync status |
 | `abap transport` | [transport.md](transport.md) | Manage transport requests |
 | `abap deploy` | [deploy.md](deploy.md) | Deploy bundled ICF ABAP service to SAP |

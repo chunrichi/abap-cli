@@ -147,6 +147,37 @@ CLASS zcl_abap_vibe_icf_ddic DEFINITION PUBLIC FINAL CREATE PUBLIC.
 
     CLASS-METHODS docu_message
       RETURNING VALUE(rv_text) TYPE string.
+
+    " VIEW (database view) — local-extension AFF document persisted via
+    " DDIF_VIEW_*. Deletion goes through RS_DD_DELETE_OBJ (ICF-safe, $TMP only).
+    CLASS-METHODS create_ddic_view
+      IMPORTING iv_name    TYPE viewname
+                iv_payload TYPE string
+                iv_package TYPE devclass
+                iv_request TYPE trkorr
+      EXPORTING es_payload TYPE zcl_abap_vibe_icf_types=>ty_ddic_create
+                ev_error   TYPE zcl_abap_vibe_icf_types=>ty_error.
+
+    CLASS-METHODS delete_ddic_object
+      IMPORTING iv_type    TYPE string
+                iv_name    TYPE string
+      EXPORTING es_payload TYPE zcl_abap_vibe_icf_types=>ty_ddic_delete
+                ev_error   TYPE zcl_abap_vibe_icf_types=>ty_error.
+
+    CLASS-METHODS last_message
+      RETURNING VALUE(rv_message) TYPE string.
+
+    CLASS-METHODS language_code_from_key
+      IMPORTING iv_key         TYPE sy-langu
+      RETURNING VALUE(rv_code) TYPE string.
+
+    CLASS-METHODS view_class_to_wire
+      IMPORTING iv_class        TYPE dd25v-viewclass
+      RETURNING VALUE(rv_class) TYPE string.
+
+    CLASS-METHODS view_class_from_wire
+      IMPORTING iv_class        TYPE string
+      RETURNING VALUE(rv_class) TYPE dd25v-viewclass.
 ENDCLASS.
 
 CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
@@ -221,7 +252,7 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    FIND REGEX '^/ddic/(doma|dtel|tabl|stru|enqu|nrob|ttyp|msag)(?:/(.+))?$' IN iv_path IGNORING CASE
+    FIND REGEX '^/ddic/(doma|dtel|tabl|stru|enqu|nrob|ttyp|msag|view)(?:/(.+))?$' IN iv_path IGNORING CASE
       SUBMATCHES lv_match_type lv_match_name.
     IF sy-subrc <> 0 OR lv_match_type IS INITIAL.
       zcl_abap_vibe_icf_response=>respond_error( io_server = io_server
@@ -238,6 +269,28 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
 
     DATA lv_package TYPE devclass.
     DATA lv_request TYPE trkorr.
+    " VIEW deletion: there is no ADT delete path for views, so the CLI
+    " DELETEs through this ICF route. RS_DD_DELETE_OBJ is the only ICF-safe
+    " delete (RS_DD_DELETE opens a confirm dynpro).
+    IF iv_method = 'DELETE'.
+      IF lv_type = 'VIEW'.
+        delete_ddic_object( EXPORTING iv_type = lv_type
+                                      iv_name = lv_name
+                            IMPORTING es_payload = DATA(ls_delete_response)
+                                      ev_error   = DATA(ls_delete_error) ).
+        IF ls_delete_error IS NOT INITIAL.
+          zcl_abap_vibe_icf_response=>respond_error( io_server  = io_server
+                         iv_status  = 200
+                         iv_reason  = 'OK'
+                         iv_code    = ls_delete_error-error-code
+                         iv_msg     = ls_delete_error-error-message
+                         iv_details = ls_delete_error-error-details ).
+        ELSE.
+          zcl_abap_vibe_icf_response=>respond_json( io_server = io_server iv_status = 200 iv_reason = 'OK' is_payload = ls_delete_response ).
+        ENDIF.
+        RETURN.
+      ENDIF.
+    ENDIF.
     " TTYP/MSAG accept both POST (create) and PUT (update) through the
     " same DDIF/table write path — the SAP APIs are upsert-shaped.
     IF ( iv_method = 'POST' OR iv_method = 'PUT' ) AND ( lv_type = 'TTYP' OR lv_type = 'MSAG' ).
@@ -343,6 +396,15 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
           " the AFF JSON (interval.* + configuration.*). Persists via
           " NRIV writes. See create_ddic_nrob for the implementation.
           create_ddic_nrob( EXPORTING iv_name    = CONV nrobj( lv_name )
+                                      iv_payload = iv_body
+                                      iv_package = lv_package
+                                      iv_request = lv_request
+                            IMPORTING es_payload = ls_create
+                                      ev_error   = ls_create_err ).
+        WHEN 'VIEW'.
+          " Database view — handcrafted view-v1 document (DD25V / DD26V /
+          " DD27P / DD28J / DD28V). See create_ddic_view.
+          create_ddic_view( EXPORTING iv_name    = CONV viewname( lv_name )
                                       iv_payload = iv_body
                                       iv_package = lv_package
                                       iv_request = lv_request
@@ -1843,6 +1905,7 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
     " the dereferenced object needs a static structure type.
     FIELD-SYMBOLS <ls_doma_payload> TYPE zcl_abap_vibe_icf_types=>ty_ddic_get_doma_data.
     FIELD-SYMBOLS <ls_dtel_payload> TYPE zcl_abap_vibe_icf_types=>ty_ddic_get_dtel_data.
+    FIELD-SYMBOLS <ls_view_payload> TYPE zcl_abap_vibe_icf_types=>ty_view_data.
     CASE iv_type.
       WHEN 'DOMA'.
         DATA ls_doma TYPE dd01v.
@@ -2007,6 +2070,86 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
         CREATE DATA es_payload TYPE zcl_abap_vibe_nrob_format=>ty_result.
         ASSIGN es_payload->* TO FIELD-SYMBOL(<ls_nrob_payload>).
         <ls_nrob_payload> = ls_nrob_artifact.
+      WHEN 'VIEW'.
+        DATA lv_view_state TYPE ddgotstate.
+        DATA ls_view_header TYPE dd25v.
+        DATA lt_view_tables TYPE TABLE OF dd26v.
+        DATA lt_view_fields TYPE TABLE OF dd27p.
+        DATA lt_view_joins TYPE TABLE OF dd28j.
+        DATA lt_view_selections TYPE TABLE OF dd28v.
+        DATA lv_view_name TYPE ddobjname.
+        DATA lv_view_package TYPE devclass.
+        lv_view_name = iv_name.
+        CALL FUNCTION 'DDIF_VIEW_GET'
+          EXPORTING
+            name     = lv_view_name
+            state    = 'A'
+            langu    = sy-langu
+          IMPORTING
+            gotstate = lv_view_state
+            dd25v_wa = ls_view_header
+          TABLES
+            dd26v_tab = lt_view_tables
+            dd27p_tab = lt_view_fields
+            dd28j_tab = lt_view_joins
+            dd28v_tab = lt_view_selections
+          EXCEPTIONS
+            illegal_input = 1
+            OTHERS        = 2.
+        IF sy-subrc <> 0 OR lv_view_state <> 'A' OR ls_view_header-viewname IS INITIAL.
+          ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                     error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'DDIC_OBJECT_NOT_FOUND'
+                                                                  message = |VIEW { iv_name } not found| ) ).
+          RETURN.
+        ENDIF.
+        CREATE DATA es_payload TYPE zcl_abap_vibe_icf_types=>ty_view_data.
+        ASSIGN es_payload->* TO <ls_view_payload>.
+        <ls_view_payload>-format_version = '1'.
+        <ls_view_payload>-type = 'VIEW'.
+        <ls_view_payload>-name = iv_name.
+        SELECT SINGLE devclass FROM tadir
+          WHERE pgmid = 'R3TR' AND object = 'VIEW' AND obj_name = @iv_name
+          INTO @lv_view_package.
+        <ls_view_payload>-package = lv_view_package.
+        <ls_view_payload>-header-description = ls_view_header-ddtext.
+        <ls_view_payload>-header-original_language = language_code_from_key( ls_view_header-ddlanguage ).
+        <ls_view_payload>-header-abap_language_version = 'standard'.
+        <ls_view_payload>-view_class = view_class_to_wire( ls_view_header-viewclass ).
+        <ls_view_payload>-root_table = ls_view_header-roottab.
+        LOOP AT lt_view_tables INTO DATA(ls_view_table).
+          APPEND VALUE zcl_abap_vibe_icf_types=>ty_view_table(
+            table_name         = ls_view_table-tabname
+            table_position     = CONV i( ls_view_table-tabpos )
+            foreign_table_name = ls_view_table-fortabname
+            for_field          = ls_view_table-forfield
+            for_direction      = ls_view_table-fordir ) TO <ls_view_payload>-tables.
+        ENDLOOP.
+        LOOP AT lt_view_fields INTO DATA(ls_view_field).
+          APPEND VALUE zcl_abap_vibe_icf_types=>ty_view_field(
+            view_field_name      = ls_view_field-viewfield
+            table_name           = ls_view_field-tabname
+            field_name           = ls_view_field-fieldname
+            key_flag             = boolc( ls_view_field-keyflag = 'X' )
+            roll_name            = ls_view_field-rollname
+            view_field_roll_name = ls_view_field-rollnamevi ) TO <ls_view_payload>-fields.
+        ENDLOOP.
+        LOOP AT lt_view_joins INTO DATA(ls_view_join).
+          APPEND VALUE zcl_abap_vibe_icf_types=>ty_view_join(
+            left_table  = ls_view_join-ltab
+            left_field  = ls_view_join-lfield
+            operator    = ls_view_join-operator
+            right_table = ls_view_join-rtab
+            right_field = ls_view_join-rfield
+            source      = ls_view_join-source ) TO <ls_view_payload>-join_conditions.
+        ENDLOOP.
+        LOOP AT lt_view_selections INTO DATA(ls_view_selection).
+          APPEND VALUE zcl_abap_vibe_icf_types=>ty_view_selection(
+            field_name = ls_view_selection-fieldname
+            negation   = ls_view_selection-negation
+            operator   = ls_view_selection-operator
+            constants  = ls_view_selection-constants
+            and_or     = ls_view_selection-and_or ) TO <ls_view_payload>-selection_conditions.
+        ENDLOOP.
       WHEN OTHERS.
         ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
                                    error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'DDIC_NOT_SUPPORTED'
@@ -2200,4 +2343,510 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
                                                                          type   = 'MSAG'
                                                                          action = 'updated' ) ).
   ENDMETHOD.
+  METHOD create_ddic_view.
+    " Persist a database view from the local view-v1 document, mirroring the
+    " abapGit view recipe:
+    "   RS_CORR_INSERT (TADIR + package/transport) →
+    "   DDIF_VIEW_PUT (all four TABLES parameters must be named, even empty) →
+    "   DDIF_VIEW_ACTIVATE (PUT only writes the inactive 'L' version).
+    DATA ls_request TYPE zcl_abap_vibe_icf_types=>ty_view_write_request.
+    DATA ls_dd25v TYPE dd25v.
+    DATA lt_dd26v TYPE TABLE OF dd26v.
+    DATA lt_dd27p TYPE TABLE OF dd27p.
+    DATA lt_dd28j TYPE TABLE OF dd28j.
+    DATA lt_dd28v TYPE TABLE OF dd28v.
+    DATA ls_dd03l TYPE dd03l.
+    DATA lt_table_names TYPE TABLE OF tabname.
+    DATA lv_name TYPE string.
+    DATA lv_view_name TYPE ddobjname.
+    DATA lv_package TYPE devclass.
+    DATA lv_master TYPE sy-langu.
+    DATA lv_view_class TYPE dd25v-viewclass.
+    DATA lv_root TYPE tabname.
+    DATA lv_table TYPE tabname.
+    DATA lv_field TYPE fieldname.
+    DATA lv_view_field TYPE fieldname.
+    DATA lv_for_table TYPE tabname.
+    DATA lv_left_table TYPE tabname.
+    DATA lv_left_field TYPE fieldname.
+    DATA lv_right_table TYPE tabname.
+    DATA lv_right_field TYPE fieldname.
+    DATA lv_operator TYPE dd28j-operator.
+    DATA lv_source TYPE dd28j-source.
+    DATA lv_pos TYPE i.
+    DATA lv_num4 TYPE n LENGTH 4.
+    DATA lv_existed TYPE abap_bool.
+
+    TRY.
+        /ui2/cl_json=>deserialize( EXPORTING json        = iv_payload
+                                             pretty_name = /ui2/cl_json=>pretty_mode-camel_case
+                                   CHANGING  data        = ls_request ).
+      CATCH cx_root.
+        ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                   error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'VIEW_INVALID_PAYLOAD'
+                                                                message = 'request body is not a valid view-v1 JSON document' ) ).
+        RETURN.
+    ENDTRY.
+
+    lv_name = to_upper( condense( val = iv_name del = ` ` ) ).
+    IF lv_name IS INITIAL OR strlen( lv_name ) > 16 OR lv_name CS ` `.
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'VIEW_NAME_INVALID'
+                                              message = |view name must be a non-empty name of at most 16 characters without whitespace (got '{ lv_name }')| ) ).
+      RETURN.
+    ENDIF.
+    IF ls_request-name IS NOT INITIAL
+       AND to_upper( condense( val = ls_request-name del = ` ` ) ) <> lv_name.
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'VIEW_NAME_INVALID'
+                                              message = |payload name { ls_request-name } does not match URL view { lv_name }| ) ).
+      RETURN.
+    ENDIF.
+    lv_view_name = lv_name.
+    lv_package = to_upper( condense( val = ls_request-package del = ` ` ) ).
+    IF lv_package IS INITIAL.
+      lv_package = '$TMP'.
+    ENDIF.
+    lv_master = language_key_from_code( ls_request-header-original_language ).
+    IF lv_master IS INITIAL.
+      lv_master = sy-langu.
+    ENDIF.
+
+    IF ls_request-header-description IS INITIAL.
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'VIEW_REQUIRED_FIELD'
+                                              message = 'header.description is required' ) ).
+      RETURN.
+    ENDIF.
+
+    lv_view_class = view_class_from_wire( ls_request-view_class ).
+    IF lv_view_class IS INITIAL.
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'VIEW_TYPE_INVALID'
+                                              message = |unsupported viewClass '{ ls_request-view_class }'; expected databaseView, maintenanceView, helpView or projectionView| ) ).
+      RETURN.
+    ENDIF.
+    IF lines( ls_request-tables ) = 0.
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'VIEW_REQUIRED_FIELD'
+                                              message = 'tables[] must contain at least the root table' ) ).
+      RETURN.
+    ENDIF.
+    IF lines( ls_request-fields ) = 0.
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'VIEW_REQUIRED_FIELD'
+                                              message = 'fields[] must contain at least one view field' ) ).
+      RETURN.
+    ENDIF.
+
+    " Step 1: involved tables (DD26V). The root table is tables[1]; every
+    " later table points back to the root (same shape SE11 writes).
+    lv_pos = 0.
+    LOOP AT ls_request-tables INTO DATA(ls_view_table).
+      lv_pos = lv_pos + 1.
+      lv_table = to_upper( condense( val = ls_view_table-table_name del = ` ` ) ).
+      IF lv_table IS INITIAL.
+        ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                   error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'VIEW_REQUIRED_FIELD'
+                                                message = |tables[{ lv_pos }].tableName is required| ) ).
+        RETURN.
+      ENDIF.
+      SELECT SINGLE tabname FROM dd02l INTO @DATA(lv_found_table)
+        WHERE tabname = @lv_table AND as4local = 'A'.
+      IF sy-subrc <> 0.
+        ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                   error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'VIEW_TABLE_NOT_FOUND'
+                                                message = |table { lv_table } does not exist| ) ).
+        RETURN.
+      ENDIF.
+      APPEND lv_table TO lt_table_names.
+      IF lv_pos = 1.
+        lv_root = lv_table.
+        lv_for_table = lv_table.
+      ELSE.
+        lv_for_table = lv_root.
+      ENDIF.
+      lv_num4 = lv_pos.
+      APPEND VALUE dd26v( ddlanguage = lv_master
+                          viewname   = lv_view_name
+                          tabname    = lv_table
+                          tabpos     = lv_num4
+                          fortabname = lv_for_table
+                          forfield   = to_upper( condense( val = ls_view_table-for_field del = ` ` ) )
+                          fordir     = to_upper( ls_view_table-for_direction ) ) TO lt_dd26v.
+    ENDLOOP.
+    IF ls_request-root_table IS NOT INITIAL
+       AND to_upper( condense( val = ls_request-root_table del = ` ` ) ) <> lv_root.
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'VIEW_REQUIRED_FIELD'
+                                              message = |rootTable { ls_request-root_table } must equal the first tables[] entry ({ lv_root })| ) ).
+      RETURN.
+    ENDIF.
+
+    " Step 2: view fields (DD27P). keyflag / rollname are derived from the
+    " underlying table field so the minimal payload only needs table+field.
+    lv_pos = 0.
+    LOOP AT ls_request-fields INTO DATA(ls_view_field_in).
+      lv_pos = lv_pos + 1.
+      lv_table = to_upper( condense( val = ls_view_field_in-table_name del = ` ` ) ).
+      lv_field = to_upper( condense( val = ls_view_field_in-field_name del = ` ` ) ).
+      IF lv_table IS INITIAL OR lv_field IS INITIAL.
+        ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                   error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'VIEW_REQUIRED_FIELD'
+                                                message = |fields[{ lv_pos }].tableName and fields[{ lv_pos }].fieldName are required| ) ).
+        RETURN.
+      ENDIF.
+      IF NOT line_exists( lt_table_names[ table_line = lv_table ] ).
+        ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                   error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'VIEW_FIELD_INVALID'
+                                                message = |fields[{ lv_pos }] references table { lv_table }, which is not in tables[]| ) ).
+        RETURN.
+      ENDIF.
+      SELECT SINGLE * FROM dd03l INTO @ls_dd03l
+        WHERE tabname = @lv_table AND fieldname = @lv_field AND as4local = 'A'.
+      IF sy-subrc <> 0.
+        ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                   error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'VIEW_FIELD_INVALID'
+                                                message = |field { lv_table }-{ lv_field } does not exist| ) ).
+        RETURN.
+      ENDIF.
+      lv_view_field = lv_field.
+      IF ls_view_field_in-view_field_name IS NOT INITIAL.
+        lv_view_field = to_upper( condense( val = ls_view_field_in-view_field_name del = ` ` ) ).
+      ENDIF.
+      lv_num4 = lv_pos.
+      APPEND VALUE dd27p( viewname   = lv_view_name
+                          objpos     = lv_num4
+                          ddlanguage = lv_master
+                          viewfield  = lv_view_field
+                          tabname    = lv_table
+                          fieldname  = lv_field
+                          keyflag    = ls_dd03l-keyflag
+                          rollname   = ls_dd03l-rollname
+                          rollnamevi = ls_dd03l-rollname ) TO lt_dd27p.
+    ENDLOOP.
+
+    " Step 3: join conditions (DD28J). Inner joins only; source 'S' is what
+    " SE11 writes for a database view.
+    LOOP AT ls_request-join_conditions INTO DATA(ls_view_join_in).
+      lv_left_table = to_upper( condense( val = ls_view_join_in-left_table del = ` ` ) ).
+      lv_left_field = to_upper( condense( val = ls_view_join_in-left_field del = ` ` ) ).
+      lv_right_table = to_upper( condense( val = ls_view_join_in-right_table del = ` ` ) ).
+      lv_right_field = to_upper( condense( val = ls_view_join_in-right_field del = ` ` ) ).
+      IF lv_left_table IS INITIAL OR lv_left_field IS INITIAL
+         OR lv_right_table IS INITIAL OR lv_right_field IS INITIAL.
+        ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                   error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'VIEW_REQUIRED_FIELD'
+                                                message = 'joinConditions[] entries require leftTable, leftField, rightTable and rightField' ) ).
+        RETURN.
+      ENDIF.
+      IF NOT line_exists( lt_table_names[ table_line = lv_left_table ] )
+         OR NOT line_exists( lt_table_names[ table_line = lv_right_table ] ).
+        ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                   error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'VIEW_FIELD_INVALID'
+                                                message = |join condition { lv_left_table }-{ lv_left_field } = { lv_right_table }-{ lv_right_field } references a table that is not in tables[]| ) ).
+        RETURN.
+      ENDIF.
+      lv_operator = to_upper( condense( val = ls_view_join_in-operator del = ` ` ) ).
+      IF lv_operator IS INITIAL.
+        lv_operator = 'EQ'.
+      ENDIF.
+      lv_source = to_upper( condense( val = ls_view_join_in-source del = ` ` ) ).
+      IF lv_source IS INITIAL.
+        lv_source = 'S'.
+      ENDIF.
+      APPEND VALUE dd28j( viewname = lv_view_name
+                          ltab     = lv_left_table
+                          lfield   = lv_left_field
+                          operator = lv_operator
+                          rtab     = lv_right_table
+                          rfield   = lv_right_field
+                          source   = lv_source ) TO lt_dd28j.
+    ENDLOOP.
+
+    " Step 4: selection conditions (DD28V). Database views normally have none;
+    " the parameter still must be named in DDIF_VIEW_PUT.
+    lv_pos = 0.
+    LOOP AT ls_request-selection_conditions INTO DATA(ls_view_selection_in).
+      lv_pos = lv_pos + 1.
+      lv_num4 = lv_pos.
+      APPEND VALUE dd28v( ddlanguage = lv_master
+                          condname   = lv_view_name
+                          position   = lv_num4
+                          tabname    = lv_root
+                          fieldname  = to_upper( condense( val = ls_view_selection_in-field_name del = ` ` ) )
+                          negation   = to_upper( condense( val = ls_view_selection_in-negation del = ` ` ) )
+                          operator   = to_upper( condense( val = ls_view_selection_in-operator del = ` ` ) )
+                          constants  = ls_view_selection_in-constants
+                          and_or     = to_upper( condense( val = ls_view_selection_in-and_or del = ` ` ) ) ) TO lt_dd28v.
+    ENDLOOP.
+
+    " Step 5: header (DD25V).
+    ls_dd25v-viewname   = lv_view_name.
+    ls_dd25v-ddlanguage = lv_master.
+    ls_dd25v-masterlang = lv_master.
+    ls_dd25v-ddtext     = ls_request-header-description.
+    ls_dd25v-viewclass  = lv_view_class.
+    ls_dd25v-roottab    = lv_root.
+    ls_dd25v-aggtype    = 'V'.
+    ls_dd25v-authclass  = '00'.
+    ls_dd25v-readonly   = 'X'.
+    ls_dd25v-viewgrant  = 'R'.
+    ls_dd25v-as4user    = sy-uname.
+    ls_dd25v-as4date    = sy-datum.
+    ls_dd25v-as4time    = sy-uzeit.
+
+    SELECT SINGLE viewname FROM dd25l INTO @DATA(lv_existing_view)
+      WHERE viewname = @lv_view_name.
+    lv_existed = boolc( sy-subrc = 0 ).
+
+    " Step 6: TADIR / package / transport.
+    CALL FUNCTION 'RS_CORR_INSERT'
+      EXPORTING object          = lv_view_name
+                object_class    = 'VIEW'
+                devclass        = lv_package
+                master_language = lv_master
+                korrnum         = iv_request
+                mode            = 'I'
+                global_lock     = abap_true
+                suppress_dialog = abap_true
+      EXCEPTIONS cancelled           = 1
+                 permission_failure  = 2
+                 unknown_objectclass = 3
+                 OTHERS              = 4.
+    IF sy-subrc <> 0.
+      DATA(lv_corr_subrc) = sy-subrc.
+      DATA(lv_corr_msg) = last_message( ).
+      IF lv_corr_msg IS INITIAL.
+        lv_corr_msg = |RS_CORR_INSERT failed for VIEW { lv_name } (sy-subrc { lv_corr_subrc })|.
+      ENDIF.
+      DATA(lv_corr_code) = SWITCH string( lv_corr_subrc
+        WHEN 1 THEN 'VIEW_TRANSPORT_REQUIRED'
+        WHEN 2 THEN 'VIEW_NOT_AUTHORIZED'
+        WHEN 3 THEN 'VIEW_PACKAGE_ASSIGN_FAILED'
+        ELSE 'VIEW_PACKAGE_ASSIGN_FAILED' ).
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = lv_corr_code
+                                              message = lv_corr_msg ) ).
+      RETURN.
+    ENDIF.
+
+    " Step 7: write the inactive version. All four TABLES parameters are named
+    " on purpose: an unnamed DD28V_TAB makes DDIF_VIEW_PUT return
+    " VIEW_INCONSISTENT (rc=3) on join views.
+    CALL FUNCTION 'DDIF_VIEW_PUT'
+      EXPORTING name     = lv_view_name
+                dd25v_wa = ls_dd25v
+      TABLES    dd26v_tab = lt_dd26v
+                dd27p_tab = lt_dd27p
+                dd28j_tab = lt_dd28j
+                dd28v_tab = lt_dd28v
+      EXCEPTIONS view_not_found    = 1
+                 name_inconsistent = 2
+                 view_inconsistent = 3
+                 put_failure       = 4
+                 put_refused       = 5
+                 OTHERS            = 6.
+    IF sy-subrc <> 0.
+      DATA(lv_put_subrc) = sy-subrc.
+      DATA(lv_put_msg) = last_message( ).
+      IF lv_put_msg IS INITIAL.
+        lv_put_msg = |DDIF_VIEW_PUT failed for { lv_name } (sy-subrc { lv_put_subrc })|.
+      ENDIF.
+      DATA(lv_put_code) = SWITCH string( lv_put_subrc
+        WHEN 2 THEN 'VIEW_NAME_INVALID'
+        WHEN 3 THEN 'VIEW_INCONSISTENT'
+        WHEN 5 THEN 'VIEW_WRITE_REFUSED'
+        ELSE 'VIEW_WRITE_FAILED' ).
+      " A brand-new local object that never landed has no DDIC rows yet; drop
+      " the TADIR row so a retry starts clean.
+      IF lv_existed = abap_false AND lv_package = '$TMP'.
+        DELETE FROM tadir WHERE pgmid = 'R3TR' AND object = 'VIEW' AND obj_name = @lv_view_name.
+      ENDIF.
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = lv_put_code
+                                              message = lv_put_msg ) ).
+      RETURN.
+    ENDIF.
+
+    " Step 8: activate (DDIF_VIEW_PUT only writes the 'L' version).
+    DATA lv_activation_rc TYPE sy-subrc.
+    CALL FUNCTION 'DDIF_VIEW_ACTIVATE'
+      EXPORTING name     = lv_view_name
+                auth_chk = abap_true
+      IMPORTING rc       = lv_activation_rc
+      EXCEPTIONS not_found   = 1
+                 put_failure = 2
+                 OTHERS      = 3.
+    IF sy-subrc <> 0 OR lv_activation_rc <> 0.
+      DATA(lv_act_subrc) = sy-subrc.
+      DATA(lv_act_msg) = last_message( ).
+      IF lv_act_msg IS INITIAL.
+        lv_act_msg = |DDIF_VIEW_ACTIVATE failed for { lv_name } (sy-subrc { lv_act_subrc }, rc { lv_activation_rc })|.
+      ENDIF.
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'VIEW_ACTIVATION_FAILED'
+                                              message = lv_act_msg ) ).
+      RETURN.
+    ENDIF.
+
+    es_payload = VALUE zcl_abap_vibe_icf_types=>ty_ddic_create( status = 'success'
+                                       data = VALUE zcl_abap_vibe_icf_types=>ty_ddic_create_data(
+                                         name   = lv_name
+                                         type   = 'VIEW'
+                                         action = COND string( WHEN lv_existed = abap_true THEN 'updated' ELSE 'created' ) ) ).
+  ENDMETHOD.
+
+  METHOD delete_ddic_object.
+    " DELETE /ddic/view/<name> (SHLP will reuse the same shape). RS_DD_DELETE_OBJ
+    " is the only ICF-safe delete path: RS_DD_DELETE opens the SAPLSPO1 confirm
+    " dynpro, which cannot run in the plugin context. An inactive-only object is
+    " activated first — deleting it directly raises E2 341 in plugin mode.
+    DATA lv_name TYPE string.
+    DATA lv_objname TYPE ddobjname.
+    DATA lv_object_type TYPE string.
+    DATA lv_tadir_object TYPE string.
+    DATA lv_rs_dd_objtype TYPE rsedd0-ddobjtype.
+    DATA lv_package TYPE devclass.
+    DATA lv_object_exists TYPE abap_bool.
+    DATA lv_tadir_exists TYPE abap_bool.
+    DATA lv_activation_rc TYPE sy-subrc.
+
+    lv_object_type = to_upper( iv_type ).
+    lv_name = to_upper( condense( val = iv_name del = ` ` ) ).
+    IF lv_name IS INITIAL OR strlen( lv_name ) > 16 OR lv_name CS ` `.
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'VIEW_NAME_INVALID'
+                                              message = |view name must be a non-empty name of at most 16 characters without whitespace (got '{ lv_name }')| ) ).
+      RETURN.
+    ENDIF.
+    lv_objname = lv_name.
+    lv_tadir_object = 'VIEW'.
+    lv_rs_dd_objtype = 'V'.
+
+    SELECT SINGLE viewname FROM dd25l INTO @DATA(lv_existing_view)
+      WHERE viewname = @lv_objname.
+    lv_object_exists = boolc( sy-subrc = 0 ).
+    SELECT SINGLE devclass FROM tadir INTO @lv_package
+      WHERE pgmid = 'R3TR' AND object = @lv_tadir_object AND obj_name = @lv_objname.
+    lv_tadir_exists = boolc( sy-subrc = 0 ).
+    IF lv_object_exists = abap_false AND lv_tadir_exists = abap_false.
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'DDIC_OBJECT_NOT_FOUND'
+                                              message = |VIEW { lv_name } not found| ) ).
+      RETURN.
+    ENDIF.
+    " Removing a repository object from a transport request cannot be recorded
+    " from the ICF context (no CTS dialog), so transported views stay with SE11.
+    IF lv_package IS NOT INITIAL AND lv_package <> '$TMP'.
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'VIEW_DELETE_UNSUPPORTED'
+                                              message = |view { lv_name } is in package { lv_package }; delete it in SE11 so the deletion is recorded in a transport request| ) ).
+      RETURN.
+    ENDIF.
+
+    IF lv_object_exists = abap_true.
+      " Make sure an inactive 'L' version is activated before the delete; an
+      " already-active view just returns rc=8 (nothing to activate).
+      CALL FUNCTION 'DDIF_VIEW_ACTIVATE'
+        EXPORTING name = lv_objname
+        IMPORTING rc   = lv_activation_rc
+        EXCEPTIONS not_found   = 1
+                   put_failure = 2
+                   OTHERS      = 3.
+      IF sy-subrc <> 0.
+        ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                   error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'VIEW_DELETE_FAILED'
+                                                message = |view { lv_name } has an inactive version that could not be activated (sy-subrc { sy-subrc }); activate it in SE11 and retry| ) ).
+        RETURN.
+      ENDIF.
+      CALL FUNCTION 'RS_DD_DELETE_OBJ'
+        EXPORTING no_ask  = 'X'
+                  objtype = lv_rs_dd_objtype
+                  objname = lv_objname
+        EXCEPTIONS not_executed         = 1
+                   object_not_found     = 2
+                   object_not_specified = 3
+                   permission_failure   = 4
+                   dialog_needed        = 5
+                   OTHERS               = 6.
+      IF sy-subrc <> 0.
+        DATA(lv_delete_subrc) = sy-subrc.
+        DATA(lv_delete_msg) = last_message( ).
+        IF lv_delete_msg IS INITIAL.
+          lv_delete_msg = |RS_DD_DELETE_OBJ failed for { lv_name } (sy-subrc { lv_delete_subrc })|.
+        ENDIF.
+        DATA(lv_delete_code) = SWITCH string( lv_delete_subrc
+          WHEN 2 THEN 'DDIC_OBJECT_NOT_FOUND'
+          WHEN 4 THEN 'VIEW_NOT_AUTHORIZED'
+          ELSE 'VIEW_DELETE_FAILED' ).
+        ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                   error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = lv_delete_code
+                                                message = lv_delete_msg ) ).
+        RETURN.
+      ENDIF.
+    ELSE.
+      " TADIR row without any DDIC object (a PUT that never landed): the delete
+      " FM raises E2 341 in plugin mode, so drop the local TADIR row directly —
+      " the same $TMP-only cleanup the TRAN delete path uses.
+      DELETE FROM tadir WHERE pgmid = 'R3TR' AND object = @lv_tadir_object AND obj_name = @lv_objname.
+    ENDIF.
+
+    es_payload = VALUE zcl_abap_vibe_icf_types=>ty_ddic_delete( status = 'success'
+                                       data = VALUE zcl_abap_vibe_icf_types=>ty_ddic_delete_data(
+                                         name   = lv_name
+                                         type   = lv_object_type
+                                         action = 'deleted' ) ).
+  ENDMETHOD.
+
+  METHOD last_message.
+    " Render the T100 message left by a failed classic FM call (the FM fills
+    " sy-msgid / sy-msgno / sy-msgv1..4 before raising its EXCEPTION).
+    CLEAR rv_message.
+    IF sy-msgid IS INITIAL OR sy-msgno IS INITIAL.
+      RETURN.
+    ENDIF.
+    MESSAGE ID sy-msgid TYPE 'S' NUMBER sy-msgno
+      WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 INTO rv_message.
+  ENDMETHOD.
+
+  METHOD language_code_from_key.
+    " SAP one-character language key -> AFF two-letter ISO code. Unknown keys
+    " fall back to 'en' so a pulled document always satisfies the schema.
+    CASE to_upper( iv_key ).
+      WHEN 'D'. rv_code = 'de'.
+      WHEN 'E'. rv_code = 'en'.
+      WHEN '1'. rv_code = 'zh'.
+      WHEN 'F'. rv_code = 'fr'.
+      WHEN 'S'. rv_code = 'es'.
+      WHEN OTHERS. rv_code = 'en'.
+    ENDCASE.
+  ENDMETHOD.
+
+  METHOD view_class_to_wire.
+    CASE to_upper( iv_class ).
+      WHEN 'D'. rv_class = 'databaseView'.
+      WHEN 'C'. rv_class = 'maintenanceView'.
+      WHEN 'H'. rv_class = 'helpView'.
+      WHEN 'P'. rv_class = 'projectionView'.
+      WHEN OTHERS. rv_class = iv_class.
+    ENDCASE.
+  ENDMETHOD.
+
+  METHOD view_class_from_wire.
+    CASE to_lower( iv_class ).
+      WHEN 'databaseview'. rv_class = 'D'.
+      WHEN 'maintenanceview'. rv_class = 'C'.
+      WHEN 'helpview'. rv_class = 'H'.
+      WHEN 'projectionview'. rv_class = 'P'.
+      WHEN OTHERS.
+        CASE to_upper( iv_class ).
+          WHEN 'D'. rv_class = 'D'.
+          WHEN 'C'. rv_class = 'C'.
+          WHEN 'H'. rv_class = 'H'.
+          WHEN 'P'. rv_class = 'P'.
+        ENDCASE.
+    ENDCASE.
+  ENDMETHOD.
+
 ENDCLASS.

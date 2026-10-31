@@ -20,6 +20,12 @@ describe('aff-router', () => {
     expect(schemaFileFor('TABL')).toBe('tabl-v1.json');
   });
 
+  it('routes the VIEW database-view document (local extension)', () => {
+    const routed = routeAffSchema('zcli_tc_view.view.json');
+    expect(routed).toEqual({ type: 'VIEW', isJson: true, schemaFile: 'view-v1.json' });
+    expect(routeType('src/zcli_tc_view.view.json')).toBe('VIEW');
+  });
+
   it('routes the DEVC package document', () => {
     const routed = routeAffSchema('zmy_package.devc.json');
     expect(routed).toEqual({ type: 'DEVC', isJson: true, schemaFile: 'devc-v1.json' });
