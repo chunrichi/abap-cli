@@ -56,10 +56,10 @@ export const SCHEMA = {
   errors: [
     { code: 'USAGE', category: 'USAGE', exitCode: 2 },
     { code: 'OBJECT_NOT_FOUND', category: 'NOT_FOUND', exitCode: 8 },
-    { code: 'AMBIGUOUS_OBJECT', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'AMBIGUOUS_OBJECT', category: 'NOT_FOUND', exitCode: 8 },
     { code: 'TYPE_NOT_SUPPORTED', category: 'VALIDATION_ERROR', exitCode: 7 },
     { code: 'MISSING_TRANSPORT', category: 'USAGE', exitCode: 2 },
-    { code: 'LOCK_FAILED', category: 'SAP_ERROR', exitCode: 6 },
+    { code: 'LOCK_FAILED', category: 'LOCKED', exitCode: 9 },
     { code: 'DELETE_FAILED', category: 'SAP_ERROR', exitCode: 6 },
   ],
 };

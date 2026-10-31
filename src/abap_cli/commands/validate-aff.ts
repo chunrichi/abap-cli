@@ -51,9 +51,9 @@ export const SCHEMA: CommandSchema = {
     { description: 'Validate a wire payload directory', command: 'abap validate:aff --wire tmp/s4h/wire/' },
   ],
   errors: [
-    { code: 'AFF_SCHEMA_MISSING', category: 'NOT_FOUND', exitCode: 2 },
-    { code: 'AFF_SCHEMA_INVALID', category: 'NOT_FOUND', exitCode: 2 },
-    { code: 'AFF_SCHEMA_COMPILE_ERROR', category: 'NOT_FOUND', exitCode: 2 },
+    { code: 'AFF_SCHEMA_MISSING', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'AFF_SCHEMA_INVALID', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'AFF_SCHEMA_COMPILE_ERROR', category: 'VALIDATION_ERROR', exitCode: 7 },
   ],
 };
 

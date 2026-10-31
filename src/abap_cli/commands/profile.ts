@@ -35,8 +35,6 @@ export const SCHEMA: CommandSchema = {
   ],
   errors: [
     { code: 'CONFIG_ERROR', category: 'CONFIG_ERROR', exitCode: 3 },
-    { code: 'PASSWORD_EXPORT', category: 'VALIDATION_ERROR', exitCode: 7 },
-    { code: 'PROFILE_MISMATCH', category: 'VALIDATION_ERROR', exitCode: 7 },
     { code: 'TLS_ERROR', category: 'TLS_ERROR', exitCode: 4 },
     { code: 'AUTH_ERROR', category: 'AUTH_ERROR', exitCode: 5 },
     { code: 'SAP_ERROR', category: 'SAP_ERROR', exitCode: 6 },
