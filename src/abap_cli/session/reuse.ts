@@ -251,13 +251,23 @@ function isAnonymousContextCookie(name: string, entry: string): boolean {
   return /(?:^|%3a|:)anon(?:%3a|:)/i.test(value);
 }
 
-/** Drop anonymous ICM context cookies from the live ADT cookie map. */
-export function dropAnonymousContextCookies(client: { httpClient: unknown }): void {
+/**
+ * Drop anonymous ICM context cookies from the live ADT cookie map.
+ * Returns true when an anonymous context was present — the caller then cannot
+ * run in stateful mode (the server could not open a real session), so it must
+ * fall back to stateless requests.
+ */
+export function dropAnonymousContextCookies(client: { httpClient: unknown }): boolean {
   const http = client.httpClient as AdtHttpLike;
-  if (!http.cookie) return;
+  if (!http.cookie) return false;
+  let dropped = false;
   for (const [name, entry] of [...http.cookie]) {
-    if (isAnonymousContextCookie(name, entry)) http.cookie.delete(name);
+    if (isAnonymousContextCookie(name, entry)) {
+      http.cookie.delete(name);
+      dropped = true;
+    }
   }
+  return dropped;
 }
 
 /**
