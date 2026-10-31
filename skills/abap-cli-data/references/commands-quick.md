@@ -114,3 +114,30 @@ abap run-report <report> [--variant <name>] [--format raw|tsv|csv] [--param NAME
   ```bash
   abap run-report ZR_MY_REPORT --variant VAR1 --json
   ```
+
+## `abap test`
+
+Run ABAP Unit tests for an object and report the summary plus failing tests (read-only).
+
+```bash
+abap test [options] <object>
+```
+
+| Option | Description |
+| --- | --- |
+| `--type <tadir>` | Object type filter for name resolution (CLAS, PROG, …); needed only when the name matches several object kinds. |
+| `--risk <levels>` | Comma-separated risk levels to execute (default: harmless). |
+| `--duration <levels>` | Comma-separated duration levels to execute (default: short). |
+| `--all` | Run every risk level and every duration level (instead of the defaults). |
+| `--strict` | Treat warning alerts as failures. |
+
+- Run the default (harmless / short) ABAP Unit tests
+
+  ```bash
+  abap test ZCL_MY_THING
+  ```
+- Run every risk and duration level
+
+  ```bash
+  abap test ZCL_MY_THING --all
+  ```

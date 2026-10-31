@@ -62,6 +62,12 @@ export const COMMAND_SPECS: LazyCommandSpec[] = [
     load: () => import('../commands/check.js').then((m) => ({ register: m.registerCheckCommand })),
   },
   {
+    name: 'test',
+    scope: 'sap',
+    description: 'Run ABAP Unit tests for an object (read-only)',
+    load: () => import('../commands/test.js').then((m) => ({ register: m.registerTestCommand })),
+  },
+  {
     name: 'search',
     description: 'Search for ABAP objects in SAP system',
     load: () => import('../commands/search.js').then((m) => ({ register: m.registerSearchCommand })),
