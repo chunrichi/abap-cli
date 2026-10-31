@@ -47,7 +47,7 @@
 | 项目 | 设想 | 价值 | 状态 |
 |------|------|------|------|
 | `abap serve`（协议化） | 常驻进程 + JSON-RPC 行协议，暴露现有全部能力；CLI 命令保留为人类 fallback，共享同一 `flows/` 层 | 免冷启动（keytar/abap-adt-api 加载重）、复用连接池、支持流式进度/取消；改变 agent 调用方式 | - [ ] |
-| 领域 DSL 收敛 | 从 30 个扁平命令收敛为少量核心动词 + 通配对象寻址：`get`/`put`/`status`/`run`/`data` | 让 agent 只记 5 个动词而非 30 个专名；`--schema` 已提供机器自描述 | - [ ] |
+| 领域 DSL 收敛 | 从 29 个扁平命令收敛为少量核心动词 + 通配对象寻址：`get`/`put`/`status`/`run`/`data` | 让 agent 只记 5 个动词而非 29 个专名；`--schema` 已提供机器自描述 | - [ ] |
 | 多 agent 并发协调 | `abap lock <obj> --owner <agent-id>` 显式声明归属、超时自动释放；`push` 前强制检查 owner，冲突返回 `LOCKED` 并指认持有者 | 从"单 agent 工具"到"多 agent 平台"的架构性转变 | - [ ] |
 | 撤销/时间旅行 | `abap restore <obj> --from <snapshot>` 从快照恢复到 SAP，配合 `snapshot` 形成"提交点→实验→回滚"循环 | 让 agent 敢于试验，可逆操作 | - [ ] |
 
