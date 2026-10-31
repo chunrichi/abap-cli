@@ -81,14 +81,14 @@ Endpoints exposed under `/sap/abap_cli/` (current service version `1.0.0`, see `
 | Endpoint | Used by |
 |---|---|
 | `/` (root: service id + version) | `abap deploy status`, `abap init` (ICF check), `abap doctor` |
-| `/ddic/<type>` (GET/POST) | `DOMA` / `DTEL` / `TABL` / `STRU` + `ENQU` / `NROB`: `abap create` / `push` / `pull` |
-| `/http/<name>` (GET/POST) | HTTP service node: `abap create HTTP` / `abap push <file>.http.json` / `abap pull --type HTTP` |
-| `/tran/<code>` (GET/POST) | transaction code (SE93): `abap create TRAN` / `push` / `pull` |
+| `/ddic/<type>` (GET/POST) | `DOMA` / `DTEL` / `TABL` / `STRU` / `ENQU` / `NROB` (+ ICF fallback for `TTYP` / `MSAG`): `abap create` / `push` / `pull` |
+| `/http/<name>` (GET/POST) | HTTP service node (SICF): `abap create HTTP` / `abap push <file>.http.json` / `abap pull --type HTTP` |
+| `/tran/<code>` (GET read; POST/PUT stub → 501) | transaction code (SE93): `abap pull` / `abap tcode` read path; write (`create` / `push`) still returns `TRAN_WRITE_NOT_IMPLEMENTED` |
 | `/tcode/<code>` (GET) | `abap tcode` (TSTC → TSTCT) |
 | `/textpool/<category>` (GET read; POST stub) | `abap pull --textpool` read. The POST branch returns `TEXTPOOL_WRITE_UNSUPPORTED`: textpool write needs the ADT text-elements write endpoint and is unavailable on releases that only expose the non-interactive API (verified on A4H) |
 | `/data/query`, `/data/find-tables-by-fields` (POST) | `abap select --table`, `abap fields --find` |
 | `/run/report` (POST) | `abap run-report` (report list output) |
-| `/mime/<resource>` (GET/POST/PUT/DELETE) | `abap mime create` / `delete` / `push` |
+| `/mime/folder` (POST/PUT), `/mime/resources` (POST) | `abap mime create` / `delete` / `push` |
 | `/version-source` (GET) | `abap pull --remote <system>` (TMS RFC destination) |
 | `/_class-check` (GET) | diagnostic / activation probe (no CLI caller in this repo) |
 
