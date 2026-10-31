@@ -197,7 +197,7 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | Doctor（环境诊断） | `doctor` | ✅ | `--fix` 自动修 |
 | --schema（命令 schema 自描述） | `--schema` | ✅ | 全部 29 命令 |
 | --json / --pretty-json | `--json / --pretty-json` | ✅ | 全部命令 |
-| Skill bundle | `init --agent` | ✅ | copilot/claude/cursor/generic |
+| Skill bundle | `init --agent` | ✅ | agents/copilot/claude/cursor/generic |
 | Wiki | `wiki/` | ✅ | 69 篇（命令页 29 个） |
 | 命令文档生成 | `scripts/gen-docs.mjs`（docs:check 入 verify） | ✅ | 单一事实源 |
 | 错误码自描述 | `CliError.references` | ✅ | 指向 skills/.../references/errors.md |

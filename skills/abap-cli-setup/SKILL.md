@@ -13,7 +13,7 @@ metadata:
 
 ## 接入前提
 
-- agent skills 由 `abap init --agent <copilot|claude|cursor|generic>` 安装（随 npm 包分发），无需手工拷贝。
+- agent skills 由 `abap init --agent <agents|copilot|claude|cursor|generic>` 安装（随 npm 包分发），无需手工拷贝。
 - 1.0.0 只支持 basic auth（SAP 用户名 + OS keychain 密码）：依赖 OAuth（BTP ABAP Environment / trial）、SAML SSO 或 X.509 证书认证的系统无法连接。
 
 ## 何时用

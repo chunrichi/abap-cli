@@ -4,22 +4,24 @@ import { fileURLToPath } from 'node:url';
 import { CliError } from '../../output/json.js';
 import { toOutputPath } from '../../core/path-output.js';
 
-/** Agent targets. Each target writes into a vendor-specific sub-directory. */
-export type AgentTarget = 'generic' | 'copilot' | 'claude' | 'cursor';
+/** Agent targets. Each target writes the shared skills/agents tree into its own directory. */
+export type AgentTarget = 'agents' | 'generic' | 'copilot' | 'claude' | 'cursor';
 
-const AGENT_TARGETS: AgentTarget[] = ['generic', 'copilot', 'claude', 'cursor'];
+const AGENT_TARGETS: AgentTarget[] = ['agents', 'generic', 'copilot', 'claude', 'cursor'];
 
 /**
- * Vendor-specific destination directories (relative to workspace root).
+ * Destination directories (relative to workspace root).
  * - copilot → .github/    (GitHub Copilot standard)
  * - claude  → .claude/    (Claude Code standard)
  * - cursor  → .cursor/    (Cursor standard)
- * - generic → .agents/    (neutral fallback when no vendor-specific dir is known)
+ * - agents  → .agents/    (vendor-neutral `SKILL.md` tree, no vendor overlay)
+ * - generic → .agents/    (earlier neutral fallback; same output as `agents`)
  *
- * Each vendor gets a `skills/` and an `agents/` sub-tree, matching how agent
+ * Each target gets a `skills/` and an `agents/` sub-tree, matching how agent
  * frameworks discover skills (SKILL.md) and agents (handoffs).
  */
 const VENDOR_DIR: Record<AgentTarget, string> = {
+  agents: '.agents',
   copilot: '.github',
   claude: '.claude',
   cursor: '.cursor',
@@ -109,7 +111,7 @@ function copyTree(
 /** Rewrite every recorded path in `out` so it carries the vendor dir prefix
  * (e.g. `skills/abap-cli-setup/SKILL.md` → `.github/skills/abap-cli-setup/SKILL.md`).
  * Token-efficient: agents see the actual final location, not an ambiguous
- * repo-rooted path that would only be true for the `generic` vendor. */
+ * repo-rooted path that would only be true for the neutral (`.agents/`) targets. */
 function rewritePaths(out: ScaffoldingResult, vendorDir: string): void {
   out.written = out.written.map(rewriteOne(vendorDir));
   out.skipped = out.skipped.map(rewriteOne(vendorDir));
@@ -187,7 +189,8 @@ function scaffoldCursor(force: boolean, out: ScaffoldingResult): void {
  *   copilot → .github/skills/<skill>/  +  .github/agents/abap-developer.agent.md
  *   claude  → .claude/skills/<skill>/  +  .claude/agents/abap-developer.agent.md  +  CLAUDE.md
  *   cursor  → .cursor/skills/<skill>/  +  .cursor/agents/abap-developer.agent.md  +  .cursor/rules/abap.mdc
- *   generic → .agents/skills/<skill>/  +  .agents/agents/abap-developer.agent.md
+ *   agents  → .agents/skills/<skill>/  +  .agents/agents/abap-developer.agent.md
+ *   generic → same as `agents` (earlier neutral fallback, kept for compatibility)
  *
  * Never writes `AGENTS.md` or `copilot-instructions.md` (those are repo-level
  * files, not user-workspace context). Idempotent: re-runs are no-ops unless
@@ -196,21 +199,20 @@ function scaffoldCursor(force: boolean, out: ScaffoldingResult): void {
 export async function scaffoldAgents(target: AgentTarget, force: boolean): Promise<ScaffoldingResult> {
   if (!AGENT_TARGETS.includes(target)) {
     throw new CliError('USAGE', `Unknown agent target: ${target}. Allowed: ${AGENT_TARGETS.join(', ')}`, {
-      nextSteps: ['Run `abap init --agent copilot` (or claude/cursor/generic).'],
-      example: 'abap init --agent copilot',
+      nextSteps: ['Run `abap init --agent agents` (or copilot/claude/cursor/generic).'],
+      example: 'abap init --agent agents',
     });
   }
   const out: ScaffoldingResult = { written: [], skipped: [] };
   const root = bundledDir();
   const vendorDir = VENDOR_DIR[target];
   scaffoldGeneric(root, vendorDir, force, out);
-  if (target === 'copilot') {
-    // base only; copilot discovers skills/agents directly under .github/.
-  } else if (target === 'claude') {
+  if (target === 'claude') {
     scaffoldClaude(force, out);
   } else if (target === 'cursor') {
     scaffoldCursor(force, out);
   }
+  // agents / generic / copilot: base tree only, no vendor overlay.
   rewritePaths(out, vendorDir);
   // P0: normalize every emitted path to POSIX separators (Windows path contract).
   return {

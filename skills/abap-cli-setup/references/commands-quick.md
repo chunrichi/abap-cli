@@ -30,7 +30,7 @@ abap init [options]
 | `--test-connection` | Probe TLS + auth and report results (implies --test-tls --test-auth). |
 | `--test-tls` | Probe the TLS handshake. |
 | `--test-auth` | Probe authentication (after TLS). |
-| `--agent <target>` | Scaffold agent context files. One of: copilot \| claude \| cursor \| generic. |
+| `--agent <target>` | Scaffold agent context files. One of: agents \| copilot \| claude \| cursor \| generic. |
 | `--force` | Overwrite existing files when scaffolding --agent (default: skip). |
 | `--yes` | Skip all prompts; fail if required input is missing. |
 | `--non-interactive` | Alias of --yes. |
