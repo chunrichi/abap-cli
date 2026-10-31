@@ -5,6 +5,13 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { registerInspectCommand } from '../../src/abap_cli/commands/inspect.js';
 import { makeProgram, runCommand } from './cli-helper.js';
 import { parseLineRange } from '../../src/abap_cli/flows/search/inspect-ops.js';
+import { parseVersionsFeed } from '../../src/abap_cli/formats/versions-feed.js';
+
+/** Feed fixture as returned by S/4HANA for a class include (verified 2026-11-01). */
+const CLASS_INCLUDE_FEED = `<?xml version="1.0" encoding="utf-8"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom" xmlns:adtcore="http://www.sap.com/adt/core"><atom:title>Version List of ZCL_DEMO (CLAS)</atom:title><atom:updated>1970-01-01T10:11:23Z</atom:updated><atom:entry><atom:author><atom:name>MOCKUSER</atom:name></atom:author><atom:content type="text/plain" src="/sap/bc/adt/oo/classes/zcl_demo/includes/main/versions/19700101101123/00004/content"/><atom:id>00004</atom:id><atom:updated>2026-10-31T19:20:44Z</atom:updated></atom:entry><atom:entry><atom:author><atom:name>MOCKUSER</atom:name></atom:author><atom:content type="text/plain" src="/sap/bc/adt/oo/classes/zcl_demo/includes/main/versions/19700101101123/00000/content"/><atom:id>00000</atom:id><atom:updated>2026-10-30T09:00:00Z</atom:updated><atom:title>Initial version</atom:title></atom:entry></atom:feed>`;
+
+/** Object-level feed carrying the transport link (no atom:id). */
+const OBJECT_FEED_WITH_TRANSPORT = `<?xml version="1.0" encoding="utf-8"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom" xmlns:adtcore="http://www.sap.com/adt/core"><atom:entry><atom:author><atom:name>DEV</atom:name></atom:author><atom:content type="text/plain" src="/sap/bc/adt/programs/programs/zprog/versions/19700101101123/00001/content"/><atom:link rel="http://www.sap.com/adt/relations/transport" type="application/vnd.sap.adt.transportrequests.v1+xml" adtcore:name="DEVK900001" href="/sap/bc/adt/cts/transportrequests/DEVK900001"/><atom:updated>2026-10-31T10:00:00Z</atom:updated><atom:title>Transport DEVK900001</atom:title></atom:entry></atom:feed>`;
 
 const searchObject = vi.fn(async (name: string) => {
   const normalized = name.replace(/\*/g, '').toUpperCase();
@@ -26,6 +33,12 @@ const searchObject = vi.fn(async (name: string) => {
   ];
 });
 
+const VERSIONS_LINK = {
+  href: 'includes/main/versions',
+  rel: 'http://www.sap.com/adt/relations/versions',
+  type: 'application/atom+xml;type=feed',
+};
+
 const objectStructure = vi.fn(async (objectUrl: string) => {
   const isClass = objectUrl.includes('/classes/');
   return {
@@ -37,32 +50,21 @@ const objectStructure = vi.fn(async (objectUrl: string) => {
       'adtcore:changedAt': 1720000000000,
       'adtcore:changedBy': 'MOCKUSER',
       'adtcore:responsible': 'MOCKUSER',
+      // Marks the structure as a class structure for the library's
+      // getRevisionLink() include lookup (isClassStructure checks this field).
+      ...(isClass ? { 'class:visibility': 'public' } : {}),
     },
+    links: isClass ? [] : [{ href: 'versions', rel: 'http://www.sap.com/adt/relations/versions' }],
     includes: isClass
       ? [
-          { 'class:includeType': 'main', 'abapsource:sourceUri': `${objectUrl}/source/main` },
-          { 'class:includeType': 'implementations', 'abapsource:sourceUri': `${objectUrl}/source/implementations` },
+          { 'class:includeType': 'main', 'abapsource:sourceUri': `${objectUrl}/source/main`, links: [VERSIONS_LINK] },
+          { 'class:includeType': 'implementations', 'abapsource:sourceUri': `${objectUrl}/source/implementations`, links: [] },
         ]
       : [],
   };
 });
 
-const revisions = vi.fn(async () => [
-  {
-    uri: '/sap/bc/adt/oo/classes/zcl_demo/source/main?version=000001',
-    date: '2026-10-01T10:00:00Z',
-    author: 'MOCKUSER',
-    version: '000001',
-    versionTitle: 'First version',
-  },
-  {
-    uri: '/sap/bc/adt/oo/classes/zcl_demo/source/main?version=000002',
-    date: '2026-10-02T10:00:00Z',
-    author: 'MOCKUSER',
-    version: '000002',
-    versionTitle: 'Second version',
-  },
-]);
+const adtFeed = vi.fn(async () => CLASS_INCLUDE_FEED);
 
 const getObjectSource = vi.fn(async () => 'CLASS zcl_demo DEFINITION PUBLIC.\nENDCLASS.\n');
 
@@ -82,6 +84,13 @@ const objectStructureElements = vi.fn(async () => [
         children: [],
       },
       {
+        name: 'LT_TYPES',
+        type: 'CLAS/OLT',
+        visibility: 'public',
+        links: [],
+        children: [],
+      },
+      {
         name: 'MV_COUNT',
         type: 'CLAS/OA',
         visibility: 'private',
@@ -97,7 +106,7 @@ vi.mock('../../src/abap_cli/clients/adt-client.js', () => ({
     create: async () => ({
       searchObject,
       objectStructure,
-      revisions,
+      adtFeed,
       getObjectSource,
       objectStructureElements,
     }),
@@ -111,6 +120,33 @@ function parseData(res: { stdout: string }) {
 function parseError(res: { stderr: string }) {
   return JSON.parse(res.stderr).error;
 }
+
+describe('parseVersionsFeed', () => {
+  it('reads the version id from atom:id and parses author/date/uri', () => {
+    const entries = parseVersionsFeed(CLASS_INCLUDE_FEED);
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toMatchObject({
+      version: '00004',
+      author: 'MOCKUSER',
+      date: '2026-10-31T19:20:44Z',
+    });
+    expect(entries[0]!.uri).toContain('/versions/19700101101123/00004/content');
+    expect(entries[1]).toMatchObject({ version: '00000', title: 'Initial version' });
+  });
+
+  it('keeps the transport request when the feed exposes the link', () => {
+    const entries = parseVersionsFeed(OBJECT_FEED_WITH_TRANSPORT);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ version: '00001', transport: 'DEVK900001' });
+  });
+
+  it('falls back to the content URI when atom:id is absent', () => {
+    const entries = parseVersionsFeed(
+      '<atom:feed><atom:entry><atom:content src="/x/versions/1/00007/content"/><atom:updated>2026-01-01T00:00:00Z</atom:updated></atom:entry></atom:feed>',
+    );
+    expect(entries[0]!.version).toBe('00007');
+  });
+});
 
 describe('parseLineRange', () => {
   it('parses the start/end fragment of an ADT atom link', () => {
@@ -136,25 +172,25 @@ describe('abap inspect --versions', () => {
     expect(res.exitCode).toBeUndefined();
     const data = parseData(res);
     expect(data.versions.include).toBe('main');
-    expect(data.versions.versions).toHaveLength(2);
+    expect(data.versions.count).toBe(2);
     expect(data.versions.versions[0]).toMatchObject({
-      version: '000001',
+      version: '00004',
       author: 'MOCKUSER',
-      title: 'First version',
+      date: '2026-10-31T19:20:44Z',
     });
-    expect(data.versions.versions[0].uri).toContain('version=000001');
-    expect(revisions).toHaveBeenCalledWith('/sap/bc/adt/oo/classes/zcl_demo', 'main');
+    expect(data.versions.versions[0].uri).toContain('/versions/19700101101123/00004/content');
+    expect(adtFeed).toHaveBeenCalledWith('/sap/bc/adt/oo/classes/zcl_demo/includes/main/versions');
   });
 
   it('--show returns the selected version source', async () => {
     const program = makeProgram();
     registerInspectCommand(program);
-    const res = await runCommand(program, ['inspect', 'ZCL_DEMO', '--versions', '--show', '000001', '--json']);
+    const res = await runCommand(program, ['inspect', 'ZCL_DEMO', '--versions', '--show', '00000', '--json']);
     expect(res.exitCode).toBeUndefined();
     const data = parseData(res);
-    expect(data.versions.shown.version).toBe('000001');
+    expect(data.versions.shown.version).toBe('00000');
     expect(data.versions.shown.source).toContain('CLASS zcl_demo');
-    expect(getObjectSource).toHaveBeenCalledWith('/sap/bc/adt/oo/classes/zcl_demo/source/main?version=000001');
+    expect(getObjectSource).toHaveBeenCalledWith('/sap/bc/adt/oo/classes/zcl_demo/includes/main/versions/19700101101123/00000/content');
   });
 
   it('--show --out writes the version source and reports a relative path', async () => {
@@ -162,18 +198,23 @@ describe('abap inspect --versions', () => {
     try {
       const program = makeProgram();
       registerInspectCommand(program);
-      const res = await runCommand(program, ['inspect', 'ZCL_DEMO', '--versions', '--show', '000002', '--out', 'v2.abap', '--json'], { cwd });
+      const res = await runCommand(program, ['inspect', 'ZCL_DEMO', '--versions', '--show', '00004', '--out', 'v4.abap', '--json'], { cwd });
       expect(res.exitCode).toBeUndefined();
       const data = parseData(res);
-      expect(data.versions.shown.out).toBe('v2.abap');
-      expect(fs.readFileSync(path.join(cwd, 'v2.abap'), 'utf8')).toContain('CLASS zcl_demo');
+      expect(data.versions.shown.out).toBe('v4.abap');
+      expect(fs.readFileSync(path.join(cwd, 'v4.abap'), 'utf8')).toContain('CLASS zcl_demo');
     } finally {
       fs.rmSync(cwd, { recursive: true, force: true });
     }
   });
 
-  it('maps a missing versions feed to TYPE_NOT_SUPPORTED', async () => {
-    revisions.mockRejectedValueOnce(new Error('Revision URL not found for object ZCL_DEMO'));
+  it('maps a missing versions link to TYPE_NOT_SUPPORTED', async () => {
+    objectStructure.mockResolvedValueOnce({
+      objectUrl: '/sap/bc/adt/oo/classes/zcl_demo',
+      metaData: { 'adtcore:name': 'ZCL_DEMO', 'adtcore:type': 'CLAS/OC' },
+      links: [],
+      includes: [{ 'class:includeType': 'main', 'abapsource:sourceUri': '/sap/bc/adt/oo/classes/zcl_demo/source/main', links: [] }],
+    });
     const program = makeProgram();
     registerInspectCommand(program);
     const res = await runCommand(program, ['inspect', 'ZCL_DEMO', '--versions', '--json']);
@@ -184,7 +225,7 @@ describe('abap inspect --versions', () => {
   it('requires --versions when --show / --out / --include are used', async () => {
     const showProgram = makeProgram();
     registerInspectCommand(showProgram);
-    const show = await runCommand(showProgram, ['inspect', 'ZCL_DEMO', '--show', '000001', '--json']);
+    const show = await runCommand(showProgram, ['inspect', 'ZCL_DEMO', '--show', '00000', '--json']);
     expect(show.exitCode).toBe(2);
     expect(parseError(show).code).toBe('USAGE');
     const outProgram = makeProgram();
@@ -212,7 +253,7 @@ describe('abap inspect --versions', () => {
     expect(res.exitCode).toBe(2);
     const error = parseError(res);
     expect(error.code).toBe('INVALID_ARGUMENT');
-    expect(error.details.available).toEqual(['000001', '000002']);
+    expect(error.details.available).toEqual(['00004', '00000']);
   });
 });
 
@@ -226,9 +267,11 @@ describe('abap inspect --symbols', () => {
     expect(res.exitCode).toBeUndefined();
     const data = parseData(res);
     expect(data.symbols.supported).toBe(true);
-    expect(data.symbols.symbols).toHaveLength(3);
+    expect(data.symbols.count).toBe(4);
     const run = data.symbols.symbols.find((s: { name: string }) => s.name === 'RUN');
     expect(run).toMatchObject({ kind: 'method', visibility: 'public', startLine: 5, endLine: 9 });
+    const localType = data.symbols.symbols.find((s: { name: string }) => s.name === 'LT_TYPES');
+    expect(localType).toMatchObject({ kind: 'local-class-type', startLine: null, endLine: null });
     const attribute = data.symbols.symbols.find((s: { name: string }) => s.name === 'MV_COUNT');
     expect(attribute).toMatchObject({ kind: 'attribute', startLine: null, endLine: null });
   });
@@ -261,7 +304,7 @@ describe('abap inspect --symbols', () => {
   it('rejects an invalid --name-pattern with USAGE', async () => {
     const program = makeProgram();
     registerInspectCommand(program);
-    const res = await runCommand(program, ['inspect', 'ZCL_DEMO', '--symbols', '--name-pattern', '(' , '--json']);
+    const res = await runCommand(program, ['inspect', 'ZCL_DEMO', '--symbols', '--name-pattern', '(', '--json']);
     expect(res.exitCode).toBe(2);
     expect(parseError(res).code).toBe('INVALID_ARGUMENT');
   });

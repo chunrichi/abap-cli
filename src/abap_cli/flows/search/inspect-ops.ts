@@ -1,10 +1,13 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { getRevisionLink } from 'abap-adt-api/build/api/revisions.js';
+import type { AbapObjectStructure, classIncludes } from 'abap-adt-api/build/api/objectstructure.js';
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError } from '../../output/json.js';
 import { resolveObject } from '../../core/resolve.js';
 import { SEARCH_RESULT_LIMIT } from '../../core/limits.js';
 import { toRelativeOutputPath } from '../../core/path-output.js';
+import { parseVersionsFeed } from '../../formats/versions-feed.js';
 
 /** Base object metadata — always returned. */
 export interface ObjectMetadata {
@@ -88,6 +91,7 @@ export interface ActivationInfo {
 
 /** One entry of an object's version history (ADT versions Atom feed). */
 export interface ObjectVersionEntry {
+  /** ADT version id (`atom:id`), e.g. "00000". */
   version: string;
   /** Feed `updated` timestamp (ISO 8601, as returned by SAP). */
   date: string;
@@ -96,6 +100,8 @@ export interface ObjectVersionEntry {
   title: string;
   /** Content URI of this version; pass to `getObjectSource` to read it. */
   uri: string;
+  /** Transport request carrying this version, when SAP exposes the link. */
+  transport?: string;
 }
 
 /** Version history for `--versions`. */
@@ -241,7 +247,7 @@ export async function inspectObject(client: AdtClientWrapper, name: string, flag
 
   const target = { name: resolved.name, type: metadata.type, objectUrl: resolved.objectUrl };
   if (flags.symbols) result.symbols = await readSymbols(client, target, flags);
-  if (flags.versions) result.versions = await readVersions(client, target, flags);
+  if (flags.versions) result.versions = await readVersions(client, target, flags, structure);
 
   return result;
 }
@@ -455,14 +461,6 @@ interface VersionTarget {
   objectUrl: string;
 }
 
-interface RevisionLike {
-  uri?: string;
-  date?: string;
-  author?: string;
-  version?: string;
-  versionTitle?: string;
-}
-
 function isClassLike(type: string): boolean {
   const upper = type.toUpperCase();
   return upper.startsWith('CLAS') || upper.startsWith('INTF');
@@ -484,6 +482,7 @@ async function readVersions(
   client: AdtClientWrapper,
   target: VersionTarget,
   flags: InspectFlags,
+  structure: AbapObjectStructure,
 ): Promise<ObjectVersionsInfo> {
   if (!isClassLike(target.type) && (flags.include || flags.show)) {
     throw new CliError('INVALID_ARGUMENT', `--include / --show are only available for classes and interfaces (got ${target.type}).`, {
@@ -492,37 +491,33 @@ async function readVersions(
     });
   }
   const include = normalizeInclude(flags.include);
-  let raw: RevisionLike[];
-  try {
-    raw = (await client.revisions(target.objectUrl, include)) as RevisionLike[];
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (/revision url not found|no versions link|not found/i.test(message)) {
-      throw new CliError('TYPE_NOT_SUPPORTED', `Version history is not available for ${target.name} (${target.type}).`, {
-        details: { object: target.name, type: target.type },
-        nextSteps: [
-          'Version history needs an ADT versions feed; objects created outside versioning (for example $TMP-only objects) may not have one.',
-          `Verify the activation state instead: abap inspect ${target.name} --activation`,
-        ],
-        example: `abap inspect ${target.name} --activation`,
-      });
-    }
-    throw error;
+  const feedPath = getRevisionLink(structure, isClassLike(target.type) ? (include as classIncludes) : undefined);
+  if (!feedPath) {
+    throw new CliError('TYPE_NOT_SUPPORTED', `Version history is not available for ${target.name} (${target.type}).`, {
+      details: { object: target.name, type: target.type },
+      nextSteps: [
+        'Version history needs an ADT versions feed; objects created outside versioning (for example $TMP-only objects) may not have one.',
+        `Verify the activation state instead: abap inspect ${target.name} --activation`,
+      ],
+      example: `abap inspect ${target.name} --activation`,
+    });
   }
+  const xml = await client.adtFeed(feedPath);
+  const raw = parseVersionsFeed(xml);
   const limit = flags.limit ?? 50;
-  const versions: ObjectVersionEntry[] = raw.slice(0, limit).map((revision) => ({
-    version: revision.version ?? '',
-    date: revision.date ?? '',
-    author: revision.author ?? '',
-    title: revision.versionTitle ?? '',
-    uri: revision.uri ?? '',
+  const versions: ObjectVersionEntry[] = raw.slice(0, limit).map((entry) => ({
+    version: entry.version,
+    date: entry.date,
+    author: entry.author,
+    title: entry.title,
+    uri: entry.uri,
+    ...(entry.transport ? { transport: entry.transport } : {}),
   }));
   const info: ObjectVersionsInfo = { include, count: versions.length, versions };
   if (flags.show) {
     const wanted = flags.show.trim();
     const revision =
-      raw.find((r) => (r.version ?? '') === wanted) ??
-      raw.find((r) => (r.version ?? '').toLowerCase() === wanted.toLowerCase());
+      raw.find((r) => r.version === wanted) ?? raw.find((r) => r.version.toLowerCase() === wanted.toLowerCase());
     if (!revision) {
       throw new CliError('INVALID_ARGUMENT', `Version '${wanted}' not found for ${target.name}.`, {
         details: { object: target.name, available: versions.map((v) => v.version) },
@@ -530,14 +525,14 @@ async function readVersions(
         example: `abap inspect ${target.name} --versions`,
       });
     }
-    const source = await client.getObjectSource(revision.uri ?? '');
+    const source = await client.getObjectSource(revision.uri);
     if (flags.out) {
       const absolute = path.resolve(flags.out);
       fs.mkdirSync(path.dirname(absolute), { recursive: true });
       fs.writeFileSync(absolute, source, 'utf8');
-      info.shown = { version: revision.version ?? wanted, out: toRelativeOutputPath(absolute) };
+      info.shown = { version: revision.version, out: toRelativeOutputPath(absolute) };
     } else {
-      info.shown = { version: revision.version ?? wanted, source };
+      info.shown = { version: revision.version, source };
     }
   }
   return info;
@@ -566,24 +561,57 @@ interface StructureElementLike {
 }
 
 /**
- * Normalized kind per ADT object-structure element type. ADT uses `CLAS/OM`,
- * `INTF/OM`, … on newer releases while some backends return bare names; both
- * are mapped here and unknown types fall back to the lower-cased raw type.
+ * Normalized kind per ADT object-structure element type (authoritative
+ * `CO_*` constants from the official ADT OO plugin, plus bare names returned
+ * by older backends). Unknown types fall back to the lower-cased raw type.
  */
 const KIND_BY_ADT_TYPE: Record<string, string> = {
+  // Global class members.
   'CLAS/OC': 'class',
+  'CLAS/OCI': 'class-implementation',
+  'CLAS/OR': 'interface-implementation',
+  'CLAS/OB': 'alias',
+  'CLAS/OO': 'method-definition',
   'CLAS/OM': 'method',
-  'CLAS/OP': 'attribute',
   'CLAS/OA': 'attribute',
   'CLAS/OE': 'event',
-  'CLAS/OF': 'friend',
   'CLAS/OT': 'type',
-  'CLAS/OD': 'alias',
+  'CLAS/OF': 'friend',
+  'CLAS/OK': 'macro',
+  'CLAS/I': 'include',
+  'CLAS/OCX': 'text-elements',
+  'CLAS/OSU': 'public-section',
+  'CLAS/OSK': 'package-section',
+  'CLAS/OSO': 'protected-section',
+  'CLAS/OSI': 'private-section',
+  // Local classes / interfaces inside a global class.
+  'CLAS/OCL': 'local-class',
+  'CLAS/ON': 'local-interface',
+  'CLAS/ONB': 'local-interface-alias',
+  'CLAS/OLB': 'local-class-alias',
+  'CLAS/OLN': 'local-class-interface-implementation',
+  'CLAS/OLD': 'local-class-method',
+  'CLAS/OLI': 'local-class-method-implementation',
+  'CLAS/OLA': 'local-class-attribute',
+  'CLAS/ONE': 'local-interface-event',
+  'CLAS/OLE': 'local-class-event',
+  'CLAS/OOV': 'local-variable',
+  'CLAS/OND': 'local-interface-method',
+  'CLAS/ONT': 'local-interface-type',
+  'CLAS/ONA': 'local-interface-attribute',
+  'CLAS/OLT': 'local-class-type',
+  'CLAS/OLF': 'local-class-friend',
+  'CLAS/OQ': 'test-seam',
+  // Global interface members.
   'INTF/OI': 'interface',
-  'INTF/OM': 'method',
-  'INTF/OP': 'attribute',
-  'INTF/OE': 'event',
-  'INTF/OT': 'type',
+  'INTF/IO': 'method',
+  'INTF/IA': 'attribute',
+  'INTF/IE': 'event',
+  'INTF/IT': 'type',
+  'INTF/IB': 'alias',
+  'INTF/I': 'include',
+  'INTF/IOV': 'local-variable',
+  // Bare names (mock / older backends).
   METHOD: 'method',
   ATTRIBUTE: 'attribute',
   EVENT: 'event',
@@ -592,8 +620,18 @@ const KIND_BY_ADT_TYPE: Record<string, string> = {
   INTERFACE: 'interface',
 };
 
+/** Normalize the visibility suffix (`CLAS/OM/public`) before the kind lookup. */
+function baseAdtType(type: string): string {
+  const segments = type.split('/');
+  if (segments.length >= 3 && /^(public|private|protected)$/i.test(segments[2] ?? '')) {
+    return segments.slice(0, 2).join('/');
+  }
+  return type;
+}
+
 function kindFor(type: string): string {
-  return KIND_BY_ADT_TYPE[type.toUpperCase()] ?? type.toLowerCase();
+  const base = baseAdtType(type);
+  return KIND_BY_ADT_TYPE[base.toUpperCase()] ?? base.toLowerCase();
 }
 
 /** Parse the `#start=12,4;end=40,7` fragment of an ADT atom link. */

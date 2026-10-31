@@ -81,8 +81,9 @@ abap inspect ZCL_FOO --symbols --json       # 扁平符号表 + 行号
 
 ## --versions（版本历史）
 
-读取对象（或类 include 分片）的 ADT versions Atom feed，返回 `{ include, count, versions[] }`，每项含 `version / date / author / title / uri`。
+读取对象（或类 include 分片）的 ADT versions Atom feed，返回 `{ include, count, versions[] }`，每项含 `version / date / author / title / uri`（对象级 feed 还可能带 `transport`）。
 
+- `version` 取 feed 的 `atom:id`（与 ADT 编辑器里看到的版本号一致）；上游库的 `revisions()` 只看 transport 链接，在类 include feed 上会返回空版本号，因此这里自行解析 feed（见 `formats/versions-feed.ts`）。
 - 默认 `--include main`；CLAS / INTF 可指定其它 include。非类对象只支持 main（传 `--include` → `INVALID_ARGUMENT`）。
 - `--show <version>` 取该版本源码：`--json` 时进 `data.versions.shown.source`；配 `--out <file>` 时写入文件并回 `data.versions.shown.out`（cwd 相对 POSIX 路径）。
 - 没有 versions link（例如对象从未纳入版本管理）→ `TYPE_NOT_SUPPORTED`（exit 7），**不要当空历史**。
@@ -227,7 +228,7 @@ abap inspect ZCL_FOO --includes --locks --package --json
 # references
 
 - 实现: [src/abap_cli/commands/inspect.ts](../../src/abap_cli/commands/inspect.ts) · [src/abap_cli/flows/search/inspect-ops.ts](../../src/abap_cli/flows/search/inspect-ops.ts)（`inspectObject` / `checkActivation` / `readVersions` / `flattenSymbols` / `parseLineRange`）
-- 对象解析: `src/abap_cli/core/resolve.ts`（`resolveObject` / `getObjectParts`）、`src/abap_cli/clients/adt-client.ts`（`objectStructure` / `objectStructureElements` / `transportInfo` / `revisions` / `getObjectSource`）
+- 对象解析: `src/abap_cli/core/resolve.ts`（`resolveObject` / `getObjectParts`）、`src/abap_cli/clients/adt-client.ts`（`objectStructure` / `objectStructureElements` / `transportInfo` / `adtFeed` / `getObjectSource`）、`src/abap_cli/formats/versions-feed.ts`（versions Atom feed 解析）
 - 文档: [docs/commands.md#abap-inspect](../../docs/commands.md#abap-inspect)
 - 相关命令页: [abap activate](activate.md)、[abap diff](diff.md)、[abap status](status.md)、[abap pull](pull.md)
 - 测试: `test/unit/inspect.test.ts`、`test/unit/inspect-activation.test.ts`、`test/unit/inspect-versions-symbols.test.ts`（versions 列表/show/out/NOT_SUPPORTED/参数校验、symbols 扁平化/行号/过滤/非类对象）

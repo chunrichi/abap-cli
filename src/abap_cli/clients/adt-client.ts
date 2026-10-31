@@ -786,9 +786,17 @@ export class AdtClientWrapper {
     return this._call(() => this.client.transportRelease(transportNumber, ignoreLocks, ignoreATC));
   }
 
-  /** Version history (Atom feed) for an object or one of its class includes. */
-  revisions(objectUrl: string, includeName?: Parameters<ADTClient['revisions']>[1]) {
-    return this._call(() => this.client.revisions(objectUrl, includeName));
+  /**
+   * Raw GET of an ADT Atom feed (versions etc.) using the wrapper's
+   * authenticated session; returns the XML body for the caller to parse.
+   */
+  adtFeed(feedPath: string) {
+    return this._call(async () => {
+      const response = await this.client.httpClient.request(feedPath, {
+        headers: { Accept: 'application/atom+xml;type=feed' },
+      });
+      return response.body;
+    });
   }
 
   // --- Object creation ---
