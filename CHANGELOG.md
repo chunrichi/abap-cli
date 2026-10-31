@@ -7,6 +7,7 @@
 
 ### Added
 
+- **`abap test`**：跑 ABAP Unit 单测 — 经 ADT ABAP Unit 端点运行类/程序测试，只输出 summary 与失败用例（通过用例不逐条列出）；失败 exit 7（`TEST_FAILED`，`details` 带 summary + failures）。支持 `--type`（解析过滤）、`--risk`（harmless,dangerous,critical，默认 harmless）、`--duration`（short,medium,long，默认 short）、`--all`（全等级）、`--strict`（warning 视为失败）。只读：不加锁、不写 transport。归 `abap-cli-data` skill。
 - **`abap deploy --dev`**：安装内置 ICF 服务的开发形态 — `abap/src` 的 19 个类全部作为全局对象按依赖顺序安装，供维护者在真机上做单类语法检查 / 激活 / 迭代；发布形态仍由不带 `--dev` 的 `abap deploy` 产出。
 
 ### Changed

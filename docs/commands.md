@@ -28,6 +28,7 @@ Every command supports `--json` (compact envelope, default for agents) and `--pr
 | `abap delete` | sap | Delete an ABAP object from SAP (lock → delete → unlock) |
 | `abap push` | sap | Push local ABAP files to SAP |
 | `abap check` | sap | Validate ABAP source code (syntax / content / atc) |
+| `abap test` | sap | Run ABAP Unit tests for an object (read-only) |
 | `abap search` | sap | Search for ABAP objects in SAP system |
 | `abap create` | sap | Create and activate a new ABAP object (CLAS, INTF, PROG, FUGR, TABL, STRU, DOMA, DTEL, HTTP) |
 | `abap status` | sap | Show local vs SAP sync status |
@@ -497,6 +498,53 @@ abap check [syntax|content|atc] [options]
 
   ```bash
   abap check atc src/zcl_demo.clas.abap --variant Z_ATC_VAR --out
+  ```
+
+## `abap test`
+
+Run ABAP Unit tests for an object and report the summary plus failing tests (read-only).
+
+```bash
+abap test [options] <object>
+```
+
+### Arguments
+
+| Argument | Required | Values | Description |
+| --- | --- | --- | --- |
+| `object` | yes |  | ABAP object to test — a class or program name (e.g. ZCL_MY_THING). Resolved through the ADT object repository. |
+
+### Options
+
+| Option | Required | Default | Values | Description |
+| --- | --- | --- | --- | --- |
+| `--type` `<tadir>` | no |  |  | Object type filter for name resolution (CLAS, PROG, …); needed only when the name matches several object kinds. |
+| `--risk` `<levels>` | no | `"harmless"` | harmless, dangerous, critical | Comma-separated risk levels to execute (default: harmless). |
+| `--duration` `<levels>` | no | `"short"` | short, medium, long | Comma-separated duration levels to execute (default: short). |
+| `--all` | no | `false` |  | Run every risk level and every duration level (instead of the defaults). |
+| `--strict` | no | `false` |  | Treat warning alerts as failures. |
+
+### Examples
+
+- Run the default (harmless / short) ABAP Unit tests
+
+  ```bash
+  abap test ZCL_MY_THING
+  ```
+- Run every risk and duration level
+
+  ```bash
+  abap test ZCL_MY_THING --all
+  ```
+- Treat warnings as failures
+
+  ```bash
+  abap test ZCL_MY_THING --strict --json
+  ```
+- Agent integration: read summary + failures from the envelope
+
+  ```bash
+  abap test ZCL_MY_THING --json
   ```
 
 ## `abap search`
@@ -1173,6 +1221,7 @@ Aggregated from the per-command schemas. The authoritative TypeScript source is 
 | `TABLE_TYPE_NOT_SUPPORTED` | VALIDATION_ERROR | 7 |
 | `TCODE_NOT_AUTHORIZED` | AUTH_ERROR | 5 |
 | `TCODE_NOT_FOUND` | NOT_FOUND | 8 |
+| `TEST_FAILED` | VALIDATION_ERROR | 7 |
 | `TIMEOUT` | SAP_ERROR | 6 |
 | `TLS_ERROR` | TLS_ERROR | 4 |
 | `TRANSPORT_CREATE_FAILED` | VALIDATION_ERROR | 7 |

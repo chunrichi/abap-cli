@@ -189,6 +189,7 @@ No type or object subdirectories, and namespaced objects use the AFF bracket tok
 | `abap status` | Show which objects differ from SAP (`--remote-only`, `--local-only`, `--since`, `--all`) |
 | `abap run <class>` | Execute a class via classrun or a PUBLIC STATIC method (`--method`, `--args`, `--timeout`, `--dry-run`) |
 | `abap run-report <report>` | Run an activated report and return its list output (`--variant`, `--param NAME=VALUE`, `--format raw / tsv / csv`) |
+| `abap test <object>` | Run ABAP Unit tests and report the summary plus failing tests (`--type`, `--risk`, `--duration`, `--all`, `--strict`) |
 | `abap select --table <name>` | Read-only table query, the SE16N equivalent (`--fields`, `--where`, `--limit`, `--offset`, `--order-by`, `--group-by`, `--count-only`) |
 | `abap fields <table>` | List table / view fields from DD03L, or reverse-lookup with `--find` (`--with-text`, `--as4local`, `--limit`) |
 | `abap types` | Print the CLI type ↔ TADIR / DDIC mapping, locally (`<type>`, `--tadir-object`) |

@@ -2,7 +2,7 @@
 
 > 按需加载。本文件仅覆盖运行时消费错误码。
 
-## 本 skill 错误码清单（4 命令范围）
+## 本 skill 错误码清单（5 命令范围）
 
 ### run
 
@@ -31,6 +31,17 @@
 | `QUERY_FAILED` | SAP_ERROR/6 | select（动态 SQL 运行时异常） | 本 skill 直接 `activate <table>`（[abap-cli-edit]） |
 | `AUTH_ERROR` | AUTH_ERROR/5 | select | 跳 `abap-cli-setup`：`profile test`；检查 `S_TABU_DIS` |
 | `ICF_CHECK_DEGRADED` | **select 不报此码**；仅 `init` 与 `deploy status` 探测时可能落入 `meta.warnings`（详见 [abap-cli-setup] 错误码全表）| 不适用；agent 不应假设 select 报此码 |
+
+### test
+
+| code | cat/exit | 触发 | 修复 |
+|---|---|---|---|
+| `TEST_FAILED` | VALIDATION_ERROR/7 | test（failedAssertion / exception；`--strict` 时含 warning） | 读 `error.details.failures` 定位 class/method/alert；`method` 为空是类级 alert |
+| `OBJECT_NOT_FOUND` | NOT_FOUND/8 | test（对象名解析不到） | `search <name>`（[abap-cli-search]）校对 |
+| `AMBIGUOUS_OBJECT` | NOT_FOUND/8 | test（同名多类型） | 补 `--type CLAS`（或 PROG） |
+| `INVALID_ARGUMENT` | USAGE/2 | test（`--risk` / `--duration` 等级非法，或 `--all` 与等级混用） | 看 `error.details.allowedValues` |
+| `USAGE` | USAGE/2 | test（缺 object 位置参数） | 传对象名，如 `abap test ZCL_FOO` |
+| `SAP_ERROR` | SAP_ERROR/6 | test（ADT ABAP Unit 端点不可用 / 系统未暴露） | `abap doctor` 排查连接；读 `error.nextSteps` |
 
 ## JSON 输出契约参考
 

@@ -68,7 +68,7 @@ cp agents/abap-developer.agent.md <your-project>/.claude/agents/
 | **`abap-cli-setup`** | workspace-and-sap | `init` `profile` `doctor` `transport` `deploy` `session` `types` | 环境就绪：工作区、凭证、诊断、传输请求、ICF 部署、session、TADIR 映射 |
 | **`abap-cli-search`** | sap（只读） | `search` `where-used` `inspect` `tcode` `diff` `status` `dumps` | 元数据探查：不改对象、不加锁、不写 transport；`dumps` 列 ST22 dump |
 | **`abap-cli-edit`** | sap（写） | `pull` `push` `check` `create`（含 `create local`）`activate` `delete` `list` `mime` `validate:aff` | 写路径：源码/DDIC/MIME 的拉取、创建、修改、推送、激活、删除；类型码以 `src/abap_cli/types/registry.ts` 为准（当前 21 个注册类型，`SRVB` 等部分类型仅支持 pull） |
-| **`abap-cli-data`** | sap（只读消费） | `select` `fields` `run` `run-report` | 运行时消费：查表/字段、跑类、跑报表；全程只读 |
+| **`abap-cli-data`** | sap（只读消费） | `select` `fields` `run` `run-report` `test` | 运行时消费：查表/字段、跑类、跑报表、跑 ABAP Unit；全程只读 |
 | **`abap-cli-performance`** | abap-performance-review | （方法论；触发只读命令 `search` / `inspect` / `pull` / `check` / `select`） | ABAP 性能 review：慢路径诊断、分平台建议、`check` / ATC 核验 |
 
 每个 skill 的内部结构：
@@ -96,7 +96,7 @@ skills/<name>/
 | 配置 / 接 SAP / 加 profile / 诊断 / 传输请求 / 部署 ICF / 看 session / 查类型映射 | `abap-cli-setup` | `init` `profile` `doctor` `transport` `deploy` `session` `types` |
 | 查对象元数据 / where-used / 业务码 / 拉取对账 / 状态只读 / 看 ST22 dump | `abap-cli-search` | `search` `where-used` `inspect` `tcode` `diff` `status` `dumps` |
 | 拉对象 / 改 / 推 / 语法检查 / 激活 / 创建 / 删除 / 列举 / MIME / AFF 校验 | `abap-cli-edit` | `pull` `push` `check` `create` `activate` `delete` `list` `mime` `validate:aff` |
-| 跑类 / 查表数据 / 列表字段 / 跑报表 / 翻页 select | `abap-cli-data` | `select` `fields` `run` `run-report` |
+| 跑类 / 查表数据 / 列表字段 / 跑报表 / 跑 ABAP Unit / 翻页 select | `abap-cli-data` | `select` `fields` `run` `run-report` `test` |
 | ABAP 性能 review / 慢路径诊断 / 优化建议 | `abap-cli-performance` | （方法论 skill，不直接管命令） |
 | Agent 卡死留痕（不依赖 SAP） | `abap-cli`（meta） | `report-stuck` |
 | Agent 提交反馈 / bug | `abap-cli`（meta） | GitHub Issues（无 CLI 命令） |
@@ -112,22 +112,22 @@ skills/<name>/
 
 权威列表见 `src/abap_cli/output/error-codes.ts`。归属约束：
 
-- `abap-cli-data`：`WRAPPER_NOT_DEPLOYED` / `WRAPPER_INPUT_UNAVAILABLE` / `METHOD_NOT_SUPPORTED` / `METHOD_FAILED` / `CLASS_NOT_RUNNABLE` / `LOCAL_CLASS_NOT_RUNNABLE` / `TABLE_NOT_FOUND` / `TABLE_TYPE_NOT_SUPPORTED` / `INVALID_FIELD` / `INVALID_WHERE` / `LIMIT_EXCEEDED` / `OFFSET_EXCEEDED` / `QUERY_FAILED` / `TIMEOUT`
+- `abap-cli-data`：`WRAPPER_NOT_DEPLOYED` / `WRAPPER_INPUT_UNAVAILABLE` / `METHOD_NOT_SUPPORTED` / `METHOD_FAILED` / `CLASS_NOT_RUNNABLE` / `LOCAL_CLASS_NOT_RUNNABLE` / `TABLE_NOT_FOUND` / `TABLE_TYPE_NOT_SUPPORTED` / `INVALID_FIELD` / `INVALID_WHERE` / `LIMIT_EXCEEDED` / `OFFSET_EXCEEDED` / `QUERY_FAILED` / `TIMEOUT` / `TEST_FAILED`
 - `abap-cli-edit`：`LOCK_FAILED` / `LOCKED` / `SYNTAX_ERROR` / `OBJECT_NOT_ACTIVE` / `ACTIVATION_FAILED` / `DDIC_NOT_SUPPORTED` / `TYPE_NOT_SUPPORTED` / `CHANNEL_DETECTION_FAILED` / `DDLS_NOT_SUPPORTED_ON_ECC` / `PUSH_FAILED`
 - `abap-cli-search`：`OBJECT_NOT_FOUND` / `TCODE_NOT_FOUND` / `AUTH_ERROR` / `TCODE_NOT_AUTHORIZED` / `AMBIGUOUS_OBJECT`
 - `abap-cli-setup`：`CONFIG_ERROR` / `TLS_ERROR` / `NO_TRANSPORT` / `SESSION_INVALID` / `SESSION_JAR_DECRYPT_FAILED`
 - `abap-cli`（meta）：无专属错误码（`report-stuck` 只用公共 `USAGE`）
 - 公共错误（`INVALID_ARGUMENT` / `USAGE` / `VALIDATION_ERROR` / `SAP_ERROR` 等）在涉及它的每个 skill 中各自内联，不做 cross-reference
 
-## 命令覆盖核对（28 CLI 命令）
+## 命令覆盖核对（29 CLI 命令）
 
 - ✅ `abap-cli-setup`：`init` `profile` `doctor` `transport` `deploy` `session` `types` — **7 顶层**
 - ✅ `abap-cli-search`：`search` `where-used` `inspect` `tcode` `diff` `status` `dumps` — **7 顶层**
 - ✅ `abap-cli-edit`：`pull` `push` `check` `create`（含 `create local`）`activate` `delete` `list` `mime` `validate:aff` — **9 顶层 + `create local` 子命令**
-- ✅ `abap-cli-data`：`select` `fields` `run` `run-report` — **4 顶层**
+- ✅ `abap-cli-data`：`select` `fields` `run` `run-report` `test` — **5 顶层**
 - ✅ `abap-cli`（meta）：`report-stuck` — **1 顶层**
 - ✅ `abap-cli-performance`：方法论 skill，不占顶层命令
-- **合计**：7 + 7 + 9 + 4 + 1 = **28 顶层命令**（与 `src/abap_cli/registry/commands.ts` 的 `COMMAND_SPECS` 1:1，由 `npm run check-skills-drift` 校验）
+- **合计**：7 + 7 + 9 + 5 + 1 = **29 顶层命令**（与 `src/abap_cli/registry/commands.ts` 的 `COMMAND_SPECS` 1:1，由 `npm run check-skills-drift` 校验）
 
 ## 版本
 

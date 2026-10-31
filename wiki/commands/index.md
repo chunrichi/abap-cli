@@ -14,6 +14,7 @@ Per-command knowledge pages (prerequisites, gotchas, real-system evidence) live 
 | `abap delete` | [delete.md](delete.md) | Delete an ABAP object from SAP (lock → delete → unlock) |
 | `abap push` | [push.md](push.md) | Push local ABAP files to SAP |
 | `abap check` | [check.md](check.md) | Validate ABAP source code (syntax / content / atc) |
+| `abap test` | [test.md](test.md) | Run ABAP Unit tests for an object (read-only) |
 | `abap search` | [search.md](search.md) | Search for ABAP objects in SAP system |
 | `abap create` | [create.md](create.md) | Create and activate a new ABAP object (CLAS, INTF, PROG, FUGR, TABL, STRU, DOMA, DTEL, HTTP) |
 | `abap status` | [status.md](status.md) | Show local vs SAP sync status |

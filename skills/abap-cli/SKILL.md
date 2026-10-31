@@ -25,13 +25,13 @@ metadata:
 | 配置 / 接 SAP / 加 profile / 诊断 / 传输请求 / 部署 ICF / 看 session / 查类型映射 | `abap-cli-setup` | `init` `profile` `doctor` `transport` `deploy` `session` `types` |
 | 查对象元数据 / where-used / 业务码 / 拉取对账 / 状态只读 / 看 ST22 dump | `abap-cli-search` | `search` `where-used` `inspect` `tcode` `diff` `status` `dumps` |
 | 拉对象 / 改 / 推 / 语法检查 / 激活 / 创建 / 删除 / 列举 / MIME / AFF 校验 | `abap-cli-edit` | `pull` `push` `check` `create` `activate` `delete` `list` `mime` `validate:aff` |
-| 跑类 / 查表 / 列表字段 / 跑报表 / 翻页 select | `abap-cli-data` | `select` `fields` `run` `run-report` |
+| 跑类 / 查表 / 列表字段 / 跑报表 / 跑 ABAP Unit / 翻页 select | `abap-cli-data` | `select` `fields` `run` `run-report` `test` |
 | ABAP 性能 review / 慢路径诊断 / 优化建议 | `abap-cli-performance` | （方法论 skill，不直接管命令） |
 | Agent 卡死留痕（不依赖 SAP） | `abap-cli`（meta） | `report-stuck` |
 | Agent 提交反馈 / bug | `abap-cli`（meta） | GitHub Issues（无 CLI 命令，见下） |
 | 意图模糊 / 不确定归哪类 | `abap-cli`（meta） | （路由查询本身） |
 
-> **同一命令唯一归属**：4 个领域 skill 的 `metadata.commands` 集合互不相交，合计 27 条；再加 meta 的 1 条（`report-stuck`），共 28 个 CLI 命令（详见 `skills/README.md`）。
+> **同一命令唯一归属**：4 个领域 skill 的 `metadata.commands` 集合互不相交，合计 28 条；再加 meta 的 1 条（`report-stuck`），共 29 个 CLI 命令（详见 `skills/README.md`）。
 >
 > **`abap-cli-performance` 例外**：它是方法论 skill，不声明 `metadata.commands`；它触发的只读命令（`search / inspect / pull / check / select`）归属上表 4 个领域 skill。本 skill 全程不写对象。
 
@@ -42,7 +42,7 @@ metadata:
 ├── 关键词含 "配置 / 接 / profile / 诊断 / 部署 / transport / 扩展 / session" → abap-cli-setup
 ├── 关键词含 "查询 / 哪些地方用 / 业务码 / 状态 / 差异 / dump" 且不含 "改 / 推 / 激活" → abap-cli-search
 ├── 关键词含 "拉 / 改 / 推 / 语法 / 激活 / 创建 / DDIC / MIME / AFF" → abap-cli-edit
-├── 关键词含 "跑 / 查表数据 / select / run / 翻页" → abap-cli-data
+├── 关键词含 "跑 / 查表数据 / select / run / test / 单测 / ABAP Unit / 翻页" → abap-cli-data
 ├── 关键词含 "慢 / 性能 / 优化 / N² / FOR ALL ENTRIES / 内表 / HASHED / AMDP / CDS" → abap-cli-performance
 ├── 关键词含 "反馈 / bug / issue / 提 issue" → 本 meta skill → 建 GitHub issue（见下）
 ├── 关键词含 "stuck / 卡死" → 本 meta skill → abap report-stuck --goal ... --tried ... --where ... --json
