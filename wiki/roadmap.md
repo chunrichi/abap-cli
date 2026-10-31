@@ -74,7 +74,7 @@
 - [x] **`create local` 错误落盘修复**：`SRVD`/`DCLS`/`DDLX`/`DDLA` 改为 `TYPE_NOT_SUPPORTED`，不再写 REPORT 骨架
 - [x] **AFF vendor schema 与上游对齐 + 溯源治理**（重新同步 6 个漂移 schema，README 记录来源）
 - [x] **wiki 漂移修正**：object-types / coverage-matrix / create / pull / push / architecture
-- [ ] **TRAN 写路径**：ABAP `/tran` POST 实现 `RPY_TRANSACTION_INSERT`（需 A4H 真机验证）
+- [x] **TRAN 写路径**：ABAP `/tran` GET/POST/PUT/DELETE 经 `RS_CORR_INSERT` + `RPY_TRANSACTION_INSERT` 实现（dialog/report/parameter/variant；OO 拒绝）；`abap create/pull/push/delete TRAN` 闭环，真机 23/23 TC
 - [ ] **DOMA/DTEL `.docu.json`**：vendor `docu-v1.json` + ICF 长文本读写（需真机验证）
 - [ ] **AFF schema 季度同步**：`scripts/sync-aff-schema.sh` 已就绪；新增类型时按需 vendor
 

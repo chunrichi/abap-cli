@@ -285,7 +285,7 @@ abap create local CLAS ZCL_DRAFT --template public-method --dir src/
 ## todo
 
 - [x] `TTYP` / `MSAG` / `DDLS` / `ENQU` / `NROB` 等 `--file` 类型已接入（`create` 的 `--schema.allowedValues` 全 21 类）
-- [ ] `TRAN` 写路径待补：ABAP `/tran` POST 仍返回 501，`create TRAN` 目前端到端不可用
+- [x] `TRAN` 写路径已实现（`/tran` POST/PUT，dialog/report/parameter/variant；OO 事务明确拒绝）
 - [ ] `create local` 为实验性命令，待与 `create` 主流程的落库闭环稳定后转正
 
 # references

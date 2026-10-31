@@ -108,6 +108,7 @@ lock/unlock）：
 ## 真机证据
 
 - **DEVC（包）已在 S/4HANA 8.134.214.7:44300（profile `test`）验证**：`$TMP` 下真实创建 `$ZCLI_TC_PKG10` 后 `abap delete '$ZCLI_TC_PKG10' --type DEVC --yes --json` 成功（复用创建命令的会话时 SAP 先报「包已锁定」，命令自动 logout + 新会话重试后成功），随后 `pull` 返回 404；非 LOCAL 包（ZLOCAL）在缺 `--tr` 时被 `MISSING_TRANSPORT`（exit 2）拦截、未发起删除。证据：`tests/261031002-realsap-devc/`（本地，不入库）。
+- **TRAN（事务码）删除走 ICF `DELETE /tran/<tcode>`**（SE93 没有 ADT 端点）：S/4HANA 8.134.214.7:44300（profile `test`）上 `abap delete ZCLI_TC_T1 --type TRAN --yes` 成功，TSTC/TSTCT/TSTCP/TSTCC/TSTCA 与 TADIR 行一并清除，随后 `pull` 返回 404。仅 `$TMP` 事务可删；可传输事务返回 `TRAN_DELETE_UNSUPPORTED`（exit 7，请在 SE93 删除以便记录到请求）。证据：`tests/261031003-realsap-tran/`（本地，不入库）。
 - **其它类型未验证**：本页没有记录 CLAS / PROG 等 `abap delete` 在 A4H / S/4HANA 上的真机执行结果。
 - 对象解析依赖的 ADT quickSearch quirk（裸名可能 0 命中，需要 `*NAME*` 回退）在 vhcala4hci（A4H）验证过，见 `src/abap_cli/core/resolve.ts` 注释；删除动作本身未验证。
 
