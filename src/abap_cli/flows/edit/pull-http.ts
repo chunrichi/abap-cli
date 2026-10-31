@@ -28,10 +28,10 @@ export async function runPullHttp(objectName: string, opts: PullOptions): Promis
     });
   }
 
-  // GET data is the nested abap-file-format payload but carries no `name`
-  // (not a member of the ABAP structure) — inject it from the request.
+  // GET data is the nested abap-file-format payload; it carries no CLI
+  // envelope fields. Keep the local file strictly AFF-shaped (the object name
+  // comes from the file name), so `validate:aff` accepts a freshly pulled file.
   const local = httpArtifact.fromWire(resp.data);
-  local.name = objectName;
   const filename = buildFilename(objectName, 'HTTP', 'main', '.json');
   const relPath = path.join(opts.dir, filename);
   const targetPath = path.resolve(process.cwd(), relPath);
