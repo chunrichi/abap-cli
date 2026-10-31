@@ -6,34 +6,49 @@
 
 ## [Unreleased]
 
-加固 `abap profile add/set/import` 的输入契约，并修复 `abap init` 字段更新与写盘行为。含 breaking 变更（profile 名规则），见 Migration。
+## [1.2.0] - 2026-11-01
+
+本版把「改完能验、能交付、能追溯」补进 agent 闭环，并统一机器可读契约：修复一批"看着成功、实际没生效/没执行"的假成功路径，新增传输预检与释放、版本历史与结构符号读取、`doctor --strict`。有破坏性变更（退出码与 `--json` 形状），见 Migration。
 
 ### Added
 
-- **`abap init --agent agents`**：`--agent` 新增 vendor 中立的 `agents` 目标，把 6 个 skill 与 `abap-developer` agent 定义装进 `.agents/` 目录；输出与 `generic` 相同，未绑定某个厂商 IDE 时用它即可。
-- **profile 子命令机器契约**：`abap profile <command> --schema --json` 返回该子命令自己的参数与选项，不再依赖把 add/set/export 选项混在一起的父级总览。
-- **profile 列表更可读**：`abap profile list` 显示 client / language，并标出当前工作区绑定的 profile 与缓存的系统信息；`profile add` 明确返回"未验证"与下一步（`profile test` → `init --profile`）。
+- **传输预检与释放**：`abap transport check <对象>` 只读报告该变更会记录到哪个请求、是否被阻塞及阻塞消息；`abap transport release <请求>` 释放请求并输出逐对象结果，支持 `--ignore-locks` / `--ignore-atc` / `--dry-run`，非交互环境需 `--yes`。
+- **版本历史与结构符号**：`abap inspect <对象> --versions` 列出 ADT 版本历史（`--show <版本>` 取该版源码，`--out` 落盘）；`abap inspect <对象> --symbols` 把类/接口结构摊平成带源码行号的符号表，可用 `--kinds` / `--name-pattern` 过滤。两者都有各自的 `--schema`。
+- **`abap doctor --strict`**：配置或环境有问题时以非零退出码结束，可作为 agent/CI 的前置 gate；`doctor` 同时新增 `data.ok`，`--fix` 会输出已修复项与剩余问题。
 
 ### Changed
 
-- **URL 一律归一化到 origin**：`profile add/set/import` 与 `init` 建 profile 时，粘贴的 Fiori/WebGUI/深链接只保留 `scheme://host[:port]`，丢弃 path/query/fragment 并给出告警；URL 内嵌用户名密码直接拒绝。此前带 path 的 URL 会被原样保存，后续所有请求都会 404。
-- **`abap init` 支持非交互字段更新**：`abap init --tr/--package/--source-dir --yes` 不需要 `--profile`，直接更新最近的 `.abap.json`；写入改为 merge，未传的字段（含 `sourceDir`）保留，不再整份覆盖。
-- **profile 名规则**：名称需 1–64 字符、字母/数字/`_`/`.`/`-` 且以字母或数字开头（名称同时是配置键与 keychain 账号）。
+- **`--json` 失败路径统一**：缺参或裸调用一律以用法错误（exit 2）结束，stdout 为空、stderr 只有一个可解析的 JSON 信封；人类 help 只保留在 `--help` / `abap help`（exit 0）。
+- **配置错误可直接恢复**：配置错误带上缺失字段、可执行的下一步与示例，agent 不再需要从散文里猜命令。
+- **`doctor` 不再"假绿"**：配置全错时 `data.ok=false`；加 `--strict` 后退出码反映问题。
+- **`validate:aff` 纳入统一契约**：缺参/路径不存在为用法错误（exit 2），校验失败为校验错误（exit 7）；输出走统一信封、紧凑 JSON，文件路径为 cwd 相对 POSIX。
+- **push 的激活校验区分"没有变更"与"静默失败"**：SAP 返回 200 但没执行激活时，先确认是否真的还有未激活版本——有则失败；没有（重复推送未改动的源码）则成功并给出告警。
+- **SAP 错误更可诊断**：失败详情包含 SAP 异常类型与属性，并对常见错误给出恢复建议。
+- **AFF 伴生文件要求放宽**：类的 include 与表技术设置改为可选，合法对象不再被 `validate:aff` 误判为失败。
+- **本地命令标注修正**：`validate:aff`、`report-stuck`、`session` 不再被列为"会连接 SAP"。
 
 ### Fixed
 
-- **`profile add` 的 textpool 探测用错连接**：此前用当前工作区的连接去探测刚创建的 profile，可能把别的系统的能力结论写进新 profile；现在由 `abap init` 针对目标 profile 探测，且连不上时不写结论。
-- **交互式 `profile add` 可能写出坏配置**：URL 直接回车会写入空 URL，导致整份 profile 配置无法读取；现在向导落盘前与参数路径使用同一套校验。
-- **`abap init` 覆盖 `.abap.json` 丢失 `sourceDir`**：字段更新与 profile 重绑现在都保留未传字段。
+- `--json` 下裸调用/缺参输出人类 help 且 exit 0，agent 会误判成功。
+- 把对象元数据 `.json` 当 ABAP 源码 push 会写脏 SAP 且可能报成功；现在直接拒绝并提示源文件。
+- `doctor` 在配置全错时仍报成功；`validate:aff` 缺文件/无参数仍报成功。
+- `transport` / `session` 裸调用时 stdout 与 stderr 双写 help。
+- `push` 在 SAP 静默跳过激活时报告成功。
+- `inspect --versions` 在类 include 上拿不到版本号；`inspect --symbols` 的成员类型映射不全。
 
 ### Removed (breaking)
 
-- **含空格、斜杠等字符的 profile 名不再接受**：`profile add/set/import` 会拒绝非法名称。既有 profile 仍可读取、连接与删除，但无法再 `set` 或导出后重新导入。
+- **`--json` 下缺参/裸调用的退出码**：`abap pull`、`run`、`check`、`profile`、`tcode`、`mime` 原先 exit 0 且 stdout 是 help；现在 exit 2、stdout 为空、stderr 单个 JSON 信封。
+- **`validate:aff` 退出码与 JSON 形状**：校验失败从 exit 1 改为 7，缺参/路径不存在从 exit 0 改为 2；`--json` 从 `{status, summary, files}` 改为统一信封 `{status, meta, data:{summary, files}}`，`files[].path` 由绝对路径改为 cwd 相对路径。
+- **profile 名称规则**：名称需 1–64 字符、字母/数字/`_`/`.`/`-` 且以字母或数字开头；旧名仍可读取/连接/删除，但不能 `set` 或导出后重新导入。
 
 **Migration**：
 
-- 旧 profile 名含空格/斜杠等字符时，用 `abap profile delete <name>` 后以合法名称重新 `abap profile add`（密码需要重新写入 keychain）；工作区 `.abap.json` 的 `system` 用 `abap init --profile <新名>` 重新绑定。
-- 旧 profile 里保存了带 path/query 的 URL 时，执行 `abap profile set <name> --url https://host:port` 修正。
+- 脚本依赖"裸调用 exit 0 + help"的，改为传必填参数；需要 help 时用 `--help` 或 `abap help <命令>`。
+- 消费 `validate:aff --json` 的脚本：改读 `data.files[]`，按 exit 7（校验失败）/ 2（用法错误）分支。
+- 以 `abap doctor` 退出码做 gate 的脚本：改用 `abap doctor --strict`（默认仍 exit 0，保持诊断语义）。
+- 旧 profile 名含空格/斜杠等字符时：`abap profile delete <名>` 后以合法名称重新 `abap profile add`；工作区用 `abap init --profile <新名>` 重新绑定。
+- 本次内置 ICF 服务版本随 CLI 升到 1.2.0（无端点功能变化）；升级后执行一次 `abap deploy --yes`，让 `deploy status` 恢复匹配。
 
 ## [1.1.0] - 2026-10-31
 

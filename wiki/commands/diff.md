@@ -110,7 +110,7 @@ abap diff --remote --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap diff", "version": "1.1.0", "timestamp": "2026-09-02T00:00:00.000Z", "durationMs": 1500, "warnings": [] },
+  "meta": { "command": "abap diff", "version": "1.2.0", "timestamp": "2026-09-02T00:00:00.000Z", "durationMs": 1500, "warnings": [] },
   "data": {
     "parts": [
       {
@@ -138,7 +138,7 @@ abap diff --remote --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap diff", "version": "1.1.0", "timestamp": "2026-09-02T00:00:00.000Z", "durationMs": 420, "warnings": [] },
+  "meta": { "command": "abap diff", "version": "1.2.0", "timestamp": "2026-09-02T00:00:00.000Z", "durationMs": 420, "warnings": [] },
   "data": { "truncated": false, "checked": 5 }
 }
 ```

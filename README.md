@@ -227,7 +227,7 @@ All commands support `--json` (compact) and `--pretty-json` (indented). Every to
 
 ```jsonc
 // success — stdout, exit 0
-{ "status": "success", "meta": { "command": "abap pull", "version": "1.1.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { /* ... */ } }
+{ "status": "success", "meta": { "command": "abap pull", "version": "1.2.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { /* ... */ } }
 
 // failure — stderr, non-zero exit, stdout stays empty
 { "status": "error", "meta": { /* ... */ }, "error": { "code": "NO_TRANSPORT", "category": "VALIDATION_ERROR", "message": "..." } }

@@ -57,7 +57,7 @@ abap report-stuck --schema --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap report-stuck", "version": "1.1.0", "timestamp": "2026-10-31T05:36:20.430Z", "durationMs": 6, "warnings": [] },
+  "meta": { "command": "abap report-stuck", "version": "1.2.0", "timestamp": "2026-10-31T05:36:20.430Z", "durationMs": 6, "warnings": [] },
   "data": {
     "id": "STUCK-20261031T053620-7f3a",
     "recorded": true,
@@ -72,7 +72,7 @@ abap report-stuck --schema --json
 {
   "status": "success",
   "meta": {
-    "command": "abap report-stuck", "version": "1.1.0", "timestamp": "2026-10-31T05:37:02.901Z", "durationMs": 4,
+    "command": "abap report-stuck", "version": "1.2.0", "timestamp": "2026-10-31T05:37:02.901Z", "durationMs": 4,
     "warnings": [ { "code": "STUCK_REPORT_DEGRADED", "message": "Could not write stuck report to /home/user/.abap-cli/reports (STUCK-DEGRADED-20261031T053702-1b2c)." } ]
   },
   "data": { "id": "STUCK-DEGRADED-20261031T053702-1b2c", "recorded": false, "echo": { "goal": "push ZCL_DEMO", "tried": "retried 3x", "where": "abap push" } }

@@ -227,7 +227,7 @@ DDIC（含 VIEW / SHLP）、HTTP、TRAN、XSLT、TTYP、MSAG 及 CDS / RAP 类�
 
 ```jsonc
 // 成功 — 写 stdout，exit 0
-{ "status": "success", "meta": { "command": "abap pull", "version": "1.1.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { /* ... */ } }
+{ "status": "success", "meta": { "command": "abap pull", "version": "1.2.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { /* ... */ } }
 
 // 失败 — 写 stderr，非零退出码，stdout 保持为空
 { "status": "error", "meta": { /* ... */ }, "error": { "code": "NO_TRANSPORT", "category": "VALIDATION_ERROR", "message": "..." } }
