@@ -82,7 +82,13 @@ describe('anonymous ICM context cookies', () => {
       ['sap-usercontext', 'sap-client=100'],
       ['sap-XSRF_S4H_100', 'xsrf'],
     ]);
-    dropAnonymousContextCookies(client);
+    expect(dropAnonymousContextCookies(client)).toBe(true);
     expect(cookieNames(client)).toEqual(['sap-usercontext', 'sap-XSRF_S4H_100']);
+  });
+
+  it('dropAnonymousContextCookies reports false when only a real context is present', () => {
+    const client = fakeClient([['sap-contextid', REAL]]);
+    expect(dropAnonymousContextCookies(client)).toBe(false);
+    expect(cookieNames(client)).toEqual(['sap-contextid']);
   });
 });
