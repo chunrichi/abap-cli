@@ -92,17 +92,17 @@ DDIC/TRAN 的探测在 `--dry-run` 之后（plan-only 不做多余 round-trip）
 | 普通源码（adt） | `pushObject` | 锁对象 → 写每个 part 源码 → check/activate → 解锁（`finally` 保证） |
 | FUGR | `push-fugr.ts` | 子对象（FM/include）是独立 ADT 锁对象，逐文件锁自己的目标、写源，最后激活整个 function group |
 | Textpool | `push-textpool.ts` | 混合模式：profile 缓存能力决定走 ADT `setTextElements`（lock→write→unlock）还是 ICF `/textpool/*`；`--check-only` 不支持（`VALIDATION_ERROR`）。**ICF 写为 stub**——`adtTextpool.write: false` 的系统上 POST 无条件报 `TEXTPOOL_WRITE_UNSUPPORTED`（见上方限制说明） |
-| ICF JSON（`route: 'icf'`） | `PUSH_ROUTES`（`icf-json`）→ `push-icf.ts` | DDIC（`.doma/.dtel/.tabl/.stru.json`）、HTTP（`.http.json`）、TRAN（`.tran.json`）。`pushOne` 查 `routing.ts` 的 `PUSH_ROUTES[objectType]` 取到具体 handler，不再有 per-type `if` 分支 |
-| TTYP / MSAG / DDLS（`route: 'adt'`） | `PUSH_ROUTES`（`aff-json`）→ `push-{ttyp,msag,ddls}.ts` | 路由表里这三类 `channel: 'auto'`（NROB 为 `icf`），`resolveFile` 给的是 `route: 'adt'`，但文件是 AFF `.json` 而非 ABAP 源码，所以 `pushOne` 必须在通用源码分支**之前**拦截；每个 flow 自己跑 `channel-detect` |
+| ICF JSON（`route: 'icf'`） | `TYPE_ROUTES`（`icf-json`）→ `push-icf.ts` | DDIC（`.doma/.dtel/.tabl/.stru/.enqu.json`）、HTTP（`.http.json`）、TRAN（`.tran.json`；SAP 侧写端点仍 501）。`pushOne` 查 `routing.ts` 的 `TYPE_ROUTES[objectType]` 取到具体 handler，不再有 per-type `if` 分支 |
+| TTYP / MSAG / DDLS / NROB（`route: 'adt'` 或 `icf`） | `TYPE_ROUTES`（`aff-json`）→ `push-{ttyp,msag,ddls,nrob}.ts` | 路由表里这几类 `channel: 'auto'`（NROB 为 `icf`），`resolveFile` 给的是 `route: 'adt'`，但文件是 AFF `.json` 而非 ABAP 源码，所以 `pushOne` 必须在通用源码分支**之前**拦截；每个 flow 自己跑 `channel-detect` |
 
-**JSON 文件的两类拦截**（都由 `routing.ts` 的 `PUSH_ROUTES` 声明，在 `readAbapFile` 之前）：
+**JSON 文件的两类拦截**（都由 `routing.ts` 的 `TYPE_ROUTES` 声明，在 `readAbapFile` 之前）：
 
-- **ICF JSON**（`.doma/.dtel/.tabl/.stru/.http/.tran.json`）：`kind: 'icf-json'`，`resolveFile` 直接给 `route: 'icf'`。
-- **通道路由 JSON**（`.ttyp/.msag/.ddls.json`）：`kind: 'aff-json'`，`route` 是 `'adt'`，但文件是 AFF 文档，`pushOne` 在通用源码分支之前命中。
+- **ICF JSON**（`.doma/.dtel/.tabl/.stru/.enqu/.http/.tran.json`）：`kind: 'icf-json'`，`resolveFile` 直接给 `route: 'icf'`。
+- **通道路由 JSON**（`.ttyp/.msag/.ddls/.nrob.json`）：`kind: 'aff-json'`，`route` 是 `'adt'`（NROB 为 `'icf'`），但文件是 AFF 文档，`pushOne` 在通用源码分支之前命中。
 
 两类共用同一套闸门语义：`--check-only` 抛 `VALIDATION_ERROR`（`--check-only is not supported for AFF JSON artifact files`）；`--dry-run` 返回 `status: dry-run` / `stage: ddic-icf` 且**零 SAP 调用**（通道路由类同样不会去连 ADT/ICF，也不会记录 `channel-*`）。
 
-DDIC 的存在性探测（`GET /ddic/<type>/<name>`）与 TRAN 的探测（`GET /tran/<code>`）在各自 ICF handler 内；HTTP 不探测（push 即创建）。`--atomic` 阶段对 ICF JSON 走各自 format 模块的结构校验，对通道路由三类走 `validate{Ttyp,Msag,Ddls}Object`（AFF schema）——都不是只读文本。
+DDIC 的存在性探测（`GET /ddic/<type>/<name>`）与 TRAN 的探测（`GET /tran/<code>`）在各自 ICF handler 内；HTTP 不探测（push 即创建）。`--atomic` 阶段对 ICF JSON 走各自 format 模块的结构校验，对通道路由四类走 AFF schema 校验（`validateAffFile` / `validate{Ttyp,Msag,Ddls,Nrob}Object`）——都不是只读文本。
 
 ### TTYP / MSAG / DDLS（双通道）
 
@@ -137,13 +137,13 @@ DDIC 的存在性探测（`GET /ddic/<type>/<name>`）与 TRAN 的探测（`GET 
 | `zif_foo.intf.abap` / `.intf.definitions.abap` / `.intf.implementations.abap` | adt | 接口及各 part |
 | `zprog.prog.abap` | adt | 程序 main |
 | `zfg.fugr.saplzfg.reps.abap` / `.fugr.lzfgtop.reps.abap` / `.fugr.<include>.reps.abap` / `.fugr.<fm>.func.abap` | adt | 函数组（含 include 与 FM 子对象，各自独立加锁） |
-| `zmy_table.tabl.json` / `.doma.json` / `.dtel.json` / `.stru.json` | icf | 四种 DDIC 对象（`PUSH_ROUTES` 的 `icf-json` 行，POST `/ddic/<type>`，push 前 GET 探测存在性） |
+| `zmy_table.tabl.json` / `.doma.json` / `.dtel.json` / `.stru.json` / `.enqu.json` | icf | 五种 DDIC 对象（`TYPE_ROUTES` 的 `icf-json` 行，POST `/ddic/<type>`，push 前 GET 探测存在性） |
 | `zmy_service.http.json` | icf | HTTP 服务（SICF 节点），POST `/http/<name>`；**不探测存在性**（push 即创建/更新） |
-| `zmy_tran.tran.json` | icf | 事务码（SE93），POST `/tran/<code>`；push 前 GET 探测存在性 |
-| `zmy_ttyp.ttyp.json` / `zmy_msag.msag.json` / `zmy_view.ddls.json` | 通道路由（adt 分支） | 036 三类型，`channel-detect` 决定 ADT / ICF |
+| `zmy_tran.tran.json` | icf | 事务码（SE93），POST `/tran/<code>`；push 前 GET 探测存在性。**SAP 侧写端点当前返回 501（`TRAN_WRITE_NOT_IMPLEMENTED`），写路径端到端不可用** |
+| `zmy_ttyp.ttyp.json` / `zmy_msag.msag.json` / `zmy_view.ddls.json` / `zmy_nrob.nrob.json` | 通道路由（adt 或 icf 分支） | 双通道类型，`channel-detect` 决定 ADT / ICF；NROB 固定走 ICF |
 | `zprog.prog.texts.en.properties`（`texts`/`selections`/`headings`） | textpool | 文本元素，混合模式路由；写仅在 ADT text-elements 写端点可用时成功 |
 
-**不支持的**：`.clas.json` 等源码对象的元数据 JSON — 被解析为 route `icf` 但对象类型既不在四种 DDIC 之内、也不是 036 的三类型，`validateLocalFile` 抛 `DDIC_NOT_SUPPORTED`（exit 7）。源码对象的创建/更新走 `abap create`，不是 push。
+**不支持的**：`.clas.json` 等源码对象的元数据 JSON — 被解析为 route `icf` 但对象类型既不在 `icf-json` 路由的五种 DDIC/HTTP/TRAN 之内、也不是 `aff-json` 路由的四类（TTYP/MSAG/DDLS/NROB），`validateLocalFile` 抛 `DDIC_NOT_SUPPORTED`（exit 7）。源码对象的创建/更新走 `abap create`，不是 push。
 
 **文件位置约定（与 pull / create local 对齐）**：`file-resolver.ts#resolveFile` 只看 `path.basename`，所以文件放在哪一层目录不影响路由与解析——push 可以推 `src/` 下的 AFF 文件名，也可以推子目录里的同名文件。pull / create local 默认把产物平铺写入 `src/`（`--dir` 只对这两条命令生效），push 直接读文件名即可。但文件名本身必须是 AFF 命名 `<name>.<type>[.<sub_type>].<ext>`：旧 `#ns#name` 命名空间 token 会被拒绝（`FILE_PARSE_ERROR`，提示重新 `abap pull`）。
 
@@ -263,7 +263,7 @@ abap push src/zprog.prog.texts.en.properties
 
 # references
 
-- 实现：`src/abap_cli/commands/push.ts`、`src/abap_cli/flows/edit/routing.ts`（`PUSH_ROUTES` 单一路由表）、`src/abap_cli/flows/edit/push.ts`（`runPush`/`pushOne`/`resolveObjectTransport`）、`push-icf.ts`（DDIC/HTTP/TRAN 的 ICF 写与校验）、`push-object.ts`、`push-fugr.ts`、`push-textpool.ts`、`push-{ttyp,msag,ddls}.ts`、`src/abap_cli/core/confirmation.ts`
+- 实现：`src/abap_cli/commands/push.ts`、`src/abap_cli/flows/edit/routing.ts`（`TYPE_ROUTES` 单一路由表）、`src/abap_cli/flows/edit/push.ts`（`runPush`/`pushOne`/`resolveObjectTransport`）、`push-icf.ts`（DDIC/HTTP/TRAN 的 ICF 写与校验）、`push-object.ts`、`push-fugr.ts`、`push-textpool.ts`、`push-{ttyp,msag,ddls,nrob}.ts`、`src/abap_cli/core/confirmation.ts`
 - transport 解析：`src/abap_cli/core/transport.ts`（`resolveTransport`）、`src/abap_cli/core/resolve.ts`（`ResolvedObject.packageName`）
 - SAP 后端：`abap/src/zcl_abap_vibe_icf_ddic.clas.abap`（`dispatch_ddic`）· `abap/src/zcl_abap_vibe_icf_textpool.clas.abap`（`dispatch_textpool`）
 - 文档：`docs/commands.md`（`abap push` 一节）、`docs/configuration.md`（Transport Resolution Order）
