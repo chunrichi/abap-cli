@@ -19,6 +19,7 @@
 
 ### Fixed
 
+- **HTTP pull 把 SICF 扩展字段写进本地 AFF 文件导致写盘校验失败**：`pull HTTP` 会把读路径的 `generalInformation.serviceId` 与 `header.descriptionByLang[]` 落进 `.http.json`，而 vendored `http-v1.json` 是 `additionalProperties:false`，写前钩子会以 `AFF_FIXTURE_INVALID` 拒绝——真实 SAP 上 `pull HTTP` 因此不可用。现在本地文件只保留 AFF 字段（`servicePath` 继续映射到 ICF wire 的 `url`），SICF 扩展不再落盘。**Migration**：旧 `.http.json` 若含 `serviceId` / `descriptionByLang`，`push` / `validate:aff` 会报校验失败；删除这两个字段或重新 `abap pull HTTP --overwrite` 即可。
 - **`create local` 对 CDS/RAP 伴生类型写到错误文件**：`SRVD` / `DCLS` / `DDLX` / `DDLA` 有 `createObjtype` 但没有本地骨架模板，旧实现会落一个 `REPORT <name>.` 内容的 `<name>.<type>.abap`（既不是合法 AFF 草稿也无法 push）。现在 `create local` 对这四类返回 `TYPE_NOT_SUPPORTED`（exit 7）并提示用 `abap create <type> <name> --file <aff.json>`，`--help` 与 README 的"支持 CDS/RAP 配套对象"文案同步更正。
 - **macOS 反复弹出的钥匙串授权窗口**：旧条目由 `keytar` 写入，ACL 只信任创建时的 node 二进制；回退到原生 `security` 读取时每次访问都会触发系统授权弹窗。现在 macOS 默认用原生 `security` 写入/读取，条目由 `/usr/bin/security`（Apple 签名）创建，读取不再弹窗。
 
