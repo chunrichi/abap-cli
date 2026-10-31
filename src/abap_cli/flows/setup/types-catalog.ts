@@ -105,6 +105,9 @@ const TADIR_OBJECT_BY_CLI: Record<string, Omit<TadirMapping, 'cliType'>> = {
 
   // Transaction code (SE93)
   TRAN: { pgmid: 'R3TR', tadirObject: 'TRAN', ddicTabclass: '', channel: 'ICF', affSchema: 'tran-v1.json', description: 'Transaction code (TSTC/TSTCC)' },
+
+  // Transformation (XSLT program)
+  XSLT: { pgmid: 'R3TR', tadirObject: 'XSLT', ddicTabclass: '', channel: 'ICF', affSchema: 'xslt-v1.json', description: 'Transformation / XSLT program (O2XSLTDESC; AFF pair .xslt.json + .xslt.xml)' },
 };
 
 /** Complete catalog in registry-stable order. */

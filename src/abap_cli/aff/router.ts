@@ -19,6 +19,7 @@
  *   *.doma.docu.json / *.dtel.docu.json → DOCU (companion schema, not a type)
  *   *.http.json / *.http.*.json        → HTTP
  *   *.tran.json / *.tran.*.json        → TRAN
+ *   *.xslt.json / *.xslt.xml           → XSLT  (metadata + source pair)
  *   *.devc.json                        → DEVC
  *
  * STRU is routed to `tabl-v1.json` at runtime via schemaPathFor().
@@ -70,6 +71,9 @@ const SUFFIX_RULES: ReadonlyArray<{ suffix: string; type: string; schemaFile?: s
   { suffix: '.tran.json', type: 'TRAN' },
   // Database view local-extension document (upstream AFF has no view format).
   { suffix: '.view.json', type: 'VIEW' },
+  // Transformation pair: metadata + source companion.
+  { suffix: '.xslt.json', type: 'XSLT' },
+  { suffix: '.xslt.xml', type: 'XSLT' },
   // dual-channel DDIC + CDS companions.
   { suffix: '.ttyp.json', type: 'TTYP' },
   { suffix: '.ttyp.type.abap', type: 'TTYP' },

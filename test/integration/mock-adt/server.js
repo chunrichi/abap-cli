@@ -57,6 +57,11 @@ const textpoolStore = new Map();
 const remoteSourceStore = new Map();
 // 014: TRAN (SE93 transaction code) store — key = TCODE, value = wire document.
 const tranStore = new Map();
+// XSLT (transformation program) store — key = NAME, value = { name, description,
+// originalLanguage, source, package }. `source` is stored in the canonical
+// (LF, no trailing break) form; GET adds the CRLF read-back the real
+// CL_O2_API_XSLTDESC->get_source_string() produces.
+const xsltStore = new Map();
 // 016: read-only table data store — key = <TABLE>, value = { tabclass, fields, rows }.
 // Seeded below with ZTAB_FIXTURE (150 rows, clientDependent, mixed types).
 const tableStore = new Map();
@@ -1429,6 +1434,67 @@ const server = http.createServer(async (req, res) => {
         return ok(res, JSON.stringify({ status: 'success', data: { name: tcode, type: 'TRAN', action: 'deleted' } }), 'application/json');
       }
       return ok(res, JSON.stringify({ status: 'error', error: { code: 'METHOD_NOT_ALLOWED', message: `${req.method} not supported on /tran/${tcode}` } }), 'application/json');
+    }
+
+    // /sap/abap_cli/xslt/<name> (GET pull / POST|PUT upsert / DELETE).
+    // Mirrors zcl_abap_vibe_icf_xslt: camelCase wire envelope, 200 + structured
+    // error for SAP-side failures, CRLF read-back for the source string.
+    const xslt = /^\/sap\/abap_cli\/xslt\/([^/]+)$/.exec(path);
+    if (xslt) {
+      const xsltName = decodeURIComponent(xslt[1]).toUpperCase();
+      if (req.method === 'GET') {
+        if (!xsltStore.has(xsltName)) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'XSLT_OBJECT_NOT_FOUND', message: `Transformation ${xsltName} not found` } }), 'application/json');
+        }
+        const stored = xsltStore.get(xsltName);
+        const readback = stored.source.replace(/\n/g, '\r\n') + '\r\n';
+        return ok(res, JSON.stringify({
+          status: 'success',
+          data: {
+            name: stored.name,
+            description: stored.description,
+            originalLanguage: stored.originalLanguage,
+            source: readback,
+            package: stored.package,
+          },
+        }), 'application/json');
+      }
+      if (req.method === 'POST' || req.method === 'PUT') {
+        const body = await readBody(req);
+        let payload = {};
+        try { payload = JSON.parse(body); } catch (_e) { payload = {}; }
+        const bodyName = (payload.name || '').toUpperCase();
+        if (bodyName && bodyName !== xsltName) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'XSLT_NAME_MISMATCH', message: `payload name ${bodyName} does not match URL transformation ${xsltName}` } }), 'application/json');
+        }
+        if (!payload.header || !payload.header.description) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'XSLT_DESCRIPTION_REQUIRED', message: 'header.description is required' } }), 'application/json');
+        }
+        if (!payload.source || !String(payload.source).trim()) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'XSLT_SOURCE_REQUIRED', message: 'source is required' } }), 'application/json');
+        }
+        const pkg = (payload.package || '').toUpperCase();
+        if (pkg && pkg !== '$TMP' && !payload.transportRequest) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'XSLT_TRANSPORT_REQUIRED', message: 'transportRequest is required for non-$TMP packages' } }), 'application/json');
+        }
+        const existed = xsltStore.has(xsltName);
+        xsltStore.set(xsltName, {
+          name: xsltName,
+          description: payload.header.description,
+          originalLanguage: (payload.header.originalLanguage || 'EN').toUpperCase(),
+          source: String(payload.source).replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n+$/, ''),
+          package: pkg || (existed ? xsltStore.get(xsltName).package : '$TMP'),
+        });
+        return ok(res, JSON.stringify({ status: 'success', data: { name: xsltName, action: existed ? 'updated' : 'created' } }), 'application/json');
+      }
+      if (req.method === 'DELETE') {
+        if (!xsltStore.has(xsltName)) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'XSLT_OBJECT_NOT_FOUND', message: `Transformation ${xsltName} not found` } }), 'application/json');
+        }
+        xsltStore.delete(xsltName);
+        return ok(res, JSON.stringify({ status: 'success', data: { name: xsltName, action: 'deleted' } }), 'application/json');
+      }
+      return ok(res, JSON.stringify({ status: 'error', error: { code: 'METHOD_NOT_ALLOWED', message: `${req.method} not supported on /xslt/${xsltName}` } }), 'application/json');
     }
 
     // 014: /sap/abap_cli/textpool/<category>?object=<name>&type=<type> (GET read / POST write).

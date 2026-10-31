@@ -4,7 +4,7 @@ title: abap CLI Wiki
 description: abap CLI 知识库首页 — 命令参考、学习记录与路线图
 tags: [abap-cli, wiki, index]
 created at: 2026-08-06 23:10:00
-changed at: 2026-09-18 22:05:00
+changed at: 2026-10-31 18:06:00
 ---
 
 # abap CLI Wiki

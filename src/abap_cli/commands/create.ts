@@ -21,10 +21,9 @@ import { schemaOption } from './schema-helpers.js';
 export function registerCreateCommand(program: Command): void {
   const createCmd = program
     .command('create')
-    .description('Create a new ABAP object (CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, VIEW, HTTP)')
+    .description('Create a new ABAP object (CLAS, INTF, PROG, FUGR, DEVC, DDIC, HTTP, TRAN, VIEW, XSLT, CDS)')
     // [type]/[name]（可选）是因为 --schema 模式下不需要 name；真实创建仍需两者。
-    .argument('[type]', 'Object type (CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, VIEW, HTTP)')
-    .argument('[name]', 'Object name')
+    .argument('[type]', 'Object type (CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, ENQU, VIEW, NROB, HTTP, TRAN, XSLT)')    .argument('[name]', 'Object name')
     .addHelpText('after', [
       '',
       'Supported types:',
@@ -44,6 +43,7 @@ export function registerCreateCommand(program: Command): void {
       '  NROB  Number range obj.  (ICF /ddic/nrob — requires --file; no abap-adt-api endpoint)',
       '  HTTP  SICF service node  (ICF /http/<name> — requires --file)',
       '  TRAN  Transaction code   (ICF /tran/<code> — requires --file)',
+      '  XSLT  Transformation     (ICF /xslt/<name> — requires --file <name>.xslt.json + .xslt.xml)',
       '  TTYP / MSAG / DDLS       (requires --file; ADT, ICF fallback on ECC for TTYP/MSAG)',
       '',
       'Run `abap create <type> --schema` for the machine-readable contract of a specific type.',
@@ -100,7 +100,7 @@ function registerCreateLocalCommand(createCmd: Command): void {
       '',
       'This command is experimental and creates a local draft only — nothing is sent to SAP.',
       'It supports the source-object types (CLAS, INTF, PROG, FUGR) only; DDIC /',
-      'HTTP / TRAN / CDS / RAP types have no local skeleton and require',
+      'HTTP / TRAN / XSLT / CDS / RAP types have no local skeleton and require',
       '`abap create <type> <name> --file <path>` with an abap-file-format JSON instead.',
       'To land a draft in SAP, run:',
       '  abap create <type> <name> --package <pkg> --description <desc> --no-pull',
@@ -210,13 +210,14 @@ export function createSchema(type?: string): CreateCommandSchema {
       ? 'VIEW (DDIC database view) is created through the self-built ICF service (/ddic/view). Requires --file with a local-extension view-v1 JSON: header.description, viewClass, rootTable, tables[] and fields[]; joinConditions[] for a multi-table view.'
       : isDdic
         ? `DDIC type ${t} created via the self-built ICF service. Requires --file <abap-file-format JSON> with top-level fields: name, description, fields[].`
-        : `Type ${t} requires --file <abap-file-format JSON>. No local skeleton path exists; write the JSON first, then create.`;
+        : t === 'XSLT'
+          ? `Type XSLT requires --file <name>.xslt.json (AFF xslt-v1 metadata); the sibling <name>.xslt.xml source must exist in the same directory. Created via the self-built ICF service at /xslt/<name>.`
+          : `Type ${t} requires --file <abap-file-format JSON>. No local skeleton path exists; write the JSON first, then create.`;
     const exampleJson = t === 'VIEW'
       ? getViewJsonExample()
       : isDdic
         ? getDdicJsonExample(t as DdicSupportedType)
-        : undefined;
-    return {
+        : undefined;    return {
       ...base,
       type: t,
       supported: true,

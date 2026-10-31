@@ -4,7 +4,7 @@ title: ICF 服务开发期全局类树 / 发布期合并单类
 description: abap/src 以全局类开发仓形态维护，abap/deploy.json 是清单；abap deploy 推送前把 helper 降级为 lcl_* 合并进 handler，SAP 上只装 3 个全局类
 tags: [abap-cli, design-decisions, icf, deploy, abap]
 created at: 2026-10-30 21:40:00
-changed at: 2026-10-30 21:40:00
+changed at: 2026-10-31 18:06:00
 ---
 
 # 012 — ICF 服务开发期全局类树 / 发布期合并单类
@@ -17,7 +17,7 @@ changed at: 2026-10-30 21:40:00
 
 `abap deploy`（默认）产出**发布形态**：读取开发源码，把 16 个 merged helper 的类头降级为 `lcl_*`、按依赖拓扑排序后合并进 handler 的 definitions / implementations 两个 include，并把 handler main 里的 `zcl_*` 引用机械改名为 `lcl_*`。SAP 上最终只装 3 个全局类：`ZCL_ABAP_VIBE_ICF` + `ZCL_ABAP_VIBE_ICF_SETUP` + `ZCL_ABAP_VIBE_RUNNER`。
 
-`abap deploy --dev` 产出**开发形态**：跳过合并，按依赖顺序把 19 个类逐个安装为全局对象，供本仓库在真机上做单类语法检查、激活、ABAP Unit 与端点迭代。
+`abap deploy --dev` 产出**开发形态**：跳过合并，按依赖顺序把 20 个类逐个安装为全局对象，供本仓库在真机上做单类语法检查、激活、ABAP Unit 与端点迭代。
 
 ## 上下文
 
@@ -30,7 +30,7 @@ changed at: 2026-10-30 21:40:00
 
 - **fragments 方案（仓库内按域拆文件、deploy 时纯拼接回两个 include）**：能把巨石拆小且可证逐字节还原，但产物仍是"两个 include + 10 个 local class"，单个 helper 不能当全局类做语法检查 / 激活 / 真机调用，开发期粒度没变。被本方案取代。
 - **abapmerge 式同名 local class 合并**：开发期也用 `lcl_*` 名写进待合并文件，发布时原样输出。形态只有一种，dev 形态没有可单独安装的全局类 → 无法单类迭代；且两种形态共用同一套名字和同一个对象，无法在同一系统共存对照。
-- **把 19 个全局类直接发布**：每个对象都要创建 / 激活 / 传输 / 授权，安装与升级面从 3 个对象涨到 19 个，正是要避免的分发成本。
+- **把 20 个全局类直接发布**：每个对象都要创建 / 激活 / 传输 / 授权，安装与升级面从 3 个对象涨到 20 个，正是要避免的分发成本。
 - **保留两个 include 巨石**：不引入清单与合并器，但继续支付整类编辑 / 检查 / review 的成本，与 Agent 使用优化相悖。
 
 ## 当前代价
@@ -43,7 +43,7 @@ changed at: 2026-10-30 21:40:00
 
 ## 后果
 
-- **仓库侧**：19 个可单独 review / 激活的全局类；共享类型集中到 `ZCL_ABAP_VIBE_ICF_TYPES` 的 PUBLIC SECTION（约 100 个 `ty_*` / `tt_*`），10 个域 helper 一律用 `zcl_abap_vibe_icf_types=>ty_*` 引用（5 个 format 类保留自己的类型定义）；`ZCL_ABAP_VIBE_ICF_MIME` 自带 `TYPE-POOLS: skwf, wbmr.` 的 definitions prelude。
+- **仓库侧**：20 个可单独 review / 激活的全局类；共享类型集中到 `ZCL_ABAP_VIBE_ICF_TYPES` 的 PUBLIC SECTION（约 100 个 `ty_*` / `tt_*`），11 个域 helper 一律用 `zcl_abap_vibe_icf_types=>ty_*` 引用（5 个 format 类保留自己的类型定义）；`ZCL_ABAP_VIBE_ICF_MIME` 自带 `TYPE-POOLS: skwf, wbmr.` 的 definitions prelude。
 - **发布侧**：3 个全局类；handler 3 个 part（main + 生成的 definitions / implementations）。`DeploymentSummary` 用 `mode: 'dev' | 'release'` 区分形态，release 额外带 `mergedClasses`；ICF 端点与 service version 不变，CLI 客户端无感知。
 - **开发循环**：`abap deploy --dev --yes` 在开发系统安装全部全局类（依赖拓扑序：共享类型最先、format 先于 ddic、handler 在全部 helper 之后、setup/runner 最后），改单类后可只推 / 只激活该类；发布前用 `abap deploy --yes` 装发布形态并用 `abap deploy --diff` 验幂等。
 - **后续改动**：新增 ICF helper = 新全局类 + `abap/deploy.json` 的 `merged` 一行（分配新的 `lcl_*` 本地名）；不需要合并的类登记到 `standalone`。
