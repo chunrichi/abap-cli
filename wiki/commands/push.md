@@ -9,7 +9,7 @@ changed at: 2026-10-31 18:06:00
 
 # abap push
 
-把本地 ABAP 文件推送到 SAP 系统，核心流程是 **lock → set source → syntax check → activate → unlock**。支持：普通源码对象（CLAS/PROG/INTF）、FUGR 子对象、textpool `.properties`，以及 ICF 路由的 `.json`（DDIC / HTTP / TRAN / VIEW / XSLT，其中 DOMA/DTEL 同目录的 `<name>.<type>.docu.json` 长文本伴生会随主文件自动推送，XSLT 则读 `.xslt.xml` 伴生）与通道路由的 TTYP / MSAG / DDLS。文件级编排在 `flows/edit/push.ts`（`runPush` / `pushOne`），单对象核心在 `flows/edit/push-object.ts`（`pushObject`）。
+把本地 ABAP 文件推送到 SAP 系统，核心流程是 **lock → set source → syntax check → activate → unlock**。支持：普通源码对象（CLAS/PROG/INTF）、FUGR 子对象、textpool `.properties`，以及 ICF 路由的 `.json`（DDIC / HTTP / TRAN / VIEW / SHLP / XSLT，其中 DOMA/DTEL 同目录的 `<name>.<type>.docu.json` 长文本伴生会随主文件自动推送，XSLT 的 `<name>.xslt.xml` 源码随 `.xslt.json` 一起推送）与通道路由的 TTYP / MSAG / DDLS。文件级编排在 `flows/edit/push.ts`（`runPush` / `pushOne`），单对象核心在 `flows/edit/push-object.ts`（`pushObject`）。
 
 > ⚠️ **textpool 写限制**：textpool `.properties` 的**读**（`abap pull --textpool`）在 ADT / ICF 两种路由都可用；**写**需要 ADT text-elements 写端点。在只提供非交互式 textpool API 的 release 上（vhcala4hci / A4H 实测），profile 缓存 `adtTextpool.write: false` → 写路由到 ICF `/textpool/*`，而自带 ICF handler 对 POST **无条件**返回 `TEXTPOOL_WRITE_UNSUPPORTED`（SAP_ERROR / exit 6）。此时选择屏幕标签改用 `SELECTION-SCREEN COMMENT <pos>(<len>) lbl_xxx` + `INITIALIZATION` 赋值，不要依赖 `push` 文本元素。
 
@@ -93,7 +93,7 @@ DDIC/TRAN 的探测在 `--dry-run` 之后（plan-only 不做多余 round-trip）
 | 普通源码（adt） | `pushObject` | 锁对象 → 写每个 part 源码 → check/activate → 解锁（`finally` 保证） |
 | FUGR | `push-fugr.ts` | 子对象（FM/include）是独立 ADT 锁对象，逐文件锁自己的目标、写源，最后激活整个 function group |
 | Textpool | `push-textpool.ts` | 混合模式：profile 缓存能力决定走 ADT `setTextElements`（lock→write→unlock）还是 ICF `/textpool/*`；`--check-only` 不支持（`VALIDATION_ERROR`）。**ICF 写为 stub**——`adtTextpool.write: false` 的系统上 POST 无条件报 `TEXTPOOL_WRITE_UNSUPPORTED`（见上方限制说明） |
-| ICF JSON（`route: 'icf'`） | `TYPE_ROUTES`（`icf-json`）→ `push-icf.ts` | DDIC（`.doma/.dtel/.tabl/.stru/.enqu/.view/.nrob.json`）、HTTP（`.http.json`）、TRAN（`.tran.json`）。`pushOne` 查 `routing.ts` 的 `TYPE_ROUTES[objectType]` 取到具体 handler，不再有 per-type `if` 分支。DOMA/DTEL 额外处理同目录长文本伴生（见下节） |
+| ICF JSON（`route: 'icf'`） | `TYPE_ROUTES`（`icf-json`）→ `push-icf.ts` | DDIC（`.doma/.dtel/.tabl/.stru/.enqu/.view/.shlp/.nrob.json`）、HTTP（`.http.json`）、TRAN（`.tran.json`）。`pushOne` 查 `routing.ts` 的 `TYPE_ROUTES[objectType]` 取到具体 handler，不再有 per-type `if` 分支。DOMA/DTEL 额外处理同目录长文本伴生（见下节） |
 | TTYP / MSAG / DDLS / NROB（`route: 'adt'` 或 `icf`） | `TYPE_ROUTES`（`aff-json`）→ `push-{ttyp,msag,ddls,nrob}.ts` | 路由表里这几类 `channel: 'auto'`（NROB 为 `icf`），`resolveFile` 给的是 `route: 'adt'`，但文件是 AFF `.json` 而非 ABAP 源码，所以 `pushOne` 必须在通用源码分支**之前**拦截；每个 flow 自己跑 `channel-detect` |
 
 **JSON 文件的两类拦截**（都由 `routing.ts` 的 `TYPE_ROUTES` 声明，在 `readAbapFile` 之前）：
@@ -171,7 +171,7 @@ abap push src/zmy_xslt.xslt.json src/zmy_xslt.xslt.xml --yes   # 两件一起给
 | `zif_foo.intf.abap` / `.intf.definitions.abap` / `.intf.implementations.abap` | adt | 接口及各 part |
 | `zprog.prog.abap` | adt | 程序 main |
 | `zfg.fugr.saplzfg.reps.abap` / `.fugr.lzfgtop.reps.abap` / `.fugr.<include>.reps.abap` / `.fugr.<fm>.func.abap` | adt | 函数组（含 include 与 FM 子对象，各自独立加锁） |
-| `zmy_table.tabl.json` / `.doma.json` / `.dtel.json` / `.stru.json` / `.enqu.json` / `.view.json` | icf | DDIC 对象（含本地扩展 view-v1）（`TYPE_ROUTES` 的 `icf-json` 行，POST `/ddic/<type>`，push 前 GET 探测存在性） |
+| `zmy_table.tabl.json` / `.doma.json` / `.dtel.json` / `.stru.json` / `.enqu.json` / `.view.json` / `.shlp.json` | icf | DDIC 对象（含本地扩展 view-v1 / shlp-v1）（`TYPE_ROUTES` 的 `icf-json` 行，POST `/ddic/<type>`，push 前 GET 探测存在性） |
 | `zmy_dom.doma.docu.json` / `zmy_dom.dtel.docu.json` | icf（随主文件） | DOMA/DTEL 长文本伴生：不单独 push；主文件 push 成功后自动 POST/删除长文本（`lines: []` 删除） |
 | `zmy_service.http.json` | icf | HTTP 服务（SICF 节点），POST `/http/<name>`；**不探测存在性**（push 即创建/更新） |
 | `zmy_tran.tran.json` | icf | 事务码（SE93），POST `/tran/<code>`；push 前 GET 探测存在性。**SAP 侧写端点当前返回 501（`TRAN_WRITE_NOT_IMPLEMENTED`），写路径端到端不可用** |
@@ -241,6 +241,7 @@ abap push src/a.clas.abap src/b.clas.abap --tr NDK123456 --atomic
 
 # 推送 DDIC 对象（$TMP 无需 --tr；VIEW 走 /ddic/view 全量覆盖）
 abap push src/zcli_tc_view.view.json --yes --json
+abap push src/zcli_tc_shlp.shlp.json --yes --json
 abap push src/ztest_e2e.tabl.json
 
 # 推送 TABL 三件套：main 即可；同目录 .tabl.ddic / .tabl.settings.json 自动一起推

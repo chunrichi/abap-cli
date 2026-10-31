@@ -18,16 +18,16 @@ import {
 } from '../../src/abap_cli/types/registry.js';
 
 describe('types/registry.ts (single source of truth)', () => {
-  it('contains exactly 24 supported types (4 source + DEVC + 4 DDIC + ENQU + VIEW + NROB + HTTP + TRAN + XSLT + 3 dual-channel + 6 )', () => {
+  it('contains exactly 25 supported types (4 source + DEVC + 4 DDIC + ENQU + VIEW + SHLP + NROB + HTTP + TRAN + XSLT + 3 dual-channel + 6 )', () => {
     // added: SRVB (metadata-only), SRVD, BDEF, DCLS, DDLX, DDLA.
     // added: ENQU (lock object, ICF) and NROB (number range object, ICF).
     // added: DEVC (package, ADT package resource; push unsupported).
-    expect(allSupportedTypes()).toHaveLength(24);
+    expect(allSupportedTypes()).toHaveLength(25);
     expect(allSupportedTypes()).toEqual([
       'CLAS', 'INTF', 'PROG', 'FUGR',         // ADT source
       'DEVC',                                  // ADT package resource
       'TABL', 'STRU', 'DOMA', 'DTEL',         // ICF DDIC
-      'ENQU', 'VIEW', 'NROB',                  // — ICF DDIC family
+      'ENQU', 'VIEW', 'SHLP', 'NROB',          // — ICF DDIC family
       'HTTP', 'TRAN', 'XSLT',                  // ICF
       'TTYP', 'MSAG', 'DDLS',                  // dual-channel
       'SRVB', 'SRVD', 'BDEF',                  // /
@@ -70,6 +70,7 @@ describe('types/registry.ts (single source of truth)', () => {
     expect(sourceFor('TRAN')).toBe('ICF');
     // VIEW is a local-extension AFF document served by the ICF service.
     expect(sourceFor('VIEW')).toBe('ICF');
+    expect(sourceFor('SHLP')).toBe('ICF');
     expect(sourceFor('XSLT')).toBe('ICF');
     // TTYP/MSAG/DDLS are ADT by default with optional ICF fallback.
     expect(sourceFor('TTYP')).toBe('ADT');

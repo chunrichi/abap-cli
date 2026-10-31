@@ -54,7 +54,7 @@ describe('schema-paths priority chain', () => {
     );
   });
 
-  it('affSupportedTypes matches the router table (16 + 6 + 2 + VIEW + DOCU types)', () => {
+  it('affSupportedTypes matches the router table (16 + 6 + 2 + VIEW + XSLT + SHLP + DOCU types)', () => {
     const types = affSupportedTypes();
     expect(types).toEqual(
       expect.arrayContaining([
@@ -67,9 +67,9 @@ describe('schema-paths priority chain', () => {
         'SRVB', 'SRVD', 'BDEF', 'DCLS', 'DDLX', 'DDLA',
         // — lock object + number range object.
         'ENQU', 'NROB',
-        // — database view local-extension schema (VIEW is a DDIC object type
-        //   whose AFF document is a local extension).
-        'VIEW',
+        // — database view (VIEW) and search help (SHLP) local-extension
+        //   schemas; XSLT also has a local-extension schema.
+        'VIEW', 'SHLP', 'XSLT',
         // — package (DEVC) metadata document.
         'DEVC',
         // — DOMA/DTEL long-text companion schema (not an object type).
@@ -84,7 +84,8 @@ describe('schema-paths priority chain', () => {
     // added DOCU (companion schema) = 26 total.
     // added VIEW (local extension) = 27 total.
     // added XSLT = 28 total.
-    expect(types).toHaveLength(28);
+    // added SHLP (local extension) = 29 total.
+    expect(types).toHaveLength(29);
   });
 
   it('bundled root contains every supported schema', () => {
