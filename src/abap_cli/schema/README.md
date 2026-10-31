@@ -4,8 +4,8 @@ These JSON schemas are vendored from the SAP `abap-file-formats` repository
 (https://github.com/SAP/abap-file-formats), commit `5bd63fdecb8b4a03c73b1433a36b779c0c9b1121`.
 
 Every file except `ttyp-v1.json`, `view-v1.json` and `shlp-v1.json` is a byte-for-byte copy of
-the upstream schema with the same name. Those two are local extensions:
-upstream has no TTYP schema and no view schema at this commit, so the files are
+the upstream schema with the same name. Those three are local extensions:
+upstream has no TTYP, view, or search-help schema at this commit, so the files are
 handcrafted here and `scripts/sync-aff-schema.sh` never overwrites them.
 
 The set is intentionally minimal — only the schemas abap-cli resolves through

@@ -4,7 +4,7 @@ title: SAP 开发任务覆盖率矩阵
 description: abap-cli 当前能 / 不能完成的 SAP 开发任务全景 — 用于未来 spec 选题 + 用户预期管理
 tags: [abap-cli, coverage, roadmap, scope]
 created at: 2026-09-01 00:00:00
-changed at: 2026-10-31 19:10:00
+changed at: 2026-11-01 00:20:00
 ---
 
 # SAP 开发任务覆盖率矩阵
@@ -41,7 +41,7 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | 创建/修改编号范围对象（NROB） | `create / pull / push NROB` | ✅ | pull 主 ADT + ICF 兜底；`create --file` |
 | 创建/修改 SICF 节点（HTTP） | `create / pull / push HTTP` | ✅ | ICF |
 | 创建/修改事务码（SE93 / TRAN） | `create / pull / push / delete TRAN` | ✅ | ICF `/tran` GET/POST/PUT/DELETE；dialog/report/parameter/variant，OO 明确拒绝；真机 23/23 TC |
-| 创建/修改转换程序（XSLT） | `create / pull / push / delete XSLT` | ✅ | ICF `/xslt` + `CL_O2_API_XSLTDESC`；AFF 两件套 `.xslt.json` + `.xslt.xml`；更新=删除后重建（不保留版本历史）；真机待补（stateful 会话受限） |
+| 创建/修改转换程序（XSLT） | `create / pull / push / delete XSLT` | ✅ | ICF `/xslt` + `CL_O2_API_XSLTDESC`；AFF 两件套 `.xslt.json` + `.xslt.xml`；更新=原地更新并保留版本历史；真机 18/18 TC |
 | Table Type（TTYP） | `create / pull / push TTYP` | ✅ | ADT 主通道；ECC 自动 ICF 兜底 |
 | 消息类（MSAG） | `create / pull / push MSAG` | ✅ | ADT 主通道；ECC 自动 ICF 兜底 |
 | CDS View（DDLS） | `create / pull / push DDLS` | ✅ | 仅 ADT；ECC 旧内核硬错 `DDLS_NOT_SUPPORTED_ON_ECC` |
@@ -198,7 +198,7 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | --schema（命令 schema 自描述） | `--schema` | ✅ | 全部 29 命令 |
 | --json / --pretty-json | `--json / --pretty-json` | ✅ | 全部命令 |
 | Skill bundle | `init --agent` | ✅ | agents/copilot/claude/cursor/generic |
-| Wiki | `wiki/` | ✅ | 69 篇（命令页 29 个） |
+| Wiki | `wiki/` | ✅ | 74 篇（命令页 29 个） |
 | 命令文档生成 | `scripts/gen-docs.mjs`（docs:check 入 verify） | ✅ | 单一事实源 |
 | 错误码自描述 | `CliError.references` | ✅ | 指向 skills/.../references/errors.md |
 | Release notes | `CHANGELOG.md` | ✅ | Keep a Changelog |
@@ -211,14 +211,9 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 
 | 缺失能力 | 价值 | 工作量 | 状态 / 去向 |
 |---|---|---|---|
-| VIEW（DDIC 视图） | 高 | 中 | 候选补充类型（ICF `DDIF_VIEW_GET/PUT` 路线），见 roadmap |
-| SHLP（搜索帮助） | 高 | 中 | 候选补充类型（ICF `DDIF_SHLP_GET/PUT` 路线），见 roadmap |
-| DEVC（Package 创建/管理） | 高 | 小-中 | 候选补充类型（ADT `DEVC/K`），见 roadmap |
-| XSLT（转换） | 中 | 中 | 候选补充类型（ICF `CL_O2_API_XSLTDESC` 路线），见 roadmap |
 | ENHO / ENHS（增强） | 中-高 | 大 | 先只读 pull，再 push；见 roadmap |
 | AUTH / SUSO 授权对象 | 中 | 中-大 | 本轮按约定暂不做；见 roadmap |
 | TRAN OO 事务写入 | 中 | 中 | 规范 FM `RPY_TRANSACTION_INSERT` 无 class/method 参数；需 SE93 BDC，ICF 上下文不可用，继续走 SE93 |
-| DOMA/DTEL `.docu.json` 长文本 | 中 | 中 | AFF `docu-v1` 未 vendor；需 ICF 长文本读写 + 真机验证 |
 | Cross-reference / where-used 全集 | 中 | 中-大 | 需 REPS 全文扫描 |
 | Transport release / delete | 低 | 小 | 本轮按约定不做 |
 | 表单（SFPF / SSFO / SAPscript） | 中 | 大 | 按需；AFF 只覆盖 SFPF |
@@ -232,7 +227,7 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 ## AFF Fixture Coverage
 
 > 手工维护：`abap validate:aff --json test/fixtures/` 的按类型汇总。
-> Last run: 2026-10-31（34 个 fixture，PASS 34 / WARN 0 / FAIL 0，13 个类型）。
+> Last run: 2026-11-01（`test/fixtures` 共 65 个文件、覆盖 18 个对象类型码；其中 35 个 AFF 文档进入 validate:aff，PASS 35 / WARN 0 / FAIL 0，14 个类型）。
 
 | Type | Fixtures | PASS | WARN | FAIL |
 |------|----------|------|------|------|
@@ -244,9 +239,9 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | STRU | 3 | 3 | 0 | 0 |
 | DOMA | 5 | 5 | 0 | 0 |
 | DTEL | 3 | 3 | 0 | 0 |
-| ENQU / HTTP / TRAN / TTYP / MSAG / DDLS | 各 1 | 各 1 | 0 | 0 |
+| DEVC / HTTP / TRAN / TTYP / MSAG / DDLS | 各 1 | 各 1 | 0 | 0 |
 
-> 尚未有 fixture 的类型：SRVB / SRVD / BDEF / DCLS / DDLX / DDLA（RAP/CDS 家族）与其它新类型；补类型时应同步补 fixture。
+> 尚无 fixture 的类型：ENQU / NROB / VIEW / SHLP / XSLT / SRVB / BDEF；SRVD / DCLS / DDLA / DDLX 的 fixture 已存在，但 `aff/router.ts` 没有对应后缀规则，`validate:aff` 不覆盖它们。补类型时应同步补 fixture。
 
 ### Schema paths
 

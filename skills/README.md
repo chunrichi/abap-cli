@@ -8,7 +8,7 @@ abap-cli 用户的 AI agent 上下文集合。**自包含**——分发时每个
 
 | 路径 | 用途 | 谁用 | 随 npm 包分发？ |
 |---|---|---|---|
-| `.agents/skills/`（`abap-style` / `abap-report-style` / `okf` / `abap-testing` / `repo-workflow`） | 本仓库贡献者的本地元方法 | vibe_with_abap 开发者 | ❌（gitignored） |
+| `.agents/skills/`（`abap-style` / `abap-report-style` / `okf` / `abap-testing` / `repo-workflow` / `release`） | 本仓库贡献者的本地元方法 | vibe_with_abap 开发者 | ❌（gitignored） |
 | **顶层 `skills/`（本目录）** | **abap-cli 用户的路由/领域 skill** | **abap-cli 用户** | **✅（`package.json#files` 含 `skills/`）** |
 | **顶层 `agents/abap-developer.agent.md`** | **abap-cli 用户的端到端开发代理** | **abap-cli 用户** | **✅（`package.json#files` 含 `agents/`）** |
 
@@ -68,7 +68,7 @@ cp agents/abap-developer.agent.md <your-project>/.claude/agents/
 | **`abap-cli`** | meta | `report-stuck` | 入口路由层：按意图分发到 4 个领域 skill + 1 个方法论 skill；本地卡死留痕；CLI 反馈直接提 GitHub issue |
 | **`abap-cli-setup`** | workspace-and-sap | `init` `profile` `doctor` `transport` `deploy` `session` `types` | 环境就绪：工作区、凭证、诊断、传输请求、ICF 部署、session、TADIR 映射 |
 | **`abap-cli-search`** | sap（只读） | `search` `where-used` `inspect` `tcode` `diff` `status` `dumps` | 元数据探查：不改对象、不加锁、不写 transport；`dumps` 列 ST22 dump |
-| **`abap-cli-edit`** | sap（写） | `pull` `push` `check` `create`（含 `create local`）`activate` `delete` `list` `mime` `validate:aff` | 写路径：源码/DDIC/MIME 的拉取、创建、修改、推送、激活、删除；类型码以 `src/abap_cli/types/registry.ts` 为准（当前 21 个注册类型，`SRVB` 等部分类型仅支持 pull） |
+| **`abap-cli-edit`** | sap（写） | `pull` `push` `check` `create`（含 `create local`）`activate` `delete` `list` `mime` `validate:aff` | 写路径：源码/DDIC/MIME 的拉取、创建、修改、推送、激活、删除；类型码以 `src/abap_cli/types/registry.ts` 为准（当前 25 个注册类型，`SRVB` 等部分类型仅支持 pull） |
 | **`abap-cli-data`** | sap（只读消费） | `select` `fields` `run` `run-report` `test` | 运行时消费：查表/字段、跑类、跑报表、跑 ABAP Unit；全程只读 |
 | **`abap-cli-performance`** | abap-performance-review | （方法论；触发只读命令 `search` / `inspect` / `pull` / `check` / `select`） | ABAP 性能 review：慢路径诊断、分平台建议、`check` / ATC 核验 |
 

@@ -2,9 +2,9 @@
 type: reference
 title: 对象类型详细文档索引
 description: 每个 SAP 对象类型的字段契约、命令路径、本地文件形态与示例
-tags: [abap-cli, object-types, reference, clas, intf, prog, fugr, devc, tabl, stru, doma, dtel, enqu, view, shlp, nrob, http, tran, xslt, ttyp, msag, ddls]
+tags: [abap-cli, object-types, reference, clas, intf, prog, fugr, devc, tabl, stru, doma, dtel, enqu, view, shlp, nrob, http, tran, xslt, ttyp, msag, ddls, srvb, srvd, bdef, dcls, ddlx, ddla]
 created at: 2026-09-01 00:00:00
-changed at: 2026-10-31 19:10:00
+changed at: 2026-11-01 00:20:00
 ---
 
 # 对象类型详细文档
@@ -32,13 +32,19 @@ changed at: 2026-10-31 19:10:00
 | `TTYP` | ADT + ICF 兜底 | `src/<name>.ttyp.json` + 可选 `src/<name>.type.abap` | [ttyp.md](ttyp.md) |
 | `MSAG` | ADT + ICF 兜底 | `src/<name>.msag.json` | [msag.md](msag.md) |
 | `DDLS` | ADT（无兜底） | `src/<name>.ddls.{json,acds}` 两件套 | [ddls.md](ddls.md) |
+| `SRVB` | ADT（无兜底） | `src/<name>.srvb.json`（Service Binding 元数据；仅 pull） | [srvb.md](srvb.md) |
+| `SRVD` | ADT（无兜底） | `src/<name>.srvd.{json,acds}` 两件套（Service Definition） | [srvd.md](srvd.md) |
+| `BDEF` | ADT（无兜底） | `src/<name>.bdef.{json,abdl}` 两件套（Behavior Definition；pull + push） | [bdef.md](bdef.md) |
+| `DCLS` | ADT（无兜底） | `src/<name>.dcls.{json,acds}` 两件套（CDS Access Control） | [dcls.md](dcls.md) |
+| `DDLX` | ADT（无兜底） | `src/<name>.ddlx.{json,acds}` 两件套（CDS Metadata Extension） | [ddlx.md](ddlx.md) |
+| `DDLA` | ADT（无兜底） | `src/<name>.ddla.{json,acds}` 两件套（CDS Annotation Definition） | [ddla.md](ddla.md) |
 
 ## 路由速查
 
 - **ADT**（源对象）：无需 ICF 部署；直接打 SAP ADT REST API；走 `abap-adt-api` 库
 - **ICF** 自建（DDIC/HTTP/TRAN/VIEW/SHLP/XSLT）：需要先 `abap deploy`；走 `/sap/abap_cli/<domain>/<type>/<name>`（VIEW 为 `/ddic/view/<name>`，SHLP 为 `/ddic/shlp/<name>`，XSLT 为 `/xslt/<name>`）
 - **ADT + ICF 兜底**（TTYP/MSAG）：优先 ADT；ECC EHP5/6 内核（< 753）自动切 ICF，envelope 写 `data.channel` + `data.fallbackReason`
-- **ADT 无兜底**（DDLS）：旧内核直接硬错 `DDLS_NOT_SUPPORTED_ON_ECC`（exit 64），不发起任何 SAP 调用
+- **ADT 无兜底**（DDLS / SRVD / BDEF / DCLS / DDLX / DDLA / SRVB）：不发起 ICF 调用；DDLS 在旧内核直接硬错 `DDLS_NOT_SUPPORTED_ON_ECC`（exit 64）
 
 ## 详细决策
 

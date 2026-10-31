@@ -4,7 +4,7 @@ title: abap CLI Wiki
 description: abap CLI 知识库首页 — 命令参考、学习记录与路线图
 tags: [abap-cli, wiki, index]
 created at: 2026-08-06 23:10:00
-changed at: 2026-10-31 18:06:00
+changed at: 2026-11-01 00:20:00
 ---
 
 # abap CLI Wiki
@@ -53,7 +53,7 @@ changed at: 2026-10-31 18:06:00
 
 ### 跨命令契约
 
-- [支持的对象类型](object-types.md) — 24 个类型码 × 命令 × 路由（ADT / ICF）总览；SICF 节点对应类型码 `HTTP`，包对应 `DEVC`
+- [支持的对象类型](object-types.md) — 25 个类型码 × 命令 × 路由（ADT / ICF）总览；SICF 节点对应类型码 `HTTP`，包对应 `DEVC`
 - [output path contract](commands/path-output.md) — `--json` 路径字段统一 POSIX，跨平台 Agent 消费稳定
 
 ## Notes
