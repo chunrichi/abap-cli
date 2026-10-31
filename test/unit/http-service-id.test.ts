@@ -1,15 +1,18 @@
 /**
  * HTTP `serviceId` + `descriptionByLang` round-trip.
  *
- * Wire shape (SAP ICF /http/<name> — nested abap-file-format payload):
+ * Wire shape (SAP ICF /http/<name> — nested payload the deployed handler
+ * deserializes; it still names the SICF path `url`):
  *   `generalInformation.serviceId`   → '/sap/zfoo'
+ *   `generalInformation.url`         → '/sap/zfoo'  (AFF `servicePath`)
  *   `header.descriptionByLang[]`     → [{ language: 'EN', description: 'My service' }]
  *
  * Local shape (abap-file-format http-v1.json + SICF extensions) is the same
- * nested shape.
+ * nested shape with AFF member names (`servicePath`).
  *
- * Both fields are SICF-specific extensions that the CLI round-trips even
- * though they're not in the abap-file-format http-v1.json schema.
+ * Both `serviceId` and `descriptionByLang` are SICF-specific extensions that
+ * the CLI round-trips even though they're not in the abap-file-format
+ * http-v1.json schema.
  */
 import { describe, it, expect } from 'vitest';
 import { localToWire, wireToLocal } from '../../src/abap_cli/formats/http/json.js';
@@ -32,6 +35,7 @@ describe('http-service-id', () => {
       });
       const generalInformation = (local as Record<string, unknown>).generalInformation as Record<string, unknown>;
       expect(generalInformation.serviceId).toBe('/sap/zfoo');
+      expect(generalInformation.servicePath).toBe('/sap/zfoo');
     });
 
     it('maps wire header.descriptionByLang[] → local header.descriptionByLang[]', () => {
@@ -85,11 +89,12 @@ describe('http-service-id', () => {
         originalLanguage: 'EN',
         generalInformation: {
           handlerClass: 'ZCL_MY_HANDLER',
-          url: '/sap/zfoo',
+          servicePath: '/sap/zfoo',
           serviceId: '/sap/zfoo',
         },
       } as Record<string, unknown>);
       expect(wire.generalInformation?.serviceId).toBe('/sap/zfoo');
+      expect(wire.generalInformation?.url).toBe('/sap/zfoo');
     });
 
     it('maps local nested header.descriptionByLang[] → wire header.descriptionByLang[]', () => {
@@ -142,7 +147,7 @@ describe('http-service-id', () => {
         description: 'My service',
         originalLanguage: 'EN',
         handlerClass: 'ZCL_MY_HANDLER',
-        url: '/sap/zfoo',
+        servicePath: '/sap/zfoo',
         formatVersion: '1',
         header: {
           description: 'My service',
@@ -154,7 +159,7 @@ describe('http-service-id', () => {
         },
         generalInformation: {
           handlerClass: 'ZCL_MY_HANDLER',
-          url: '/sap/zfoo',
+          servicePath: '/sap/zfoo',
           serviceId: '/sap/zfoo',
         },
       };
@@ -162,6 +167,7 @@ describe('http-service-id', () => {
       const header = (back as Record<string, unknown>).header as Record<string, unknown>;
       const generalInformation = (back as Record<string, unknown>).generalInformation as Record<string, unknown>;
       expect(generalInformation.serviceId).toBe('/sap/zfoo');
+      expect(generalInformation.servicePath).toBe('/sap/zfoo');
       expect(header.descriptionByLang).toEqual([
         { language: 'EN', description: 'My service' },
         { language: 'DE', description: 'Mein Service' },

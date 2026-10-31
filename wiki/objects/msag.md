@@ -4,7 +4,7 @@ title: MSAG — 消息类（Message Class）
 description: MSAG 对象的双通道路由、messages[] 字段契约、占位符转义
 tags: [abap-cli, object-type, msag, adt, icf, abap-file-format, message-class]
 created at: 2026-09-04 00:00:00
-changed at: 2026-10-30 20:00:00
+changed at: 2026-10-31 14:40:00
 ---
 
 # MSAG — 消息类（Message Class）
@@ -51,7 +51,7 @@ src/
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `header.description` | string | 消息类短文本（T100A-STEXT） |
-| `messages[].number` | string | 三位消息号，前导零保留（`"001"`，不是 `1`） |
+| `messages[].number` | string | 三位消息号（必填），前导零保留（`"001"`，不是 `1`） |
 | `messages[].text` | string | 消息文本，最多 4 个占位符 `&1`–`&4` |
 
 ## 占位符与 XML 转义
@@ -68,7 +68,7 @@ abap push src/zmy_msag.msag.json --tr DEVK900001 --json
 
 ## abap-file-format 合规性
 
-复用上游 `msag/msag-v1.json` schema。`messages` 为必填字段——缺失会被 `validate:aff` 拒绝（`AFF_FIXTURE_INVALID`）。
+复用上游 `msag/msag-v1.json` schema。`messages` 为必填字段，且每条消息的 `number` 也是必填（上游加严）——缺失会被 `validate:aff` 拒绝（`AFF_FIXTURE_INVALID`）。
 
 ## 已知坑
 

@@ -48,7 +48,7 @@ function writeHttpJsonFile(name: string, extra: Record<string, unknown> = {}) {
   const json = {
     formatVersion: '1',
     header: { description: 'Test HTTP service', originalLanguage: 'EN' },
-    generalInformation: { handlerClass: 'ZCL_HTTP_HANDLER', url: '/sap/zhttp_test' },
+    generalInformation: { handlerClass: 'ZCL_HTTP_HANDLER', servicePath: '/sap/zhttp_test' },
     name,
     ...extra,
   };
