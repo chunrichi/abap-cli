@@ -192,7 +192,6 @@ src/(ui2)cl_json.clas.abap                # 命名空间对象 /UI2/CL_JSON
 | `abap select --table <name>` | 只读查表，SE16N 等价物（`--fields`、`--where`、`--limit`、`--offset`、`--order-by`、`--group-by`、`--count-only`） |
 | `abap fields <table>` | 从 DD03L 列表 / 视图字段，`--find` 反查（`--with-text`、`--as4local`、`--limit`） |
 | `abap types` | 打印 CLI 类型 ↔ TADIR / DDIC 映射，纯本地（`<type>`、`--tadir-object`） |
-| `abap feedback` | 提交 agent 会话的 issue 报告（`--feature-key`、`--title`、`--description`、`--dry-run`） |
 | `abap report-stuck` | 在本地记录 agent 卡死报告用于 triage（`--goal`、`--tried`、`--where`） |
 
 所有命令支持 `--json`（紧凑）和 `--pretty-json`（缩进）。每个顶层命令还支持 `--schema --json`，在不连 SAP 的情况下返回参数、选项、允许值、示例与错误码；嵌套子命令（如 `create local`、`transport list`、`deploy status`）只提供 `--help`。
@@ -230,7 +229,7 @@ DDIC、HTTP、TRAN、TTYP、MSAG 及 CDS / RAP 类型执行 `create` 时必须�
 { "status": "error", "meta": { /* ... */ }, "error": { "code": "NO_TRANSPORT", "category": "VALIDATION_ERROR", "message": "..." } }
 ```
 
-退出码稳定且与 `error.category` 一一对应：`0` 成功、`1` 未知、`2` 用法、`3` 配置、`4` TLS、`5` 认证、`6` SAP、`7` 校验、`8` 未找到、`9` 锁定。警告只进 `meta.warnings`，不改变退出码。另有保留区退出码：`64` 本版本不支持 DDLS、`65` 通道探测、`66` CONFLICT、`67` 持久化、`68` HTTP 错误。
+退出码稳定且与 `error.category` 一一对应：`0` 成功、`1` 未知、`2` 用法、`3` 配置、`4` TLS、`5` 认证、`6` SAP、`7` 校验、`8` 未找到、`9` 锁定。警告只进 `meta.warnings`，不改变退出码。另有保留区退出码：`64` 本版本不支持 DDLS、`65` 通道探测。
 
 ### 命令自描述
 
@@ -286,7 +285,7 @@ npm 包内含 6 个 skill 和 1 个 agent 定义：
 
 ## 贡献
 
-一个 PR 一个交付单元，Conventional Commits，合并前 `npm run verify` 全绿——详见 [CONTRIBUTING.md](CONTRIBUTING.md)。问题与讨论走 [GitHub Issues](https://github.com/chunrichi/abap-cli/issues)。
+一个 PR 一个交付单元，Conventional Commits，合并前 `npm run verify` 全绿——详见 [CONTRIBUTING.md](CONTRIBUTING.md)。问题与讨论走 [GitHub Issues](https://github.com/chunrichi/abap-cli/issues)：agent 可用 GitHub MCP 的建 issue 工具或 `gh issue create` 直接提交，没有 GitHub 访问能力时把预填 issue URL 交给用户。
 
 ## License
 

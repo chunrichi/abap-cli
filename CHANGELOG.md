@@ -11,6 +11,7 @@
 
 ### Changed
 
+- **vendored AFF schema 对齐上游最新 HEAD**：`src/abap_cli/schema/` 的 22 个上游 schema 现在是 `SAP/abap-file-formats` 的字节级副本（`enqu` 补末尾换行，`http` / `msag` / `tabt` / `tran` 升级到上游新版）；手写的 `ttyp-v1.json` 是唯一本地变体。`nrob-v1.json` 去掉本地加严的 `originalLanguage` `pattern`/`maxLength` 与 `percentWarning` `multipleOf`，回到上游版本——这些约束没有测试或文档依赖，却可能拒绝 SAP 自己产出的 AFF 文档。`msag` 现在要求每条消息带 `number`；`tabt` 的 `sizeCategory` 由 enum 改为等价的 pattern。同步脚本的 `FILES` 列表补上 `ddls` / `msag`，`src/abap_cli/schema/README.md` 重写为逐文件溯源表。
 - **内置 ICF 服务按"开发期全局类树 / 发布期合并单类"维护**：`abap/src` 现在是 19 个开发期全局类（handler + 共享类型 + 10 个域 helper + 5 个 format + setup/runner），`abap/deploy.json` 是唯一清单；`abap deploy` 在推送前把 16 个 helper 降级为 `lcl_*` 本地类、按依赖顺序合并进 handler 的 definitions / implementations，SAP 上只装 3 个全局类。`abap deploy` 的结果新增 `mode: "dev" | "release"` 与 `mergedClasses`；清单缺失 / 不一致分别给 `DEPLOY_MANIFEST_MISSING` warning 与 `DEPLOY_MANIFEST_INVALID` 错误。ICF 端点与服务版本不变（仍 `1.0.0`）。**Migration**：升级后执行一次 `abap deploy --yes` 刷新 handler；旧系统上残留的 helper 全局类不再被引用、无需删除。
 - **keychain 后端默认改为原生实现**：默认先探测原生后端（macOS `/usr/bin/security`、Windows `cmdkey.exe`、Linux `secret-tool`），仅在原生不可用时回退 `keytar`；`ABAP_CLI_KEYCHAIN_BACKEND` 仍可强制指定。原生后端把条目的可信应用绑定到系统签名 helper，跨 Node 升级稳定；`keytar` 绑定 node 二进制的 cdhash，Homebrew 升级 node 后 ACL 失效。**Migration**：旧 `keytar` 条目仍可读（service/account 命名一致）；macOS 上建议在普通终端执行一次 `abap profile set <name> --password <pwd>` 重建密码条目，再 `security delete-generic-password -a abap-cli/session-key -s abap-cli` 并重跑一次命令重建会话密钥。
 - **macOS 写入已存在的 keychain 条目改为重建**：`security add-generic-password` 返回退出码 45（条目已存在）时先删除再创建，使 ACL 重新绑定 `/usr/bin/security`；受限/沙箱 shell 写 login keychain 被拒时，错误信息提示改用普通终端。
@@ -26,6 +27,7 @@
 
 ### Removed (breaking)
 
+- **HTTP 本地文件字段 `generalInformation.url` 改名为 `servicePath`**：上游重写了 AFF `http-v1.json`（SICF 路径成员改名，新增可选 `tokenHandling`）。本地 `.http.json` 现在只接受 AFF 的 `servicePath`；`url` 会被 `validate:aff` / `create` / `push` 以 VALIDATION_ERROR 拒绝。ICF 载荷（ABAP handler 的 `ty_http_service_data`）仍用 `url`，转换收敛在 `formats/http/json.ts`，SAP 侧与 ICF 版本不变。
 - **Node.js 18 / 20 及未打补丁的 22 / 24 / 26 运行时**：不再受支持 —— 这些版本的 Brotli 解码器未修复，EOL 版本也不会再收到修复。
 - **类型/对象子目录布局**：删除 `src/<typeFolder>/<objectName>/` 嵌套布局与 `formats/type-folder.ts#folderFor`。所有 `pull` / `create` / `create local` 产物直接平铺在输出目录（默认 `src/`），文件名遵循 abap-file-format：`<name>.<type>[.<sub_type>][.<content_type>][.<language>].<ext>`（如 `src/zcl_my_class.clas.json` + `src/zcl_my_class.clas.abap`、`src/ztabl_demo.tabl.json` + `.tabl.ddic` + `.tabl.settings.json`、`src/zfg.fugr.saplzfg.reps.abap`、`src/zprog.prog.texts.en.properties`）。`abap types` 输出删除 FOLDER 列/字段。bundled `abap/src/clas/*` 同步扁平为 `abap/src/*`。
 - **abapGit `#` 命名空间转义**：命名空间对象落盘从 `#ui2#cl_json` 改为 AFF 规范的括号形式 `(ui2)cl_json`（`/UI2/CL_JSON` → `src/(ui2)cl_json.clas.abap`）；旧 `#` token 不再识别，push 报 `FILE_PARSE_ERROR` 并提示重新 `abap pull`。
@@ -33,6 +35,7 @@
 - **认证相关命令面**：`abap profile login` / `abap profile cookie` 子命令；`--auth-method` / `--auth-option` / `--cert-path` / `--cert-key` / `--cert-ca` / `--cert-passphrase` / `--remove-cert-passphrase` / `--clear-cert-auth` / `--sso-cookie-file` / `--clear-sso-cookie-file` / `--service-key` / `--clear-oauth-password` / `--spn` / `--reauth-on-expiry` 参数；keychain 的 cert-passphrase 条目读写。
 - **profile 输出/格式**：profile JSON 不再含 `auth` 字段；`profile show` 不再输出 `auth` / `certPassphrase*`，`profile delete` 不再返回 `certPassphraseCleaned` / `cookieJarCleaned`；`profile export` bundle 版本 2 → 3；`profile test` 各层不再带 `authMethod`。
 - **CA store**：删除客户端证书/私钥导入（`--cert-path` / `--cert-key` / `--cert-ca`）；只保留 `--ca` 的 CA 导入/回收。
+- **`abap feedback` 与自建反馈服务**：删除命令、`FeedbackClient` / 反馈 flow，以及 `feedback.example.com` 占位 HTTP 契约（幂等 key、priority、username 解析、`CONFLICT` exit 66 / `PERSISTENCE_ERROR` 67 / `HTTP_ERROR` 68 三个保留错误类别）。反馈改为 agent 直接提 GitHub issue（GitHub MCP / `gh issue create` / `GITHUB_TOKEN`），无凭据时给用户预填 issue URL；离线留档仍用 `abap report-stuck`。
 
 **Migration**：
 
@@ -43,6 +46,8 @@
 - 旧 `profile export` bundle（version 2）中带旧 auth 的条目在 `import` 时被拒绝；用 basic profile 重新导出/导入。
 - 依赖 BTP trial / SAML / X.509 认证的系统在 basic-only 下无法登录；请使用支持 basic auth 的 on-prem/ADT 端点，或等待认证方式重新引入。
 - **Node.js 运行时**：升级到 22.23.4+ / 24.22.1+ / 26.12.1+（或更新的受支持版本线），然后重新运行；`abap doctor` 会指出不合规的运行时并给出升级建议。
+- **反馈链路**：脚本 / 文档中的 `abap feedback ...` 调用改为直接建 GitHub issue —— `gh issue create --repo chunrichi/abap-cli --title "..." --body "..."`（或 GitHub MCP 的建 issue 工具、`POST /repos/chunrichi/abap-cli/issues`）；没有 GitHub 凭据时用 `https://github.com/chunrichi/abap-cli/issues/new?title=...&body=...` 预填 URL 交给用户手动提交。退出码 66–68 不再出现。
+- **HTTP 本地文件**：把 `.http.json` 的 `generalInformation.url` / 顶层 `url` 改名为 `servicePath`（值不变），或 `abap pull <name> --type HTTP --overwrite` 重新生成；`generalInformation.tokenHandling` 可选，当前 ICF handler 未实现该开关。
 
 ## [1.0.0] - 2026-10-30
 

@@ -192,7 +192,6 @@ No type or object subdirectories, and namespaced objects use the AFF bracket tok
 | `abap select --table <name>` | Read-only table query, the SE16N equivalent (`--fields`, `--where`, `--limit`, `--offset`, `--order-by`, `--group-by`, `--count-only`) |
 | `abap fields <table>` | List table / view fields from DD03L, or reverse-lookup with `--find` (`--with-text`, `--as4local`, `--limit`) |
 | `abap types` | Print the CLI type ↔ TADIR / DDIC mapping, locally (`<type>`, `--tadir-object`) |
-| `abap feedback` | Submit an issue report from an agent session (`--feature-key`, `--title`, `--description`, `--dry-run`) |
 | `abap report-stuck` | Record a stuck-agent report locally for triage (`--goal`, `--tried`, `--where`) |
 
 All commands support `--json` (compact) and `--pretty-json` (indented). Every top-level command also supports `--schema --json`, which returns its arguments, options, allowed values, examples and error codes without touching SAP; nested subcommands (e.g. `create local`, `transport list`, `deploy status`) only expose `--help`.
@@ -230,7 +229,7 @@ All commands support `--json` (compact) and `--pretty-json` (indented). Every to
 { "status": "error", "meta": { /* ... */ }, "error": { "code": "NO_TRANSPORT", "category": "VALIDATION_ERROR", "message": "..." } }
 ```
 
-Exit codes are stable and 1:1 with `error.category`: `0` success, `1` unknown, `2` usage, `3` config, `4` TLS, `5` auth, `6` SAP, `7` validation, `8` not found, `9` locked. Warnings live in `meta.warnings` and never change the exit code. Reserved-range codes: `64` DDLS not supported on this release, `65` channel detection, `66` conflict, `67` persistence, `68` HTTP error.
+Exit codes are stable and 1:1 with `error.category`: `0` success, `1` unknown, `2` usage, `3` config, `4` TLS, `5` auth, `6` SAP, `7` validation, `8` not found, `9` locked. Warnings live in `meta.warnings` and never change the exit code. Reserved-range codes: `64` DDLS not supported on this release, `65` channel detection.
 
 ### Self-describing commands
 
@@ -286,7 +285,7 @@ See [SECURITY.md](SECURITY.md) for the reporting process.
 
 ## Contributing
 
-One logical change per PR, Conventional Commits, and `npm run verify` green before merge — see [CONTRIBUTING.md](CONTRIBUTING.md). Issues and questions go to [GitHub Issues](https://github.com/chunrichi/abap-cli/issues).
+One logical change per PR, Conventional Commits, and `npm run verify` green before merge — see [CONTRIBUTING.md](CONTRIBUTING.md). Issues and questions go to [GitHub Issues](https://github.com/chunrichi/abap-cli/issues): agents can file them directly with a GitHub MCP issue tool or `gh issue create`, and hand the user a prefilled issue URL when no GitHub access is available.
 
 ## License
 
