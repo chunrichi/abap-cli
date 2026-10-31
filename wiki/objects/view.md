@@ -4,7 +4,7 @@ title: VIEW — 数据库视图（Database View）
 description: VIEW 对象的 ICF 路由、自建 view-v1 字段契约（DD25V/DD26V/DD27P/DD28J/DD28V）、写路径与 $TMP-only 删除
 tags: [abap-cli, object-type, view, icf, abap-file-format, database-view]
 created at: 2026-10-31 18:00:00
-changed at: 2026-10-31 18:00:00
+changed at: 2026-10-31 18:20:00
 ---
 
 # VIEW — 数据库视图（Database View）
@@ -183,11 +183,24 @@ abap delete ZCLI_TC_VIEW --type VIEW --yes --json
 
 ## 真机验证
 
-待补：SAP 侧 ICF handler 尚未在真机部署（`abap deploy` 需要 stateful 会话，当前
-SAP 环境登录只返回匿名上下文，锁类操作被拒）。恢复后按
-`abap-testing` 六阶段执行 create → pull → push → select 校验
-（`DD25L`/`DD26V`/`DD27P`/`DD28J`）→ delete → 清理，证据落
-`tests/261031006-realsap-view/`。
+在 S/4HANA 8.134.214.7:44300（profile `test`，client 100，sap103）按
+`abap-testing` 六阶段跑通（2026-10-31）：
+
+- **create** 两表 join 视图（MARA + MAKT，$TMP）→ `action=created`；
+  **pull** 回来 2 表 / 4 字段 / 2 join 条件 / `package=$TMP` 一致。
+- **DDIC 落库校验**：`DD25L` 1 行（`AS4LOCAL=A`、`VIEWCLASS=D`、`ROOTTAB=MARA`）；
+  `DD26S` 2 行（`FORTABNAME=MARA`）；`DD27S` 4 行（OBJPOS 1..4，`KEYFLAG`/`ROLLNAME`
+  按底层字段推导正确）；`DD28S` 4 行（两条 join 条件的两侧）。
+- **视图本身可查**：`abap select --table ZCLI_TC_VIEW --fields MANDT,MATNR,SPRAS,MAKTX`
+  返回 MARA+MAKT 的真实 join 数据。
+- **push** 修改（description v2 + 追加 `MAKTG`）→ 复拉一致（5 字段）；
+  **delete** → `deleted=true, lockReleased=true`，删除后 DD25L/DD26S/DD27S/DD28S
+  与 TADIR 的 `ZCLI_TC_*` 视图 0 残留。
+- 单表视图 create→pull→delete、错误路径（17 字符名 / 不存在字段 / 非 $TMP 无
+  `--tr` / 可传输视图删除 / pull 不存在对象）均返回预期错误码。
+
+证据（本地，不入库）：`tests/261031006-realsap-view/`（17 TC 全 PASS，含
+`evidence/TC-R1..R10`、`TC-E1..E5`、`summary.md`）。
 
 ## Gotcha
 

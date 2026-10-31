@@ -82,7 +82,7 @@
 
 | 类型 | SAP 侧路线 | 本地格式 | 状态 |
 |---|---|---|---|
-| `VIEW` | ICF `/ddic/view`：`DDIF_VIEW_GET` / `DDIF_VIEW_PUT` | 自建 `view-v1.json`（AFF 无此格式；按 AFF 命名/JSON 约定，README 标注 local extension） | - [ ] 实现完成（ABAP/CLI/mock/unit/integration）；真机 deploy + 六阶段待 SAP stateful 恢复后补 |
+| `VIEW` | ICF `/ddic/view`：`DDIF_VIEW_GET` / `DDIF_VIEW_PUT` | 自建 `view-v1.json`（AFF 无此格式；按 AFF 命名/JSON 约定，README 标注 local extension） | - [x] 已完成（ABAP/CLI/mock/unit/integration + 真机 17/17 TC） |
 | `SHLP` | ICF `/ddic/shlp`：`DDIF_SHLP_GET` / `DDIF_SHLP_PUT` | 自建 `shlp-v1.json`（同上） | - [ ] |
 | `DEVC` | ADT `createObject` `DEVC/K` + `GET /sap/bc/adt/packages/<name>` 读 | AFF `devc-v1.json` | - [x] 已完成（create/pull/delete；push 不支持——ADT 无包更新端点） |
 | `XSLT` | ICF + `CL_O2_API_XSLTDESC`（create/load） | AFF `xslt-v1.json` + `.xslt.xml` | - [ ] |

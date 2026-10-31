@@ -2389,6 +2389,12 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
     ENDTRY.
 
     lv_name = to_upper( condense( val = iv_name del = ` ` ) ).
+    IF lv_name IS INITIAL.
+      " POST /ddic/view carries the object name in the payload (the same
+      " convention as the other DDIC create routes); the URL name is used by
+      " GET/DELETE only.
+      lv_name = to_upper( condense( val = ls_request-name del = ` ` ) ).
+    ENDIF.
     IF lv_name IS INITIAL OR strlen( lv_name ) > 16 OR lv_name CS ` `.
       ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
                                  error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'VIEW_NAME_INVALID'
