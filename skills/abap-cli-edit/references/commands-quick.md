@@ -117,6 +117,9 @@ abap create <type> <name> [options]
 | `--overwrite` | When pulling the new object back, replace an existing local file (default: keep the local draft) |
 | `--file <path>` | abap-file-format JSON input (required for TABL/STRU/DOMA/DTEL/ENQU/NROB/HTTP/TRAN/TTYP/MSAG/DDLS/SRVD/DCLS/DDLX/DDLA) |
 | `--func <name>` | With FUGR: create a function module (FUGR/FF) inside the existing function group <name> |
+| `--software-component <swcomp>` | With DEVC: software component of the new package (default: inherited from the super package) |
+| `--transport-layer <layer>` | With DEVC: transport layer of the new package (default: inherited from the super package) |
+| `--package-type <type>` | With DEVC: package type |
 | `--yes` | Confirm in non-interactive environments. |
 | `--non-interactive` | Alias of --yes. |
 

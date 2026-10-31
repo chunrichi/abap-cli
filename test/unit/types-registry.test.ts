@@ -18,12 +18,14 @@ import {
 } from '../../src/abap_cli/types/registry.js';
 
 describe('types/registry.ts (single source of truth)', () => {
-  it('contains exactly 21 supported types (4 source + 4 DDIC + ENQU + NROB + HTTP + TRAN + 3 dual-channel + 6 )', () => {
+  it('contains exactly 22 supported types (4 source + DEVC + 4 DDIC + ENQU + NROB + HTTP + TRAN + 3 dual-channel + 6 )', () => {
     // added: SRVB (metadata-only), SRVD, BDEF, DCLS, DDLX, DDLA.
     // added: ENQU (lock object, ICF) and NROB (number range object, ICF).
-    expect(allSupportedTypes()).toHaveLength(21);
+    // added: DEVC (package, ADT package resource; push unsupported).
+    expect(allSupportedTypes()).toHaveLength(22);
     expect(allSupportedTypes()).toEqual([
       'CLAS', 'INTF', 'PROG', 'FUGR',         // ADT source
+      'DEVC',                                  // ADT package resource
       'TABL', 'STRU', 'DOMA', 'DTEL',         // ICF DDIC
       'ENQU', 'NROB',                          // — ICF DDIC family
       'HTTP', 'TRAN',                          // ICF

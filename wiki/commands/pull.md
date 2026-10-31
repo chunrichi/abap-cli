@@ -4,7 +4,7 @@ title: abap pull
 description: 从 SAP 下载对象到本地文件 — 支持源码对象、包批量、DDIC JSON、textpool 与远程版本拉取
 tags: [abap-cli, command, pull, download, abap-file-format, ddic, textpool, version-management]
 created at: 2026-08-06 23:21:15
-changed at: 2026-10-30 20:00:00
+changed at: 2026-10-31 16:20:00
 ---
 
 # abap pull
@@ -50,6 +50,7 @@ abap pull
 4. **`--textpool`** — 拉取三个 `.properties` 文件，走混合模式路由（profile 缓存的能力决定走 ADT `getTextElements` 还是 ICF `/textpool/*`），JSON 结果带 `route` 字段（`adt`/`icf`）；文件落为 `src/<name>.<type>.<category>.<lang>.properties`。
 5. **DDIC 类型**（DOMA/DTEL/TABL/STRU/ENQU/NROB）— 走 ICF `GET /ddic/<type>/<name>`，`wireToLocal` 转成本地 JSON，写为 `src/<name>.<type>.json`（TABL/STRU 为三件套）。
 6. **通道路由类型**（TTYP/MSAG/DDLS）— 见下节。
+7. **包（DEVC）** — 见下节「Package（DEVC）」：`GET /sap/bc/adt/packages/<name>`，单文件落盘，无批量选择器差异。
 
 ### 新增 TTYP / MSAG / DDLS（双通道）
 
@@ -116,9 +117,35 @@ envelope 附加字段：
 
 注意差异：源码对象主路由（`pullObject`）会**先比较内容**再决定；DDIC / textpool / `--remote` 路由**不比较内容**，只要文件存在且两个 flag 都没给就直接抛 `OVERWRITE_REQUIRED`。
 
+### Package（DEVC）
+
+`abap pull <package> --type DEVC` 读 ADT 的 `pak:package` 资源，映射成 AFF `devc-v1.json`：
+
+```
+src/<name>.devc.json        # 如 src/$tmp.devc.json、src/(accgo)acmcm_bw.devc.json
+```
+
+| 落盘字段 | 说明 |
+|---|---|
+| `header.description` / `header.originalLanguage` | 包的描述 / 主语言（小写） |
+| `generalInformation.type` | `development` / `main` / `structure` |
+| `generalInformation.superPackage` | 父包名 |
+| `generalInformation.switch` | 包开关（无则省略） |
+| `generalInformation.applicationComponent` | 应用组件（空则省略） |
+| `generalInformation.softwareComponent` / `transportLayer` | 软件组件 / 传输层 |
+| `generalInformation.supportsRecordChanges` / `isAddingObjectsNotAllowed` / `isEncapsulated` | 包属性布尔值 |
+| `generalInformation.defaultAbapLanguageVersion` | `standard` / `keyUser` / `cloudDevelopment`（wire 键 `0`/`2`/`5`） |
+| `useAccesses[]` | 使用访问（packageInterface + severity） |
+
+`<name>` 大小写不敏感；命名空间包（`/ACCGO/ACMCM_BW`）落成 AFF 括号 token `(accgo)acmcm_bw.devc.json`。
+包不存在 → `OBJECT_NOT_FOUND`（exit 8）。`--overwrite` / `--skip-existing` 与其他类型语义一致。
+
 ## Examples
 
 ```bash
+# 拉取一个包（DEVC）
+abap pull ZLOCAL --type DEVC --json
+
 # 拉取单个类（含所有 include parts）
 abap pull ZCL_MY_CLASS
 

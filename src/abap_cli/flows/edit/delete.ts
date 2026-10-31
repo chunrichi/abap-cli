@@ -10,13 +10,16 @@
  *
  * Supported types: anything reachable by `client.deleteObject` (CLAS, INTF,
  * PROG, FUGR, FUGR/FF, TABL, STRU, DOMA, DTEL, MSAG, TTYP, DDLS, DDLX, BDEF,
- * DCLS, SRVD, SRVB, HTTP, ENQU, NROB). CDSV views and similar type codes
- * without an ADT delete endpoint surface as `TYPE_NOT_SUPPORTED`.
+ * DCLS, SRVD, SRVB, HTTP, ENQU, NROB). DEVC takes the dedicated package branch
+ * (`delete-devc.ts` — packages are deleted without a lock). CDSV views and
+ * similar type codes without an ADT delete endpoint surface as
+ * `TYPE_NOT_SUPPORTED`.
  */
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError } from '../../output/json.js';
 import { resolveObject } from '../../core/resolve.js';
 import { normalizeTypeInput } from '../../cli/type-alias.js';
+import { runDeleteDevc } from './delete-devc.js';
 
 export interface DeleteOptions {
   /** Object type code (CLAS / PROG / ...). Required — `delete` without a type
@@ -67,6 +70,13 @@ export async function runDelete(objectName: string, opts: DeleteOptions): Promis
   }
 
   const typeUpper = normalizeTypeInput(opts.type).type.toUpperCase();
+  // Package (DEVC) deletion has its own contract: no lock/unlock cycle and a
+  // transport rule derived from the package's software component. It also
+  // does not need `resolveObject` (the ADT package resource is addressed by
+  // name directly).
+  if (typeUpper === 'DEVC') {
+    return runDeleteDevc(objectName, opts);
+  }
   const client = await AdtClientWrapper.create();
   const resolved = await resolveObject(client, objectName, typeUpper);
 

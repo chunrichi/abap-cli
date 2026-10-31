@@ -67,13 +67,16 @@ describe('schema-paths priority chain', () => {
         'SRVB', 'SRVD', 'BDEF', 'DCLS', 'DDLX', 'DDLA',
         // — lock object + number range object.
         'ENQU', 'NROB',
+        // — package (DEVC) metadata document.
+        'DEVC',
       ]),
     );
     // TABT is exposed as a schema key for the .settings.json override path.
     // REPS + FUNC added in the FUGR pull — 16 pre-Phase-3.
     // added SRVB / SRVD / BDEF / DCLS / DDLX / DDLA = 6 more = 22 total.
     // added ENQU / NROB = 24 total.
-    expect(types).toHaveLength(24);
+    // added DEVC = 25 total.
+    expect(types).toHaveLength(25);
   });
 
   it('bundled root contains every supported schema', () => {

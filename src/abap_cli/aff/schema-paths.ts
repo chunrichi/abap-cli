@@ -42,6 +42,8 @@ const SCHEMA_FILE: Record<string, string> = {
   // from the abap-file-format mirror.
   ENQU: 'enqu-v1.json',
   NROB: 'nrob-v1.json',
+  // Package (DEVC) metadata read from the ADT package resource.
+  DEVC: 'devc-v1.json',
   HTTP: 'http-v1.json',
   TRAN: 'tran-v1.json',
   // three new dual-channel types.

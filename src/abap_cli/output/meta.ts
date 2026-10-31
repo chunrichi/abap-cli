@@ -36,6 +36,8 @@ export type WarningCode =
   // F-04: `create` pulls the new skeleton back locally; an existing local draft
   // was kept instead of being silently overwritten.
   | 'LOCAL_FILE_KEPT'
+  // create DEVC — the package was created but the local AFF copy could not be written
+  | 'LOCAL_FILE_WRITE_FAILED'
   | 'PASSWORD_EXPORT'       // connection export includes passwords
   | 'KEYCHAIN_WARNING'      // OS keychain store/cleanup failed (degraded continue)
   | 'FORCE_BYPASSED'        // deploy --force bypassed safety guards
