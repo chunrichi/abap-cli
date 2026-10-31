@@ -1,6 +1,8 @@
 import { getSystem, listSystemNames, upsertSystem, type SystemProfile } from './user-config.js';
 import { getPassword, storePassword } from './secrets.js';
 import { CliError } from '../output/json.js';
+import { assertValidProfileName, normalizeProfileUrl } from './validation.js';
+import { collectWarning } from '../output/meta.js';
 
 /**
  * Portable profile bundle. Passwords are excluded by default; `--with-passwords`
@@ -85,6 +87,7 @@ export async function exportProfiles(opts: ExportOptions = {}): Promise<ProfileB
 export async function importProfiles(bundle: ProfileBundle, opts: ImportOptions = {}): Promise<ImportResult> {
   const imported: ImportResult['imported'] = [];
   for (const entry of bundle.systems) {
+    assertValidProfileName(entry.name);
     const unsupported = detectUnsupportedAuth(entry);
     if (unsupported) {
       throw new CliError(
@@ -103,8 +106,15 @@ export async function importProfiles(bundle: ProfileBundle, opts: ImportOptions 
       imported.push({ name: entry.name, action: 'skipped' });
       continue;
     }
+    const normalized = normalizeProfileUrl(entry.url);
+    if (normalized.dropped.length > 0) {
+      collectWarning(
+        'URL_NORMALIZED',
+        `Profile '${entry.name}': URL normalized to '${normalized.url}' — dropped ${normalized.dropped.join(', ')}.`,
+      );
+    }
     const profile: SystemProfile = {
-      url: entry.url,
+      url: normalized.url,
       client: entry.client,
       username: entry.username,
       language: entry.language,

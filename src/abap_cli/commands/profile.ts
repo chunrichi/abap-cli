@@ -32,6 +32,7 @@ export const SCHEMA: CommandSchema = {
     { description: 'Add a profile', command: 'abap profile add DEV --url https://... --username DEV --password ***' },
     { description: 'Test a profile', command: 'abap profile test DEV' },
     { description: 'Export profiles', command: 'abap profile export --file profiles.json' },
+    { description: 'Inspect a subcommand schema', command: 'abap profile add --schema' },
   ],
   errors: [
     { code: 'CONFIG_ERROR', category: 'CONFIG_ERROR', exitCode: 3 },
@@ -41,6 +42,109 @@ export const SCHEMA: CommandSchema = {
     { code: 'INVALID_ARGUMENT', category: 'USAGE', exitCode: 2 },
   ],
 };
+
+const NAME_ARGUMENT = {
+  name: 'name',
+  type: 'string' as const,
+  required: true,
+  description: 'Connection profile name (1-64 chars: letters, digits, "_", ".", "-").',
+};
+
+/** Per-subcommand machine contracts. The parent schema cannot express which
+ *  option belongs to `add` vs `set` vs `export`; agents can query
+ *  `abap profile <command> --schema --json` for the exact surface. */
+const SUBCOMMAND_SCHEMAS: Record<string, CommandSchema> = {
+  list: {
+    ...baseSchema('profile list', 'List all saved connection profiles.', 'abap profile list', 'local'),
+    examples: [{ description: 'List profiles', command: 'abap profile list --json' }],
+  },
+  show: {
+    ...baseSchema('profile show', 'Show one connection profile (no secrets).', 'abap profile show <name>', 'local'),
+    arguments: [NAME_ARGUMENT],
+    examples: [{ description: 'Show a profile', command: 'abap profile show DEV --json' }],
+  },
+  add: {
+    ...baseSchema('profile add', 'Create a new connection profile. Does not connect; verify with `profile test`.', 'abap profile add <name> --url <url> --username <user>', 'local'),
+    arguments: [NAME_ARGUMENT],
+    options: [
+      { name: '--url', type: 'string', valuePlaceholder: '<url>', description: 'SAP system URL; normalized to scheme://host:port (path/query dropped).' },
+      { name: '--client', type: 'string', valuePlaceholder: '<client>', description: 'SAP client number (3 digits, default 100).' },
+      { name: '--username', type: 'string', valuePlaceholder: '<user>', description: 'SAP username.' },
+      { name: '--language', type: 'string', valuePlaceholder: '<lang>', description: 'SAP language (2 letters, default EN).' },
+      { name: '--password', type: 'string', valuePlaceholder: '<password>', description: 'Password; stored in the OS keychain.' },
+      { name: '--insecure', type: 'boolean', description: 'Skip SSL certificate verification (development only).' },
+      { name: '--ca', type: 'string', valuePlaceholder: '<path>', description: 'PEM CA certificate to import and bind to this profile.' },
+      schemaOption(),
+    ],
+    examples: [{ description: 'Add a profile', command: 'abap profile add dev --url https://sap.example.com:44300 --username DEV --password ***' }],
+  },
+  set: {
+    ...baseSchema('profile set', 'Modify an existing connection profile (fields or password).', 'abap profile set <name> [options]', 'local'),
+    arguments: [NAME_ARGUMENT],
+    options: [
+      { name: '--url', type: 'string', valuePlaceholder: '<url>', description: 'New SAP system URL; normalized to scheme://host:port.' },
+      { name: '--client', type: 'string', valuePlaceholder: '<client>', description: 'New SAP client number.' },
+      { name: '--username', type: 'string', valuePlaceholder: '<username>', description: 'New SAP username.' },
+      { name: '--language', type: 'string', valuePlaceholder: '<lang>', description: 'New SAP language.' },
+      { name: '--password', type: 'string', valuePlaceholder: '<password>', description: 'New password; updates the keychain credential.' },
+      { name: '--remove-password', type: 'boolean', description: 'Remove the stored password from the keychain.' },
+      { name: '--insecure', type: 'boolean', description: 'Skip SSL certificate verification (development only).' },
+      { name: '--ca', type: 'string', valuePlaceholder: '<path>', description: 'PEM CA certificate to import and bind to this profile.' },
+      { name: '--clear-ca', type: 'boolean', description: 'Remove the CA certificate setting.' },
+      schemaOption(),
+    ],
+    examples: [{ description: 'Update a password', command: 'abap profile set dev --password ***' }],
+  },
+  test: {
+    ...baseSchema('profile test', 'Probe a connection profile end-to-end (tls -> auth -> adt -> icf).', 'abap profile test <name>', 'local'),
+    arguments: [NAME_ARGUMENT],
+    examples: [{ description: 'Probe a profile', command: 'abap profile test dev --json' }],
+  },
+  delete: {
+    ...baseSchema('profile delete', 'Delete a connection profile and its stored password.', 'abap profile delete <name> --yes', 'local'),
+    arguments: [NAME_ARGUMENT],
+    options: [{ name: '--yes', type: 'boolean', description: 'Skip the confirmation prompt.' }, schemaOption()],
+    examples: [{ description: 'Delete a profile', command: 'abap profile delete dev --yes' }],
+  },
+  export: {
+    ...baseSchema('profile export', 'Export connection profiles to a bundle (passwords excluded by default).', 'abap profile export [names...] [--file <path>]', 'local'),
+    arguments: [{ name: 'names', type: 'string', required: false, description: 'Profile names to export (default: all).' }],
+    options: [
+      { name: '--file', type: 'string', valuePlaceholder: '<path>', description: 'Write the bundle to a file (default: stdout).' },
+      { name: '--with-passwords', type: 'boolean', description: 'Include passwords in the bundle (warned opt-in).' },
+      schemaOption(),
+    ],
+    examples: [{ description: 'Export all profiles', command: 'abap profile export --file profiles.json' }],
+  },
+  import: {
+    ...baseSchema('profile import', 'Import connection profiles from a bundle.', 'abap profile import <file>', 'local'),
+    arguments: [{ name: 'file', type: 'string', required: true, description: 'Bundle file path.' }],
+    options: [
+      { name: '--overwrite', type: 'boolean', description: 'Update profiles that already exist.' },
+      schemaOption(),
+    ],
+    examples: [{ description: 'Import profiles', command: 'abap profile import profiles.json --overwrite' }],
+  },
+};
+
+/** Print `abap profile <command> --schema` when requested; true means printed. */
+function maybePrintSubSchema(cmd: Command, key: keyof typeof SUBCOMMAND_SCHEMAS): boolean {
+  if (cmd.optsWithGlobals<{ schema?: boolean }>().schema !== true) return false;
+  const schema = SUBCOMMAND_SCHEMAS[key];
+  if (!schema) return false;
+  printSchema(schema, jsonFromCommand(cmd));
+  return true;
+}
+
+/** Subcommand positionals are optional at the parser level so `--schema` works
+ *  without them; the action still fails with the same USAGE error when absent. */
+function requireArg(value: string | undefined, name: string): string {
+  if (value) return value;
+  throw new CliError('USAGE', `missing required argument '${name}'`, {
+    nextSteps: ["Run 'abap profile --help' for usage."],
+    example: 'abap profile list --json',
+  });
+}
 
 export function registerProfileCommand(program: Command): void {
   const profile = program
@@ -59,23 +163,27 @@ export function registerProfileCommand(program: Command): void {
   profile
     .command('list')
     .description('List all saved connection profiles')
+    .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action((_opts, cmd) => {
+      if (maybePrintSubSchema(cmd, 'list')) return;
       runList(jsonFromCommand(cmd));
     });
 
   profile
-    .command('show <name>')
+    .command('show [name]')
     .description('Show details of a connection profile')
-    .action(async (name: string, _opts, cmd) => {
+    .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
+    .action(async (name: string | undefined, _opts, cmd) => {
+      if (maybePrintSubSchema(cmd, 'show')) return;
       try {
-        await runShow(name, jsonFromCommand(cmd));
+        await runShow(requireArg(name, 'name'), jsonFromCommand(cmd));
       } catch (error: unknown) {
         handleError(jsonFromCommand(cmd), error);
       }
     });
 
   profile
-    .command('add <name>')
+    .command('add [name]')
     .description('Create a new connection profile')
     .option('--url <url>', 'SAP system URL')
     .option('-c, --client <client>', 'SAP client number')
@@ -84,16 +192,18 @@ export function registerProfileCommand(program: Command): void {
     .option('-p, --password <password>', 'Password (stores credential in keychain)')
     .option('--insecure', 'Skip SSL certificate verification (self-signed certs, development only)')
     .option('--ca <path>', 'PEM CA certificate to import into ~/.abap-cli/certificates/ and bind to this profile')
-    .action(async (name: string, opts, cmd) => {
+    .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
+    .action(async (name: string | undefined, opts, cmd) => {
+      if (maybePrintSubSchema(cmd, 'add')) return;
       try {
-        await runAdd(name, opts, jsonFromCommand(cmd));
+        await runAdd(requireArg(name, 'name'), opts, jsonFromCommand(cmd));
       } catch (error: unknown) {
         handleError(jsonFromCommand(cmd), error);
       }
     });
 
   profile
-    .command('set <name>')
+    .command('set [name]')
     .description('Modify an existing connection profile (fields or password)')
     .option('--url <url>', 'New SAP system URL')
     .option('-c, --client <client>', 'New SAP client number')
@@ -104,32 +214,38 @@ export function registerProfileCommand(program: Command): void {
     .option('--insecure', 'Skip SSL certificate verification (self-signed certs, development only)')
     .option('--ca <path>', 'PEM CA certificate to import into ~/.abap-cli/certificates/ and bind to this profile')
     .option('--clear-ca', 'Remove the CA certificate setting')
-    .action(async (name: string, opts, cmd) => {
+    .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
+    .action(async (name: string | undefined, opts, cmd) => {
+      if (maybePrintSubSchema(cmd, 'set')) return;
       try {
-        await runSet(name, opts, jsonFromCommand(cmd));
+        await runSet(requireArg(name, 'name'), opts, jsonFromCommand(cmd));
       } catch (error: unknown) {
         handleError(jsonFromCommand(cmd), error);
       }
     });
 
   profile
-    .command('test <name>')
+    .command('test [name]')
     .description('Probe a connection profile end-to-end')
-    .action(async (name: string, _opts, cmd) => {
+    .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
+    .action(async (name: string | undefined, _opts, cmd) => {
+      if (maybePrintSubSchema(cmd, 'test')) return;
       try {
-        await runTest(name, jsonFromCommand(cmd));
+        await runTest(requireArg(name, 'name'), jsonFromCommand(cmd));
       } catch (error: unknown) {
         handleError(jsonFromCommand(cmd), error);
       }
     });
 
   profile
-    .command('delete <name>')
+    .command('delete [name]')
     .description('Delete a connection profile and its stored password')
     .option('--yes', 'Delete without prompting')
-    .action(async (name: string, opts: { yes?: boolean }, cmd) => {
+    .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
+    .action(async (name: string | undefined, opts: { yes?: boolean }, cmd) => {
+      if (maybePrintSubSchema(cmd, 'delete')) return;
       try {
-        await runDelete(name, opts.yes === true, jsonFromCommand(cmd));
+        await runDelete(requireArg(name, 'name'), opts.yes === true, jsonFromCommand(cmd));
       } catch (error: unknown) {
         handleError(jsonFromCommand(cmd), error);
       }
@@ -140,7 +256,9 @@ export function registerProfileCommand(program: Command): void {
     .description('Export connection profiles to a bundle')
     .option('--file <path>', 'Write the bundle to a file (default: stdout)')
     .option('--with-passwords', 'Include passwords in the bundle (warned opt-in)')
+    .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action(async (names: string[], opts: { file?: string; withPasswords?: boolean }, cmd) => {
+      if (maybePrintSubSchema(cmd, 'export')) return;
       const mode = jsonFromCommand(cmd);
       try {
         if (opts.withPasswords) {
@@ -161,13 +279,16 @@ export function registerProfileCommand(program: Command): void {
     });
 
   profile
-    .command('import <file>')
+    .command('import [file]')
     .description('Import connection profiles from a bundle')
     .option('--overwrite', 'Update profiles that already exist')
-    .action(async (file: string, opts: { overwrite?: boolean }, cmd) => {
+    .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
+    .action(async (file: string | undefined, opts: { overwrite?: boolean }, cmd) => {
+      if (maybePrintSubSchema(cmd, 'import')) return;
       const mode = jsonFromCommand(cmd);
       try {
-        const raw = JSON.parse(fs.readFileSync(path.resolve(file), 'utf-8'));
+        const bundleFile = requireArg(file, 'file');
+        const raw = JSON.parse(fs.readFileSync(path.resolve(bundleFile), 'utf-8'));
         const bundle = validateBundle(raw);
         const result = await importProfiles(bundle, { overwrite: opts.overwrite });
         const human = result.imported

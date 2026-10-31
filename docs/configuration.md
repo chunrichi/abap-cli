@@ -17,7 +17,7 @@ Precedence for credentials: **OS keychain** for the referenced system name; pass
 Created by `abap profile add` and referenced by `abap init --profile <name>`:
 
 ```bash
-abap profile list                  # List saved profiles
+abap profile list                  # List saved profiles (current binding + client/language)
 abap profile show dev              # Show profile details (no secrets)
 abap profile add dev --url https://sap:44300 --username DEV --password '***'  # Create a profile
 abap profile set dev --url https://sap:44300   # Modify a field
@@ -25,7 +25,13 @@ abap profile set dev --password '***'          # Update the stored password
 abap profile delete dev            # Delete profile + stored password
 ```
 
-The file is written with mode `0600` (`0700` for the directory) and is not committed.
+Rules enforced on write (`add` / `set` / `import`):
+
+- **Profile name**: 1–64 chars, letters/digits/`_`/`.`/`-`, must start with a letter or digit. The name is the `systems.json` key and the keychain account.
+- **URL**: stored as `scheme://host[:port]` only. Path/query/fragment from a pasted browser URL are dropped (warning `URL_NORMALIZED`); embedded credentials are rejected. `profile add` never connects — run `abap profile test <name>` to verify.
+- **`--schema`**: `abap profile <command> --schema --json` returns that subcommand's argument/option contract.
+
+The file is written with mode `0600` (`0700` for the directory), includes a `formatVersion` marker, and is not committed.
 
 ## Workspace Config (`.abap.json`)
 
@@ -51,6 +57,7 @@ The same `abap init` command is also the entry point for **inspecting and cleari
 abap init --show-config               # print the current .abap.json (read-only)
 abap init --unset-package --yes       # remove the `package` key
 abap init --unset-tr --unset-source-dir --yes   # remove multiple keys
+abap init --tr DEVK900001 --package ZNEW --yes  # update fields without re-binding the profile
 ```
 
 Setting fields (`--profile`, `--tr`, `--package`, `--source-dir`) is also done through `abap init`; the command merges with the existing `.abap.json` rather than replacing it.
