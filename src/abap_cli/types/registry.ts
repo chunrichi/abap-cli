@@ -86,6 +86,9 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
   // Database view (SE11 view). Upstream abap-file-formats has no view
   // schema, so `view-v1.json` is a local extension (see schema/README.md).
   { type: 'VIEW', source: 'ICF', affSchemaFile: 'view-v1.json', requiresFile: true },
+  // Search help (SE11 search help). Upstream AFF has no SHLP schema, so
+  // `shlp-v1.json` is a local extension (see schema/README.md).
+  { type: 'SHLP', source: 'ICF', affSchemaFile: 'shlp-v1.json', requiresFile: true },
   { type: 'NROB', source: 'ADT', affSchemaFile: 'nrob-v1.json', requiresFile: true },
   // HTTP service (SICF node) via ICF. originally wrote a local
   // skeleton when --file was absent; that path was removed (refactor decision

@@ -11,8 +11,9 @@
  * Supported types: anything reachable by `client.deleteObject` (CLAS, INTF,
  * PROG, FUGR, FUGR/FF, TABL, STRU, DOMA, DTEL, MSAG, TTYP, DDLS, DDLX, BDEF,
  * DCLS, SRVD, SRVB, HTTP, ENQU, NROB). DEVC takes the dedicated package branch
- * (`delete-devc.ts` — packages are deleted without a lock); TRAN and VIEW go
- * through the bundled ICF service (`DELETE /tran/<tcode>` / `/ddic/view/<name>`).
+ * (`delete-devc.ts` — packages are deleted without a lock); TRAN, VIEW and SHLP
+ * go through the bundled ICF service (`DELETE /tran/<tcode>` /
+ * `/ddic/view|shlp/<name>`).
  * CDSV views and similar type codes without an ADT delete endpoint surface as
  * `TYPE_NOT_SUPPORTED`.
  */
@@ -24,6 +25,7 @@ import { resolveObject } from '../../core/resolve.js';
 import { normalizeTypeInput } from '../../cli/type-alias.js';
 import { runDeleteDevc } from './delete-devc.js';
 import { runDeleteView } from './delete-view.js';
+import { runDeleteShlp } from './delete-shlp.js';
 
 export interface DeleteOptions {
   /** Object type code (CLAS / PROG / ...). Required — `delete` without a type
@@ -85,6 +87,10 @@ export async function runDelete(objectName: string, opts: DeleteOptions): Promis
   // the bundled ICF service (RS_DD_DELETE_OBJ, $TMP only).
   if (typeUpper === 'VIEW') {
     return runDeleteView(objectName, opts);
+  }
+  // SHLP (DDIC search help) has no ADT delete endpoint either.
+  if (typeUpper === 'SHLP') {
+    return runDeleteShlp(objectName, opts);
   }
   // TRAN (SE93 transaction codes) has no ADT delete endpoint: a transaction is
   // repository metadata spread over TSTC/TSTCT/TSTCP/TSTCC/TSTCA plus TADIR, so

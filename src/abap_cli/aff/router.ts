@@ -74,6 +74,8 @@ const SUFFIX_RULES: ReadonlyArray<{ suffix: string; type: string; schemaFile?: s
   // Transformation pair: metadata + source companion.
   { suffix: '.xslt.json', type: 'XSLT' },
   { suffix: '.xslt.xml', type: 'XSLT' },
+  // Search help local-extension document (upstream AFF has no SHLP format).
+  { suffix: '.shlp.json', type: 'SHLP' },
   // dual-channel DDIC + CDS companions.
   { suffix: '.ttyp.json', type: 'TTYP' },
   { suffix: '.ttyp.type.abap', type: 'TTYP' },

@@ -1,7 +1,7 @@
 ---
 type: command
 title: abap create
-description: 在 SAP 创建新对象并激活 — 源对象（CLAS/INTF/PROG/FUGR，ADT REST）、DDIC（DOMA/DTEL/TABL/STRU/ENQU/VIEW/NROB，--file 走 ICF）、HTTP/SICF 节点、事务码、TTYP/MSAG/DDLS 及 CDS/RAP 配套对象；FUGR 配 --func 可在既有函数组内新建函数模块（FUGR/FF）；--no-activate / --template / --no-pull / --check-only / --audit；--schema 提供 agent 参数自省；create local 为离线草稿（仅 4 类源对象）
+description: 在 SAP 创建新对象并激活 — 源对象（CLAS/INTF/PROG/FUGR，ADT REST）、DDIC（DOMA/DTEL/TABL/STRU/ENQU/VIEW/SHLP/NROB，--file 走 ICF）、HTTP/SICF 节点、事务码、TTYP/MSAG/DDLS 及 CDS/RAP 配套对象；FUGR 配 --func 可在既有函数组内新建函数模块（FUGR/FF）；--no-activate / --template / --no-pull / --check-only / --audit；--schema 提供 agent 参数自省；create local 为离线草稿（仅 4 类源对象）
 tags: [abap-cli, command, create, clas, intf, prog, fugr, fugr-ff, doma, dtel, tabl, stru, ddic, icf, template, schema]
 created at: 2026-08-07 00:00:00
 changed at: 2026-10-31 18:06:00
@@ -9,7 +9,7 @@ changed at: 2026-10-31 18:06:00
 
 # abap create
 
-在 SAP 中创建新 ABAP 对象并激活。源对象（`CLAS`/`INTF`/`PROG`/`FUGR`）走 ADT REST API；DDIC 对象（`DOMA`/`DTEL`/`TABL`/`STRU`/`ENQU`/`VIEW`/`NROB`）走自建 ICF 服务（需 `--file`）。创建后默认 create-then-pull 写本地副本。拒绝覆盖已存在对象（`OBJECT_EXISTS`）。
+在 SAP 中创建新 ABAP 对象并激活。源对象（`CLAS`/`INTF`/`PROG`/`FUGR`）走 ADT REST API；DDIC 对象（`DOMA`/`DTEL`/`TABL`/`STRU`/`ENQU`/`VIEW`/`SHLP`/`NROB`）走自建 ICF 服务（需 `--file`）。创建后默认 create-then-pull 写本地副本。拒绝覆盖已存在对象（`OBJECT_EXISTS`）。
 
 `FUGR` 类型有两种形态：`abap create FUGR <group>` 新建**函数组**；`abap create FUGR <group> --func <module>` 在**既有函数组内新建函数模块**（`FUGR/FF`，ADT `POST /sap/bc/adt/functions/groups/<group>/fmodules`）。后者的 `<name>` 是组名，须已存在于 SAP。
 
@@ -24,7 +24,7 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 
 ## Options
 
-- `<type>`: 支持 24 个类型码（完整矩阵见 [object-types](../object-types.md)）：4 个源对象 `CLAS` / `INTF` / `PROG` / `FUGR` 走 ADT 骨架；`DEVC` 走独立 ADT handler（`--package` 是**父包**，无需 `--file`，见 [DEVC（Package）](#devcpackage)）；`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `VIEW` / `NROB` / `HTTP` / `TRAN` / `XSLT` / `TTYP` / `MSAG` / `DDLS` / `SRVD` / `DCLS` / `DDLX` / `DDLA` 必须配 `--file`（AFF JSON，VIEW 为本地扩展 `view-v1.json`）；`BDEF` 是 pull-only、`SRVB` 仅 pull。未知类型 → `TYPE_NOT_SUPPORTED`（exit 7）。
+- `<type>`: 支持 25 个类型码（完整矩阵见 [object-types](../object-types.md)）：4 个源对象 `CLAS` / `INTF` / `PROG` / `FUGR` 走 ADT 骨架；`DEVC` 走独立 ADT handler（`--package` 是**父包**，无需 `--file`，见 [DEVC（Package）](#devcpackage)）；`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `VIEW` / `SHLP` / `NROB` / `HTTP` / `TRAN` / `XSLT` / `TTYP` / `MSAG` / `DDLS` / `SRVD` / `DCLS` / `DDLX` / `DDLA` 必须配 `--file`（AFF JSON，VIEW/SHLP 为本地扩展 `view-v1.json` / `shlp-v1.json`）；`BDEF` 是 pull-only、`SRVB` 仅 pull。未知类型 → `TYPE_NOT_SUPPORTED`（exit 7）。
 - `<name>`: 对象名（自动转大写；命名空间名如 `/UI2/CL_JSON` 在磁盘上用 AFF 括号 token `(ui2)cl_json`）。本地预校验：≤30 字符、仅 `A-Z 0-9 _`、命名空间形如 `/NS/NAME`（NS ≤10，总长 ≤30），违规 → `VALIDATION_ERROR`（exit 7）
 - `--package <package>`: 目标 SAP 包（必填）
 - `--description <desc>`: 对象描述（必填；有 `--file` 时可选，由 JSON 提供）
@@ -34,7 +34,7 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 - `--no-pull`: 跳过 create-then-pull 本地副本（默认拉取）
 - `--check-only`: 只校验对象可行性（`validateNewObject`），不创建
 - `--audit`: 额外一次 SAP 往返记录 before-checksum（默认关）
-- `--file <path>`: abap-file-format JSON 输入（`types/registry.ts` 的 `requiresFile` 类型必填：TABL/STRU/DOMA/DTEL/ENQU/VIEW/NROB/HTTP/TRAN/XSLT/TTYP/MSAG/DDLS/SRVD/DCLS/DDLX/DDLA）。XSLT 是两件套：`--file` 指向 `.xslt.json`，同目录 `.xslt.xml` 源码必须同时存在。TABL/STRU 是三件套：`--file` 指向 main `.tabl.json`，CLI 自动读同目录 `.tabl.ddic`（DDL 源）与 `.tabl.settings.json`；只有 main JSON 时回落 legacy wire-flat 单文件（顶层 `name` / `fields[]`）。DDL 解析失败 → `TABL_DDL_INVALID`（exit 7）
+- `--file <path>`: abap-file-format JSON 输入（`types/registry.ts` 的 `requiresFile` 类型必填：TABL/STRU/DOMA/DTEL/ENQU/VIEW/SHLP/NROB/HTTP/TRAN/XSLT/TTYP/MSAG/DDLS/SRVD/DCLS/DDLX/DDLA）。TABL/STRU 是三件套：`--file` 指向 main `.tabl.json`，CLI 自动读同目录 `.tabl.ddic`（DDL 源）与 `.tabl.settings.json`；XSLT 用 `<name>.xslt.json` + 同目录 `<name>.xslt.xml` 两件套；只有 main JSON 时回落 legacy wire-flat 单文件（顶层 `name` / `fields[]`）。DDL 解析失败 → `TABL_DDL_INVALID`（exit 7）
 - `--func <module>`: 仅 `FUGR` 类型可用 — 在**既有函数组 `<name>`** 内新建函数模块（`FUGR/FF` 子对象）。组不存在 → `OBJECT_NOT_FOUND`（exit 8，附建组指引）；组内同名模块已存在 → `OBJECT_EXISTS`（exit 2）；模块名同样过本地预校验（≤30、`A-Z 0-9 _`）。`--check-only` 不支持该形态
 - `--software-component <swcomp>`: 仅 `DEVC` — 新包的软件组件；缺省从父包继承（`$TMP` → `LOCAL`）。LOCAL 包名必须 `$`/`TEST` 开头
 - `--transport-layer <layer>`: 仅 `DEVC` — 新包的传输层；缺省从父包继承（`$TMP` → 空）
@@ -117,6 +117,19 @@ abap create XSLT ZMY_XSLT --file src/zmy_xslt.xslt.json --package '$TMP' --yes
 ```bash
 abap create VIEW ZCLI_TC_VIEW --file src/zcli_tc_view.view.json --package $TMP --yes
 abap create --schema VIEW   # 带 exampleJson 的机器契约
+```
+
+### SHLP（DDIC 搜索帮助）
+
+`SHLP` 是本地扩展类型：`--file` 指向 `shlp-v1.json`，`kind` 为 `elementary`
+（`selectionMethod` + `parameters[]`）或 `collective`（`includedSearchHelps[]` +
+`parameterMappings[]`）。名称 ≤30 字符；collective 引用的子搜索帮助必须已存在。
+写路径 `POST /ddic/shlp` 由 `RS_CORR_INSERT` + `DDIF_SHLP_PUT` +
+`DDIF_SHLP_ACTIVATE` 完成。字段契约与示例见 [objects/shlp](../objects/shlp.md)。
+
+```bash
+abap create SHLP ZCLI_TC_SHLP --file src/zcli_tc_shlp.shlp.json --package $TMP --yes
+abap create --schema SHLP   # 带 exampleJson 的机器契约
 ```
 
 ### DEVC（Package）

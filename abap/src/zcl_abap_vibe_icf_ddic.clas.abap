@@ -178,6 +178,40 @@ CLASS zcl_abap_vibe_icf_ddic DEFINITION PUBLIC FINAL CREATE PUBLIC.
     CLASS-METHODS view_class_from_wire
       IMPORTING iv_class        TYPE string
       RETURNING VALUE(rv_class) TYPE dd25v-viewclass.
+
+    " SHLP (search help) — local-extension AFF document persisted via
+    " DDIF_SHLP_*. Deletion reuses delete_ddic_object (ICF-safe, $TMP only).
+    CLASS-METHODS create_ddic_shlp
+      IMPORTING iv_name    TYPE shlpname
+                iv_payload TYPE string
+                iv_package TYPE devclass
+                iv_request TYPE trkorr
+      EXPORTING es_payload TYPE zcl_abap_vibe_icf_types=>ty_ddic_create
+                ev_error   TYPE zcl_abap_vibe_icf_types=>ty_error.
+
+    CLASS-METHODS shlp_selmtype_from_wire
+      IMPORTING iv_type        TYPE string
+      RETURNING VALUE(rv_type) TYPE dd30v-selmtype.
+
+    CLASS-METHODS shlp_selmtype_to_wire
+      IMPORTING iv_type        TYPE dd30v-selmtype
+      RETURNING VALUE(rv_type) TYPE string.
+
+    CLASS-METHODS shlp_dlgtype_from_wire
+      IMPORTING iv_type        TYPE string
+      RETURNING VALUE(rv_type) TYPE dd30v-dialogtype.
+
+    CLASS-METHODS shlp_dlgtype_to_wire
+      IMPORTING iv_type        TYPE dd30v-dialogtype
+      RETURNING VALUE(rv_type) TYPE string.
+
+    CLASS-METHODS shlp_valuedirec_from_wire
+      IMPORTING iv_direction        TYPE string
+      RETURNING VALUE(rv_direction) TYPE dd33v-valuedirec.
+
+    CLASS-METHODS shlp_valuedirec_to_wire
+      IMPORTING iv_direction        TYPE dd33v-valuedirec
+      RETURNING VALUE(rv_direction) TYPE string.
 ENDCLASS.
 
 CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
@@ -252,7 +286,7 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    FIND REGEX '^/ddic/(doma|dtel|tabl|stru|enqu|nrob|ttyp|msag|view)(?:/(.+))?$' IN iv_path IGNORING CASE
+    FIND REGEX '^/ddic/(doma|dtel|tabl|stru|enqu|nrob|ttyp|msag|view|shlp)(?:/(.+))?$' IN iv_path IGNORING CASE
       SUBMATCHES lv_match_type lv_match_name.
     IF sy-subrc <> 0 OR lv_match_type IS INITIAL.
       zcl_abap_vibe_icf_response=>respond_error( io_server = io_server
@@ -269,11 +303,11 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
 
     DATA lv_package TYPE devclass.
     DATA lv_request TYPE trkorr.
-    " VIEW deletion: there is no ADT delete path for views, so the CLI
-    " DELETEs through this ICF route. RS_DD_DELETE_OBJ is the only ICF-safe
-    " delete (RS_DD_DELETE opens a confirm dynpro).
+    " VIEW / SHLP deletion: there is no ADT delete path for these types, so
+    " the CLI DELETEs through this ICF route. RS_DD_DELETE_OBJ is the only
+    " ICF-safe delete (RS_DD_DELETE opens a confirm dynpro).
     IF iv_method = 'DELETE'.
-      IF lv_type = 'VIEW'.
+      IF lv_type = 'VIEW' OR lv_type = 'SHLP'.
         delete_ddic_object( EXPORTING iv_type = lv_type
                                       iv_name = lv_name
                             IMPORTING es_payload = DATA(ls_delete_response)
@@ -405,6 +439,15 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
           " Database view — handcrafted view-v1 document (DD25V / DD26V /
           " DD27P / DD28J / DD28V). See create_ddic_view.
           create_ddic_view( EXPORTING iv_name    = CONV viewname( lv_name )
+                                      iv_payload = iv_body
+                                      iv_package = lv_package
+                                      iv_request = lv_request
+                            IMPORTING es_payload = ls_create
+                                      ev_error   = ls_create_err ).
+        WHEN 'SHLP'.
+          " Search help (elementary / collective) — handcrafted shlp-v1
+          " document (DD30V / DD31V / DD32P / DD33V). See create_ddic_shlp.
+          create_ddic_shlp( EXPORTING iv_name    = CONV shlpname( lv_name )
                                       iv_payload = iv_body
                                       iv_package = lv_package
                                       iv_request = lv_request
@@ -1906,6 +1949,7 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
     FIELD-SYMBOLS <ls_doma_payload> TYPE zcl_abap_vibe_icf_types=>ty_ddic_get_doma_data.
     FIELD-SYMBOLS <ls_dtel_payload> TYPE zcl_abap_vibe_icf_types=>ty_ddic_get_dtel_data.
     FIELD-SYMBOLS <ls_view_payload> TYPE zcl_abap_vibe_icf_types=>ty_view_data.
+    FIELD-SYMBOLS <ls_shlp_payload> TYPE zcl_abap_vibe_icf_types=>ty_shlp_data.
     CASE iv_type.
       WHEN 'DOMA'.
         DATA ls_doma TYPE dd01v.
@@ -2149,6 +2193,81 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
             operator   = ls_view_selection-operator
             constants  = ls_view_selection-constants
             and_or     = ls_view_selection-and_or ) TO <ls_view_payload>-selection_conditions.
+        ENDLOOP.
+      WHEN 'SHLP'.
+        DATA lv_shlp_state TYPE ddgotstate.
+        DATA ls_shlp_header TYPE dd30v.
+        DATA lt_shlp_included TYPE TABLE OF dd31v.
+        DATA lt_shlp_parameters TYPE TABLE OF dd32p.
+        DATA lt_shlp_mappings TYPE TABLE OF dd33v.
+        DATA lv_shlp_name TYPE ddobjname.
+        DATA lv_shlp_package TYPE devclass.
+        lv_shlp_name = iv_name.
+        CALL FUNCTION 'DDIF_SHLP_GET'
+          EXPORTING
+            name     = lv_shlp_name
+            state    = 'A'
+            langu    = sy-langu
+          IMPORTING
+            gotstate = lv_shlp_state
+            dd30v_wa = ls_shlp_header
+          TABLES
+            dd31v_tab = lt_shlp_included
+            dd32p_tab = lt_shlp_parameters
+            dd33v_tab = lt_shlp_mappings
+          EXCEPTIONS
+            illegal_input = 1
+            OTHERS        = 2.
+        IF sy-subrc <> 0 OR lv_shlp_state <> 'A' OR ls_shlp_header-shlpname IS INITIAL.
+          ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                     error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'DDIC_OBJECT_NOT_FOUND'
+                                                                  message = |SHLP { iv_name } not found| ) ).
+          RETURN.
+        ENDIF.
+        CREATE DATA es_payload TYPE zcl_abap_vibe_icf_types=>ty_shlp_data.
+        ASSIGN es_payload->* TO <ls_shlp_payload>.
+        <ls_shlp_payload>-format_version = '1'.
+        <ls_shlp_payload>-type = 'SHLP'.
+        <ls_shlp_payload>-name = iv_name.
+        SELECT SINGLE devclass FROM tadir
+          WHERE pgmid = 'R3TR' AND object = 'SHLP' AND obj_name = @iv_name
+          INTO @lv_shlp_package.
+        <ls_shlp_payload>-package = lv_shlp_package.
+        <ls_shlp_payload>-header-description = ls_shlp_header-ddtext.
+        <ls_shlp_payload>-header-original_language = language_code_from_key( ls_shlp_header-ddlanguage ).
+        <ls_shlp_payload>-header-abap_language_version = 'standard'.
+        <ls_shlp_payload>-kind = COND string( WHEN ls_shlp_header-issimple = 'X'
+                                                THEN 'elementary'
+                                                ELSE 'collective' ).
+        <ls_shlp_payload>-selection_method = ls_shlp_header-selmethod.
+        <ls_shlp_payload>-selection_method_type = shlp_selmtype_to_wire( ls_shlp_header-selmtype ).
+        <ls_shlp_payload>-text_table = ls_shlp_header-texttab.
+        <ls_shlp_payload>-dialog_type = shlp_dlgtype_to_wire( ls_shlp_header-dialogtype ).
+        <ls_shlp_payload>-hotkey = ls_shlp_header-hotkey.
+        LOOP AT lt_shlp_parameters INTO DATA(ls_shlp_parameter).
+          APPEND VALUE zcl_abap_vibe_icf_types=>ty_shlp_parameter(
+            field_name         = ls_shlp_parameter-fieldname
+            position           = CONV i( ls_shlp_parameter-flposition )
+            roll_name          = ls_shlp_parameter-rollname
+            input              = boolc( ls_shlp_parameter-shlpinput = 'X' )
+            output             = boolc( ls_shlp_parameter-shlpoutput = 'X' )
+            selection_position = CONV i( ls_shlp_parameter-shlpselpos )
+            list_position      = CONV i( ls_shlp_parameter-shlplispos )
+            default_value      = ls_shlp_parameter-defaultval ) TO <ls_shlp_payload>-parameters.
+        ENDLOOP.
+        LOOP AT lt_shlp_included INTO DATA(ls_shlp_include).
+          APPEND VALUE zcl_abap_vibe_icf_types=>ty_shlp_included(
+            search_help     = ls_shlp_include-subshlp
+            position        = CONV i( ls_shlp_include-shposition )
+            via_search_help = ls_shlp_include-viashlp
+            hide            = boolc( ls_shlp_include-hideflag = 'X' ) ) TO <ls_shlp_payload>-included_search_helps.
+        ENDLOOP.
+        LOOP AT lt_shlp_mappings INTO DATA(ls_shlp_mapping).
+          APPEND VALUE zcl_abap_vibe_icf_types=>ty_shlp_mapping(
+            field_name      = ls_shlp_mapping-fieldname
+            sub_search_help = ls_shlp_mapping-subshlp
+            sub_field_name  = ls_shlp_mapping-subfield
+            value_direction = shlp_valuedirec_to_wire( ls_shlp_mapping-valuedirec ) ) TO <ls_shlp_payload>-parameter_mappings.
         ENDLOOP.
       WHEN OTHERS.
         ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
@@ -2704,34 +2823,48 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD delete_ddic_object.
-    " DELETE /ddic/view/<name> (SHLP will reuse the same shape). RS_DD_DELETE_OBJ
-    " is the only ICF-safe delete path: RS_DD_DELETE opens the SAPLSPO1 confirm
-    " dynpro, which cannot run in the plugin context. An inactive-only object is
-    " activated first — deleting it directly raises E2 341 in plugin mode.
+    " DELETE /ddic/view|shlp/<name>. RS_DD_DELETE_OBJ is the only ICF-safe
+    " delete path: RS_DD_DELETE opens the SAPLSPO1 confirm dynpro, which cannot
+    " run in the plugin context. An inactive-only object is activated first —
+    " deleting it directly raises E2 341 in plugin mode.
     DATA lv_name TYPE string.
-    DATA lv_objname TYPE ddobjname.
+    DATA lv_objname TYPE rsedd0-ddobjname.
     DATA lv_object_type TYPE string.
     DATA lv_tadir_object TYPE string.
     DATA lv_rs_dd_objtype TYPE rsedd0-ddobjtype.
+    DATA lv_name_limit TYPE i.
     DATA lv_package TYPE devclass.
     DATA lv_object_exists TYPE abap_bool.
     DATA lv_tadir_exists TYPE abap_bool.
     DATA lv_activation_rc TYPE sy-subrc.
+    DATA lv_delete_code TYPE string.
 
     lv_object_type = to_upper( iv_type ).
     lv_name = to_upper( condense( val = iv_name del = ` ` ) ).
-    IF lv_name IS INITIAL OR strlen( lv_name ) > 16 OR lv_name CS ` `.
+    IF lv_object_type = 'SHLP'.
+      lv_name_limit    = 30.
+      lv_tadir_object  = 'SHLP'.
+      lv_rs_dd_objtype = 'H'.
+    ELSE.
+      lv_name_limit    = 16.
+      lv_tadir_object  = 'VIEW'.
+      lv_rs_dd_objtype = 'V'.
+    ENDIF.
+    IF lv_name IS INITIAL OR strlen( lv_name ) > lv_name_limit OR lv_name CS ` `.
+      DATA(lv_name_code) = COND string( WHEN lv_object_type = 'SHLP' THEN 'SHLP_NAME_INVALID' ELSE 'VIEW_NAME_INVALID' ).
       ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
-                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'VIEW_NAME_INVALID'
-                                              message = |view name must be a non-empty name of at most 16 characters without whitespace (got '{ lv_name }')| ) ).
+                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = lv_name_code
+                                              message = |{ lv_object_type } name must be a non-empty name of at most { lv_name_limit } characters without whitespace (got '{ lv_name }')| ) ).
       RETURN.
     ENDIF.
     lv_objname = lv_name.
-    lv_tadir_object = 'VIEW'.
-    lv_rs_dd_objtype = 'V'.
-
-    SELECT SINGLE viewname FROM dd25l INTO @DATA(lv_existing_view)
-      WHERE viewname = @lv_objname.
+    IF lv_object_type = 'SHLP'.
+      SELECT SINGLE shlpname FROM dd30l INTO @DATA(lv_existing_shlp)
+        WHERE shlpname = @lv_objname.
+    ELSE.
+      SELECT SINGLE viewname FROM dd25l INTO @DATA(lv_existing_view)
+        WHERE viewname = @lv_objname.
+    ENDIF.
     lv_object_exists = boolc( sy-subrc = 0 ).
     SELECT SINGLE devclass FROM tadir INTO @lv_package
       WHERE pgmid = 'R3TR' AND object = @lv_tadir_object AND obj_name = @lv_objname.
@@ -2739,31 +2872,43 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
     IF lv_object_exists = abap_false AND lv_tadir_exists = abap_false.
       ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
                                  error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'DDIC_OBJECT_NOT_FOUND'
-                                              message = |VIEW { lv_name } not found| ) ).
+                                              message = |{ lv_object_type } { lv_name } not found| ) ).
       RETURN.
     ENDIF.
     " Removing a repository object from a transport request cannot be recorded
-    " from the ICF context (no CTS dialog), so transported views stay with SE11.
+    " from the ICF context (no CTS dialog), so transported objects stay with SE11.
     IF lv_package IS NOT INITIAL AND lv_package <> '$TMP'.
+      DATA(lv_unsupported_code) = COND string( WHEN lv_object_type = 'SHLP' THEN 'SHLP_DELETE_UNSUPPORTED' ELSE 'VIEW_DELETE_UNSUPPORTED' ).
       ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
-                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'VIEW_DELETE_UNSUPPORTED'
-                                              message = |view { lv_name } is in package { lv_package }; delete it in SE11 so the deletion is recorded in a transport request| ) ).
+                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = lv_unsupported_code
+                                              message = |{ lv_object_type } { lv_name } is in package { lv_package }; delete it in SE11 so the deletion is recorded in a transport request| ) ).
       RETURN.
     ENDIF.
 
     IF lv_object_exists = abap_true.
-      " Make sure an inactive 'L' version is activated before the delete; an
-      " already-active view just returns rc=8 (nothing to activate).
-      CALL FUNCTION 'DDIF_VIEW_ACTIVATE'
-        EXPORTING name = lv_objname
-        IMPORTING rc   = lv_activation_rc
-        EXCEPTIONS not_found   = 1
-                   put_failure = 2
-                   OTHERS      = 3.
+      " Activate an inactive version first; an already-active object just
+      " returns "nothing to activate" from the activate FM.
+      IF lv_object_type = 'SHLP'.
+        CALL FUNCTION 'DDIF_SHLP_ACTIVATE'
+          EXPORTING name = lv_objname
+          IMPORTING rc   = lv_activation_rc
+          EXCEPTIONS not_found   = 1
+                     put_failure = 2
+                     OTHERS      = 3.
+      ELSE.
+        CALL FUNCTION 'DDIF_VIEW_ACTIVATE'
+          EXPORTING name     = lv_objname
+                    auth_chk = abap_true
+          IMPORTING rc       = lv_activation_rc
+          EXCEPTIONS not_found   = 1
+                     put_failure = 2
+                     OTHERS      = 3.
+      ENDIF.
       IF sy-subrc <> 0.
+        DATA(lv_activate_failed_code) = COND string( WHEN lv_object_type = 'SHLP' THEN 'SHLP_DELETE_FAILED' ELSE 'VIEW_DELETE_FAILED' ).
         ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
-                                   error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'VIEW_DELETE_FAILED'
-                                                message = |view { lv_name } has an inactive version that could not be activated (sy-subrc { sy-subrc }); activate it in SE11 and retry| ) ).
+                                   error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = lv_activate_failed_code
+                                                message = |{ lv_object_type } { lv_name } has an inactive version that could not be activated (sy-subrc { sy-subrc }); activate it in SE11 and retry| ) ).
         RETURN.
       ENDIF.
       CALL FUNCTION 'RS_DD_DELETE_OBJ'
@@ -2782,10 +2927,13 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
         IF lv_delete_msg IS INITIAL.
           lv_delete_msg = |RS_DD_DELETE_OBJ failed for { lv_name } (sy-subrc { lv_delete_subrc })|.
         ENDIF.
-        DATA(lv_delete_code) = SWITCH string( lv_delete_subrc
-          WHEN 2 THEN 'DDIC_OBJECT_NOT_FOUND'
-          WHEN 4 THEN 'VIEW_NOT_AUTHORIZED'
-          ELSE 'VIEW_DELETE_FAILED' ).
+        IF lv_delete_subrc = 2.
+          lv_delete_code = 'DDIC_OBJECT_NOT_FOUND'.
+        ELSEIF lv_delete_subrc = 4.
+          lv_delete_code = COND string( WHEN lv_object_type = 'SHLP' THEN 'SHLP_NOT_AUTHORIZED' ELSE 'VIEW_NOT_AUTHORIZED' ).
+        ELSE.
+          lv_delete_code = COND string( WHEN lv_object_type = 'SHLP' THEN 'SHLP_DELETE_FAILED' ELSE 'VIEW_DELETE_FAILED' ).
+        ENDIF.
         ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
                                    error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = lv_delete_code
                                                 message = lv_delete_msg ) ).
@@ -2852,6 +3000,480 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
           WHEN 'H'. rv_class = 'H'.
           WHEN 'P'. rv_class = 'P'.
         ENDCASE.
+    ENDCASE.
+  ENDMETHOD.
+
+  METHOD create_ddic_shlp.
+    " Persist a search help from the local shlp-v1 document:
+    "   RS_CORR_INSERT (object_class='SHLP') →
+    "   DDIF_SHLP_PUT (elementary: only DD32P; collective: DD31V + DD32P +
+    "   DD33V — the TABLES parameters that are named participate) →
+    "   DDIF_SHLP_ACTIVATE (PUT only writes the inactive version).
+    DATA ls_request TYPE zcl_abap_vibe_icf_types=>ty_shlp_write_request.
+    DATA ls_dd30v TYPE dd30v.
+    DATA lt_dd31v TYPE TABLE OF dd31v.
+    DATA lt_dd32p TYPE TABLE OF dd32p.
+    DATA lt_dd33v TYPE TABLE OF dd33v.
+    DATA lt_parameter_names TYPE TABLE OF fieldname.
+    DATA lt_included_names TYPE TABLE OF shlpname.
+    DATA lv_name TYPE string.
+    DATA lv_shlp_name TYPE ddobjname.
+    DATA lv_package TYPE devclass.
+    DATA lv_master TYPE sy-langu.
+    DATA lv_kind TYPE string.
+    DATA lv_selmethod TYPE tabname.
+    DATA lv_selmtype TYPE dd30v-selmtype.
+    DATA lv_dialogtype TYPE dd30v-dialogtype.
+    DATA lv_texttab TYPE tabname.
+    DATA lv_hotkey TYPE dd30v-hotkey.
+    DATA lv_field TYPE fieldname.
+    DATA lv_roll TYPE rollname.
+    DATA lv_sub TYPE shlpname.
+    DATA lv_subfield TYPE fieldname.
+    DATA lv_direction TYPE dd33v-valuedirec.
+    DATA lv_pos TYPE i.
+    DATA lv_map_pos TYPE i.
+    DATA lv_num4 TYPE n LENGTH 4.
+    DATA lv_num2 TYPE n LENGTH 2.
+    DATA lv_input TYPE dd32p-shlpinput.
+    DATA lv_output TYPE dd32p-shlpoutput.
+    DATA lv_via TYPE shlpname.
+    DATA lv_hide TYPE dd31v-hideflag.
+    DATA lv_existed TYPE abap_bool.
+
+    TRY.
+        /ui2/cl_json=>deserialize( EXPORTING json        = iv_payload
+                                             pretty_name = /ui2/cl_json=>pretty_mode-camel_case
+                                   CHANGING  data        = ls_request ).
+      CATCH cx_root.
+        ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                   error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'SHLP_INVALID_PAYLOAD'
+                                                                message = 'request body is not a valid shlp-v1 JSON document' ) ).
+        RETURN.
+    ENDTRY.
+
+    lv_name = to_upper( condense( val = iv_name del = ` ` ) ).
+    IF lv_name IS INITIAL.
+      " POST /ddic/shlp carries the object name in the payload, like the other
+      " DDIC create routes; the URL name is used by GET/DELETE only.
+      lv_name = to_upper( condense( val = ls_request-name del = ` ` ) ).
+    ENDIF.
+    IF lv_name IS INITIAL OR strlen( lv_name ) > 30 OR lv_name CS ` `.
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'SHLP_NAME_INVALID'
+                                              message = |search help name must be a non-empty name of at most 30 characters without whitespace (got '{ lv_name }')| ) ).
+      RETURN.
+    ENDIF.
+    IF ls_request-name IS NOT INITIAL
+       AND to_upper( condense( val = ls_request-name del = ` ` ) ) <> lv_name.
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'SHLP_NAME_INVALID'
+                                              message = |payload name { ls_request-name } does not match URL search help { lv_name }| ) ).
+      RETURN.
+    ENDIF.
+    lv_shlp_name = lv_name.
+    lv_package = to_upper( condense( val = ls_request-package del = ` ` ) ).
+    IF lv_package IS INITIAL.
+      lv_package = '$TMP'.
+    ENDIF.
+    lv_master = language_key_from_code( ls_request-header-original_language ).
+    IF lv_master IS INITIAL.
+      lv_master = sy-langu.
+    ENDIF.
+    IF ls_request-header-description IS INITIAL.
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'SHLP_REQUIRED_FIELD'
+                                              message = 'header.description is required' ) ).
+      RETURN.
+    ENDIF.
+    lv_kind = to_lower( ls_request-kind ).
+    IF lv_kind <> 'elementary' AND lv_kind <> 'collective'.
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'SHLP_KIND_INVALID'
+                                              message = |unsupported kind '{ ls_request-kind }'; expected elementary or collective| ) ).
+      RETURN.
+    ENDIF.
+    IF lines( ls_request-parameters ) = 0.
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'SHLP_REQUIRED_FIELD'
+                                              message = 'parameters[] must contain at least one interface parameter' ) ).
+      RETURN.
+    ENDIF.
+
+    ls_dd30v-shlpname   = lv_shlp_name.
+    ls_dd30v-ddlanguage = lv_master.
+    ls_dd30v-ddtext     = ls_request-header-description.
+    ls_dd30v-as4user    = sy-uname.
+    ls_dd30v-as4date    = sy-datum.
+    ls_dd30v-as4time    = sy-uzeit.
+    lv_hotkey = to_upper( condense( val = ls_request-hotkey del = ` ` ) ).
+    ls_dd30v-hotkey = lv_hotkey.
+
+    IF lv_kind = 'elementary'.
+      lv_selmethod = to_upper( condense( val = ls_request-selection_method del = ` ` ) ).
+      IF lv_selmethod IS INITIAL.
+        ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                   error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'SHLP_REQUIRED_FIELD'
+                                                message = 'selectionMethod is required for an elementary search help' ) ).
+        RETURN.
+      ENDIF.
+      SELECT SINGLE tabname FROM dd02l INTO @DATA(lv_found_tab)
+        WHERE tabname = @lv_selmethod AND as4local = 'A'.
+      IF sy-subrc <> 0.
+        ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                   error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'SHLP_SELECTION_METHOD_NOT_FOUND'
+                                                message = |selection method { lv_selmethod } does not exist| ) ).
+        RETURN.
+      ENDIF.
+      lv_selmtype = shlp_selmtype_from_wire( ls_request-selection_method_type ).
+      IF lv_selmtype IS INITIAL.
+        lv_selmtype = 'X'.
+      ENDIF.
+      lv_dialogtype = shlp_dlgtype_from_wire( ls_request-dialog_type ).
+      IF lv_dialogtype IS INITIAL.
+        lv_dialogtype = 'D'.
+      ENDIF.
+      lv_texttab = to_upper( condense( val = ls_request-text_table del = ` ` ) ).
+      ls_dd30v-issimple   = 'X'.
+      ls_dd30v-selmethod  = lv_selmethod.
+      ls_dd30v-selmtype   = lv_selmtype.
+      ls_dd30v-texttab    = lv_texttab.
+      ls_dd30v-dialogtype = lv_dialogtype.
+    ELSE.
+      IF lines( ls_request-included_search_helps ) = 0.
+        ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                   error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'SHLP_REQUIRED_FIELD'
+                                                message = 'includedSearchHelps[] must contain at least one included search help' ) ).
+        RETURN.
+      ENDIF.
+      IF lines( ls_request-parameter_mappings ) = 0.
+        ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                   error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'SHLP_REQUIRED_FIELD'
+                                                message = 'parameterMappings[] must map the interface parameters to the included search helps' ) ).
+        RETURN.
+      ENDIF.
+      ls_dd30v-elemexi = 'X'.
+    ENDIF.
+
+    " Step 1: interface parameters (DD32P). rollName is derived from the
+    " selection method (elementary) or from the mapped sub-search-help
+    " parameter (collective) when the payload omits it.
+    lv_pos = 0.
+    LOOP AT ls_request-parameters INTO DATA(ls_parameter).
+      lv_pos = lv_pos + 1.
+      lv_field = to_upper( condense( val = ls_parameter-field_name del = ` ` ) ).
+      IF lv_field IS INITIAL.
+        ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                   error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'SHLP_REQUIRED_FIELD'
+                                                message = |parameters[{ lv_pos }].fieldName is required| ) ).
+        RETURN.
+      ENDIF.
+      APPEND lv_field TO lt_parameter_names.
+      lv_roll = to_upper( condense( val = ls_parameter-roll_name del = ` ` ) ).
+      IF lv_roll IS INITIAL.
+        IF lv_kind = 'elementary'.
+          SELECT SINGLE rollname FROM dd03l INTO @lv_roll
+            WHERE tabname = @lv_selmethod AND fieldname = @lv_field AND as4local = 'A'.
+        ELSE.
+          LOOP AT ls_request-parameter_mappings INTO DATA(ls_mapping_probe)
+               WHERE field_name = lv_field.
+            lv_sub = to_upper( condense( val = ls_mapping_probe-sub_search_help del = ` ` ) ).
+            lv_subfield = to_upper( condense( val = ls_mapping_probe-sub_field_name del = ` ` ) ).
+            IF lv_sub IS NOT INITIAL AND lv_subfield IS NOT INITIAL.
+              SELECT SINGLE rollname FROM dd32s INTO @lv_roll
+                WHERE shlpname = @lv_sub AND fieldname = @lv_subfield AND as4local = 'A'.
+              IF sy-subrc = 0 AND lv_roll IS NOT INITIAL.
+                EXIT.
+              ENDIF.
+            ENDIF.
+          ENDLOOP.
+        ENDIF.
+        IF lv_roll IS INITIAL.
+          ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                     error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'SHLP_FIELD_INVALID'
+                                                  message = |rollName for parameter { lv_field } could not be derived; set it explicitly| ) ).
+          RETURN.
+        ENDIF.
+      ENDIF.
+      CLEAR lv_input.
+      IF ls_parameter-input = abap_true.
+        lv_input = 'X'.
+      ENDIF.
+      CLEAR lv_output.
+      IF ls_parameter-output = abap_true.
+        lv_output = 'X'.
+      ENDIF.
+      lv_num4 = lv_pos.
+      " SE11 gives every parameter a selection-area position (the probe read
+      " back SELPOS=02 for an output-only parameter), so default it to the
+      " parameter position instead of 00.
+      IF ls_parameter-selection_position IS NOT INITIAL.
+        lv_num2 = ls_parameter-selection_position.
+      ELSE.
+        lv_num2 = lv_pos.
+      ENDIF.
+      DATA lv_selpos TYPE dd32p-shlpselpos.
+      lv_selpos = lv_num2.
+      IF lv_output = 'X'.
+        IF ls_parameter-list_position IS NOT INITIAL.
+          lv_num2 = ls_parameter-list_position.
+        ELSE.
+          lv_num2 = lv_pos.
+        ENDIF.
+      ELSE.
+        lv_num2 = 0.
+      ENDIF.
+      DATA lv_lispos TYPE dd32p-shlplispos.
+      lv_lispos = lv_num2.
+      APPEND VALUE dd32p( shlpname   = lv_shlp_name
+                          fieldname  = lv_field
+                          flposition = lv_num4
+                          rollname   = lv_roll
+                          shlpinput  = lv_input
+                          shlpoutput = lv_output
+                          shlpselpos = lv_selpos
+                          shlplispos = lv_lispos
+                          defaultval = ls_parameter-default_value ) TO lt_dd32p.
+    ENDLOOP.
+
+    " Step 2: collective search help — included search helps (DD31V) and the
+    " parameter mapping (DD33V). The sub-search-help must already exist.
+    IF lv_kind = 'collective'.
+      lv_pos = 0.
+      LOOP AT ls_request-included_search_helps INTO DATA(ls_included).
+        lv_pos = lv_pos + 1.
+        lv_sub = to_upper( condense( val = ls_included-search_help del = ` ` ) ).
+        IF lv_sub IS INITIAL.
+          ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                     error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'SHLP_REQUIRED_FIELD'
+                                                  message = |includedSearchHelps[{ lv_pos }].searchHelp is required| ) ).
+          RETURN.
+        ENDIF.
+        SELECT SINGLE shlpname FROM dd30l INTO @DATA(lv_found_shlp)
+          WHERE shlpname = @lv_sub AND as4local = 'A'.
+        IF sy-subrc <> 0.
+          ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                     error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'SHLP_INCLUDED_NOT_FOUND'
+                                                  message = |included search help { lv_sub } does not exist| ) ).
+          RETURN.
+        ENDIF.
+        APPEND lv_sub TO lt_included_names.
+        lv_via = to_upper( condense( val = ls_included-via_search_help del = ` ` ) ).
+        IF lv_via IS INITIAL.
+          lv_via = lv_shlp_name.
+        ENDIF.
+        CLEAR lv_hide.
+        IF ls_included-hide = abap_true.
+          lv_hide = 'X'.
+        ENDIF.
+        lv_num4 = lv_pos.
+        APPEND VALUE dd31v( shlpname   = lv_shlp_name
+                            subshlp    = lv_sub
+                            shposition = lv_num4
+                            viashlp   = lv_via
+                            hideflag   = lv_hide ) TO lt_dd31v.
+      ENDLOOP.
+
+      lv_map_pos = 0.
+      LOOP AT ls_request-parameter_mappings INTO DATA(ls_mapping).
+        lv_map_pos = lv_map_pos + 1.
+        lv_field = to_upper( condense( val = ls_mapping-field_name del = ` ` ) ).
+        lv_sub = to_upper( condense( val = ls_mapping-sub_search_help del = ` ` ) ).
+        lv_subfield = to_upper( condense( val = ls_mapping-sub_field_name del = ` ` ) ).
+        IF lv_field IS INITIAL OR lv_sub IS INITIAL OR lv_subfield IS INITIAL.
+          ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                     error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'SHLP_REQUIRED_FIELD'
+                                                  message = |parameterMappings[{ lv_map_pos }] requires fieldName, subSearchHelp and subFieldName| ) ).
+          RETURN.
+        ENDIF.
+        IF NOT line_exists( lt_parameter_names[ table_line = lv_field ] ).
+          ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                     error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'SHLP_FIELD_INVALID'
+                                                  message = |parameterMappings[{ lv_map_pos }].fieldName { lv_field } is not an interface parameter| ) ).
+          RETURN.
+        ENDIF.
+        IF NOT line_exists( lt_included_names[ table_line = lv_sub ] ).
+          ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                     error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'SHLP_FIELD_INVALID'
+                                                  message = |parameterMappings[{ lv_map_pos }].subSearchHelp { lv_sub } is not in includedSearchHelps[]| ) ).
+          RETURN.
+        ENDIF.
+        lv_direction = shlp_valuedirec_from_wire( ls_mapping-value_direction ).
+        IF lv_direction IS INITIAL.
+          lv_direction = 'I'.
+        ENDIF.
+        APPEND VALUE dd33v( shlpname   = lv_shlp_name
+                            fieldname  = lv_field
+                            subshlp    = lv_sub
+                            subfield   = lv_subfield
+                            valuedirec = lv_direction ) TO lt_dd33v.
+      ENDLOOP.
+    ENDIF.
+
+    SELECT SINGLE shlpname FROM dd30l INTO @DATA(lv_existing_shlp)
+      WHERE shlpname = @lv_shlp_name.
+    lv_existed = boolc( sy-subrc = 0 ).
+
+    " Step 3: TADIR / package / transport.
+    CALL FUNCTION 'RS_CORR_INSERT'
+      EXPORTING object          = lv_shlp_name
+                object_class    = 'SHLP'
+                devclass        = lv_package
+                master_language = lv_master
+                korrnum         = iv_request
+                mode            = 'I'
+                global_lock     = abap_true
+                suppress_dialog = abap_true
+      EXCEPTIONS cancelled           = 1
+                 permission_failure  = 2
+                 unknown_objectclass = 3
+                 OTHERS              = 4.
+    IF sy-subrc <> 0.
+      DATA(lv_corr_subrc) = sy-subrc.
+      DATA(lv_corr_msg) = last_message( ).
+      IF lv_corr_msg IS INITIAL.
+        lv_corr_msg = |RS_CORR_INSERT failed for SHLP { lv_name } (sy-subrc { lv_corr_subrc })|.
+      ENDIF.
+      DATA(lv_corr_code) = SWITCH string( lv_corr_subrc
+        WHEN 1 THEN 'SHLP_TRANSPORT_REQUIRED'
+        WHEN 2 THEN 'SHLP_NOT_AUTHORIZED'
+        WHEN 3 THEN 'SHLP_PACKAGE_ASSIGN_FAILED'
+        ELSE 'SHLP_PACKAGE_ASSIGN_FAILED' ).
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = lv_corr_code
+                                              message = lv_corr_msg ) ).
+      RETURN.
+    ENDIF.
+
+    " Step 4: write the inactive version. Elementary search helps only need
+    " DD32P; collective ones also carry DD31V and DD33V.
+    IF lv_kind = 'elementary'.
+      CALL FUNCTION 'DDIF_SHLP_PUT'
+        EXPORTING name     = lv_shlp_name
+                  dd30v_wa = ls_dd30v
+        TABLES    dd32p_tab = lt_dd32p
+        EXCEPTIONS shlp_not_found    = 1
+                   name_inconsistent = 2
+                   shlp_inconsistent = 3
+                   put_failure       = 4
+                   put_refused       = 5
+                   OTHERS            = 6.
+    ELSE.
+      CALL FUNCTION 'DDIF_SHLP_PUT'
+        EXPORTING name     = lv_shlp_name
+                  dd30v_wa = ls_dd30v
+        TABLES    dd31v_tab = lt_dd31v
+                  dd32p_tab = lt_dd32p
+                  dd33v_tab = lt_dd33v
+        EXCEPTIONS shlp_not_found    = 1
+                   name_inconsistent = 2
+                   shlp_inconsistent = 3
+                   put_failure       = 4
+                   put_refused       = 5
+                   OTHERS            = 6.
+    ENDIF.
+    IF sy-subrc <> 0.
+      DATA(lv_put_subrc) = sy-subrc.
+      DATA(lv_put_msg) = last_message( ).
+      IF lv_put_msg IS INITIAL.
+        lv_put_msg = |DDIF_SHLP_PUT failed for { lv_name } (sy-subrc { lv_put_subrc })|.
+      ENDIF.
+      DATA(lv_put_code) = SWITCH string( lv_put_subrc
+        WHEN 2 THEN 'SHLP_NAME_INVALID'
+        WHEN 3 THEN 'SHLP_INCONSISTENT'
+        WHEN 5 THEN 'SHLP_WRITE_REFUSED'
+        ELSE 'SHLP_WRITE_FAILED' ).
+      IF lv_existed = abap_false AND lv_package = '$TMP'.
+        DELETE FROM tadir WHERE pgmid = 'R3TR' AND object = 'SHLP' AND obj_name = @lv_shlp_name.
+      ENDIF.
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = lv_put_code
+                                              message = lv_put_msg ) ).
+      RETURN.
+    ENDIF.
+
+    " Step 5: activate (PUT only writes the inactive version).
+    DATA lv_activation_rc TYPE sy-subrc.
+    CALL FUNCTION 'DDIF_SHLP_ACTIVATE'
+      EXPORTING name = lv_shlp_name
+      IMPORTING rc   = lv_activation_rc
+      EXCEPTIONS not_found   = 1
+                 put_failure = 2
+                 OTHERS      = 3.
+    IF sy-subrc <> 0 OR lv_activation_rc <> 0.
+      DATA(lv_act_subrc) = sy-subrc.
+      DATA(lv_act_msg) = last_message( ).
+      IF lv_act_msg IS INITIAL.
+        lv_act_msg = |DDIF_SHLP_ACTIVATE failed for { lv_name } (sy-subrc { lv_act_subrc }, rc { lv_activation_rc })|.
+      ENDIF.
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'SHLP_ACTIVATION_FAILED'
+                                              message = lv_act_msg ) ).
+      RETURN.
+    ENDIF.
+
+    es_payload = VALUE zcl_abap_vibe_icf_types=>ty_ddic_create( status = 'success'
+                                       data = VALUE zcl_abap_vibe_icf_types=>ty_ddic_create_data(
+                                         name   = lv_name
+                                         type   = 'SHLP'
+                                         action = COND string( WHEN lv_existed = abap_true THEN 'updated' ELSE 'created' ) ) ).
+  ENDMETHOD.
+
+  METHOD shlp_selmtype_from_wire.
+    CASE to_lower( iv_type ).
+      WHEN 'view'.  rv_type = 'V'.
+      WHEN 'table'. rv_type = 'X'.
+      WHEN OTHERS.
+        CASE to_upper( iv_type ).
+          WHEN 'V'.        rv_type = 'V'.
+          WHEN 'X' OR 'T'. rv_type = 'X'.
+        ENDCASE.
+    ENDCASE.
+  ENDMETHOD.
+
+  METHOD shlp_selmtype_to_wire.
+    CASE to_upper( iv_type ).
+      WHEN 'V'.        rv_type = 'view'.
+      WHEN 'X' OR 'T'. rv_type = 'table'.
+    ENDCASE.
+  ENDMETHOD.
+
+  METHOD shlp_dlgtype_from_wire.
+    CASE to_lower( iv_type ).
+      WHEN 'dialog'.           rv_type = 'C'.
+      WHEN 'displayvalueslist'. rv_type = 'D'.
+      WHEN OTHERS.
+        CASE to_upper( iv_type ).
+          WHEN 'C'. rv_type = 'C'.
+          WHEN 'D'. rv_type = 'D'.
+        ENDCASE.
+    ENDCASE.
+  ENDMETHOD.
+
+  METHOD shlp_dlgtype_to_wire.
+    CASE to_upper( iv_type ).
+      WHEN 'C'. rv_type = 'dialog'.
+      WHEN OTHERS. rv_type = 'displayValuesList'.
+    ENDCASE.
+  ENDMETHOD.
+
+  METHOD shlp_valuedirec_from_wire.
+    CASE to_lower( iv_direction ).
+      WHEN 'import'. rv_direction = 'I'.
+      WHEN 'export'. rv_direction = 'E'.
+      WHEN OTHERS.
+        CASE to_upper( iv_direction ).
+          WHEN 'I' OR 'C'. rv_direction = 'I'.
+          WHEN 'E'.        rv_direction = 'E'.
+        ENDCASE.
+    ENDCASE.
+  ENDMETHOD.
+
+  METHOD shlp_valuedirec_to_wire.
+    CASE to_upper( iv_direction ).
+      WHEN 'E'.        rv_direction = 'export'.
+      WHEN 'I' OR 'C'. rv_direction = 'import'.
+      WHEN OTHERS.     rv_direction = 'import'.
     ENDCASE.
   ENDMETHOD.
 

@@ -44,6 +44,7 @@ import { createEnquHandler } from './create-enqu.js';
 import { createNrobHandler } from './create-nrob.js';
 import { createDevcHandler } from './create-devc.js';
 import { createViewHandler } from './create-view.js';
+import { createShlpHandler } from './create-shlp.js';
 import { pullDevcHandler } from './pull-devc.js';
 import { createXsltHandler } from './create-xslt.js';
 import { runPullXslt } from './pull-xslt.js';
@@ -57,6 +58,7 @@ import { pullCdsExtensionHandler } from './pull-cds-extension.js';
 import { pullEnquHandler } from './pull-enqu.js';
 import { pullNrobHandler } from './pull-nrob.js';
 import { runPullView } from './pull-view.js';
+import { runPullShlp } from './pull-shlp.js';
 import { runPullDdic } from './pull-ddic.js';
 import { runPullHttp } from './pull-http.js';
 import { runPullTran } from './pull-transport.js';
@@ -66,6 +68,7 @@ import { runPushDdls } from './push-ddls.js';
 import { runPushEnqu } from './push-enqu.js';
 import { runPushNrob } from './push-nrob.js';
 import { pushViewFile, validateViewFile } from './push-view.js';
+import { pushShlpFile, validateShlpFile } from './push-shlp.js';
 import {
   pushDdicFile,
   pushHttpFile,
@@ -250,6 +253,19 @@ export const TYPE_ROUTES: Readonly<Record<string, TypeRoute>> = {
       channel: 'icf',
       run: ({ client, resolved, file, opts }) => pushViewFile(client, resolved, file, opts),
       validate: (file) => validateViewFile(file),
+    },
+  },
+
+  // Search help (SE11 search help) — local-extension `shlp-v1` document, ICF
+  // only; ADT has no search-help resource, so all operations use /ddic/shlp.
+  SHLP: {
+    create: handler('icf', createShlpHandler),
+    pull: handler('icf', ({ objectName, opts }) => runPullShlp(objectName, opts)),
+    push: {
+      kind: 'icf-json',
+      channel: 'icf',
+      run: ({ client, resolved, file, opts }) => pushShlpFile(client, resolved, file, opts),
+      validate: (file) => validateShlpFile(file),
     },
   },
 

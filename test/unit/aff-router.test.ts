@@ -20,6 +20,12 @@ describe('aff-router', () => {
     expect(schemaFileFor('TABL')).toBe('tabl-v1.json');
   });
 
+  it('routes the SHLP search-help document (local extension)', () => {
+    const routed = routeAffSchema('zcli_tc_shlp.shlp.json');
+    expect(routed).toEqual({ type: 'SHLP', isJson: true, schemaFile: 'shlp-v1.json' });
+    expect(routeType('src/zcli_tc_shlp.shlp.json')).toBe('SHLP');
+  });
+
   it('routes the VIEW database-view document (local extension)', () => {
     const routed = routeAffSchema('zcli_tc_view.view.json');
     expect(routed).toEqual({ type: 'VIEW', isJson: true, schemaFile: 'view-v1.json' });
