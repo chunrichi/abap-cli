@@ -1,6 +1,6 @@
 ---
 name: abap-cli-data
-description: abap-cli 对对象的运行时消费 — `select` 查表/视图数据 / `run` 跑类（classrun 或静态方法）。use when asking how to query a table / how to run a class / how to see the output of a classrun / how to do read-only data analysis against SAP.
+description: abap-cli 对对象的运行时消费 — `select` 查表/视图数据 / `fields` 列字段（表/视图字段清单，含 `--find` 反查）/ `run` 跑类（classrun 或静态方法）/ `run-report` 跑报表（取经典 list 输出）。use when asking how to query a table / how to list the fields of a table / how to run a class / how to run a report and read its list output / how to see the output of a classrun / how to do read-only data analysis against SAP.
 metadata:
   version: "1.0.0"
   scope: sap
@@ -16,7 +16,7 @@ metadata:
 
 - 看表数据：`select --table ZTAB`
 - 查表有哪些字段：`fields VRSD`（DD03L 字段清单，只读）
-- 反查哪些表有某字段（典型："哪些表记录最后修改人+时间"）：`fields --find CHANGED_BY,CHANGED_ON`（S-2）
+- 反查哪些表有某字段（典型："哪些表记录最后修改人+时间"）：`fields --find CHANGED_BY,CHANGED_ON`
 - 跑类：`run ZCL_FOO`
 - 跑报表并取列表输出：`run-report ZR_MY_REPORT`（默认选择参数，只能取经典 list 输出）
 - 翻页 select（> 10000 行）：`scripts/pages-select.mjs` 自动分页
@@ -98,7 +98,7 @@ metadata:
 2. **`select` 完全可放心反复调用**：不修改表数据、不产生传输请求、不加锁
 3. **`run --method` 前先看 `deploy status`**（[abap-cli-setup]）：若 `WRAPPER_NOT_DEPLOYED`，跳 `abap-cli-setup` 部署
 4. **`run` 业务退出码 vs CLI 退出码**：`data.exitCode` 是**业务退出码**（SAP 端写），CLI 退出码是命令本身状态——`jq '.data.exitCode'` 读业务码
-5. **`select --count-only` 比 `select --limit 99999` 快**：只取 `COUNT(*)`
+5. **`select --count-only` 比 `select --limit 10000` 快**：只取 `COUNT(*)`，不取明细行
 6. **跨 skill**：环境/连接/transport 切 `abap-cli-setup`；对象元数据切 `abap-cli-search`；对象修改切 `abap-cli-edit`
 
 ## references（按需加载）

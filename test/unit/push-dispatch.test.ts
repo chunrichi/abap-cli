@@ -128,7 +128,7 @@ const DTEL_DOC = {
 const DOCS: Record<string, unknown> = { HTTP: HTTP_DOC, TABL: TABL_DOC, DOMA: DOMA_DOC, DTEL: DTEL_DOC };
 const fileFor = (type: string) => `src/z${type.toLowerCase()}_dispatch.${type.toLowerCase()}.json`;
 
-describe('Phase 4 — ICF push routing table', () => {
+describe('ICF push routing table', () => {
   it('HTTP routes to postHttp without an existence probe', async () => {
     write(fileFor('HTTP'), DOCS.HTTP);
     const res = await push([fileFor('HTTP'), '--tr', 'TRN001']);

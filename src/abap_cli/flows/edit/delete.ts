@@ -3,7 +3,7 @@
  *
  * Deletes an ABAP object from SAP (read-only counterpart: `abap pull`).
  * Always goes through lock → delete → unlock so an ADT lock is never left
- * behind even when delete itself fails (feedback S-3: `delete` was a
+ * behind even when delete itself fails (feedback: `delete` was a
  * completely missing capability, forcing users to leave probe classes
  * behind in the system; this flow provides that capability with a
  * single explicit confirm gate).

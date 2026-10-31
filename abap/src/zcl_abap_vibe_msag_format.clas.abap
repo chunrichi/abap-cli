@@ -92,7 +92,7 @@ CLASS zcl_abap_vibe_msag_format IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD read_metadata.
-    " T100A holds the message class header; T100 the numbered texts. Neither
+    " A holds the message class header; the numbered texts. Neither
     " has a DDIF_ read module, so we read them directly.
     SELECT SINGLE stext FROM t100a
       WHERE arbgb = @iv_name

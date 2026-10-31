@@ -3,7 +3,7 @@ import { expectSchemaPass, readJsonFixture } from './_helpers.js';
 import { validateAff } from '../../../src/abap_cli/aff/schema-validator.js';
 import { localToWire as httpLocalToWire, wireToLocal as httpWireToLocal } from '../../../src/abap_cli/formats/http/json.js';
 
-describe('schema-compliance / http (T033-051)', () => {
+describe('schema-compliance / http', () => {
   it('zmy_service.http.json passes http-v1.json (handcrafted — upstream has no example)', async () => {
     await expectSchemaPass('zmy_service.http.json', 'HTTP');
   });

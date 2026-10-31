@@ -1,5 +1,5 @@
 /**
- * T3.2 — `renderServiceBindingMetadata` projects the abap-adt-api
+ * — `renderServiceBindingMetadata` projects the abap-adt-api
  * ServiceBinding payload into the AFF `<name>.srvb.json` shape (matches
  * srvb-v1.json):
  *   - `bindingType` (string)        — type + version joined with space
@@ -57,7 +57,7 @@ const SAMPLE_META: Record<string, unknown> = {
   'adtcore:masterLanguage': 'DE',
 };
 
-describe('renderServiceBindingMetadata (T3.2)', () => {
+describe('renderServiceBindingMetadata', () => {
   it('projects a complete binding payload', () => {
     const result = renderServiceBindingMetadata(SAMPLE_BINDING, SAMPLE_META);
     expect(result.formatVersion).toBe('1');

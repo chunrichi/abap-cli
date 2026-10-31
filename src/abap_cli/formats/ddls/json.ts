@@ -1,5 +1,5 @@
 /**
- * Spec 036 US4: DDLS (CDS view) local ↔ wire mapping.
+ * DDLS (CDS view) local ↔ wire mapping.
  *
  * Local shape (AFF nested):
  *   { formatVersion, header, sourceOrigin, sourceType, parentName? }
@@ -113,7 +113,7 @@ export function wireToLocal(xml: string): { doc: DdlsLocal; source: string } {
 /**
  * Normalise a {@link DdlsLocal} in place: sourceOrigin defaults to
  * `'abapDevelopmentTools'` and sourceType to `'unknown'` when the
- * value is missing or not in the canonical set. T3.5 closes the gap
+ * value is missing or not in the canonical set. closes the gap
  * between real-SAP wire responses (which always carry a value) and
  * locally-edited fixtures (which may carry a typo or future enum).
  */

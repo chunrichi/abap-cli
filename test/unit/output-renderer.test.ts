@@ -10,7 +10,7 @@ const meta: OutputMeta = {
   warnings: [],
 };
 
-describe('output renderer ', () => {
+describe('output renderer', () => {
   it('renderResult("json", data, human, meta) emits compact JSON with meta on stdout', () => {
     const out = renderResult('json', { hello: 'world' }, 'human text', meta);
     expect(out.stdout).toHaveLength(1);
@@ -31,7 +31,7 @@ describe('output renderer ', () => {
     expect(parsed.data).toEqual({ hello: 'world' });
   });
 
-  it('renderResult compact JSON is materially smaller than pretty-json (NFR-001)', () => {
+  it('renderResult compact JSON is materially smaller than pretty-json (N )', () => {
     const payload = {
       items: Array.from({ length: 5 }, (_, i) => ({ id: i, name: `item-${i}`, nested: { ok: true } })),
       skipped: [],
@@ -90,7 +90,7 @@ describe('output renderer ', () => {
     expect(out.exitCode).toBe(4); // TLS_ERROR → 4
   });
 
-  it('stripEmpty() recurses into nested data ()', () => {
+  it('stripEmpty recurses into nested data', () => {
     const out = renderResult('json', {
       ok: 1,
       skipped: [],

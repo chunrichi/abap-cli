@@ -101,7 +101,7 @@ describe('abap push FUGR (sub-object mapping)', () => {
       'TRN001',
     );
     expect(unLock).toHaveBeenCalledWith(`${GROUP}/fmodules/tableframe_zfg_wechat_table`, 'lock-1');
-    // T1.6: FM activation now goes through activateAll (not the single-object
+    // FM activation now goes through activateAll (not the single-object
     // activate overload), with parentUri pointing at the enclosing group.
     expect(activateAll).toHaveBeenCalledWith([
       expect.objectContaining({
@@ -148,7 +148,7 @@ describe('abap push FUGR (sub-object mapping)', () => {
     expect(setObjectSource).not.toHaveBeenCalled();
   });
 
-  it('T1.6: pushes an FXX include using its child object URL (not the group)', async () => {
+  it('pushes an FXX include using its child object URL (not the group)', async () => {
     const file = writeFile(
       'src/zfg_wechat_table/zfg_wechat_table.fugr.lzfg_wechat_tablef01.reps.abap',
       'INCLUDE LZFG_WECHAT_TABLEF01.',
@@ -167,7 +167,7 @@ describe('abap push FUGR (sub-object mapping)', () => {
     );
   });
 
-  it('T1.6: dry-run does not make any mutating network calls', async () => {
+  it('dry-run does not make any mutating network calls', async () => {
     const file = writeFile(
       'src/zfg_wechat_table/zfg_wechat_table.fugr.lzfg_wechat_tablef01.reps.abap',
       'INCLUDE LZFG_WECHAT_TABLEF01.',
@@ -182,7 +182,7 @@ describe('abap push FUGR (sub-object mapping)', () => {
     expect(unLock).not.toHaveBeenCalled();
   });
 
-  it('T1.6: FM push throws ACTIVATION_FAILED when latest and active source diverge', async () => {
+  it('FM push throws ACTIVATION_FAILED when latest and active source diverge', async () => {
     const file = writeFile(
       'src/zfg_wechat_table/zfg_wechat_table.fugr.tableframe_zfg_wechat_table.func.abap',
       'FUNCTION TABLEFRAME_ZFG_WECHAT_TABLE.\nENDFUNCTION.',
@@ -195,7 +195,7 @@ describe('abap push FUGR (sub-object mapping)', () => {
     expect(res.stderr).toMatch(/ACTIVATION_FAILED|active source is stale/i);
   });
 
-  it('T1.6: FM push normalizes SAP-native FUNC source to canonical before write', async () => {
+  it('FM push normalizes SAP-native FUNC source to canonical before write', async () => {
     const file = writeFile(
       'src/zfg_wechat_table/zfg_wechat_table.fugr.tableframe_zfg_wechat_table.func.abap',
       [

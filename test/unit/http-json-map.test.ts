@@ -152,7 +152,7 @@ describe('022 HTTP JSON helpers', () => {
     });
   });
 
-  // ----- T2.2 AFF schema-based validation -----
+  // ----- AFF schema-based validation -----
 
   describe('validateHttpService (AFF schema)', () => {
     it('passes a valid AFF-shaped document', () => {

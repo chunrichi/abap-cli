@@ -5,7 +5,7 @@ import { CliError } from '../../src/abap_cli/output/json.js';
 import { categoryOf } from '../../src/abap_cli/output/error-codes.js';
 import { exitCodeFor } from '../../src/abap_cli/output/exit-codes.js';
 
-// Error-code mapping (data-model §5): SAP/wrapper code → CLI ErrorCode →
+// Error-code mapping: SAP/wrapper code → CLI ErrorCode →
 // category → exit code, plus special-case semantics (details, nextSteps,
 // references, INSTANCE/ACCESS_DENIED collapses).
 //
@@ -32,7 +32,7 @@ async function expectThrown(
   }
 }
 
-describe('run-flow error mapping (data-model §5)', () => {
+describe('run-flow error mapping (data-model )', () => {
   const cases: Array<{
     code: string;
     expected: string;
@@ -117,13 +117,13 @@ describe('run-flow error semantics (details / nextSteps / references)', () => {
       { message: 'ZCL_ABAP_VIBE_RUNNER missing on target system' },
     );
     expect(err.nextSteps?.some((s) => s.includes('abap deploy'))).toBe(true);
-    // 025 重构：WRAPPER_NOT_DEPLOYED 修复动作在 abap-cli-setup（deploy）
+    // 重构：WRAPPER_NOT_DEPLOYED 修复动作在 abap-cli-setup（deploy）
     expect(err.references).toBe('skills/abap-cli-setup/references/errors.md');
   });
 
   it('METHOD_FAILED references the abap-cli-data errors doc', async () => {
     const err = await expectThrown('METHOD_FAILED', { message: 'target raised cx_root' });
-    // 025 重构：其他 run 错误归 abap-cli-data（运行时消费域）
+    // 重构：其他 run 错误归 abap-cli-data（运行时消费域）
     expect(err.references).toBe('skills/abap-cli-data/references/errors.md');
   });
 });

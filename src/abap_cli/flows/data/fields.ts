@@ -3,7 +3,7 @@
  *
  * Two modes:
  *   abap fields <table>                 list the fields of a single table (F-25)
- *   abap fields --find <fields...>      reverse field lookup (S-2)
+ * abap fields --find <fields...> reverse field lookup
  *
  * Both modes share a single SAP-side helper (the existing /data/query
  * channel plus the new /data/find-tables-by-fields endpoint added in
@@ -117,7 +117,7 @@ export interface FindFieldsOptions {
   as4local?: string;
   /** Default 200, hard cap 5000. */
   limit?: number;
-  /** S-1: when true, server joins DD03T/DD04T to populate field/element
+  /** when true, server joins DD03T/DD04T to populate field/element
    *  short text on each match. Default false (one-shot opt-in; the join
    *  adds ~2 left-queries per match set and most callers only want names). */
   withText?: boolean;

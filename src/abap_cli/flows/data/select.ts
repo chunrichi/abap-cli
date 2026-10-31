@@ -8,7 +8,7 @@
  * flow is responsible only for transport, error mapping, and CLI-friendly
  * shaping.
  *
- * Design conventions follow the established 015 `run-flow.ts` pattern:
+ * Design conventions follow the established `run-flow.ts` pattern
  *   - `parseArgs`-style normalisers for option strings (with `CliError` on bad input)
  *   - `runSelect` is the main entry; pure `interpret` is exported for tests
  *   - Errors are mapped via a single table to `ErrorCode`
@@ -71,7 +71,7 @@ export interface SelectResult {
   table: string;
   objectType: 'TABL' | 'VIEW';
   fields: string[];
-  /** Native typed cell values (string | number | boolean | null) — 017 Q1 B. */
+  /** Native typed cell values (string | number | boolean | null). */
   rows: Record<string, unknown>[];
   rowCount: number;
   truncated: boolean;

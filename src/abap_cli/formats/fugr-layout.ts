@@ -15,7 +15,7 @@ import type { FuncComponent } from './func-pseudo.js';
  * Namespaced names keep `/` in SAP and use the AFF parentheses token on disk
  * (`/EXAMPLE/FOO` → `(example)foo`).
  *
- * As of 0.3.0 (T1.3 migration), FUGR/I includes other than UXX are no longer
+ * As of 0.3.0, FUGR/I includes other than UXX are no longer
  * silently dropped — FXX / OXX / IXX / arbitrary sub-includes all surface in
  * `layout.includes[]` so the pull side can emit one `.reps.{abap,json}` pair
  * for each. Callers (pull-fugr) still skip UXX because it is metadata-only.

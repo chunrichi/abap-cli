@@ -1,6 +1,6 @@
 /**
- * Spec 036 T036-039: DDLS pull — ADT-only channel plus the ECC hard error
- * (SC-004: exit 64, `DDLS_NOT_SUPPORTED_ON_ECC`, zero SAP calls).
+ * DDLS pull — ADT-only channel plus the ECC hard error
+ * (exit 64, `DDLS_NOT_SUPPORTED_ON_ECC`, zero SAP calls).
  */
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
@@ -69,7 +69,7 @@ async function load() {
   return runPullDdls;
 }
 
-describe('runPullDdls — ADT channel (036 US4)', () => {
+describe('runPullDdls — ADT channel', () => {
   it('writes the .ddls.json + .ddls.acds pair', async () => {
     const runPullDdls = await load();
     const result = await runPullDdls('zmy_view_entity', { profile: ADT_PROFILE, rootDir: root });
@@ -98,7 +98,7 @@ describe('runPullDdls — ADT channel (036 US4)', () => {
   });
 });
 
-describe('runPullDdls — ECC hard error (036 US4-AS4 / SC-004)', () => {
+describe('runPullDdls — ECC hard error (036 / )', () => {
   it('throws DDLS_NOT_SUPPORTED_ON_ECC without contacting SAP', async () => {
     const runPullDdls = await load();
     await expect(runPullDdls('zmy_view_entity', { profile: ECC_PROFILE, rootDir: root })).rejects.toMatchObject({

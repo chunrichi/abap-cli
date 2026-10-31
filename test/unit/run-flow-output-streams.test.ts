@@ -3,7 +3,7 @@ import { renderResult, renderError } from '../../src/abap_cli/output/json.js';
 import { buildMeta } from '../../src/abap_cli/output/meta.js';
 import { CliError } from '../../src/abap_cli/output/json.js';
 
-// P1.7 / FR-011 — stdout/stderr separation for abap run envelopes.
+// / — stdout/stderr separation for abap run envelopes.
 
 describe('abap run output streams', () => {
   const meta = buildMeta();

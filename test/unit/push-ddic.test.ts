@@ -16,7 +16,7 @@ const icfPostDdic = vi.fn(async () => ({
   error: null,
 }));
 
-// 035: DDIC push probes existence via ICF GET before POST; default = object exists.
+// DDIC push probes existence via ICF GET before POST; default = object exists.
 const icfGetDdic = vi.fn(async () => ({
   status: 'success' as const,
   data: {},
@@ -52,7 +52,7 @@ beforeEach(() => {
 });
 
 function writeTableJson(pkg = 'ZPKG', extra: Record<string, unknown> = {}) {
-  // 033: AFF canonical — settings under generalInformation.*.
+  // AFF canonical — settings under generalInformation.*.
   const json = {
     formatVersion: '1',
     header: { description: 'Test table', originalLanguage: 'EN' },
@@ -141,8 +141,8 @@ describe('014 abap push DDIC (.json via ICF)', () => {
     expect(out.data.results[0].plan).toContain('ddic-icf');
   });
 
-  it('032 US5: pushes a three-piece TABL artifact (.tabl.json + .tabl.ddic) — wire merges DDL fields', async () => {
-    // 024 abap-file-format three-piece layout — wire picks up fields from .tabl.ddic.
+  it('032: pushes a three-piece TABL artifact (.tabl.json +.tabl.ddic) — wire merges DDL fields', async () => {
+    // abap-file-format three-piece layout — wire picks up fields from.tabl.ddic.
     const main = {
       formatVersion: '1',
       header: { description: 'Three-piece test', originalLanguage: 'EN' },
@@ -167,7 +167,7 @@ describe('014 abap push DDIC (.json via ICF)', () => {
       name: 'ZTAB_3PC',
       transportRequest: 'TRN001',
       // readTablArtifact strips CLIENT/MANDT for client-dependent TABLs.
-      // 033: clientDependent lives under generalInformation.* (AFF canonical).
+      // clientDependent lives under generalInformation.* (AFF canonical).
       generalInformation: expect.objectContaining({ clientDependent: true }),
       fields: expect.arrayContaining([
         expect.objectContaining({ fieldName: 'COUNTRY', dataType: 'CHAR', length: 3, checkTable: 'T005' }),
@@ -175,7 +175,7 @@ describe('014 abap push DDIC (.json via ICF)', () => {
     }));
   });
 
-  it('032 US5: STRU push accepts three-piece without .tabl.settings.json sidecar', async () => {
+  it('032: STRU push accepts three-piece without.tabl.settings.json sidecar', async () => {
     const main = {
       formatVersion: '1',
       header: { description: 'Structure no-settings', originalLanguage: 'EN' },
@@ -200,7 +200,7 @@ describe('014 abap push DDIC (.json via ICF)', () => {
     }));
   });
 
-  it('032 US5: malformed .tabl.ddic surfaces TABL_DDL_INVALID (exit 7), no ICF call', async () => {
+  it('032: malformed.tabl.ddic surfaces TABL_DDL_INVALID (exit 7), no ICF call', async () => {
     fs.writeFileSync(path.join(cwd, 'src/ztab_bad.tabl.json'), JSON.stringify({
       formatVersion: '1',
       header: { description: 'Bad DDL', originalLanguage: 'EN' },

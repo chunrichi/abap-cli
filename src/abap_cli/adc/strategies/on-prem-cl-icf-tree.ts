@@ -3,7 +3,7 @@ import type { AdtClientWrapper } from '../../clients/adt-client.js';
 import type { IcfRegisterStrategy, IcfRegisterOutcome, IcfServiceSpec } from '../icf-register-strategy.js';
 import type { RuntimeProbeResult } from '../runtime-probe.js';
 
-/** 034: on-prem `cl_icf_tree` strategy — wraps the existing
+/** on-prem `cl_icf_tree` strategy — wraps the existing
  *  `ZCL_ABAP_VIBE_ICF_SETUP` classrun so deploy-flow has a uniform
  *  `register()` call. Supports any runtime whose ICF collection is
  *  available (trial on-prem or NetWeaver). On Steampunk the ICF collection
@@ -13,10 +13,10 @@ export class OnPremClIcfTreeStrategy implements IcfRegisterStrategy {
 
   supports(probe: RuntimeProbeResult): boolean {
     // Either an explicit capability flag (preferred), or any non-steampunk
-    // runtime as a conservative fallback (030 contract: unknown → on-prem).
+    // runtime as a conservative fallback.
     if (probe.apiCapabilities?.icf.available === true) return true;
     if (probe.runtime === 'netweaver740' || probe.runtime === 'netweaver750') return true;
-    if (probe.runtime === 'unknown') return true; // 030 conservative default
+    if (probe.runtime === 'unknown') return true; // conservative default
     return false;
   }
 

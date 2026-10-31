@@ -1,5 +1,5 @@
 /**
- * Spec 036 T036-030 + T036-048: MSAG pull — ADT primary channel and the ICF
+ * +: MSAG pull — ADT primary channel and the ICF
  * fallback selected by channel-detect on an ECC EHP6 kernel.
  */
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
@@ -72,7 +72,7 @@ async function load() {
   return runPullMsag;
 }
 
-describe('runPullMsag — ADT channel (036 US3)', () => {
+describe('runPullMsag — ADT channel', () => {
   it('pulls an empty message class via ADT', async () => {
     const runPullMsag = await load();
     const result = await runPullMsag('zmy_empty', { profile: ADT_PROFILE, rootDir: root });
@@ -98,7 +98,7 @@ describe('runPullMsag — ADT channel (036 US3)', () => {
   });
 });
 
-describe('runPullMsag — ICF fallback (036 US5 / SC-003)', () => {
+describe('runPullMsag — ICF fallback (036 / )', () => {
   it('routes to ICF on ECC EHP6 with the message-class fallback reason', async () => {
     const runPullMsag = await load();
     const result = await runPullMsag('zmy_msag', { profile: ECC_PROFILE, rootDir: root });

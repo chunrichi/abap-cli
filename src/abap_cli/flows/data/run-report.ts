@@ -21,7 +21,7 @@ export interface RunReportOptions {
   /** Selection variant to use instead of plain defaults. */
   variant?: string;
   /**
-   * S-4: ad-hoc selection-screen parameters, repeated as NAME=VALUE.
+   * ad-hoc selection-screen parameters, repeated as NAME=VALUE.
    * Forwarded to the ICF `/run/report` handler, which emits a
    * `SUBMIT ... WITH <name> = '<value>'` clause for each pair.
    *
@@ -30,7 +30,7 @@ export interface RunReportOptions {
    */
   params?: Array<{ name: string; value: string }>;
   /**
-   * S-4: render the captured list in a machine-friendly format.
+   * render the captured list in a machine-friendly format.
    *   - 'raw'  (default) — the SAP list output as-is (with `-----`
    *     separator bars and `|` column dividers).
    *   - 'tsv'  — tab-separated columns, one row per captured line,
@@ -48,7 +48,7 @@ export interface RunReportResult {
   report: string;
   variant?: string;
   /**
-   * S-4: selection-screen parameters forwarded to SAP, in declaration
+   * selection-screen parameters forwarded to SAP, in declaration
    * order. Empty when the caller did not pass `--param`.
    */
   params?: Array<{ name: string; value: string }>;
@@ -57,7 +57,7 @@ export interface RunReportResult {
   /** The same list joined with newlines — what a human would see. */
   output: string;
   /**
-   * S-4: client-formatted rendering in the requested `--format`. When
+   * client-formatted rendering in the requested `--format`. When
    * `format` is omitted (or 'raw'), equals `output`. When 'tsv' or
    * 'csv', this is the column-extracted form and `output` keeps the
    * raw list verbatim for callers who want both.
@@ -137,7 +137,7 @@ export async function runReport(
     });
   }
 
-  // S-4: validate --param shape and forward to SAP.
+  // validate --param shape and forward to SAP.
   const paramList = normaliseParams(opts.params);
   const format = opts.format ?? 'raw';
   if (format !== 'raw' && format !== 'tsv' && format !== 'csv') {
@@ -274,7 +274,7 @@ function escapeCsvCell(value: string): string {
 
 /** Human-readable rendering: the captured list, then a one-line summary. */
 export function formatRunReportHuman(result: RunReportResult): string {
-  // Defensive: `formatted` and `format` are added in 0.2.9 (S-4). Older
+  // Defensive: `formatted` and `format` are added in 0.2.9. Older
   // tests and partial mocks may pass objects without them; treat the
   // missing fields as 'raw' / output.
   const format = (result as { format?: string }).format ?? 'raw';

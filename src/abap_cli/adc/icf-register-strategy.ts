@@ -1,7 +1,7 @@
 import type { AdtClientWrapper } from '../clients/adt-client.js';
 import type { RuntimeProbeResult } from './runtime-probe.js';
 
-/** 034: Spec for an HTTP service registration request. Concrete strategy
+/** Spec for an HTTP service registration request. Concrete strategy
  *  implementations (on-prem `cl_icf_tree`, BTP SWB, Cockpit fallback) map
  *  this common shape into their own API call. */
 export interface IcfServiceSpec {
@@ -36,7 +36,7 @@ export interface IcfRegisterOutcome {
   error?: { code: string; message: string };
 }
 
-/** 034: contract for runtime-branched HTTP service registration. Each
+/** contract for runtime-branched HTTP service registration. Each
  *  strategy owns exactly one mutation shape (cl_icf_tree vs SWB vs hint).
  *  Registry maps runtime → strategy; selectIcfStrategy is the only public
  *  dispatch path. */

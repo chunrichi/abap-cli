@@ -1,12 +1,12 @@
 /**
- * T3.5 — DDLS acds parser covers all 11 sourceType values.
- * Spec 036 + T3.5: extend coverage from 5 to 11 forms (tableEntity,
+ * — DDLS acds parser covers all 11 sourceType values.
+ * +: extend coverage from 5 to 11 forms (tableEntity
  * abstractEntity, customEntity, hierarchy, externalEntity, ddicBasedView).
  */
 import { describe, it, expect } from 'vitest';
 import { parseAcds } from '../../src/abap_cli/formats/ddls/acds.js';
 
-describe('parseAcds (T3.5 — 11 sourceTypes)', () => {
+describe('parseAcds (11 sourceTypes)', () => {
   it.each([
     ['viewEntity', 'define view entity ZMY_VIEW as select from ztable { key id as Id }'],
     ['viewEntityExtend', 'define view entity ZMY_EXTEND extend ZMY_VIEW with { field1 : abap.char(10) }'],

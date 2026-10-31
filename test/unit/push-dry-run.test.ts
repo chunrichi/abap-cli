@@ -13,7 +13,7 @@ function mockClient(): AdtClientWrapper {
   } as unknown as AdtClientWrapper;
 }
 
-describe('push dry-run ', () => {
+describe('push dry-run', () => {
   it('pushObject with dryRun makes zero mutating calls and records stages', async () => {
     const client = mockClient();
     const stages: string[] = [];
@@ -35,7 +35,7 @@ describe('push dry-run ', () => {
     expect(stages).toContain('unlock');
   });
 
-  it('pushObject without dryRun still calls lock()', async () => {
+  it('pushObject without dryRun still calls lock', async () => {
     const client = mockClient();
     // lock() returns an object with LOCK_HANDLE; we mock that here
     (client.lock as ReturnType<typeof vi.fn>).mockResolvedValue({ LOCK_HANDLE: 'h1' });
@@ -53,7 +53,7 @@ describe('push dry-run ', () => {
     expect(stages).toContain('unlock');
   });
 
-  it('a failed unlock surfaces as UNLOCK_WARNING via onWarning, not an error (US-5)', async () => {
+  it('a failed unlock surfaces as UNLOCK_WARNING via onWarning, not an error', async () => {
     const client = mockClient();
     (client.lock as ReturnType<typeof vi.fn>).mockResolvedValue({ LOCK_HANDLE: 'h1' });
     (client.setObjectSource as ReturnType<typeof vi.fn>).mockResolvedValue({});
@@ -71,7 +71,7 @@ describe('push dry-run ', () => {
     expect(warnings[0]).toMatchObject({ code: 'UNLOCK_WARNING', details: { unlock: 'failed' } });
   });
 
-  // ----- T2.4 stage-order assertion -----
+  // ----- stage-order assertion -----
 
   it('records all stages in lock → write → unlock → activate order (full push, no separate check)', async () => {
     const client = mockClient();

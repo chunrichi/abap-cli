@@ -94,7 +94,7 @@ export async function runCheck(
     : undefined;
 
   const failed = outIssues.some((i) => i.severity === 'error' || (opts.strict && i.severity === 'warning'));
-  // Feedback §6: `check syntax` passing while `push` fails activation is not a
+  // Feedback: `check syntax` passing while `push` fails activation is not a
   // bug (activation runs generation steps the syntax check does not), but the
   // CLI never said so. State the scope explicitly instead of leaving the user to
   // infer it from two contradicting verdicts.

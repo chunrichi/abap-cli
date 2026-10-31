@@ -45,7 +45,7 @@ describe('config/paths.ts — home injection', () => {
     );
   });
 
-  it('defaults to os.homedir() when home is not passed', () => {
+  it('defaults to os.homedir when home is not passed', () => {
     const realHome = os.homedir();
     expect(userConfigDir()).toBe(path.join(realHome, USER_CONFIG_DIR_NAME));
     expect(userConfigPath()).toBe(path.join(realHome, USER_CONFIG_DIR_NAME, USER_CONFIG_FILE_NAME));

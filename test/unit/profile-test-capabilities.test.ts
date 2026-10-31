@@ -1,5 +1,5 @@
 /**
- * Spec 036 T036-007: profile test must expose `data.capabilities.{ttyp,msag,ddls}`
+ * profile test must expose `data.capabilities.{ttyp,msag,ddls}`
  * + `data.ddlSourceSupported`. This file complements profile-test-four-layer
  * by asserting the *new* shape fields; we mock `probeSystem` to return both
  * the four-layer payload and the capabilities snapshot.

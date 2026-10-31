@@ -6,10 +6,10 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 /**
- * P0.2 — command-boundary error contract enforcement.
+ * — command-boundary error contract enforcement.
  *
  * The CLI promises that every error reaching the user carries a stable
- * `{ status, error: { code, category, message, ... } }` shape (contract §1.2).
+ * `{ status, error: { code, category, message... } }` shape.
  * If a command path throws a raw `Error` (or any non-CliError value) the
  * renderer falls back to `UNKNOWN` (exit 1) and the user loses the
  * actionable `nextSteps` / `example` hints.
@@ -76,7 +76,7 @@ function findRawErrorThrows(file: string, source: string): RawErrorViolation[] {
   return violations;
 }
 
-describe('P0.2 — command boundary throws must use CliError (lark-style lint)', () => {
+describe('command boundary throws must use CliError (lark-style lint)', () => {
   it('every throw new <Error> in command boundaries is a CliError (or allow-listed)', () => {
     const all: RawErrorViolation[] = [];
     for (const { file, abs } of listBoundaryFiles()) {

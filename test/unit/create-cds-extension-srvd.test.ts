@@ -1,5 +1,5 @@
 /**
- * Phase 4 — DCLS / DDLX / DDLA / SRVD create handlers + requiresFile fail-fast.
+ * — DCLS / DDLX / DDLA / SRVD create handlers + requiresFile fail-fast.
  *
  * Regression: docs and SKILL.md marketed these four types as
  * `create: ✅ --file`; the previous dispatcher fell through to the typed

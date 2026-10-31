@@ -1,5 +1,5 @@
 /**
- * Spec 036 US2: TTYP local-file ↔ wire-format mapping.
+ * TTYP local-file ↔ wire-format mapping.
  *
  * Local file: `*.ttyp.json` (AFF nested — `formatVersion / header /
  * accessType / lineType / keyDefinition? / rows?`), plus an optional
@@ -9,7 +9,7 @@
  * (key → string). Mapped onto our local shape via `wireToLocal()`, then
  * schema-validated through the shared AFF artifact contract (`artifact.ts`).
  *
- * Spec 036 Q1: upstream SAP `type-v1.json` is *type-pool*, not table-type —
+ * Upstream SAP `type-v1.json` is *type-pool*, not table-type
  * our `ttyp-v1.json` is a deliberate handcrafted mirror, header-annotated
  * in `tmp/abap-file-formats/file-formats/ttyp/ttyp-v1.json`.
  */

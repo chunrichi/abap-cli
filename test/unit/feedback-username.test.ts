@@ -61,7 +61,7 @@ describe('feedback username resolution (F-06)', () => {
     expect(normalizeFeedback(base).payload.username).toBe('posix-user');
   });
 
-  it('falls back to os.userInfo().username', () => {
+  it('falls back to os.userInfo.username', () => {
     h.userInfoThrows.value = false;
     expect(normalizeFeedback(base).payload.username).toBe('os-user');
   });

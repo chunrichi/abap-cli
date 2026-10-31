@@ -1,5 +1,5 @@
 /**
- * T3.3 — `runPullBdef` end-to-end: BDEF pull writes
+ * — `runPullBdef` end-to-end: BDEF pull writes
  *   <root>/bdef/<lower>/<lower>.bdef.json
  *   <root>/bdef/<lower>/<lower>.bdef.abdl
  */
@@ -48,7 +48,7 @@ async function load() {
   return import('../../src/abap_cli/flows/edit/pull-bdef.js');
 }
 
-describe('runPullBdef (T3.3)', () => {
+describe('runPullBdef', () => {
   it('writes the .bdef.json + .bdef.abdl pair', async () => {
     const { runPullBdef } = await load();
     const result = await runPullBdef('zrb_travel_bdef', { rootDir: root });

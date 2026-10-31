@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { registerRunCommand } from '../../src/abap_cli/commands/run.js';
 import { makeProgram } from './cli-helper.js';
 
-// US4 / FR-002 — --help lists every new option and the 015 error codes.
+// / — --help lists every new option and the error codes.
 // Commander writes help to process.stdout.write (not console.log), so capture
 // that stream too.
 

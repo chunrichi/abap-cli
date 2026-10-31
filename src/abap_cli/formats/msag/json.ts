@@ -1,5 +1,5 @@
 /**
- * Spec 036 US3: MSAG (message class) local ↔ wire mapping.
+ * MSAG (message class) local ↔ wire mapping.
  *
  * Local shape matches the upstream `msag-v1.json` AFF schema (already
  * mirrored under `src/abap_cli/schema/msag-v1.json`):

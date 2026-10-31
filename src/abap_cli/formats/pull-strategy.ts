@@ -64,14 +64,14 @@ export interface PullStrategy {
  * objectStructure + source-parts layout: one <name>.<type>.json metadata
  * file plus one source per include part.
  *
- * 032 US13: PROG/I (include program) sub-route. The single source part on
+ * PROG/I (include program) sub-route. The single source part on
  * a PROG/I is a top-level include (no `main`), so its subtype is renamed
  * `main → include` to land at `<name>.prog.include.abap` (abap-file-format
  * PROG subtype). The `metadata.programType` (`'I'` raw / `'include'` enum)
  * already maps to `generalInformation.programType: 'include'` via
  * `renderObjectMetadataJson` — that's the JSON marker for INCLUDE.
  *
- * T3.1 / T3.3 / T3.4: source-bearing types use a non-`.abap` extension
+ * / /: source-bearing types use a non-`.abap` extension
  * (DDLS / DCLS / DDLX / DDLA / SRVD → `.acds`, BDEF → `.abdl`). The
  * extension is looked up via `sourceExtensionForObjectType(object.type)`
  * rather than hard-coded.
@@ -87,7 +87,7 @@ function sourceObjectStrategy(): PullStrategy {
       const parts = opts.includeAllParts
         ? allParts
         : allParts.filter((p) => (opts.includeTests ? true : p.subtype !== 'testclasses'));
-      // 032 US13: PROG/I — remap `main` subtype to `include` so the file
+      // PROG/I — remap `main` subtype to `include` so the file
       // lands at `<name>.prog.include.abap`. Object-detection reuses the
       // primary-type split from `object.type` (PROG/I splits to PROG).
       const isProgInclude = object.type.split('/')[0]!.toUpperCase() === 'PROG'
@@ -102,7 +102,7 @@ function sourceObjectStrategy(): PullStrategy {
         {
           filename: buildFilename(object.name, object.type, undefined, '.json'),
           content: async () => {
-            // Phase 3: route metadata through `renderSourceMetadata` so
+            // route metadata through `renderSourceMetadata` so
             // SRVD nests sourceOrigin/sourceType under generalInformation
             // (per srvd-v1.json) instead of leaking them as top-level keys.
             const enriched = renderSourceMetadata(primary, metadata, object.type);
@@ -121,7 +121,7 @@ function sourceObjectStrategy(): PullStrategy {
 }
 
 /**
- * T3.2: pull strategy for objects that have no source code (SRVB).
+ * pull strategy for objects that have no source code (SRVB).
  * Issues one objectStructure call to get header metadata, then a
  * second call (`client.serviceBinding`) to fetch the binding payload
  * (services / binding type / category / version) that is *not* in
@@ -148,11 +148,11 @@ function metadataOnlyStrategy(): PullStrategy {
 
 const SOURCE_OBJECT_TYPES = new Set([
   'CLAS', 'PROG', 'INTF',
-  // T3.1 / T3.3 / T3.4: CDS-source-bearing types (acds) + BDEF (.abdl).
+  // / /: CDS-source-bearing types (acds) + BDEF (.abdl).
   'DDLS', 'DCLS', 'DDLX', 'DDLA', 'BDEF', 'SRVD',
 ]);
 const METADATA_ONLY_OBJECT_TYPES = new Set([
-  // T3.2: service bindings are managed in SAP GUI, not pushed via CLI.
+  // service bindings are managed in SAP GUI, not pushed via CLI.
   'SRVB',
 ]);
 
@@ -227,7 +227,7 @@ export function renderSourceMetadata(
 }
 
 /**
- * T3.2: project the abap-adt-api `ServiceBinding` payload into the
+ * project the abap-adt-api `ServiceBinding` payload into the
  * AFF `<name>.srvb.json` shape (matches srvb-v1.json):
  *   - `bindingType` / `bindingTypeCategory` / `services[]`
  *   - `formatVersion` + `header` (description / originalLanguage)

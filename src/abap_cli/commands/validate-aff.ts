@@ -46,9 +46,9 @@ export const SCHEMA: CommandSchema = {
   ],
   globalOptions: ['--json', '--pretty-json'],
   examples: [
-    { description: 'Validate a single fixture', command: 'abap validate:aff test/fixtures/zmy_basic.tabl.json' },
-    { description: 'Validate all fixtures', command: 'abap validate:aff test/fixtures/' },
-    { description: 'Validate a wire payload directory', command: 'abap validate:aff --wire tmp/s4h/wire/' },
+    { description: 'Validate a single AFF file', command: 'abap validate:aff src/zmy_basic.tabl.json' },
+    { description: 'Validate every AFF file under a directory', command: 'abap validate:aff src/' },
+    { description: 'Validate a wire payload directory', command: 'abap validate:aff src/zt_x.tabl.json --wire path/to/wire' },
   ],
   errors: [
     { code: 'AFF_SCHEMA_MISSING', category: 'VALIDATION_ERROR', exitCode: 7 },

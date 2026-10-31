@@ -132,20 +132,20 @@ export const COMMAND_SPECS: LazyCommandSpec[] = [
     load: () => import('../commands/dumps.js').then((m) => ({ register: m.registerDumpsCommand })),
   },
   {
-    // S-5: static CLI ↔ TADIR ↔ DDIC tabclass mapping (pure local).
+    // static CLI ↔ TADIR ↔ DDIC tabclass mapping (pure local).
     name: 'types',
     scope: 'local',
     description: 'Print the CLI type ↔ TADIR / DDIC mapping (no SAP call)',
     load: () => import('../commands/types.js').then((m) => ({ register: m.registerTypesCommand })),
   },
   {
-    // P3.3: feedback command
+    // feedback command
     name: 'feedback',
     description: 'Send CLI feedback to upstream tracker',
     load: () => import('../commands/feedback.js').then((m) => ({ register: m.registerFeedbackCommand })),
   },
   {
-    // P3.3: report-stuck command
+    // report-stuck command
     name: 'report-stuck',
     description: 'Write a stuck-operation report for offline triage',
     load: () => import('../commands/report-stuck.js').then((m) => ({ register: m.registerReportStuckCommand })),
@@ -164,7 +164,7 @@ export const COMMAND_SPECS: LazyCommandSpec[] = [
     load: () => import('../commands/validate-aff.js').then((m) => ({ register: m.registerValidateAffCommand })),
   },
   {
-    // 034: session reuse inspector — read-only, no SAP traffic.
+    // session reuse inspector — read-only, no SAP traffic.
     name: 'session',
     description: 'Inspect / manage session cookie reuse state',
     load: () => import('../commands/session.js').then((m) => ({ register: m.registerSessionCommand })),

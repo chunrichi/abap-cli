@@ -5,7 +5,7 @@
  * Pulls one object's selected parts into local files; the coordinator
  * (pull.ts) invokes this for both single-object and package-pull flows.
  *
- * T2.6: file writes funnel through {@link writePullFile}, which:
+ * file writes funnel through {@link writePullFile}, which
  *   - pre-validates `.json` metadata against the matching AFF schema
  *     (so callers cannot write a fixture that violates abap-file-format);
  *   - pre-validates `.tabl.ddic` DDL via `parseTablDdic` (rejects malformed
@@ -49,7 +49,7 @@ export interface WritePullFileResult {
 }
 
 /**
- * T2.6: generic pull-file writer.
+ * generic pull-file writer.
  *
  * Handles three concerns:
  *  1. Pre-write validation:
@@ -151,7 +151,7 @@ async function preValidateMetadata(absPath: string, content: string, outPath: st
  * The function is intentionally narrow: it only matches the unambiguous
  * single-token extensions used by the `sourceObjectStrategy()` family and
  * the FUGR strategy (`.fugr.json`, `.reps.json`, `.func.json`). New types
- * added in Phase 3 should register their mapping here.
+ * added in should register their mapping here.
  */
 function affTypeFromFilename(fileName: string): string | undefined {
   // FUGR: name.fugr.json / name.<include>.reps.json / name.<fm>.func.json
@@ -163,7 +163,7 @@ function affTypeFromFilename(fileName: string): string | undefined {
   if (!m) return undefined;
   const t = m[1]!.toUpperCase();
   // Only validate the canonical AFF types whose schemas the project vendors.
-  // T3.x — Phase 3 added SRVD / BDEF / DCLS / DDLX / DDLA alongside DDLS
+  // T3.x — added SRVD / BDEF / DCLS / DDLX / DDLA alongside DDLS
   // (SRVB is metadata-only, validated inline at the strategy layer).
   const KNOWN = new Set([
     'CLAS', 'INTF', 'PROG', 'DDLS', 'TABL', 'STRU', 'DOMA', 'DTEL', 'TTYP', 'MSAG',
@@ -181,7 +181,7 @@ export async function pullObject(
     skipExisting?: boolean;
     includeTests?: boolean;
     includeAllParts?: boolean;
-    /** PR4: when pulling a function module (FUGR/FF) by name, the resolved
+    /** when pulling a function module (FUGR/FF) by name, the resolved
      *  object is rewritten to the parent function group; this preserves
      *  the original FM so the fugr strategy scopes its output to that
      *  one module rather than dumping every FM in the group. */

@@ -1,6 +1,6 @@
 CLASS zcl_abap_vibe_nrob_format DEFINITION PUBLIC FINAL CREATE PUBLIC.
   PUBLIC SECTION.
-    " PR5: the ICF dispatcher serialises this structure with
+    " the ICF dispatcher serialises this structure with
     " /ui2/cl_json=>serialize( pretty_name = camel_case ), so snake_case
     " component names below become the camelCase JSON keys the CLI reads
     " (formats/nrob/json.ts#wireToLocal). No JSON string building here.
@@ -87,7 +87,7 @@ CLASS zcl_abap_vibe_nrob_format IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD read_nrob.
-    " PR5: NROB (number range object) read. There is no DDIF_NROB_GET in NW 7.93
+    " NROB (number range object) read. There is no DDIF_NROB_GET in NW 7.93
     " (NROB is custom, not in the DDIF range), so the read goes via plain
     " SELECT on TNRO + TNROT. NRIV carries the actual interval data which the
     " AFF `nrob-v1.json` schema does NOT expose, so this method does not

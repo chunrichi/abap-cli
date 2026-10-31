@@ -1,5 +1,5 @@
 /**
- * Spec 036 T036-018: TTYP wire ↔ local byte-level zero-diff.
+ * TTYP wire ↔ local byte-level zero-diff.
  *
  * Three rounds:
  *   1. Standard table type (rowType reference).
@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import { ttypArtifact } from '../../src/abap_cli/formats/ttyp/json.js';
 
-describe('TTYP round-trip (036)', () => {
+describe('TTYP round-trip', () => {
   it('standard table type round-trips', () => {
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <ttyp:tableType xmlns:ttyp="http://www.sap.com/adt/ddic/tabletypes">

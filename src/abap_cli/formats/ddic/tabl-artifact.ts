@@ -15,7 +15,7 @@ export interface TablArtifactPaths {
   settings: string;
 }
 
-/** 024: match TABL (.tabl.{json,ddic,settings.json}) and STRU (.stru.{json,ddic,settings.json}). */
+/** match TABL (.tabl.{json,ddic,settings.json}) and STRU (.stru.{json,ddic,settings.json}). */
 export function isTablArtifactFile(filePath: string): boolean {
   return /\.(tabl|stru)(?:\.settings)?\.(?:json|ddic)$/i.test(path.basename(filePath));
 }
@@ -54,11 +54,11 @@ export async function readTablArtifact(filePath: string): Promise<TablArtifact |
   const generalInformation = settings?.generalInformation && typeof settings.generalInformation === 'object'
     ? settings.generalInformation as Record<string, unknown>
     : {};
-  // US6: filter the synthetic @ClientHandling.type / @AbapCatalog.* sentinel fields
+  // filter the synthetic @ClientHandling.type / @AbapCatalog.* sentinel fields
   // — they are stash markers, not real table fields.
   const realFields = parsed.fields.filter(f => !f.fieldName.startsWith('@'));
   const fields = realFields.filter(field => !(parsed.type === 'TABL' && ['CLIENT', 'MANDT'].includes(field.fieldName.toUpperCase())));
-  // US6: explicit @ClientHandling.type beats field heuristic — `CLIENT_DEPENDENT` /
+  // explicit @ClientHandling.type beats field heuristic — `CLIENT_DEPENDENT`
   // `CLIENT_INDEPENDENT` map to clientDependent. The legacy fallback (presence of a
   // CLIENT/MANDT field) keeps on-prem parity.
   const clientHandlingField = realFields.find(f => f.fieldName === '@ClientHandling.type');
@@ -69,10 +69,10 @@ export async function readTablArtifact(filePath: string): Promise<TablArtifact |
       && realFields.some(field => ['CLIENT', 'MANDT'].includes(field.fieldName.toUpperCase())))
   );
 
-// 033 + P2.3: AFF canonical — settings live under `generalInformation.*`
+// +: AFF canonical — settings live under `generalInformation.*`
   // and the table-level deliveryClass / dataClass / sizeCategory / clientDependent
   // are nested there too. `formatVersion` lives at the top level.
-  // P2.3: TABT buffering + dbSpecificSettings also belong at the top level
+  // TABT buffering + dbSpecificSettings also belong at the top level
   // (per `schema/tabt-v1.json` + ABAP zcl_abap_vibe_tabl_format's
   // build_settings_json output). Merge them into generalInformation so the
   // localToWire<TABL> path forwards a single nested object to SAP's
@@ -142,7 +142,7 @@ export function parseTablDdic(source: string): ParsedTablDdic {
     }
     const clientHandlingMatch = line.match(/^@ClientHandling\.type\s*:\s*#([A-Za-z0-9_]+)\s*$/i);
     if (clientHandlingMatch) {
-      // US6: ClientHandling.type drives clientDependent at the artifact layer.
+      // ClientHandling.type drives clientDependent at the artifact layer.
       // Stash on a sentinel field so the caller (readTablArtifact) can pick it up.
       pendingField = { fieldName: '@ClientHandling.type', dataType: clientHandlingMatch[1]!.toUpperCase() };
       continue;
@@ -221,7 +221,7 @@ export function parseTablDdic(source: string): ParsedTablDdic {
     let fieldType = fieldMatch[3]!.trim();
     const notNull = /\s+not\s+null$/i.test(fieldType);
     if (notNull) fieldType = fieldType.replace(/\s+not\s+null$/i, '').trim();
-    // Inline foreign-key clause on the same line, e.g. `abap.char(3) with foreign key [dependent] check t005`.
+    // Inline foreign-key clause on the same line, e.g. `abap.char(3) with foreign key [dependent] check `.
     const inlineFkMatch = fieldType.match(/\s+with\s+foreign\s+key(?:\s+\[[^\]]+\])?\s+check\s+([\w/#]+)\s*$/i);
     if (inlineFkMatch) fieldType = fieldType.replace(inlineFkMatch[0], '').trim();
     const type = parseDdlType(fieldType);

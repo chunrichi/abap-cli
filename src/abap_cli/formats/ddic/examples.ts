@@ -5,7 +5,7 @@
 import type { DdicSupportedType } from './types.js';
 
 /**
- * 014 + BUG-1: return a minimal **abap-file-format** example for a given DDIC
+ * + BUG-1: return a minimal **abap-file-format** example for a given DDIC
  * type. For TABL/STRU this is the canonical three-piece layout
  * (`<name>.tabl.json` + `<name>.tabl.ddic` + optional `<name>.tabl.settings.json`).
  * For DOMA/DTEL the legacy single-file wire-flat shape is the only one.

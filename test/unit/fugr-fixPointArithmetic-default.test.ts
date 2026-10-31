@@ -71,7 +71,7 @@ beforeEach(() => {
   fs.mkdirSync(path.join(cwd, 'src'), { recursive: true });
 });
 
-describe('032 US4: FUGR fixPointArithmetic fallback', () => {
+describe('032: FUGR fixPointArithmetic fallback', () => {
   it('emits true when abapsource:fixPointArithmetic="true" is present', async () => {
     fixtureWithMeta({ 'abapsource:fixPointArithmetic': true });
     const program = makeProgram();

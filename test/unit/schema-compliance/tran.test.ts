@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { expectSchemaPass } from './_helpers.js';
 import { validateAff } from '../../../src/abap_cli/aff/schema-validator.js';
 
-describe('schema-compliance / tran (T033-016)', () => {
+describe('schema-compliance / tran', () => {
   it('upstream example z_aff_example_tran.tran.json passes', async () => {
     await expectSchemaPass('z_aff_example_tran.tran.json');
   });

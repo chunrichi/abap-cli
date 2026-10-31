@@ -11,7 +11,7 @@ const five = [
   'zdmy_conv_exit.doma.json',
 ];
 
-describe('schema-compliance / doma (T033-020)', () => {
+describe('schema-compliance / doma', () => {
   for (const rel of five) {
     it(`${rel} passes AFF schema`, async () => {
       await expectSchemaPass(rel, 'DOMA');

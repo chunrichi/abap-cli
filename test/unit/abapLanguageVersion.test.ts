@@ -24,8 +24,8 @@ describe('032 P0: abapLanguageVersion pull', () => {
     expect(doc.header).not.toHaveProperty('abapLanguageVersion');
   });
 
-  it('T1.2: does NOT render abapLanguageVersion for PROG (CLAS/INTF only)', () => {
-    // 0.3.0 (T1.2) spec change: abapLanguageVersion is rendered only for
+  it('does NOT render abapLanguageVersion for PROG (CLAS/INTF only)', () => {
+    // 0.3.0 change: abapLanguageVersion is rendered only for
     // CLAS / INTF metadata. PROG fixtures must not carry it; SAP would
     // reject the file.
     const meta: ObjectMetadata = {

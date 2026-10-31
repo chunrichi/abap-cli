@@ -36,7 +36,7 @@ metadata:
 ├── 业务码 → tcode <code>
 ├── 推送前对账 → status
 ├── 单文件差异 → diff <obj>
-└── ST22 dump 调查 → dumps [--limit 20] [--user <name>]   # 0.2.4+；只读
+└── ST22 dump 调查 → dumps [--limit 20] [--user <name>]   # 只读
 ```
 
 ## 错误恢复（本 skill 专属错误码）
@@ -47,10 +47,9 @@ metadata:
 | `AUTH_ERROR` (exit 5) | 用户无 `S_TCODE` / `S_ADT_RES` 等权限；跳 `abap-cli-setup` 跑 `profile test` |
 | `TCODE_NOT_FOUND` (exit 8) | 业务码未在 TSTC；校对拼写 |
 | `TCODE_NOT_AUTHORIZED` (exit 5) | 用户无 `S_TCODE`；换有权限用户 |
-| `INVALID_ARGUMENT` (exit 2) | 看 `error.nextSteps` / `error.references` |
+| `INVALID_ARGUMENT` (exit 2) | 参数不合法（如 `dumps --limit` 不在 [1, 100]）；看 `error.nextSteps` / `error.references` |
 | `USAGE` (exit 2) | 缺必填参数；看 `error.nextSteps` |
 | `SAP_ERROR` (exit 6) | `data.objects[]` 看哪个失败；ICF 端未知错码时跳 `abap-cli-setup` 跑 `deploy status` |
-| `INVALID_ARGUMENT` (exit 2) | `--limit` 不在 [1, 100] |
 
 ## 通用规则
 

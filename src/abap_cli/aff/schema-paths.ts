@@ -2,7 +2,7 @@
  * AFF schema path resolver.
  *
  * Owns the mapping from canonical abap-cli type code → schema file path.
- * STRU reuses `tabl-v1.json` (single source of truth: spec 018 / spec 033).
+ * STRU reuses `tabl-v1.json`.
  *
  * Schemas are searched in this priority order:
  *   1. `ABAP_CLI_AFF_MIRROR` environment variable (explicit dev override).
@@ -31,27 +31,27 @@ const SCHEMA_FILE: Record<string, string> = {
   PROG: 'prog-v1.json',
   FUGR: 'fugr-v1.json',
   TABL: 'tabl-v1.json',
-  // STRU reuses TABL's schema (spec 018 US1 / spec 033 US5).
+  // STRU reuses TABL's schema.
   STRU: 'tabl-v1.json',
   // TABL/STRU `settings.json` companion files use the technical-settings
   // schema (the main `tabl-v1.json` only declares formatVersion + header).
   TABT: 'tabt-v1.json',
   DOMA: 'doma-v1.json',
   DTEL: 'dtel-v1.json',
-  // PR5: ENQU (lock object) + NROB (number range object) schemas vendored
+  // ENQU (lock object) + NROB (number range object) schemas vendored
   // from the abap-file-format mirror.
   ENQU: 'enqu-v1.json',
   NROB: 'nrob-v1.json',
   HTTP: 'http-v1.json',
   TRAN: 'tran-v1.json',
-  // 036-ttyp-msag-ddls: three new dual-channel types.
+  // three new dual-channel types.
   TTYP: 'ttyp-v1.json',   // handcrafted (upstream has type-pool only)
   MSAG: 'msag-v1.json',
   DDLS: 'ddls-v1.json',
-  // T1.5 FUGR pull: REPS + FUNC companion schemas.
+  // FUGR pull: REPS + FUNC companion schemas.
   REPS: 'reps-v1.json',
   FUNC: 'func-v1.json',
-  // T3.2 / T3.1 / T3.3 / T3.4 — Phase 3 type extensions (SRVB metadata-only;
+  // type extensions (SRVB metadata-only
   // SRVD / BDEF / DCLS / DDLX / DDLA all source-bearing).
   SRVB: 'srvb-v1.json',
   SRVD: 'srvd-v1.json',

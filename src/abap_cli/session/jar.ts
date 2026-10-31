@@ -6,7 +6,7 @@
  * invocations of any command can skip the `ADTClient.login()` round-trip
  * and just inject the headers.
  *
- * Layout (T034-003):
+ * Layout
  *   nonce (12 bytes) | ciphertext (N bytes) | auth tag (16 bytes)
  *
  * The whole payload is opaque bytes; the structured shape lives in the

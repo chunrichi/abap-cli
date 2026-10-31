@@ -54,25 +54,25 @@ describe('schema-paths priority chain', () => {
     );
   });
 
-  it('affSupportedTypes matches the router table (16 + 6 Phase 3 + 2 PR5 types)', () => {
+  it('affSupportedTypes matches the router table (16 + 6 + 2 types)', () => {
     const types = affSupportedTypes();
     expect(types).toEqual(
       expect.arrayContaining([
         'CLAS', 'INTF', 'PROG', 'FUGR', 'TABL', 'STRU', 'TABT', 'DOMA', 'DTEL', 'HTTP', 'TRAN',
-        // 036: channel-routed types.
+        // channel-routed types.
         'TTYP', 'MSAG', 'DDLS',
-        // T1.5: FUGR companion schemas for .reps.json and .func.json files.
+        // FUGR companion schemas for.reps.json and.func.json files.
         'REPS', 'FUNC',
-        // T3.x — Phase 3 type extensions.
+        // T3.x — type extensions.
         'SRVB', 'SRVD', 'BDEF', 'DCLS', 'DDLX', 'DDLA',
-        // PR5 — lock object + number range object.
+        // — lock object + number range object.
         'ENQU', 'NROB',
       ]),
     );
     // TABT is exposed as a schema key for the .settings.json override path.
-    // REPS + FUNC added in T1.5 (FUGR pull) — 16 pre-Phase-3.
-    // Phase 3 added SRVB / SRVD / BDEF / DCLS / DDLX / DDLA = 6 more = 22 total.
-    // PR5 added ENQU / NROB = 24 total.
+    // REPS + FUNC added in the FUGR pull — 16 pre-Phase-3.
+    // added SRVB / SRVD / BDEF / DCLS / DDLX / DDLA = 6 more = 22 total.
+    // added ENQU / NROB = 24 total.
     expect(types).toHaveLength(24);
   });
 

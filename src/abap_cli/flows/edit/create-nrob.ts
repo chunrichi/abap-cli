@@ -1,5 +1,5 @@
 /**
- * PR5 (B1): NROB (number range object) create flow via ICF `/ddic/nrob` route.
+ * (B1): NROB (number range object) create flow via ICF `/ddic/nrob` route.
  *
  * NROB has no abap-adt-api endpoint, so this flow always goes through the
  * self-built ICF service. The wire body is a JSON document that mirrors the
