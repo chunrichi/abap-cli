@@ -4,12 +4,14 @@ title: SAP 开发任务覆盖率矩阵
 description: abap-cli 当前能 / 不能完成的 SAP 开发任务全景 — 用于未来 spec 选题 + 用户预期管理
 tags: [abap-cli, coverage, roadmap, scope]
 created at: 2026-09-01 00:00:00
-changed at: 2026-09-18 22:05:00
+changed at: 2026-10-31 14:45:00
 ---
 
 # SAP 开发任务覆盖率矩阵
 
-abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的开发工作**。本页是一份**诚实快照**——按 SAP 开发任务分类，给出当前覆盖度与缺口。
+abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的开发工作**。本页是一份**诚实快照**——按 SAP 开发任务分类，给出当前覆盖度与缺口。对象类型补充的排序与取舍见 [roadmap](roadmap.md)。
+
+> 当前规模：**29 个顶层命令**、**21 个对象类型**（19 类可 create、21 类可 pull、20 类有 push 入口）、**6 个 skill + 1 个 agent**。基线：`v1.0.0` + 后续 Unreleased 改动。
 
 ## 评分图例
 
@@ -29,36 +31,41 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | 创建 OO 类（CLAS） | `create CLAS` | ✅ | 含 template 骨架 |
 | 修改 OO 类（CLAS） | `pull / push` | ✅ | lock → write → activate 闭环 |
 | 创建接口（INTF） | `create INTF` | ✅ | |
-| 创建报表程序（PROG） | `create PROG` | ✅ | 4 种 programType 都有 |
-| 创建函数组（FUGR） | `create FUGR` | ✅ | 多文件布局 |
+| 创建报表程序（PROG） | `create PROG` | ✅ | 多种 programType + 模板 |
+| 创建函数组（FUGR） | `create FUGR` | ✅ | 多文件布局；`--func` 建 FM |
 | 创建/修改 DDIC 域（DOMA） | `create / pull / push DOMA` | ✅ | ICF |
 | 创建/修改 DDIC 数据元素（DTEL） | `create / pull / push DTEL` | ✅ | ICF |
-| 创建/修改透明表（TABL） | `create / pull / push TABL` | ✅ | 三件套 + ICF |
+| 创建/修改透明表（TABL） | `create / pull / push TABL` | ✅ | 三件套 + ICF；AFF 不覆盖索引 |
 | 创建/修改结构（STRU） | `create / pull / push STRU` | ✅ | 三件套 + ICF |
-| 创建/修改 SICF 节点（HTTP） | `create / pull /push HTTP` | ✅ | ICF |
-| 创建/修改事务码（SE93 / TRAN） | `create / pull TRAN` | ✅ | ICF，5 种 transactionType |
-| Table Type（TTYP） | `create / pull / push TTYP` | ✅ | ADT 主通道；ECC EHP5/6 自动 ICF 兜底 |
-| Pool/Cluster Table | — | ❌ | 仅 TABL/STRU |
-| View（VIEW） | `select` 仅查 | ⚪ | 仅查询；不能创建 view |
+| 创建/修改锁对象（ENQU） | `create / pull / push ENQU` | ✅ | ICF；`create --file` |
+| 创建/修改编号范围对象（NROB） | `create / pull / push NROB` | ✅ | pull 主 ADT + ICF 兜底；`create --file` |
+| 创建/修改 SICF 节点（HTTP） | `create / pull / push HTTP` | ✅ | ICF |
+| 创建/修改事务码（SE93 / TRAN） | `create / pull TRAN` | 🟡 | 读通；**ABAP `/tran` 写端点仍返回 501，create/push 端到端不可用** |
+| Table Type（TTYP） | `create / pull / push TTYP` | ✅ | ADT 主通道；ECC 自动 ICF 兜底 |
+| 消息类（MSAG） | `create / pull / push MSAG` | ✅ | ADT 主通道；ECC 自动 ICF 兜底 |
 | CDS View（DDLS） | `create / pull / push DDLS` | ✅ | 仅 ADT；ECC 旧内核硬错 `DDLS_NOT_SUPPORTED_ON_ECC` |
-| CDS Table Function | — | ❌ | |
-| AMDP 类 | — | ❌ | |
-| Enhancement（ENHO / ENHS） | — | ❌ | |
-| BAdI 定义/实现 | — | ❌ | |
-| Package | `pull --package` 仅查 | ⚪ | 不能创建 package |
-| 文本元素（textpool） | `pull --textpool` | ✅ | 读可用；**写**受系统限制（无 ADT text-elements 写端点时 `TEXTPOOL_WRITE_UNSUPPORTED`，A4H 实测） |
-| 消息类（MSAG） | `create / pull / push MSAG` | ✅ | ADT 主通道；ECC EHP5/6 自动 ICF 兜底 |
-| Lock Object | — | ❌ | |
-| Search Help | — | ❌ | |
-| Authorization Object | — | ❌ | |
-| SAPscript / Smart Form | — | ❌ | |
-| Web Dynpro | — | ❌ | |
-| Adobe Form | — | ❌ | |
+| Service Definition（SRVD） | `create / pull / push SRVD` | ✅ | ADT；`create --file` |
+| Access Control（DCLS） | `create / pull / push DCLS` | ✅ | ADT；`create --file` |
+| Metadata Extension（DDLX） | `create / pull / push DDLX` | ✅ | ADT；`create --file` |
+| Annotation Definition（DDLA） | `create / pull / push DDLA` | ✅ | ADT；`create --file` |
+| Behavior Definition（BDEF） | `pull / push BDEF` | 🟡 | SAP 不接受 CLI 创建（无 ADT create 端点），只能 pull / push |
+| Service Binding（SRVB） | `pull SRVB` | ⚪ | metadata-only；binding 在 SAP GUI 管理 |
+| Pool/Cluster Table | — | ❌ | 仅 TABL/STRU |
+| View（VIEW） | `select` 仅查 | ⚪ | 仅查询已有视图；不能创建视图（候选补充类型，见 roadmap） |
+| Search Help（SHLP） | — | ❌ | 候选补充类型，见 roadmap |
+| Authorization Object / Field（AUTH / SUSO） | — | ❌ | 候选补充类型，见 roadmap |
+| Enhancement（ENHO / ENHS） | — | ❌ | 候选补充类型，见 roadmap |
+| BAdI 定义/实现 | — | ❌ | 可用 `where-used` 查引用 |
+| AMDP 类 / CDS Table Function | — | ❌ | |
+| Package（DEVC） | `pull --package` / `list` 仅查 | ⚪ | 不能创建 package；`transport create --package` 只指定已有包 |
+| 文本元素（textpool） | `pull --textpool` / `push *.texts.*.properties` | 🟡 | 读可用；写依赖系统 ADT text-elements 写端点，旧系统（如 A4H/ECC）走 ICF 写桩时返回 `TEXTPOOL_WRITE_UNSUPPORTED` |
+| XSLT / STRANS | — | ❌ | 候选补充类型，见 roadmap（`/version-source` 只读版本管理已含 XSLT） |
+| SAPscript / Smart Form / Adobe Form | — | ❌ | |
+| Web Dynpro / ITS / BSP | — | ❌ | |
 | IDoc / ALE 配置 | — | ❌ | |
 | Workflow | — | ❌ | |
-| XSLT（STRANS） | — | ❌ | |
 
-**覆盖率**：CRUD 主体（CLAS / INTF / PROG / FUGR / DOMA / DTEL / TABL / STRU / HTTP / TRAN）= **10/10** ✅；高级对象（CDS / AMDP / Enhancement / BAdI / IDoc / Form / Workflow）= **0/7** ❌。
+**覆盖率**：基础开发对象（CLAS / INTF / PROG / FUGR / DOMA / DTEL / TABL / STRU / ENQU / NROB / HTTP / TTYP / MSAG / DDLS / CDS-RAP 5 类）已形成完整 create/pull/push 闭环；高级/遗留对象（VIEW / SHLP / AUTH / ENHO-ENHS / BAdI / AMDP / forms / Web Dynpro / IDoc / Workflow / XSLT）= **0/11** ❌。
 
 ---
 
@@ -68,22 +75,23 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 |---|---|---|---|
 | 跑 OO 类（classrun） | `run <class>` | ✅ | 走 ADT /sap/bc/adt/oo/classrun |
 | 跑 PUBLIC STATIC 方法 | `run <class> --method` | ✅ | 走 ICF wrapper（需 `deploy`） |
+| **跑 ABAP Unit 测试** | `test <object>` | ✅ | ADT ABAP Unit `/sap/bc/adt/abapunit/testruns`；只输出汇总 + 失败项，`--strict` 让告警也失败 |
 | SELECT 表数据 | `select --table` | ✅ | 走 ICF /data/query；最大 10000 行 |
 | SELECT with WHERE / LIMIT / ORDER BY | `select --where --limit --order-by` | ✅ | 全功能 |
 | COUNT-only | `select --count-only` | ✅ | |
 | 翻页 OFFSET | `select --offset` | ✅ | 最大 offset 100000 |
+| 表字段清单 / 反查 | `fields` | ✅ | DD03L / DD02L；`--find` 反查 |
 | ST22 读 dumps | `dumps` | ✅ | 仅查询 |
 | 事务码解析 | `tcode` | ✅ | TSTC → TSTCT；ICF |
-| 单元测试运行 | — | ❌ | spec 候选；需要 ABAP Unit 集成 |
-| ATC 静态检查 | `check atc` | ✅ | 但 `--variant` 必须已存在 |
+| ATC 静态检查 | `check atc` | ✅ | `--variant` 必须已存在 |
 | SE16N 等价 | `select` | ✅ | |
 | SE16H（带 HINT） | — | ❌ | |
-| SE11（数据浏览器） | — | ❌ | |
+| SE11（数据浏览器） | — | ⚪ | 对象元数据走 `inspect`；DDIC 读写走 create/pull/push |
 | SM37（作业） | — | ❌ | |
 | ST05（SQL 跟踪） | — | ❌ | |
 | STA（运行时统计） | — | ❌ | |
 
-**覆盖率**：核心（classrun / select / dumps / tcode / atc）= **5/5** ✅；性能/调试（trace / job / SE16H）= **0/4** ❌。
+**覆盖率**：核心（classrun / ABAP Unit / select / fields / dumps / tcode / atc）= **7/7** ✅；性能/调试（trace / job / SE16H）= **0/3** ❌。
 
 ---
 
@@ -91,17 +99,17 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 
 | 任务 | 命令 | 覆盖 | 备注 |
 |---|---|---|---|
-| 列出 transport | `transport list` | ✅ | --mine / --all / --open |
-| 创建 transport | `transport create` | ✅ | --type workbench / customization |
+| 列出 transport | `transport list` | ✅ | 仅 `--open`（无 `--mine` / `--all`） |
+| 创建 transport | `transport create` | ✅ | `--type workbench / customization` |
 | 查看 transport 详情 | `transport show` | ✅ | 含嵌套任务 |
 | 解析 transport | `transport resolve` | ✅ | |
 | 分配 transport | `transport assign` | ✅ | |
-| 释放 / 解锁 transport | — | ❌ | spec 候选；SE01 等价 |
-| 删除 transport | — | ❌ | spec 候选 |
-| 拉取 transport 内全部对象 | `pull --tr` | ✅ | 024 实现 |
+| 释放 / 解锁 transport | — | ❌ | 待办（本轮按约定不做） |
+| 删除 transport | — | ❌ | 待办（本轮按约定不做） |
+| 拉取 transport 内全部对象 | `pull --tr` | ✅ | |
 | 推送时绑定 transport | `push --tr` | ✅ | |
 
-**覆盖率**：7/9（release / delete 缺）。
+**覆盖率**：7/9（release / delete 缺，属"请求管理"范围，本轮明确不做）。
 
 ---
 
@@ -114,13 +122,14 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | Includes | `inspect --includes` | ✅ | |
 | Locks | `inspect --locks` | ✅ | 查持有者 |
 | Activation 状态 | `inspect --activation` | ✅ | 分 active / inactive |
-| Where-used | `where-used` | ✅ | 直接引用 |
-| Cross-reference（增强版） | — | ❌ | spec 候选；需要 REPS 全文扫描 |
-| 包内对象列表 | `pull --package` | ✅ | |
+| Where-used | `where-used` | ✅ | 直接引用（对象级，非全文扫描） |
+| Cross-reference（增强版） | — | ❌ | 需要 REPS 全文扫描 |
+| 包内对象列表 | `pull --package` / `list` | ✅ | |
 | 对象差异（本地↔SAP） | `diff` | ✅ | |
-| 工作区状态（哪些改了） | `status` | ✅ | --remote-only / --local-only |
+| 工作区状态（哪些改了） | `status` | ✅ | `--remote-only` / `--local-only` |
+| 对象生命周期收尾 | `delete` | ✅ | lock → delete → unlock；非 `$TMP` 需 `--tr` |
 
-**覆盖率**：9/10（cross-reference 缺）。
+**覆盖率**：10/11（cross-reference 缺）。
 
 ---
 
@@ -129,13 +138,14 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | 任务 | 命令 | 覆盖 | 备注 |
 |---|---|---|---|
 | 拉取远端系统 active 版本 | `pull --remote <id>` | ✅ | 走 ICF `/version-source` |
+| 拉取 local/latest 版本 | `pull`（默认） | ✅ | 当前工作区版本（未激活改动） |
+| 拉取 active 版本 | `pull --active` | ✅ | 与 latest 区分，配合 `inspect --activation` 使用 |
 | 远端版本未传输时返回空 | — | ✅ | `data.source === ''` |
-| 拉取未激活版本 | — | ❌ | pull.md fixme：active vs latest 区分 |
 | 跨 transport 迁移 | `pull NDK1 → push DEVK1` | ✅ | 命令组合 |
 | 多 profile 切换 | `profile list/show/add` | ✅ | |
 | 系统健康检查 | `profile test` | ✅ | 分层：TLS / AUTH / ADT / ICF |
 
-**覆盖率**：5/6（latest/inactive 区分缺）。
+**覆盖率**：7/7 ✅。
 
 ---
 
@@ -150,9 +160,10 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | Basic auth（user/password） | `profile add --password` | ✅ | 唯一登录方式；密码在 OS keychain |
 | 历史 auth profile 迁移 | `profile show/set` | ✅ | 旧 cert/SSO/OAuth profile → basic |
 | 路径解析 | — | ✅ | BTP trial 包路径校验 |
-| 配置刷新缓存 | `runtime-cache.ts` | ✅ | 自动 |
+| 会话 cookie 查看 | `session info` | ✅ | 只读 |
+| AFF 校验 | `validate:aff` | ✅ | 本地官方 schema 校验 |
 
-**覆盖率**：7/7 ✅。
+**覆盖率**：9/9 ✅。
 
 ---
 
@@ -160,16 +171,19 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 
 | 任务 | 命令 | 覆盖 | 备注 |
 |---|---|---|---|
-| 部署 ICF 服务 | `deploy` | ✅ | on-prem / Steampunk / BTP trial |
+| 部署 ICF 服务 | `deploy` | ✅ | on-prem / Steampunk / BTP trial；`--dev` 开发形态 |
 | 检查 ICF 状态 | `deploy status` | ✅ | 版本 + 已部署 |
+| DDIC CRUD（DOMA/DTEL/TABL/STRU/ENQU/NROB） | `pull / create / push` | ✅ | ICF；`/ddic/<type>` |
+| 双通道 DDIC（TTYP/MSAG） | `pull / create / push` | ✅ | ADT 主 + ECC ICF 兜底 |
 | 解析 SICF 节点（HTTP 类型） | `pull / create / push HTTP` | ✅ | ICF |
-| 解析事务码（TRAN 类型） | `pull / create / push TRAN` | ✅ | ICF |
-| DDIC CRUD（DOMA/DTEL/TABL/STRU） | `pull / create / push` | ✅ | ICF |
-| 数据查询（SELECT） | `select` | ✅ | ICF |
+| 解析事务码（TRAN 类型） | `pull / create / push TRAN` | 🟡 | 读通；写入 501（见 §1） |
+| 数据查询（SELECT） | `select` / `fields` | ✅ | ICF |
+| 报表运行 | `run-report` | ✅ | ICF；经典 list，5000 行/200k 字符 |
 | classrun wrapper | `deploy` | ✅ | ZCL_ABAP_VIBE_RUNNER |
 | tcode wrapper | `tcode` | ✅ | ICF |
+| MIME Repository | `mime create / delete / push` | ✅ | ICF；当前只有 folder/resources 两类端点 |
 
-**覆盖率**：8/8 ✅。
+**覆盖率**：10/11（TRAN 写路径 501）。
 
 ---
 
@@ -178,10 +192,10 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | 任务 | 命令 | 覆盖 | 备注 |
 |---|---|---|---|
 | Doctor（环境诊断） | `doctor` | ✅ | `--fix` 自动修 |
-| --schema（命令 schema 自描述） | `--schema` | ✅ | 全部 19 命令 |
+| --schema（命令 schema 自描述） | `--schema` | ✅ | 全部 29 命令 |
 | --json / --pretty-json | `--json / --pretty-json` | ✅ | 全部命令 |
 | Skill bundle | `init --agent` | ✅ | copilot/claude/cursor/generic |
-| Wiki | `wiki/` | ✅ | 32 篇 |
+| Wiki | `wiki/` | ✅ | 69 篇（命令页 29 个） |
 | 命令文档生成 | `scripts/gen-docs.mjs`（docs:check 入 verify） | ✅ | 单一事实源 |
 | 错误码自描述 | `CliError.references` | ✅ | 指向 skills/.../references/errors.md |
 | Release notes | `CHANGELOG.md` | ✅ | Keep a Changelog |
@@ -192,31 +206,30 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 
 ## 9. 缺失的主要能力（按优先级）
 
-| 缺失能力 | 候选 spec | 价值 | 工作量估计 |
+| 缺失能力 | 价值 | 工作量 | 状态 / 去向 |
 |---|---|---|---|
-| ABAP Unit 测试运行 | — | 高（端到端验证） | 中 |
-| AMDP 类 | — | 中（数据库近计算） | 中 |
-| Enhancement（ENHO / ENHS） | — | 中（遗留代码改造） | 中 |
-| BAdI 定义/实现 | — | 中（扩展点） | 中 |
-| Cross-reference / Where-used 全集 | — | 中（重构影响面） | 中（大） |
-| Transport release / delete | — | 低（日常边缘） | 小 |
-| Pull latest/inactive 版本 | pull.md fixme | 中（未激活修复） | 小 |
-| `abap delete` | — | 中（生命周期闭合） | 中 |
-| RAP / CAP 模型 | — | 低（云端专用） | 大 |
-| IDoc / ALE / Workflow | — | 低 | 大 |
-| Performance trace（ST05 / STA） | — | 低（性能调优） | 中 |
-| Background job（SM36 / SM37） | — | 低（运维） | 中 |
-| Authorization Object | — | 低（安全配置） | 中 |
-| SAPscript / Smart / Adobe Form | — | 低（打印） | 中 |
+| VIEW（DDIC 视图） | 高 | 中 | 候选补充类型（ICF `DDIF_VIEW_GET/PUT` 路线），见 roadmap |
+| SHLP（搜索帮助） | 高 | 中 | 候选补充类型（ICF `DDIF_SHLP_GET/PUT` 路线），见 roadmap |
+| DEVC（Package 创建/管理） | 高 | 小-中 | 候选补充类型（ADT `DEVC/K`），见 roadmap |
+| XSLT（转换） | 中 | 中 | 候选补充类型（ICF `CL_O2_API_XSLTDESC` 路线），见 roadmap |
+| ENHO / ENHS（增强） | 中-高 | 大 | 先只读 pull，再 push；见 roadmap |
+| AUTH / SUSO 授权对象 | 中 | 中-大 | 本轮按约定暂不做；见 roadmap |
+| TRAN 写路径（501） | 中 | 中 | 需 ABAP 侧 ICF 实现（`RPY_TRANSACTION_INSERT`）+ 真机验证 |
+| DOMA/DTEL `.docu.json` 长文本 | 中 | 中 | AFF `docu-v1` 未 vendor；需 ICF 长文本读写 + 真机验证 |
+| Cross-reference / where-used 全集 | 中 | 中-大 | 需 REPS 全文扫描 |
+| Transport release / delete | 低 | 小 | 本轮按约定不做 |
+| 表单（SFPF / SSFO / SAPscript） | 中 | 大 | 按需；AFF 只覆盖 SFPF |
+| IDoc / ALE | 中 | 大 | 按需；AFF 无格式 |
+| Web Dynpro / ITS / BSP | 低 | 大 | AFF 无格式，不建议 |
+| 性能 trace（ST05 / STA） / 后台作业（SM36/SM37） | 低 | 中 | 按需 |
+| Pool / Cluster Table、TABL 索引 | 低 | 中 | AFF 不覆盖；按需扩展 |
 
-**最值得做（高价值 + 中等工作量）**：ABAP Unit 测试运行、Enhancement、Cross-reference 全集、Pull latest/inactive 版本。
+**路线图与取舍**见 [roadmap](roadmap.md)（对象类型补充 P0/P1/P2 与"不做"清单）。
 
 ## AFF Fixture Coverage
 
 > 手工维护：`abap validate:aff --json test/fixtures/` 的按类型汇总。
-> Last run: 2026-09-03T12:47:42.196Z
-
-Per-type fixture-level schema validation：10 个受支持类型 × ≥ 1 fixture × 官方 AFF schema。
+> Last run: 2026-10-31（34 个 fixture，PASS 34 / WARN 0 / FAIL 0，13 个类型）。
 
 | Type | Fixtures | PASS | WARN | FAIL |
 |------|----------|------|------|------|
@@ -228,8 +241,9 @@ Per-type fixture-level schema validation：10 个受支持类型 × ≥ 1 fixtur
 | STRU | 3 | 3 | 0 | 0 |
 | DOMA | 5 | 5 | 0 | 0 |
 | DTEL | 3 | 3 | 0 | 0 |
-| HTTP | 1 | 1 | 0 | 0 |
-| TRAN | 1 | 1 | 0 | 0 |
+| ENQU / HTTP / TRAN / TTYP / MSAG / DDLS | 各 1 | 各 1 | 0 | 0 |
+
+> 尚未有 fixture 的类型：SRVB / SRVD / BDEF / DCLS / DDLX / DDLA（RAP/CDS 家族）与其它新类型；补类型时应同步补 fixture。
 
 ### Schema paths
 
@@ -238,16 +252,20 @@ Per-type fixture-level schema validation：10 个受支持类型 × ≥ 1 fixtur
 | CLAS | `src/abap_cli/schema/clas-v1.json` |
 | INTF | `src/abap_cli/schema/intf-v1.json` |
 | PROG | `src/abap_cli/schema/prog-v1.json` |
-| FUGR | `src/abap_cli/schema/fugr-v1.json` |
-| TABL | `src/abap_cli/schema/tabl-v1.json` |
+| FUGR | `src/abap_cli/schema/fugr-v1.json`（+ `func-v1` / `reps-v1`） |
+| TABL | `src/abap_cli/schema/tabl-v1.json`（+ `tabt-v1`） |
 | STRU | `src/abap_cli/schema/tabl-v1.json` (alias) |
 | DOMA | `src/abap_cli/schema/doma-v1.json` |
 | DTEL | `src/abap_cli/schema/dtel-v1.json` |
+| ENQU | `src/abap_cli/schema/enqu-v1.json` |
+| NROB | `src/abap_cli/schema/nrob-v1.json` |
 | HTTP | `src/abap_cli/schema/http-v1.json` |
 | TRAN | `src/abap_cli/schema/tran-v1.json` |
+| TTYP | `src/abap_cli/schema/ttyp-v1.json`（上游无此格式，本地维护） |
+| MSAG | `src/abap_cli/schema/msag-v1.json` |
+| DDLS / SRVD / BDEF / DCLS / DDLX / DDLA | 同名 `*-v1.json` |
 
-Companion files (TABL/STRU `.settings.json`) validate against `tabt-v1.json`.
-PROG 与 HTTP fixture 为手写样本（引入 fixture 时上游 abap-file-format 尚未提供 examples）。
+Companion files (TABL/STRU `.settings.json`) validate against `tabt-v1.json`。PROG 与 HTTP fixture 为手写样本（引入 fixture 时上游 abap-file-format 尚未提供 examples）。
 
 ---
 
@@ -256,6 +274,7 @@ PROG 与 HTTP fixture 为手写样本（引入 fixture 时上游 abap-file-forma
 - 详细 wiki 索引：[`wiki/index.md`](index.md)
 - 决策录：[`wiki/design-decisions/`](design-decisions/)
 - 对象详细文档：[`wiki/objects/`](objects/)
+- 对象类型矩阵：[`wiki/object-types.md`](object-types.md)
 - 命令文档：[`docs/commands.md`](../docs/commands.md)
 - 端到端剧本：[`wiki/agent-cookbook.md`](agent-cookbook.md)
-- 路线图草稿：[`wiki/roadmap.md`](roadmap.md)
+- 路线图：[`wiki/roadmap.md`](roadmap.md)

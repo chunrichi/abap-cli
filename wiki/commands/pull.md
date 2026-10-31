@@ -33,6 +33,7 @@ abap pull
 - `--include-tests`: 包含 testclasses 源码部分
 - `--include-all-parts`: 包含所有源码部分（含 testclasses）
 - `--textpool`: 同时拉取 textpool `.properties` 文件（`.texts`/`.selections`/`.headings.<lang>.properties`）
+- `--active`: 拉取对象的 **active** 版本源码（默认拉 latest/工作区版本——即未激活的最新改动）；配合 `abap inspect --activation` 判断是否需要先看激活态
 - `--remote <remoteid>`: 拉取对象在远程系统的 active 版本源码（Version Management，`/version-source` 端点）
 - `--tr <request>`: T4.2 — 拉取 transport 请求内全部对象（直接对象 + 嵌套 task 对象，去重），与对象名/`--package` **互斥**；空字符串 → `INVALID_ARGUMENT`
 - `--user <sap-user>`: PR2 — 与 `--tr` 配合使用，按 transport task owner 过滤对象（不区分大小写）；无 `--tr` 时单独使用 → `INVALID_ARGUMENT`（exit 2）。直接对象继承 transport 顶层 owner；task 内对象继承 task 自身 owner；owner 缺失的对象保留（避免静默丢失）。
@@ -47,7 +48,7 @@ abap pull
 2. **`--package`** — `searchObject` 全量搜索 + 按 `adtcore:packageName` 过滤，分页（`limit × page`）逐对象拉取；单对象失败不中断整体（记为 `failed`），截断时提示 `--page N+1`。**分页的原因**：SAP quickSearch 端点的 `maxResults` 有上限（默认 `SEARCH_RESULT_LIMIT` = 20），一次请求拿不全整个包。实现上每次请求 `limit × page` 条结果、按包名过滤后取 `(page-1)*limit` 到 `page*limit` 的窗口——所以 `--limit` 越大单轮拉得越多，`--page` 递增继续拉下一批。单对象 pull（`abap pull ZCL_X`）无分页。
 3. **`--remote <id>`** — 走 ICF `/version-source`（TMS RFC destination `TMSADM@<id>.DOMAIN_<id>`）。CLI 类型 → VRSD 类型映射：`PROG → REPS`、`INTF → INTF`、`CLAS → CLSD`（类定义）。源码写入 AFF 标准文件名 `src/<name>.<type>.abap`（扁平布局，见下文）。对象从未传输到远端时后端返回空 `source`（成功）。
 4. **`--textpool`** — 拉取三个 `.properties` 文件，走混合模式路由（profile 缓存的能力决定走 ADT `getTextElements` 还是 ICF `/textpool/*`），JSON 结果带 `route` 字段（`adt`/`icf`）；文件落为 `src/<name>.<type>.<category>.<lang>.properties`。
-5. **DDIC 类型**（DOMA/DTEL/TABL/STRU）— 走 ICF `GET /ddic/<type>/<name>`，`wireToLocal` 转成本地 JSON，写为 `src/<name>.<type>.json`。
+5. **DDIC 类型**（DOMA/DTEL/TABL/STRU/ENQU/NROB）— 走 ICF `GET /ddic/<type>/<name>`，`wireToLocal` 转成本地 JSON，写为 `src/<name>.<type>.json`（TABL/STRU 为三件套）。
 6. **通道路由类型**（TTYP/MSAG/DDLS）— 见下节。
 
 ### 新增 TTYP / MSAG / DDLS（双通道）
@@ -215,7 +216,7 @@ abap pull --tr NDK123456
 
 ## todo
 
-- [ ] **pull 未激活版本** — 目前 `abap pull` 只拉取 active 版本源码；对处于未激活（stale，active != latest）状态的对象，增加拉取 latest/inactive 源码的能力（参考 `abap inspect <obj> --activation` 的 `checkActivation`：`getObjectSource(abs)` 取 latest，`raw.getObjectSource(abs, { version: 'active' })` 取 active），让用户在激活前能拿到未激活的改动，可作为 `--activation` 检查后的补救手段。
+- [x] **pull 未激活版本** — 已实现 `--active`：默认拉 latest（工作区，含未激活改动），`--active` 拉 active 版本；依据 `formats/pull-strategy.ts` 的 `versionKind` 传给 `fetchPullSource`。
 
 # references
 
