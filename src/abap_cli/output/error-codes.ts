@@ -60,6 +60,7 @@ export type ErrorCode =
   | 'MISSING_TRANSPORT'    // NEW — delete requires --tr for non-$TMP packages
   | 'DELETE_FAILED'        // NEW — abap delete general failure (lock/delete/unlock cycle)
   | 'PUSH_FAILED'
+  | 'TEST_FAILED'           // ABAP Unit run reported failing tests (VALIDATION_ERROR)
   | 'PULL_PARTIAL_FAILURE'  // some objects in a pull succeeded, others failed (VALIDATION_ERROR)
   | 'VALIDATION_ERROR'     // semantic rejection (exit 7)
   | 'OBJECT_EXISTS'        // normalized legacy code (USAGE/2), used by create.ts
@@ -155,6 +156,7 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   OBJECT_EXISTS: 'USAGE',
   FILE_EXISTS: 'USAGE',
   PUSH_FAILED: 'VALIDATION_ERROR',
+  TEST_FAILED: 'VALIDATION_ERROR',
   COMMAND_MOVED: 'VALIDATION_ERROR',
   // mappings
   METHOD_FAILED: 'VALIDATION_ERROR',
