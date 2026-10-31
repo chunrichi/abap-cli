@@ -46,6 +46,8 @@ export interface PushFileResult {
   lineScope?: string;
   /** Raw SAP activation messages (`{type,text,line?}`), when activation ran. */
   messages?: unknown[];
+  /** DOMA/DTEL long-text companion action (`saved` / `deleted`), when pushed. */
+  docu?: 'saved' | 'deleted';
 }
 
 /** Outcome of pushing one file (before the coordinator decorates the result). */
@@ -56,6 +58,12 @@ export interface PushOneResult {
   status?: PushFileResult['status'];
   /** Channel actually used, for channel-routed (`.json` AFF) pushes. */
   channel?: 'adt' | 'icf';
+  /**
+   * DOMA/DTEL long-text companion action, when a `<name>.<type>.docu.json`
+   * existed next to the pushed main document: `saved` for a write,
+   * `deleted` when the companion carried `lines: []`.
+   */
+  docu?: 'saved' | 'deleted';
 }
 
 /** Minimal shape a push route needs from `resolveFile`. */

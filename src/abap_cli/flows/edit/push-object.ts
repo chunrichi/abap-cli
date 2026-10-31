@@ -14,6 +14,8 @@ export type PushStage =
   | 'textpool-icf'
   // DDIC stages (ICF route).
   | 'ddic-icf'
+  // DOMA/DTEL long-text companion (ICF `/ddic/<type>/<name>/docu`).
+  | 'docu-icf'
   // TTYP/MSAG/DDLS stages (channel-detect route).
   | 'channel-adt'
   | 'channel-icf';

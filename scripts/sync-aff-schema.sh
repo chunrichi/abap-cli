@@ -52,6 +52,9 @@ FILES=(
   "tabl/tabt-v1.json"
   "doma/doma-v1.json"
   "dtel/dtel-v1.json"
+  # long-text companion schema (DOMA/DTEL `.docu.json`); upstream keeps it
+  # at the top level of file-formats/, not under a type directory.
+  "docu-v1.json"
   # lock object + number range object.
   "enqu/enqu-v1.json"
   "nrob/nrob-v1.json"

@@ -17,6 +17,7 @@ import { type DdicSupportedType } from '../../formats/ddic/types.js';
 import { CliError } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
 import { toOutputPath, normalizePullData } from '../../core/path-output.js';
+import { pullDocuCompanion } from './docu-companion.js';
 import type { PullOptions, PullResult } from './pull-shared.js';
 
 export async function runPullDdic(objectName: string, type: DdicSupportedType, opts: PullOptions): Promise<PullResult> {
@@ -105,16 +106,42 @@ export async function runPullDdic(objectName: string, type: DdicSupportedType, o
   await writeDdicJson(targetPath, local);
   const outPath = toOutputPath(relPath);
 
+  const entries: Array<{ file: string; status: 'written'; kind?: 'docu' }> = [
+    { file: outPath, status: 'written' },
+  ];
+  const written = [outPath];
+
+  // DOMA / DTEL long text — a 0..1 companion. Best-effort by design: a missing
+  // or broken docu endpoint only adds a meta.warning, the main file stays pulled.
+  let deleted: string[] = [];
+  if (type === 'DOMA' || type === 'DTEL') {
+    const docu = await pullDocuCompanion({
+      icf,
+      objectName,
+      type,
+      mainFile: targetPath,
+      overwrite: opts.overwrite,
+    });
+    if (docu.written) {
+      entries.push({ file: docu.written, status: 'written', kind: 'docu' });
+      written.push(docu.written);
+    }
+    if (docu.deleted) deleted = [docu.deleted];
+  }
+
+  const docuNote = entries.length > 1 ? ` + ${entries.slice(1).map((e) => e.file).join(', ')}` : '';
+  const deletedNote = deleted.length > 0 ? ` (removed stale companion ${deleted.join(', ')})` : '';
   return {
     data: normalizePullData({
       object: objectName,
       type,
-      entries: [{ file: outPath, status: 'written' }],
-      written: [outPath],
+      entries,
+      written,
       skipped: [],
       failed: [],
+      ...(deleted.length > 0 ? { deleted } : {}),
     }),
-    human: `Pulled ${type} ${objectName} to ${outPath}`,
+    human: `Pulled ${type} ${objectName} to ${outPath}${docuNote}${deletedNote}`,
   };
 }
 
