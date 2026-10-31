@@ -12,6 +12,7 @@ import {
   setTextElements as adtSetTextElements,
 } from 'abap-adt-api/build/api/textelements.js';
 import { loadConfig, type ProjectConfig } from '../config/project-config.js';
+import { CONFIG_ERROR_REFERENCE } from '../config/recovery.js';
 import { CliError } from '../output/json.js';
 import { classifyHttpError } from './http-error.js';
 import { buildBasicAuth } from './basic-auth.js';
@@ -176,7 +177,14 @@ export class AdtClientWrapper {
     } catch (error: unknown) {
       if (error instanceof CliError) throw error;
       const message = error instanceof Error ? error.message : String(error);
-      throw new CliError('CONFIG_ERROR', message);
+      throw new CliError('CONFIG_ERROR', message, {
+        nextSteps: [
+          'Check the bound profile: abap profile list --json',
+          'Re-bind the workspace: abap init --profile <name>',
+        ],
+        example: 'abap init --profile dev',
+        references: CONFIG_ERROR_REFERENCE,
+      });
     }
   }
 

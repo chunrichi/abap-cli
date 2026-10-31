@@ -91,13 +91,14 @@ describe('stdout/stderr separation audit (handleTopLevelError)', () => {
       const res = run(err, ['--json', 'transport', 'create'], program);
       expect(res.exitCode).toBe(2);
       expect(res.stdout).toBe('');
-      const payload = JSON.parse(res.stderr.split('\n\n')[0]);
+      // Exactly one JSON envelope on stderr (no spliced help body), so the
+      // whole stderr parses in one shot.
+      const payload = JSON.parse(res.stderr);
       expect(payload.status).toBe('error');
       expect(payload.error.code).toBe('USAGE');
       expect(payload.error.category).toBe('USAGE');
-      // Help body accompanies the envelope on stderr.
-      expect(res.stderr).toContain('Usage:');
-      expect(res.stderr).toContain('<description>');
+      expect(payload.error.details.help).toBe('abap transport create --help');
+      expect(res.stderr).not.toContain('Usage:');
     });
 
     it('commander.help on bare subcommand: JSON envelope on stderr (no help re-emit), stdout empty', () => {
@@ -164,8 +165,8 @@ describe('stdout/stderr separation audit (handleTopLevelError)', () => {
     });
   });
 
-  describe('human mode: USAGE paths put help on stdout (when relevant) and error on stderr', () => {
-    it('commander.missingArgument: sub help on stdout, structured error on stderr', () => {
+  describe('human mode: USAGE paths keep stdout empty and print the structured error on stderr', () => {
+    it('commander.missingArgument: structured error + one-line help pointer on stderr', () => {
       // Build a program with the relevant subcommand so resolveSubcommand
       // walks to the deepest one.
       const program = new Command().name('abap-cli');
@@ -174,12 +175,13 @@ describe('stdout/stderr separation audit (handleTopLevelError)', () => {
       const err = new CommanderError(1, 'commander.missingArgument', "error: missing required argument 'description'");
       const res = run(err, ['transport', 'create'], program);
       expect(res.exitCode).toBe(2);
-      expect(res.stdout).toContain('Usage:');
-      expect(res.stdout).toContain('<description>');
+      expect(res.stdout).toBe('');
       expect(res.stderr).toMatch(/Error:.*description/);
+      expect(res.stderr).toContain('abap transport create --help');
+      expect(res.stderr).not.toContain('Usage:');
     });
 
-    it('commander.help on bare subcommand: handler does not re-emit (commander already wrote it)', () => {
+    it('commander.help on bare subcommand: no re-emit, USAGE error on stderr', () => {
       // Bare `abap transport` only fires commander.help when the program
       // actually has a `transport` subcommand registered — empty programs
       // dispatch it as a real help request (exit 0). commander has already
@@ -191,7 +193,8 @@ describe('stdout/stderr separation audit (handleTopLevelError)', () => {
       const res = run(err, ['transport'], program);
       expect(res.exitCode).toBe(2);
       expect(res.stdout).toBe('');
-      expect(res.stderr).toMatch(/Missing required argument/);
+      expect(res.stderr).toMatch(/Missing required subcommand/);
+      expect(res.stderr).toContain('abap transport --help');
     });
 
     it('commander.unknownCommand: error on stderr only (no stdout)', () => {
@@ -266,7 +269,7 @@ describe('stdout/stderr separation audit (handleTopLevelError)', () => {
       const res = run(err, ['transport'], program);
       expect(res.exitCode).toBe(2);
       expect(res.stdout).toBe('');
-      expect(res.stderr).toMatch(/Missing required argument/);
+      expect(res.stderr).toMatch(/Missing required subcommand/);
     });
 
     it('JSON mode: empty stdout, JSON USAGE envelope on stderr, exit 2', () => {

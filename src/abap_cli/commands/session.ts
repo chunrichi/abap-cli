@@ -20,7 +20,9 @@ import { getSystem } from '../config/user-config.js';
 import { computeSystemHash, decryptJar } from '../session/jar.js';
 import { resolveSessionPolicy, effectivePolicy } from '../session/policy.js';
 import { SESSION_KEYCHAIN_ACCOUNT } from '../config/secrets.js';
+import { CONFIG_ERROR_REFERENCE } from '../config/recovery.js';
 import { schemaOption } from './schema-helpers.js';
+import { failMissingInvocation } from '../output/usage.js';
 
 export const SCHEMA: CommandSchema = {
   schemaVersion: 1,
@@ -68,8 +70,13 @@ export function registerSessionCommand(program: Command): void {
         printSchema(SCHEMA, mode);
         return;
       }
-      // Bare `abap session` falls through to the subcommand help.
-      cmd.help();
+      // Bare `abap session` is a USAGE failure; help is only printed by
+      // `abap session --help`.
+      failMissingInvocation(
+        cmd,
+        "Missing subcommand: use 'session info'.",
+        'abap session info --json',
+      );
     });
 
   session
@@ -90,7 +97,14 @@ export function registerSessionCommand(program: Command): void {
           throw error;
         }
         const message = error instanceof Error ? error.message : String(error);
-        throw new CliError('CONFIG_ERROR', `session info failed: ${message}`);
+        throw new CliError('CONFIG_ERROR', `session info failed: ${message}`, {
+          nextSteps: [
+            'Check the bound profile: abap profile list --json',
+            'Re-bind the workspace: abap init --profile <name>',
+          ],
+          example: 'abap session info --json',
+          references: CONFIG_ERROR_REFERENCE,
+        });
       }
     });
 }

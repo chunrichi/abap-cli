@@ -139,14 +139,14 @@ describe('015 remote pull', () => {
   });
 });
 
-describe('015 bare pull prints help', () => {
-  it('abap pull (no object) prints the command help and exits 0', async () => {
+describe('015 bare pull is a USAGE failure', () => {
+  it('abap pull (no object) exits 2 with a help pointer and never calls SAP', async () => {
     const program = makeProgram();
     registerPullCommand(program);
     const res = await runCommand(program, ['pull'], { cwd });
-    expect(res.exitCode).toBeUndefined();
-    expect(res.stdout).toContain('Usage:');
-    expect(res.stdout).toContain('--remote');
+    expect(res.exitCode).toBe(2);
+    expect(res.stdout).toBe('');
+    expect(res.stderr).toContain('abap pull --help');
     expect(icfGetRemoteSource).not.toHaveBeenCalled();
   });
 });

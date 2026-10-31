@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import { jsonFromCommand, printError, printResult, printSchema } from '../output/json.js';
+import { failMissingInvocation } from '../output/usage.js';
 import { runTcode, type TcodeResult } from '../flows/search/tcode.js';
 
 export const SCHEMA = {
@@ -54,8 +55,13 @@ export function registerTcodeCommand(program: Command): void {
         return;
       }
       if (!tcode) {
-        process.stdout.write(cmd.helpInformation());
-        return;
+        // Bare `abap tcode` is a USAGE failure; help is only printed by
+        // `abap tcode --help`.
+        failMissingInvocation(
+          cmd,
+          'Missing required argument: <tcode> is required.',
+          'abap tcode SE38 --json',
+        );
       }
 
       try {
