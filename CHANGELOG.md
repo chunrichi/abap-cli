@@ -6,6 +6,8 @@
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-01
+
 本版重做 CLI 的 SAP 会话层：跨命令真正复用同一个 SAP 会话，无法复用时命令结束一定登出，`SM04` 不再按命令数增长；会话存储/密钥/复用状态可通过 `abap session info` 直接看到。有破坏性变更（`session info --json` 形状、`$TMPDIR` 兜底移除），见 Migration。
 
 ### Added
