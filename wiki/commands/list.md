@@ -4,7 +4,7 @@ title: abap list
 description: "只读列出包内 ABAP 对象（ADT quickSearch 通配搜索 + 客户端包过滤），用于清理临时对象或审计包内内容。"
 tags: [abap-cli, command, list, package, adt, quicksearch, read-only]
 created at: 2026-10-29 14:30:14
-changed at: 2026-10-31 13:24:09
+changed at: 2026-11-01 22:05:00
 ---
 
 # abap list
@@ -52,7 +52,7 @@ abap list --package ZDEV --type PROG --limit 20
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap list", "version": "1.3.0", "timestamp": "2026-10-31T05:34:02.115Z", "durationMs": 268, "warnings": [] },
+  "meta": { "command": "abap list", "version": "2.0.0", "timestamp": "2026-10-31T05:34:02.115Z", "durationMs": 268, "warnings": [] },
   "data": {
     "count": 2, "truncated": false, "packageName": "$TMP", "type": "CLAS",
     "entries": [

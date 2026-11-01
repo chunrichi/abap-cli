@@ -4,7 +4,7 @@ title: abap deploy
 description: 部署内置 ICF ABAP 服务 — `abap deploy` 默认推送发布形态（helper 合并为 handler 内 `lcl_*` 本地类，SAP 上只装 3 个全局类）；`--dev` 安装开发形态的全部全局类；`abap deploy status` 只读探测版本匹配
 tags: [abap-cli, command, deploy, icf, steampunk, btp, merge]
 created at: 2026-09-05 00:00:00
-changed at: 2026-11-01 21:30:00
+changed at: 2026-11-01 22:05:00
 ---
 
 # abap deploy
@@ -104,7 +104,7 @@ abap deploy status --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap deploy", "version": "1.3.0", "timestamp": "2026-10-30T00:00:00.000Z", "durationMs": 8400, "warnings": [] },
+  "meta": { "command": "abap deploy", "version": "2.0.0", "timestamp": "2026-10-30T00:00:00.000Z", "durationMs": 8400, "warnings": [] },
   "data": {
     "mode": "release",
     "mergedClasses": 16,

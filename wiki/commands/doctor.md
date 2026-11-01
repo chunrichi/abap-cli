@@ -4,7 +4,7 @@ title: abap doctor
 description: 诊断 CLI 环境 — environment / config 两段检查，data.ok 布尔 gate、--strict 退出码、--fix 结构化修复摘要
 tags: [abap-cli, command, doctor, diagnose, setup, gate, strict]
 created at: 2026-08-06 23:10:00
-changed at: 2026-11-01 18:10:00
+changed at: 2026-11-01 22:05:00
 ---
 
 # abap doctor
@@ -59,7 +59,7 @@ abap doctor [--verbose] [--strict] [--fix [--yes]]
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap doctor", "version": "1.3.0", "timestamp": "2026-11-01T00:00:00.000Z", "durationMs": 18, "warnings": [] },
+  "meta": { "command": "abap doctor", "version": "2.0.0", "timestamp": "2026-11-01T00:00:00.000Z", "durationMs": 18, "warnings": [] },
   "data": {
     "ok": false,
     "environment": [

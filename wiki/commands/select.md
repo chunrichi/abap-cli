@@ -4,7 +4,7 @@ title: abap select
 description: 只读查询表数据 — 走 ICF /data/query 端点；Agent 的 SE16N 等价能力；覆盖"看这条记录"这一数据查询闭环
 tags: [abap-cli, command, select, se16n, data-query, icf, agent-loop, read-only]
 created at: 2026-08-07 23:50:00
-changed at: 2026-10-30 01:14:53
+changed at: 2026-11-01 22:05:00
 ---
 
 # abap select
@@ -55,7 +55,7 @@ abap select --table ZTABLE --where "FIELD = 'X'" --dry-run --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap select", "version": "1.3.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 42, "warnings": [] },
+  "meta": { "command": "abap select", "version": "2.0.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 42, "warnings": [] },
   "data": {
     "table": "ZTAB_FIXTURE",
     "objectType": "TABL",
@@ -80,7 +80,7 @@ abap select --table ZTABLE --where "FIELD = 'X'" --dry-run --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap select", "version": "1.3.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 18, "warnings": [] },
+  "meta": { "command": "abap select", "version": "2.0.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 18, "warnings": [] },
   "data": {
     "table": "ZTAB_FIXTURE",
     "objectType": "TABL",
@@ -97,7 +97,7 @@ abap select --table ZTABLE --where "FIELD = 'X'" --dry-run --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap select", "version": "1.3.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 3, "warnings": [] },
+  "meta": { "command": "abap select", "version": "2.0.0", "timestamp": "2026-08-07T00:00:00.000Z", "durationMs": 3, "warnings": [] },
   "data": {
     "table": "ZTAB_FIXTURE",
     "objectType": "TABL",

@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-11-01
+
+本版收窄本地包定义（只有 `$` 前缀免 transport）、放开内置 ICF 服务的本地包支持，并把运行时基线升级到 Node.js 24 LTS。有破坏性变更（Node.js 22/26 不再支持、`TEST...` 前缀的包不再免 transport），见 Migration。
+
 ### Changed
 
 - **本地包一律免 transport**：`$` 前缀的本地包（`$TMP`、`$CRW` 等）中的对象在 `create` / `push` / `delete` / `deploy` 时都不再需要 `--tr`，也不会被自动带上任何 transport 请求；此前只有 `$TMP` 享受该规则。内置 ICF 服务同步放开：ENQU / NROB 创建、XSLT 创建、VIEW / SHLP / TRAN 删除对 `$` 前缀本地包不再要求 transport（ENQU / NROB 的 `push` 走同一 POST，同样受益）；升级后执行一次 `abap deploy`。`TEST...` 等非 `$` 开头的包不视为本地，仍需 `--tr`。本地包上传入的 `--tr` 会被忽略：既不写进请求体，也不出现在 `data.transport`（`abap deploy` 是唯一显式拒绝 `--tr` 的入口）。
@@ -18,7 +22,8 @@
 **Migration**：
 
 - 升级到 Node.js 24 LTS（Homebrew 用户把 `node@22` 换成 `node@24`，或用官方安装包）后重跑 CLI；npm 使用方在 Node 24 下重新安装依赖即可。
-- 本地包判定以 `$` 前缀为准：`TEST...` 前缀的包不再免 transport；内置 ICF 服务升级后需执行一次 `abap deploy`。
+- 本地包判定以 `$` 前缀为准：`TEST...` 前缀的包不再免 transport，需要 `--tr`。
+- 内置 ICF 服务版本随 CLI 升到 2.0.0：升级后 `abap deploy status` 会提示 outdated，先执行一次 `abap deploy --yes`；旧的「仅 `$TMP` 免 transport」服务端行为在重新部署前保持不变。
 
 ## [1.3.0] - 2026-11-01
 

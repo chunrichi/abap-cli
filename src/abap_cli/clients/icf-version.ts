@@ -26,8 +26,8 @@ export const ICF_BASE_PATH = '/sap/abap_cli';
  *  bumped 0.6.0 → 1.0.0 with the 1.0.0 CLI release (versions are unified:
  *  package.json == ICF service == CHANGELOG).
  *  Root version check stays backward compatible.
- *  1.3.0: ICF handler runs stateless (no SAP user session per request). */
-export const ICF_SERVICE_VERSION = '1.3.0';
+ *  2.0.0: ICF handler runs stateless (no SAP user session per request). */
+export const ICF_SERVICE_VERSION = '2.0.0';
 
 export type IcfDeploymentStatus = 'not_deployed' | 'current' | 'outdated' | 'unreachable';
 

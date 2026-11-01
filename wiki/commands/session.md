@@ -4,7 +4,7 @@ title: abap session
 description: 查看 / 重置 SAP 会话存储 —— 实际生效的存储、候选目录、密钥来源、jar 的 cookie/CSRF/连续失败计数，以及复用是否启用及原因（只读，不发起 SAP 调用）
 tags: [abap-cli, command, session, cookie, csrf, reuse, keychain, sap-sessionid, sap-contextid, logout, session-store]
 created at: 2026-09-03 00:00:00
-changed at: 2026-11-01 12:10:00
+changed at: 2026-11-01 22:05:00
 ---
 
 # abap session
@@ -47,7 +47,7 @@ abap session reset --yes
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap session info", "version": "1.3.0", "warnings": [] },
+  "meta": { "command": "abap session info", "version": "2.0.0", "warnings": [] },
   "data": {
     "policy": "reuse",
     "policySource": "default",

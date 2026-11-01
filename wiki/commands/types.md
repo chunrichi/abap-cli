@@ -4,7 +4,7 @@ title: abap types
 description: "Print the canonical CLI type ↔ TADIR PGMID/OBJECT ↔ DDIC tabclass mapping. Pure local — no SAP call. Surfaces the non-obvious mappings that cost real time when joining CLI write paths to TADIR queries (CLI HTTP ↔ TADIR SICF, CLI STRU ↔ TADIR TABL + DD02L-TABCLASS=INTTAB, etc.)."
 tags: [abap-cli, command, types]
 created at: 2026-10-29 14:30:14
-changed at: 2026-10-30 20:00:00
+changed at: 2026-11-01 22:05:00
 ---
 
 # abap types
@@ -52,7 +52,7 @@ abap types STRU --tadir-object
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap types", "version": "1.3.0", "timestamp": "2026-10-30T12:00:00.000Z", "durationMs": 2, "warnings": [] },
+  "meta": { "command": "abap types", "version": "2.0.0", "timestamp": "2026-10-30T12:00:00.000Z", "durationMs": 2, "warnings": [] },
   "data": [
     { "cliType": "CLAS", "pgmid": "R3TR", "tadirObject": "CLAS", "ddicTabclass": "", "channel": "ADT", "affSchema": "clas-v1.json", "description": "Global ABAP class" },
     { "cliType": "STRU", "pgmid": "R3TR", "tadirObject": "TABL", "ddicTabclass": "INTTAB", "channel": "ICF", "affSchema": "tabl-v1.json", "description": "Structure (DDIC) — TADIR OBJECT is also TABL; disambiguate via DD02L-TABCLASS=INTTAB" }

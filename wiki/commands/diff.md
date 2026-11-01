@@ -4,7 +4,7 @@ title: abap diff
 description: 本地↔SAP 对比 — per-part direction（unchanged / divergent / local-only / remote-only）+ bounded 行变化摘要（added / removed / changedLines），只读不锁
 tags: [abap-cli, command, diff, compare, read-only, agent-loop]
 created at: 2026-08-09 22:40:00
-changed at: 2026-10-30 01:14:53
+changed at: 2026-11-01 22:05:00
 ---
 
 # abap diff
@@ -110,7 +110,7 @@ abap diff --remote --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap diff", "version": "1.3.0", "timestamp": "2026-09-02T00:00:00.000Z", "durationMs": 1500, "warnings": [] },
+  "meta": { "command": "abap diff", "version": "2.0.0", "timestamp": "2026-09-02T00:00:00.000Z", "durationMs": 1500, "warnings": [] },
   "data": {
     "parts": [
       {
@@ -138,7 +138,7 @@ abap diff --remote --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap diff", "version": "1.3.0", "timestamp": "2026-09-02T00:00:00.000Z", "durationMs": 420, "warnings": [] },
+  "meta": { "command": "abap diff", "version": "2.0.0", "timestamp": "2026-09-02T00:00:00.000Z", "durationMs": 420, "warnings": [] },
   "data": { "truncated": false, "checked": 5 }
 }
 ```

@@ -4,7 +4,7 @@ title: abap profile
 description: 管理全局连接 profile — add / list / show / set / test / delete / export / import；绑定工作区用 abap init --profile。登录方式只有 basic auth
 tags: [abap-cli, command, profile, connection, keychain]
 created at: 2026-08-17 00:00:00
-changed at: 2026-11-01 00:27:00
+changed at: 2026-11-01 22:05:00
 ---
 
 # abap profile
@@ -128,7 +128,7 @@ abap profile import profiles.json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap profile add", "version": "1.3.0", "timestamp": "2026-10-31T00:00:00.000Z", "durationMs": 210, "warnings": [] },
+  "meta": { "command": "abap profile add", "version": "2.0.0", "timestamp": "2026-10-31T00:00:00.000Z", "durationMs": 210, "warnings": [] },
   "data": {
     "system": { "name": "dev", "url": "https://sap:44300", "client": "100", "username": "DEV", "language": "EN" },
     "passwordUpdated": true,

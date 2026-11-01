@@ -4,7 +4,7 @@ title: abap transport
 description: 管理 SAP 传输请求（CTS）— list 列当前用户请求 / create 新建（写操作）/ show 查看请求元数据 / resolve 解析对象所属请求 / assign 把对象挂到请求（写操作，已挂则 no-op）/ check 写前预检查询将记录到哪个请求 / release 释放请求（不可逆）；create / assign / release 在非 TTY 需 --yes 或 --dry-run
 tags: [abap-cli, command, transport, cts, trkorr, list, create, show, resolve, assign, check, release, dry-run]
 created at: 2026-08-07 00:39:21
-changed at: 2026-11-01 00:27:00
+changed at: 2026-11-01 22:05:00
 ---
 
 # abap transport
@@ -235,7 +235,7 @@ abap transport release DEVK900001 --yes --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap transport check", "version": "1.3.0", "timestamp": "2026-11-01T00:20:00.000Z", "durationMs": 220, "warnings": [] },
+  "meta": { "command": "abap transport check", "version": "2.0.0", "timestamp": "2026-11-01T00:20:00.000Z", "durationMs": 220, "warnings": [] },
   "data": {
     "object": "ZCL_DEMO",
     "ok": true,
@@ -251,7 +251,7 @@ abap transport release DEVK900001 --yes --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap transport check", "version": "1.3.0", "timestamp": "2026-11-01T00:20:00.000Z", "durationMs": 210, "warnings": [] },
+  "meta": { "command": "abap transport check", "version": "2.0.0", "timestamp": "2026-11-01T00:20:00.000Z", "durationMs": 210, "warnings": [] },
   "data": {
     "object": "ZCL_DEMO",
     "ok": false,
@@ -267,7 +267,7 @@ abap transport release DEVK900001 --yes --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap transport release", "version": "1.3.0", "timestamp": "2026-11-01T00:20:00.000Z", "durationMs": 900, "warnings": [] },
+  "meta": { "command": "abap transport release", "version": "2.0.0", "timestamp": "2026-11-01T00:20:00.000Z", "durationMs": 900, "warnings": [] },
   "data": {
     "transport": "DEVK900001",
     "released": true,
@@ -283,7 +283,7 @@ abap transport release DEVK900001 --yes --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap transport release", "version": "1.3.0", "timestamp": "2026-11-01T00:20:00.000Z", "durationMs": 15, "warnings": [] },
+  "meta": { "command": "abap transport release", "version": "2.0.0", "timestamp": "2026-11-01T00:20:00.000Z", "durationMs": 15, "warnings": [] },
   "data": { "transport": "DEVK900001", "dryRun": true, "released": false }
 }
 ```

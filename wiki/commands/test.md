@@ -4,7 +4,7 @@ title: abap test
 description: 通过 ADT ABAP Unit API 跑类/程序单测，输出 summary 与失败用例；失败 exit 7
 tags: [abap-cli, command, test, abap-unit, adt, read-only]
 created at: 2026-10-31 14:36:00
-changed at: 2026-10-31 14:36:00
+changed at: 2026-11-01 22:05:00
 ---
 
 # abap test
@@ -65,7 +65,7 @@ abap test --schema
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap test", "version": "1.3.0", "timestamp": "2026-10-31T06:30:00.000Z", "durationMs": 431, "warnings": [] },
+  "meta": { "command": "abap test", "version": "2.0.0", "timestamp": "2026-10-31T06:30:00.000Z", "durationMs": 431, "warnings": [] },
   "data": {
     "object": { "name": "ZCL_MY_THING", "type": "CLAS/OC" },
     "riskLevels": ["harmless"],
@@ -80,7 +80,7 @@ abap test --schema
 ```json
 {
   "status": "error",
-  "meta": { "command": "abap test", "version": "1.3.0", "timestamp": "2026-10-31T06:31:00.000Z", "durationMs": 398, "warnings": [] },
+  "meta": { "command": "abap test", "version": "2.0.0", "timestamp": "2026-10-31T06:31:00.000Z", "durationMs": 398, "warnings": [] },
   "error": {
     "code": "TEST_FAILED",
     "category": "VALIDATION_ERROR",

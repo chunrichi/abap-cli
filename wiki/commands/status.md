@@ -4,7 +4,7 @@ title: abap status
 description: 本地 vs SAP 同步状态 — 按 part 列出差异（local-only / remote-only / divergent / unchanged）；可选 --remote-only / --local-only / --all / --since / --limit
 tags: [abap-cli, command, status, sync, diff, parts]
 created at: 2026-08-28 00:00:00
-changed at: 2026-10-30 01:14:53
+changed at: 2026-11-01 22:05:00
 ---
 
 # abap status
@@ -66,7 +66,7 @@ abap status --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap status", "version": "1.3.0", "timestamp": "2026-08-28T00:00:00.000Z", "durationMs": 1800, "warnings": [] },
+  "meta": { "command": "abap status", "version": "2.0.0", "timestamp": "2026-08-28T00:00:00.000Z", "durationMs": 1800, "warnings": [] },
   "data": {
     "changedParts": [
       { "object": "ZCL_DEMO", "part": "main", "direction": "divergent", "detail": "local file: src/zcl_demo.clas.abap" },
@@ -84,7 +84,7 @@ abap status --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap status", "version": "1.3.0", "timestamp": "2026-08-28T00:00:00.000Z", "durationMs": 900, "warnings": [] },
+  "meta": { "command": "abap status", "version": "2.0.0", "timestamp": "2026-08-28T00:00:00.000Z", "durationMs": 900, "warnings": [] },
   "data": { "truncated": false, "checked": 5 }
 }
 ```

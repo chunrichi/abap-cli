@@ -4,7 +4,7 @@ title: abap report-stuck
 description: "把一次 agent 卡死记录成本地 JSON 报告（离线、不连 SAP / 网络），供事后 offline triage。"
 tags: [abap-cli, command, report-stuck, meta, local, triage, feedback-loop]
 created at: 2026-10-29 14:30:14
-changed at: 2026-10-31 06:45:00
+changed at: 2026-11-01 22:05:00
 ---
 
 # abap report-stuck
@@ -57,7 +57,7 @@ abap report-stuck --schema --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap report-stuck", "version": "1.3.0", "timestamp": "2026-10-31T05:36:20.430Z", "durationMs": 6, "warnings": [] },
+  "meta": { "command": "abap report-stuck", "version": "2.0.0", "timestamp": "2026-10-31T05:36:20.430Z", "durationMs": 6, "warnings": [] },
   "data": {
     "id": "STUCK-20261031T053620-7f3a",
     "recorded": true,
@@ -72,7 +72,7 @@ abap report-stuck --schema --json
 {
   "status": "success",
   "meta": {
-    "command": "abap report-stuck", "version": "1.3.0", "timestamp": "2026-10-31T05:37:02.901Z", "durationMs": 4,
+    "command": "abap report-stuck", "version": "2.0.0", "timestamp": "2026-10-31T05:37:02.901Z", "durationMs": 4,
     "warnings": [ { "code": "STUCK_REPORT_DEGRADED", "message": "Could not write stuck report to /home/user/.abap-cli/reports (STUCK-DEGRADED-20261031T053702-1b2c)." } ]
   },
   "data": { "id": "STUCK-DEGRADED-20261031T053702-1b2c", "recorded": false, "echo": { "goal": "push ZCL_DEMO", "tried": "retried 3x", "where": "abap push" } }

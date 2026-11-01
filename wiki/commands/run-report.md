@@ -4,7 +4,7 @@ title: abap run-report
 description: "执行一个已激活的可执行报表并返回其经典 list 输出（只读，经 bundled ICF 的 /run/report），支持 variant 与客户端 raw/tsv/csv 格式化。"
 tags: [abap-cli, command, run-report, report, submit, icf, read-only]
 created at: 2026-10-29 14:30:14
-changed at: 2026-10-31 13:24:09
+changed at: 2026-11-01 22:05:00
 ---
 
 # abap run-report
@@ -31,7 +31,7 @@ abap run-report --schema --json
 
 ## 前置条件
 
-- 已绑定 profile，SAP 可达；bundled ICF 服务已部署且版本匹配（当前 `1.3.0` 含 `/run/report`）。旧服务会以 `SAP_ERROR` / `QUERY_FAILED` 类错误暴露，先 `abap deploy --yes`。
+- 已绑定 profile，SAP 可达；bundled ICF 服务已部署且版本匹配（当前 `2.0.0` 含 `/run/report`）。旧服务会以 `SAP_ERROR` / `QUERY_FAILED` 类错误暴露，先 `abap deploy --yes`。
 - 目标报表存在、已激活，且 `TRDIR-SUBC = '1'`；include、module pool、class pool、function group 都不可执行。
 - 报表在**默认选择参数**下能跑完；需要必填参数的报表要先建选择变式，用 `--variant` 指定。
 - 报表输出经典 list（`WRITE` / `WRITE:/` 或 ALV 渲染到 list）；纯 GUI 容器控件的报表无法捕获。
@@ -56,7 +56,7 @@ abap run-report ZR_MY_REPORT --param P_USERNAME=DEVELOPER --param P_MAX=10 --jso
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap run-report", "version": "1.3.0", "timestamp": "2026-10-31T05:40:18.204Z", "durationMs": 2317, "warnings": [] },
+  "meta": { "command": "abap run-report", "version": "2.0.0", "timestamp": "2026-10-31T05:40:18.204Z", "durationMs": 2317, "warnings": [] },
   "data": {
     "report": "ZR_MY_REPORT", "params": [ { "name": "P_MAX", "value": "10" } ],
     "lines": ["|------|--------|", "|USER  |COUNT   |", "|DEV   |42      |", "|------|--------|"],
