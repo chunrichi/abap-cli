@@ -253,7 +253,7 @@ Channel routing: source objects, `DEVC`, `TTYP`, `MSAG`, `DDLS`, the CDS / RAP c
 
 ```jsonc
 // success — stdout, exit 0
-{ "status": "success", "meta": { "command": "abap pull", "version": "2.0.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { /* ... */ } }
+{ "status": "success", "meta": { "command": "abap pull", "version": "2.0.1", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { /* ... */ } }
 
 // failure — stderr, non-zero exit, stdout stays empty
 { "status": "error", "meta": { /* ... */ }, "error": { "code": "NO_TRANSPORT", "category": "VALIDATION_ERROR", "message": "..." } }

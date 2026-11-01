@@ -6,6 +6,8 @@
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-11-02
+
 本版修正 MSAG / TTYP / DDLS 的 ADT 通道读写，补齐两处机器契约缺口（`validate:aff` 的 NROB/ENQU 校验、`profile test` 的 ADT 能力探测），并让 NROB 创建接受空子类型；没有破坏性变更。
 
 ### Added
