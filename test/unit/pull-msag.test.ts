@@ -1,31 +1,19 @@
 /**
- * +: MSAG pull — ADT primary channel and the ICF
- * fallback selected by channel-detect on an ECC EHP6 kernel.
+ * MSAG pull — ADT primary channel, ICF fallback selected by channel-detect on
+ * an ECC EHP6 kernel, and the runtime fallback when a modern kernel does not
+ * route the ADT endpoint ("No URI-Mapping defined for URI").
+ *
+ * ADT fixtures use the real EMF shape: header in `adtcore` attributes, one
+ * `<mc:messages mc:msgno=… mc:msgtext=…>` element per message.
  */
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-const MSAG_EMPTY_XML = `<?xml version="1.0" encoding="UTF-8"?>
-<mc:messageClass xmlns:mc="http://www.sap.com/adt/messageclass">
-  <mc:description>Empty class</mc:description>
-  <mc:originalLanguage>EN</mc:originalLanguage>
-  <mc:messages/>
-</mc:messageClass>`;
+const MSAG_EMPTY_XML = `<?xml version="1.0" encoding="utf-8"?><mc:messageClass adtcore:name="ZMY_EMPTY" adtcore:type="MSAG/N" adtcore:description="Empty class" adtcore:language="EN" xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core"/>`;
 
-const MSAG_WITH_ARGS_XML = `<?xml version="1.0" encoding="UTF-8"?>
-<mc:messageClass xmlns:mc="http://www.sap.com/adt/messageclass">
-  <mc:description>Args class</mc:description>
-  <mc:originalLanguage>EN</mc:originalLanguage>
-  <mc:messages>
-    <mc:message number="001"><mc:text>Object &amp;1 created</mc:text></mc:message>
-    <mc:message number="002"><mc:text>Object &amp;1 not found in &amp;2</mc:text></mc:message>
-    <mc:message number="003"><mc:text>Plain message</mc:text></mc:message>
-    <mc:message number="004"><mc:text>Value &amp;1 &lt; &amp;2</mc:text></mc:message>
-    <mc:message number="005"><mc:text>Done</mc:text></mc:message>
-  </mc:messages>
-</mc:messageClass>`;
+const MSAG_WITH_ARGS_XML = `<?xml version="1.0" encoding="utf-8"?><mc:messageClass adtcore:masterLanguage="EN" adtcore:name="ZMY_WITH_ARGS" adtcore:type="MSAG/N" adtcore:description="Args class" adtcore:language="EN" xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core"><mc:messages mc:msgno="001" mc:msgtext="Object &amp;1 created"/><mc:messages mc:msgno="002" mc:msgtext="Object &amp;1 not found in &amp;2"/><mc:messages mc:msgno="003" mc:msgtext="Plain message"/><mc:messages mc:msgno="004" mc:msgtext="Value &amp;1 &lt; &amp;2"/><mc:messages mc:msgno="005" mc:msgtext="Done"/></mc:messageClass>`;
 
 const ICF_MSAG_DOC = {
   formatVersion: '1',
@@ -95,6 +83,38 @@ describe('runPullMsag — ADT channel', () => {
     expect(result.doc.messages[0]).toEqual({ number: '001', text: 'Object &1 created' });
     expect(result.doc.messages[1]!.text).toBe('Object &1 not found in &2');
     expect(result.doc.messages[3]!.text).toBe('Value &1 < &2');
+  });
+});
+
+describe('runPullMsag — runtime ADT endpoint fallback', () => {
+  it('falls back to ICF when the ADT endpoint answers "No URI-Mapping"', async () => {
+    adtGetMsag.mockRejectedValueOnce(new Error('No URI-Mapping defined for URI'));
+    const runPullMsag = await load();
+    const result = await runPullMsag('zmy_msag', { profile: ADT_PROFILE, rootDir: root });
+
+    expect(result.channel).toBe('icf');
+    expect(result.fallbackReason).toBe('ADT_ENDPOINT_UNAVAILABLE');
+    expect(icfGet).toHaveBeenCalledWith('/ddic/msag/ZMY_MSAG');
+    expect(result.doc.header.description).toBe('ECC fallback message class');
+  });
+
+  it('does not swallow unrelated ADT failures', async () => {
+    adtGetMsag.mockRejectedValueOnce(new Error('401 unauthorized'));
+    const runPullMsag = await load();
+    await expect(runPullMsag('zmy_msag', { profile: ADT_PROFILE, rootDir: root })).rejects.toThrow('401 unauthorized');
+    expect(icfGet).not.toHaveBeenCalled();
+  });
+
+  it('maps an ADT 404 onto OBJECT_NOT_FOUND instead of SAP_ERROR', async () => {
+    const { CliError } = await import('../../src/abap_cli/output/json.js');
+    adtGetMsag.mockRejectedValueOnce(
+      new CliError('SAP_ERROR', 'Resource MSAG ZMY_NOPE does not exist.', { details: { httpStatus: 404 } }),
+    );
+    const runPullMsag = await load();
+    await expect(runPullMsag('zmy_nope', { profile: ADT_PROFILE, rootDir: root })).rejects.toMatchObject({
+      code: 'OBJECT_NOT_FOUND',
+    });
+    expect(icfGet).not.toHaveBeenCalled();
   });
 });
 

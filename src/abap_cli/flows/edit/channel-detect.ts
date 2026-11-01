@@ -11,6 +11,11 @@
  *   - `{ channel: 'icf', fallbackReason: ... }`  — ECC EHP5/6 for TTYP/MSAG
  *   - DDLS on ECC → throws `DDLS_NOT_SUPPORTED_ON_ECC` (no fallback exists)
  *
+ * A modern kernel can still lack the ADT endpoint for a type (the release
+ * number predicts the DDIC model, not the SICF node). The flows catch that at
+ * runtime with `isAdtEndpointUnavailable()` and record `ADT_ENDPOINT_UNAVAILABLE`
+ * — the decision itself stays profile-only and cacheable.
+ *
  * Cache key = profileHash + type; TTL = process lifetime (SAP
  * profiles don't change inside one CLI invocation, and we deliberately avoid
  * cache-busting logic so tests stay deterministic).
@@ -176,4 +181,24 @@ export function detectChannel(profile: SystemProfile, subject: ChannelSubject): 
 export async function loadChannelProfile(): Promise<SystemProfile> {
   const cfg = await loadConfig();
   return { kernelRelease: cfg.systemVersion };
+}
+
+/** Runtime fallback reason when the kernel looks modern but the ADT endpoint
+ *  is not routed on that system — `detectChannel` cannot predict this from the
+ *  profile alone, so it is recorded after the ADT call fails. */
+export type AdtFallbackReason = 'ADT_ENDPOINT_UNAVAILABLE';
+
+/**
+ * Some kernels answer the MSAG ADT endpoint with "No URI-Mapping defined for
+ * URI" (HTTP 500) instead of a clean 404: the release number says the object
+ * type exists, but the SICF node behind the endpoint does not. Treat that
+ * signature as "ADT endpoint unavailable" so callers can fall back to the
+ * bundled ICF service.
+ *
+ * This is the one place where a SAP error is recognised by its message text —
+ * the ICF routing failure has no structured exception type to branch on.
+ */
+export function isAdtEndpointUnavailable(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /No URI-Mapping defined for URI/i.test(message);
 }

@@ -186,7 +186,18 @@ describe('runPushMsag', () => {
     const result = await runPushMsag(file, { profile: ADT_PROFILE, transport: 'NDK900002' });
 
     expect(result).toMatchObject({ object: 'ZMY_MSAG', channel: 'adt', action: 'updated' });
-    expect(adtUpdateMsag).toHaveBeenCalledWith('ZMY_MSAG', expect.stringContaining('Object &amp;1 pushed'), 'LH1', 'NDK900002');
+    expect(adtUpdateMsag).toHaveBeenCalledWith(
+      'ZMY_MSAG',
+      expect.stringContaining('xmlns:mc="http://www.sap.com/adt/MessageClass"'),
+      'LH1',
+      'NDK900002',
+    );
+    expect(adtUpdateMsag).toHaveBeenCalledWith(
+      'ZMY_MSAG',
+      expect.stringContaining('mc:msgtext="Object &amp;1 pushed"'),
+      'LH1',
+      'NDK900002',
+    );
   });
 
   it('reports OBJECT_NOT_FOUND for a missing message class', async () => {
@@ -196,6 +207,20 @@ describe('runPushMsag', () => {
     const file = write('zmy_msag.msag.json', MSAG_DOC);
 
     await expect(runPushMsag(file, { profile: ADT_PROFILE })).rejects.toMatchObject({ code: 'OBJECT_NOT_FOUND' });
+  });
+
+  it('falls back to ICF when the ADT endpoint answers "No URI-Mapping"', async () => {
+    await fresh();
+    adtGetMsag.mockRejectedValueOnce(new Error('No URI-Mapping defined for URI'));
+    const { runPushMsag } = await import('../../src/abap_cli/flows/edit/push-msag.js');
+    const file = write('zmy_msag.msag.json', MSAG_DOC);
+
+    const result = await runPushMsag(file, { profile: ADT_PROFILE });
+
+    expect(result.channel).toBe('icf');
+    expect(result.fallbackReason).toBe('ADT_ENDPOINT_UNAVAILABLE');
+    expect(icfPut).toHaveBeenCalledWith('/ddic/msag/ZMY_MSAG', { main: MSAG_DOC });
+    expect(adtUpdateMsag).not.toHaveBeenCalled();
   });
 
   it('falls back to ICF on an ECC EHP6 kernel', async () => {

@@ -6,6 +6,19 @@
 
 ## [Unreleased]
 
+本版修正 MSAG（消息类）双通道读写，并让 NROB 创建接受空子类型；没有破坏性变更。
+
+### Fixed
+
+- **MSAG 拉取不再写出空消息类**：ADT 通道此前按错误的 XML 形态解析，消息类的描述和消息文本会全部丢失；现在按 SAP 实际返回的 ADT 文档解析，`abap pull <消息类> --type MSAG` 能拿回完整描述与消息。
+- **MSAG 推送能真正写回消息文本**：ADT 更新此前把锁句柄放在请求头里，SAP 报 "Parameter lockHandle could not be found"；现在按 ADT 约定放在查询参数里，锁定 → 写入 → 解锁正常完成。
+- **MSAG 创建分两步写入**：ADT 创建端点只建头，消息文本需要后续锁定写入；此前创建请求里带的消息被 SAP 静默丢弃，得到空消息类。现在创建后立即写入消息。
+- **NROB 创建接受空 `subType`**：AFF schema 要求 `subType` 键存在但允许空字符串（没有子对象的普通编号范围对象）；此前内置 ICF 服务会拒绝空值，现在与 SE11 行为一致。
+
+### Changed
+
+- **MSAG 双通道兜底更完整**：现代内核上 ADT 端点未注册（SAP 答 "No URI-Mapping defined for URI"）时，`create` / `pull` / `push` 自动切到内置 ICF 服务，`data.channel` 为 `icf`、`data.fallbackReason` 为 `ADT_ENDPOINT_UNAVAILABLE`；ECC 旧内核仍为 `ECC_EHP6_NO_ADT_MESSAGECLASS`。本次涉及内置 ICF 服务，升级后执行一次 `abap deploy --yes`。
+
 ## [2.0.0] - 2026-11-01
 
 本版收窄本地包定义（只有 `$` 前缀免 transport）、放开内置 ICF 服务的本地包支持，并把运行时基线升级到 Node.js 24 LTS。有破坏性变更（Node.js 22/26 不再支持、`TEST...` 前缀的包不再免 transport），见 Migration。

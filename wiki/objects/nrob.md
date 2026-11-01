@@ -4,7 +4,7 @@ title: NROB — 编号范围对象（Number Range Object）
 description: NROB 对象的 ICF 路由、interval / configuration 字段契约、Z/Y 命名规则
 tags: [abap-cli, object-type, nrob, icf, abap-file-format, number-range, tnro, tnrot]
 created at: 2026-09-16 00:00:00
-changed at: 2026-11-01 21:35:00
+changed at: 2026-11-01 23:05:00
 ---
 
 # NROB — 编号范围对象（Number Range Object）
@@ -56,13 +56,15 @@ src/
 
 ## 关键字段
 
-### `interval`（全部必填）
+### `interval`（键全部必填）
+
+AFF schema 要求 `interval` 的六个键都存在；`subType` 的值允许是空字符串——空值表示编号范围对象**没有子对象**（SAP 的普通 NRIV 编号，SE11 里 Subobject 留空），ICF 创建接受该形态。
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `numberLengthDomain` | string | 决定编号长度的域（NUMC/CHAR，1–20 位）——与编号范围对象名是两个概念 |
 | `percentWarning` | number | 剩余编号告警阈值，0.1–99.9，步长 0.1 |
-| `subType` | string | 子对象绑定用的数据元素（需有检查表，域长 1–6） |
+| `subType` | string | 子对象绑定用的数据元素（需有检查表，域长 1–6）；空字符串 = 无子对象 |
 | `untilYear` | boolean | 是否按会计年度区分区间 |
 | `rolling` | boolean | 区间用尽后是否回卷 |
 | `prefix` | boolean | 编号是否带子对象前缀 |
@@ -130,7 +132,7 @@ src/
 2. **`nrobjstxt` 是 CHAR 20 不是 30** —— `description(30)` 在 description 短时 substr 表达式本身 dump "Subfield access offset=0 length=30 on size-28 data object"。先 strlen 再分支。
 3. **CLI 必须把 `name` 放进 wire body** —— ABAP 路径正则 `^/ddic/(...)/(.+)?$` 把 `/ddic/nrob` 的 name 段视为可选；CLI POST `/ddic/nrob`（无名字段）→ `lv_match_name` 空；body 里也得有 `name`，否则 `INVALID_ARGUMENT`。
 4. **`lv_name TYPE nrobj` = CHAR 10** —— 客户端送 12 字符名字，ABAP 自动截到 10，CLI 显示用 SAP 实际写的名字。
-5. **`subType` 必须有检查表、域长 1–6** —— `EBELP`(NUMC 5) / `BUKRS`(CHAR 4) / `KOSAR`(CHAR 1) 都能过；`MATNR`(CHAR 18) / `KUNNR`(CHAR 10) / `BANKN`(无 value table) / `RSNUM`(CHAR 10) 都过不了。
+5. **`subType` 非空时必须有检查表、域长 1–6** —— `EBELP`(NUMC 5) / `BUKRS`(CHAR 4) / `KOSAR`(CHAR 1) 都能过；`MATNR`(CHAR 18) / `KUNNR`(CHAR 10) / `BANKN`(无 value table) / `RSNUM`(CHAR 10) 都过不了。空字符串合法：表示不绑定子对象，ICF 创建不要求 `subType` 非空（2026-11-01 起）。
 6. **CLI `nrob.create.name` 静默截断** —— NROB name 截断后 ICF 返回 SAP 实际写的名字（10 字符），CLI 显示就用截断后的名字。如果用户传 `ZNR_VIBE_TEST`（12 字符），返回的 `data.name` 是 `ZNR_VIBE_T`（10 字符），用户需注意。
 
 ## Round-trip 验证结果
@@ -138,6 +140,7 @@ src/
 | 测试用例 | 创建 | 拉取 | 关键字段保持 |
 |---|---|---|---|
 | `ZNR_VIBE` (mainBuffer / 10% / rolling / EBELP) | ✓ | ✓ | buffering, percentWarning, rolling, subType, numberLengthDomain |
+| `subType` 为空（无子对象，`""`） | ✓（2026-11-01 真机） | ✓（ICF 兜底） | 创建后 TNRO.dtelsobj 为空，pull 回 `subType: ""`；对象无删除通道，测试残留需临时报表清理 |
 | `ZNR_EDGE` (none / 50% / rolling=false / untilYear=true / BUKRS / transactionId=ZTEST_TXN) | ✓ | ✓ | rolling→nonrswap 反义正确，transactionId 写入了 rfcdest，untilYear 写入了 yearind，none buffering 写入 ' ' |
 | Missing `numberLengthDomain` | ✗（CLI pre-flight） | — | AFF schema validation 拦截 |
 | `--package ZPKG_FAKE`（非本地包） | ✗（本地校验） | — | `transportRequest is required when package is not a local package` |

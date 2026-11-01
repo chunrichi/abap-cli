@@ -15,7 +15,7 @@ changed at: 2026-10-30 00:05:00
 
 - `kind: 'source'` — 该操作走协调器里的通用 ABAP 源码路径（CLAS / INTF / PROG / FUGR 等）。
 - `kind: 'handler'` — 该操作走 per-type flow（`create-*` / `pull-*` / `push-*` / `push-icf.ts`）。
-- `channel` — 该操作实际使用的 SAP 通道：`adt`、`icf`，或 `auto`（flow 内部调 `channel-detect`，按内核版本决定 ADT 主路径 / ECC ICF fallback）。
+- `channel` — 该操作实际使用的 SAP 通道：`adt`、`icf`，或 `auto`（flow 内部调 `channel-detect`，按内核版本决定 ADT 主路径 / ECC ICF fallback；现代内核缺 ADT 端点时，flow 还会在运行时按 `ADT_ENDPOINT_UNAVAILABLE` 降级，`channel` 仍表示实际落到的通道）。
 
 `types/registry.ts` 继续只负责对象类型的能力元数据（`createObjtype` / AFF schema / `requiresFile`）；本地路径不在这里注册——AFF 产物平铺为 `<rootDir>/<name>.<type>.<ext>`。`test/unit/routing.test.ts` 断言两张表的类型集合与每操作通道完全一致。
 

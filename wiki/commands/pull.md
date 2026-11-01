@@ -65,7 +65,7 @@ abap pull --help
 envelope 附加字段：
 
 - `data.channel`: `"adt"` | `"icf"` — 实际使用的通道
-- `data.fallbackReason`: `"ECC_EHP6_NO_ADT_TABLETYPE"` | `"ECC_EHP6_NO_ADT_MESSAGECLASS"` — 仅走 ICF 时出现
+- `data.fallbackReason`: `"ECC_EHP6_NO_ADT_TABLETYPE"` | `"ECC_EHP6_NO_ADT_MESSAGECLASS"`（ECC 旧内核）| `"ADT_ENDPOINT_UNAVAILABLE"`（现代内核但 ADT 端点未路由，运行时降级）— 仅走 ICF 时出现
 
 错误码映射：
 

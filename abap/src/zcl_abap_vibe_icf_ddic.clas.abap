@@ -1799,12 +1799,13 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
                                      message = 'number range object name is required' ) ).
       RETURN.
     ENDIF.
+    " subType is optional: blank means "no subobject" (SAP default for plain
+    " NRIV numbering), so it is not part of the required-field guard below.
     IF ls_request-interval-number_length_domain IS INITIAL
-       OR ls_request-interval-sub_type IS INITIAL
        OR ls_request-header-description IS INITIAL.
       ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
         error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code    = 'INVALID_ARGUMENT'
-                                     message = 'NROB create needs header.description, interval.numberLengthDomain and interval.subType' ) ).
+                                     message = 'NROB create needs header.description and interval.numberLengthDomain' ) ).
       RETURN.
     ENDIF.
     IF zcl_abap_vibe_icf_types=>is_local_package( lv_package ) = abap_false.

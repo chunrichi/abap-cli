@@ -1,13 +1,21 @@
 /**
- * MSAG create flow — dual-channel (ADT preferred, ICF fallback on ECC).
+ * MSAG create flow — dual-channel (ADT preferred, ICF fallback on ECC or when
+ * the ADT endpoint is not routed on this kernel).
+ *
+ * ADT splits creation in two calls: the collection POST creates the header
+ * (name / description / language / package), then a locked PUT writes the
+ * `mc:messages` content — a create body that carries messages is accepted but
+ * the messages are dropped.
  */
 import * as path from 'node:path';
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { IcfClient } from '../../clients/icf-client.js';
 import { CliError, printResult, type OutputMode } from '../../output/json.js';
-import { msagArtifact, type MsagLocal } from '../../formats/msag/json.js';
+import { msagArtifact, localToWire, type MsagLocal } from '../../formats/msag/json.js';
 import { toOutputPath } from '../../core/path-output.js';
-import { detectChannel, loadChannelProfile } from './channel-detect.js';
+import { transportForPackage } from '../../core/transport.js';
+import { detectChannel, loadChannelProfile, isAdtEndpointUnavailable } from './channel-detect.js';
+import { writeMsagContent } from './msag-adt.js';
 import { affObjectToken } from '../../formats/file-resolver.js';
 import type { CreateOptions } from './create.js';
 import type { CreateHandler } from './routing.js';
@@ -40,19 +48,32 @@ export async function runCreateMsag(
   }
   const profile = await loadChannelProfile();
   const decision = detectChannel(profile, 'msag');
-  const wire = msagArtifact.toWire(doc);
+  const wire = localToWire(doc, name);
+  // A stray --tr on a local package must not reach either channel.
+  const transport = transportForPackage(opts.package ?? '$TMP', opts.tr);
   if (decision.channel === 'adt') {
-    const client = await AdtClientWrapper.create();
-    await client.createMsag(name, wire, opts.package, opts.tr);
-    printResult(mode, { object: name, type: 'MSAG', action: 'created', channel: 'adt' }, `Created MSAG ${name} via ADT`);
-  } else {
-    const icf = await IcfClient.create();
-    const resp = await icf.post(`/ddic/msag/${encodeURIComponent(name)}`, { main: doc, ...(opts.tr ? { transportRequest: opts.tr } : {}) });
-    if (resp.status !== 'success') {
-      throw new CliError('DDIC_CREATE_FAILED' as never, resp.error?.message ?? 'ICF MSAG create failed', { object: name, type: 'MSAG', details: resp.error?.details });
+    try {
+      const client = await AdtClientWrapper.create();
+      await client.createMsag(name, {
+        packageName: opts.package ?? '$TMP',
+        description: doc.header.description,
+        language: doc.header.originalLanguage,
+        ...(transport ? { transport } : {}),
+      });
+      await writeMsagContent(client, name, wire, transport);
+      printResult(mode, { object: name, type: 'MSAG', action: 'created', channel: 'adt' }, `Created MSAG ${name} via ADT`);
+      return;
+    } catch (error) {
+      if (!isAdtEndpointUnavailable(error)) throw error;
+      // ADT endpoint missing on this kernel — use the bundled ICF fallback.
     }
-    printResult(mode, { object: name, type: 'MSAG', action: 'created', channel: 'icf' }, `Created MSAG ${name} via ICF fallback`);
   }
+  const icf = await IcfClient.create();
+  const resp = await icf.post(`/ddic/msag/${encodeURIComponent(name)}`, { main: doc, ...(transport ? { transportRequest: transport } : {}) });
+  if (resp.status !== 'success') {
+    throw new CliError('DDIC_CREATE_FAILED' as never, resp.error?.message ?? 'ICF MSAG create failed', { object: name, type: 'MSAG', details: resp.error?.details });
+  }
+  printResult(mode, { object: name, type: 'MSAG', action: 'created', channel: 'icf' }, `Created MSAG ${name} via ICF fallback`);
 }
 
 export const createMsagHandler: CreateHandler = async ({ name, opts, mode }) => {

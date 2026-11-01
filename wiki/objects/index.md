@@ -43,7 +43,7 @@ changed at: 2026-11-01 00:20:00
 
 - **ADT**（源对象）：无需 ICF 部署；直接打 SAP ADT REST API；走 `abap-adt-api` 库
 - **ICF** 自建（DDIC/HTTP/TRAN/VIEW/SHLP/XSLT）：需要先 `abap deploy`；走 `/sap/abap_cli/<domain>/<type>/<name>`（VIEW 为 `/ddic/view/<name>`，SHLP 为 `/ddic/shlp/<name>`，XSLT 为 `/xslt/<name>`）
-- **ADT + ICF 兜底**（TTYP/MSAG）：优先 ADT；ECC EHP5/6 内核（< 753）自动切 ICF，envelope 写 `data.channel` + `data.fallbackReason`
+- **ADT + ICF 兜底**（TTYP/MSAG）：优先 ADT；ECC EHP5/6 内核（< 753）自动切 ICF，现代内核缺 ADT 端点时运行时降级，envelope 写 `data.channel` + `data.fallbackReason`
 - **ADT 无兜底**（DDLS / SRVD / BDEF / DCLS / DDLX / DDLA / SRVB）：不发起 ICF 调用；DDLS 在旧内核直接硬错 `DDLS_NOT_SUPPORTED_ON_ECC`（exit 64）
 
 ## 详细决策

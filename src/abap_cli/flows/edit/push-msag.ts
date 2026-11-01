@@ -1,21 +1,26 @@
 /**
- * +: MSAG push.
+ * MSAG (message class) push — dual-channel (ADT preferred, ICF fallback on ECC
+ * or when the ADT endpoint is not routed on this kernel).
+ *
+ * ADT writes the message texts through a locked PUT (see `msag-adt.ts`); the
+ * ICF fallback POST/PUT is upsert-shaped and takes the local AFF document.
  */
 import * as path from 'node:path';
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { IcfClient } from '../../clients/icf-client.js';
 import { CliError } from '../../output/json.js';
 import { resolveFile } from '../../formats/file-resolver.js';
-import { detectChannel } from './channel-detect.js';
-import type { SystemProfile } from './channel-detect.js';
-import { msagArtifact } from '../../formats/msag/json.js';
+import { detectChannel, isAdtEndpointUnavailable } from './channel-detect.js';
+import type { AdtFallbackReason, SystemProfile } from './channel-detect.js';
+import { writeMsagContent } from './msag-adt.js';
+import { msagArtifact, localToWire } from '../../formats/msag/json.js';
 import { loadConfig } from '../../config/project-config.js';
 
 export interface PushMsagOptions { profile?: SystemProfile; transport?: string }
 export interface PushMsagResult {
   object: string;
   channel: 'adt' | 'icf';
-  fallbackReason?: 'ECC_EHP6_NO_ADT_MESSAGECLASS';
+  fallbackReason?: 'ECC_EHP6_NO_ADT_MESSAGECLASS' | AdtFallbackReason;
   action: 'updated';
 }
 
@@ -34,20 +39,16 @@ async function pushAdt(name: string, xml: string, transport: string | undefined)
   const client = await AdtClientWrapper.create();
   try {
     await client.getMsag(name);
-  } catch {
+  } catch (error) {
+    // A missing ADT endpoint is not "object does not exist" — let the caller
+    // fall back to ICF instead of masking the routing failure.
+    if (isAdtEndpointUnavailable(error)) throw error;
     throw new CliError('OBJECT_NOT_FOUND', `MSAG ${name} does not exist; use 'abap create MSAG ${name} --file <json>'`, {
       object: name,
       nextSteps: ["Re-run with 'abap create MSAG <name> --file <json> --package $TMP'."],
     });
   }
-  const url = `/sap/bc/adt/messageclass/${name}`;
-  const lock = await client.lock(url);
-  const handle = lock.LOCK_HANDLE;
-  try {
-    await client.updateMsag(name, xml, handle, transport);
-  } finally {
-    await client.unLock(url, handle).catch(() => undefined);
-  }
+  await writeMsagContent(client, name, xml, transport);
 }
 
 async function pushIcf(name: string, doc: object, transport: string | undefined): Promise<void> {
@@ -76,16 +77,26 @@ export async function runPushMsag(file: string, opts: PushMsagOptions = {}): Pro
       details: errors,
     });
   }
-  const wire = msagArtifact.toWire(doc);
+  const wire = localToWire(doc, name);
+  let channel: 'adt' | 'icf' = decision.channel;
+  let fallbackReason: PushMsagResult['fallbackReason'];
   if (decision.channel === 'adt') {
-    await pushAdt(name, wire, opts.transport);
+    try {
+      await pushAdt(name, wire, opts.transport);
+    } catch (error) {
+      if (!isAdtEndpointUnavailable(error)) throw error;
+      channel = 'icf';
+      fallbackReason = 'ADT_ENDPOINT_UNAVAILABLE';
+      await pushIcf(name, doc, opts.transport);
+    }
   } else {
+    fallbackReason = decision.fallbackReason as 'ECC_EHP6_NO_ADT_MESSAGECLASS';
     await pushIcf(name, doc, opts.transport);
   }
   return {
     object: name,
-    channel: decision.channel,
-    ...(decision.channel === 'icf' ? { fallbackReason: decision.fallbackReason as 'ECC_EHP6_NO_ADT_MESSAGECLASS' } : {}),
+    channel,
+    ...(fallbackReason ? { fallbackReason } : {}),
     action: 'updated',
   };
 }

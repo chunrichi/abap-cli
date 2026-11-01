@@ -5,12 +5,25 @@
  * mirrored under `src/abap_cli/schema/msag-v1.json`):
  *   { formatVersion, header, messages: [{number, text}] }
  *
- * Wire body is SAP ADT `mc:messageClass` XML. Wire → local uses regex
- * extraction (msag XML is shallow); local → wire produces a small XML
- * payload accepted by ADT POST. File/schema plumbing comes from the shared
- * AFF artifact contract (`artifact.ts`).
+ * Wire body is the ADT EMF `mc:messageClass` document that
+ * `/sap/bc/adt/messageclass/<name>` returns and accepts (shape verified
+ * against a live S/4HANA system): the header lives in `adtcore` attributes and
+ * every message is one `<mc:messages>` element — the element name is plural in
+ * the ADT model, and it carries the text as attributes:
+ *
+ *   <mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass"
+ *                    xmlns:adtcore="http://www.sap.com/adt/core"
+ *                    adtcore:name="ZMY_MSAG" adtcore:type="MSAG/N"
+ *                    adtcore:description="My message class"
+ *                    adtcore:language="EN">
+ *     <mc:messages mc:msgno="001" mc:msgtext="Object &amp;1 created"/>
+ *   </mc:messageClass>
+ *
+ * The local file name carries the object name, so `localToWire` takes it as an
+ * argument; that makes the pair a plain function pair instead of a symmetric
+ * `WireArtifact`. The artifact itself keeps the shared JSON/schema plumbing.
  */
-import { defineWireArtifact } from '../artifact.js';
+import { defineJsonArtifact } from '../artifact.js';
 
 export interface MsagMessageLocal {
   number: string;
@@ -35,7 +48,7 @@ function decodeXmlEntities(s: string): string {
     .replace(/&apos;/g, "'");
 }
 
-/** Inverse of `decodeXmlEntities` — `&` must be escaped first. */
+/** Inverse of `decodeXmlEntities` — `&` must be escaped first. Attribute-safe. */
 function encodeXmlEntities(s: string): string {
   return s
     .replace(/&/g, '&amp;')
@@ -45,25 +58,37 @@ function encodeXmlEntities(s: string): string {
     .replace(/'/g, '&apos;');
 }
 
+/** Read one `adtcore:`-prefixed attribute from the `mc:messageClass` root. */
+function coreAttribute(xml: string, name: string): string | undefined {
+  return new RegExp(`\\badtcore:${name}\\s*=\\s*"([^"]*)"`).exec(xml)?.[1];
+}
+
+/** Read one attribute from a `<mc:messages …>` tag (namespace prefix optional). */
+function messageAttribute(attrs: string, name: string): string | undefined {
+  return new RegExp(`\\b(?:\\w+:)?${name}\\s*=\\s*"([^"]*)"`, 'i').exec(attrs)?.[1];
+}
+
 export function wireToLocal(xml: string): MsagLocal {
-  const tag = (re: RegExp): string => {
-    const m = xml.match(re);
-    return (m?.[1] ?? '').trim();
-  };
-  const description = decodeXmlEntities(tag(/<[^>]*description[^>]*>([^<]+)<\/[^>]+>/i));
-  const originalLanguage = (tag(/<[^>]*originalLanguage[^>]*>([^<]+)<\/[^>]+>/i) || 'EN').toUpperCase();
-  // Anchor on the closing </...message> so a nested <mc:text> wrapper does not
-  // terminate the match early.
-  const messageRe =
-    /<(?:\w+:)?message\b[^>]*\snumber="([^"]+)"[^>]*?(?:\/>|>([\s\S]*?)<\/(?:\w+:)?message>)/gi;
+  const description = decodeXmlEntities(coreAttribute(xml, 'description') ?? '');
+  // The object's original language is the ADT master language; the plain
+  // `language` attribute is the fallback for objects whose TADIR master
+  // language is not visible over ADT (e.g. objects written by the ICF fallback).
+  const originalLanguage = (
+    coreAttribute(xml, 'masterLanguage') ??
+    coreAttribute(xml, 'language') ??
+    'EN'
+  ).toUpperCase();
   const messages: MsagMessageLocal[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = messageRe.exec(xml)) !== null) {
-    const body = m[2] ?? '';
-    // Unwrap the optional <mc:text>…</mc:text> child; self-closing bodies stay empty.
-    const textMatch = body.match(/<(?:\w+:)?text\b[^>]*>([\s\S]*?)<\/(?:\w+:)?text>/i);
-    const inner = (textMatch?.[1] ?? body).trim();
-    messages.push({ number: m[1]!.padStart(3, '0').slice(-3), text: decodeXmlEntities(inner) });
+  // Each message is one `<mc:messages …>` element; it may be self-closing or
+  // carry `<atom:link>` children (long text / navigation links).
+  for (const match of xml.matchAll(/<(?:\w+:)?messages\b([^>]*?)(?:\/>|>)/g)) {
+    const attrs = match[1] ?? '';
+    const number = messageAttribute(attrs, 'msgno');
+    if (!number) continue;
+    messages.push({
+      number: number.padStart(3, '0').slice(-3),
+      text: decodeXmlEntities(messageAttribute(attrs, 'msgtext') ?? ''),
+    });
   }
   return {
     formatVersion: '1',
@@ -72,25 +97,22 @@ export function wireToLocal(xml: string): MsagLocal {
   };
 }
 
-export function localToWire(local: MsagLocal): string {
-  const messages = (local.messages ?? []).map((msg) =>
-    `      <mc:message number="${msg.number}"><mc:text>${encodeXmlEntities(msg.text)}</mc:text></mc:message>`,
-  ).join('\n');
+export function localToWire(local: MsagLocal, name: string): string {
+  const messages = (local.messages ?? []).map(
+    (msg) => `  <mc:messages mc:msgno="${encodeXmlEntities(msg.number)}" mc:msgtext="${encodeXmlEntities(msg.text)}"/>`,
+  );
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    '<mc:messageClass xmlns:mc="http://www.sap.com/adt/messageclass">',
-    `  <mc:description>${encodeXmlEntities(local.header.description)}</mc:description>`,
-    `  <mc:originalLanguage>${local.header.originalLanguage}</mc:originalLanguage>`,
-    '  <mc:messages>',
-    messages,
-    '  </mc:messages>',
+    '<mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass"',
+    '                 xmlns:adtcore="http://www.sap.com/adt/core"',
+    `                 adtcore:name="${encodeXmlEntities(name.toUpperCase())}" adtcore:type="MSAG/N"`,
+    `                 adtcore:description="${encodeXmlEntities(local.header.description)}"`,
+    `                 adtcore:language="${encodeXmlEntities(local.header.originalLanguage.toUpperCase())}">`,
+    ...messages,
     '</mc:messageClass>',
   ].join('\n');
 }
 
-/** MSAG AFF artifact: file/schema plumbing + ADT wire mapping. */
-export const msagArtifact = defineWireArtifact<MsagLocal, string>({
-  type: 'MSAG',
-  toWire: (local) => localToWire(local),
-  fromWire: (xml) => wireToLocal(xml),
-});
+/** MSAG AFF artifact: file/schema plumbing (wire mapping is `wireToLocal` /
+ *  `localToWire` above — the write side needs the object name). */
+export const msagArtifact = defineJsonArtifact<MsagLocal>({ type: 'MSAG' });

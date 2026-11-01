@@ -21,7 +21,10 @@ const { mockConfig } = vi.hoisted(() => ({
 
 const createTtyp = vi.fn(async () => {});
 const createMsag = vi.fn(async () => {});
+const updateMsag = vi.fn(async () => {});
 const createDdls = vi.fn(async () => {});
+const adtLock = vi.fn(async () => ({ LOCK_HANDLE: 'LH1' }));
+const adtUnlock = vi.fn(async () => undefined);
 const icfPost = vi.fn(async () => ({ status: 'success' as const, data: {}, error: null }));
 
 vi.mock('../../src/abap_cli/config/project-config.js', () => ({
@@ -34,7 +37,10 @@ vi.mock('../../src/abap_cli/clients/adt-client.js', () => ({
     create: async () => ({
       createTtyp,
       createMsag,
+      updateMsag,
       createDdls,
+      lock: adtLock,
+      unLock: adtUnlock,
       getConfig: () => ({ transport: 'TRN001' }),
     }),
   },

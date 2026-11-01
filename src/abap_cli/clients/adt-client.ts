@@ -340,24 +340,33 @@ export class AdtClientWrapper {
     });
   }
 
-  /** POST /sap/bc/adt/messageclass — create a new MSAG. */
-  createMsag(name: string, xml: string, packageName: string, transport?: string): Promise<void> {
-    return this._call(async () => {
-      const url = `/sap/bc/adt/messageclass?_action=create&objtype=msag&objname=${encodeURIComponent(name.toUpperCase())}&corrNr=${encodeURIComponent(transport ?? '')}`;
-      await this.client.httpClient.request(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/xml',
-          Accept: 'application/*',
-          ...(packageName ? { 'X-CPACKAGE': packageName } : {}),
-          ...(transport ? { 'X-CORR-NR': transport } : {}),
-        },
-        body: xml,
-      });
+  /** POST /sap/bc/adt/messageclass — create a new MSAG (header only).
+   *
+   * The ADT creation endpoint takes name / description / language / package
+   * and silently drops any `mc:messages` in the body, so callers write the
+   * message texts with a follow-up PUT (see `flows/edit/msag-adt.ts`).
+   */
+  createMsag(
+    name: string,
+    meta: { packageName: string; description: string; language?: string; transport?: string },
+  ): Promise<void> {
+    return this.createObject({
+      objtype: 'MSAG/N',
+      name: name.toUpperCase(),
+      parentName: meta.packageName,
+      parentPath: '',
+      description: meta.description,
+      ...(meta.language ? { language: meta.language, masterLanguage: meta.language } : {}),
+      ...(meta.transport ? { transport: meta.transport } : {}),
     });
   }
 
-  /** PUT /sap/bc/adt/messageclass/<name> — overwrite an existing MSAG. */
+  /** PUT /sap/bc/adt/messageclass/<name> — overwrite an existing MSAG.
+   *
+   * ADT expects the lock handle and the transport as query parameters
+   * (`?lockHandle=&corrNr=`); sending them as headers makes SAP answer
+   * "Parameter lockHandle could not be found".
+   */
   updateMsag(name: string, xml: string, lockHandle: string, transport?: string): Promise<void> {
     return this._call(async () => {
       const url = `/sap/bc/adt/messageclass/${name.toUpperCase()}`;
@@ -366,8 +375,10 @@ export class AdtClientWrapper {
         headers: {
           'Content-Type': 'application/xml',
           Accept: 'application/*',
-          ...(lockHandle ? { 'X-LOCK': lockHandle } : {}),
-          ...(transport ? { 'X-CORR-NR': transport } : {}),
+        },
+        qs: {
+          ...(lockHandle ? { lockHandle } : {}),
+          ...(transport ? { corrNr: transport } : {}),
         },
         body: xml,
       });

@@ -12,6 +12,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   detectChannel,
   isEccOldRelease,
+  isAdtEndpointUnavailable,
   clearChannelCache,
   type SystemProfile,
 } from '../../src/abap_cli/flows/edit/channel-detect.js';
@@ -148,5 +149,20 @@ describe('detectChannel performance', () => {
     }
     const elapsed = performance.now() - start;
     expect(elapsed).toBeLessThan(500);
+  });
+});
+
+describe('isAdtEndpointUnavailable (runtime fallback signature)', () => {
+  it('recognises the ICM "No URI-Mapping" answer for a missing ADT endpoint', () => {
+    expect(isAdtEndpointUnavailable(new Error('No URI-Mapping defined for URI'))).toBe(true);
+    // The classifier may prefix the HTTP status line / append the URI.
+    expect(isAdtEndpointUnavailable(new Error('HTTP 500 Internal Server Error — No URI-Mapping defined for URI /sap/bc/adt/messageclass'))).toBe(true);
+  });
+
+  it('does not swallow unrelated ADT failures', () => {
+    expect(isAdtEndpointUnavailable(new Error('401 unauthorized'))).toBe(false);
+    expect(isAdtEndpointUnavailable(new Error('Parameter lockHandle could not be found.'))).toBe(false);
+    expect(isAdtEndpointUnavailable(new Error('LOCK_FAILED'))).toBe(false);
+    expect(isAdtEndpointUnavailable(undefined)).toBe(false);
   });
 });
