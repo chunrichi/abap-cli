@@ -1,15 +1,15 @@
 ---
 name: abap-cli-setup
-description: abap-cli 接入、诊断与基础设施就绪 — 配置工作区（`abap init` / `profile`）、诊断环境（`abap doctor`）、管理传输请求（`abap transport`）、部署/探测自带 ICF 服务（`abap deploy` / `abap deploy status`）、探查 session cookie jar（`abap session info`）、查阅 CLI ↔ TADIR 类型映射（`abap types`）。use when asking how to connect to SAP / configure a workspace / add a system profile / diagnose the CLI environment / list / create / show / resolve / assign a transport request / install or upgrade the bundled ICF service / check whether the bundled ICF service is current / inspect the SAP session cookie jar / debug a 400 "session timed out" auth error / what TADIR OBJECT a CLI type code maps to.
+description: abap-cli 接入、诊断与基础设施就绪 — 配置工作区（`abap init` / `profile`）、诊断环境（`abap doctor`）、管理传输请求（`abap transport`）、部署/探测自带 ICF 服务（`abap deploy` / `abap deploy status`）、查看 / 重置 SAP 会话存储（`abap session info` / `abap session reset`）、查阅 CLI ↔ TADIR 类型映射（`abap types`）。use when asking how to connect to SAP / configure a workspace / add a system profile / diagnose the CLI environment / list / create / show / resolve / assign a transport request / install or upgrade the bundled ICF service / check whether the bundled ICF service is current / inspect or reset the SAP session store / debug a 400 "session timed out" auth error / what TADIR OBJECT a CLI type code maps to.
 metadata:
-  version: "1.2.0"
+  version: "1.3.0"
   scope: workspace-and-sap
   commands: [init, profile, doctor, transport, deploy, session, types]
 ---
 
 # abap-cli-setup — 接入、诊断与基础设施就绪
 
-`workspace-and-sap` scope — 7 个命令管工作区配置、profile 凭证、本地诊断、SAP 传输请求、ICF 服务部署、session cookie 探查。本 skill **不**管对象操作（拉 / 推 / 查 / 跑）—— 那走 `abap-cli-search` / `abap-cli-edit` / `abap-cli-data`。
+`workspace-and-sap` scope — 7 个命令管工作区配置、profile 凭证、本地诊断、SAP 传输请求、ICF 服务部署、session 会话存储查看/重置。本 skill **不**管对象操作（拉 / 推 / 查 / 跑）—— 那走 `abap-cli-search` / `abap-cli-edit` / `abap-cli-data`。
 
 ## 接入前提
 

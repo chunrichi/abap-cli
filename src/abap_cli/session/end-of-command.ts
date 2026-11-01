@@ -1,8 +1,8 @@
 /**
  * End-of-command session release policy.
  *
- * `always-logout`: log every live session out (ADT + ICF) when the command
- *           ends; the jar is cleared on logout.
+ * `always-logout`: log every live ADT session out when the command ends; the
+ *           jar is cleared on logout.
  * `reuse`   (default): keep the session open — the jar persists it so the
  *           next CLI process reuses the same session. As a safety net, a
  *           session this process opened itself but could not persist for
@@ -33,7 +33,7 @@ export async function runEndOfCommandCleanup(config: Parameters<typeof resolveSe
   policyChecked = true;
   const policy = effectivePolicy(resolveSessionPolicy(config));
   if (policy === 'always-logout') {
-    await drainClients({ adt: true, icf: true });
+    await drainClients();
     return;
   }
   await drainUnreusableClients();

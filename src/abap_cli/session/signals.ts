@@ -53,7 +53,7 @@ export async function handleSignal(signal: 'SIGINT' | 'SIGTERM'): Promise<void> 
   if (exiting) return;
   exiting = true;
   try {
-    await drainClients({ adt: true, icf: true });
+    await drainClients();
   } catch {
     // drain is best-effort; never block the exit on it
   } finally {

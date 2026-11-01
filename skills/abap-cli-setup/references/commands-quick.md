@@ -159,20 +159,26 @@ abap deploy [options] | abap deploy status [options]
 
 ## `abap session`
 
-Inspect the session cookie reuse state for the active profile (no SAP call).
+Inspect or reset the SAP session store for the active profile (no SAP call).
 
 ```bash
-abap session info [--profile <name>]
+abap session info [--profile <name>] | abap session reset [--profile <name>] --yes
 ```
 
 | Option | Description |
 | --- | --- |
 | `--profile <name>` | Override the active profile (defaults to .abap.json#system). |
+| `--yes` | Confirm `session reset` (required; discards the persisted session). |
 
-- Show session jar state for the active profile
+- Show the effective session store and jar state
 
   ```bash
   abap session info --json
+  ```
+- Forget the persisted session (e.g. after reuse was paused)
+
+  ```bash
+  abap session reset --yes
   ```
 
 ## `abap types`

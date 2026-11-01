@@ -6,6 +6,9 @@ import { assertValidProfile } from '../../config/validation.js';
 import { findWorkspaceConfig } from '../../config/project-config.js';
 import { toOutputPath } from '../../core/path-output.js';
 import { nodeSatisfies } from './node-runtime.js';
+import { isSecretStoreDurable } from '../../config/secrets.js';
+import { sessionKeyModeForced } from '../../session/key.js';
+import { displayPath, SESSION_DIR_ENV, writableHint } from '../../session/store.js';
 
 export type DoctorStatus = 'ok' | 'err';
 
@@ -419,11 +422,72 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
     );
   }
 
+  // Session reuse is local (it only needs the store path + key source), so
+  // doctor can explain a degraded setup without touching SAP: a read-only HOME
+  // without a writable workspace store means "one login + logout per command".
+  await addSessionItems(environment, push, { home, cwd, verbose });
+
   // Connection probing intentionally lives outside doctor. Use
   // `abap profile test <name>` for live connectivity diagnostics; doctor
   // stays read-only and offline.
 
   return { ok: isOk(environment, config), environment, config, nextSteps: suggestions };
+}
+
+/**
+ * Session-store / session-key diagnostics (offline, read-only, no keychain
+ * probe): reports the store that a SAP command would actually use and whether
+ * session reuse is possible there. A read-only HOME plus a writable workspace
+ * store is normal for sandboxed agents and counts as ok.
+ */
+async function addSessionItems(
+  environment: DoctorItem[],
+  push: (section: DoctorItem[], item: DoctorItem, suggestionKey?: string) => void,
+  opts: { home: string; cwd: string; verbose: boolean },
+): Promise<void> {
+  const candidates: Array<{ kind: 'env' | 'home' | 'workspace'; dir: string }> = [];
+  const envDir = process.env[SESSION_DIR_ENV]?.trim();
+  if (envDir) candidates.push({ kind: 'env', dir: path.resolve(envDir) });
+  candidates.push({ kind: 'home', dir: path.join(opts.home, '.abap-cli', 'sessions') });
+  const workspaceConfig = findWorkspaceConfig(opts.cwd);
+  if (workspaceConfig) {
+    candidates.push({ kind: 'workspace', dir: path.join(path.dirname(workspaceConfig), '.abap-cli', 'sessions') });
+  }
+  const active = candidates.find((c) => writableHint(c.dir)) ?? null;
+  if (active) {
+    push(
+      environment,
+      okInfo(
+        'session.store',
+        `Session store is writable (${active.kind}).`,
+        opts.verbose ? displayPath(active.dir) : undefined,
+      ),
+    );
+  } else {
+    push(
+      environment,
+      errItem(
+        'session.store',
+        'No writable session store: session reuse is disabled and every command logs in and out again.',
+        'Set ABAP_CLI_SESSION_DIR to a writable directory (or make ~/.abap-cli writable) to enable session reuse.',
+      ),
+    );
+  }
+
+  const durable = await isSecretStoreDurable();
+  if (sessionKeyModeForced()) {
+    push(environment, okInfo('session.key', 'Session key: derived (forced by ABAP_CLI_SESSION_KEY_MODE).'));
+  } else if (!durable) {
+    push(
+      environment,
+      okInfo(
+        'session.key',
+        'Session key store is test/CI-only; session reuse is disabled and every command logs in and out again.',
+      ),
+    );
+  } else {
+    push(environment, okInfo('session.key', 'Session key: OS keychain.'));
+  }
 }
 
 /** True iff every environment / config item is `ok`. */

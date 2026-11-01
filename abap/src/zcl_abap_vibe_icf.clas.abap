@@ -6,6 +6,11 @@ ENDCLASS.
 
 CLASS zcl_abap_vibe_icf IMPLEMENTATION.
   METHOD if_http_extension~handle_request.
+    " Stateless service: every route does its work inside one request (locks are
+    " taken and released in the same call). Keeping the HTTP session stateful
+    " left one user session per CLI command in SM04, so mark it stateless here.
+    server->set_session_stateful( stateful = if_http_server=>co_disabled ).
+
     DATA(lv_path) = server->request->get_header_field( '~path_info' ).
     DATA(lv_method) = server->request->get_method( ).
     DATA(lv_body) = server->request->get_cdata( ).

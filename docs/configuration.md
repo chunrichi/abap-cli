@@ -71,6 +71,21 @@ A template lives at [`.abap.json.example`](../.abap.json.example). This file is 
 | `SAP_URL` / `SAP_USER` / `SAP_CLIENT` / `SAP_LANGUAGE` | Used by `abap init` in non-interactive mode |
 | `NODE_TLS_REJECT_UNAUTHORIZED` | Set to `0` for self-signed certs (development only) |
 | `ABAP_CLI_KEYCHAIN_BACKEND` | Force the credential store: `native` (default), `keytar` (legacy fallback), `none` (CI/tests), `fixture` (tests only) |
+| `ABAP_CLI_SESSION_POLICY` | `reuse` (default) or `always-logout`; overrides `.abap.json#sap.sessionPolicy` |
+| `ABAP_CLI_SESSION_DIR` | Explicit session-store directory (durable path; agent sandboxes / CI that need a fixed location) |
+| `ABAP_CLI_SESSION_KEY_MODE` | Set to `derived` to force the PBKDF2-derived jar key without an OS keychain (tests / CI) |
+
+### Session store
+
+The CLI reuses one SAP HTTP session across commands through an encrypted jar
+(`<system-hash>.json`, AES-256-GCM, key in the OS keychain). The store is
+resolved in this order:
+
+1. `ABAP_CLI_SESSION_DIR` (explicit override);
+2. `~/.abap-cli/sessions` (normal development machines);
+3. `<workspace>/.abap-cli/sessions` (sandboxed agents / CI where `$HOME` is read-only; the directory is self-ignored with `.gitignore` = `*`, mode 0700/0600).
+
+`$TMPDIR` is deliberately **not** used: a temp directory cannot be proven readable by the next process, and treating it as durable is how one orphan SAP session per command used to accumulate. When no store is writable the session layer degrades to "login + logout per command" (SM04 does not grow) and reports `SESSION_REUSE_DISABLED` in `meta.warnings`. Inspect the effective store with `abap session info --json`; reset it with `abap session reset --yes`.
 
 Passwords are **not** read from environment variables — they come from the OS keychain, `--password`, or a TTY prompt. `SAP_PASSWORD` / `BTP_PASSWORD` overrides were removed.
 

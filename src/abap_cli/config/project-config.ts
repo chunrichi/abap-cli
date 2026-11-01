@@ -35,6 +35,10 @@ export interface ProjectConfig {
   package: string;
   /** current system name (for capability reads / route decisions). */
   systemName: string;
+  /** Absolute path of the workspace `.abap.json`, when one was found. */
+  configPath: string | null;
+  /** Directory that contains the workspace `.abap.json` (workspace root). */
+  workspaceRoot: string | null;
   /** ADT text-element capability recorded at connect/init (optional). */
   adtTextpool?: { read: boolean; write: boolean; checkedAt: string };
   systemVersion?: string;
@@ -171,6 +175,8 @@ export async function loadConfig(options: LoadConfigOptions | string = {}): Prom
     systemName: live.systemName,
     adtTextpool: live.adtTextpool,
     systemVersion: live.systemVersion,
+    configPath,
+    workspaceRoot: configPath ? path.dirname(configPath) : null,
   };
 }
 

@@ -7,17 +7,31 @@
  *
  * The keychain entry is global (one key per OS user, not per profile) —
  * jars are bucketed by system hash on disk, not by key.
+ *
+ * `ABAP_CLI_SESSION_KEY_MODE=derived` forces the deterministic PBKDF2 key
+ * without touching the OS keychain. It exists for hermetic tests/CI (a
+ * durable key source that needs no keychain) and is reported as
+ * `keyMode:'derived'` by `abap session info`.
  */
 
 import { pbkdf2Sync, randomBytes } from 'node:crypto';
 import { SESSION_KEYCHAIN_ACCOUNT, getSessionKey, storeSessionKey, deleteSessionKey, isSecretStoreDurable } from '../config/secrets.js';
 import { CliError } from '../output/json.js';
 import type { SapConfig } from '../config/project-config.js';
+import type { SessionKeyMode } from './jar.js';
 
 const PBKDF2_ITER = 100_000;
 const PBKDF2_SALT = 'abap-cli-session-fallback-v1';
 const PBKDF2_KEYLEN = 32;
 const KEY_BYTES = 32;
+
+/** Force the deterministic derived key (hermetic tests/CI); no keychain I/O. */
+export const SESSION_KEY_MODE_ENV = 'ABAP_CLI_SESSION_KEY_MODE';
+
+/** True when the process was told to use the PBKDF2 key source. */
+export function sessionKeyModeForced(): boolean {
+  return process.env[SESSION_KEY_MODE_ENV]?.toLowerCase() === 'derived';
+}
 
 let _keychainAvailable: boolean | null = null;
 
@@ -80,26 +94,54 @@ export interface SessionKeyLoadResult {
    * `ephemeral`: the active secret store does not persist the key across
    * processes (test/CI backends), so cookie-jar reuse is disabled.
    */
-  mode: 'keychain' | 'derived' | 'ephemeral';
+  mode: Extract<SessionKeyMode, 'keychain' | 'derived'> | 'ephemeral';
+}
+
+export interface SessionKeyPeek {
+  mode: Exclude<SessionKeyMode, 'unknown'> | 'missing' | 'ephemeral';
+  key?: Buffer;
+}
+
+/**
+ * Read the key source without creating or writing anything — used by the
+ * read-only `abap session info` diagnostic. A keychain that is reachable but
+ * has no entry yet reports `missing`; session operations would create one.
+ */
+export async function peekSessionKey(profile: SapConfig): Promise<SessionKeyPeek> {
+  if (sessionKeyModeForced()) return { mode: 'derived', key: deriveSessionKey(profile) };
+  if (!(await isSecretStoreDurable())) return { mode: 'ephemeral' };
+  const available = await detectKeychainAvailable();
+  if (!available) return { mode: 'derived', key: deriveSessionKey(profile) };
+  const existing = await getSessionKey();
+  if (!existing) return { mode: 'missing' };
+  try {
+    return { mode: 'keychain', key: sessionKeyFromBase64(existing) };
+  } catch {
+    return { mode: 'missing' };
+  }
 }
 
 let _warnedAboutKeychain = false;
 
 /**
- * Resolve the encryption key for `~/.abap-cli/sessions/<hash>.json`.
+ * Resolve the encryption key for the session jar.
  *
  * Order:
- *   0. If the secret store is not durable (test/CI backends), return a
+ *   0. `ABAP_CLI_SESSION_KEY_MODE=derived` → deterministic derived key.
+ *   1. If the secret store is not durable (test/CI backends), return a
  *      derived key in `ephemeral` mode — the jar could never be decrypted by
  *      the next process, so callers disable reuse and log the session out.
- *   1. If keychain is available and an entry exists, use it.
- *   2. If keychain is available but no entry, generate a fresh 32-byte
+ *   2. If keychain is available and an entry exists, use it.
+ *   3. If keychain is available but no entry, generate a fresh 32-byte
  *      random key and store it.
- *   3. If keychain is unavailable, fall back to a PBKDF2-derived key
+ *   4. If keychain is unavailable, fall back to a PBKDF2-derived key
  *      (deterministic per profile) and emit a one-shot stderr WARN so
  *      the user knows their jar is not as strongly protected.
  */
 export async function loadOrCreateSessionKey(profile: SapConfig): Promise<SessionKeyLoadResult> {
+  if (sessionKeyModeForced()) {
+    return { key: deriveSessionKey(profile), mode: 'derived' };
+  }
   if (!(await isSecretStoreDurable())) {
     return { key: deriveSessionKey(profile), mode: 'ephemeral' };
   }

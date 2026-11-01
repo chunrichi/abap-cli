@@ -1,16 +1,22 @@
 /**
- * Session jar — encrypted blob persisted at `~/.abap-cli/sessions/<system-hash>.json`.
+ * Session jar — encrypted blob holding a live SAP HTTP session so the next
+ * CLI process can skip the login round-trip.
  *
- * The blob is the on-disk representation of an active SAP HTTP session
- * (`SAP_SESSIONID_<sid>_<client>` cookie + CSRF token) so subsequent
- * invocations of any command can skip the `ADTClient.login()` round-trip
- * and just inject the headers.
+ * The jar is stored by `session/store.ts`; this module only owns the format:
  *
- * Layout
  *   nonce (12 bytes) | ciphertext (N bytes) | auth tag (16 bytes)
  *
- * The whole payload is opaque bytes; the structured shape lives in the
- * inner `SessionJar` JSON which is only revealed after `decryptJar` succeeds.
+ * Format v2 adds the fields the session lifecycle needs to make honest reuse
+ * decisions (`keyMode`, `reuseFailures`, `reuseBlockedUntil`) and the SAP
+ * session identity (`sapSessionId`). v1 jars are still readable and are
+ * normalised to v2 in memory on decrypt.
+ *
+ * The cookie set is the *complete* set the SAP session was opened with —
+ * including `sap-contextid`. An S/4HANA ADT request that carries the session
+ * cookie but not its context cookie is routed into a brand-new SAP session
+ * (HTTP 200, no error), which is how the CLI used to leave one orphan session
+ * per command in SM04. Context cookies are therefore only droppable when the
+ * set has no stateful session cookie at all (stateless / degraded ICM).
  */
 
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
@@ -21,13 +27,25 @@ const ALGO = 'aes-256-gcm';
 const NONCE_BYTES = 12;
 const TAG_BYTES = 16;
 const KEY_BYTES = 32;
+const FORMAT_VERSION = '2' as const;
+
+/** Where the jar encryption key came from when the jar was written. */
+export type SessionKeyMode = 'keychain' | 'derived' | 'unknown';
 
 export interface SessionJarHeader {
   createdAt: string;
   lastLoginAt: string;
+  lastUsedAt?: string;
   systemHash: string;
   profileName: string;
   systemType: string;
+  keyMode: SessionKeyMode;
+  /** Consecutive commands whose replayed session SAP rejected with an auth error. */
+  reuseFailures: number;
+  /** Reuse is paused until this instant after `reuseFailures` crossed the limit. */
+  reuseBlockedUntil?: string;
+  /** `SAP_SESSIONID_<sid>_<client>` value, for diagnostics only. */
+  sapSessionId?: string;
 }
 
 export interface SessionJarCookie {
@@ -46,10 +64,30 @@ export interface SessionJarCsrf {
 }
 
 export interface SessionJar {
-  formatVersion: '1';
+  formatVersion: typeof FORMAT_VERSION;
   header: SessionJarHeader;
   cookies: SessionJarCookie[];
   csrf: SessionJarCsrf;
+}
+
+/** Cookie name that carries the ABAP/ICM context id. */
+export function isContextCookieName(name: string): boolean {
+  return name.toLowerCase() === 'sap-contextid';
+}
+
+/** Cookie name prefix that identifies a stateful SAP session. */
+export function isStatefulCookieName(name: string): boolean {
+  return /^SAP_SESSIONID_/i.test(name);
+}
+
+/** True when the cookie set carries a stateful SAP session cookie. */
+export function hasStatefulSessionCookie(cookies: readonly SessionJarCookie[]): boolean {
+  return cookies.some((c) => isStatefulCookieName(c.name));
+}
+
+/** `SAP_SESSIONID_...` value of the set, for diagnostics only. */
+export function jarSessionId(jar: SessionJar): string | undefined {
+  return jar.cookies.find((c) => isStatefulCookieName(c.name))?.value;
 }
 
 /**
@@ -77,7 +115,8 @@ export function encryptJar(jar: SessionJar, key: Buffer): Buffer {
 
 /**
  * Decrypt and validate a jar blob. The system hash check prevents a jar
- * written for profile A from being silently reused by profile B.
+ * written for profile A from being silently reused by profile B. v1 jars are
+ * normalised to the v2 shape (unknown key mode / no failure counters).
  */
 export function decryptJar(blob: Buffer, key: Buffer, expectedSystemHash: string): SessionJar {
   if (key.length !== KEY_BYTES) {
@@ -123,7 +162,7 @@ export function validateJarStructure(value: unknown): SessionJar {
     throw new CliError('SESSION_JAR_DECRYPT_FAILED', 'Session jar must be a JSON object.');
   }
   const v = value as Record<string, unknown>;
-  if (v.formatVersion !== '1') {
+  if (v.formatVersion !== '1' && v.formatVersion !== FORMAT_VERSION) {
     throw new CliError('SESSION_JAR_DECRYPT_FAILED', `Unsupported session jar formatVersion: ${String(v.formatVersion)}`);
   }
   const header = v.header as Record<string, unknown> | undefined;
@@ -162,31 +201,49 @@ export function validateJarStructure(value: unknown): SessionJar {
   }
   const validatedCsrf: SessionJarCsrf = { value: csrf.value, fetchedAt: csrf.fetchedAt };
   if (isStringOrUndefined(csrf.expiresAt)) validatedCsrf.expiresAt = csrf.expiresAt as string | undefined;
+
+  const keyMode =
+    h.keyMode === 'keychain' || h.keyMode === 'derived' || h.keyMode === 'unknown' ? h.keyMode : 'unknown';
+  const reuseFailures = typeof h.reuseFailures === 'number' && Number.isFinite(h.reuseFailures) ? h.reuseFailures : 0;
+  const validatedHeader: SessionJarHeader = {
+    createdAt: h.createdAt as string,
+    lastLoginAt: h.lastLoginAt as string,
+    systemHash: h.systemHash as string,
+    profileName: h.profileName as string,
+    systemType: h.systemType as string,
+    keyMode,
+    reuseFailures,
+  };
+  if (typeof h.lastUsedAt === 'string') validatedHeader.lastUsedAt = h.lastUsedAt;
+  if (typeof h.reuseBlockedUntil === 'string') validatedHeader.reuseBlockedUntil = h.reuseBlockedUntil;
+  if (typeof h.sapSessionId === 'string') validatedHeader.sapSessionId = h.sapSessionId;
+
   return {
-    formatVersion: '1',
-    header: {
-      createdAt: h.createdAt as string,
-      lastLoginAt: h.lastLoginAt as string,
-      systemHash: h.systemHash as string,
-      profileName: h.profileName as string,
-      systemType: h.systemType as string,
-    },
+    formatVersion: FORMAT_VERSION,
+    header: validatedHeader,
     cookies: validatedCookies,
     csrf: validatedCsrf,
   };
 }
 
 /** Convenience for tests / docs: build a well-formed jar from primitives. */
-export function makeEmptyJar(profile: SapConfig, systemType: string, profileName: string): SessionJar {
+export function makeEmptyJar(
+  profile: SapConfig,
+  systemType: string,
+  profileName: string,
+  keyMode: SessionKeyMode = 'unknown',
+): SessionJar {
   const now = new Date().toISOString();
   return {
-    formatVersion: '1',
+    formatVersion: FORMAT_VERSION,
     header: {
       createdAt: now,
       lastLoginAt: now,
       systemHash: computeSystemHash(profile),
       profileName,
       systemType,
+      keyMode,
+      reuseFailures: 0,
     },
     cookies: [],
     csrf: { value: '', fetchedAt: now },
@@ -199,4 +256,5 @@ export const SESSION_JAR_CONSTANTS = {
   NONCE_BYTES,
   TAG_BYTES,
   KEY_BYTES,
+  FORMAT_VERSION,
 } as const;

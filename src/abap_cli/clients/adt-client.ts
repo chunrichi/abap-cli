@@ -12,22 +12,14 @@ import {
   getTextElements as adtGetTextElements,
   setTextElements as adtSetTextElements,
 } from 'abap-adt-api/build/api/textelements.js';
+import { AxiosHttpClient } from 'abap-adt-api/build/AxiosHttpClient.js';
 import { loadConfig, type ProjectConfig } from '../config/project-config.js';
 import { CONFIG_ERROR_REFERENCE } from '../config/recovery.js';
 import { CliError } from '../output/json.js';
 import { classifyHttpError } from './http-error.js';
 import { buildBasicAuth } from './basic-auth.js';
-import { makeEmptyJar, type SessionJar } from '../session/jar.js';
-import { effectivePolicy, isUnsupportedInContext, resolveSessionPolicy } from '../session/policy.js';
-import { loadOrCreateSessionKey } from '../session/key.js';
-import {
-  captureSessionFromAdt,
-  clearJarFromDisk,
-  injectSessionIntoAdt,
-  loadJarFromDisk,
-  markJarPersisted,
-  shouldDegradeToStateless,
-} from '../session/reuse.js';
+import { SessionLifecycle } from '../session/manager.js';
+import { SessionHttpClient } from './session-http.js';
 import { registerAdtClient } from '../session/registry.js';
 import { buildCreateWire, type DevcCreateWireOptions } from '../formats/devc/json.js';
 
@@ -93,30 +85,20 @@ function mapPackageNotFound(error: unknown, name: string, action: 'read' | 'dele
 export class AdtClientWrapper {
   private client: ADTClient;
   private config: ProjectConfig;
+  private lifecycle: SessionLifecycle;
 
-  /** Effective session policy (`reuse` / `always-logout`) after env/config resolution. */
-  private policy: 'reuse' | 'always-logout' = 'reuse';
-  /** Loaded jar in reuse mode; `null` when fresh login is required. */
-  private jar: SessionJar | null = null;
-  /** 32-byte AES key for jar persistence (reuse mode only). */
-  private sessionKey: Buffer | null = null;
-  /** True once the session is ready (reused OR fresh-logged-in). */
-  private sessionReady = false;
-  /** True once a 401 fallback re-login has been attempted. */
-  private fallbackUsed = false;
-  /** True once this process opened a SAP session itself (fresh login). */
-  private freshLogin = false;
-  /** True when the live session is persisted for the next command to reuse. */
-  private sessionReusable = false;
-
-  private constructor(config: ProjectConfig, auth: { password: string; options: ClientOptions }) {
+  private constructor(config: ProjectConfig, auth: { password: string; options: ClientOptions }, lifecycle: SessionLifecycle) {
     this.config = config;
+    this.lifecycle = lifecycle;
+    // The custom HTTP client owns cookie injection/capture; the library's
+    // private cookie map is never touched (see clients/session-http.ts).
+    const http = new SessionHttpClient(new AxiosHttpClient(config.sap.url, auth.options), lifecycle.controller);
     this.client = new ADTClient(
-      this.config.sap.url,
-      this.config.sap.username,
+      http,
+      config.sap.username,
       auth.password,
-      this.config.sap.client,
-      this.config.sap.language,
+      config.sap.client,
+      config.sap.language,
       auth.options,
     );
     this.client.stateful = session_types.stateful;
@@ -125,42 +107,31 @@ export class AdtClientWrapper {
   /**
    * Force a fresh login now (used by flows that need to authenticate before
    * a probe, e.g. runtime-probe / probe). Distinct from the lazy session
-   * path in `_call`: it logs in directly and captures the session into the
-   * jar when in reuse mode.
+   * path in `_call`: it logs in directly and captures the session for reuse.
    */
   async login(): Promise<void> {
     await this._loginNow();
   }
 
   /**
-   * Keep the SAP session mode in sync with the ICM: an anonymous context cookie
-   * is never replayed (it makes the server answer `400 Session not found`), but
-   * the session only degrades to stateless when SAP did not hand out a real
-   * stateful session at all. Some systems return both an anonymous context and
-   * `SAP_SESSIONID_*` in the same login response; degrading there would break
-   * every lock-requiring command with the library's `STATELESS` error.
+   * Keep the SAP session mode in sync with what the login produced. Some
+   * systems hand out `sap-contextid` plus `SAP_SESSIONID_*`; stateful mode is
+   * kept whenever a real session cookie exists (otherwise every lock-requiring
+   * operation fails with the library's `STATELESS` error). Only a login that
+   * produced no session at all degrades to stateless.
    */
   private applySessionMode(): void {
-    if (shouldDegradeToStateless(this.client)) {
-      this.client.stateful = session_types.stateless;
-    } else {
-      // The login produced a real SAP session cookie: keep stateful mode even
-      // when the anonymous context cookie was dropped, otherwise every
-      // lock-requiring operation fails with the library's STATELESS error.
-      this.client.stateful = session_types.stateful;
-    }
+    this.client.stateful = this.lifecycle.controller.hasStatefulSession()
+      ? session_types.stateful
+      : session_types.stateless;
   }
 
   private async _loginNow(): Promise<void> {
     try {
+      this.lifecycle.beginFreshLogin();
       await this.client.login();
       this.applySessionMode();
-      this.freshLogin = true;
-      this.sessionReady = true;
-      if (this.jar && this.sessionKey) {
-        captureSessionFromAdt(this.client, this.jar);
-        this.sessionReusable = await markJarPersisted(this.jar, this.config.sap, this.sessionKey);
-      }
+      await this.lifecycle.adoptFreshLogin(this.client);
     } catch (error: unknown) {
       if (error instanceof CliError) throw error;
       throw classifyHttpError(error, { name: this.config.systemName });
@@ -171,8 +142,9 @@ export class AdtClientWrapper {
     try {
       const config = await loadConfig();
       const auth = buildBasicAuth(config.sap);
-      const wrapper = new AdtClientWrapper(config, auth);
-      await wrapper.initSession();
+      const lifecycle = await SessionLifecycle.init(config);
+      const wrapper = new AdtClientWrapper(config, auth, lifecycle);
+      lifecycle.applyTo(wrapper.client);
       registerAdtClient(wrapper);
       return wrapper;
     } catch (error: unknown) {
@@ -191,110 +163,36 @@ export class AdtClientWrapper {
 
   /** Effective session policy of this client (`reuse` or `always-logout`). */
   get sessionPolicy(): 'reuse' | 'always-logout' {
-    return this.policy;
+    return this.lifecycle.policy;
   }
 
   /** True when this wrapper reused a persisted SAP session (cookie jar). */
   get reusedSession(): boolean {
-    return this.sessionReady && !!this.jar && this.jar.cookies.length > 0;
+    return this.lifecycle.reused;
   }
 
   /**
    * True when this process opened a SAP session that the next command cannot
-   * reuse (non-durable key store, unwritable jar). The end-of-command hook
-   * releases such sessions so a degraded reuse path cannot leave one orphan
-   * session per command.
+   * reuse (no durable store, blocked reuse, persistence failure). The
+   * end-of-command hook releases such sessions so a degraded reuse path cannot
+   * leave one orphan session per command.
    */
   get sessionNeedsRelease(): boolean {
-    return this.freshLogin && !this.sessionReusable;
-  }
-
-  /**
-   * Decide whether to reuse a persisted SAP session or fall back to a fresh
-   * login on the first real request.
-   *
-   * cloud / btp: never touch the cookie jar — fresh login.
-   *  - `always-logout`: fresh login every command; no jar read/write.
-   *  - non-durable key store (test/CI backends): no jar read/write — fresh
-   *    login, released again at command end.
-   *  - `reuse` + valid jar: inject cookie + csrf so the first request skips
-   *    the `ADTClient.login()` round-trip and reuses the SAP session.
-   *  - `reuse` + no jar: lazily fresh-login on first `_call`, then capture
-   *    the cookie map + csrf back into a new jar and persist it.
-   *
-   * Runs before any request (from `create()`), so every existing call site
-   * gets session reuse without touching the 23+ `create()` callers.
-   */
-  private async initSession(): Promise<void> {
-    this.policy = effectivePolicy(resolveSessionPolicy(this.config));
-    if (isUnsupportedInContext(this.config) || this.policy === 'always-logout') {
-      // Cloud/BTP or forced fresh login: no jar read/write at all.
-      this.sessionReady = false;
-      return;
-    }
-
-    const { key, mode } = await loadOrCreateSessionKey(this.config.sap);
-    this.sessionKey = key;
-    if (mode === 'ephemeral') {
-      // The key store does not persist across processes, so a jar written now
-      // could never be decrypted by the next command. Skip the jar entirely
-      // and let the end-of-command hook release the fresh login.
-      this.sessionReady = false;
-      return;
-    }
-    const jar = await loadJarFromDisk(this.config.sap, key);
-    if (jar && jar.cookies.length > 0) {
-      injectSessionIntoAdt(this.client, jar);
-      this.jar = jar;
-      this.sessionReady = true; // first request reuses the saved SAP session
-      this.sessionReusable = true;
-    } else {
-      this.jar =
-        jar ??
-        makeEmptyJar(
-          { ...this.config.sap, password: '' },
-          this.config.sap.systemType ?? 'on-prem',
-          this.config.systemName,
-        );
-      this.sessionReady = false; // fresh login on first _call
-    }
+    return this.lifecycle.needsRelease;
   }
 
   /** Lazy fresh login + capture/persist of the new session (first real call). */
   private async ensureSession(): Promise<void> {
-    if (this.sessionReady) return;
-    await this.client.login();
-    this.applySessionMode();
-    this.freshLogin = true;
-    this.sessionReady = true;
-    if (this.jar && this.sessionKey) {
-      captureSessionFromAdt(this.client, this.jar);
-      this.sessionReusable = await markJarPersisted(this.jar, this.config.sap, this.sessionKey);
-    }
+    if (this.lifecycle.hasEstablishedSession) return;
+    await this._loginNow();
   }
 
   /**
-   * Explicit logout — used by `always-logout` policy at command end and by
-   * the SIGINT/SIGTERM handlers. Best-effort: never throws to the caller.
-   *
-   * The on-disk jar is cleared only when this process actually participated in
-   * reuse (`this.jar` is set): those cookies are dead after the logout. Under
-   * `always-logout` the wrapper never reads or writes the jar, so a jar left by
-   * a concurrent `reuse` command belongs to a *different*, still-open session —
-   * deleting it orphaned that session in SM04 (and forced the next command into
-   * a fresh login). Mixed policies must not fight over the shared jar.
+   * Explicit logout — used by the end-of-command lifecycle and by the
+   * SIGINT/SIGTERM handlers. Best-effort: never throws to the caller.
    */
   async logout(): Promise<void> {
-    const ownedJar = this.jar !== null;
-    try {
-      await this.client.logout();
-      this.sessionReady = false;
-      this.freshLogin = false;
-      this.sessionReusable = false;
-      if (ownedJar) clearJarFromDisk(this.config.sap);
-    } catch {
-      // logout is best-effort — swallow transport/auth errors.
-    }
+    await this.lifecycle.release(this.client);
   }
 
   get raw(): ADTClient {
@@ -323,21 +221,18 @@ export class AdtClientWrapper {
       return fn();
     };
     try {
-      return await attempt();
+      const result = await attempt();
+      this.lifecycle.markReuseSuccess();
+      return result;
     } catch (error: unknown) {
       const classified = error instanceof CliError ? error : classifyHttpError(error, { name: this.config.systemName });
-      if (this.jar && !this.fallbackUsed && classified.code === 'AUTH_ERROR') {
-        this.fallbackUsed = true;
-        // Stale session: re-login, re-capture, persist, then retry the call.
-        await this.client.login();
-        this.applySessionMode();
-        this.freshLogin = true;
-        captureSessionFromAdt(this.client, this.jar);
-        if (this.sessionKey) {
-          this.sessionReusable = await markJarPersisted(this.jar, this.config.sap, this.sessionKey);
-        }
+      if (classified.code === 'AUTH_ERROR' && this.lifecycle.recordAuthFailure()) {
+        // Stale session: re-login, re-capture, persist, then retry once.
+        await this._loginNow();
         try {
-          return await attempt();
+          const result = await attempt();
+          this.lifecycle.markReuseSuccess();
+          return result;
         } catch (retryError: unknown) {
           if (retryError instanceof CliError) throw retryError;
           throw classifyHttpError(retryError, { name: this.config.systemName });

@@ -79,9 +79,12 @@
 
 ### session
 
-| code | cat/exit | 触发 | 修复 |
-|---|---|---|---|
-| `SESSION_JAR_DECRYPT_FAILED` | VALIDATION_ERROR/7 | `session info` 解密失败 | keychain 缺 / 密钥错；删除 `~/.abap-cli/sessions/<hash>.json` 让下次 login 重建 |
+| Code | Category/Exit | When |
+|---|---|---|
+| `SESSION_JAR_DECRYPT_FAILED` | VALIDATION_ERROR/7 | `session info` 解密失败：key 变了 / jar 损坏 / 换了 profile。`abap session reset --yes` 后下次登录重建 |
+| `SESSION_REUSE_UNSUPPORTED` | VALIDATION_ERROR/7 | cloud/BTP profile 不支持 cookie 复用（`doctor` warning；不阻断） |
+
+`--json` 的 `meta.warnings` 里可能出现：`SESSION_REUSE_DISABLED`（没有 durable 存储或 key 不可持久化，复用关闭、每条命令登录+登出）、`SESSION_STORE_FALLBACK`（HOME 不可写，已切到工作区存储）、`SESSION_REUSE_UNSTABLE`（SAP 连续拒绝存档会话，复用暂停 10 分钟）、`SESSION_JAR_CORRUPT`（jar 解不开已隔离）。排查看 `abap session info --json` 的 `store` / `candidates` / `jar`。
 
 ## JSON 输出契约参考
 

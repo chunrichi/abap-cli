@@ -13,7 +13,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { deriveSessionKey, loadOrCreateSessionKey, resetKeychainCache, sessionKeyFromBase64, sessionKeyToBase64 } from '../../../src/abap_cli/session/key.js';
 import { _resetBackendForTesting, isSecretStoreDurable } from '../../../src/abap_cli/config/secrets.js';
-import { drainClients, registerAdtClient, registerIcfClient, resetRegistry } from '../../../src/abap_cli/session/registry.js';
+import { drainClients, registerAdtClient, resetRegistry } from '../../../src/abap_cli/session/registry.js';
 import { _resetPolicyGuard, runEndOfCommandCleanup } from '../../../src/abap_cli/session/end-of-command.js';
 import { _resetSignalState, handleSignal } from '../../../src/abap_cli/session/signals.js';
 import type { SapConfig } from '../../../src/abap_cli/config/project-config.js';
@@ -79,25 +79,18 @@ describe('registry drain', () => {
     const b = { logout: vi.fn().mockResolvedValue(undefined) };
     registerAdtClient(a as never);
     registerAdtClient(b as never);
-    await drainClients({ adt: true, icf: false });
+    await drainClients();
     expect(a.logout).toHaveBeenCalledTimes(1);
     expect(b.logout).toHaveBeenCalledTimes(1);
     // Second drain is a no-op (registry already empty).
-    await drainClients({ adt: true, icf: false });
+    await drainClients();
     expect(a.logout).toHaveBeenCalledTimes(1);
-  });
-
-  it('calls cleanup on every registered ICF client', async () => {
-    const a = { cleanup: vi.fn() };
-    registerIcfClient(a as never);
-    await drainClients({ adt: false, icf: true });
-    expect(a.cleanup).toHaveBeenCalledTimes(1);
   });
 
   it('tolerates a logout that throws', async () => {
     const a = { logout: vi.fn().mockRejectedValue(new Error('network down')) };
     registerAdtClient(a as never);
-    await expect(drainClients({ adt: true, icf: false })).resolves.toBeUndefined();
+    await expect(drainClients()).resolves.toBeUndefined();
   });
 });
 
@@ -249,5 +242,16 @@ describe('session-key durability gate', () => {
     _resetBackendForTesting();
 
     await expect(isSecretStoreDurable()).resolves.toBe(true);
+  });
+
+  it('honours the explicit derived key mode without touching the keychain', async () => {
+    process.env.ABAP_CLI_SESSION_KEY_MODE = 'derived';
+    try {
+      const result = await loadOrCreateSessionKey(profile());
+      expect(result.mode).toBe('derived');
+      expect(result.key.equals(deriveSessionKey(profile()))).toBe(true);
+    } finally {
+      delete process.env.ABAP_CLI_SESSION_KEY_MODE;
+    }
   });
 });

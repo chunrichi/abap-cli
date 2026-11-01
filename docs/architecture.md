@@ -37,9 +37,9 @@ src/abap_cli/
 │   ├── devc/             # DEVC (package) wire → AFF devc-v1.json mapping + create request body
 │   └── xslt/             # XSLT pair (.xslt.json metadata + .xslt.xml source) mapping + line-ending normalisation
 ├── types/                # TYPE_REGISTRY — object-type metadata single source of truth
-├── clients/              # AdtClientWrapper (abap-adt-api), ICF client + version check, connection probe, basic auth
+├── clients/              # AdtClientWrapper (abap-adt-api + cookie-aware HTTP transport), ICF client + version check, connection probe, basic auth
 ├── config/               # .abap.json + user system profiles, keychain (secrets.ts), CA, profile export/import
-├── session/              # session reuse, cookie / key policy
+├── session/              # session store (env/home/workspace) + cookie policy + lifecycle state machine
 ├── core/                 # cross-layer utilities: object/transport resolution, limits, path output, confirmation
 ├── aff/                  # vendored AFF schema resolution + validation
 ├── adc/                  # ADT Deployment Channel runtime probe + ICF register strategies
@@ -49,6 +49,7 @@ src/abap_cli/
 
 ### Key decisions
 
+- **Session reuse is store-first, not write-first** — a CLI process may keep its SAP session open only when the encrypted jar landed in a *durable* store (`ABAP_CLI_SESSION_DIR` → `~/.abap-cli/sessions` → `<workspace>/.abap-cli/sessions`), contains a stateful `SAP_SESSIONID_*` cookie *and* its `sap-contextid`, and replay has not been paused after repeated auth failures. Everything else is logged out at command end. `$TMPDIR` is not a store: it cannot prove the next process can read the jar. The cookie policy matters because S/4HANA silently routes a request that carries the session cookie without its context cookie into a new SAP session (one orphan per command in SM04); see `docs/architecture.md`, `wiki/commands/session.md` and `wiki/design-decisions/015-session-lifecycle.md`.
 - **ADT via `abap-adt-api`** — source objects (Class/Interface/Program/Function Group) use the standard ADT REST API: search, object structure, source GET/PUT, lock/unlock, content-based syntax check, ABAP Unit runs (`test`), activation, object creation, transport management, usage references (`where-used`).
 - **Thin client** — the CLI only orchestrates HTTP calls and file/result handling; business logic stays on the SAP side.
 - **Unified output** — every command uses `output/json.ts` (`printResult`/`printError`) so `--json` output is consistent across commands and parseable by agents. `OutputMode` is `'human' | 'json' | 'pretty-json'`; `--json` is compact (token-efficient), `--pretty-json` is indented. `stripEmpty()` recursively trims empty `{}` / `[]` from `data` in JSON modes.
@@ -82,7 +83,9 @@ The bundled ICF service under `/sap/abap_cli` is maintained in two forms generat
 
 **Development form** — `abap deploy --dev` installs all 20 classes as global objects in dependency order (shared types first, format renderers before the DDIC helper, the handler after every helper, setup / runner last) and skips the merge. Maintainers use it to iterate on a single class on a real system, where each class can be syntax-checked, activated and run on its own. The two forms coexist on one system: the release form uses `lcl_*` locals, the development form uses `zcl_*` globals, and only the handler name is shared — whichever form was deployed last owns its three parts.
 
-Endpoints exposed under `/sap/abap_cli/` (current service version `1.2.0`, see `src/abap_cli/clients/icf-version.ts`):
+The ICF endpoint is **stateless** (`IF_HTTP_SERVER->SET_SESSION_STATEFUL( abap_false )` in the handler): every route does its work inside one request, and no SAP user session is kept between requests. Before this, each CLI command that used ICF left one session in SM04.
+
+Endpoints exposed under `/sap/abap_cli/` (current service version `1.3.0`, see `src/abap_cli/clients/icf-version.ts`):
 
 | Endpoint | Used by |
 |---|---|

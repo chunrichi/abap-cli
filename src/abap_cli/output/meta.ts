@@ -71,6 +71,12 @@ export type WarningCode =
   // standalone activate cannot tell an already-active object from a silent
   // no-op, so it surfaces the flag instead of failing (push hard-fails).
   | 'ACTIVATION_NOT_EXECUTED'
+  // session lifecycle — degraded reuse surfaces in `--json` (not just a
+  // once-per-process stderr line) so an agent can see why reuse is off.
+  | 'SESSION_REUSE_DISABLED'   // no durable session store / non-persistent key backend
+  | 'SESSION_REUSE_UNSTABLE'   // SAP kept rejecting the stored session; reuse paused
+  | 'SESSION_JAR_CORRUPT'      // stored jar could not be decrypted; discarded
+  | 'SESSION_STORE_FALLBACK'   // home not writable; workspace store is in use
   ;
 
 export interface Warning {

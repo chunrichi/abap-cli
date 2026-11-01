@@ -4,10 +4,6 @@ import { buildBasicAuth } from './basic-auth.js';
 import { CliError } from '../output/json.js';
 import type { ErrorCode } from '../output/error-codes.js';
 import { classifyHttpError } from './http-error.js';
-import { effectivePolicy, isUnsupportedInContext, resolveSessionPolicy } from '../session/policy.js';
-import { loadJarFromDisk, icfCookieHeader } from '../session/reuse.js';
-import { loadOrCreateSessionKey } from '../session/key.js';
-import { registerIcfClient } from '../session/registry.js';
 import { ICF_BASE_PATH } from './icf-version.js';
 
 export interface IcfResponse<T = unknown> {
@@ -20,34 +16,9 @@ export interface IcfResponse<T = unknown> {
   } | null;
 }
 
-/**
- * Whether a transport error looks like an expired/invalid SAP session, i.e. the
- * session jar's cookie is no longer usable.
- *
- * The retry used to cover only HTTP 401/403, but SAP's ICF layer answers a
- * timed-out session with **HTTP 400** and a body saying `Session Timed Out`
- * (verified on vhcala4hci). Because that case was not retried, a stale cookie
- * jar made every ICF command — `select`, `deploy status`, `--textpool`, TABL
- * pulls — fail until the user forced a fresh login. See the F-19 investigation
- * in docs/abap-cli-feedback-verification.md.
- */
-function isStaleSessionError(error: unknown): boolean {
-  if (!axios.isAxiosError(error)) return false;
-  const status = error.response?.status;
-  if (status === 401 || status === 403) return true;
-  if (status !== 400) return false;
-  const data: unknown = error.response?.data;
-  const text = typeof data === 'string' ? data : JSON.stringify(data ?? '');
-  return /session (?:timed out|timeout|no longer|invalid|expired)|logon/i.test(text);
-}
-
 export class IcfClient {
   private http: AxiosInstance;
   private baseUrl: string;
-  /** Cookie header from the session jar when reuse is active (else undefined). */
-  private jarCookie: string | undefined;
-  /** Whether this client attempted a stale-session 401 fallback already. */
-  private fallbackUsed = false;
 
   private constructor(config: ProjectConfig, auth: { password: string; options: import('abap-adt-api').ClientOptions }) {
     this.baseUrl = `${config.sap.url}${ICF_BASE_PATH}`;
@@ -68,34 +39,19 @@ export class IcfClient {
     });
   }
 
+  /**
+   * Create a basic-auth ICF client.
+   *
+   * The bundled ICF service is being made stateless server-side, so this
+   * client deliberately does not read or inject the ADT session jar: an ICF
+   * request belongs to its own HTTP session, and replaying the ADT cookie set
+   * here never joined that session anyway (it only produced stale-session
+   * retries and orphan sessions).
+   */
   static async create(): Promise<IcfClient> {
     const config = await loadConfig();
     const authOpts = buildBasicAuth(config.sap);
-
-    // Session reuse for ICF: same jar as ADT, so a pull + push pair on the
-    // same profile reuses the SAP session (no new `User Sessions` entry per
-    // push). cloud / btp / always-logout / non-durable key stores keep the
-    // fresh-login path.
-    const policy = effectivePolicy(resolveSessionPolicy(config));
-    if (!isUnsupportedInContext(config) && policy === 'reuse') {
-      const { key, mode } = await loadOrCreateSessionKey(config.sap);
-      if (mode !== 'ephemeral') {
-        const jar = await loadJarFromDisk(config.sap, key);
-        if (jar && jar.cookies.length > 0) {
-          const cookieHeader = icfCookieHeader(jar);
-          if (cookieHeader) {
-            const client = new IcfClient(config, authOpts);
-            client.jarCookie = cookieHeader;
-            client.http.defaults.headers.common['Cookie'] = cookieHeader;
-            registerIcfClient(client);
-            return client;
-          }
-        }
-      }
-    }
-    const client = new IcfClient(config, authOpts);
-    registerIcfClient(client);
-    return client;
+    return new IcfClient(config, authOpts);
   }
 
   async get<T>(path: string): Promise<IcfResponse<T>> {
@@ -259,25 +215,12 @@ export class IcfClient {
 
   /** Run one HTTP call and normalize transport errors into a CliError. */
   private async request<T>(method: 'get' | 'post' | 'put' | 'delete', path: string, body?: unknown): Promise<IcfResponse<T>> {
-    let resp: AxiosResponse<IcfResponse<T>>;
     try {
-      resp = await this.send<T>(method, path, body);
+      const resp = await this.send<T>(method, path, body);
+      return resp.data;
     } catch (error: unknown) {
-      // Stale jar cookie: drop the Cookie header and retry once with plain
-      // basic-auth before surfacing a transport error.
-      if (this.jarCookie && !this.fallbackUsed && isStaleSessionError(error)) {
-        this.fallbackUsed = true;
-        delete this.http.defaults.headers.common['Cookie'];
-        try {
-          resp = await this.send<T>(method, path, body);
-        } catch (retryError: unknown) {
-          return this.normalizeError(retryError);
-        }
-        return resp.data;
-      }
       return this.normalizeError(error);
     }
-    return resp.data;
   }
 
   /** Low-level send used by `request` (single attempt, no cookie fallback). */
@@ -304,17 +247,6 @@ export class IcfClient {
     throw toHttpError(error);
   }
 
-  /**
-   * Drop the reused session cookie. Called when the command ends in
-   * `always-logout` mode or on SIGINT/SIGTERM; keeps ICF from pinning a
-   * session the ADT side already logged out. Best-effort.
-   */
-  cleanup(): void {
-    if (this.jarCookie) {
-      delete this.http.defaults.headers.common['Cookie'];
-      this.jarCookie = undefined;
-    }
-  }
 }
 
 /**

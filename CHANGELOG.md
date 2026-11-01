@@ -6,6 +6,40 @@
 
 ## [Unreleased]
 
+本版重做 CLI 的 SAP 会话层：跨命令真正复用同一个 SAP 会话，无法复用时命令结束一定登出，`SM04` 不再按命令数增长；会话存储/密钥/复用状态可通过 `abap session info` 直接看到。有破坏性变更（`session info --json` 形状、`$TMPDIR` 兜底移除），见 Migration。
+
+### Added
+
+- **`abap session reset`**：删除当前 profile 的持久化会话（含损坏隔离副本），用于会话复用因连续失败被暂停后立即重试；需 `--yes`。
+- **`abap session info` 重建**：报告实际生效的会话存储、所有候选目录、密钥来源、jar 的真实 cookie 数 / CSRF / 连续失败计数，以及复用是否启用及原因。
+- **`ABAP_CLI_SESSION_DIR`**：显式指定会话存储目录（agent 沙箱/CI 需要固定位置时使用）。
+- **`ABAP_CLI_SESSION_KEY_MODE=derived`**：不依赖 OS keychain 的确定性会话密钥，供无 keychain 的测试/CI 启用会话复用。
+- **工作区会话存储**：HOME 不可写（agent sandbox / CI）时自动使用 `<workspace>/.abap-cli/sessions`（目录自忽略、0700/0600、加密），不再依赖 `$TMPDIR`。
+
+### Changed
+
+- **会话复用判定改为「可持久化且未被拒绝」**：只有 jar 写入 durable 会话存储、包含 stateful 会话 cookie、且未被连续拒绝时，命令结束才保留会话；否则本轮登录的会话在命令结束时登出。`$TMPDIR` 兜底被移除——它无法证明下一条命令能读到 jar。
+- **内置 ICF 服务改为无状态**：`/sap/abap_cli/` 的请求不再保留 SAP HTTP 会话（此前每条走 ICF 的命令会在 SM04 留下一个会话）。升级后执行一次 `abap deploy --yes`。
+- **会话降级可见**：复用不可用、工作区回退、连续被拒、损坏 jar 都会以结构化 warning 出现在 `--json` 的 `meta.warnings`，不再只有一次 stderr 提示。
+- **`abap doctor`** 增加 `session.store` / `session.key` 检查（离线）。
+
+### Fixed
+
+- **每条命令在 SM04 残留一个 SAP 会话**：ADT 请求未携带 `sap-contextid` 时，SAP 会把它路由到一个新的用户会话（HTTP 200、无报错），jar 里的登录会话从未被真正复用；现在会话 cookie 与 context cookie 成对持久化/回放，跨命令复用同一个 SAP 会话。
+- **「无法复用时命令结束登出」的安全网**此前按「jar 写成功」判定，在退化路径上不触发；现在按实际可复用性判定。
+- **`session info` 只看 `~/.abap-cli/sessions`**，fallback/工作区 jar 不可见、`cookieCount=0` 误导；现在报告实际生效的存储与 jar。
+
+### Removed (breaking)
+
+- **`abap session info --json` 的 `data` 形状**：`jarPath` / `lastLoginAt` / `cookieCount` / `csrfPresent` 改为 `store` / `candidates` / `jar` 结构，并新增 `keyMode` / `reuseEnabled` / `reuseReason`；`data.jar` 为 `null` 表示没有可读 jar。
+- **`$TMPDIR/abap-cli/sessions` 兜底存储**：不再读写。HOME 不可写时自动落工作区存储；两者都不可写时会话复用关闭（每条命令登录+登出，SM04 不增长）。
+
+**Migration**：
+
+- 消费 `abap session info --json` 的脚本：改读 `data.store` / `data.candidates` / `data.jar`；没有会话时 `data.jar === null`。
+- agent / CI 沙箱：通常无需配置（自动使用工作区存储）；如果需要固定位置，设置 `ABAP_CLI_SESSION_DIR`。
+- 升级后执行一次 `abap deploy --yes` 应用 ICF 无状态变更（ICF 服务版本随 CLI 升到 1.3.0；`abap deploy status` 会提示 outdated）。
+
 ## [1.2.0] - 2026-11-01
 
 本版把「改完能验、能交付、能追溯」补进 agent 闭环，并统一机器可读契约：修复一批"看着成功、实际没生效/没执行"的假成功路径，新增传输预检与释放、版本历史与结构符号读取、`doctor --strict`。有破坏性变更（退出码与 `--json` 形状），见 Migration。

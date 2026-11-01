@@ -56,6 +56,15 @@ export function resolveSessionPolicy(config: ProjectConfig): SessionPolicy {
   return 'default';
 }
 
+/** Where the effective policy came from (diagnostics: `session info`). */
+export function sessionPolicySource(config: ProjectConfig): 'env' | 'profile' | 'default' {
+  const fromEnv = process.env[SESSION_POLICY_ENV];
+  if (fromEnv === 'reuse' || fromEnv === 'always-logout') return 'env';
+  const fromProfile = config.sap.sessionPolicy;
+  if (fromProfile && fromProfile !== 'default') return 'profile';
+  return 'default';
+}
+
 /** Map a policy to its effective behavior. `'default'` aliases `'reuse'`. */
 export function effectivePolicy(policy: SessionPolicy): 'reuse' | 'always-logout' {
   return policy === 'always-logout' ? 'always-logout' : 'reuse';

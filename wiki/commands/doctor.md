@@ -4,7 +4,7 @@ title: abap doctor
 description: 诊断 CLI 环境 — environment / config 两段检查，data.ok 布尔 gate、--strict 退出码、--fix 结构化修复摘要
 tags: [abap-cli, command, doctor, diagnose, setup, gate, strict]
 created at: 2026-08-06 23:10:00
-changed at: 2026-11-01 00:25:00
+changed at: 2026-11-01 12:10:00
 ---
 
 # abap doctor
@@ -43,6 +43,8 @@ abap doctor [--verbose] [--strict] [--fix [--yes]]
 - `env.install`: 当前进程加载的 CLI 版本与安装布局（npm install / source checkout / linked checkout；纯诊断，永不失败）
 - `env.config`: `~/.abap-cli/systems.json` 可读可解析
 - `env.deps`: `ajv` / `ajv-formats` 可加载 + OS keychain 后端可用
+- `session.store`: 会话存储目录是否可写（`ABAP_CLI_SESSION_DIR` → `~/.abap-cli/sessions` → `<workspace>/.abap-cli/sessions`）；都不可写时 err 并提示设置 `ABAP_CLI_SESSION_DIR`（此时复用关闭、每条命令登录+登出）
+- `session.key`: 会话密钥来源（OS keychain / 派生密钥 / 测试后端），纯诊断不阻断
 
 ### config
 
@@ -57,7 +59,7 @@ abap doctor [--verbose] [--strict] [--fix [--yes]]
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap doctor", "version": "1.2.0", "timestamp": "2026-11-01T00:00:00.000Z", "durationMs": 18, "warnings": [] },
+  "meta": { "command": "abap doctor", "version": "1.3.0", "timestamp": "2026-11-01T00:00:00.000Z", "durationMs": 18, "warnings": [] },
   "data": {
     "ok": false,
     "environment": [

@@ -9,7 +9,7 @@
  *   - a WARN is emitted (and the exit path stays clean) when the timeout wins,
  *   - clients registered while a drain is running are still released,
  *   - a re-entrant call during shutdown returns the same promise,
- *   - registry wrapper functions (`registerAdtClient` / `registerIcfClient`)
+ *   - registry wrapper functions (`registerAdtClient`)
  *     route through the same lifecycle, including the `adt` / `icf` filter.
  *
  * Timers are faked: every timeout is driven explicitly, so the suite does not
@@ -29,7 +29,6 @@ import {
 import {
   drainClients,
   registerAdtClient,
-  registerIcfClient,
   resetRegistry,
 } from '../../src/abap_cli/session/registry.js';
 
@@ -185,32 +184,17 @@ describe('session/registry facade', () => {
   it('registerAdtClient logs out via the shared lifecycle', async () => {
     const logout = vi.fn().mockResolvedValue(undefined);
     registerAdtClient({ logout } as never);
-    await drainClients({ adt: true, icf: false });
+    await drainClients();
     expect(logout).toHaveBeenCalledTimes(1);
   });
 
-  it('registerIcfClient cleans up via the shared lifecycle', async () => {
-    const cleanup = vi.fn();
-    registerIcfClient({ cleanup } as never);
-    await drainClients({ adt: false, icf: true });
-    expect(cleanup).toHaveBeenCalledTimes(1);
-  });
-
-  it('honours the adt / icf filter instead of draining everything', async () => {
+  it('drain is idempotent for ADT clients', async () => {
     const logout = vi.fn().mockResolvedValue(undefined);
-    const cleanup = vi.fn();
     registerAdtClient({ logout } as never);
-    registerIcfClient({ cleanup } as never);
-
-    await drainClients({ adt: true, icf: false });
+    await drainClients();
+    await drainClients();
     expect(logout).toHaveBeenCalledTimes(1);
-    expect(cleanup).not.toHaveBeenCalled();
-    // The skipped client stays tracked for a later drain.
-    expect(trackedLabels()).toEqual(['icf']);
-
-    await drainClients({ adt: false, icf: true });
-    expect(cleanup).toHaveBeenCalledTimes(1);
-    expect(logout).toHaveBeenCalledTimes(1);
+    expect(trackedLabels()).toEqual([]);
   });
 
   it('caps a stuck logout so a slow SAP cannot block the agent loop', async () => {
@@ -220,7 +204,7 @@ describe('session/registry facade', () => {
       const stderr = captureStderr();
       try {
         registerAdtClient({ logout } as never);
-        const drain = drainClients({ adt: true, icf: false });
+        const drain = drainClients();
         // The lifecycle module owns its own 5s default; drive it explicitly.
         await vi.advanceTimersByTimeAsync(DEFAULT_TIMEOUT_MS);
         await expect(drain).resolves.toBeUndefined();

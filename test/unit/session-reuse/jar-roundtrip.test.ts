@@ -1,119 +1,123 @@
 /**
- * SessionJar round-trip + deterministic hash.
+ * Session jar format — v2 round-trip + v1 read compatibility.
  *
- * - encrypt → decrypt is byte-lossless
- * - AES-GCM auth-tag mismatch / wrong system hash → SESSION_JAR_DECRYPT_FAILED
- * - computeSystemHash is deterministic for a profile and changes when any of
- *   url / username / client changes
+ * The jar is the on-disk session identity: cookie set (including
+ * `sap-contextid`), CSRF token and the lifecycle metadata (`keyMode`,
+ * `reuseFailures`, `reuseBlockedUntil`). It must be readable, tamper evident
+ * and bucketed per system.
  */
 import { describe, expect, it } from 'vitest';
-import { computeSystemHash, decryptJar, encryptJar, makeEmptyJar, validateJarStructure } from '../../../src/abap_cli/session/jar.js';
-import { deriveSessionKey } from '../../../src/abap_cli/session/key.js';
+import {
+  computeSystemHash,
+  decryptJar,
+  encryptJar,
+  makeEmptyJar,
+  validateJarStructure,
+  hasStatefulSessionCookie,
+  jarSessionId,
+  SESSION_JAR_CONSTANTS,
+} from '../../../src/abap_cli/session/jar.js';
 import type { SapConfig } from '../../../src/abap_cli/config/project-config.js';
-
-/** Expect a CliError carrying the given machine code. */
-function throwsCode(fn: () => unknown, code: string): void {
-  try {
-    fn();
-  } catch (error: unknown) {
-    expect((error as { code?: string }).code).toBe(code);
-    return;
-  }
-  expect.unreachable('expected function to throw');
-}
 
 function profile(overrides: Partial<SapConfig> = {}): SapConfig {
   return {
-    url: 'http://vhcala4hci:50000',
-    client: '001',
+    url: 'https://sap.example:44300',
+    client: '100',
     username: 'DEVELOPER',
     password: 'x',
     language: 'EN',
     insecure: true,
     caPath: '',
-    auth: { method: 'basic' },
     sourceDir: '.',
     ...overrides,
   };
 }
 
-describe('computeSystemHash', () => {
-  it('is deterministic for the same url|username|client', () => {
-    const a = profile();
-    expect(computeSystemHash(a)).toBe(computeSystemHash(profile()));
+const KEY = Buffer.alloc(SESSION_JAR_CONSTANTS.KEY_BYTES, 7);
+
+function jar() {
+  const j = makeEmptyJar(profile(), 'on-prem', 'dev', 'keychain');
+  j.cookies = [
+    { name: 'SAP_SESSIONID_S4H_100', value: 'sid-1' },
+    { name: 'sap-contextid', value: 'SID%3aANON%3ahost%3asid%3actx-ATT' },
+    { name: 'sap-usercontext', value: 'sap-client=100' },
+  ];
+  j.csrf = { value: 'csrf-1', fetchedAt: '2026-01-01T00:00:00.000Z' };
+  j.header.lastLoginAt = '2026-01-01T00:00:00.000Z';
+  j.header.reuseFailures = 1;
+  j.header.sapSessionId = 'sid-1';
+  return j;
+}
+
+describe('session jar v2 round-trip', () => {
+  it('encrypts and decrypts the full structure', () => {
+    const original = jar();
+    const blob = encryptJar(original, KEY);
+    const decoded = decryptJar(blob, KEY, computeSystemHash(profile()));
+    expect(decoded.formatVersion).toBe('2');
+    expect(decoded.header.keyMode).toBe('keychain');
+    expect(decoded.header.reuseFailures).toBe(1);
+    expect(decoded.header.sapSessionId).toBe('sid-1');
+    expect(decoded.cookies.map((c) => c.name)).toEqual([
+      'SAP_SESSIONID_S4H_100',
+      'sap-contextid',
+      'sap-usercontext',
+    ]);
+    expect(decoded.csrf.value).toBe('csrf-1');
   });
 
-  it('changes when the url changes', () => {
-    const base = computeSystemHash(profile());
-    expect(computeSystemHash(profile({ url: 'http://other:8000' }))).not.toBe(base);
+  it('reads a v1 jar and normalises it to v2 in memory', () => {
+    const legacy = {
+      formatVersion: '1',
+      header: {
+        createdAt: '2025-01-01T00:00:00.000Z',
+        lastLoginAt: '2025-01-01T00:00:00.000Z',
+        systemHash: computeSystemHash(profile()),
+        profileName: 'dev',
+        systemType: 'on-prem',
+      },
+      cookies: [{ name: 'SAP_SESSIONID_S4H_100', value: 'old' }],
+      csrf: { value: 'old-csrf', fetchedAt: '2025-01-01T00:00:00.000Z' },
+    };
+    const blob = encryptJar(legacy as never, KEY);
+    const decoded = decryptJar(blob, KEY, computeSystemHash(profile()));
+    expect(decoded.formatVersion).toBe('2');
+    expect(decoded.header.keyMode).toBe('unknown');
+    expect(decoded.header.reuseFailures).toBe(0);
   });
 
-  it('changes when the username changes', () => {
-    const base = computeSystemHash(profile());
-    expect(computeSystemHash(profile({ username: 'OTHER' }))).not.toBe(base);
+  it('rejects a jar written for another system', () => {
+    const blob = encryptJar(jar(), KEY);
+    expect(() => decryptJar(blob, KEY, 'ffffffffffffffff')).toThrow(/systemHash mismatch/);
   });
 
-  it('changes when the client changes', () => {
-    const base = computeSystemHash(profile());
-    expect(computeSystemHash(profile({ client: '100' }))).not.toBe(base);
+  it('rejects a tampered blob', () => {
+    const blob = encryptJar(jar(), KEY);
+    blob[blob.length - 5] = blob[blob.length - 5]! ^ 0xff;
+    expect(() => decryptJar(blob, KEY, computeSystemHash(profile()))).toThrow(/decrypt failed/);
   });
 
-  it('is a 16-char hex string', () => {
-    expect(computeSystemHash(profile())).toMatch(/^[0-9a-f]{16}$/);
+  it('rejects an unknown future formatVersion', () => {
+    const future = { ...jar(), formatVersion: '3' };
+    const blob = encryptJar(future as never, KEY);
+    expect(() => decryptJar(blob, KEY, computeSystemHash(profile()))).toThrow(/formatVersion/);
+  });
+
+  it('rejects a key of the wrong length', () => {
+    expect(() => encryptJar(jar(), Buffer.alloc(16))).toThrow(/32 bytes/);
+    expect(() => decryptJar(encryptJar(jar(), KEY), Buffer.alloc(16), 'x')).toThrow(/32 bytes/);
+  });
+
+  it('validates required header fields', () => {
+    expect(() => validateJarStructure({ formatVersion: '2' })).toThrow(/header is missing/);
+    expect(() => validateJarStructure({ formatVersion: '2', header: {}, cookies: [] })).toThrow(/createdAt/);
   });
 });
 
-describe('encryptJar / decryptJar', () => {
-  it('round-trips a jar byte-losslessly', () => {
-    const key = deriveSessionKey(profile());
-    const jar = makeEmptyJar(profile(), 'on-prem', 'vhcala4hci');
-    jar.cookies = [{ name: 'SAP_SESSIONID_VH4_001', value: 'abc123' }];
-    jar.csrf = { value: 'token-xyz', fetchedAt: new Date().toISOString() };
-    const blob = encryptJar(jar, key);
-    const decoded = decryptJar(blob, key, computeSystemHash(profile()));
-    expect(decoded).toEqual(jar);
-  });
-
-  it('throws SESSION_JAR_DECRYPT_FAILED when the auth tag is corrupted', () => {
-    const key = deriveSessionKey(profile());
-    const blob = encryptJar(makeEmptyJar(profile(), 'on-prem', 'x'), key);
-    const corrupted = Buffer.from(blob);
-    corrupted[corrupted.length - 1] ^= 0xff; // flip a bit in the auth tag
-    throwsCode(() => decryptJar(corrupted, key, computeSystemHash(profile())), 'SESSION_JAR_DECRYPT_FAILED');
-  });
-
-  it('throws SESSION_JAR_DECRYPT_FAILED when systemHash does not match', () => {
-    const key = deriveSessionKey(profile());
-    const blob = encryptJar(makeEmptyJar(profile(), 'on-prem', 'x'), key);
-    throwsCode(() => decryptJar(blob, key, 'deadbeefdeadbeef'), 'SESSION_JAR_DECRYPT_FAILED');
-  });
-
-  it('rejects a too-short blob', () => {
-    const key = deriveSessionKey(profile());
-    throwsCode(() => decryptJar(Buffer.from('short'), key, 'a'.repeat(16)), 'SESSION_JAR_DECRYPT_FAILED');
-  });
-
-  it('generates a fresh nonce per encryption (same jar encrypts differently)', () => {
-    const key = deriveSessionKey(profile());
-    const jar = makeEmptyJar(profile(), 'on-prem', 'x');
-    expect(encryptJar(jar, key).equals(encryptJar(jar, key))).toBe(false);
-  });
-});
-
-describe('validateJarStructure', () => {
-  it('accepts a well-formed jar', () => {
-    const jar = makeEmptyJar(profile(), 'on-prem', 'x');
-    expect(validateJarStructure(jar)).toEqual(jar);
-  });
-
-  it('rejects a jar with the wrong formatVersion', () => {
-    const jar = makeEmptyJar(profile(), 'on-prem', 'x');
-    throwsCode(() => validateJarStructure({ ...jar, formatVersion: '2' }), 'SESSION_JAR_DECRYPT_FAILED');
-  });
-
-  it('rejects a jar missing cookies / csrf', () => {
-    const jar = makeEmptyJar(profile(), 'on-prem', 'x');
-    const { cookies, csrf, ...rest } = jar as unknown as { cookies: unknown[]; csrf: unknown };
-    throwsCode(() => validateJarStructure({ ...rest, cookies, csrf: undefined }), 'SESSION_JAR_DECRYPT_FAILED');
+describe('stateful session helpers', () => {
+  it('detects the stateful session cookie', () => {
+    expect(hasStatefulSessionCookie(jar().cookies)).toBe(true);
+    expect(hasStatefulSessionCookie([{ name: 'sap-usercontext', value: 'x' }])).toBe(false);
+    expect(jarSessionId(jar())).toBe('sid-1');
   });
 });

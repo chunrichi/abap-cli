@@ -25,7 +25,6 @@ import {
   type CloseableClient,
 } from '../clients/client-lifecycle.js';
 import type { AdtClientWrapper } from '../clients/adt-client.js';
-import type { IcfClient } from '../clients/icf-client.js';
 
 /** ADT adapter: async logout, labelled "adt". */
 function toAdtCloseable(client: AdtClientWrapper): CloseableClient {
@@ -42,42 +41,17 @@ function toAdtCloseable(client: AdtClientWrapper): CloseableClient {
   };
 }
 
-/** ICF adapter: sync cleanup wrapped in a resolved promise, labelled "icf". */
-function toIcfCloseable(client: IcfClient): CloseableClient {
-  return {
-    label: 'icf',
-    close: async () => {
-      try {
-        client.cleanup();
-      } catch {
-        // cleanup is best-effort per client
-      }
-    },
-  };
-}
-
 /** Register a live ADT client for end-of-command logout. */
 export function registerAdtClient(client: AdtClientWrapper): void {
   trackClient(toAdtCloseable(client));
 }
 
-/** Register a live ICF client for end-of-command cleanup. */
-export function registerIcfClient(client: IcfClient): void {
-  trackClient(toIcfCloseable(client));
-}
-
 /**
  * Best-effort release of every live client. Idempotent — safe to call from
  * `postAction`, an error path, or a signal handler more than once.
- *
- * `opts` selects which kinds to release (`adt` / `icf`, both default on);
- * clients of an excluded kind stay tracked for a later drain.
  */
-export async function drainClients(opts: { adt?: boolean; icf?: boolean } = {}): Promise<void> {
-  const labels = new Set<string>();
-  if (opts.adt ?? true) labels.add('adt');
-  if (opts.icf ?? true) labels.add('icf');
-  await closeTrackedClients(undefined, labels);
+export async function drainClients(): Promise<void> {
+  await closeTrackedClients();
 }
 
 /**
