@@ -52,7 +52,7 @@ abap push src/zcl_my_class.clas.abap --tr DEVK900001    # 锁 → 写 → 激活
 ## 能做什么
 
 - **就地在本地编辑**——`pull` 把对象拉成 abap-file-format 文件树，用编辑器改，`push` 写回（锁 → 写 → 激活 → 解锁）；写之前可以先 `check` 和 `diff`。
-- **覆盖 25 种对象类型**——类、接口、程序、函数组；包；DDIC 表、结构、域、数据元素、数据库视图、搜索帮助、锁对象、编号范围对象；SICF 节点、事务码、XSLT 转换程序；表类型、消息类、CDS 视图及 CDS / RAP 配套对象。其中 23 种支持 create、25 种支持 pull、23 种有 push 入口；`DEVC` 支持 create / pull / delete（无 push），`BDEF` 支持 pull / push，`SRVB` 仅元数据拉取。
+- **覆盖 25 种对象类型**——类、接口、程序、函数组；包；DDIC 表、结构、域、数据元素、数据库视图、搜索帮助、锁对象、编号范围对象；SICF 节点、事务码、XSLT 转换程序；表类型、消息类、CDS 视图及 CDS / RAP 配套对象。其中 23 种支持 create、25 种支持 pull、23 种有 push 入口、23 种有 delete 路径；`DEVC` 支持 create / pull / delete（无 push），`BDEF` 支持 pull / push / delete（无 create），`SRVB` 仅元数据拉取。
 - **只读探查 SAP**——`search`、`inspect`、`where-used`、`tcode`、`list`、`dumps`、`fields`、`select`、`run-report` 都不改系统。
 - **运行与验证**——`abap run` 执行类（classrun）或 PUBLIC STATIC 方法；`abap run-report` 返回列表输出；`abap select` 就是 SE16N 的等价物。
 - **管理传输**——`transport list / create / show / resolve / assign`，`push` 时按对象自动解析。
@@ -201,23 +201,49 @@ src/(ui2)cl_json.clas.abap                # 命名空间对象 /UI2/CL_JSON
 
 ## 支持的对象类型
 
-25 个类型码，按 ADT 或捆绑 ICF 服务路由：
+25 个类型码，按 ADT REST API 或捆绑 ICF 服务路由：23 种支持 `create`、25 种支持 `pull`、23 种有 `push` 入口、23 种有 `delete` 路径（SICF 节点与编号范围对象分别在 SICF / SNRO 中删除）。每个对象对应一组 abap-file-format（AFF）文件，平铺在 `src/` 下；`<name>` 是 AFF 文件 token（小写；`/UI2/CL_JSON` → `(ui2)cl_json`），`{json,abap}` 表示每个后缀各一个文件，`<group>` / `<fm>` / `<include>` 分别指函数组、函数模块与函数组 include（`sapl<group>`、`l<group>top` 等）。
 
-| 类型 | create | pull | push | 说明 |
-|---|---|---|---|---|
-| `CLAS` `INTF` `PROG` `FUGR` | ✅ | ✅ | ✅ | ABAP 源对象；可用 `create local` 离线草稿 |
-| `DEVC` | ✅ | ✅ | — | ABAP 包（`DEVC/K`）走 ADT；`--package` 是父包；支持 delete、无 push（ADT 无包更新端点） |
-| `TABL` `STRU` `DOMA` `DTEL` | ✅ | ✅ | ✅ | DDIC 走 ICF；TABL / STRU 为三件套 AFF |
-| `VIEW` `SHLP` | ✅ | ✅ | ✅ | DDIC 数据库视图 / 搜索帮助走 ICF，`create --file`；仅 `$TMP` 可删除 |
-| `ENQU` `NROB` | ✅ | ✅ | ✅ | 锁对象 / 编号范围对象，`create --file` |
-| `HTTP` `TRAN` | ✅ | ✅ | ✅ | SICF 服务节点 / 事务码（SE93），`create --file` |
-| `XSLT` | ✅ | ✅ | ✅ | XSLT 转换程序走 ICF，AFF 两件套 `.xslt.json` + `.xslt.xml`，`create --file` |
-| `TTYP` `MSAG` `DDLS` | ✅ | ✅ | ✅ | `create --file`；TTYP / MSAG 在旧版 ECC 自动兜底 ICF，DDLS 仅 ADT |
-| `SRVD` `DCLS` `DDLX` `DDLA` | ✅ | ✅ | ✅ | CDS / RAP 配套对象，`create --file`，仅 ADT |
-| `BDEF` | — | ✅ | ✅ | RAP behavior definition 不能新建（ADT 无 create 端点），仅 pull / push |
-| `SRVB` | — | ✅ | — | Service binding 仅元数据（在 SAP GUI 管理） |
+| 类型 | 对象 | AFF 文件（`src/`） | create | pull | push | delete |
+|---|---|---|---|---|---|---|
+| `CLAS` | 类 | `.clas.json` + `.clas.abap` + `.clas.{definitions,implementations,macros,testclasses}.abap` | ✅ | ✅ | ✅ | ✅ |
+| `INTF` | 接口 | `.intf.json` + `.intf.abap` | ✅ | ✅ | ✅ | ✅ |
+| `PROG` | 程序 | `.prog.json` + `.prog.abap`（include 程序为 `.prog.include.abap`） | ✅ | ✅ | ✅ | ✅ |
+| `FUGR` | 函数组 | `.fugr.json` + `.fugr.<include>.reps.{json,abap}` + `.fugr.<fm>.func.{json,abap}` | ✅ | ✅ | ✅ | ✅ |
+| `DEVC` | 包 | `.devc.json` | ✅ | ✅ | — | ✅ |
+| `TABL` | 透明表 | `.tabl.json` + `.tabl.ddic` + `.tabl.settings.json` | ✅ `--file` | ✅ | ✅ | ✅ |
+| `STRU` | 结构 | `.stru.json` + `.stru.ddic` | ✅ `--file` | ✅ | ✅ | ✅ |
+| `DOMA` | 域 | `.doma.json`（+ `.doma.docu.json`） | ✅ `--file` | ✅ | ✅ | ✅ |
+| `DTEL` | 数据元素 | `.dtel.json`（+ `.dtel.docu.json`） | ✅ `--file` | ✅ | ✅ | ✅ |
+| `ENQU` | 锁对象 | `.enqu.json` | ✅ `--file` | ✅ | ✅ | ✅ |
+| `NROB` | 编号范围对象 | `.nrob.json` | ✅ `--file` | ✅ | ✅ | — |
+| `VIEW` | 数据库视图 | `.view.json` | ✅ `--file` | ✅ | ✅ | ✅ `$TMP` |
+| `SHLP` | 搜索帮助 | `.shlp.json` | ✅ `--file` | ✅ | ✅ | ✅ `$TMP` |
+| `HTTP` | SICF 服务节点 | `.http.json` | ✅ `--file` | ✅ | ✅ | — |
+| `TRAN` | 事务码 | `.tran.json` | ✅ `--file` | ✅ | ✅ | ✅ `$TMP` |
+| `XSLT` | 转换程序 | `.xslt.json` + `.xslt.xml` | ✅ `--file` | ✅ | ✅ | ✅ |
+| `TTYP` | 表类型 | `.ttyp.json`（+ `.type.abap`） | ✅ `--file` | ✅ | ✅ | ✅ |
+| `MSAG` | 消息类 | `.msag.json` | ✅ `--file` | ✅ | ✅ | ✅ |
+| `DDLS` | CDS 视图 | `.ddls.json` + `.ddls.acds` | ✅ `--file` | ✅ | ✅ | ✅ |
+| `SRVD` | 服务定义 | `.srvd.json` + `.srvd.acds` | ✅ `--file` | ✅ | ✅ | ✅ |
+| `BDEF` | 行为定义 | `.bdef.json` + `.bdef.abdl` | — | ✅ | ✅ | ✅ |
+| `DCLS` | CDS 访问控制 | `.dcls.json` + `.dcls.acds` | ✅ `--file` | ✅ | ✅ | ✅ |
+| `DDLX` | CDS 元数据扩展 | `.ddlx.json` + `.ddlx.acds` | ✅ `--file` | ✅ | ✅ | ✅ |
+| `DDLA` | CDS 注解定义 | `.ddla.json` + `.ddla.acds` | ✅ `--file` | ✅ | ✅ | ✅ |
+| `SRVB` | 服务绑定 | `.srvb.json` | — | ✅ | — | ✅ |
 
-DDIC（含 VIEW / SHLP）、HTTP、TRAN、XSLT、TTYP、MSAG 及 CDS / RAP 类型执行 `create` 时必须提供 `--file <aff.json>`；`abap create --schema <type>` 会给出该类型的契约，TABL / STRU / DOMA / DTEL / VIEW / SHLP 还附带示例 JSON。完整的类型 × 命令矩阵见 [wiki/object-types.md](wiki/object-types.md)。
+`--file` 标记该类型的 `create` 需要读取 AFF JSON 文档（可手写，或先 `pull` 一个同类对象）；同一行里的伴生文件属于同一组产物。源对象与 `DEVC` 直接用命令行参数创建，`create local` 可离线生成 `CLAS` / `INTF` / `PROG` / `FUGR` 草稿。`abap create --schema <type>` 打印该类型的契约，能提供示例文档时一并给出。
+
+`delete` 走 lock → delete → unlock；包不加锁，`VIEW` / `SHLP` / `TRAN` / `XSLT` 走 ICF 服务删除。`$TMP` 表示只能删除本地对象——可传输对象请在 SAP GUI 删除，让删除动作进入传输请求。`pull --textpool` 会额外写出文本元素文件（`<name>.<type>.{texts,selections,headings}.en.properties`）。
+
+路由：源对象、`DEVC`、`TTYP`、`MSAG`、`DDLS`、CDS / RAP 配套对象与 `SRVB` 走 ADT；`TABL` `STRU` `DOMA` `DTEL` `ENQU` `VIEW` `SHLP` `HTTP` `TRAN` `XSLT` 走捆绑 ICF 服务（`abap deploy`）；`TTYP` / `MSAG` 在 ECC EHP5/6 上自动降级到 ICF；`NROB` 的 pull 走 ADT（ICF 兜底）、写入走 ICF；`DDLS` 在 ECC 上直接拒绝（`DDLS_NOT_SUPPORTED_ON_ECC`）。逐类型细节与完整类型 × 命令矩阵见 [wiki/object-types.md](wiki/object-types.md)。
+
+- `DEVC`——`create` 用 `--package`（父包）与 `--description`；没有 `push`，ADT 拒绝包更新。
+- `TRAN`——覆盖 dialog / report / parameter / variant 四类事务；OO 事务仍需在 SE93 维护。
+- `VIEW` / `SHLP`——上游 AFF 没有这两种格式，使用本地扩展 schema（`view-v1.json` / `shlp-v1.json`）。
+- `ENQU` / `NROB`——`create` 只支持 `$TMP`（可传输创建需要 TADIR 记录）；编号范围对象没有 delete 路径，请在 SNRO 中删除。
+- `BDEF`——SAP 不提供 ADT create 端点，只能 pull / push / delete。
+- `SRVB`——仅元数据；binding 在 SAP GUI 创建与维护。
+- `HTTP`——SICF 节点可 create / pull / push，但暂无 delete 路径；节点删除请走 SICF。
 
 ---
 

@@ -1,10 +1,10 @@
 ---
 type: reference
 title: 支持的对象类型
-description: abap CLI 支持的 ABAP 对象类型总览 — 25 个类型码 × create/pull/push 路由（ADT / ICF）与本地 AFF 文件布局
+description: abap CLI 支持的 ABAP 对象类型总览 — 25 个类型码 × create/pull/push/delete 路由（ADT / ICF）与本地 AFF 文件布局
 tags: [abap-cli, object-types, ddic, http, sicf, reference]
 created at: 2026-08-29 10:00:00
-changed at: 2026-11-01 00:20:00
+changed at: 2026-11-01 13:56:00
 ---
 
 # 支持的对象类型
@@ -13,36 +13,38 @@ abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **25 个
 
 ## 类型 × 命令矩阵
 
-| 类型码 | 对象 | 路由 | `create` | `pull` | `push` | `create local` | 本地文件（平铺 `src/`） |
-|---|---|---|---|---|---|---|---|
-| `CLAS` | 类 | ADT | 骨架 | ✅ | ✅ | ✅ | `<name>.clas.json` + `<name>.clas.abap` + 各 include `.clas.<subtype>.abap` |
-| `INTF` | 接口 | ADT | 骨架 | ✅ | ✅ | ✅ | `<name>.intf.json` + `<name>.intf.abap` |
-| `PROG` | 报表程序 | ADT | 骨架 | ✅ | ✅ | ✅ | `<name>.prog.json` + `<name>.prog.abap`（include 为 `.prog.include.abap`） |
-| `FUGR` | 函数组 | ADT | 骨架 | ✅ | ✅ | ✅ | `<group>.fugr.json` + `.fugr.sapl<group>.reps.*` + `.fugr.l<group>top.reps.*` + 每 FM `.fugr.<fm>.func.*` |
-| `DEVC` | 包（Package） | ADT | 包参数（`--package` = 父包，无需 `--file`） | ✅ | ❌（ADT 无更新端点） | ❌ | `<name>.devc.json` |
-| `TABL` | 透明表 | ICF | `--file` | ✅ | ✅ | ❌ | `<name>.tabl.{json,ddic,settings.json}` |
-| `STRU` | 结构 | ICF | `--file` | ✅ | ✅ | ❌ | `<name>.stru.{json,ddic,settings.json}` |
-| `DOMA` | 域 | ICF | `--file` | ✅ | ✅ | ❌ | `<name>.doma.json`（可选伴生 `<name>.doma.docu.json`，长文本 0..1） |
-| `DTEL` | 数据元素 | ICF | `--file` | ✅ | ✅ | ❌ | `<name>.dtel.json`（可选伴生 `<name>.dtel.docu.json`，长文本 0..1） |
-| `ENQU` | 锁对象 | ICF | `--file` | ✅ | ✅ | ❌ | `<name>.enqu.json` |
-| `VIEW` | 数据库视图 | ICF | `--file`（`view-v1.json`，本地扩展） | ✅ | ✅ | ❌ | `<name>.view.json` |
-| `SHLP` | 搜索帮助 | ICF | `--file`（`shlp-v1.json`，本地扩展；elementary/collective） | ✅ | ✅ | ❌ | `<name>.shlp.json` |
-| `NROB` | 编号范围对象 | ICF（pull 主 ADT + ICF 兜底） | `--file` | ✅ | ✅ | ❌ | `<name>.nrob.json` |
-| `HTTP` | **ICF / SICF 节点** | ICF | `--file` | ✅ | ✅ | ❌ | `<name>.http.json` |
-| `TRAN` | 事务码 (SE93) | ICF | `--file` | ✅ | ✅ | ❌ | `<code>.tran.json` |
-| `XSLT` | 转换程序（XSLT Program） | ICF | `--file` | ✅ | ✅ | ❌ | `<name>.xslt.{json,xml}` 两件套 |
-| `TTYP` | 表类型 | auto（ADT 主 / ECC ICF 兜底） | `--file` | ✅ | ✅ | ❌ | `<name>.ttyp.json` + 可选 `<name>.ttyp.type.abap` |
-| `MSAG` | 消息类 | auto（ADT 主 / ECC ICF 兜底） | `--file` | ✅ | ✅ | ❌ | `<name>.msag.json` |
-| `DDLS` | CDS 视图 | ADT | `--file` | ✅ | ✅ | ❌ | `<name>.ddls.{json,acds}` |
-| `SRVB` | Service Binding (metadata only) | ADT | ❌ | ✅ | ❌ | ❌ | `<name>.srvb.json` |
-| `SRVD` | Service Definition | ADT | `--file` | ✅ | ✅ | ❌ | `<name>.srvd.{json,acds}` |
-| `BDEF` | Behaviour Definition | ADT | ❌（SAP 不接受 CLI 创建 BDEF） | ✅ | ✅ | ❌ | `<name>.bdef.{json,abdl}` |
-| `DCLS` | CDS Access Control | ADT | `--file` | ✅ | ✅ | ❌ | `<name>.dcls.{json,acds}` |
-| `DDLX` | CDS Metadata Extension | ADT | `--file` | ✅ | ✅ | ❌ | `<name>.ddlx.{json,acds}` |
-| `DDLA` | CDS Annotation Definition | ADT | `--file` | ✅ | ✅ | ❌ | `<name>.ddla.{json,acds}` |
+| 类型码 | 对象 | 路由 | `create` | `pull` | `push` | `delete` | `create local` | 本地文件（平铺 `src/`） |
+|---|---|---|---|---|---|---|---|---|
+| `CLAS` | 类 | ADT | 骨架 | ✅ | ✅ | ✅ | ✅ | `<name>.clas.json` + `<name>.clas.abap` + 各 include `.clas.<subtype>.abap` |
+| `INTF` | 接口 | ADT | 骨架 | ✅ | ✅ | ✅ | ✅ | `<name>.intf.json` + `<name>.intf.abap` |
+| `PROG` | 报表程序 | ADT | 骨架 | ✅ | ✅ | ✅ | ✅ | `<name>.prog.json` + `<name>.prog.abap`（include 为 `.prog.include.abap`） |
+| `FUGR` | 函数组 | ADT | 骨架 | ✅ | ✅ | ✅ | ✅ | `<group>.fugr.json` + `.fugr.sapl<group>.reps.*` + `.fugr.l<group>top.reps.*` + 每 FM `.fugr.<fm>.func.*` |
+| `DEVC` | 包（Package） | ADT | 包参数（`--package` = 父包，无需 `--file`） | ✅ | ❌（ADT 无更新端点） | ✅（不加锁） | ❌ | `<name>.devc.json` |
+| `TABL` | 透明表 | ICF | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.tabl.{json,ddic,settings.json}` |
+| `STRU` | 结构 | ICF | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.stru.{json,ddic}`（`.settings.json` 仅 TABL 有） |
+| `DOMA` | 域 | ICF | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.doma.json`（可选伴生 `<name>.doma.docu.json`，长文本 0..1） |
+| `DTEL` | 数据元素 | ICF | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.dtel.json`（可选伴生 `<name>.dtel.docu.json`，长文本 0..1） |
+| `ENQU` | 锁对象 | ICF | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.enqu.json` |
+| `VIEW` | 数据库视图 | ICF | `--file`（`view-v1.json`，本地扩展） | ✅ | ✅ | ✅（仅 `$TMP`） | ❌ | `<name>.view.json` |
+| `SHLP` | 搜索帮助 | ICF | `--file`（`shlp-v1.json`，本地扩展；elementary/collective） | ✅ | ✅ | ✅（仅 `$TMP`） | ❌ | `<name>.shlp.json` |
+| `NROB` | 编号范围对象 | ICF（pull 主 ADT + ICF 兜底） | `--file` | ✅ | ✅ | ❌（SNRO 中删除） | ❌ | `<name>.nrob.json` |
+| `HTTP` | **ICF / SICF 节点** | ICF | `--file` | ✅ | ✅ | ❌（SICF 中删除） | ❌ | `<name>.http.json` |
+| `TRAN` | 事务码 (SE93) | ICF | `--file` | ✅ | ✅ | ✅（仅 `$TMP`） | ❌ | `<code>.tran.json` |
+| `XSLT` | 转换程序（XSLT Program） | ICF | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.xslt.{json,xml}` 两件套 |
+| `TTYP` | 表类型 | auto（ADT 主 / ECC ICF 兜底） | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.ttyp.json` + 可选 `<name>.type.abap` |
+| `MSAG` | 消息类 | auto（ADT 主 / ECC ICF 兜底） | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.msag.json` |
+| `DDLS` | CDS 视图 | ADT | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.ddls.{json,acds}` |
+| `SRVB` | Service Binding (metadata only) | ADT | ❌ | ✅ | ❌ | ✅ | ❌ | `<name>.srvb.json` |
+| `SRVD` | Service Definition | ADT | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.srvd.{json,acds}` |
+| `BDEF` | Behaviour Definition | ADT | ❌（SAP 不接受 CLI 创建 BDEF） | ✅ | ✅ | ✅ | ❌ | `<name>.bdef.{json,abdl}` |
+| `DCLS` | CDS Access Control | ADT | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.dcls.{json,acds}` |
+| `DDLX` | CDS Metadata Extension | ADT | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.ddlx.{json,acds}` |
+| `DDLA` | CDS Annotation Definition | ADT | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.ddla.{json,acds}` |
 
 > **`create local` 只支持 `CLAS` / `INTF` / `PROG` / `FUGR`**（`formats/templates.ts` 只有这四类模板），其余类型一律 `TYPE_NOT_SUPPORTED`（exit 7）。`SRVD` / `DCLS` / `DDLX` / `DDLA` 在 SAP 侧可创建（`createObjtype`），但没有本地骨架模板；`create local` 会拒绝它们并提示改用 `abap create <type> --file <aff.json>`。
-> **`create` 的 `--file` 是数据驱动必填项**（`types/registry.ts` 的 `ObjectTypeEntry.requiresFile`）：`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `NROB` / `HTTP` / `TRAN` / `XSLT` / `TTYP` / `MSAG` / `DDLS` / `SRVD` / `DCLS` / `DDLX` / `DDLA` 缺 `--file` 直接 `USAGE`（exit 2）。`BDEF` 是 pull-only（SAP 不接受 CLI 创建）；`SRVB` 仅 pull（SAP GUI 管理 binding）。
+> **`create` 的 `--file` 是数据驱动必填项**（`types/registry.ts` 的 `ObjectTypeEntry.requiresFile`）：`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `NROB` / `HTTP` / `TRAN` / `XSLT` / `TTYP` / `MSAG` / `DDLS` / `SRVD` / `DCLS` / `DDLX` / `DDLA` 缺 `--file` 直接 `USAGE`（exit 2）。`BDEF` 无法 create（SAP 不接受 CLI 创建），pull / push / delete 可用；`SRVB` 仅 pull 时写元数据（binding 在 SAP GUI 管理，delete 走通用 ADT 路径）。
+> **`ENQU` / `NROB` 的 create 仅支持 `$TMP`**：可传输创建需要额外写 TADIR 记录，ICF 服务对非 `$TMP` 直接拒绝（`ENQU_PACKAGE_NOT_SUPPORTED` / `NROB_TRANSPORT_NOT_SUPPORTED`）；`NROB` 也没有 delete 通道（ADT `numberranges` 资源只读，ICF 只删 VIEW/SHLP），删除请在 SNRO 操作。
+
 > **`TRAN` 写路径已实现**：ABAP `/tran/<code>` 支持 GET / POST / PUT / DELETE，覆盖 dialog / report（含 report variant）/ parameter / variant 四种事务；OO 事务返回 `TRAN_OO_NOT_SUPPORTED`（规范 FM 没有 class/method 参数，仍用 SE93 维护）。`delete` 只支持 `$TMP` 事务（可传输事务请在 SE93 删除以便记录到请求）。类型页面：[tran](objects/tran.md)。
 > **`XSLT` 两件套**：`<name>.xslt.json`（AFF xslt-v1 元数据）+ `<name>.xslt.xml`（源码）必须成对存在；SAP 侧走 ICF `/xslt/<name>` + `CL_O2_API_XSLTDESC`，更新语义是**原地更新并保留版本历史**（`load` → `set_source` → `save` → `activate`）。行尾统一规范化（SAP 读回多一个 CRLF）。类型页面：[xslt](objects/xslt.md)。
 
@@ -50,7 +52,7 @@ abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **25 个
 
 > **`VIEW` 写路径已实现（真机 17/17 TC 通过）**：ABAP `/ddic/view` 支持 GET / POST / PUT / DELETE（`DDIF_VIEW_GET` / `RS_CORR_INSERT` + `DDIF_VIEW_PUT` + `DDIF_VIEW_ACTIVATE`；删除 `$TMP` 视图用 `RS_DD_DELETE_OBJ(no_ask)`，可传输视图请在 SE11 删除）。本地格式 `view-v1.json` 是**本地扩展**——上游 abap-file-formats 没有 view 格式，字段按 DD25V/DD26V/DD27P/DD28J/DD28V 设计；视图名上限 16 字符。类型页面：[view](objects/view.md)。
 
-本地产物一律平铺在 `src/` 下（无类型/对象子目录），文件名自带类型后缀；命名空间用 AFF 括号 token（`/UI2/CL_JSON` → `(ui2)cl_json`）。DDIC 三件套（TABL / STRU）与 DOMA / DTEL 的详细字段契约见 [create](commands/create.md) 与 [pull](commands/pull.md)。
+本地产物一律平铺在 `src/` 下（无类型/对象子目录），文件名自带类型后缀；命名空间用 AFF 括号 token（`/UI2/CL_JSON` → `(ui2)cl_json`）。DDIC（TABL / STRU）与 DOMA / DTEL 的详细字段契约见 [create](commands/create.md) 与 [pull](commands/pull.md)。
 
 > **DOMA / DTEL 长文本是伴生文件，不是新对象类型**：`<name>.doma.docu.json` / `<name>.dtel.docu.json` 遵循 AFF `docu-v1.json`，0..1 可选；`abap types` / `abap create` 不列 `DOCU`，pull / push 自动带出（`lines: []` = 删除远端长文本）。字段与行约束见 [doma](objects/doma.md) / [dtel](objects/dtel.md)。
 
@@ -133,7 +135,7 @@ abap push src/zmy_service.http.json --tr <TR>
 - `create <type>` 的 `--schema` `allowedValues` 已是全 25 类：`CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, ENQU, VIEW, SHLP, NROB, HTTP, TRAN, XSLT, TTYP, MSAG, DDLS, SRVB, SRVD, BDEF, DCLS, DDLX, DDLA`。
 - `DDIC_NOT_SUPPORTED` (exit 7) → 文件按 ICF 路由、但类型不在 `types/registry.ts` 的 25 类内时触发；已注册类型不会命中。
 - 所有 ICF 路由类型在扩展未部署时都会失败 → 先 `abap deploy status`。
-- CDS 家族（`DDLS`/`DCLS`/`DDLX`/`DDLA`）+ RAP 三件套（`SRVB`/`SRVD`/`BDEF`）走 ADT，**不**经 ICF。`SRVB` 仅 `pull`（SAP GUI 管理 binding）；`DDLS` / `SRVD` / `DCLS` / `DDLX` / `DDLA` 支持 create/pull/push；`BDEF` 仅 pull/push。
+- CDS 家族（`DDLS`/`DCLS`/`DDLX`/`DDLA`）+ RAP 三件套（`SRVB`/`SRVD`/`BDEF`）走 ADT，**不**经 ICF。`SRVB` 仅 `pull` 写元数据（SAP GUI 管理 binding）；`DDLS` / `SRVD` / `DCLS` / `DDLX` / `DDLA` 支持 create/pull/push；`BDEF` 支持 pull/push/delete（无 create）。
 
 # More
 

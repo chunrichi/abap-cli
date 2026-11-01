@@ -10,12 +10,14 @@
  *
  * Supported types: anything reachable by `client.deleteObject` (CLAS, INTF,
  * PROG, FUGR, FUGR/FF, TABL, STRU, DOMA, DTEL, MSAG, TTYP, DDLS, DDLX, BDEF,
- * DCLS, SRVD, SRVB, HTTP, ENQU, NROB). DEVC takes the dedicated package branch
+ * DCLS, SRVD, SRVB, ENQU). DEVC takes the dedicated package branch
  * (`delete-devc.ts` — packages are deleted without a lock); TRAN, VIEW and SHLP
  * go through the bundled ICF service (`DELETE /tran/<tcode>` /
  * `/ddic/view|shlp/<name>`).
- * CDSV views and similar type codes without an ADT delete endpoint surface as
- * `TYPE_NOT_SUPPORTED`.
+ * HTTP (SICF node) and NROB have no delete path: ADT does not index SICF nodes,
+ * so HTTP fails at resolve (`OBJECT_NOT_FOUND`), and the ADT `numberranges`
+ * resource is read-only for writes, so NROB fails at lock / delete. Type codes
+ * without an ADT delete endpoint surface as `TYPE_NOT_SUPPORTED`.
  */
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { IcfClient } from '../../clients/icf-client.js';

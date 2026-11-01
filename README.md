@@ -52,7 +52,7 @@ If you would otherwise script the ADT REST API yourself, `abap-cli` packages the
 ## What you can do
 
 - **Edit in place** — `pull` any object into an abap-file-format tree, edit it with your editor, `push` it back with lock → write → activate → unlock. `check` and `diff` before you write.
-- **Cover 25 object types** — classes, interfaces, programs and function groups; packages; DDIC tables, structures, domains, data elements, database views, search helps, lock objects and number ranges; SICF nodes, transaction codes and XSLT transformations; table types, message classes, CDS views and the CDS / RAP companions. 23 support create, all 25 support pull, and 23 have a push path; `DEVC` supports create / pull / delete (no push), `BDEF` is pull / push and `SRVB` metadata-only.
+- **Cover 25 object types** — classes, interfaces, programs and function groups; packages; DDIC tables, structures, domains, data elements, database views, search helps, lock objects and number ranges; SICF nodes, transaction codes and XSLT transformations; table types, message classes, CDS views and the CDS / RAP companions. 23 support create, all 25 support pull, 23 have a push path, and 23 have a delete path; `DEVC` supports create / pull / delete (no push), `BDEF` is pull / push / delete (no create) and `SRVB` metadata-only.
 - **Read SAP safely** — `search`, `inspect`, `where-used`, `tcode`, `list`, `dumps`, `fields`, `select` and `run-report` never change the system.
 - **Run and verify** — `abap run` executes a class (classrun) or a PUBLIC STATIC method; `abap run-report` returns list output; `abap select` is the SE16N equivalent.
 - **Manage transports** — `transport list / create / show / resolve / assign`, with per-object resolution during `push`.
@@ -201,23 +201,49 @@ All commands support `--json` (compact) and `--pretty-json` (indented). Every to
 
 ## Supported object types
 
-25 type codes, routed through ADT or the bundled ICF service:
+25 type codes, routed through the ADT REST API or the bundled ICF service: 23 support `create`, all 25 support `pull`, 23 have a `push` path, and 23 have a `delete` path (SICF nodes and number ranges are removed in SICF / SNRO). Each object maps to one abap-file-format (AFF) artifact set written flat under `src/`, with `<name>` as the AFF file token (lowercase; `/UI2/CL_JSON` → `(ui2)cl_json`). `{json,abap}` means one file per suffix, and `<group>` / `<fm>` / `<include>` stand for a function group, function module and function-group include (`sapl<group>`, `l<group>top`, …).
 
-| Types | create | pull | push | Notes |
-|---|---|---|---|---|
-| `CLAS` `INTF` `PROG` `FUGR` | ✅ | ✅ | ✅ | ABAP source; `create local` drafts available offline |
-| `DEVC` | ✅ | ✅ | — | ABAP package (`DEVC/K`) via ADT; `--package` is the super package; delete supported, no push (ADT has no package update endpoint) |
-| `TABL` `STRU` `DOMA` `DTEL` | ✅ | ✅ | ✅ | DDIC via ICF; TABL / STRU use the three-piece AFF layout |
-| `VIEW` `SHLP` | ✅ | ✅ | ✅ | DDIC database view / search help via ICF, `create --file`; delete is `$TMP`-only |
-| `ENQU` `NROB` | ✅ | ✅ | ✅ | Lock object / number range object, `create --file` |
-| `HTTP` `TRAN` | ✅ | ✅ | ✅ | SICF service node / transaction code (SE93), `create --file` |
-| `XSLT` | ✅ | ✅ | ✅ | XSLT transformation program via ICF, AFF pair `.xslt.json` + `.xslt.xml`, `create --file` |
-| `TTYP` `MSAG` `DDLS` | ✅ | ✅ | ✅ | `create --file`; TTYP / MSAG fall back to ICF on older ECC, DDLS is ADT-only |
-| `SRVD` `DCLS` `DDLX` `DDLA` | ✅ | ✅ | ✅ | CDS / RAP companions, `create --file`, ADT only |
-| `BDEF` | — | ✅ | ✅ | RAP behavior definition cannot be created (no ADT create endpoint); pull / push only |
-| `SRVB` | — | ✅ | — | Service binding is metadata-only (managed in SAP GUI) |
+| Type | Object | AFF files in `src/` | create | pull | push | delete |
+|---|---|---|---|---|---|---|
+| `CLAS` | Class | `.clas.json` + `.clas.abap` + `.clas.{definitions,implementations,macros,testclasses}.abap` | ✅ | ✅ | ✅ | ✅ |
+| `INTF` | Interface | `.intf.json` + `.intf.abap` | ✅ | ✅ | ✅ | ✅ |
+| `PROG` | Program | `.prog.json` + `.prog.abap` (`.prog.include.abap` for include programs) | ✅ | ✅ | ✅ | ✅ |
+| `FUGR` | Function group | `.fugr.json` + `.fugr.<include>.reps.{json,abap}` + `.fugr.<fm>.func.{json,abap}` | ✅ | ✅ | ✅ | ✅ |
+| `DEVC` | Package | `.devc.json` | ✅ | ✅ | — | ✅ |
+| `TABL` | Transparent table | `.tabl.json` + `.tabl.ddic` + `.tabl.settings.json` | ✅ `--file` | ✅ | ✅ | ✅ |
+| `STRU` | Structure | `.stru.json` + `.stru.ddic` | ✅ `--file` | ✅ | ✅ | ✅ |
+| `DOMA` | Domain | `.doma.json` (+ `.doma.docu.json`) | ✅ `--file` | ✅ | ✅ | ✅ |
+| `DTEL` | Data element | `.dtel.json` (+ `.dtel.docu.json`) | ✅ `--file` | ✅ | ✅ | ✅ |
+| `ENQU` | Lock object | `.enqu.json` | ✅ `--file` | ✅ | ✅ | ✅ |
+| `NROB` | Number range object | `.nrob.json` | ✅ `--file` | ✅ | ✅ | — |
+| `VIEW` | Database view | `.view.json` | ✅ `--file` | ✅ | ✅ | ✅ `$TMP` |
+| `SHLP` | Search help | `.shlp.json` | ✅ `--file` | ✅ | ✅ | ✅ `$TMP` |
+| `HTTP` | SICF service node | `.http.json` | ✅ `--file` | ✅ | ✅ | — |
+| `TRAN` | Transaction code | `.tran.json` | ✅ `--file` | ✅ | ✅ | ✅ `$TMP` |
+| `XSLT` | Transformation | `.xslt.json` + `.xslt.xml` | ✅ `--file` | ✅ | ✅ | ✅ |
+| `TTYP` | Table type | `.ttyp.json` (+ `.type.abap`) | ✅ `--file` | ✅ | ✅ | ✅ |
+| `MSAG` | Message class | `.msag.json` | ✅ `--file` | ✅ | ✅ | ✅ |
+| `DDLS` | CDS view | `.ddls.json` + `.ddls.acds` | ✅ `--file` | ✅ | ✅ | ✅ |
+| `SRVD` | Service definition | `.srvd.json` + `.srvd.acds` | ✅ `--file` | ✅ | ✅ | ✅ |
+| `BDEF` | Behavior definition | `.bdef.json` + `.bdef.abdl` | — | ✅ | ✅ | ✅ |
+| `DCLS` | CDS access control | `.dcls.json` + `.dcls.acds` | ✅ `--file` | ✅ | ✅ | ✅ |
+| `DDLX` | CDS metadata extension | `.ddlx.json` + `.ddlx.acds` | ✅ `--file` | ✅ | ✅ | ✅ |
+| `DDLA` | CDS annotation definition | `.ddla.json` + `.ddla.acds` | ✅ `--file` | ✅ | ✅ | ✅ |
+| `SRVB` | Service binding | `.srvb.json` | — | ✅ | — | ✅ |
 
-`create` for DDIC (including VIEW / SHLP), HTTP, TRAN, XSLT, TTYP, MSAG and the CDS / RAP types requires an `--file <aff.json>` input; `abap create --schema <type>` prints the per-type contract, and TABL / STRU / DOMA / DTEL / VIEW / SHLP include an example JSON. The full type × command matrix lives in [wiki/object-types.md](wiki/object-types.md).
+`--file` marks the types whose `create` reads an AFF JSON document (write it yourself or `pull` a comparable object first); companion files shown in the same row belong to the same artifact set. Source objects and `DEVC` create from CLI arguments, and `create local` drafts `CLAS` / `INTF` / `PROG` / `FUGR` offline. `abap create --schema <type>` prints the per-type contract, including an example document where one exists.
+
+`delete` runs lock → delete → unlock; packages delete without a lock, and `VIEW` / `SHLP` / `TRAN` / `XSLT` delete through the ICF service. `$TMP` marks types that can only delete local objects — delete transportable ones in SAP GUI so the deletion is recorded in a transport. `pull --textpool` adds text-element files (`<name>.<type>.{texts,selections,headings}.en.properties`).
+
+Channel routing: source objects, `DEVC`, `TTYP`, `MSAG`, `DDLS`, the CDS / RAP companions and `SRVB` use ADT; `TABL` `STRU` `DOMA` `DTEL` `ENQU` `VIEW` `SHLP` `HTTP` `TRAN` `XSLT` use the bundled ICF service (`abap deploy`); `TTYP` / `MSAG` fall back to ICF on ECC EHP5/6; `NROB` pulls through ADT (ICF fallback) and writes through ICF; `DDLS` is rejected on ECC (`DDLS_NOT_SUPPORTED_ON_ECC`). Per-type gotchas and the full type × command matrix live in [wiki/object-types.md](wiki/object-types.md).
+
+- `DEVC` — `create` takes `--package` (the super package) and `--description`; no `push`, because ADT rejects package updates.
+- `TRAN` — dialog, report, parameter and variant transactions; OO transactions stay in SE93.
+- `VIEW` / `SHLP` — local-extension schemas (`view-v1.json` / `shlp-v1.json`); upstream AFF defines neither.
+- `ENQU` / `NROB` — `create` supports `$TMP` only (transportable creation needs a TADIR entry); number ranges have no delete path, remove them in SNRO.
+- `BDEF` — SAP exposes no ADT create endpoint, so pull / push / delete only.
+- `SRVB` — metadata only; bindings are created and maintained in SAP GUI.
+- `HTTP` — SICF nodes can be created, pulled and pushed, but there is no delete path yet; remove the node in SICF.
 
 ---
 
