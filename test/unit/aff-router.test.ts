@@ -38,6 +38,25 @@ describe('aff-router', () => {
     expect(routeType('(mock)ns_pkg.devc.json')).toBe('DEVC');
   });
 
+  it('routes the ENQU lock-object and NROB number-range documents', () => {
+    expect(routeAffSchema('zmy_lock.enqu.json')).toEqual({
+      type: 'ENQU',
+      isJson: true,
+      schemaFile: 'enqu-v1.json',
+    });
+    expect(routeAffSchema('zmy_number_range.nrob.json')).toEqual({
+      type: 'NROB',
+      isJson: true,
+      schemaFile: 'nrob-v1.json',
+    });
+    // The new suffixes must not shadow their neighbours.
+    expect(routeType('zmy_basic.tabl.json')).toBe('TABL');
+    expect(routeType('zmy.doma.docu.json')).toBe('DOCU');
+    expect(routeType('zmy.ddls.json')).toBe('DDLS');
+    expect(routeType('zmy_enqu.json')).toBeUndefined();
+    expect(routeType('zmy.nrob.txt')).toBeUndefined();
+  });
+
   it('routes companion JSON files for FUGR (reps/func)', () => {
     expect(routeType('zmy.fugr.lzmy_grouptop.reps.json')).toBe('FUGR');
     expect(routeType('zmy.fugr.saplzmy_group.reps.json')).toBe('FUGR');

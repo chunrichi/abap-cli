@@ -165,6 +165,25 @@ export async function probeSystem(name: string): Promise<SystemProbe> {
   }
 }
 
+/** Numeric HTTP status carried by an abap-adt-api exception. The library
+ *  throws on non-2xx: `AdtErrorException` stores the code on `.err`,
+ *  `AdtHttpException` / `HttpClientException` expose it as `.status` (0 for a
+ *  transport failure). Mirrors the normalization in `http-error.ts`. */
+function errorStatus(error: unknown): number | undefined {
+  const exc = error as { status?: unknown; err?: unknown } | undefined;
+  if (typeof exc?.status === 'number') return exc.status;
+  if (typeof exc?.err === 'number') return exc.err;
+  return undefined;
+}
+
+/** True when SAP answered with any HTTP status below 500. A 2xx–4xx response
+ *  proves the endpoint is deployed: 4xx only means the object behind it is
+ *  missing or not authorized. 5xx, status 0 and a status-less exception mean
+ *  the route itself is absent. */
+function endpointPresent(status: number | undefined): boolean {
+  return status !== undefined && status >= 200 && status < 500;
+}
+
 /** probe the four per-type endpoints.
  *
  * Strategy: hit each ADT/ICF endpoint with a HEAD-ish GET and watch the
@@ -183,16 +202,18 @@ async function probeCapabilities(
 ): Promise<{ capabilities: ProfileCapabilitySnapshot; kernelRelease?: string }> {
   const probeUrl = async (path: string): Promise<'ok' | 'absent'> => {
     try {
-      // `request` returns a response with statusCode (4xx == present, 5xx/none == absent).
-      const resp = await client.httpClient.request(path, {
+      // `request` resolves only for 2xx; anything else is thrown by
+      // abap-adt-api, so the status has to be read from the exception below.
+      const resp = (await client.httpClient.request(path, {
         method: 'GET',
         headers: { Accept: 'application/xml' },
-      }).catch((err: unknown) => ({ statusCode: 0, error: err }));
-      const code = (resp as { status?: number }).status ?? 0;
-      if (code >= 200 && code < 500) return 'ok';
-      return 'absent';
-    } catch {
-      return 'absent';
+      })) as { status?: unknown };
+      return endpointPresent(typeof resp.status === 'number' ? resp.status : undefined) ? 'ok' : 'absent';
+    } catch (error: unknown) {
+      // A 4xx (missing object / missing authorization) still proves the
+      // endpoint exists; only 5xx or a status-less network failure means the
+      // route is absent.
+      return endpointPresent(errorStatus(error)) ? 'ok' : 'absent';
     }
   };
   const adtProbe = state.adtOk

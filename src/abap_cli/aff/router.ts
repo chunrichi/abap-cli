@@ -17,6 +17,8 @@
  *   *.doma.json / *.doma.*.json        → DOMA
  *   *.dtel.json / *.dtel.*.json        → DTEL
  *   *.doma.docu.json / *.dtel.docu.json → DOCU (companion schema, not a type)
+ *   *.enqu.json                        → ENQU
+ *   *.nrob.json                        → NROB
  *   *.http.json / *.http.*.json        → HTTP
  *   *.tran.json / *.tran.*.json        → TRAN
  *   *.xslt.json / *.xslt.xml           → XSLT  (metadata + source pair)
@@ -82,6 +84,9 @@ const SUFFIX_RULES: ReadonlyArray<{ suffix: string; type: string; schemaFile?: s
   { suffix: '.msag.json', type: 'MSAG' },
   { suffix: '.ddls.json', type: 'DDLS' },
   { suffix: '.ddls.acds', type: 'DDLS' },
+  // DDIC bridge objects (lock object / number range object).
+  { suffix: '.enqu.json', type: 'ENQU' },
+  { suffix: '.nrob.json', type: 'NROB' },
   // Package (DEVC) local document.
   { suffix: '.devc.json', type: 'DEVC' },
 ];
