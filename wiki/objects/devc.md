@@ -4,7 +4,7 @@ title: DEVC — 包（Package）
 description: DEVC 对象的 ADT 路由、devc-v1.json 字段契约、wire 字段映射、LOCAL 命名约束与 push 不支持的原因
 tags: [abap-cli, object-type, devc, package, adt, abap-file-format]
 created at: 2026-10-31 16:20:00
-changed at: 2026-10-31 16:20:00
+changed at: 2026-11-01 21:30:00
 ---
 
 # DEVC — 包（Package）
@@ -108,7 +108,7 @@ create-then-pull，写 `src/<name>.devc.json`（`--no-pull` 关闭，`--overwrit
 - 长度 ≤30；普通名字 `A-Z 0-9 _`，可带前导 `$`；命名空间形如 `/NS/NAME`（NS ≤10，总长 ≤30）。
 - **软件组件为 `LOCAL` 时，包名必须以 `$` 或 `TEST` 开头**（SAP `packages/validation` 原文：
   `Names of LOCAL packages must start with '$' or 'TEST'`）。所以 `$TMP` 下建子包只能写
-  `$MY_PACKAGE` / `TEST_MY_PACKAGE`，普通 `ZPKG` 在非 `$TMP` 父包下用。
+  `$MY_PACKAGE` / `TEST_MY_PACKAGE`，普通 `ZPKG` 在非 `$TMP` 父包下用。**注意**：`TEST` 前缀只是 LOCAL 包的命名约束；transport-free（不产生请求）只按 `$` 前缀判定，`TEST...` 开头的包仍需 `--tr`。
 - 本地预校验在写 SAP 前拦截非法形状；`--check-only` 例外——它把 LOCAL 前缀规则交给 SAP 判定并回显原文。
 
 ## 已知坑

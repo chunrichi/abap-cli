@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import { IcfClient } from '../../clients/icf-client.js';
 import { CliError, printResult, type OutputMode } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
+import { isLocalPackageName, transportForPackage } from '../../core/transport.js';
 import { enquArtifact, type EnquLocal } from '../../formats/enqu/json.js';
 import { toOutputPath } from '../../core/path-output.js';
 import { affObjectToken } from '../../formats/file-resolver.js';
@@ -67,9 +68,9 @@ export async function runCreateEnqu(
   }
 
   const targetPackage = (opts.package ?? '$TMP').trim().toUpperCase();
-  if (targetPackage !== '$TMP' && !opts.tr) {
-    throw new CliError('VALIDATION_ERROR', 'transportRequest is required when package is not $TMP', {
-      nextSteps: ['Re-run with --tr <REQUEST>', 'Or use --package $TMP for local objects.'],
+  if (!isLocalPackageName(targetPackage) && !opts.tr) {
+    throw new CliError('VALIDATION_ERROR', 'transportRequest is required when package is not a local package', {
+      nextSteps: ['Re-run with --tr <REQUEST>.', 'Or use a local package ($TMP) for local objects.'],
       example: `abap create ENQU ${upper} --file ${toOutputPath(opts.file)} --package ${opts.package} --tr <REQUEST> --yes`,
     });
   }
@@ -82,7 +83,9 @@ export async function runCreateEnqu(
   (wire as Record<string, unknown>).name = upper;
   if (opts.description) wire.header = { ...(wire.header as object), description: opts.description };
   if (opts.package) (wire as Record<string, unknown>).package = opts.package;
-  if (opts.tr) (wire as Record<string, unknown>).transportRequest = opts.tr;
+  // Local objects are transport-free: a stray --tr must not reach the wire.
+  const transportRequest = transportForPackage(targetPackage, opts.tr);
+  if (transportRequest) (wire as Record<string, unknown>).transportRequest = transportRequest;
 
   const icf = await IcfClient.create();
   const resp = await icf.postDdic<{ name: string; type: string; action: 'created' | 'updated' }>('enqu', wire);

@@ -12,7 +12,7 @@ import type { AdtClientWrapper } from '../../clients/adt-client.js';
 import { IcfClient } from '../../clients/icf-client.js';
 import { CliError } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
-import { resolveTransport } from '../../core/transport.js';
+import { isLocalPackageName, resolveTransport } from '../../core/transport.js';
 import { toRelativeOutputPath } from '../../core/path-output.js';
 import { resolveFile } from '../../formats/file-resolver.js';
 import { viewArtifact, type ViewLocal } from '../../formats/view/json.js';
@@ -53,7 +53,7 @@ export async function pushViewFile(
   // Transport: --tr > config > file's recorded package rule > user's open request.
   const packageName = (wire.package ?? '').toUpperCase();
   let transport = opts.tr ?? client.getConfig().transport ?? '';
-  if (!transport && packageName !== '$TMP') {
+  if (!transport && !isLocalPackageName(packageName)) {
     transport = await resolveTransport(client, opts.tr, client.getConfig().transport);
   }
   wire.transportRequest = transport || undefined;

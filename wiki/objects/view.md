@@ -1,10 +1,10 @@
 ---
 type: object-type
 title: VIEW — 数据库视图（Database View）
-description: VIEW 对象的 ICF 路由、自建 view-v1 字段契约（DD25V/DD26V/DD27P/DD28J/DD28V）、写路径与 $TMP-only 删除
+description: VIEW 对象的 ICF 路由、自建 view-v1 字段契约（DD25V/DD26V/DD27P/DD28J/DD28V）、写路径与本地包（`$` 前缀）删除
 tags: [abap-cli, object-type, view, icf, abap-file-format, database-view]
 created at: 2026-10-31 18:00:00
-changed at: 2026-10-31 18:20:00
+changed at: 2026-11-01 21:35:00
 ---
 
 # VIEW — 数据库视图（Database View）
@@ -21,7 +21,7 @@ DDIC 视图（SE11 → 视图）。`VIEW` 是 abap-cli 的**本地扩展类型**
 | create | `POST /sap/abap_cli/ddic/view`（body 带 `name`；PUT 同语义） |
 | pull | `GET /sap/abap_cli/ddic/view/<name>` |
 | push | `GET`（存在性探测）→ `POST /sap/abap_cli/ddic/view` |
-| delete | `DELETE /sap/abap_cli/ddic/view/<name>`（仅 `$TMP`） |
+| delete | `DELETE /sap/abap_cli/ddic/view/<name>`（仅 `$` 前缀本地包；旧 ICF 部署只认 `$TMP`） |
 
 ADT 没有 DDIC 视图资源，所以 `registry` 里 `source: 'ICF'`：四类操作全部走自建
 ICF 服务，需要先 `abap deploy`。SAP 侧 handler 在
@@ -116,7 +116,7 @@ src/
 `abap delete <name> --type VIEW` → `DELETE /ddic/view/<name>`：
 
 - handler 先 `SELECT SINGLE FROM dd25l` 判断对象是否存在，再查 TADIR 判定包；
-- 非 `$TMP` 视图 → `VIEW_DELETE_UNSUPPORTED`（exit 7）：ICF 上下文无法把删除记录进
+- 非本地包（`$` 前缀之外）视图 → `VIEW_DELETE_UNSUPPORTED`（exit 7）：ICF 上下文无法把删除记录进
   传输请求，请在 SE11 删除；
 - `$TMP` 视图：若只有 inactive `L` 版本，先 `DDIF_VIEW_ACTIVATE` 激活，
   再 `RS_DD_DELETE_OBJ(objtype='V', no_ask='X')`（**不要**用会弹 dynpro 的
@@ -150,14 +150,14 @@ cat > src/zcli_tc_view.view.json <<'JSON'
 }
 JSON
 
-# create（$TMP 免 transport；非 $TMP 必须 --tr）
+# create（本地包免 transport；非本地包必须 --tr）
 abap create VIEW ZCLI_TC_VIEW --file src/zcli_tc_view.view.json --package '$TMP' --yes --json
 
 # 拉回、改描述、推回
 abap pull ZCLI_TC_VIEW --type VIEW --overwrite --json
 abap push src/zcli_tc_view.view.json --json
 
-# 删除（仅 $TMP）
+# 删除（仅 `$` 前缀本地包）
 abap delete ZCLI_TC_VIEW --type VIEW --yes --json
 ```
 
@@ -173,7 +173,7 @@ abap delete ZCLI_TC_VIEW --type VIEW --yes --json
 | `VIEW_INVALID_PAYLOAD` | VALIDATION_ERROR / 7 | body 不是合法 view-v1 JSON |
 | `VIEW_INCONSISTENT` / `VIEW_WRITE_REFUSED` | VALIDATION_ERROR / 7 | `DDIF_VIEW_PUT` 的 `view_inconsistent` / `put_refused` |
 | `VIEW_WRITE_FAILED` / `VIEW_ACTIVATION_FAILED` | SAP_ERROR / 6 | PUT / ACTIVATE 失败 |
-| `VIEW_TRANSPORT_REQUIRED` | VALIDATION_ERROR / 7 | 非 `$TMP` 写未给有效 transport |
+| `VIEW_TRANSPORT_REQUIRED` | VALIDATION_ERROR / 7 | 非本地包写未给有效 transport |
 | `VIEW_NOT_AUTHORIZED` | AUTH_ERROR / 5 | `RS_CORR_INSERT` 权限不足 |
 | `VIEW_DELETE_UNSUPPORTED` | VALIDATION_ERROR / 7 | 删除可传输视图 |
 | `VIEW_DELETE_FAILED` | SAP_ERROR / 6 | `RS_DD_DELETE_OBJ` 失败 |
@@ -214,11 +214,13 @@ abap delete ZCLI_TC_VIEW --type VIEW --yes --json
   `AGGTYPE='V'`、`AUTHCLASS='00'`、`READONLY='X'`、`VIEWGRANT='R'`，与 SE11
   建数据库视图一致；维护视图/帮助视图的额外属性（TDDAT、维护生成器）不在
   view-v1 覆盖范围。
-- **删除只支持 `$TMP`**：可传输视图请在 SE11 删，否则删除无法记录到传输请求。
+- **删除只支持本地包（`$` 前缀）**：非本地包视图请在 SE11 删，否则删除无法记录到传输请求。
 - **pull 只返回 active 版本**：`DDIF_VIEW_GET state='A'`；inactive 版本需先
   `DDIF_VIEW_ACTIVATE`（`push` 会自动激活，`delete` 也会先激活）。
 - **语言文本**：`header.originalLanguage` 来自 `DD25V-DDLANGUAGE`；字段短文本
   `DD27P-DDTEXT` 不在 view-v1 里（由数据元素/表字段承载）。
+
+- **`$` 前缀本地包（2026-11-01）**：在 `$ZCLI_TC_LP2`（父 `$TMP`，LOCAL 组件）中 create/delete 均 PASS，`transport list --open` 空、E071 0 行；旧 ICF 部署只认 `$TMP`，升级后需一次 `abap deploy`。证据：`tests/261101901-localpkg-icf/`（本地，不入库）。
 
 # references
 

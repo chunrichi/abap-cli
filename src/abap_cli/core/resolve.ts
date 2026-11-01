@@ -7,7 +7,7 @@ export interface ResolvedObject {
   name: string;
   type: string;
   objectUrl: string;
-  /** Package from the search hit — used to detect $TMP (transport-free) objects. */
+  /** Package from the search hit — used to detect local-package (transport-free) objects. */
   packageName?: string;
   parts: ObjectPart[];
 }

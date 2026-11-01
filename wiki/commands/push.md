@@ -4,7 +4,7 @@ title: abap push
 description: 推送本地 ABAP 文件到 SAP — lock → set source → syntax check → activate → unlock，支持源码对象、FUGR、textpool、DDIC/HTTP/TRAN/XSLT JSON 与 DOMA/DTEL 长文本伴生，按对象解析 transport（textpool 写受系统限制）
 tags: [abap-cli, command, push, upload, abap-file-format, ddic, docu, xslt, textpool, transport]
 created at: 2026-08-07 00:11:03
-changed at: 2026-11-01 00:28:00
+changed at: 2026-11-01 21:30:00
 ---
 
 # abap push
@@ -69,8 +69,10 @@ abap push [options] [files...]
 `runPush` **不再**在顶层统一解析一个 transport；改为每个文件 dispatch 时逐对象解析（`resolveObjectTransport`）：
 
 1. **对象已绑定请求**（`client.transportInfo(objectUrl)` → `TRANSPORTS[0].TRKORR`）— 直接复用该请求，**无需 `--tr`**；若显式传了不同的 `--tr` → 抛 `VALIDATION_ERROR`（exit 7），提示去掉 `--tr` 或先用 `abap transport assign` 换请求。push 不允许顺手改对象的请求归属。
-2. **`$TMP` 对象**（search 命中 `adtcore:packageName === '$TMP'`，经 `ResolvedObject.packageName` 携带）— transport-free，空 transport 推送，无需 `--tr`（与 `abap deploy` 的 `$TMP` 规则一致）。显式传了非空 `--tr` → **告警 + 忽略**（`meta.warnings` 的 `PUSH_TR_IGNORED_TMP`，exit 不变），不会真的绑定到任何请求。
-3. 其余未绑定非 `$TMP` 对象：`--tr` > 项目 config `transport` > 用户第一个可修改请求（`userTransports`）> `NO_TRANSPORT`（exit 7）。
+2. **本地包对象**（search 命中 `adtcore:packageName` 为 `$` 前缀，如 `$TMP`、`$CRW`，经 `ResolvedObject.packageName` 携带）— transport-free，空 transport 推送，无需 `--tr`（与 `abap deploy` 的本地包规则一致）。显式传了非空 `--tr` → **告警 + 忽略**（`meta.warnings` 的 `PUSH_TR_IGNORED_TMP`，exit 不变），不会真的绑定到任何请求。
+3. 其余未绑定非本地包对象：`--tr` > 项目 config `transport` > 用户第一个可修改请求（`userTransports`）> `NO_TRANSPORT`（exit 7）。
+
+> **ICF 服务端**：ENQU / NROB 创建、XSLT 创建、VIEW / SHLP / TRAN 删除同样按 `$` 前缀判定本地包（旧 ICF 部署只认 `$TMP`，升级后执行一次 `abap deploy`）。`TEST...` 这类非 `$` 开头的包不视为本地，仍需 `--tr`。
 
 `--dry-run` 不查真实请求，用 `--tr` > config > `'DRY_RUN'` 占位。每文件 JSON 结果带该文件实际解析到的 `transport`。
 

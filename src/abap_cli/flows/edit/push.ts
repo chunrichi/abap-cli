@@ -28,7 +28,7 @@ import {
 } from '../../formats/file-resolver.js';
 import { readAbapFile } from '../../formats/abap-source.js';
 import { resolveObject, getObjectParts, validateLocalFile, type ResolvedObject } from '../../core/resolve.js';
-import { resolveTransport } from '../../core/transport.js';
+import { isLocalPackageName, resolveTransport } from '../../core/transport.js';
 import { resolveLocalTargets } from '../../core/local-targets.js';
 import { requireWriteConfirmation } from '../../core/confirmation.js';
 import { pushObject, type PushStage } from './push-object.js';
@@ -302,7 +302,7 @@ function normalizePushResult(r: PushFileResult): PushFileResult {
  * Resolve the transport for one object:
  * - an object already assigned to a request reuses it — push must NOT change it
  * - explicit --tr is honored only when it matches the binding or the object is unbound
- * - $TMP objects are transport-free (no request needed)
+ * - local package objects ($TMP, $CRW, ...) are transport-free (no request needed)
  * - otherwise: --tr > config > user's first modifiable request > NO_TRANSPORT
  */
 async function resolveObjectTransport(
@@ -314,12 +314,12 @@ async function resolveObjectTransport(
     return opts.tr ?? client.getConfig().transport ?? 'DRY_RUN';
   }
 
-  // FR-1: $TMP objects are transport-free — an explicit --tr is ignored
+  // Local package objects are transport-free — an explicit --tr is ignored
   // (warn instead of silently dropping, so agents don't assume it applied).
-  // Checked before transportInfo so $TMP objects skip the bound-request lookup.
-  if (object.packageName === '$TMP') {
+  // Checked before transportInfo so local objects skip the bound-request lookup.
+  if (isLocalPackageName(object.packageName)) {
     if (opts.tr) {
-      collectWarning('PUSH_TR_IGNORED_TMP', `$TMP object ${object.name} is transport-free; ignoring --tr ${opts.tr}`, {
+      collectWarning('PUSH_TR_IGNORED_TMP', `${object.packageName ?? 'local'} object ${object.name} is transport-free; ignoring --tr ${opts.tr}`, {
         object: object.name,
         tr: opts.tr,
       });

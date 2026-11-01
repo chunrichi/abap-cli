@@ -9,18 +9,20 @@ exposure.
 
 ## Node.js runtime
 
-`abap-cli` decompresses SAP HTTP responses in-process. Node.js releases before
-**22.23.4**, **24.22.1** and **26.12.1** ship a vulnerable Brotli decoder
+`abap-cli` requires **Node.js 24 LTS** (`^24.22.1`). The CLI decompresses SAP
+HTTP responses in-process. Node.js releases before **24.22.1** ship a vulnerable
+Brotli decoder
 ([CVE-2026-111497](https://nvd.nist.gov/vuln/detail/CVE-2026-111497), "Node2Shell"):
 a crafted `Content-Encoding: br` response — from a malicious SAP endpoint or a
 network attacker on a plain-HTTP connection — can corrupt the CLI process.
-End-of-life lines (18.x, 20.x, 23.x, 25.x) will not receive a fix.
+Node 22 is in maintenance and no longer supported by `abap-cli`; other lines
+(18.x, 20.x, 23.x, 25.x, 26.x and newer) are outside the support matrix.
 
-The supported range is `^22.23.4 || ^24.22.1 || >=26.12.1`, declared in
+The supported range is `^24.22.1`, declared in
 `package.json` `engines.node` and checked by `abap doctor` (`env.node`). Upgrade
 the runtime before running the CLI; there is no application-level workaround.
 Distribution builds that link a system Brotli library instead of the bundled
-one (for example Homebrew's `node@22`, or distro packages) must also upgrade
+one (for example Homebrew's `node@24`, or distro packages) must also upgrade
 that library to a fixed release — `process.version` alone does not prove the
 decoder is patched.
 

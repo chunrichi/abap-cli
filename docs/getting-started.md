@@ -4,7 +4,7 @@ This guide walks through installing `abap-cli`, configuring a connection to an S
 
 ## Requirements
 
-- A **security-patched Node.js** — 22.23.4+, or 24.22.1+ / 26.12.1+ on newer lines (ESM project, `"type": "module"`); see [SECURITY.md](../SECURITY.md)
+- **Node.js 24 LTS** — 24.22.1+ (ESM project, `"type": "module"`); see [SECURITY.md](../SECURITY.md)
 - An SAP system with the **ADT (ABAP Development Tools)** service enabled (ADT is part of the standard ABAP application server)
 - A user with developer authorizations (create/change/activate repository objects)
 
@@ -113,7 +113,7 @@ abap push src/zcl_my_class.clas.abap --tr DEVK900001
 
 ### When You Have No Transport Request
 
-`abap push` resolves the transport **per object**: an object already assigned to a request reuses it, and objects in `$TMP` push with no transport at all — so a freshly `abap create`d or `abap deploy`ed `$TMP` object can be pushed without `--tr`. Only an unbound object in a real package needs an explicit request:
+`abap push` resolves the transport **per object**: an object already assigned to a request reuses it, and objects in local packages (`$` prefixed, e.g. `$TMP`, `$CRW`) push with no transport at all — so a freshly `abap create`d or `abap deploy`ed local object can be pushed without `--tr`. Only an unbound object in a real package needs an explicit request:
 
 ```bash
 # See what's available

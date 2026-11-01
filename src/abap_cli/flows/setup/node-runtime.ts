@@ -1,17 +1,17 @@
 /**
- * Supported Node.js runtime range.
+ * Supported Node.js runtime range: the Node.js 24 LTS line.
  *
  * The CLI decompresses SAP HTTP responses in-process (axios auto-decodes a
  * `Content-Encoding: br` response), so a vulnerable Node.js Brotli decoder can
  * be corrupted by a crafted response. The floor therefore tracks the Node.js
- * security releases of 2026-10-21 rather than an API-compatibility minimum:
- * every line below is exposed to the Brotli decoder out-of-bounds write, and
- * end-of-life lines (18.x, 20.x, 23.x, 25.x) will not receive a fix.
+ * security release of 2026-10-21 (24.22.1) rather than an API-compatibility
+ * minimum. Node 22 is in maintenance and out of the support matrix: only the
+ * Node 24 LTS line is tested and shipped against.
  *
  * Keep this string identical to `engines.node` in package.json — a unit test
  * enforces the pair.
  */
-export const SUPPORTED_NODE_RANGE = '^22.23.4 || ^24.22.1 || >=26.12.1';
+export const SUPPORTED_NODE_RANGE = '^24.22.1';
 
 type Version = [number, number, number];
 

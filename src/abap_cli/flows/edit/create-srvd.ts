@@ -11,7 +11,7 @@
  */
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError, printResult, type OutputMode } from '../../output/json.js';
-import { resolveTransport } from '../../core/transport.js';
+import { isLocalPackageName, resolveTransport } from '../../core/transport.js';
 import { resolveObject } from '../../core/resolve.js';
 import { toOutputPath } from '../../core/path-output.js';
 import { affObjectToken } from '../../formats/file-resolver.js';
@@ -53,7 +53,7 @@ async function runCreateSrvd(
     client,
     opts.tr,
     client.getConfig().transport,
-    { transportOptional: (opts.package ?? '$TMP').trim().toUpperCase() === '$TMP' },
+    { transportOptional: isLocalPackageName(opts.package ?? '$TMP') },
   );
   try {
     await resolveObject(client, name, 'SRVD');

@@ -9,7 +9,7 @@ export const SCHEMA = {
   description:
     'Delete an ABAP object from SAP (lock → delete → unlock). ' +
     'Type is required to avoid ambiguity; --yes is required for non-interactive confirmation; ' +
-    'a transport request is required for non-$TMP objects (matching `abap push` semantics).',
+    'objects outside local packages require a transport request (matching `abap push` semantics).',
   usage: 'abap delete <object> --type <type> [--tr <request>] --yes',
   scope: 'sap',
   arguments: [
@@ -33,7 +33,7 @@ export const SCHEMA = {
       type: 'string',
       required: false,
       valuePlaceholder: '<request>',
-      description: 'Transport request number (required for non-$TMP packages).',
+      description: 'Transport request number (required for non-local packages).',
     },
     {
       name: '--yes',
@@ -75,7 +75,7 @@ export function registerDeleteCommand(program: Command): void {
     // before argument validation — matches the `fields` / `select` pattern that
     // the envelope-schema contract test depends on.
     .option('--type <type>', 'Object type code (CLAS, PROG, INTF, ...). Required for deletion.')
-    .option('--tr <request>', 'Transport request number (required for non-$TMP packages)')
+    .option('--tr <request>', 'Transport request number (required for non-local packages)')
     .option('--yes', 'Confirm the deletion. Required for deletion.')
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action(async (object: string | undefined, opts: DeleteOptions & { type?: string; schema?: boolean }, cmd: Command) => {

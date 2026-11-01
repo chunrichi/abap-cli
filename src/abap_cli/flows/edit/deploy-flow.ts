@@ -1,7 +1,7 @@
 /**
  * `abap deploy` flow — bundled ICF service deployment and its status probe.
  *
- * Owns the transport/package guards (only $TMP is transport-free, and $TMP must
+ * Owns the transport/package guards (local packages are transport-free and must
  * never silently land in a user transport), the deployment summary rendering and
  * the `deploy status` interpretation (installed / current / outdated /
  * unreachable). The command layer only declares options and prints the result.
@@ -9,7 +9,7 @@
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError } from '../../output/json.js';
 import { collectWarning } from '../../output/meta.js';
-import { resolveTransport } from '../../core/transport.js';
+import { isLocalPackageName, resolveTransport } from '../../core/transport.js';
 import { deployBundled, type DeploymentSummary } from './deploy.js';
 import { checkIcfDeployment, ICF_SERVICE_VERSION } from '../../clients/icf-version.js';
 import { loadConfig } from '../../config/project-config.js';
@@ -33,14 +33,15 @@ export interface DeployResult {
 
 export async function runDeploy(opts: DeployRunOptions): Promise<DeployResult> {
   const targetPackage = (opts.package ?? '$TMP').trim().toUpperCase();
-  if (targetPackage !== '$TMP' && !opts.tr) {
+  const isLocal = isLocalPackageName(targetPackage);
+  if (!isLocal && !opts.tr) {
     throw new CliError(
       'NO_TRANSPORT',
-      `--tr <transport> is required when --package is ${targetPackage} (only $TMP is transport-free)`,
+      `--tr <transport> is required when --package is ${targetPackage} (local packages are transport-free)`,
       {
         nextSteps: [
           'Re-run with --tr <request> (e.g. --tr NDK123456).',
-          'Or use --package $TMP for local objects (no transport needed).',
+          'Or use a local package ($TMP) for local objects (no transport needed).',
         ],
         example: `abap deploy --package ${targetPackage} --tr NDK123456 --yes`,
       },
@@ -48,29 +49,30 @@ export async function runDeploy(opts: DeployRunOptions): Promise<DeployResult> {
   }
   const client = await AdtClientWrapper.create();
   const projectConfig = client.getConfig();
-  // When --package $TMP (local objects), NEVER use a transport. The
+  // Local packages ($TMP, ...) NEVER use a transport. The
   // previous `transportOptional: true` flag was a footgun — `resolveTransport`
   // still preferred the user's first modifiable request before falling back
   // to '', so the new gc_version / source landed in a user transport instead
   // of $TMP. The transport's release/import gate then made `deploy status`
   // read back the old `gc_version` forever ("outdated" deadlock even after
-  // re-deploying). $TMP is local — push source straight to the active object.
-  if (targetPackage === '$TMP' && opts.tr) {
+  // re-deploying). A local package is not transportable — push source straight
+  // to the active object.
+  if (isLocal && opts.tr) {
     throw new CliError(
       'NO_TRANSPORT',
-      '--tr cannot be combined with --package $TMP (local objects do not need a transport)',
+      `--tr cannot be combined with the local package ${targetPackage} (local objects do not need a transport)`,
       {
         nextSteps: [
-          'Re-run without --tr (the ICF sources are local in $TMP).',
+          `Re-run without --tr (the ICF sources are local in ${targetPackage}).`,
           'Or use --package <custom> --tr <request> for a transportable deploy.',
         ],
-        example: 'abap deploy --package $TMP --yes',
+        example: `abap deploy --package ${targetPackage} --yes`,
       },
     );
   }
   const transport = opts.dryRun
     ? (opts.tr ?? projectConfig.transport ?? 'DRY_RUN')
-    : targetPackage === '$TMP'
+    : isLocal
       ? ''
       : await resolveTransport(client, opts.tr, projectConfig.transport);
   const summary = await deployBundled(client, {

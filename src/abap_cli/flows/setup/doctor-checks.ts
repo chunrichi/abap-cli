@@ -256,8 +256,8 @@ export async function runDoctorChecks(opts: DoctorOptions = {}): Promise<DoctorR
       ? okItem('env.node', verbose ? `node ${nodeVersion}` : undefined)
       : errItem(
           'env.node',
-          `Node ${nodeVersion} is not a supported, security-patched release.`,
-          'Upgrade Node.js to 22.23.4+, 24.22.1+, or 26.12.1+.',
+          `Node ${nodeVersion} is outside the supported Node 24 LTS range.`,
+          'Install Node.js 24.22.1+ (Node 24 LTS).',
         ),
   );
   push(

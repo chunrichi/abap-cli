@@ -11,7 +11,7 @@
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError, printResult, type OutputMode } from '../../output/json.js';
 import { resolveObject, type ResolvedObject } from '../../core/resolve.js';
-import { resolveTransport } from '../../core/transport.js';
+import { isLocalPackageName, resolveTransport } from '../../core/transport.js';
 import { toOutputPath } from '../../core/path-output.js';
 import type { CreateOptions } from './create.js';
 import { normalizeName, validateObjectName } from './object-name.js';
@@ -72,7 +72,7 @@ export async function runCreateFugrFunc(
     client,
     opts.tr,
     client.getConfig().transport,
-    { transportOptional: (opts.package ?? '$TMP').trim().toUpperCase() === '$TMP' },
+    { transportOptional: isLocalPackageName(opts.package ?? '$TMP') },
   );
 
   const fmUrl = `${groupUrl}/fmodules/${funcName.toLowerCase()}`;

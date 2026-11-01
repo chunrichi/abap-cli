@@ -296,13 +296,13 @@ CLASS zcl_abap_vibe_icf_xslt IMPLEMENTATION.
     IF lv_package IS INITIAL.
       lv_package = '$TMP'.
     ENDIF.
-    IF lv_package = '$TMP'.
+    IF zcl_abap_vibe_icf_types=>is_local_package( lv_package ) = abap_true.
       CLEAR lv_transport.
     ELSEIF lv_transport IS INITIAL.
       respond_write_error( io_server = io_server
                            iv_status = 400
                            iv_code   = 'XSLT_TRANSPORT_REQUIRED'
-                           iv_msg    = |package { lv_package } is transportable; transportRequest is required| ).
+                           iv_msg    = |package { lv_package } is not a local package ($ prefix); transportRequest is required| ).
       RETURN.
     ENDIF.
 
@@ -475,7 +475,7 @@ CLASS zcl_abap_vibe_icf_xslt IMPLEMENTATION.
                                      CHANGING  data        = ls_request ).
         CATCH cx_root.
           " A malformed delete body is irrelevant — deletion only needs the
-          " transport, which stays empty and SAP treats $TMP objects locally.
+          " transport, which stays empty for local objects.
       ENDTRY.
     ENDIF.
     DATA lv_transport TYPE trkorr.

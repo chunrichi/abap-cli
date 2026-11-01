@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import { IcfClient } from '../../clients/icf-client.js';
 import { CliError, printResult, type OutputMode } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
+import { isLocalPackageName, transportForPackage } from '../../core/transport.js';
 import {
   tranArtifact,
   localToWire as tranLocalToWire,
@@ -61,9 +62,9 @@ export async function runCreateTran(
   }
 
   const targetPackage = (opts.package ?? '$TMP').trim().toUpperCase();
-  if (targetPackage !== '$TMP' && !opts.tr) {
-    throw new CliError('VALIDATION_ERROR', 'transportRequest is required when package is not $TMP', {
-      nextSteps: ['Re-run with --tr <REQUEST>', 'Or use --package $TMP for local objects.'],
+  if (!isLocalPackageName(targetPackage) && !opts.tr) {
+    throw new CliError('VALIDATION_ERROR', 'transportRequest is required when package is not a local package', {
+      nextSteps: ['Re-run with --tr <REQUEST>.', 'Or use a local package ($TMP) for local objects.'],
       example: `abap create TRAN ${objectName} --file ${toOutputPath(opts.file)} --package ${opts.package} --tr <REQUEST> --description "..."`,
     });
   }
@@ -73,7 +74,9 @@ export async function runCreateTran(
     wire.header = { ...(wire.header ?? { description: opts.description, originalLanguage: 'en' }), description: opts.description };
   }
   if (opts.package) wire.package = opts.package;
-  if (opts.tr) wire.transportRequest = opts.tr;
+  // Local objects are transport-free: a stray --tr must not reach the wire.
+  const transportRequest = transportForPackage(targetPackage, opts.tr);
+  if (transportRequest) wire.transportRequest = transportRequest;
 
   const icf = await IcfClient.create();
   const resp = await icf.postTran<{ name: string; type: string; action: 'created' | 'updated' }>(objectName, wire);

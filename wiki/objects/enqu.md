@@ -4,7 +4,7 @@ title: ENQU — 锁对象（Lock Object）
 description: ENQU 对象的 ICF 路由、primaryTable / lockParameters / lockModules 字段契约、EZ/EY 命名规则
 tags: [abap-cli, object-type, enqu, icf, abap-file-format, lock-object]
 created at: 2026-09-16 00:00:00
-changed at: 2026-10-30 20:00:00
+changed at: 2026-11-01 21:35:00
 ---
 
 # ENQU — 锁对象（Lock Object）
@@ -122,3 +122,6 @@ CALL FUNCTION 'DDIF_ENQU_GET'
 
 因此 `pull → push` 往返不会保留被设置的 "allow RFC"。
 
+## 真机证据
+
+- **`$` 前缀本地包（2026-11-01，S/4HANA test-system / profile `test`）**：旧 ICF handler 拒绝 `$ZCLI_TC_LP` 中的 ENQU（`ENQU_PACKAGE_NOT_SUPPORTED`）；执行 `abap deploy` 后同一命令创建成功，`transport list --open` 空、E071 0 行。ENQU 目前**没有删除通道**（ADT 不索引锁对象、ICF 无 delete 路由），清理需走 SE11 或临时报表直删 DDIC 行。证据：`tests/261101901-localpkg-icf/`（本地，不入库）。

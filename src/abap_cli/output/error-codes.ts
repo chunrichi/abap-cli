@@ -57,7 +57,7 @@ export type ErrorCode =
   | 'TABT_VALIDATION_FAILED'       // .tabl.settings.json failed tabt-v1.json enum validation (VALIDATION_ERROR)
   | 'TYPE_NOT_SUPPORTED'
   | 'OVERWRITE_REQUIRED'   // NEW
-  | 'MISSING_TRANSPORT'    // NEW — delete requires --tr for non-$TMP packages
+  | 'MISSING_TRANSPORT'    // NEW — delete requires --tr outside local packages
   | 'DELETE_FAILED'        // NEW — abap delete general failure (lock/delete/unlock cycle)
   | 'PUSH_FAILED'
   | 'READONLY_METADATA'     // a source object's AFF `.json` metadata was handed to push (VALIDATION_ERROR)
@@ -174,8 +174,10 @@ export type ErrorCode =
   // ENQU (lock object) / NROB (number range object) ICF routes
   | 'ENQU_CREATE_FAILED'         // ICF /ddic/enqu POST failure (SAP_ERROR)
   | 'ENQU_PUSH_FAILED'           // ICF /ddic/enqu POST failure during push (SAP_ERROR)
+  | 'ENQU_PACKAGE_NOT_SUPPORTED' // ENQU create outside a local ($-prefixed) package (VALIDATION_ERROR)
   | 'NROB_CREATE_FAILED'         // ICF /ddic/nrob POST failure (SAP_ERROR)
   | 'NROB_PUSH_FAILED'           // ICF /ddic/nrob POST failure during push (SAP_ERROR)
+  | 'NROB_PACKAGE_NOT_SUPPORTED' // NROB create outside a local ($-prefixed) package (VALIDATION_ERROR)
   | 'ENQU_NOT_IMPLEMENTED'       // ICF handler accepts /ddic/enqu but the SAP-side read/write is not deployed yet (SAP_ERROR)
   | 'NROB_NOT_IMPLEMENTED'       // ICF handler accepts /ddic/nrob but the SAP-side read/write is not deployed yet (SAP_ERROR)
   // bundled-service deploy: dev-class merge into the handler class
@@ -267,8 +269,10 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   // — ENQU / NROB ICF routes
   ENQU_CREATE_FAILED: 'SAP_ERROR',
   ENQU_PUSH_FAILED: 'SAP_ERROR',
+  ENQU_PACKAGE_NOT_SUPPORTED: 'VALIDATION_ERROR',
   NROB_CREATE_FAILED: 'SAP_ERROR',
   NROB_PUSH_FAILED: 'SAP_ERROR',
+  NROB_PACKAGE_NOT_SUPPORTED: 'VALIDATION_ERROR',
   ENQU_NOT_IMPLEMENTED: 'SAP_ERROR',
   NROB_NOT_IMPLEMENTED: 'SAP_ERROR',
   TABL_DDL_INVALID: 'VALIDATION_ERROR',

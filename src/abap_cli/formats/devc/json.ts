@@ -15,6 +15,8 @@
  * `localToWire` round-trip.
  */
 
+import { isLocalPackageName } from '../../core/transport.js';
+
 /** AFF `devc-v1.json` shape (only the fields this CLI emits). */
 export interface DevcLocal {
   formatVersion: '1';
@@ -263,9 +265,13 @@ export function isLocalSoftwareComponent(softwareComponent: string): boolean {
  * "Names of LOCAL packages must start with '$' or 'TEST'" — verified on the
  * `packages/validation` endpoint. Local pre-check so `create` fails before a
  * round-trip and the message matches SAP's wording.
+ *
+ * Package-creation naming rule only: the transport-free predicate is
+ * `core/transport.ts#isLocalPackageName`, which treats `$`-prefixed packages
+ * as local (that is what SAP keeps out of transport requests).
  */
 export function validateLocalPackageName(name: string): string | undefined {
-  const upper = name.toUpperCase();
+  const upper = name.trim().toUpperCase();
   if (upper.startsWith('$') || upper.startsWith('TEST')) return undefined;
   return "Names of LOCAL packages must start with '$' or 'TEST'";
 }

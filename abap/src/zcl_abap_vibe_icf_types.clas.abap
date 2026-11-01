@@ -775,7 +775,19 @@ TYPES:
     status TYPE string,
     data   TYPE ty_xslt_write_data,
   END OF ty_xslt_write.
+
+  " ----- local package predicate -----
+  CLASS-METHODS is_local_package
+    IMPORTING iv_package      TYPE devclass
+    RETURNING VALUE(rv_local) TYPE abap_bool.
 ENDCLASS.
 
 CLASS zcl_abap_vibe_icf_types IMPLEMENTATION.
+  METHOD is_local_package.
+    " SAP reserves the '$' prefix for LOCAL packages: their objects are never
+    " recorded in a transport request, so the ICF write paths must neither
+    " demand a request nor attach one.
+    rv_local = boolc( strlen( iv_package ) >= 1
+                      AND substring( val = to_upper( iv_package ) off = 0 len = 1 ) = '$' ).
+  ENDMETHOD.
 ENDCLASS.

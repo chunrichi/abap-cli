@@ -4,7 +4,7 @@ title: abap deploy
 description: 部署内置 ICF ABAP 服务 — `abap deploy` 默认推送发布形态（helper 合并为 handler 内 `lcl_*` 本地类，SAP 上只装 3 个全局类）；`--dev` 安装开发形态的全部全局类；`abap deploy status` 只读探测版本匹配
 tags: [abap-cli, command, deploy, icf, steampunk, btp, merge]
 created at: 2026-09-05 00:00:00
-changed at: 2026-10-31 18:06:00
+changed at: 2026-11-01 21:30:00
 ---
 
 # abap deploy
@@ -41,8 +41,8 @@ abap deploy status [options]          # 只读探测：是否已安装？版本�
 ### Options
 
 - `--dev`: 安装开发形态（20 个全局类，跳过发布合并）；发布形态是默认
-- `--tr <transport>`: transport 号（`--package` 非 `$TMP` 时必填）
-- `--package <package>`: 目标包（默认 `$TMP`——本地对象，无需 transport）
+- `--tr <transport>`: transport 号（`--package` 非本地包时必填）
+- `--package <package>`: 目标包（默认 `$TMP`——本地对象，无需 transport；其它 `$` 前缀本地包如 `$CRW` 同样 transport-free）
 - `--dry-run`: 仅计划，零 SAP 变更调用
 - `--diff`: 逐文件差异摘要（生成的两个 include 也参与比较）
 - `--force`: 绕过安全检查（结果 `forced: true`）
@@ -51,10 +51,10 @@ abap deploy status [options]          # 只读探测：是否已安装？版本�
 
 ### 行为规则
 
-- `--package` 非 `$TMP` 且无 `--tr` → `NO_TRANSPORT`（exit 7 类）
-- **`$TMP` 与 `--tr` 互斥**：deploy 在 `$TMP` 路径下显式拒绝 `--tr`。**禁止**自动选 user 的 modifiable transport：当 user 拥有任意可改 transport 时，原 `resolveTransport({transportOptional: true})` 会把新 `gc_version` 写进 transport，`$TMP` 里的 active class 仍是旧版 → `deploy status` 永远 outdated、`deploy` 看似 success 实际 no-op。`$TMP` 必须走空 transport（local object 直接激活）。
-- `targetPackage === '$TMP'`：`transport = ''`（走 local object 直接激活）
-- `targetPackage !== '$TMP'`：`resolveTransport` 解析链：`--tr` > 项目配置 > 用户可改请求
+- `--package` 非本地包且无 `--tr` → `NO_TRANSPORT`（exit 7 类）
+- **本地包与 `--tr` 互斥**：deploy 在本地包（`$TMP`、`$CRW` 等 `$` 前缀包）路径下显式拒绝 `--tr`。**禁止**自动选 user 的 modifiable transport：当 user 拥有任意可改 transport 时，原 `resolveTransport({transportOptional: true})` 会把新 `gc_version` 写进 transport，本地 active class 仍是旧版 → `deploy status` 永远 outdated、`deploy` 看似 success 实际 no-op。本地包必须走空 transport（local object 直接激活）。
+- 本地包（`isLocalPackageName`：`$` 前缀）：`transport = ''`（走 local object 直接激活）
+- 其它包：`resolveTransport` 解析链：`--tr` > 项目配置 > 用户可改请求
 - 自动创建 SAP 上不存在的捆绑对象（`objects` 数组：`created | updated | unchanged | failed`）
 - 发布形态只推 3 个对象：merged helper 不单独推送、也不逐条列在 `files[]`；对象级 summary 用 `mergedClasses` 记录合并数量
 - `abap/src` 有类未登记进 `abap/deploy.json`、或清单与源码不一致 → `DEPLOY_MANIFEST_INVALID`（exit 7）；合并切分失败 / 依赖成环 / 改名残留 → `DEPLOY_MERGE_FAILED`（exit 7）

@@ -4,7 +4,7 @@ title: abap create
 description: 在 SAP 创建新对象并激活 — 源对象（CLAS/INTF/PROG/FUGR，ADT REST）、DDIC（DOMA/DTEL/TABL/STRU/ENQU/VIEW/SHLP/NROB，--file 走 ICF）、HTTP/SICF 节点、事务码、TTYP/MSAG/DDLS 及 CDS/RAP 配套对象；FUGR 配 --func 可在既有函数组内新建函数模块（FUGR/FF）；--no-activate / --template / --no-pull / --check-only / --audit；--schema 提供 agent 参数自省；create local 为离线草稿（仅 4 类源对象）
 tags: [abap-cli, command, create, clas, intf, prog, fugr, fugr-ff, doma, dtel, tabl, stru, ddic, icf, template, schema]
 created at: 2026-08-07 00:00:00
-changed at: 2026-11-01 00:20:00
+changed at: 2026-11-01 21:25:00
 ---
 
 # abap create
@@ -28,7 +28,7 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 - `<name>`: 对象名（自动转大写；命名空间名如 `/UI2/CL_JSON` 在磁盘上用 AFF 括号 token `(ui2)cl_json`）。本地预校验：≤30 字符、仅 `A-Z 0-9 _`、命名空间形如 `/NS/NAME`（NS ≤10，总长 ≤30），违规 → `VALIDATION_ERROR`（exit 7）
 - `--package <package>`: 目标 SAP 包（必填）
 - `--description <desc>`: 对象描述（必填；有 `--file` 时可选，由 JSON 提供）
-- `--tr <transport>`: 传输请求号；缺省时 `resolveTransport` 解析（非 `$TMP` 包下 DDIC 必须显式给出）
+- `--tr <transport>`: 传输请求号；缺省时 `resolveTransport` 解析（非本地包下 DDIC 必须显式给出；本地包 = `$` 前缀，如 `$TMP` / `$CRW`）
 - `--no-activate`: 创建并写 skeleton 但不激活
 - `--template <template>`: skeleton 模板（`minimal` / `public-method` / `report` / `selection-screen`…）；未知模板 → `INVALID_ARGUMENT`
 - `--no-pull`: 跳过 create-then-pull 本地副本（默认拉取）
@@ -36,7 +36,7 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 - `--audit`: 额外一次 SAP 往返记录 before-checksum（默认关）
 - `--file <path>`: abap-file-format JSON 输入（`types/registry.ts` 的 `requiresFile` 类型必填：TABL/STRU/DOMA/DTEL/ENQU/VIEW/SHLP/NROB/HTTP/TRAN/XSLT/TTYP/MSAG/DDLS/SRVD/DCLS/DDLX/DDLA）。TABL/STRU 是三件套：`--file` 指向 main `.tabl.json`，CLI 自动读同目录 `.tabl.ddic`（DDL 源）与 `.tabl.settings.json`；XSLT 用 `<name>.xslt.json` + 同目录 `<name>.xslt.xml` 两件套；只有 main JSON 时回落 legacy wire-flat 单文件（顶层 `name` / `fields[]`）。DDL 解析失败 → `TABL_DDL_INVALID`（exit 7）
 - `--func <module>`: 仅 `FUGR` 类型可用 — 在**既有函数组 `<name>`** 内新建函数模块（`FUGR/FF` 子对象）。组不存在 → `OBJECT_NOT_FOUND`（exit 8，附建组指引）；组内同名模块已存在 → `OBJECT_EXISTS`（exit 2）；模块名同样过本地预校验（≤30、`A-Z 0-9 _`）。`--check-only` 不支持该形态
-- `--software-component <swcomp>`: 仅 `DEVC` — 新包的软件组件；缺省从父包继承（`$TMP` → `LOCAL`）。LOCAL 包名必须 `$`/`TEST` 开头
+- `--software-component <swcomp>`: 仅 `DEVC` — 新包的软件组件；缺省从父包继承（`$TMP` → `LOCAL`）。LOCAL 包名必须 `$`/`TEST` 开头（命名约束；是否免 transport 只看 `$` 前缀）
 - `--transport-layer <layer>`: 仅 `DEVC` — 新包的传输层；缺省从父包继承（`$TMP` → 空）
 - `--package-type <type>`: 仅 `DEVC` — `development`（默认）/ `main` / `structure`；非法值 → `INVALID_ARGUMENT`
 - `--schema`: 打印参数 schema 为 JSON 并退出（无 SAP 调用；`<type>`/`<name>` 可不传）
@@ -56,10 +56,11 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 - **创建即激活**：复用 push 流程（lock → 写 skeleton → activate → unlock）；`--no-activate` 跳过激活
 - **FUGR 与源对象的差异**：新 FUGR 用 `objectStructure` 取 parts（立即可读）；CLAS/INTF/PROG 对新建对象 objectStructure 有就绪延迟（真机 "wrong input data"），回退到稳定 `<objectUrl>/source/main`
 - **FUGR/FF（组内建函数模块）**：`--func` 形态不改组、只建模块。组须先存在（`resolveObject` 校验）；模块经 `createObject({objtype:'FUGR/FF', parentName:<group>, parentPath:<group URL>})` 打到 `/sap/bc/adt/functions/groups/<group>/fmodules`（abap-adt-api objectcreator 内建类型，真机 $TMP 下直接产出激活态模块）；随后按 `--no-activate` 决定是否显式 activate。create-then-pull 只补写 `src/<group>.fugr.<fm>.func.{abap,json}`（`skipExisting`，绝不覆盖用户已编辑的组文件）；`includeNumber`（UXX 编号）由 SAP 创建时自动分配、pull 时从 UXX include 读取（如 FF01→01、FF02→02）
-- **DDIC 客户端校验**（快失败，零 SAP 往返）：命名空间（Z/Y/slash）与必需字段 → `VALIDATION_ERROR`；非 `$TMP` 包必须 `--tr`
+- **DDIC 客户端校验**（快失败，零 SAP 往返）：命名空间（Z/Y/slash）与必需字段 → `VALIDATION_ERROR`；非本地包必须 `--tr`（ENQU / NROB 创建同样接受 `$` 前缀本地包；旧 ICF 部署只认 `$TMP`，升级后需执行一次 `abap deploy`）
 - **DEVC 的差异**：包没有源码 / 激活步骤。名字走包规则（可带前导 `$`、命名空间 `/NS/NAME`，≤30），软件组件 LOCAL 时包名必须 `$`/`TEST` 开头；`--check-only` 调 SAP 的 `POST /sap/bc/adt/packages/validation` 并把名字/组件类错误的 SAP 原文回显（`valid:false` 仍是 success envelope）；create-then-pull 写 `src/<name>.devc.json`。`--file` / `--template` / `--func` 对 DEVC 无效（显式拒绝）
 - **DDIC TABL/STRU 三件套解析**：`readDdicObjectForCreate(filePath, type)` 探测同目录 `.tabl.ddic`（或 `.stru.ddic`）与 `.tabl.settings.json`；三件齐全走 `readTablArtifact`，否则回落 `readDdicJson`（legacy wire-flat）。DDL 解析失败 → `TABL_DDL_INVALID`（exit 7）；main JSON 缺 `header.description` 等必填 → `VALIDATION_ERROR`，`error.example` 字段附 wire-flat 最小模板
 - **CLI flag 覆盖文件值**：`--description` / `--package` / `--tr` 优先于 `--file` JSON 内字段；`--description` 覆盖 `header.description`
+- **本地包 + `--tr`**：`$` 前缀本地包是 transport-free 的，写路径会丢弃 `--tr`（不进请求体、不出现在 `data.transport`）；只有 `abap deploy` 对本地包 + `--tr` 显式报 `NO_TRANSPORT`
 - **`--check-only` 仅源对象**：DDIC 路由不接受（走 `--file` 校验）
 - **create-then-pull**：成功后把激活后的源码平铺写回 `src/<name>.<type>.abap`（`--no-pull` 关闭）。目标固定为工作区 `src/`——`create` 不读 `--dir`（`--dir` 只对 `abap pull` 与 `abap create local` 生效）
 - **`create local` 落库路径**：本地草稿 → `abap create <type> <name> --package <pkg> --description <desc> --no-pull` → `abap push src/<name>.<type>.abap --tr <transport>`（帮助文本中给出）
@@ -93,7 +94,7 @@ envelope 附加 `data.channel`（`"adt"` / `"icf"`）。
 `XSLT` 走 **ICF `POST /sap/abap_cli/xslt/<name>`**，SAP 侧用 `CL_O2_API_XSLTDESC` 创建 + 激活。
 
 - **两件套必填**：`--file` 指向 `<name>.xslt.json`（AFF `xslt-v1.json` 元数据），同目录必须有 `<name>.xslt.xml`（源码）。缺 XML → `VALIDATION_ERROR`（exit 7，提示补伴生文件）；XML 为空同样拒绝。
-- **`--package` 缺省 `$TMP`**；非 `$TMP` 包必须 `--tr`（否则本地 `VALIDATION_ERROR`，SAP 侧还有 `XSLT_TRANSPORT_REQUIRED` 双保险）。
+- **`--package` 缺省 `$TMP`**；非本地包必须 `--tr`（否则本地 `VALIDATION_ERROR`；SAP 侧另有 `XSLT_TRANSPORT_REQUIRED` 兜底——handler 按 `$` 前缀判定本地包（旧 ICF 部署只认 `$TMP`，升级后需 `abap deploy`）。
 - **`--description` 覆盖 `header.description`**；`header.originalLanguage` 是 ISO 2 位，ABAP 侧用 T002 换算成 SAP 1 位语言码。
 - **`--check-only` 是本地校验**（读两件套 + schema，不调 SAP），与 DDIC 的 SAP 预检不同。
 - **文件名必须等于对象名**：`--file` 的 basename 必须是 AFF token 形式 `<token>.xslt.json`（命名空间 `(zns)my_xslt.xslt.json`），否则 `INVALID_ARGUMENT`（exit 2）。
@@ -177,7 +178,7 @@ abap create CLAS ZCL_VALIDATE --package ZPKG --description "check" --check-only
 # DDIC：从 abap-file-format JSON 创建数据元素（$TMP 免 transport）
 abap create DTEL ZDTEL_NAME --file src/zdtel_name.dtel.json --package $TMP
 
-# DDIC：非 $TMP 包必须给 transport
+# DDIC：非本地包必须给 transport
 abap create DOMA ZDOMA_CODE --file src/zdoma_code.doma.json --package ZPKG --tr A4HK900116
 
 # DDIC TABL/STRU：abap-file-format 三件套（happy path；--file 指向 main，自动读取同名 .tabl.ddic + .tabl.settings.json）

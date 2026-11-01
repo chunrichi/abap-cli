@@ -44,7 +44,10 @@ vi.mock('../../src/abap_cli/core/resolve.js', () => ({
   resolveObject: mocks.resolveObject,
   getObjectParts: mocks.getObjectParts,
 }));
-vi.mock('../../src/abap_cli/core/transport.js', () => ({ resolveTransport: mocks.resolveTransport }));
+vi.mock('../../src/abap_cli/core/transport.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/abap_cli/core/transport.js')>();
+  return { ...actual, resolveTransport: mocks.resolveTransport };
+});
 vi.mock('../../src/abap_cli/flows/edit/push-object.js', () => ({ pushObject: mocks.pushObject }));
 vi.mock('../../src/abap_cli/core/confirmation.js', () => ({ requireWriteConfirmation: () => undefined }));
 

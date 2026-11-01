@@ -4,7 +4,7 @@ title: NROB — 编号范围对象（Number Range Object）
 description: NROB 对象的 ICF 路由、interval / configuration 字段契约、Z/Y 命名规则
 tags: [abap-cli, object-type, nrob, icf, abap-file-format, number-range, tnro, tnrot]
 created at: 2026-09-16 00:00:00
-changed at: 2026-10-30 20:00:00
+changed at: 2026-11-01 21:35:00
 ---
 
 # NROB — 编号范围对象（Number Range Object）
@@ -140,11 +140,12 @@ src/
 | `ZNR_VIBE` (mainBuffer / 10% / rolling / EBELP) | ✓ | ✓ | buffering, percentWarning, rolling, subType, numberLengthDomain |
 | `ZNR_EDGE` (none / 50% / rolling=false / untilYear=true / BUKRS / transactionId=ZTEST_TXN) | ✓ | ✓ | rolling→nonrswap 反义正确，transactionId 写入了 rfcdest，untilYear 写入了 yearind，none buffering 写入 ' ' |
 | Missing `numberLengthDomain` | ✗（CLI pre-flight） | — | AFF schema validation 拦截 |
-| `--package ZPKG_FAKE`（非 $TMP） | ✗（本地校验） | — | `transportRequest required when package is not $TMP` |
+| `--package ZPKG_FAKE`（非本地包） | ✗（本地校验） | — | `transportRequest is required when package is not a local package` |
 
 ## 当前限制
 
-- **只支持 `$TMP`** —— transport-bound NROB 需要额外的 `TR_TADIR_INTERFACE` + `RS_CORR_INSERT` 写 TADIR，本轮没实现。下轮再加：先 `TR_TADIR_INTERFACE` (object 'NROB')，再 `INSERT tnro / tnrot`，最后 `RS_CORR_INSERT`。
+- **ICF 服务端接受 `$` 前缀本地包**（旧 ICF 部署只认 `$TMP`，升级后执行一次 `abap deploy`）—— transport-bound NROB 仍不支持：需要额外的 `TR_TADIR_INTERFACE` + `RS_CORR_INSERT` 写 TADIR，本轮没实现。
+- **`$` 前缀本地包（2026-11-01 真机）**：非本地包 + `--tr` 被新 handler 拒绝（`NROB_PACKAGE_NOT_SUPPORTED`，消息改为 "supports local packages (name starts with $) only"）；正向创建未做——SNRO/ICF 均无删除通道，会产生无法清理的残留。证据：`tests/261101901-localpkg-icf/`（本地，不入库）。
 - **不写 NRIV** —— 创建 object 声明后，interval 数据需要 `SNRO` 维护。
 - **不读 NRIV** —— pull 时 `nrobFormat.generate` 不输出 intervals 数组（schema 没暴露）。
 - **runtime dump 在 CLI 不报 NROB_NOT_FOUND 后** —— NROB_NOT_FOUND 是正常错误（对象不存在），runtime dump 是 5xx 的 SAP HTML；如果看到 5xx 而非 4xx JSON，说明是 ABAP 端缺激活或代码 bug，需要查 `tmp/scripts/probe-icf-incl2.mjs` 重新抓 implementations include 确认部署内容。

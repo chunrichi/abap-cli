@@ -48,7 +48,7 @@ export type WarningCode =
   // textpool pull — per-category soft warning when object has no
   // elements of that category (CLAS has no selections, FUGR has no headings, etc.)
   | 'TEXTPOOL_CATEGORY_MISSING'
-  // push — $TMP object is transport-free; an explicit --tr is ignored
+  // push — local package object is transport-free; an explicit --tr is ignored
   | 'PUSH_TR_IGNORED_TMP'
   // pull DOMA/DTEL — the 0..1 long-text companion could not be pulled; the
   // main object file was still written.

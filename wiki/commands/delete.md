@@ -1,17 +1,17 @@
 ---
 type: command
 title: abap delete
-description: "从 SAP 删除单个 ABAP 对象（lock → delete → unlock）：--type 必填消歧、--yes 显式确认、非 $TMP 对象必须用 --tr 指定传输请求。"
+description: "从 SAP 删除单个 ABAP 对象（lock → delete → unlock）：--type 必填消歧、--yes 显式确认、非本地包对象必须用 --tr 指定传输请求。"
 tags: [abap-cli, command, delete, adt, lock, transport, cleanup]
 created at: 2026-10-29 14:30:14
-changed at: 2026-10-31 18:06:00
+changed at: 2026-11-01 21:35:00
 ---
 
 # abap delete
 
 从 SAP 删除一个 ABAP 对象。这是**写命令**：先按名字和类型解析对象，再 `lock → DELETE → unlock`——无论删除是否成功都会尽力释放锁，避免留下 ADT 锁。
 
-删除规则与 `abap push` 对齐：`$TMP` 对象不需要 transport；其它包的对象必须用 `--tr` 指定一个**打开且可修改**的传输请求。DEVC（包）例外见下方 gotcha：包删除**不加锁**，transportable 判定依据是包的软件组件而不是所在包。`--type` 必填——同名对象可能同时存在多种类型（如 CLAS 与 PROG），不传会报 `AMBIGUOUS_OBJECT`；非交互环境（Agent / CI）必须显式 `--yes`。命令**只删 SAP 端对象，不删除本地文件**；`src/<name>.*` 需要自己清理，否则下一次 `push` 会把它重新创建出来。
+删除规则与 `abap push` 对齐：本地包（`$` 前缀，如 `$TMP`、`$CRW`）中的对象不需要 transport；其它包的对象必须用 `--tr` 指定一个**打开且可修改**的传输请求。DEVC（包）例外见下方 gotcha：包删除**不加锁**，transportable 判定依据是包的软件组件而不是所在包。`--type` 必填——同名对象可能同时存在多种类型（如 CLAS 与 PROG），不传会报 `AMBIGUOUS_OBJECT`；非交互环境（Agent / CI）必须显式 `--yes`。命令**只删 SAP 端对象，不删除本地文件**；`src/<name>.*` 需要自己清理，否则下一次 `push` 会把它重新创建出来。
 
 ## Usage
 
@@ -24,7 +24,7 @@ abap delete --schema --json
 
 - `<object>`: SAP 对象名（如 `ZCL_MY_CLASS`），不是本地文件名；内部走 ADT quickSearch 解析成对象 URL。
 - `--type <type>`: **必填**。对象类型码（`CLAS` / `PROG` / `INTF` / `FUGR` / `DEVC` / `TABL` / `VIEW` / `SHLP` / `TRAN` / ... / `XSLT`），大小写不敏感。`DEVC` 走独立删除路径（包资源按名字直接寻址，不依赖 quickSearch，也不加锁）；`VIEW` / `SHLP` 走 ICF `DELETE /ddic/view|shlp/<name>`（仅 `$TMP`，先激活 inactive 版本再 `RS_DD_DELETE_OBJ`）。
-- `--tr <request>`: 传输请求号。`$TMP` 对象可省略；其它包必填。
+- `--tr <request>`: 传输请求号。本地包对象可省略；其它包必填。
 - `--yes`: **必填**。显式确认删除；无 TTY 时缺失直接报 `USAGE`。
 - `--schema`: 打印本命令参数 schema 并退出，不调用 SAP。
 - `--json` / `--pretty-json`: 全局输出模式，见 [agent-integration](../../docs/agent-integration.md)。
@@ -32,8 +32,8 @@ abap delete --schema --json
 ## 前置条件
 
 - 工作区已绑定 profile（`.abap.json`），SAP 可达且凭据有效。
-- 对象存在且名字、类型正确；`--tr` 必须是对象所属的打开请求（已释放 / 已关闭的请求会被 SAP 拒绝）。`XSLT` 的包从 ICF GET 读取，非 `$TMP` 缺 `--tr` 时在发 DELETE 前被 `MISSING_TRANSPORT`（exit 2）拦截。
-- 非 `$TMP` 对象需要一个可修改的 transport：先 `abap transport list --open` 或 `abap transport create`。
+- 对象存在且名字、类型正确；`--tr` 必须是对象所属的打开请求（已释放 / 已关闭的请求会被 SAP 拒绝）。`XSLT` 的包从 ICF GET 读取，非本地包缺 `--tr` 时在发 DELETE 前被 `MISSING_TRANSPORT`（exit 2）拦截。
+- 非本地包对象需要一个可修改的 transport：先 `abap transport list --open` 或 `abap transport create`。
 - 对象没有被其他用户锁住。
 
 ## Examples
@@ -42,7 +42,7 @@ abap delete --schema --json
 # 删除 $TMP 里的临时探针类（不需要 transport）
 abap delete ZCL_ZR_CHK9 --type CLAS --yes --json
 
-# 删除非 $TMP 对象：必须带 --tr
+# 删除非本地包对象：必须带 --tr
 abap delete ZR_OLD --type PROG --tr NDK900123 --yes
 
 # 删除 $TMP 下的本地子包（无需 transport，不加锁）
@@ -87,7 +87,7 @@ lock/unlock）：
 }
 ```
 
-失败示例（错误信封走 stderr；这里是非 `$TMP` 对象漏传 `--tr`，exit 2）：
+失败示例（错误信封走 stderr；这里是非本地包对象漏传 `--tr`，exit 2）：
 
 ```json
 {
@@ -110,7 +110,7 @@ lock/unlock）：
 | `OBJECT_NOT_FOUND` | NOT_FOUND / 8 | 名字不存在或类型不匹配 | `abap search <name> --exact` 核对 |
 | `AMBIGUOUS_OBJECT` | NOT_FOUND / 8 | 同名多类型且没给 `--type` | 用 `--type` 消歧 |
 | `TYPE_NOT_SUPPORTED` | VALIDATION_ERROR / 7 | 该类型没有 ADT delete 端点（如 CDS 视图类类型） | 换受支持的类型；映射以底层 ADT 响应为准 |
-| `MISSING_TRANSPORT` | USAGE / 2 | 非 `$TMP` 对象没给 `--tr` | 补 `--tr`，或把对象移到 `$TMP` |
+| `MISSING_TRANSPORT` | USAGE / 2 | 非本地包对象没给 `--tr` | 补 `--tr`，或把对象移到本地包 |
 | `XSLT_DELETE_FAILED` | SAP_ERROR / 6 | XSLT 的 `delete` / `save` 调用失败 | 查看 `details`；对象可能仍保留，重试或到 SE80 手工删除 |
 | `XSLT_TRANSPORT_REQUIRED` | VALIDATION_ERROR / 7 | 非 `$TMP` XSLT 缺 transportRequest | 补 `--tr` |
 | `LOCK_FAILED` | LOCKED / 9 | SAP 没返回 `LOCK_HANDLE`，通常对象被他人锁住 | 让对方释放锁，或 SE11 检查锁条目后重试 |
@@ -118,6 +118,7 @@ lock/unlock）：
 
 ## 真机证据
 
+- **`$` 前缀本地包（2026-11-01）**：在 `$ZCLI_TC_LP2`（父 `$TMP`）中 TRAN / XSLT / VIEW / SHLP 的 delete 全部 PASS，`transport list --open` 空；旧 ICF 部署只认 `$TMP`，升级后需一次 `abap deploy`。证据：`tests/261101901-localpkg-icf/`（本地，不入库）。
 - **VIEW（数据库视图）**：`abap delete <name> --type VIEW` 走 ICF `DELETE /ddic/view/<name>`；仅 `$TMP` 视图可删（可传输视图返回 `VIEW_DELETE_UNSUPPORTED`，exit 7，请在 SE11 删除）。已在 S/4HANA test-system（profile `test`）验证：`$TMP` 视图删除成功（`deleted + lockReleased`），DD25L/DD26S/DD27S/DD28S/TADIR 无残留；`V_T001`（package FBZ）被 `VIEW_DELETE_UNSUPPORTED` 拦截且未发起 DELETE。证据：`tests/261031006-realsap-view/`（本地，不入库）。
 - **DEVC（包）已在 S/4HANA test-system（profile `test`）验证**：`$TMP` 下真实创建 `$ZCLI_TC_PKG10` 后 `abap delete '$ZCLI_TC_PKG10' --type DEVC --yes --json` 成功（复用创建命令的会话时 SAP 先报「包已锁定」，命令自动 logout + 新会话重试后成功），随后 `pull` 返回 404；非 LOCAL 包（ZLOCAL）在缺 `--tr` 时被 `MISSING_TRANSPORT`（exit 2）拦截、未发起删除。证据：`tests/261031002-realsap-devc/`（本地，不入库）。
 - **SHLP（搜索帮助）删除走 ICF `DELETE /ddic/shlp/<name>`**：仅 `$TMP` 搜索帮助可删（先激活 inactive 版本，再 `RS_DD_DELETE_OBJ(objtype='H', no_ask='X')`）；可传输搜索帮助返回 `SHLP_DELETE_UNSUPPORTED`（exit 7，请在 SE11 删除以便记录到请求）。证据：`tests/261031007-realsap-shlp/`（本地，不入库）。
@@ -131,7 +132,8 @@ lock/unlock）：
 ## gotcha
 
 - **本地文件不会删**：命令只调 SAP 的 delete 端点。删完记得清理 `src/` 下对应文件，否则后续 `push` 会把对象重新建出来。
-- **`$TMP` 判定依赖搜索结果的包名**：ADT 搜索没返回 `packageName` 时按非 `$TMP` 处理并强制要求 `--tr`，不代表对象真的在传输包里。
+- **本地包判定依赖搜索结果的包名**：ADT 搜索没返回 `packageName` 时按非本地包处理并强制要求 `--tr`，不代表对象真的在传输包里。
+- **ICF 路由的删除按 `$` 前缀判定本地包**：`VIEW` / `SHLP` / `TRAN` 的 ICF handler 接受 `$` 开头本地包（旧 ICF 部署只认 `$TMP`，升级后执行一次 `abap deploy`）；非本地包删除返回 `*_DELETE_UNSUPPORTED`，请在 SE11 操作。
 - **`--tr` 不能随便传**：必须是对象所属的、打开可修改的请求；传不相关或已关闭的请求会被 SAP 拒绝，最终表现为 `DELETE_FAILED`。
 - **`lockReleased: false`**：删除可能已成功但解锁失败；锁可从 SE11 → Utilities → Lock entries 手工清理。DEVC 恒为 `false`（包删除根本不加锁）。
 - **DEVC 不加锁**：先 lock 再 `DELETE /sap/bc/adt/packages/<name>` 会被 SAP 以「包已锁定」拒绝。命令对包直接 DELETE（transportable 包带 `corrNr`）。

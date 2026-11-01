@@ -14,7 +14,7 @@ export const SCHEMA: CommandSchema = {
   ...baseSchema('deploy', 'Deploy bundled ICF ABAP service to SAP.', 'abap deploy [options] | abap deploy status [options]', 'sap'),
   arguments: [],
   options: [
-    { name: '--tr', type: 'string', valuePlaceholder: '<transport>', description: 'Transport number (required when --package is not $TMP).' },
+    { name: '--tr', type: 'string', valuePlaceholder: '<transport>', description: 'Transport number (required when --package is not a local package).' },
     { name: '--package', type: 'string', valuePlaceholder: '<package>', default: '$TMP', description: 'Target SAP package (default $TMP — local, no transport needed).' },
     { name: '--dry-run', type: 'boolean', description: 'Plan only — make no mutating SAP calls.' },
     { name: '--diff', type: 'boolean', description: 'Report per-file source differences.' },
@@ -43,7 +43,7 @@ type DeployOptions = DeployRunOptions & { schema?: boolean };
 function applyDeployOptions(cmd: Command): Command {
   return cmd
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
-    .option('--tr <transport>', 'Transport number (required when --package is not $TMP)')
+    .option('--tr <transport>', 'Transport number (required when --package is not a local package)')
     .option('--package <package>', 'Target SAP package (default $TMP — local, no transport needed)', '$TMP')
     .option('--dry-run', 'Plan only — make no mutating SAP calls')
     .option('--diff', 'Report per-file source differences')

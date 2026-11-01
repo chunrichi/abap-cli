@@ -4,7 +4,7 @@ title: TRAN — 事务码（SE93 Transaction Code）
 description: TRAN 对象的路由、5 种 transactionType、读写映射、已知限制与真机证据
 tags: [abap-cli, object-type, tran, icf, abap-file-format, transaction, se93]
 created at: 2026-09-01 00:00:00
-changed at: 2026-10-31 16:30:00
+changed at: 2026-11-01 21:35:00
 ---
 
 # TRAN — 事务码（SE93 Transaction Code）
@@ -17,7 +17,7 @@ changed at: 2026-10-31 16:30:00
 |---|---|---|
 | `GET` | 读 TSTC/TSTCT/TSTCP/TSTCC/TSTCA + TADIR package → `tran-v1` wire | `abap pull <code> --type TRAN`、`abap tcode` |
 | `POST` / `PUT` | 创建或覆盖（同一路径：已存在则替换定义） | `abap create TRAN <code> --file ...`、`abap push *.tran.json` |
-| `DELETE` | 删除（仅 `$TMP` 事务） | `abap delete <code> --type TRAN --yes` |
+| `DELETE` | 删除（仅 `$` 前缀本地包事务） | `abap delete <code> --type TRAN --yes` |
 
 ## 本地文件形态
 
@@ -43,7 +43,7 @@ src/
    补 report variant 的 CINFO x'10' 位、写入 TSTCA 起始授权对象并置 CINFO x'04'。
 5. 返回 `{ name, type: 'TRAN', action: 'created' | 'updated' }`。
 
-`DELETE` 删除五张事务表 + 本地 TADIR 行；可传输事务（非 `$TMP`）返回
+`DELETE` 删除五张事务表 + 本地 TADIR 行；非本地包事务返回
 `TRAN_DELETE_UNSUPPORTED`，请在 SE93 删除，让删除动作进入请求。
 
 ## 5 种 transactionType 与 TSTC-CINFO
@@ -160,6 +160,8 @@ report+variant / parameter / variant 五种形状，23/23 TC PASS，TSTC/TSTCP/T
 逐项核对（例如 parameter：`/*SE16 DATABROWSE-TABLENAME=TSTC;`；variant：
 `@@SLG1 /BOBF/LOG`；CINFO：x00/x02/x02/x80/x90）。证据：`tests/261031003-realsap-tran/`
 （本地，不入库）。OO 事务写入在真机返回 `TRAN_OO_NOT_SUPPORTED`（exit 7）。
+
+- **`$` 前缀本地包（2026-11-01）**：在 `$ZCLI_TC_LP2`（父 `$TMP`，LOCAL 组件）中 create/delete 均 PASS，`transport list --open` 空、E071 0 行；旧 ICF 部署只认 `$TMP`，升级后需一次 `abap deploy`。证据：`tests/261101901-localpkg-icf/`（本地，不入库）。
 
 # references
 

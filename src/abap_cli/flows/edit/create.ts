@@ -4,7 +4,7 @@ import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError, printResult, type OutputMode } from '../../output/json.js';
 import { resolveObject, getObjectParts, type ResolvedObject } from '../../core/resolve.js';
 import type { ObjectPart } from '../../formats/object-parts.js';
-import { resolveTransport } from '../../core/transport.js';
+import { isLocalPackageName, resolveTransport } from '../../core/transport.js';
 import { pushObject } from './push-object.js';
 import { requireWriteConfirmation } from '../../core/confirmation.js';
 import { affObjectToken, buildFilename } from '../../formats/file-resolver.js';
@@ -159,8 +159,8 @@ export async function runCreate(type: string | undefined, name: string | undefin
     client,
     opts.tr,
     client.getConfig().transport,
-    // $TMP is case-insensitive: shell expansion to "" + user-typed variants should all skip transport.
-    { transportOptional: (opts.package ?? '$TMP').trim().toUpperCase() === '$TMP' },
+    // Local packages ($TMP, $CRW, ...) are transport-free; shell expansion and case variants included.
+    { transportOptional: isLocalPackageName(opts.package ?? '$TMP') },
   );
 
   // Refuse to overwrite: create is a "new object" operation.

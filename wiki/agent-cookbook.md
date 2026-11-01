@@ -4,7 +4,7 @@ title: Agent Cookbook — 端到端 SAP 开发剧本
 description: AI agent 在 abap-cli 上完成常见 SAP 开发任务的最小可运行命令链。每个剧本：场景 → 完整命令序列 → 验证 → 失败兜底
 tags: [abap-cli, agent, cookbook, end-to-end, scenarios]
 created at: 2026-09-01 00:00:00
-changed at: 2026-10-30 20:00:00
+changed at: 2026-11-01 21:30:00
 ---
 
 # Agent Cookbook — 端到端 SAP 开发剧本
@@ -263,7 +263,7 @@ abap inspect ZCL_NEW_CLASS --activation --json
 
 ## 剧本 8：删除对象（极少用）
 
-`abap delete <obj> --type <type> --yes --json` 删除对象（lock → delete → unlock）。`--type` 必填（避免同名歧义），非 `$TMP` 对象需要 `--tr`。
+`abap delete <obj> --type <type> --yes --json` 删除对象（lock → delete → unlock）。`--type` 必填（避免同名歧义），非本地包（`$` 前缀之外）对象需要 `--tr`。
 
 ```bash
 # 1. 先留一份源码副本

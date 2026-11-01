@@ -70,6 +70,12 @@ const tableStore = new Map();
 // DEVC: package store — key = package name (upper), value = package metadata.
 // Served by GET/POST/DELETE /sap/bc/adt/packages and the search endpoint.
 const packages = new Map();
+// ICF write rules mirror the ABAP handler: only `$`-prefixed packages are
+// LOCAL (transport-free); an empty package means "use $TMP", hence local.
+function isLocalPackage(pkg) {
+  const name = String(pkg || '').trim();
+  return name === '' || name.startsWith('$');
+}
 // Tracks whether the DDIC POST handler saw a pre-existing entry (used to derive
 // data.action = 'updated' vs 'created'). Local to the request handler.
 let ddicStore_existed_before = false;
@@ -1265,7 +1271,7 @@ const server = http.createServer(async (req, res) => {
     // VIEW (database view) — local-extension view-v1 document via ICF.
     // Mirrors the ABAP handler contract for GET / POST|PUT / DELETE
     // (/ddic/view/<name>), including the 16-character name limit and the
-    // $TMP-only delete rule.
+    // local-package-only delete rule.
     const viewRoute = /^\/sap\/abap_cli\/ddic\/view(?:\/(.+))?$/.exec(path);
     if (viewRoute) {
       const viewName = viewRoute[1] ? decodeURIComponent(viewRoute[1]).toUpperCase() : '';
@@ -1290,8 +1296,8 @@ const server = http.createServer(async (req, res) => {
           return ok(res, JSON.stringify({ status: 'error', error: { code: 'VIEW_REQUIRED_FIELD', message: 'fields[] must contain at least one view field' } }), 'application/json');
         }
         const pkg = (payload.package || '').toUpperCase();
-        if (pkg && pkg !== '$TMP' && !payload.transportRequest) {
-          return ok(res, JSON.stringify({ status: 'error', error: { code: 'VIEW_TRANSPORT_REQUIRED', message: 'transportRequest is required for non-$TMP packages' } }), 'application/json');
+        if (!isLocalPackage(pkg) && !payload.transportRequest) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'VIEW_TRANSPORT_REQUIRED', message: 'transportRequest is required for non-local packages' } }), 'application/json');
         }
         const existed = viewStore.has(objName);
         viewStore.set(objName, Object.assign({}, payload, { name: objName, type: 'VIEW', package: pkg || '$TMP' }));
@@ -1311,7 +1317,7 @@ const server = http.createServer(async (req, res) => {
           return ok(res, JSON.stringify({ status: 'error', error: { code: 'DDIC_OBJECT_NOT_FOUND', message: `VIEW ${viewName} not found in mock store` } }), 'application/json');
         }
         const stored = viewStore.get(viewName);
-        if ((stored.package || '').toUpperCase() !== '$TMP') {
+        if (!isLocalPackage(stored.package)) {
           return ok(res, JSON.stringify({ status: 'error', error: { code: 'VIEW_DELETE_UNSUPPORTED', message: `VIEW ${viewName} is in package ${stored.package}; delete it in SE11` } }), 'application/json');
         }
         viewStore.delete(viewName);
@@ -1370,8 +1376,8 @@ const server = http.createServer(async (req, res) => {
           }
         }
         const pkg = (payload.package || '').toUpperCase();
-        if (pkg && pkg !== '$TMP' && !payload.transportRequest) {
-          return ok(res, JSON.stringify({ status: 'error', error: { code: 'SHLP_TRANSPORT_REQUIRED', message: 'transportRequest is required for non-$TMP packages' } }), 'application/json');
+        if (!isLocalPackage(pkg) && !payload.transportRequest) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'SHLP_TRANSPORT_REQUIRED', message: 'transportRequest is required for non-local packages' } }), 'application/json');
         }
         const existed = shlpStore.has(objName);
         shlpStore.set(objName, Object.assign({}, payload, { name: objName, type: 'SHLP', package: pkg || '$TMP' }));
@@ -1391,7 +1397,7 @@ const server = http.createServer(async (req, res) => {
           return ok(res, JSON.stringify({ status: 'error', error: { code: 'DDIC_OBJECT_NOT_FOUND', message: `SHLP ${shlpName} not found in mock store` } }), 'application/json');
         }
         const stored = shlpStore.get(shlpName);
-        if ((stored.package || '').toUpperCase() !== '$TMP') {
+        if (!isLocalPackage(stored.package)) {
           return ok(res, JSON.stringify({ status: 'error', error: { code: 'SHLP_DELETE_UNSUPPORTED', message: `SHLP ${shlpName} is in package ${stored.package}; delete it in SE11` } }), 'application/json');
         }
         shlpStore.delete(shlpName);
@@ -1420,8 +1426,8 @@ const server = http.createServer(async (req, res) => {
         if (firstChar !== 'Z' && firstChar !== 'Y' && firstChar !== '/') {
           return ok(res, JSON.stringify({ status: 'error', error: { code: 'DDIC_INVALID_NAME', message: `Invalid namespace: name must start with Z, Y, or / (got "${objName}")` } }), 'application/json');
         }
-        if (payload.package && payload.package !== '$TMP' && !payload.transportRequest) {
-          return ok(res, JSON.stringify({ status: 'error', error: { code: 'DDIC_TRANSPORT_REQUIRED', message: 'transportRequest is required for non-$TMP packages' } }), 'application/json');
+        if (!isLocalPackage(payload.package) && !payload.transportRequest) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'DDIC_TRANSPORT_REQUIRED', message: 'transportRequest is required for non-local packages' } }), 'application/json');
         }
         if (ddicType === 'TABL' || ddicType === 'STRU') {
           if (!Array.isArray(payload.fields) || payload.fields.length === 0) {
@@ -1493,8 +1499,8 @@ const server = http.createServer(async (req, res) => {
           return ok(res, JSON.stringify({ status: 'error', error: { code: 'TRAN_DESCRIPTION_REQUIRED', message: 'header.description is required' } }), 'application/json');
         }
         const pkg = (payload.package || '').toUpperCase();
-        if (pkg && pkg !== '$TMP' && !payload.transportRequest) {
-          return ok(res, JSON.stringify({ status: 'error', error: { code: 'TRAN_TRANSPORT_REQUIRED', message: 'transportRequest is required for non-$TMP packages' } }), 'application/json');
+        if (!isLocalPackage(pkg) && !payload.transportRequest) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'TRAN_TRANSPORT_REQUIRED', message: 'transportRequest is required for non-local packages' } }), 'application/json');
         }
         if (type === 'ooTransaction') {
           return ok(res, JSON.stringify({ status: 'error', error: { code: 'TRAN_OO_NOT_SUPPORTED', message: 'OO transactions cannot be written through RPY_TRANSACTION_INSERT' } }), 'application/json');
@@ -1512,6 +1518,10 @@ const server = http.createServer(async (req, res) => {
       if (req.method === 'DELETE') {
         if (!tranStore.has(tcode)) {
           return ok(res, JSON.stringify({ status: 'error', error: { code: 'TRAN_OBJECT_NOT_FOUND', message: `Transaction ${tcode} not found` } }), 'application/json');
+        }
+        const storedTran = tranStore.get(tcode);
+        if (!isLocalPackage(storedTran.package)) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'TRAN_DELETE_UNSUPPORTED', message: `transaction ${tcode} is in non-local package ${storedTran.package}; delete it in SE93` } }), 'application/json');
         }
         tranStore.delete(tcode);
         return ok(res, JSON.stringify({ status: 'success', data: { name: tcode, type: 'TRAN', action: 'deleted' } }), 'application/json');
@@ -1557,8 +1567,8 @@ const server = http.createServer(async (req, res) => {
           return ok(res, JSON.stringify({ status: 'error', error: { code: 'XSLT_SOURCE_REQUIRED', message: 'source is required' } }), 'application/json');
         }
         const pkg = (payload.package || '').toUpperCase();
-        if (pkg && pkg !== '$TMP' && !payload.transportRequest) {
-          return ok(res, JSON.stringify({ status: 'error', error: { code: 'XSLT_TRANSPORT_REQUIRED', message: 'transportRequest is required for non-$TMP packages' } }), 'application/json');
+        if (!isLocalPackage(pkg) && !payload.transportRequest) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'XSLT_TRANSPORT_REQUIRED', message: 'transportRequest is required for non-local packages' } }), 'application/json');
         }
         const existed = xsltStore.has(xsltName);
         xsltStore.set(xsltName, {

@@ -12,7 +12,7 @@ const { version: pkgVersion } = createRequire(import.meta.url)('../../package.js
 
 // Pin the runtime doctor evaluates so the suite does not depend on the Node.js
 // version of the machine running it; the floor itself is covered separately.
-const PATCHED_NODE = 'v22.23.4';
+const PATCHED_NODE = 'v24.22.1';
 const run = (opts: DoctorOptions = {}) => runDoctorChecks({ nodeVersion: PATCHED_NODE, ...opts });
 
 function tmpDir(): string {
@@ -50,16 +50,16 @@ describe('doctor-checks', () => {
   });
 
   it('env.node errs on an unpatched runtime and suggests a patched release', async () => {
-    const report = await runDoctorChecks({ home, cwd, nodeVersion: 'v22.23.3' });
+    const report = await runDoctorChecks({ home, cwd, nodeVersion: 'v24.22.0' });
     const item = report.environment.find((i) => i.key === 'env.node');
     expect(item?.status).toBe('err');
-    expect(item?.message).toContain('v22.23.3');
-    expect(item?.suggestion).toContain('22.23.4');
+    expect(item?.message).toContain('v24.22.0');
+    expect(item?.suggestion).toContain('24.22.1');
     expect(report.nextSteps).toContain(item?.suggestion);
   });
 
-  it('env.node accepts every supported patched release line', async () => {
-    for (const nodeVersion of ['v22.23.4', 'v24.22.1', 'v26.12.1']) {
+  it('env.node accepts every supported patched release', async () => {
+    for (const nodeVersion of ['v24.22.1', 'v24.30.0']) {
       const report = await runDoctorChecks({ home, cwd, nodeVersion });
       expect(report.environment.find((i) => i.key === 'env.node')?.status).toBe('ok');
     }

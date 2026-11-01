@@ -3,7 +3,7 @@
  *
  * Reads the abap-file-format JSON from `--file`, validates it, converts to wire
  * schema, and POSTs /ddic/<type>. Command-line --description overrides the file's
- * description. Other required fields (package, transport for non-$TMP) are validated
+ * description. Other required fields (package, transport for non-local packages) are validated
  * client-side before the round-trip.
  *
  * For TABL/STRU, the file `--file` is the *abap-file-format* main JSON
@@ -19,6 +19,7 @@ import * as path from 'node:path';
 import { IcfClient } from '../../clients/icf-client.js';
 import { CliError, printResult, type OutputMode } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
+import { isLocalPackageName } from '../../core/transport.js';
 import { readDdicObjectForCreate } from '../../formats/ddic/io.js';
 import { localToWire } from '../../formats/ddic/wire.js';
 import { validateDdicObject } from '../../formats/ddic/validate.js';
@@ -80,9 +81,9 @@ export async function runCreateDdic(
   }
 
   const targetPackage = (opts.package ?? '$TMP').trim().toUpperCase();
-  if (targetPackage !== '$TMP' && !opts.tr) {
-    throw new CliError('VALIDATION_ERROR', 'transportRequest is required when package is not $TMP', {
-      nextSteps: ['Re-run with --tr <REQUEST>', 'Or use --package $TMP for local objects.'],
+  if (!isLocalPackageName(targetPackage) && !opts.tr) {
+    throw new CliError('VALIDATION_ERROR', 'transportRequest is required when package is not a local package', {
+      nextSteps: ['Re-run with --tr <REQUEST>.', 'Or use a local package ($TMP) for local objects.'],
       example: `abap create ${type} ${objectName} --file ${toOutputPath(opts.file)} --package ${opts.package} --tr <REQUEST> --description "..."`,
     });
   }

@@ -3,7 +3,7 @@
  * `--tr` requirement rules.
  *
  * - default `--package` is `$TMP` (local, transport-free)
- * - `--tr` is optional when `--package` is `$TMP`
+ * - `--tr` is optional for any `$`-prefixed local package (`$TMP`, `$CRW`)
  * - `--tr` is required when `--package` is anything else → NO_TRANSPORT
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
@@ -54,6 +54,27 @@ describe('abap deploy command — --package default and --tr rules', () => {
     expect(stdoutHasError(res.stdout)).toBe(false);
   });
 
+  it('omitting --tr with a $-prefixed local package is accepted', async () => {
+    const res = await runCommand(program(), ['deploy', '--dry-run', '--package', '$CRW', '--json']);
+    expect(deployBundled).toHaveBeenCalledTimes(1);
+    expect(stdoutHasError(res.stdout)).toBe(false);
+  });
+
+  it('rejects a TEST-prefixed package without --tr (not transport-free)', async () => {
+    const res = await runCommand(program(), ['deploy', '--dry-run', '--package', 'TEST_SCRATCH', '--json']);
+    expect(deployBundled).not.toHaveBeenCalled();
+    expect(res.stderr).toMatch(/"code"\s*:\s*"NO_TRANSPORT"/);
+    expect(res.exitCode).toBe(7);
+  });
+
+  it('passes an empty transport for a non-$TMP local package (never the config transport)', async () => {
+    const res = await runCommand(program(), ['deploy', '--package', '$CRW', '--json']);
+    expect(deployBundled).toHaveBeenCalledTimes(1);
+    const [, opts] = deployBundled.mock.calls[0]!;
+    expect(opts.transport).toBe('');
+    expect(stdoutHasError(res.stdout)).toBe(false);
+  });
+
   it('rejects --package ZFOO without --tr with NO_TRANSPORT', async () => {
     const res = await runCommand(program(), ['deploy', '--dry-run', '--package', 'ZFOO', '--json']);
     expect(deployBundled).not.toHaveBeenCalled();
@@ -76,6 +97,13 @@ describe('abap deploy command — --package default and --tr rules', () => {
   // Force NO_TRANSPORT instead so the user picks one path.
   it('rejects --package $TMP combined with --tr (ICF dead-lock guard)', async () => {
     const res = await runCommand(program(), ['deploy', '--dry-run', '--package', '$TMP', '--tr', 'NDK123456', '--json']);
+    expect(deployBundled).not.toHaveBeenCalled();
+    expect(res.stderr).toMatch(/"code"\s*:\s*"NO_TRANSPORT"/);
+    expect(res.exitCode).toBe(7);
+  });
+
+  it('rejects a non-$TMP local package combined with --tr (ICF dead-lock guard)', async () => {
+    const res = await runCommand(program(), ['deploy', '--dry-run', '--package', '$CRW', '--tr', 'NDK123456', '--json']);
     expect(deployBundled).not.toHaveBeenCalled();
     expect(res.stderr).toMatch(/"code"\s*:\s*"NO_TRANSPORT"/);
     expect(res.exitCode).toBe(7);

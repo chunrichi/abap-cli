@@ -9,6 +9,7 @@
 import { IcfClient } from '../../clients/icf-client.js';
 import { CliError } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
+import { isLocalPackageName } from '../../core/transport.js';
 import { VIEW_NAME_MAX_LENGTH } from '../../formats/view/json.js';
 import type { DeleteOptions, DeleteResult } from './delete.js';
 
@@ -39,7 +40,7 @@ export async function runDeleteView(objectName: string, opts: DeleteOptions): Pr
   }
 
   const packageName = probe.data.package;
-  const isLocal = (packageName ?? '').trim().toUpperCase() === '$TMP';
+  const isLocal = isLocalPackageName(packageName);
   if (!isLocal) {
     throw new CliError('VIEW_DELETE_UNSUPPORTED', `VIEW ${name} is in package ${packageName ?? '?'}; delete transportable views in SE11 so the deletion is recorded in a transport request`, {
       object: name,

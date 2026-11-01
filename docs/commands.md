@@ -385,7 +385,7 @@ abap list --package <pkg> [--type <type>] [--limit <n>]
 
 ## `abap delete`
 
-Delete an ABAP object from SAP (lock → delete → unlock). Type is required to avoid ambiguity; --yes is required for non-interactive confirmation; a transport request is required for non-$TMP objects (matching `abap push` semantics).
+Delete an ABAP object from SAP (lock → delete → unlock). Type is required to avoid ambiguity; --yes is required for non-interactive confirmation; objects outside local packages require a transport request (matching `abap push` semantics).
 
 ```bash
 abap delete <object> --type <type> [--tr <request>] --yes
@@ -402,7 +402,7 @@ abap delete <object> --type <type> [--tr <request>] --yes
 | Option | Required | Default | Values | Description |
 | --- | --- | --- | --- | --- |
 | `--type` `<type>` | yes |  |  | Object type code (CLAS, PROG, INTF, FUGR, TABL, ...). |
-| `--tr` `<request>` | no |  |  | Transport request number (required for non-$TMP packages). |
+| `--tr` `<request>` | no |  |  | Transport request number (required for non-local packages). |
 | `--yes` | yes |  |  | Confirm the deletion. Required — there is no implicit confirmation. |
 
 ### Examples
@@ -720,7 +720,7 @@ abap deploy [options] | abap deploy status [options]
 
 | Option | Required | Default | Values | Description |
 | --- | --- | --- | --- | --- |
-| `--tr` `<transport>` | no |  |  | Transport number (required when --package is not $TMP). |
+| `--tr` `<transport>` | no |  |  | Transport number (required when --package is not a local package). |
 | `--package` `<package>` | no | `"$TMP"` |  | Target SAP package (default $TMP — local, no transport needed). |
 | `--dry-run` | no |  |  | Plan only — make no mutating SAP calls. |
 | `--diff` | no |  |  | Report per-file source differences. |

@@ -13,6 +13,7 @@
  */
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError } from '../../output/json.js';
+import { isLocalPackageName } from '../../core/transport.js';
 import { wireToLocal, isLocalSoftwareComponent } from '../../formats/devc/json.js';
 import { normalizeName } from './object-name.js';
 import type { DeleteOptions, DeleteResult } from './delete.js';
@@ -32,7 +33,7 @@ export async function runDeleteDevc(objectName: string, opts: DeleteOptions): Pr
   const info = doc.generalInformation;
   const softwareComponent = info?.softwareComponent ?? '';
   const isLocal =
-    isLocalSoftwareComponent(softwareComponent) || name.startsWith('$') || name.startsWith('TEST');
+    isLocalSoftwareComponent(softwareComponent) || isLocalPackageName(name);
   if (!isLocal && !opts.tr) {
     throw new CliError(
       'MISSING_TRANSPORT',

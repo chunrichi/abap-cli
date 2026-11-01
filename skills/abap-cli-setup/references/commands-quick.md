@@ -138,7 +138,7 @@ abap deploy [options] | abap deploy status [options]
 
 | Option | Description |
 | --- | --- |
-| `--tr <transport>` | Transport number (required when --package is not $TMP). |
+| `--tr <transport>` | Transport number (required when --package is not a local package). |
 | `--package <package>` | Target SAP package (default $TMP — local, no transport needed). |
 | `--dry-run` | Plan only — make no mutating SAP calls. |
 | `--diff` | Report per-file source differences. |

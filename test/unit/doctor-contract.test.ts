@@ -21,7 +21,7 @@ import {
  */
 
 // Pin the runtime so the suite does not depend on the Node.js of the machine.
-const PATCHED_NODE = 'v22.23.4';
+const PATCHED_NODE = 'v24.22.1';
 
 function tmpDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'doctor-contract-'));

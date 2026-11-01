@@ -374,6 +374,38 @@ describe('create TABL', () => {
     expect(out.error.message).toContain('transportRequest');
   });
 
+  it('accepts a $-prefixed local package without --tr', async () => {
+    writeTableJson('ZTAB_LOCAL');
+    const program = makeProgram();
+    registerCreateCommand(program);
+    const res = await runCommand(program, [
+      'create', 'TABL', 'ZTAB_LOCAL',
+      '--file', 'src/ztab_test.tabl.json',
+      '--package', '$CRW',
+      '--yes', '--json',
+    ], { cwd });
+    expect(res.exitCode).toBeUndefined();
+    expect(icfPostDdic).toHaveBeenCalledWith('tabl', expect.objectContaining({ name: 'ZTAB_LOCAL', package: '$CRW' }));
+    const [, wire] = icfPostDdic.mock.calls[0]!;
+    expect(wire).toMatchObject({ package: '$CRW' });
+    expect((wire as Record<string, unknown>).transportRequest).toBeUndefined();
+  });
+
+  it('requires --tr for a TEST-prefixed package (not transport-free)', async () => {
+    writeTableJson('ZTAB_LOCAL');
+    const program = makeProgram();
+    registerCreateCommand(program);
+    const res = await runCommand(program, [
+      'create', 'TABL', 'ZTAB_LOCAL',
+      '--file', 'src/ztab_test.tabl.json',
+      '--package', 'TEST_SCRATCH',
+      '--yes', '--json',
+    ], { cwd });
+    expect(res.exitCode).toBe(7);
+    expect(icfPostDdic).not.toHaveBeenCalled();
+    expect(JSON.parse(res.stderr).error.message).toContain('transportRequest');
+  });
+
   it('routes TTYP through the 036 channel flow instead of rejecting the type', async () => {
     writeTableJson('ZTAB_X');
     fs.writeFileSync(path.join(cwd, 'src/ztab_x.ttyp.json'), '{"name":"ZTAB_X","rowType":"ZREF"}');

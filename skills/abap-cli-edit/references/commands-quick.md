@@ -201,7 +201,7 @@ abap validate:aff <file-or-dir> [--wire <wire-dir>]
 
 ## `abap delete`
 
-Delete an ABAP object from SAP (lock → delete → unlock). Type is required to avoid ambiguity; --yes is required for non-interactive confirmation; a transport request is required for non-$TMP objects (matching `abap push` semantics).
+Delete an ABAP object from SAP (lock → delete → unlock). Type is required to avoid ambiguity; --yes is required for non-interactive confirmation; objects outside local packages require a transport request (matching `abap push` semantics).
 
 ```bash
 abap delete <object> --type <type> [--tr <request>] --yes
@@ -210,7 +210,7 @@ abap delete <object> --type <type> [--tr <request>] --yes
 | Option | Description |
 | --- | --- |
 | `--type <type>` | Object type code (CLAS, PROG, INTF, FUGR, TABL, ...). |
-| `--tr <request>` | Transport request number (required for non-$TMP packages). |
+| `--tr <request>` | Transport request number (required for non-local packages). |
 | `--yes` | Confirm the deletion. Required — there is no implicit confirmation. |
 
 - Delete a local $TMP class

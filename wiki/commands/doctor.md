@@ -4,7 +4,7 @@ title: abap doctor
 description: 诊断 CLI 环境 — environment / config 两段检查，data.ok 布尔 gate、--strict 退出码、--fix 结构化修复摘要
 tags: [abap-cli, command, doctor, diagnose, setup, gate, strict]
 created at: 2026-08-06 23:10:00
-changed at: 2026-11-01 12:10:00
+changed at: 2026-11-01 18:10:00
 ---
 
 # abap doctor
@@ -38,7 +38,7 @@ abap doctor [--verbose] [--strict] [--fix [--yes]]
 
 ### environment
 
-- `env.node`: Node 为受支持且已修复安全漏洞的版本（22.23.4+ / 24.22.1+ / 26.12.1+）
+- `env.node`: Node 为受支持的 Node 24 LTS 版本（24.22.1+）
 - `env.tls`: OpenSSL 运行时存在
 - `env.install`: 当前进程加载的 CLI 版本与安装布局（npm install / source checkout / linked checkout；纯诊断，永不失败）
 - `env.config`: `~/.abap-cli/systems.json` 可读可解析

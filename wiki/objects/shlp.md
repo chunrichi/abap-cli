@@ -1,10 +1,10 @@
 ---
 type: object-type
 title: SHLP — 搜索帮助（Search Help）
-description: SHLP 对象的 ICF 路由、自建 shlp-v1 字段契约（DD30V/DD31V/DD32P/DD33V）、elementary/collective 写路径与 $TMP-only 删除
+description: SHLP 对象的 ICF 路由、自建 shlp-v1 字段契约（DD30V/DD31V/DD32P/DD33V）、elementary/collective 写路径与本地包（`$` 前缀）删除
 tags: [abap-cli, object-type, shlp, icf, abap-file-format, search-help]
 created at: 2026-10-31 18:50:00
-changed at: 2026-10-31 19:05:00
+changed at: 2026-11-01 21:35:00
 ---
 
 # SHLP — 搜索帮助（Search Help）
@@ -26,7 +26,7 @@ SAP 上游 `abap-file-formats` 没有搜索帮助格式，本仓库自建 `shlp-
 | create | `POST /sap/abap_cli/ddic/shlp`（body 带 `name`；PUT 同语义） |
 | pull | `GET /sap/abap_cli/ddic/shlp/<name>` |
 | push | `GET`（存在性探测）→ `POST /sap/abap_cli/ddic/shlp` |
-| delete | `DELETE /sap/abap_cli/ddic/shlp/<name>`（仅 `$TMP`） |
+| delete | `DELETE /sap/abap_cli/ddic/shlp/<name>`（仅 `$` 前缀本地包；旧 ICF 部署只认 `$TMP`） |
 
 ADT 没有搜索帮助资源，所以 `registry` 里 `source: 'ICF'`：四类操作全部走自建
 ICF 服务，需要先 `abap deploy`。SAP 侧 handler 在
@@ -137,7 +137,7 @@ collective 形态把 `kind` 改为 `collective`，去掉 `selectionMethod` 等 e
 `abap delete <name> --type SHLP` → `DELETE /ddic/shlp/<name>`：
 
 - handler 先 `SELECT SINGLE FROM dd30l` 判断对象是否存在，再查 TADIR 判定包；
-- 非 `$TMP` → `SHLP_DELETE_UNSUPPORTED`（exit 7）：ICF 上下文无法把删除记录进
+- 非本地包（`$` 前缀之外） → `SHLP_DELETE_UNSUPPORTED`（exit 7）：ICF 上下文无法把删除记录进
   传输请求，请在 SE11 删除；
 - `$TMP`：若只有 inactive 版本，先 `DDIF_SHLP_ACTIVATE` 激活，再
   `RS_DD_DELETE_OBJ(objtype='H', no_ask='X')`（**不要**用会弹 dynpro 的
@@ -183,7 +183,7 @@ cat > src/zcli_tc_shlpc.shlp.json <<'JSON'
 JSON
 abap create SHLP ZCLI_TC_SHLC --file src/zcli_tc_shlpc.shlp.json --package '$TMP' --yes --json
 
-# 删除（仅 $TMP；先删 collective 再删 elementary）
+# 删除（仅 `$` 前缀本地包；先删 collective 再删 elementary）
 abap delete ZCLI_TC_SHLC --type SHLP --yes --json
 abap delete ZCLI_TC_SHLP --type SHLP --yes --json
 ```
@@ -201,7 +201,7 @@ abap delete ZCLI_TC_SHLP --type SHLP --yes --json
 | `SHLP_INVALID_PAYLOAD` | VALIDATION_ERROR / 7 | body 不是合法 shlp-v1 JSON |
 | `SHLP_INCONSISTENT` / `SHLP_WRITE_REFUSED` | VALIDATION_ERROR / 7 | `DDIF_SHLP_PUT` 的 `shlp_inconsistent` / `put_refused` |
 | `SHLP_WRITE_FAILED` / `SHLP_ACTIVATION_FAILED` | SAP_ERROR / 6 | PUT / ACTIVATE 失败 |
-| `SHLP_TRANSPORT_REQUIRED` | VALIDATION_ERROR / 7 | 非 `$TMP` 写未给有效 transport |
+| `SHLP_TRANSPORT_REQUIRED` | VALIDATION_ERROR / 7 | 非本地包写未给有效 transport |
 | `SHLP_NOT_AUTHORIZED` | AUTH_ERROR / 5 | `RS_CORR_INSERT` 权限不足 |
 | `SHLP_DELETE_UNSUPPORTED` | VALIDATION_ERROR / 7 | 删除可传输搜索帮助 |
 | `SHLP_DELETE_FAILED` | SAP_ERROR / 6 | `RS_DD_DELETE_OBJ` 失败 |
@@ -241,13 +241,15 @@ abap delete ZCLI_TC_SHLP --type SHLP --yes --json
 - **PUT 不激活**：写成功但没 activate 时 `GET state='A'` 返回空（`gotstate=''`）。
 - **inactive 版本**：只用 `DDIF_SHLP_PUT` 未激活的对象在删除前会先激活；
   直接 `RS_DD_DELETE_OBJ` 会抛 E2 341（plugin mode 500）。
-- **删除只支持 `$TMP`**：可传输搜索帮助请在 SE11 删，否则删除无法记录到传输请求。
+- **删除只支持本地包（`$` 前缀）**：非本地包搜索帮助请在 SE11 删，否则删除无法记录到传输请求。
 - **`SELMTYPE` 写 X / 读回 T**：写路径用 `'X'` 表示表选择方法，SAP 激活后
   DD30V 读回 `'T'`；本地都归一化为 `table`。
 - **valueDirection 归一化**：本地 `import` 写 `'I'`，SAP 激活后读回 `'C'`
   （输入/检查）或 `'E'`（输出）；本地映射 `I`/`C` → `import`、`E` → `export`。
 - **hotkey / dialogType** 等 UI 属性是可选覆盖；不填时 SAP 用默认值
   （`dialogType=D`）。
+
+- **`$` 前缀本地包（2026-11-01）**：在 `$ZCLI_TC_LP2`（父 `$TMP`，LOCAL 组件）中 create/delete 均 PASS，`transport list --open` 空、E071 0 行；旧 ICF 部署只认 `$TMP`，升级后需一次 `abap deploy`。证据：`tests/261101901-localpkg-icf/`（本地，不入库）。
 
 # references
 

@@ -4,7 +4,7 @@ title: XSLT — 转换程序（Transformation / XSLT Program）
 description: XSLT 对象的路由、AFF 两件套布局、字段映射、行尾规范化、更新语义（删除+重建）与命令示例
 tags: [abap-cli, object-type, xslt, icf, abap-file-format, transformation]
 created at: 2026-10-31 17:50:00
-changed at: 2026-10-31 18:06:00
+changed at: 2026-11-01 21:35:00
 ---
 
 # XSLT — 转换程序（Transformation / XSLT Program）
@@ -43,7 +43,7 @@ src/
 | `header.originalLanguage`（ISO 2 位） | `header.originalLanguage` | `O2XSLTATTR-LANGU`（SAP 1 位） | ABAP 侧用 `T002` 做 ISO↔SAP 换算；未知语言回退当前语言 / 读回回退 `EN` |
 | `<name>.xslt.xml` 全文 | `source` | `get_source_string()` / `create_new_from_string( p_source )` | 行尾规范化见下节 |
 | — | `package` | `O2XSLTATTR-DEVCLASS` | 写：payload 的 package，缺省沿用既有包（新建默认 `$TMP`）；读：GET 回带 `devclass` 供 delete 判 transport |
-| — | `transportRequest` | `save( CHANGING p_transport_request )` / `activate( CHANGING i_transport_request )` | 非 `$TMP` 包写入/删除必须带 `--tr`，否则 `XSLT_TRANSPORT_REQUIRED` |
+| — | `transportRequest` | `save( CHANGING p_transport_request )` / `activate( CHANGING i_transport_request )` | 非 `$` 前缀本地包写入/删除必须带 `--tr`，否则 `XSLT_TRANSPORT_REQUIRED` |
 
 只支持 **XSLT program**（`generalInformation.transformationType` 缺省 `xsltProgram`）；Simple Transformation（STRANS）不在本类型范围内。
 
@@ -93,7 +93,7 @@ src/
 | `XSLT_SOURCE_REQUIRED` | 7 | source 为空 |
 | `XSLT_SOURCE_LINE_TOO_LONG` | 7 | 单行源码 >255 字符（`O2PAGELINE-LINE` 上限），需先拆行 |
 | `XSLT_NAME_MISMATCH` | 7 | payload.name 与 URL 名称不一致 |
-| `XSLT_TRANSPORT_REQUIRED` | 7 | 非 `$TMP` 包缺 transportRequest |
+| `XSLT_TRANSPORT_REQUIRED` | 7 | 非本地包缺 transportRequest |
 | `XSLT_CREATE_FAILED` / `XSLT_LOAD_FAILED` / `XSLT_DELETE_FAILED` / `XSLT_WRITE_CANCELLED` / `XSLT_OBJECT_EXISTS` | 6 | SAP API 返回错误 |
 | `XSLT_NOT_AUTHORIZED` | 5 | `create_new_from_string` 的 `not_authorized` |
 | `XSLT_ACTIVATION_FAILED` | 7 | `activate` 返回语法/生成错误（对象保留 inactive，需修正后重推） |
@@ -158,6 +158,8 @@ abap delete ZMY_XSLT --type XSLT --yes
 - **API 探针（S/4HANA test-system，profile `test`，$TMP）**：`CL_O2_API_XSLTDESC` 的 `exists` / `load` / `create` / `save` / `activate` / `get_attributes` / `get_source_string` / `delete` 全链路 rc=0；读回源码以 CRLF 拼接且末尾多一个换行。证据：`tmp/research/261031-api-probes/xslt.md` 与 `evidence/xslt-api-class/`（本地，不入库）。
 - **CLI + ICF `/xslt` 六阶段（真机 PASS）**：S/4HANA test-system（profile `test`）上 deploy release form（17 merged classes）→ 真机 TC01–TC18 全 PASS：create/upsert、pull 两件套与行尾规范化、push 修改、激活失败恢复、delete、404、清理。关键结论：**update = 原地 `set_source`（保留版本历史）**；create 用 `create_new` 行表；save↔activate 之间 commit。证据：`tests/261031008-realsap-xslt/`（本地，不入库）。
 - **mock 集成测试**：`test/integration/xslt-lifecycle.test.ts` 覆盖 create → pull（CRLF 读回规范化）→ push 修改 → pull → 两件套去重 → delete → 404 全链路。
+
+- **`$` 前缀本地包（2026-11-01）**：在 `$ZCLI_TC_LP2`（父 `$TMP`，LOCAL 组件）中 create/delete 均 PASS，`transport list --open` 空、E071 0 行；旧 ICF 部署只认 `$TMP`，升级后需一次 `abap deploy`。证据：`tests/261101901-localpkg-icf/`（本地，不入库）。
 
 # references
 

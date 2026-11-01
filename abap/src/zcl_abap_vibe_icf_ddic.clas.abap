@@ -1528,10 +1528,10 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
                                      message = 'primaryTable.name is required' ) ).
       RETURN.
     ENDIF.
-    IF lv_package <> '$TMP'.
+    IF zcl_abap_vibe_icf_types=>is_local_package( lv_package ) = abap_false.
       ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
         error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code    = 'ENQU_PACKAGE_NOT_SUPPORTED'
-                                     message = |ENQU create supports package $TMP only (got { lv_package }); a transported lock object additionally needs a TADIR entry| ) ).
+                                     message = |ENQU create supports local packages (name starts with $) only (got { lv_package }); a transported lock object additionally needs a TADIR entry| ) ).
       RETURN.
     ENDIF.
 
@@ -1807,10 +1807,10 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
                                      message = 'NROB create needs header.description, interval.numberLengthDomain and interval.subType' ) ).
       RETURN.
     ENDIF.
-    IF lv_package <> '$TMP'.
+    IF zcl_abap_vibe_icf_types=>is_local_package( lv_package ) = abap_false.
       ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
-        error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code    = 'NROB_TRANSPORT_NOT_SUPPORTED'
-                                     message = |NROB create supports package $TMP only (got { lv_package }); a transported number range object additionally needs a TADIR entry| ) ).
+        error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code    = 'NROB_PACKAGE_NOT_SUPPORTED'
+                                     message = |NROB create supports local packages (name starts with $) only (got { lv_package }); a transported number range object additionally needs a TADIR entry| ) ).
       RETURN.
     ENDIF.
 
@@ -2785,7 +2785,7 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
         ELSE 'VIEW_WRITE_FAILED' ).
       " A brand-new local object that never landed has no DDIC rows yet; drop
       " the TADIR row so a retry starts clean.
-      IF lv_existed = abap_false AND lv_package = '$TMP'.
+      IF lv_existed = abap_false AND zcl_abap_vibe_icf_types=>is_local_package( lv_package ) = abap_true.
         DELETE FROM tadir WHERE pgmid = 'R3TR' AND object = 'VIEW' AND obj_name = @lv_view_name.
       ENDIF.
       ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
@@ -2876,12 +2876,12 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
       RETURN.
     ENDIF.
     " Removing a repository object from a transport request cannot be recorded
-    " from the ICF context (no CTS dialog), so transported objects stay with SE11.
-    IF lv_package IS NOT INITIAL AND lv_package <> '$TMP'.
+    " from the ICF context (no CTS dialog), so non-local objects stay with SE11.
+    IF lv_package IS NOT INITIAL AND zcl_abap_vibe_icf_types=>is_local_package( lv_package ) = abap_false.
       DATA(lv_unsupported_code) = COND string( WHEN lv_object_type = 'SHLP' THEN 'SHLP_DELETE_UNSUPPORTED' ELSE 'VIEW_DELETE_UNSUPPORTED' ).
       ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
                                  error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = lv_unsupported_code
-                                              message = |{ lv_object_type } { lv_name } is in package { lv_package }; delete it in SE11 so the deletion is recorded in a transport request| ) ).
+                                              message = |{ lv_object_type } { lv_name } is in non-local package { lv_package }; delete it in SE11 so the deletion is recorded in a transport request| ) ).
       RETURN.
     ENDIF.
 
@@ -3383,7 +3383,7 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
         WHEN 3 THEN 'SHLP_INCONSISTENT'
         WHEN 5 THEN 'SHLP_WRITE_REFUSED'
         ELSE 'SHLP_WRITE_FAILED' ).
-      IF lv_existed = abap_false AND lv_package = '$TMP'.
+      IF lv_existed = abap_false AND zcl_abap_vibe_icf_types=>is_local_package( lv_package ) = abap_true.
         DELETE FROM tadir WHERE pgmid = 'R3TR' AND object = 'SHLP' AND obj_name = @lv_shlp_name.
       ENDIF.
       ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'

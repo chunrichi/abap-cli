@@ -23,6 +23,7 @@ import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { IcfClient } from '../../clients/icf-client.js';
 import { CliError } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
+import { isLocalPackageName } from '../../core/transport.js';
 import { resolveObject } from '../../core/resolve.js';
 import { normalizeTypeInput } from '../../cli/type-alias.js';
 import { runDeleteDevc } from './delete-devc.js';
@@ -33,8 +34,8 @@ export interface DeleteOptions {
   /** Object type code (CLAS / PROG / ...). Required — `delete` without a type
    *  is rejected by the command layer to keep the operation unambiguous. */
   type: string;
-  /** Optional transport request number. Required for non-`$TMP` objects,
-   *  matching `abap push` semantics. */
+  /** Optional transport request number. Required outside local packages
+   *  (`$` / `TEST` prefixed), matching `abap push` semantics. */
   tr?: string;
   /** Caller must pass `--yes`; the command layer guards this. */
   yes: boolean;
@@ -108,15 +109,15 @@ export async function runDelete(objectName: string, opts: DeleteOptions): Promis
   const client = await AdtClientWrapper.create();
   const resolved = await resolveObject(client, objectName, typeUpper);
 
-  // $TMP is the only transport-free package: enforce the same rule `push`
+  // Local packages are transport-free: enforce the same rule `push`
   // uses, so a missing --tr is rejected before locking.
-  const isLocal = (resolved.packageName ?? '').trim().toUpperCase() === '$TMP';
+  const isLocal = isLocalPackageName(resolved.packageName);
   if (!isLocal && !opts.tr) {
     throw new CliError('MISSING_TRANSPORT', `Object ${resolved.name} is in package ${resolved.packageName ?? '?'}; --tr is required`, {
       details: { object: resolved.name, type: resolved.type, packageName: resolved.packageName },
       nextSteps: [
         'Pass --tr <request> to record the deletion in a transportable change.',
-        'Or move the object to $TMP first if it is local scratch work.',
+        'Or move the object to a local package ($TMP) first if it is local scratch work.',
       ],
       example: `abap delete ${resolved.name} --type ${resolved.type} --tr NDK900123 --yes`,
     });
@@ -203,13 +204,13 @@ async function runDeleteTran(objectName: string, opts: DeleteOptions): Promise<D
   }
 
   const packageName = probe.data.package;
-  const isLocal = (packageName ?? '').trim().toUpperCase() === '$TMP';
+  const isLocal = isLocalPackageName(packageName);
   if (!isLocal && !opts.tr) {
     throw new CliError('MISSING_TRANSPORT', `Transaction ${name} is in package ${packageName ?? '?'}; --tr is required`, {
       details: { object: name, type: 'TRAN', packageName },
       nextSteps: [
         'Pass --tr <request> to record the deletion in a transportable change.',
-        'Or recreate the transaction in $TMP if it is local scratch work.',
+        'Or recreate the transaction in a local package ($TMP) if it is local scratch work.',
       ],
       example: `abap delete ${name} --type TRAN --tr NDK900123 --yes`,
     });
@@ -277,7 +278,7 @@ async function runDeleteXslt(objectName: string, opts: DeleteOptions): Promise<D
   }
 
   const packageName = probe.data.package;
-  const isLocal = (packageName ?? '').trim().toUpperCase() === '$TMP';
+  const isLocal = isLocalPackageName(packageName);
   if (!isLocal && !opts.tr) {
     throw new CliError('MISSING_TRANSPORT', `XSLT ${name} is in package ${packageName ?? '?'}; --tr is required`, {
       details: { object: name, type: 'XSLT', packageName },

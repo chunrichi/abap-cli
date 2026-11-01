@@ -46,7 +46,7 @@ metadata:
 3. **凭证走 keychain**：密码用 `profile add/set` 写入；不在命令行传明文。
 4. **推送先小步**：`--check-only` / `--dry-run` 先看。
 5. **多文件推送用 `--atomic`**：避免半写状态。
-6. **不省略 transport**：非 `$TMP` / 未绑定对象必须 `--tr` 或让解析兜底。
+6. **不省略 transport**：非本地包（`$` 前缀以外）或未绑定对象必须 `--tr` 或让解析兜底。
 7. **激活不掩盖语法错**：push 报 activated 仍要 `inspect --activation` 复核。
 8. **`select` 完全只读**：可反复调用，不加锁 / 不写 transport。
 

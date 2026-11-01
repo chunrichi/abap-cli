@@ -114,6 +114,38 @@ describe('abap push per-object transport resolution', () => {
     expect(out.data.results[0].transport).toBe('');
   });
 
+  it('pushes a $-prefixed local package object with no transport and no --tr', async () => {
+    // Local packages other than $TMP ($-prefixed) are transport-free too.
+    searchObject.mockResolvedValue([
+      { 'adtcore:name': 'ZCL_TR', 'adtcore:type': 'CLAS/OC', 'adtcore:uri': '/sap/bc/adt/oo/classes/zcl_tr', 'adtcore:packageName': '$CRW' },
+    ]);
+    const program = makeProgram();
+    registerPushCommand(program);
+    const res = await runCommand(program, ['push', 'src/zcl_tr.clas.abap', '--yes', '--json'], { cwd });
+    expect(res.exitCode).toBeUndefined();
+    expect(setObjectSource).toHaveBeenCalledWith(
+      '/sap/bc/adt/oo/classes/zcl_tr/source/main',
+      expect.any(String),
+      'lock-1',
+      '',
+    );
+    const out = JSON.parse(res.stdout);
+    expect(out.data.results[0].transport).toBe('');
+  });
+
+  it('requires a transport for a TEST-prefixed package (not transport-free)', async () => {
+    searchObject.mockResolvedValue([
+      { 'adtcore:name': 'ZCL_TR', 'adtcore:type': 'CLAS/OC', 'adtcore:uri': '/sap/bc/adt/oo/classes/zcl_tr', 'adtcore:packageName': 'TEST_SCRATCH' },
+    ]);
+    const program = makeProgram();
+    registerPushCommand(program);
+    const res = await runCommand(program, ['push', 'src/zcl_tr.clas.abap', '--yes', '--json'], { cwd });
+    // No --tr, no project config transport, no open user request → NO_TRANSPORT.
+    expect(res.exitCode).not.toBeUndefined();
+    expect(JSON.parse(res.stderr).error.code).toBe('NO_TRANSPORT');
+    expect(setObjectSource).not.toHaveBeenCalled();
+  });
+
   it('035: ignores --tr on a $TMP object and emits PUSH_TR_IGNORED_TMP', async () => {
     // A $TMP object is transport-free; an explicit --tr must NOT apply — warn + ignore.
     searchObject.mockResolvedValue([

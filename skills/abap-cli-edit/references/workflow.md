@@ -104,7 +104,7 @@ abap push src/z_d_x.doma.json               # $TMP 无需 --tr
 
 - 命名空间必须 `Z`/`Y`/`/` 开头（客户命名空间）
 - 必填字段（依 type 而异）：TABL/STRU 至少 `fields[]` 非空；DOMA 至少 `dataType` + `length`；DTEL 至少 `description` + (`domain` 或 `dataType`)
-- 非 `$TMP` 包必须 `--tr`
+- 非本地包（`$` 前缀之外）必须 `--tr`；ICF 承载的 ENQU / NROB / XSLT 创建同样接受 `$` 本地包（旧 ICF 部署需先 `abap deploy`）
 
 错误码：`DDIC_NOT_SUPPORTED` / `TABL_DDL_INVALID`（三件套 DDL 解析错）/ `INVALID_FIELD` / `VALIDATION_ERROR`。schema 与 example：见 `abap create <type> --schema` 的 `exampleJson` 字段（三件套形态）与 `error.example`（legacy wire-flat fallback 提示）。
 

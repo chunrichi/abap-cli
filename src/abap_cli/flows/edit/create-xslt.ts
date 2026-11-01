@@ -4,12 +4,13 @@
  * Reads the abap-file-format pair from `--file <name>.xslt.json` + the sibling
  * `<name>.xslt.xml` (both required), validates the metadata against
  * `xslt-v1.json`, and POSTs the ICF `/xslt/<name>` upsert. `--package`
- * defaults to `$TMP`; a transportable package requires `--tr`.
+ * defaults to `$TMP`; a non-local package requires `--tr`.
  */
 import * as path from 'node:path';
 import { IcfClient } from '../../clients/icf-client.js';
 import { CliError, printResult, type OutputMode } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
+import { isLocalPackageName, transportForPackage } from '../../core/transport.js';
 import { localToWire } from '../../formats/xslt/json.js';
 import { affObjectToken } from '../../formats/file-resolver.js';
 import { readXsltPair, xsltPairPaths } from '../../formats/xslt/companion.js';
@@ -51,11 +52,11 @@ export async function runCreateXslt(
   }
 
   const packageName = (opts.package ?? '$TMP').trim().toUpperCase();
-  if (packageName !== '$TMP' && !opts.tr) {
-    throw new CliError('VALIDATION_ERROR', 'transportRequest is required when package is not $TMP', {
+  if (!isLocalPackageName(packageName) && !opts.tr) {
+    throw new CliError('VALIDATION_ERROR', 'transportRequest is required when package is not a local package', {
       object: objectName,
       type: 'XSLT',
-      nextSteps: ['Re-run with --tr <REQUEST>', 'Or use --package $TMP for local objects.'],
+      nextSteps: ['Re-run with --tr <REQUEST>.', 'Or use a local package ($TMP) for local objects.'],
       example: `abap create XSLT ${objectName} --file ${toOutputPath(opts.file)} --package ${opts.package} --tr <REQUEST> --yes`,
     });
   }
@@ -72,10 +73,12 @@ export async function runCreateXslt(
     return;
   }
 
+  // Local objects are transport-free: a stray --tr must not reach the wire.
+  const transportRequest = transportForPackage(packageName, opts.tr);
   const wire = localToWire(local, source, {
     name: objectName,
     package: packageName,
-    transportRequest: opts.tr,
+    transportRequest,
   });
   const icf = await IcfClient.create();
   const resp = await icf.postXslt<{ name: string; action: 'created' | 'updated' }>(objectName, wire);
@@ -96,7 +99,7 @@ export async function runCreateXslt(
       type: 'XSLT',
       action: resp.data.action,
       package: packageName,
-      transport: opts.tr,
+      transport: transportRequest,
       files: [toOutputPath(paths.jsonPath), toOutputPath(paths.xmlPath)],
     },
     `Created XSLT ${resp.data.name} via ICF (${resp.data.action})`,

@@ -611,7 +611,7 @@ CLASS zcl_abap_vibe_icf_tcode IMPLEMENTATION.
       lv_package = '$TMP'.
     ENDIF.
     lv_transport = to_upper( condense( val = ls_request-transport_request del = ` ` ) ).
-    IF lv_package = '$TMP'.
+    IF zcl_abap_vibe_icf_types=>is_local_package( lv_package ) = abap_true.
       CLEAR lv_transport.
     ENDIF.
 
@@ -920,14 +920,14 @@ CLASS zcl_abap_vibe_icf_tcode IMPLEMENTATION.
     IF sy-subrc = 0.
       lv_transport = to_upper( lv_match ).
     ENDIF.
-    " Transported transactions stay out of scope: removing a repository object
-    " from a transport request cannot be recorded from the ICF context (the CTS
-    " dialog is unavailable), so SE93 remains the canonical path there.
-    IF lv_package IS NOT INITIAL AND lv_package <> '$TMP'.
+    " Removing a repository object from a transport request cannot be recorded
+    " from the ICF context (the CTS dialog is unavailable), so non-local
+    " transactions stay with SE93.
+    IF lv_package IS NOT INITIAL AND zcl_abap_vibe_icf_types=>is_local_package( lv_package ) = abap_false.
       respond_tran_write_error( io_server = io_server
                                 iv_status = 400
                                 iv_code   = 'TRAN_DELETE_UNSUPPORTED'
-                                iv_msg    = |transaction { lv_name } is in transportable package { lv_package }; delete it in SE93 so the deletion is recorded in a transport request| ).
+                                iv_msg    = |transaction { lv_name } is in non-local package { lv_package }; delete it in SE93 so the deletion is recorded in a transport request| ).
       RETURN.
     ENDIF.
 
@@ -937,10 +937,10 @@ CLASS zcl_abap_vibe_icf_tcode IMPLEMENTATION.
     DELETE FROM tstcc WHERE tcode = @lv_tcode.
     DELETE FROM tstca WHERE tcode = @lv_tcode.
 
-    " A local ($TMP) object has no CTS entry to record, so drop the TADIR row
+    " A local object has no CTS entry to record, so drop the TADIR row
     " directly; TR_TADIR_INTERFACE/TRINT_DELETE_TADIR_IF_LOCAL refuse this
     " object type with object_is_distributed in a non-dialog session.
-    IF lv_package = '$TMP'.
+    IF zcl_abap_vibe_icf_types=>is_local_package( lv_package ) = abap_true.
       DELETE FROM tadir WHERE pgmid = 'R3TR' AND object = 'TRAN' AND obj_name = @lv_tcode.
     ENDIF.
 

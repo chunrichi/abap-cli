@@ -6,6 +6,20 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **本地包一律免 transport**：`$` 前缀的本地包（`$TMP`、`$CRW` 等）中的对象在 `create` / `push` / `delete` / `deploy` 时都不再需要 `--tr`，也不会被自动带上任何 transport 请求；此前只有 `$TMP` 享受该规则。内置 ICF 服务同步放开：ENQU / NROB 创建、XSLT 创建、VIEW / SHLP / TRAN 删除对 `$` 前缀本地包不再要求 transport（ENQU / NROB 的 `push` 走同一 POST，同样受益）；升级后执行一次 `abap deploy`。`TEST...` 等非 `$` 开头的包不视为本地，仍需 `--tr`。本地包上传入的 `--tr` 会被忽略：既不写进请求体，也不出现在 `data.transport`（`abap deploy` 是唯一显式拒绝 `--tr` 的入口）。
+- **运行时基线改为 Node.js 24 LTS**：`engines.node` 从 `^22.23.4 || ^24.22.1 || >=26.12.1` 收窄为 `^24.22.1`；`abap doctor` 会对其它版本给出升级提示。
+
+### Removed (breaking)
+
+- **Node.js 22 及更早、26 及更新版本线不再支持**：CLI 只在 Node.js 24 LTS（24.22.1+）上测试和发布。
+
+**Migration**：
+
+- 升级到 Node.js 24 LTS（Homebrew 用户把 `node@22` 换成 `node@24`，或用官方安装包）后重跑 CLI；npm 使用方在 Node 24 下重新安装依赖即可。
+- 本地包判定以 `$` 前缀为准：`TEST...` 前缀的包不再免 transport；内置 ICF 服务升级后需执行一次 `abap deploy`。
+
 ## [1.3.0] - 2026-11-01
 
 本版重做 CLI 的 SAP 会话层：跨命令真正复用同一个 SAP 会话，无法复用时命令结束一定登出，`SM04` 不再按命令数增长；会话存储/密钥/复用状态可通过 `abap session info` 直接看到。有破坏性变更（`session info --json` 形状、`$TMPDIR` 兜底移除），见 Migration。
