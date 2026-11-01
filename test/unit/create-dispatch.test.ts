@@ -20,11 +20,21 @@ const { mockConfig } = vi.hoisted(() => ({
 }));
 
 const createTtyp = vi.fn(async () => {});
+const updateTtyp = vi.fn(async () => {});
 const createMsag = vi.fn(async () => {});
 const updateMsag = vi.fn(async () => {});
 const createDdls = vi.fn(async () => {});
+const writeDdlsSource = vi.fn(async () => {});
 const adtLock = vi.fn(async () => ({ LOCK_HANDLE: 'LH1' }));
 const adtUnlock = vi.fn(async () => undefined);
+const adtActivate = vi.fn(async () => ({
+  messages: [],
+  success: true,
+  inactive: [],
+  checkExecuted: true,
+  activationExecuted: true,
+  generationExecuted: false,
+}));
 const icfPost = vi.fn(async () => ({ status: 'success' as const, data: {}, error: null }));
 
 vi.mock('../../src/abap_cli/config/project-config.js', () => ({
@@ -36,12 +46,15 @@ vi.mock('../../src/abap_cli/clients/adt-client.js', () => ({
   AdtClientWrapper: {
     create: async () => ({
       createTtyp,
+      updateTtyp,
       createMsag,
       updateMsag,
       createDdls,
+      writeDdlsSource,
       lock: adtLock,
       unLock: adtUnlock,
-      getConfig: () => ({ transport: 'TRN001' }),
+      activate: adtActivate,
+      getConfig: () => ({ transport: 'TRN001', sap: { language: 'EN' } }),
     }),
   },
 }));
@@ -79,7 +92,9 @@ describe('create dispatcher — handler registry routing', () => {
     const file = copyFixture('zmy_ttyp.ttyp.json');
     const res = await run(['create', 'TTYP', 'ZMY_TTYP', '--file', file]);
     expect(res.exitCode).toBeUndefined();
-    expect(createTtyp).toHaveBeenCalledWith('ZMY_TTYP', expect.any(String), '$TMP', undefined);
+    expect(createTtyp).toHaveBeenCalledWith(expect.stringContaining('<adtcore:packageRef adtcore:name="$TMP"/>'), undefined);
+    expect(updateTtyp).toHaveBeenCalledWith('ZMY_TTYP', expect.stringContaining('<ttyp:tableType'), 'LH1', undefined);
+    expect(adtActivate).toHaveBeenCalledWith('/sap/bc/adt/ddic/tabletypes/ZMY_TTYP', 'TTYP/DA', 'ZMY_TTYP');
     expect(JSON.parse(res.stdout)).toMatchObject({
       status: 'success',
       data: { object: 'ZMY_TTYP', type: 'TTYP', action: 'created', channel: 'adt' },
@@ -117,6 +132,8 @@ describe('create dispatcher — handler registry routing', () => {
     const res = await run(['create', 'DDLS', 'ZMY_DDLS', '--file', file]);
     expect(res.exitCode).toBeUndefined();
     expect(createDdls).toHaveBeenCalledTimes(1);
+    expect(createDdls).toHaveBeenCalledWith('ZMY_DDLS', expect.objectContaining({ packageName: '$TMP', description: expect.any(String) }));
+    expect(writeDdlsSource).toHaveBeenCalledWith('ZMY_DDLS', expect.stringContaining('define view entity'), undefined);
     expect(JSON.parse(res.stdout)).toMatchObject({
       data: { object: 'ZMY_DDLS', type: 'DDLS', action: 'created', channel: 'adt' },
     });

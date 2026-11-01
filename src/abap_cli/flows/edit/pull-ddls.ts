@@ -56,10 +56,21 @@ export async function runPullDdls(name: string, opts: PullDdlsOptions = {}): Pro
   const acdsPath = path.join(root, `${token}.ddls.acds`);
 
   const client = await AdtClientWrapper.create();
-  const { xml, source } = await client.getDdls(upper);
-  const { doc } = wireToLocal(xml);
-  // The wire payload's ddlSourceString carries the body — prefer it; fall back
-  // to a heuristic search of the full XML if the source element is empty.
+  let meta: { xml: string; source: string };
+  try {
+    meta = await client.getDdls(upper);
+  } catch (error) {
+    // The ADT resource answers 404 for a missing DDL source; map it onto the
+    // channel-independent not-found contract (`abap pull` docs).
+    if (error instanceof CliError && (error.details?.httpStatus === 404 || error.code === 'OBJECT_NOT_FOUND')) {
+      throw new CliError('OBJECT_NOT_FOUND', `DDLS ${upper} not found`, { object: upper });
+    }
+    throw error;
+  }
+  const { xml, source } = meta;
+  const { doc } = wireToLocal(xml, source);
+  // The source is a separate `source/main` resource; keep the metadata XML as
+  // the last-resort body so a failed secondary fetch never writes an empty file.
   const finalSource = source || xml;
 
   const errors = await ddlsArtifact.validate(doc);

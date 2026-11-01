@@ -87,6 +87,12 @@
         }
       }
     },
+    "keyKind": {
+      "title": "Key Kind",
+      "description": "Uniqueness of the primary key when keyDefinition is set (ADT ttyp:primaryKey/kind). Optional: push defaults to unique for hashed tables, nonUnique otherwise.",
+      "type": "string",
+      "enum": ["unique", "nonUnique"]
+    },
     "rows": {
       "title": "Initial Rows",
       "description": "Optional default rows (rare for table types).",

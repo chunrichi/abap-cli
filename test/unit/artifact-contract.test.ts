@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { defineJsonArtifact, defineWireArtifact, type JsonArtifact } from '../../src/abap_cli/formats/artifact.js';
 import { ttypArtifact, type TtypLocal } from '../../src/abap_cli/formats/ttyp/json.js';
 import { msagArtifact } from '../../src/abap_cli/formats/msag/json.js';
+import { wireToLocal as ttypWireToLocal, localToWire as ttypLocalToWire } from '../../src/abap_cli/formats/ttyp/json.js';
 
 const VALID_TTYP: TtypLocal = {
   formatVersion: '1',
@@ -104,12 +105,13 @@ describe('defineWireArtifact', () => {
   it('exposes the wire mapping alongside the file/schema plumbing', async () => {
     const artifact = defineWireArtifact<TtypLocal, string>({
       type: 'TTYP',
-      toWire: ttypArtifact.toWire,
-      fromWire: ttypArtifact.fromWire,
+      toWire: (local) => ttypLocalToWire(local, 'ZMY_ARTIFACT'),
+      fromWire: (xml) => ttypWireToLocal(xml),
     });
     const wire = artifact.toWire(VALID_TTYP);
-    expect(wire).toContain('<ttyp:lineType>string</ttyp:lineType>');
-    expect(artifact.fromWire(wire).lineType.rowType).toBe('string');
+    expect(wire).toContain('<ttyp:tableType');
+    expect(wire).toContain('<ttyp:dataType>STRING</ttyp:dataType>');
+    expect(artifact.fromWire(wire).lineType.rowType).toBe('STRING');
   });
 
   it('the MSAG artifact rejects a document without messages', async () => {

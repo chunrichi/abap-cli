@@ -13,9 +13,17 @@ const adtUpdateTtyp = vi.fn(async () => undefined);
 const adtGetMsag = vi.fn(async () => '<mc:messageClass/>');
 const adtUpdateMsag = vi.fn(async () => undefined);
 const adtGetDdls = vi.fn(async () => ({ xml: '<ddl:ddlSource/>', source: '' }));
-const adtUpdateDdls = vi.fn(async () => undefined);
+const adtWriteDdlsSource = vi.fn(async () => undefined);
 const adtLock = vi.fn(async () => ({ LOCK_HANDLE: 'LH1' }));
 const adtUnlock = vi.fn(async () => undefined);
+const adtActivate = vi.fn(async () => ({
+  messages: [],
+  success: true,
+  inactive: [],
+  checkExecuted: true,
+  activationExecuted: true,
+  generationExecuted: false,
+}));
 
 const icfPut = vi.fn(async () => ({ status: 'success' as const, data: {}, error: null }));
 
@@ -27,9 +35,11 @@ vi.mock('../../src/abap_cli/clients/adt-client.js', () => ({
       getMsag: adtGetMsag,
       updateMsag: adtUpdateMsag,
       getDdls: adtGetDdls,
-      updateDdls: adtUpdateDdls,
+      writeDdlsSource: adtWriteDdlsSource,
       lock: adtLock,
       unLock: adtUnlock,
+      activate: adtActivate,
+      getConfig: () => ({ transport: 'TRN001', sap: { language: 'EN' } }),
     }),
   },
 }));
@@ -104,18 +114,47 @@ describe('runPushTtyp', () => {
 
     expect(result).toMatchObject({ object: 'ZMY_TTYP', channel: 'adt', action: 'updated' });
     expect(adtLock).toHaveBeenCalledWith('/sap/bc/adt/ddic/tabletypes/ZMY_TTYP');
-    expect(adtUpdateTtyp).toHaveBeenCalledWith('ZMY_TTYP', expect.stringContaining('ttyp:tableType'), 'LH1', 'NDK900001');
+    expect(adtUpdateTtyp).toHaveBeenCalledWith('ZMY_TTYP', expect.stringContaining('<ttyp:tableType'), 'LH1', 'NDK900001');
+    expect(adtUpdateTtyp).toHaveBeenCalledWith('ZMY_TTYP', expect.stringContaining('<ttyp:dataType>STRING</ttyp:dataType>'), 'LH1', 'NDK900001');
     expect(adtUnlock).toHaveBeenCalledWith('/sap/bc/adt/ddic/tabletypes/ZMY_TTYP', 'LH1');
+    expect(adtActivate).toHaveBeenCalledWith('/sap/bc/adt/ddic/tabletypes/ZMY_TTYP', 'TTYP/DA', 'ZMY_TTYP');
   });
 
   it('reports OBJECT_NOT_FOUND instead of creating the object', async () => {
     await fresh();
-    adtGetTtyp.mockRejectedValueOnce(new Error('404'));
+    const { CliError } = await import('../../src/abap_cli/output/json.js');
+    adtGetTtyp.mockRejectedValueOnce(new CliError('SAP_ERROR', 'Resource TTYP ZMY_TTYP does not exist.', { details: { httpStatus: 404 } }));
     const { runPushTtyp } = await import('../../src/abap_cli/flows/edit/push-ttyp.js');
     const file = write('zmy_ttyp.ttyp.json', TTYP_DOC);
 
     await expect(runPushTtyp(file, { profile: ADT_PROFILE })).rejects.toMatchObject({ code: 'OBJECT_NOT_FOUND' });
     expect(adtUpdateTtyp).not.toHaveBeenCalled();
+  });
+
+  it('falls back to ICF when the ADT endpoint answers "No URI-Mapping"', async () => {
+    await fresh();
+    adtGetTtyp.mockRejectedValueOnce(new Error('No URI-Mapping defined for URI'));
+    const { runPushTtyp } = await import('../../src/abap_cli/flows/edit/push-ttyp.js');
+    const file = write('zmy_ttyp.ttyp.json', TTYP_DOC);
+
+    const result = await runPushTtyp(file, { profile: ADT_PROFILE });
+
+    expect(result.channel).toBe('icf');
+    expect(result.fallbackReason).toBe('ADT_ENDPOINT_UNAVAILABLE');
+    expect(icfPut).toHaveBeenCalledWith('/ddic/ttyp/ZMY_TTYP', { main: TTYP_DOC });
+    expect(adtUpdateTtyp).not.toHaveBeenCalled();
+  });
+
+  it('rejects an inline rowStructure on the ADT channel before touching SAP', async () => {
+    await fresh();
+    const { runPushTtyp } = await import('../../src/abap_cli/flows/edit/push-ttyp.js');
+    const file = write('zmy_ttyp.ttyp.json', {
+      ...TTYP_DOC,
+      lineType: { rowStructure: { fieldName: 'ROW', dataType: 'CHAR', length: 1 } },
+    });
+
+    await expect(runPushTtyp(file, { profile: ADT_PROFILE })).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    expect(adtGetTtyp).not.toHaveBeenCalled();
   });
 
   it('falls back to ICF on an ECC EHP6 kernel', async () => {
@@ -256,7 +295,7 @@ describe('runPushDdls', () => {
     return file;
   }
 
-  it('locks, updates and unlocks via ADT', async () => {
+  it('writes the CDS source and activates via ADT', async () => {
     await fresh();
     const { runPushDdls } = await import('../../src/abap_cli/flows/edit/push-ddls.js');
     const file = writeDdls();
@@ -264,7 +303,8 @@ describe('runPushDdls', () => {
     const result = await runPushDdls(file, { profile: ADT_PROFILE, transport: 'NDK900003' });
 
     expect(result).toMatchObject({ object: 'ZMY_DDLS', channel: 'adt', action: 'updated' });
-    expect(adtUpdateDdls).toHaveBeenCalledWith('ZMY_DDLS', expect.stringContaining('define view entity'), 'LH1', 'NDK900003');
+    expect(adtGetDdls).toHaveBeenCalledWith('ZMY_DDLS');
+    expect(adtWriteDdlsSource).toHaveBeenCalledWith('ZMY_DDLS', expect.stringContaining('define view entity'), 'NDK900003');
   });
 
   it('rejects a sourceType that disagrees with the .acds body', async () => {
@@ -273,7 +313,18 @@ describe('runPushDdls', () => {
     const file = writeDdls('tableFunction');
 
     await expect(runPushDdls(file, { profile: ADT_PROFILE })).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
-    expect(adtUpdateDdls).not.toHaveBeenCalled();
+    expect(adtWriteDdlsSource).not.toHaveBeenCalled();
+  });
+
+  it('maps an ADT 404 onto OBJECT_NOT_FOUND', async () => {
+    await fresh();
+    const { CliError } = await import('../../src/abap_cli/output/json.js');
+    adtGetDdls.mockRejectedValueOnce(new CliError('SAP_ERROR', 'Resource DDLS ZMY_DDLS does not exist.', { details: { httpStatus: 404 } }));
+    const { runPushDdls } = await import('../../src/abap_cli/flows/edit/push-ddls.js');
+    const file = writeDdls();
+
+    await expect(runPushDdls(file, { profile: ADT_PROFILE })).rejects.toMatchObject({ code: 'OBJECT_NOT_FOUND' });
+    expect(adtWriteDdlsSource).not.toHaveBeenCalled();
   });
 
   it('rejects a missing .acds companion file', async () => {
@@ -293,7 +344,7 @@ describe('runPushDdls', () => {
       code: 'DDLS_NOT_SUPPORTED_ON_ECC',
     });
     expect(icfPut).not.toHaveBeenCalled();
-    expect(adtUpdateDdls).not.toHaveBeenCalled();
+    expect(adtWriteDdlsSource).not.toHaveBeenCalled();
   });
 
   it('derives the namespaced object name and companion from the AFF token', async () => {
@@ -307,6 +358,6 @@ describe('runPushDdls', () => {
 
     expect(result.object).toBe('/UI2/CL_JSON');
     expect(adtGetDdls).toHaveBeenCalledWith('/UI2/CL_JSON');
-    expect(adtLock).toHaveBeenCalledWith('/sap/bc/adt/ddic/ddl/sources//UI2/CL_JSON');
+    expect(adtWriteDdlsSource).toHaveBeenCalledWith('/UI2/CL_JSON', expect.stringContaining('define view entity'), undefined);
   });
 });

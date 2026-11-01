@@ -1,12 +1,12 @@
 /**
- * /: TTYP pull flow.
+ * TTYP pull flow.
  *
  * Coordinates:
- *   1. `detectChannel` — picks ADT (EHP7+) or ICF fallback (EHP5/6).
+ *   1. `detectChannel` — picks ADT (EHP7+) or ICF fallback (EHP5/6); a modern
+ *      kernel whose ADT endpoint is not routed falls back to ICF at runtime.
  *   2. Reads the wire body via the chosen transport.
  *   3. Maps wire → local AFF nested shape.
  *   4. Writes `<rootDir>/<lower>.ttyp.json` (+ `.type.abap` source sidecar).
- *   5. Writes the optional sidecar `*.type.abap` (DDL `define type ...: ...`).
  *
  * push semantics: pull never auto-creates; if the object is missing
  * on the ADT path we surface OBJECT_NOT_FOUND so the agent can route to
@@ -16,9 +16,9 @@ import * as path from 'node:path';
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { IcfClient } from '../../clients/icf-client.js';
 import { CliError } from '../../output/json.js';
-import { detectChannel } from './channel-detect.js';
-import type { SystemProfile } from './channel-detect.js';
-import { ttypArtifact, buildTypeSource, type TtypLocal } from '../../formats/ttyp/json.js';
+import { detectChannel, isAdtEndpointUnavailable } from './channel-detect.js';
+import type { AdtFallbackReason, SystemProfile } from './channel-detect.js';
+import { ttypArtifact, buildTypeSource, wireToLocal, type TtypLocal } from '../../formats/ttyp/json.js';
 import { affObjectToken } from '../../formats/file-resolver.js';
 import { loadConfig, findWorkspaceConfig } from '../../config/project-config.js';
 import type { PullHandler } from './routing.js';
@@ -48,7 +48,7 @@ export interface PullTtypOptions {
 export interface PullTtypResult {
   object: string;
   channel: 'adt' | 'icf';
-  fallbackReason?: 'ECC_EHP6_NO_ADT_TABLETYPE' | 'ECC_EHP6_NO_ADT_MESSAGECLASS';
+  fallbackReason?: 'ECC_EHP6_NO_ADT_TABLETYPE' | AdtFallbackReason;
   files: string[];
   doc: TtypLocal;
 }
@@ -82,7 +82,7 @@ async function profileFromWorkspace(opts: PullTtypOptions): Promise<SystemProfil
 async function pullFromAdt(name: string): Promise<TtypLocal> {
   const client = await AdtClientWrapper.create();
   const xml = await client.getTtyp(name);
-  return ttypArtifact.fromWire(xml);
+  return wireToLocal(xml);
 }
 
 async function pullFromIcf(name: string): Promise<TtypLocal> {
@@ -111,9 +111,22 @@ export async function runPullTtyp(name: string, opts: PullTtypOptions = {}): Pro
   const abapPath = path.join(root, `${token}.type.abap`);
 
   let doc: TtypLocal;
-  let fallbackReason: 'ECC_EHP6_NO_ADT_TABLETYPE' | undefined;
+  let channel: 'adt' | 'icf' = decision.channel;
+  let fallbackReason: PullTtypResult['fallbackReason'];
   if (decision.channel === 'adt') {
-    doc = await pullFromAdt(upper);
+    try {
+      doc = await pullFromAdt(upper);
+    } catch (error) {
+      if (isAdtEndpointUnavailable(error)) {
+        channel = 'icf';
+        fallbackReason = 'ADT_ENDPOINT_UNAVAILABLE';
+        doc = await pullFromIcf(upper);
+      } else if (error instanceof CliError && (error.details?.httpStatus === 404 || error.code === 'OBJECT_NOT_FOUND')) {
+        throw new CliError('OBJECT_NOT_FOUND', `TTYP ${upper} not found`, { object: upper });
+      } else {
+        throw error;
+      }
+    }
   } else {
     fallbackReason = decision.fallbackReason as 'ECC_EHP6_NO_ADT_TABLETYPE';
     doc = await pullFromIcf(upper);
@@ -137,7 +150,7 @@ export async function runPullTtyp(name: string, opts: PullTtypOptions = {}): Pro
 
   return {
     object: upper,
-    channel: decision.channel,
+    channel,
     ...(fallbackReason ? { fallbackReason } : {}),
     files: written,
     doc,

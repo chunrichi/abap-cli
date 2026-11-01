@@ -1,16 +1,22 @@
 /**
- * DDLS create flow — ADT only (DDLS_NOT_SUPPORTED_ON_ECC is raised by channel-detect on ECC).
+ * DDLS create flow — ADT only (DDLS_NOT_SUPPORTED_ON_ECC is raised by
+ * channel-detect on ECC).
  *
- * Reads both the `.ddls.json` (cds view spec) and the companion `.ddls.acds`
- * (DDL source string). Create requires both files; the JSON without the
- * source is meaningless.
+ * Reads both the `.ddls.json` (CDS view spec) and the companion `.ddls.acds`
+ * (DDL source string). Create requires both files; the JSON without the source
+ * is meaningless.
+ *
+ * ADT splits creation in two calls: the object-create endpoint registers the
+ * DDLS header (description / package / original language), then a locked PUT
+ * writes the CDS source to `source/main` and activates the view.
  */
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError, printResult, type OutputMode } from '../../output/json.js';
-import { ddlsArtifact, localToWire as ddlsLocalToWire, type DdlsLocal } from '../../formats/ddls/json.js';
+import { ddlsArtifact, type DdlsLocal } from '../../formats/ddls/json.js';
 import { toOutputPath } from '../../core/path-output.js';
+import { transportForPackage } from '../../core/transport.js';
 import { detectChannel, loadChannelProfile } from './channel-detect.js';
 import { affObjectToken } from '../../formats/file-resolver.js';
 import type { CreateOptions } from './create.js';
@@ -57,9 +63,17 @@ export async function runCreateDdls(
       nextSteps: ['Both files must be supplied on create — write the DDL next to the JSON.'],
     });
   }
-  const wire = ddlsLocalToWire(doc, source);
+  const targetPackage = (opts.package ?? '$TMP').trim().toUpperCase();
+  // A stray --tr on a local package must not reach SAP.
+  const transport = transportForPackage(targetPackage, opts.tr);
   const client = await AdtClientWrapper.create();
-  await client.createDdls(name, wire, opts.package, opts.tr);
+  await client.createDdls(name, {
+    packageName: targetPackage,
+    description: doc.header.description,
+    originalLanguage: doc.header.originalLanguage,
+    ...(transport ? { transport } : {}),
+  });
+  await client.writeDdlsSource(name, source, transport);
   printResult(mode, { object: name, type: 'DDLS', action: 'created', channel: 'adt' }, `Created DDLS ${name} via ADT`);
 }
 

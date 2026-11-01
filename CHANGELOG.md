@@ -6,18 +6,27 @@
 
 ## [Unreleased]
 
-本版修正 MSAG（消息类）双通道读写，并让 NROB 创建接受空子类型；没有破坏性变更。
+本版修正 MSAG / TTYP / DDLS 的 ADT 通道读写，补齐两处机器契约缺口（`validate:aff` 的 NROB/ENQU 校验、`profile test` 的 ADT 能力探测），并让 NROB 创建接受空子类型；没有破坏性变更。
+
+### Added
+
+- **TTYP `keyKind` 字段**：`ttyp-v1.json` 新增可选 `keyKind`（`unique` / `nonUnique`），保留 ADT 主键唯一性；sorted/hashed 表类型的键组件现在能完整 round-trip。
 
 ### Fixed
 
+- **TTYP 的 ADT 通道修复**：创建此前用不可路由的 `_action=create` URL 且不带完整 DDIC 文档，S/4 上直接 400；pull 按错误形态解析导致行类型/描述丢失；push 的锁句柄放请求头且缺少激活。现在 create/pull/push 全部按 ADT DDIC 模型工作。
+- **DDLS 的 ADT 通道修复**：创建/推送此前用错误的 XML 信封 + 请求头锁句柄，源码没有写入 `source/main`、对象未激活；pull 元数据按错误形态解析（描述为空、`sourceType` 落成 `unknown`）。现在创建/推送按「建头 + 锁定写源码 + 激活」执行，pull 解析真实属性并正确识别 `sourceType`。
 - **MSAG 拉取不再写出空消息类**：ADT 通道此前按错误的 XML 形态解析，消息类的描述和消息文本会全部丢失；现在按 SAP 实际返回的 ADT 文档解析，`abap pull <消息类> --type MSAG` 能拿回完整描述与消息。
 - **MSAG 推送能真正写回消息文本**：ADT 更新此前把锁句柄放在请求头里，SAP 报 "Parameter lockHandle could not be found"；现在按 ADT 约定放在查询参数里，锁定 → 写入 → 解锁正常完成。
 - **MSAG 创建分两步写入**：ADT 创建端点只建头，消息文本需要后续锁定写入；此前创建请求里带的消息被 SAP 静默丢弃，得到空消息类。现在创建后立即写入消息。
 - **NROB 创建接受空 `subType`**：AFF schema 要求 `subType` 键存在但允许空字符串（没有子对象的普通编号范围对象）；此前内置 ICF 服务会拒绝空值，现在与 SE11 行为一致。
+- **`validate:aff` 支持 NROB / ENQU**：此前这两类 AFF 文件被静默跳过（`files: []`）；现在分别按 `enqu-v1.json` / `nrob-v1.json` 校验。
+- **`abap profile test` 的 ADT 能力探测**：4xx 曾被当成端点不存在，导致 `capabilities.{ttyp,msag,ddls}.adt` 全部误报 `absent`；现在 4xx 视为端点存在，仅 5xx / 网络错误视为不存在。
 
 ### Changed
 
-- **MSAG 双通道兜底更完整**：现代内核上 ADT 端点未注册（SAP 答 "No URI-Mapping defined for URI"）时，`create` / `pull` / `push` 自动切到内置 ICF 服务，`data.channel` 为 `icf`、`data.fallbackReason` 为 `ADT_ENDPOINT_UNAVAILABLE`；ECC 旧内核仍为 `ECC_EHP6_NO_ADT_MESSAGECLASS`。本次涉及内置 ICF 服务，升级后执行一次 `abap deploy --yes`。
+- **MSAG / TTYP 双通道兜底更完整**：现代内核上 ADT 端点未注册（SAP 答 "No URI-Mapping defined for URI"）时，`create` / `pull` / `push` 自动切到内置 ICF 服务，`data.channel` 为 `icf`、`data.fallbackReason` 为 `ADT_ENDPOINT_UNAVAILABLE`；ECC 旧内核仍为 `ECC_EHP6_NO_ADT_MESSAGECLASS` / `ECC_EHP6_NO_ADT_TABLETYPE`。MSAG 部分涉及内置 ICF 服务，升级后执行一次 `abap deploy --yes`。
+- **`$` 本地包上的误传 `--tr` 一律丢弃**：TTYP / DDLS 的 `create` / `push` 与 MSAG / NROB 保持一致，不再把 transport 带进 ADT 请求。
 
 ## [2.0.0] - 2026-11-01
 

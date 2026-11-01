@@ -1,11 +1,12 @@
 /**
- * +: DDLS push.
+ * DDLS push.
  *
- * Cross-validates the `.ddls.json` sourceType field against the .acds top
+ * Cross-validates the `.ddls.json` sourceType field against the `.acds` top
  * line (`define view entity ...` etc.). Mismatch → VALIDATION_ERROR.
  *
- * DDLS has no ICF fallback. ECC kernels raise `DDLS_NOT_SUPPORTED_ON_ECC`
- * from channel-detect.
+ * The write is a locked PUT of the CDS source to `source/main` followed by
+ * activation (`AdtClientWrapper.writeDdlsSource`); DDLS has no ICF fallback.
+ * ECC kernels raise `DDLS_NOT_SUPPORTED_ON_ECC` from channel-detect.
  */
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
@@ -14,7 +15,7 @@ import { CliError } from '../../output/json.js';
 import { resolveFile } from '../../formats/file-resolver.js';
 import { detectChannel } from './channel-detect.js';
 import type { SystemProfile } from './channel-detect.js';
-import { ddlsArtifact, localToWire } from '../../formats/ddls/json.js';
+import { ddlsArtifact } from '../../formats/ddls/json.js';
 import { parseAcds } from '../../formats/ddls/acds.js';
 import { loadConfig } from '../../config/project-config.js';
 
@@ -70,23 +71,18 @@ export async function runPushDdls(file: string, opts: PushDdlsOptions = {}): Pro
       details: errors,
     });
   }
-  const wire = localToWire(doc, source);
   const client = await AdtClientWrapper.create();
   try {
     await client.getDdls(name);
-  } catch {
-    throw new CliError('OBJECT_NOT_FOUND', `DDLS ${name} does not exist; use 'abap create DDLS ${name} --file <json>'`, {
-      object: name,
-      nextSteps: [`Re-run with 'abap create DDLS <name> --file ${file} --package $TMP'.`],
-    });
+  } catch (error) {
+    if (error instanceof CliError && (error.details?.httpStatus === 404 || error.code === 'OBJECT_NOT_FOUND')) {
+      throw new CliError('OBJECT_NOT_FOUND', `DDLS ${name} does not exist; use 'abap create DDLS ${name} --file <json>'`, {
+        object: name,
+        nextSteps: [`Re-run with 'abap create DDLS <name> --file ${file} --package $TMP'.`],
+      });
+    }
+    throw error;
   }
-  const url = `/sap/bc/adt/ddic/ddl/sources/${name}`;
-  const lock = await client.lock(url);
-  const handle = lock.LOCK_HANDLE;
-  try {
-    await client.updateDdls(name, wire, handle, opts.transport);
-  } finally {
-    await client.unLock(url, handle).catch(() => undefined);
-  }
+  await client.writeDdlsSource(name, source, opts.transport);
   return { object: name, channel: 'adt', action: 'updated' };
 }

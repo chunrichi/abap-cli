@@ -47,11 +47,19 @@ const adtGetDdls = vi.fn(async () => ({ xml: '<ddl:ddlSource/>', source: '' }));
 const adtUpdateDdls = vi.fn(async () => undefined);
 const adtLock = vi.fn(async () => ({ LOCK_HANDLE: 'LH1' }));
 const adtUnLock = vi.fn(async () => undefined);
+const adtActivate = vi.fn(async () => ({
+  messages: [],
+  success: true,
+  inactive: [],
+  checkExecuted: true,
+  activationExecuted: true,
+  generationExecuted: false,
+}));
 
 vi.mock('../../src/abap_cli/clients/adt-client.js', () => ({
   AdtClientWrapper: {
     create: async () => ({
-      getConfig: () => ({ transport: 'TRN001' }),
+      getConfig: () => ({ transport: 'TRN001', sap: { language: 'EN' } }),
       getTtyp: adtGetTtyp,
       updateTtyp: adtUpdateTtyp,
       getMsag: adtGetMsag,
@@ -60,6 +68,7 @@ vi.mock('../../src/abap_cli/clients/adt-client.js', () => ({
       updateDdls: adtUpdateDdls,
       lock: adtLock,
       unLock: adtUnLock,
+      activate: adtActivate,
     }),
   },
 }));
@@ -79,7 +88,7 @@ beforeEach(() => {
   icfPostHttp.mockReset().mockResolvedValue(icfOk());
   icfPostTran.mockReset().mockResolvedValue(icfOk());
   icfGetTran.mockReset().mockResolvedValue(icfOk());
-  for (const fn of [adtGetTtyp, adtUpdateTtyp, adtGetMsag, adtUpdateMsag, adtGetDdls, adtUpdateDdls, adtLock, adtUnLock]) {
+  for (const fn of [adtGetTtyp, adtUpdateTtyp, adtGetMsag, adtUpdateMsag, adtGetDdls, adtUpdateDdls, adtLock, adtUnLock, adtActivate]) {
     fn.mockClear();
   }
   cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'push-dispatch-'));

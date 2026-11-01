@@ -30,7 +30,7 @@ The set is intentionally minimal — only the schemas abap-cli resolves through
 | `devc-v1.json` | DEVC | `file-formats/devc/devc-v1.json` | |
 | `http-v1.json` | HTTP | `file-formats/http/http-v1.json` | |
 | `tran-v1.json` | TRAN | `file-formats/tran/tran-v1.json` | |
-| `ttyp-v1.json` | TTYP | — | **local variant**, handcrafted |
+| `ttyp-v1.json` | TTYP | — | **local variant**, handcrafted (`keyKind` is a local extension) |
 | `view-v1.json` | VIEW | — | **local extension**, handcrafted from DD25V / DD26V / DD27P / DD28J / DD28V |
 | `shlp-v1.json` | SHLP | — | **local extension**, handcrafted from DD30V / DD31V / DD32P / DD33V |
 | `msag-v1.json` | MSAG | `file-formats/msag/msag-v1.json` | |

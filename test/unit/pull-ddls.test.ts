@@ -24,14 +24,9 @@ define view ZMY_DDIC_BASED
   key connid
 }`;
 
-function wireBody(source: string, description: string): string {
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<ddl:ddlSource xmlns:ddl="http://www.sap.com/adt/ddic/ddl/sources">
-  <ddl:description>${description}</ddl:description>
-  <ddl:originalLanguage>EN</ddl:originalLanguage>
-  <ddl:sourceOrigin>abapDevelopmentTools</ddl:sourceOrigin>
-  <ddl:ddlSourceString>${source}</ddl:ddlSourceString>
-</ddl:ddlSource>`;
+/** Real ADT metadata document: header in attributes, source fetched separately. */
+function wireBody(_source: string, description: string, sourceType = 'view entity'): string {
+  return `<?xml version="1.0" encoding="utf-8"?><ddl:ddlSource ddl:source_origin="0" ddl:source_type="${sourceType}" ddl:source_type_description="View Entity" ddl:source_origin_description="ABAP Development Tools" abapsource:sourceUri="source/main" adtcore:name="ZMY_VIEW_ENTITY" adtcore:type="DDLS/DF" adtcore:description="${description}" adtcore:language="EN" adtcore:masterLanguage="EN" xmlns:ddl="http://www.sap.com/adt/ddic/ddlsources" xmlns:abapsource="http://www.sap.com/adt/abapsource" xmlns:adtcore="http://www.sap.com/adt/core"/>`;
 }
 
 const adtGetDdls = vi.fn(async () => ({
@@ -87,7 +82,7 @@ describe('runPullDdls — ADT channel', () => {
 
   it('detects the ddicBasedView form from the DDL body', async () => {
     adtGetDdls.mockResolvedValueOnce({
-      xml: wireBody(DDIC_BASED_SOURCE, 'DDIC based view'),
+      xml: wireBody(DDIC_BASED_SOURCE, 'DDIC based view', 'ddic based view'),
       source: DDIC_BASED_SOURCE,
     });
     const runPullDdls = await load();
@@ -112,6 +107,17 @@ describe('runPullDdls — ECC hard error (036 / )', () => {
     await expect(runPullDdls('zmy_view_entity', { profile: ECC_PROFILE, rootDir: root })).rejects.toThrow(
       /ECC EHP7\+ or S\/4HANA/,
     );
+  });
+
+  it('maps an ADT 404 onto OBJECT_NOT_FOUND', async () => {
+    const { CliError } = await import('../../src/abap_cli/output/json.js');
+    adtGetDdls.mockRejectedValueOnce(
+      new CliError('SAP_ERROR', 'Resource DDLS ZMY_NOPE does not exist.', { details: { httpStatus: 404 } }),
+    );
+    const runPullDdls = await load();
+    await expect(runPullDdls('zmy_nope', { profile: ADT_PROFILE, rootDir: root })).rejects.toMatchObject({
+      code: 'OBJECT_NOT_FOUND',
+    });
   });
 
   it('honours an explicit ddlsSupported flag on an old kernel', async () => {

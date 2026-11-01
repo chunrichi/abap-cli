@@ -294,36 +294,49 @@ export class AdtClientWrapper {
     });
   }
 
-  /** POST /sap/bc/adt/ddic/tabletypes — create a new TTYP object. */
-  createTtyp(name: string, xml: string, packageName: string, transport?: string): Promise<void> {
+  /** POST /sap/bc/adt/ddic/tabletypes — create a new TTYP object.
+   *
+   * The collection POST only registers the object with default content; the
+   * row type / access type / keys are applied by a follow-up PUT (see
+   * `flows/edit/ttyp-adt.ts`). `body` must therefore carry the
+   * `adtcore:packageRef` for the create request.
+   */
+  createTtyp(body: string, transport?: string): Promise<void> {
     return this._call(async () => {
-      const url = `/sap/bc/adt/ddic/tabletypes?_action=create&objtype=ttyp&objname=${encodeURIComponent(name.toUpperCase())}&corrNr=${encodeURIComponent(transport ?? '')}`;
-      await this.client.httpClient.request(url, {
+      await this.client.httpClient.request('/sap/bc/adt/ddic/tabletypes', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/xml',
+          'Content-Type': 'application/vnd.sap.adt.tabletype.v1+xml',
           Accept: 'application/*',
-          ...(packageName ? { 'X-CPACKAGE': packageName } : {}),
-          ...(transport ? { 'X-CORR-NR': transport } : {}),
         },
-        body: xml,
+        qs: {
+          ...(transport ? { corrNr: transport } : {}),
+        },
+        body,
       });
     });
   }
 
-  /** PUT /sap/bc/adt/ddic/tabletypes/<name> — overwrite an existing TTYP. */
-  updateTtyp(name: string, xml: string, lockHandle: string, transport?: string): Promise<void> {
+  /** PUT /sap/bc/adt/ddic/tabletypes/<name> — overwrite an existing TTYP.
+   *
+   * ADT expects the lock handle / transport as query parameters and the
+   * vendor media type (`application/vnd.sap.adt.tabletype.v1+xml`); a plain
+   * `application/xml` PUT is rejected with 415.
+   */
+  updateTtyp(name: string, body: string, lockHandle: string, transport?: string): Promise<void> {
     return this._call(async () => {
       const url = `/sap/bc/adt/ddic/tabletypes/${name.toUpperCase()}`;
       await this.client.httpClient.request(url, {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/xml',
+          'Content-Type': 'application/vnd.sap.adt.tabletype.v1+xml',
           Accept: 'application/*',
-          ...(lockHandle ? { 'X-LOCK': lockHandle } : {}),
-          ...(transport ? { 'X-CORR-NR': transport } : {}),
         },
-        body: xml,
+        qs: {
+          ...(lockHandle ? { lockHandle } : {}),
+          ...(transport ? { corrNr: transport } : {}),
+        },
+        body,
       });
     });
   }
@@ -409,37 +422,55 @@ export class AdtClientWrapper {
     });
   }
 
-  /** POST /sap/bc/adt/ddic/ddl/sources — create a new DDLS. */
-  createDdls(name: string, xml: string, packageName: string, transport?: string): Promise<void> {
-    return this._call(async () => {
-      const url = `/sap/bc/adt/ddic/ddl/sources?_action=create&objtype=ddls&objname=${encodeURIComponent(name.toLowerCase())}&corrNr=${encodeURIComponent(transport ?? '')}`;
-      await this.client.httpClient.request(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/xml',
-          Accept: 'application/*',
-          ...(packageName ? { 'X-CPACKAGE': packageName } : {}),
-          ...(transport ? { 'X-CORR-NR': transport } : {}),
-        },
-        body: xml,
-      });
+  /** POST /sap/bc/adt/ddic/ddl/sources — create a new DDLS (header only).
+   *
+   * The DDLS source lives at `<objectUrl>/source/main` and is written by a
+   * locked PUT afterwards (see `writeDdlsSource`). The create request carries
+   * the description in the logon language (ADT rejects a description language
+   * that differs from the logon language) and the object's original language
+   * as `masterLanguage`.
+   */
+  createDdls(
+    name: string,
+    meta: { packageName: string; description: string; originalLanguage?: string; transport?: string },
+  ): Promise<void> {
+    return this.createObject({
+      objtype: 'DDLS/DF',
+      name,
+      parentName: meta.packageName,
+      parentPath: `/sap/bc/adt/packages/${encodeURIComponent(meta.packageName)}`,
+      description: meta.description,
+      language: this.config.sap.language,
+      masterLanguage: meta.originalLanguage ?? this.config.sap.language,
+      ...(meta.transport ? { transport: meta.transport } : {}),
     });
   }
 
-  /** PUT /sap/bc/adt/ddic/ddl/sources/<name> — overwrite an existing DDLS. */
-  updateDdls(name: string, xml: string, lockHandle: string, transport?: string): Promise<void> {
+  /** Write the CDS source of an existing DDLS: lock → PUT source/main → unlock
+   *  → activate. DDLS is a source object, so the write needs the lock handle in
+   *  the query string and a text/plain body. */
+  writeDdlsSource(name: string, source: string, transport?: string): Promise<void> {
     return this._call(async () => {
-      const url = `/sap/bc/adt/ddic/ddl/sources/${name.toLowerCase()}`;
-      await this.client.httpClient.request(url, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/xml',
-          Accept: 'application/*',
-          ...(lockHandle ? { 'X-LOCK': lockHandle } : {}),
-          ...(transport ? { 'X-CORR-NR': transport } : {}),
-        },
-        body: xml,
-      });
+      const objectUrl = `/sap/bc/adt/ddic/ddl/sources/${name.toLowerCase()}`;
+      const lock = await this.lock(objectUrl);
+      const handle = lock.LOCK_HANDLE;
+      try {
+        await this.client.httpClient.request(`${objectUrl}/source/main`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'text/plain; charset=utf-8',
+            Accept: 'application/*',
+          },
+          qs: {
+            ...(handle ? { lockHandle: handle } : {}),
+            ...(transport ? { corrNr: transport } : {}),
+          },
+          body: source,
+        });
+      } finally {
+        await this.unLock(objectUrl, handle).catch(() => undefined);
+      }
+      await this.activate(objectUrl, 'DDLS/DF', name);
     });
   }
 

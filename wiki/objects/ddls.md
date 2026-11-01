@@ -4,7 +4,7 @@ title: DDLS — CDS 视图源（Data Definition Language Source）
 description: DDLS 对象的 ADT-only 路由、三件套形态、5 种 CDS 形态识别、ECC 硬错
 tags: [abap-cli, object-type, ddls, cds, adt, abap-file-format, view-entity]
 created at: 2026-09-04 00:00:00
-changed at: 2026-10-30 20:00:00
+changed at: 2026-11-02 00:05:00
 ---
 
 # DDLS — CDS 视图源（DDL Source）
@@ -29,6 +29,21 @@ DDL source 是 SAP 内核能力，**没有 ICF 兜底的可能**——旧内核�
 ```
 
 若某台旧内核系统确实装了 DDL 支持，可在 profile 上显式设 `ddlsSupported: true` 覆盖判定。
+
+## ADT wire 形态与创建
+
+`/sap/bc/adt/ddic/ddl/sources/<name>` 的元数据是 `ddl:ddlSource` 文档：头信息在属性里（`adtcore:description`、`adtcore:masterLanguage`、`ddl:source_origin`、`ddl:source_type`），源码在独立的 `source/main` 资源：
+
+```xml
+<ddl:ddlSource xmlns:ddl="http://www.sap.com/adt/ddic/ddlsources"
+               ddl:source_origin="0" ddl:source_type="view entity"
+               adtcore:name="ZMY_VIEW" adtcore:type="DDLS/DF"
+               adtcore:description="My CDS view" adtcore:masterLanguage="EN">
+  <adtcore:packageRef adtcore:name="$TMP"/>
+</ddl:ddlSource>
+```
+
+ADT 的创建分两步：`POST` 对象创建端点注册 DDLS 头（描述语言必须等于登录语言，`masterLanguage` 记录对象原始语言），随后 lock → `PUT source/main?lockHandle=`（`text/plain`）→ unlock → activate 写入源码。`push` 走同一条 locked PUT；`source/main` 缺失时 pull 仍会把元数据 XML 作为最后兜底写入 `.acds`。
 
 ## 本地文件形态（三件套）
 
@@ -72,9 +87,9 @@ src/
 ## 命令示例
 
 ```bash
-abap create DDLS ZMY_VIEW --file src/zmy_view.ddls.json --package $TMP --json
+abap create DDLS ZMY_VIEW --file src/zmy_view.ddls.json --package $TMP --yes --json
 abap pull I_ABAPAPPLICATIONCOMPONENT --type DDLS --json
-abap push src/zmy_view.ddls.json --tr DEVK900001 --json
+abap push src/zmy_view.ddls.json --yes --json
 ```
 
 ## abap-file-format 合规性

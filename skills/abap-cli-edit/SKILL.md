@@ -106,7 +106,7 @@ AFF 写盘前 gate（纯本地，不进 SAP）
 ### 关键说明
 
 - **ICF 通道类型**（`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `NROB` / `HTTP` / `TRAN`）依赖内置 ICF 服务已部署——失败先跳 `abap-cli-setup` 跑 `deploy status`。`TTYP` / `MSAG` 在旧内核（ECC EHP5/6）也降级走同一 ICF 服务；`DDLS` 无兜底。
-- **`TTYP` / `MSAG` / `DDLS`**（双通道降级）：envelope 多 `data.channel: 'adt' | 'icf'` 与 `data.fallbackReason`（`'ECC_EHP6_NO_ADT_TABLETYPE'` / `'ECC_EHP6_NO_ADT_MESSAGECLASS'`；MSAG 在现代内核上缺 ADT 端点时为 `'ADT_ENDPOINT_UNAVAILABLE'`）；ECC EHP5/6 自动降级 ICF；`DDLS` ECC 旧内核硬错 `DDLS_NOT_SUPPORTED_ON_ECC`（exit 64），不静默降级。
+- **`TTYP` / `MSAG` / `DDLS`**（双通道降级）：envelope 多 `data.channel: 'adt' | 'icf'` 与 `data.fallbackReason`（`'ECC_EHP6_NO_ADT_TABLETYPE'` / `'ECC_EHP6_NO_ADT_MESSAGECLASS'`；TTYP / MSAG 在现代内核上缺 ADT 端点时为 `'ADT_ENDPOINT_UNAVAILABLE'`）；ECC EHP5/6 自动降级 ICF；`DDLS` ECC 旧内核硬错 `DDLS_NOT_SUPPORTED_ON_ECC`（exit 64），不静默降级。
 - **DDIC 三件套（TABL/STRU）**：`--file` 指向 main `.tabl.json`，CLI 自动读同目录 `.tabl.ddic`（DDL 真值）与可选 `.tabl.settings.json`；详见下方 TABL vs STRU 注解差异。
 - **`create` 的未知类型报错已由 registry 驱动**：会列出全部 25 个注册类型码，无需再记住"哪些没被列进文案"。真正受限的是 `create local`（只 CLAS/INTF/PROG/FUGR）。
 
