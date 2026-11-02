@@ -59,6 +59,8 @@ const textpoolStore = new Map();
 const remoteSourceStore = new Map();
 // 014: TRAN (SE93 transaction code) store — key = TCODE, value = wire document.
 const tranStore = new Map();
+// HTTP (SICF node) store — key = node name (upper), value = AFF wire document.
+const httpStore = new Map();
 // XSLT (transformation program) store — key = NAME, value = { name, description,
 // originalLanguage, source, package }. `source` is stored in the canonical
 // (LF, no trailing break) form; GET adds the CRLF read-back the real
@@ -1469,6 +1471,53 @@ const server = http.createServer(async (req, res) => {
         return ok(res, JSON.stringify({ status: 'success', data: ddicStore.get(key) }), 'application/json');
       }
       return ok(res, JSON.stringify({ status: 'error', error: { code: 'METHOD_NOT_ALLOWED', message: `${req.method} not supported on /ddic/${ddicType}` } }), 'application/json');
+    }
+
+    // /sap/abap_cli/http/<name> (GET pull / POST|PUT upsert / DELETE).
+    // Mirrors the bundled handler contract: node name derives from the AFF
+    // generalInformation.url, writes are local-package-only, delete refuses
+    // missing nodes and nodes that still have children.
+    const httpSvc = /^\/sap\/abap_cli\/http\/([^/]+)$/.exec(path);
+    if (httpSvc) {
+      const requested = decodeURIComponent(httpSvc[1]);
+      if (req.method === 'POST' || req.method === 'PUT') {
+        const body = await readBody(req);
+        let payload = {};
+        try { payload = JSON.parse(body); } catch (_e) { payload = {}; }
+        const general = (payload && payload.generalInformation) || {};
+        const url = String(general.url || general.servicePath || '').replace(/\/+$/, '');
+        const nodeName = url.split('/').filter(Boolean).pop() || requested;
+        if (!payload.header || !payload.header.description || !url) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'HTTP_SERVICE_INVALID', message: 'formatVersion, header.description and generalInformation.url are required' } }), 'application/json');
+        }
+        if (payload.package && !isLocalPackage(payload.package)) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'HTTP_PACKAGE_NOT_SUPPORTED', message: 'SICF nodes can only be written in local packages' } }), 'application/json');
+        }
+        const key = nodeName.toUpperCase();
+        const existed = httpStore.has(key);
+        httpStore.set(key, payload);
+        return ok(res, JSON.stringify({ status: 'success', data: { name: nodeName.toLowerCase(), type: 'HTTP', action: existed ? 'updated' : 'created' } }), 'application/json');
+      }
+      if (req.method === 'GET') {
+        const key = requested.toUpperCase();
+        if (!httpStore.has(key)) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'HTTP_OBJECT_NOT_FOUND', message: `SICF service not found: ${requested}` } }), 'application/json');
+        }
+        return ok(res, JSON.stringify({ status: 'success', data: httpStore.get(key) }), 'application/json');
+      }
+      if (req.method === 'DELETE') {
+        const key = requested.toUpperCase();
+        if (!httpStore.has(key)) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'HTTP_OBJECT_NOT_FOUND', message: `SICF service not found: ${requested}` } }), 'application/json');
+        }
+        const hasChildren = [...httpStore.keys()].some((k) => k.startsWith(key + '/'));
+        if (hasChildren) {
+          return ok(res, JSON.stringify({ status: 'error', error: { code: 'HTTP_SERVICE_HAS_CHILDREN', message: `${requested} has child nodes` } }), 'application/json');
+        }
+        httpStore.delete(key);
+        return ok(res, JSON.stringify({ status: 'success', data: { name: key.toLowerCase(), type: 'HTTP', action: 'deleted' } }), 'application/json');
+      }
+      return ok(res, JSON.stringify({ status: 'error', error: { code: 'METHOD_NOT_ALLOWED', message: `${req.method} not supported on /http/${requested}` } }), 'application/json');
     }
 
     // 014: /sap/abap_cli/tran/<tcode> (GET pull / POST|PUT upsert / DELETE).

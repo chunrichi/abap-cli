@@ -15,7 +15,7 @@ import * as path from 'node:path';
 import { IcfClient } from '../../clients/icf-client.js';
 import { CliError, printResult, type OutputMode } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
-import { isLocalPackageName } from '../../core/transport.js';
+import { isLocalPackageName, transportForPackage } from '../../core/transport.js';
 import {
   httpArtifact,
   localToWire as httpLocalToWire,
@@ -52,7 +52,10 @@ export async function runCreateHttp(
     });
   }
 
-  const errors = validateHttpObject(local);
+  // The on-disk AFF document carries no object name (the file name carries
+  // it), but the namespace/name guard needs it: inject the CLI argument before
+  // validating so a pulled AFF file can be used as the create template.
+  const errors = validateHttpObject({ ...local, name: objectName.toUpperCase() });
   if (errors.length > 0) {
     const outFile = toOutputPath(opts.file);
     throw new CliError('VALIDATION_ERROR', `Invalid HTTP definition in ${outFile}: ${errors.join('; ')}`, {
@@ -67,11 +70,19 @@ export async function runCreateHttp(
     });
   }
 
+  // SICF node writes go through the bundled ICF service, which cannot record a
+  // creation/change in a transport request: only local ($-prefixed) packages
+  // are writable. Transportable nodes stay in transaction SICF.
   const targetPackage = (opts.package ?? '$TMP').trim().toUpperCase();
-  if (!isLocalPackageName(targetPackage) && !opts.tr) {
-    throw new CliError('VALIDATION_ERROR', 'transportRequest is required when package is not a local package', {
-      nextSteps: ['Re-run with --tr <REQUEST>.', 'Or use a local package ($TMP) for local objects.'],
-      example: `abap create HTTP ${objectName} --file ${toOutputPath(opts.file)} --package ${opts.package} --tr <REQUEST> --description "..."`,
+  if (!isLocalPackageName(targetPackage)) {
+    throw new CliError('HTTP_PACKAGE_NOT_SUPPORTED', `HTTP services can only be written in local packages starting with $ (got ${targetPackage}); create transportable SICF nodes in transaction SICF`, {
+      object: objectName,
+      type: 'HTTP',
+      nextSteps: [
+        'Use a local package such as $TMP for scratch SICF nodes.',
+        'Maintain transportable SICF nodes in transaction SICF so the change is recorded in a transport request.',
+      ],
+      example: `abap create HTTP ${objectName} --file ${toOutputPath(opts.file)} --package '$TMP' --yes`,
     });
   }
 
@@ -80,8 +91,10 @@ export async function runCreateHttp(
     wire.header = wire.header ?? {};
     wire.header.description = opts.description;
   }
-  if (opts.package) wire.package = opts.package;
-  if (opts.tr) wire.transportRequest = opts.tr;
+  wire.package = targetPackage;
+  // Local packages are transport-free: a stray --tr must not reach the wire.
+  const transport = transportForPackage(targetPackage, opts.tr);
+  if (transport) wire.transportRequest = transport;
 
   const icf = await IcfClient.create();
   const resp = await icf.postHttp<{ name: string; type: string; action: 'created' | 'updated' }>(objectName, wire);

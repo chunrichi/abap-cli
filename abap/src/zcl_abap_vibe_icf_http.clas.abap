@@ -12,6 +12,14 @@ CLASS zcl_abap_vibe_icf_http DEFINITION PUBLIC FINAL CREATE PUBLIC.
     CLASS-METHODS resolve_handler_lang_version
       IMPORTING iv_class_name TYPE string
       RETURNING VALUE(rv_version) TYPE string.
+
+    " Normalise an SICF URL for identity checks: lowercase and no trailing
+    " slash. service_from_url falls back to the nearest parent node when the
+    " requested URL does not exist, so callers compare this canonical form
+    " against the request to detect a miss.
+    CLASS-METHODS normalize_icf_url
+      IMPORTING iv_url         TYPE string
+      RETURNING VALUE(rv_url)  TYPE string.
 ENDCLASS.
 
 CLASS zcl_abap_vibe_icf_http IMPLEMENTATION.
@@ -23,6 +31,7 @@ CLASS zcl_abap_vibe_icf_http IMPLEMENTATION.
     DATA lv_node_name    TYPE icfname.
     DATA lv_transport    TYPE trkorr.
     DATA lv_transport_raw TYPE string.
+    DATA lv_package_raw  TYPE string.
     DATA lv_guid         TYPE icfnodguid.
     DATA lv_parent_guid  TYPE icfparguid.
     DATA lv_service_name TYPE icfservice-icf_name.
@@ -42,6 +51,11 @@ CLASS zcl_abap_vibe_icf_http IMPLEMENTATION.
     DATA lv_alt_name      TYPE icfservice-icfaltnme.
     DATA lv_icf_message   TYPE string.
     DATA lv_change_subrc  TYPE sy-subrc.
+    DATA lv_package       TYPE devclass.
+    DATA lv_tadir_name    TYPE tadir-obj_name.
+    DATA lv_delete_subrc  TYPE sy-subrc.
+    DATA lv_delete_message TYPE string.
+    DATA lv_node_name_clean TYPE string.
 
     " Resolve the endpoint key to an SICF URL; a bare name means /sap/<name>.
     FIND REGEX '^/http/(.+)$' IN iv_path IGNORING CASE SUBMATCHES lv_match_name.
@@ -120,6 +134,18 @@ CLASS zcl_abap_vibe_icf_http IMPLEMENTATION.
         RETURN.
       ENDIF.
 
+      " service_from_url resolves a missing URL to its nearest parent (a
+      " missing /sap/foo comes back as /sap/). Treat a canonical-URL mismatch
+      " as "not found" instead of returning the parent node's data.
+      IF normalize_icf_url( lv_info_url ) <> normalize_icf_url( lv_url ).
+        zcl_abap_vibe_icf_response=>respond_error( io_server = io_server
+                       iv_status = 404
+                       iv_reason = 'Not Found'
+                       iv_code = 'HTTP_OBJECT_NOT_FOUND'
+                       iv_msg = |SICF service not found: { lv_url }| ).
+        RETURN.
+      ENDIF.
+
       READ TABLE lt_serv_info INDEX 1 INTO ls_serv_info.
       READ TABLE ls_serv_info-handlertbl INDEX 1 INTO ls_handler.
       CASE sy-langu.
@@ -181,12 +207,211 @@ CLASS zcl_abap_vibe_icf_http IMPLEMENTATION.
       RETURN.
     ENDIF.
 
+    IF iv_method = 'DELETE'.
+      " SICF node deletion. Only nodes whose TADIR row is in a local
+      " ($-prefixed) package are reachable: the ICF context cannot record a
+      " removal in a transport request, so SICF stays canonical for
+      " transported services. The node must have no children — cl_icf_tree
+      " refuses those, and deleting them implicitly would be surprising.
+      IF lv_match_name CP '/*'.
+        lv_url = lv_match_name.
+      ELSE.
+        lv_url = |/sap/{ to_lower( lv_match_name ) }|.
+      ENDIF.
+
+      CALL METHOD cl_icf_tree=>if_icf_tree~service_from_url
+        EXPORTING
+          url        = lv_url
+          hostnumber = 0
+        IMPORTING
+          icfnodguid = lv_guid
+        EXCEPTIONS
+          wrong_url    = 4
+          no_authority = 5
+          OTHERS       = 99.
+      IF sy-subrc <> 0.
+        zcl_abap_vibe_icf_response=>respond_error( io_server = io_server
+                       iv_status = 404
+                       iv_reason = 'Not Found'
+                       iv_code = 'HTTP_OBJECT_NOT_FOUND'
+                       iv_msg = |SICF service not found: { lv_url }| ).
+        RETURN.
+      ENDIF.
+
+      SELECT SINGLE * FROM icfservice
+        WHERE icfnodguid = @lv_guid
+        INTO @ls_existing_service.
+      IF sy-subrc <> 0.
+        zcl_abap_vibe_icf_response=>respond_error( io_server = io_server
+                       iv_status = 404
+                       iv_reason = 'Not Found'
+                       iv_code = 'HTTP_OBJECT_NOT_FOUND'
+                       iv_msg = |SICF service metadata not found: { lv_url }| ).
+        RETURN.
+      ENDIF.
+
+      " service_from_url resolves a missing URL to its nearest parent; use the
+      " node's canonical URL to tell "requested node" from "parent fallback"
+      " before applying the delete rules.
+      CALL METHOD cl_icf_tree=>if_icf_tree~get_info_from_serv
+        EXPORTING
+          icf_name   = ls_existing_service-icf_name
+          icfparguid = ls_existing_service-icfparguid
+          icf_langu  = sy-langu
+        IMPORTING
+          serv_info = lt_serv_info
+          url       = lv_info_url
+        EXCEPTIONS
+          wrong_name        = 1
+          wrong_parguid     = 2
+          incorrect_service = 3
+          no_authority      = 4
+          OTHERS            = 5.
+      IF sy-subrc <> 0 OR lt_serv_info IS INITIAL.
+        zcl_abap_vibe_icf_response=>respond_error( io_server = io_server
+                       iv_status = 500
+                       iv_reason = 'Internal Server Error'
+                       iv_code = 'HTTP_SERVICE_READ_FAILED'
+                       iv_msg = |Could not read SICF service metadata: { lv_url }| ).
+        RETURN.
+      ENDIF.
+      IF normalize_icf_url( lv_info_url ) <> normalize_icf_url( lv_url ).
+        zcl_abap_vibe_icf_response=>respond_error( io_server = io_server
+                       iv_status = 404
+                       iv_reason = 'Not Found'
+                       iv_code = 'HTTP_OBJECT_NOT_FOUND'
+                       iv_msg = |SICF service not found: { lv_url }| ).
+        RETURN.
+      ENDIF.
+
+      " The root node (and virtual-host roots) cannot be deleted through the
+      " SAP API — SICF does it interactively.
+      IF ls_existing_service-icfparguid CO '0'.
+        zcl_abap_vibe_icf_response=>respond_error( io_server = io_server
+                       iv_status = 400
+                       iv_reason = 'Bad Request'
+                       iv_code = 'HTTP_SERVICE_ROOT_NODE'
+                       iv_msg = |{ lv_url } is an SICF root node; delete it in transaction SICF| ).
+        RETURN.
+      ENDIF.
+
+      " ICFSERVICE.ICF_NAME is CHAR(15): strip the padding into a string before
+      " the name guard (a CHAR target would re-pad and trip the whitespace check)
+      " and before building the TADIR object name (which re-pads to 15).
+      lv_node_name_clean = to_upper( condense( val = ls_existing_service-icf_name del = ` ` ) ).
+      lv_parent_guid = ls_existing_service-icfparguid.
+      IF strlen( lv_node_name_clean ) > 15 OR lv_node_name_clean CS ` `.
+        zcl_abap_vibe_icf_response=>respond_error( io_server = io_server
+                       iv_status = 400
+                       iv_reason = 'Bad Request'
+                       iv_code = 'HTTP_SERVICE_INVALID'
+                       iv_msg = |SICF node name must be at most 15 characters without whitespace (got '{ lv_node_name_clean }')| ).
+        RETURN.
+      ENDIF.
+
+      " TADIR is the only place that carries the SICF node package; its object
+      " name is the 15-character node name followed by the parent GUID.
+      lv_tadir_name = |{ lv_node_name_clean WIDTH = 15 }{ lv_parent_guid }|.
+      SELECT SINGLE devclass FROM tadir INTO @lv_package
+        WHERE pgmid = 'R3TR' AND object = 'SICF' AND obj_name = @lv_tadir_name.
+      IF sy-subrc <> 0.
+        zcl_abap_vibe_icf_response=>respond_error( io_server = io_server
+                       iv_status = 400
+                       iv_reason = 'Bad Request'
+                       iv_code = 'HTTP_DELETE_UNSUPPORTED'
+                       iv_msg = |{ lv_url } has no TADIR package metadata; delete it in transaction SICF| ).
+        RETURN.
+      ENDIF.
+      IF zcl_abap_vibe_icf_types=>is_local_package( lv_package ) = abap_false.
+        zcl_abap_vibe_icf_response=>respond_error( io_server = io_server
+                       iv_status = 400
+                       iv_reason = 'Bad Request'
+                       iv_code = 'HTTP_DELETE_UNSUPPORTED'
+                       iv_msg = |{ lv_url } is in package { lv_package }; delete transportable SICF services in transaction SICF so the removal is recorded in a transport request| ).
+        RETURN.
+      ENDIF.
+
+      " Application customizing rows make the SAP API refuse the delete; SICF
+      " removes them first, so mirror that here.
+      DELETE FROM icfapplcust
+        WHERE icf_name = @lv_service_name
+          AND icfparguid = @lv_parent_guid.
+
+      CALL METHOD cl_icf_tree=>if_icf_tree~delete_node
+        EXPORTING
+          icfparguid = lv_parent_guid
+        CHANGING
+          icf_name   = ls_existing_service-icf_name
+        EXCEPTIONS
+          no_virtual_host_delete      = 1
+          special_service_error       = 2
+          enqueue_error               = 3
+          node_not_existing           = 4
+          node_has_childs             = 5
+          node_is_aliased             = 6
+          node_not_in_original_system = 7
+          transport_error             = 8
+          tadir_error                 = 9
+          db_error                    = 10
+          no_authority                = 11
+          OTHERS                      = 12.
+      lv_delete_subrc = sy-subrc.
+      IF lv_delete_subrc <> 0.
+        MESSAGE ID sy-msgid TYPE 'S' NUMBER sy-msgno
+          WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 INTO lv_delete_message.
+        IF lv_delete_message IS INITIAL.
+          lv_delete_message = |cl_icf_tree delete_node failed (subrc={ lv_delete_subrc })|.
+        ENDIF.
+        CASE lv_delete_subrc.
+          WHEN 4.
+            zcl_abap_vibe_icf_response=>respond_error( io_server = io_server
+                           iv_status = 404
+                           iv_reason = 'Not Found'
+                           iv_code = 'HTTP_OBJECT_NOT_FOUND'
+                           iv_msg = lv_delete_message ).
+          WHEN 5.
+            zcl_abap_vibe_icf_response=>respond_error( io_server = io_server
+                           iv_status = 400
+                           iv_reason = 'Bad Request'
+                           iv_code = 'HTTP_SERVICE_HAS_CHILDREN'
+                           iv_msg = |{ lv_url } has child nodes; delete the children first (SICF or abap delete)| ).
+          WHEN 6 OR 7.
+            zcl_abap_vibe_icf_response=>respond_error( io_server = io_server
+                           iv_status = 400
+                           iv_reason = 'Bad Request'
+                           iv_code = 'HTTP_DELETE_UNSUPPORTED'
+                           iv_msg = |{ lv_url } cannot be deleted through the bundled ICF service: { lv_delete_message }| ).
+          WHEN 11.
+            zcl_abap_vibe_icf_response=>respond_error( io_server = io_server
+                           iv_status = 403
+                           iv_reason = 'Forbidden'
+                           iv_code = 'HTTP_SERVICE_NOT_AUTHORIZED'
+                           iv_msg = |Not authorized to delete { lv_url }: { lv_delete_message }| ).
+          WHEN OTHERS.
+            zcl_abap_vibe_icf_response=>respond_error( io_server = io_server
+                           iv_status = 500
+                           iv_reason = 'Internal Server Error'
+                           iv_code = 'HTTP_DELETE_FAILED'
+                           iv_msg = lv_delete_message ).
+        ENDCASE.
+        RETURN.
+      ENDIF.
+
+      zcl_abap_vibe_icf_response=>respond_json( io_server = io_server
+                    iv_status = 200
+                    iv_reason = 'OK'
+                    is_payload = VALUE zcl_abap_vibe_icf_types=>ty_http_write(
+                      status = 'success'
+                      data = VALUE #( name = lv_node_name_clean type = 'HTTP' action = 'deleted' ) ) ).
+      RETURN.
+    ENDIF.
+
     IF iv_method <> 'POST'.
       zcl_abap_vibe_icf_response=>respond_error( io_server = io_server
                      iv_status = 405
                      iv_reason = 'Method Not Allowed'
                      iv_code = 'METHOD_NOT_ALLOWED'
-                     iv_msg = |GET and POST only on /http/{ lv_match_name }| ).
+                     iv_msg = |GET, POST and DELETE only on /http/{ lv_match_name }| ).
       RETURN.
     ENDIF.
 
@@ -208,6 +433,14 @@ CLASS zcl_abap_vibe_icf_http IMPLEMENTATION.
       IN iv_body IGNORING CASE SUBMATCHES lv_transport_raw.
     IF sy-subrc = 0.
       lv_transport = lv_transport_raw.
+    ENDIF.
+    " Package is CLI envelope metadata (not part of the AFF document). Empty
+    " means "not specified": an update keeps the node's existing TADIR package,
+    " a create defaults to $TMP.
+    FIND FIRST OCCURRENCE OF REGEX '"package"\s*:\s*"([^"]*)"'
+      IN iv_body IGNORING CASE SUBMATCHES lv_package_raw.
+    IF sy-subrc = 0.
+      lv_package = to_upper( lv_package_raw ).
     ENDIF.
 
     lv_url = ls_http-general_information-url.
@@ -300,6 +533,32 @@ CLASS zcl_abap_vibe_icf_http IMPLEMENTATION.
         DELETE TABLE lt_icfhndlist FROM <ls_existing>-icfhandler.
       ENDLOOP.
 
+      " Package: the CLI envelope wins when present, otherwise keep the node's
+      " existing TADIR package. Transported nodes stay SICF-managed: the ICF
+      " context cannot record a change in a transport request.
+      IF lv_package IS INITIAL.
+        lv_node_name_clean = to_upper( condense( val = lv_service_name del = ` ` ) ).
+        lv_tadir_name = |{ lv_node_name_clean WIDTH = 15 }{ lv_parent_guid }|.
+        SELECT SINGLE devclass FROM tadir INTO @lv_package
+          WHERE pgmid = 'R3TR' AND object = 'SICF' AND obj_name = @lv_tadir_name.
+        IF sy-subrc <> 0 OR lv_package IS INITIAL.
+          zcl_abap_vibe_icf_response=>respond_error( io_server = io_server
+                         iv_status = 400
+                         iv_reason = 'Bad Request'
+                         iv_code = 'HTTP_PACKAGE_NOT_SUPPORTED'
+                         iv_msg = |{ lv_url } has no TADIR package metadata; maintain it in transaction SICF| ).
+          RETURN.
+        ENDIF.
+      ENDIF.
+      IF zcl_abap_vibe_icf_types=>is_local_package( lv_package ) = abap_false.
+        zcl_abap_vibe_icf_response=>respond_error( io_server = io_server
+                         iv_status = 400
+                         iv_reason = 'Bad Request'
+                         iv_code = 'HTTP_PACKAGE_NOT_SUPPORTED'
+                         iv_msg = |{ lv_url } is in package { lv_package }; HTTP services can only be written in local packages starting with $ through abap-cli, maintain transportable SICF nodes in transaction SICF| ).
+        RETURN.
+      ENDIF.
+
       MOVE-CORRESPONDING ls_serv_info-service TO ls_icfserdesc.
       CALL METHOD cl_icf_tree=>if_icf_tree~change_node
         EXPORTING
@@ -310,7 +569,7 @@ CLASS zcl_abap_vibe_icf_http IMPLEMENTATION.
           doculang   = sy-langu
           icfhandlst = lt_icfhndlist
           icfactive  = 'X'
-          package    = '$TMP'
+          package    = lv_package
           application = ''
           icfserdesc = ls_icfserdesc
         EXCEPTIONS
@@ -385,6 +644,19 @@ CLASS zcl_abap_vibe_icf_http IMPLEMENTATION.
     ENDIF.
 
     lv_alt_name = lv_node_name.
+    " New nodes default to $TMP; transportable packages are rejected because the
+    " ICF context cannot record the creation in a transport request.
+    IF lv_package IS INITIAL.
+      lv_package = '$TMP'.
+    ENDIF.
+    IF zcl_abap_vibe_icf_types=>is_local_package( lv_package ) = abap_false.
+      zcl_abap_vibe_icf_response=>respond_error( io_server = io_server
+                     iv_status = 400
+                     iv_reason = 'Bad Request'
+                     iv_code = 'HTTP_PACKAGE_NOT_SUPPORTED'
+                     iv_msg = |{ lv_url } would be created in package { lv_package }; HTTP services can only be written in local packages starting with $ through abap-cli, create transportable SICF nodes in transaction SICF| ).
+      RETURN.
+    ENDIF.
     CALL METHOD cl_icf_tree=>if_icf_tree~insert_node
       EXPORTING
         icf_name   = lv_node_name
@@ -392,7 +664,7 @@ CLASS zcl_abap_vibe_icf_http IMPLEMENTATION.
         icfdocu    = ls_insert_docu
         icfhandlst = lt_icfhndlist
         icfactive  = 'X'
-        package    = '$TMP'
+        package    = lv_package
         application = ''
         doculang   = sy-langu
       IMPORTING
@@ -443,6 +715,17 @@ CLASS zcl_abap_vibe_icf_http IMPLEMENTATION.
                     status = 'success'
                     data = VALUE #( name = lv_node_name type = 'HTTP' action = 'created' ) ) ).
   ENDMETHOD.
+
+  METHOD normalize_icf_url.
+    " Lowercase and strip trailing slashes so the canonical URL reported by
+    " get_info_from_serv can be compared with the requested one.
+    rv_url = to_lower( iv_url ).
+    WHILE strlen( rv_url ) > 1
+      AND substring( val = rv_url off = strlen( rv_url ) - 1 len = 1 ) = '/'.
+      rv_url = substring( val = rv_url off = 0 len = strlen( rv_url ) - 1 ).
+    ENDWHILE.
+  ENDMETHOD.
+
   METHOD resolve_handler_lang_version.
     " Map the handler class's ABAP language version to the abap-file-format
     " header value ('standard' | 'cloudDevelopment'). 'standard' is the default

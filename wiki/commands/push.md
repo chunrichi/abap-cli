@@ -4,7 +4,7 @@ title: abap push
 description: 推送本地 ABAP 文件到 SAP — lock → set source → syntax check → activate → unlock，支持源码对象、FUGR、textpool、DDIC/HTTP/TRAN/XSLT JSON 与 DOMA/DTEL 长文本伴生，按对象解析 transport（textpool 写受系统限制）
 tags: [abap-cli, command, push, upload, abap-file-format, ddic, docu, xslt, textpool, transport]
 created at: 2026-08-07 00:11:03
-changed at: 2026-11-01 21:30:00
+changed at: 2026-11-03 00:25:00
 ---
 
 # abap push
@@ -82,7 +82,7 @@ push 是「把本地文件写进 SAP 的**已存在**对象」，不是创建入
 
 - **ADT 源对象**（CLAS/INTF/PROG/FUGR）：对象不存在 → `OBJECT_NOT_FOUND`，`nextSteps` 引导 `abap create`（不自动创建）。
 - **DDIC**（DOMA/DTEL/TABL/STRU/ENQU/VIEW/NROB）与 **TRAN**：push 前先 ICF GET 探测存在性（`GET /ddic/<type>/<name>` / `GET /tran/<code>`，与 pull 同一端点）。对象不存在 → `OBJECT_NOT_FOUND`（`nextSteps` 引导 `abap create <TYPE> <name> --file ...`），**不再**让 ICF POST 隐式 upsert 创建。
-- **HTTP**（SICF 节点）：**明确例外，保留 push 即创建**。`abap create HTTP` 现在也要求 `--file`（032 US10 的"无 `--file` 落本地骨架"路径已按重构决策 1A 删除），所以 SICF 节点的两条建法都保留：`abap create HTTP <name> --file <path>` 走真实 create，或直接 `abap push <file>.http.json` 由 ICF POST 创建；因此 HTTP 不做存在性探测。
+- **HTTP**（SICF 节点）：**明确例外，保留 push 即创建**。`abap create HTTP` 现在也要求 `--file`（032 US10 的"无 `--file` 落本地骨架"路径已按重构决策 1A 删除），所以 SICF 节点的两条建法都保留：`abap create HTTP <name> --file <path>` 走真实 create，或直接 `abap push <file>.http.json` 由 ICF POST 创建；因此 HTTP 不做存在性探测。HTTP 写入**只支持 `$` 前缀本地包**：可传输包在本地预检即返回 `HTTP_PACKAGE_NOT_SUPPORTED`（exit 7）；pulled 文件不带 `package` 时保留节点现有的本地包，`--tr` 对 HTTP 不生效。
 
 DDIC/TRAN 的探测在 `--dry-run` 之后（plan-only 不做多余 round-trip）；探测的 not-found 之外的错误（网络/权限）按原错误码传播。
 

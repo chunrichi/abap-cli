@@ -4,7 +4,7 @@ title: abap delete
 description: "从 SAP 删除单个 ABAP 对象（lock → delete → unlock）：--type 必填消歧、--yes 显式确认、非本地包对象必须用 --tr 指定传输请求。"
 tags: [abap-cli, command, delete, adt, lock, transport, cleanup]
 created at: 2026-10-29 14:30:14
-changed at: 2026-11-02 23:25:00
+changed at: 2026-11-03 00:15:00
 ---
 
 # abap delete
@@ -23,7 +23,7 @@ abap delete --schema --json
 ## Options
 
 - `<object>`: SAP 对象名（如 `ZCL_MY_CLASS`），不是本地文件名；内部走 ADT quickSearch 解析成对象 URL。
-- `--type <type>`: **必填**。对象类型码（`CLAS` / `PROG` / `INTF` / `FUGR` / `DEVC` / `TABL` / `VIEW` / `SHLP` / `TRAN` / ... / `XSLT`），大小写不敏感。`DEVC` 走独立删除路径（包资源按名字直接寻址，不依赖 quickSearch，也不加锁）；`VIEW` / `SHLP` / `ENQU` / `NROB` 走 ICF delete（仅 `$TMP`）：VIEW/SHLP 先激活 inactive 版本再 `RS_DD_DELETE_OBJ`，ENQU 先回填本地 TADIR 再 `RS_DD_DELETE_OBJ`，NROB 清区间后 `NUMBER_RANGE_OBJECT_DELETE`。
+- `--type <type>`: **必填**。对象类型码（`CLAS` / `PROG` / `INTF` / `FUGR` / `DEVC` / `TABL` / `VIEW` / `SHLP` / `TRAN` / `HTTP` / ... / `XSLT`），大小写不敏感。`DEVC` 走独立删除路径（包资源按名字直接寻址，不依赖 quickSearch，也不加锁）；`VIEW` / `SHLP` / `ENQU` / `NROB` / `HTTP` 走 ICF delete（本地 `$` 前缀包）：VIEW/SHLP 先激活 inactive 版本再 `RS_DD_DELETE_OBJ`，ENQU 先回填本地 TADIR 再 `RS_DD_DELETE_OBJ`，NROB 清区间后 `NUMBER_RANGE_OBJECT_DELETE`，HTTP 用 `cl_icf_tree` 删 SICF 节点（根节点 / 有子节点 / 可传输节点拒绝）。
 - `--tr <request>`: 传输请求号。本地包对象可省略；其它包必填。
 - `--yes`: **必填**。显式确认删除；无 TTY 时缺失直接报 `USAGE`。
 - `--schema`: 打印本命令参数 schema 并退出，不调用 SAP。
@@ -62,6 +62,14 @@ abap delete ZMY_XSLT --type XSLT --yes
 
 # 可传输包里的转换程序
 abap delete ZMY_XSLT --type XSLT --tr NDK900123 --yes
+```
+
+```bash
+# $TMP 里的 SICF 节点（HTTP）；根节点 / 有子节点 / 可传输节点请在 SICF 删除
+abap delete ZMY_SERVICE --type HTTP --yes --json
+
+# 也可以直接给 SICF 路径
+abap delete /sap/zmy_service --type HTTP --yes --json
 ```
 
 ## Expected Output
@@ -115,6 +123,12 @@ lock/unlock）：
 | `XSLT_TRANSPORT_REQUIRED` | VALIDATION_ERROR / 7 | 非 `$TMP` XSLT 缺 transportRequest | 补 `--tr` |
 | `LOCK_FAILED` | LOCKED / 9 | SAP 没返回 `LOCK_HANDLE`，通常对象被他人锁住 | 让对方释放锁，或 SE11 检查锁条目后重试 |
 | `DELETE_FAILED` | SAP_ERROR / 6 | 加锁后的删除失败（请求已关闭、权限不足等） | 看 `error.details.sapErrorBody` 的 SAP 原文 |
+| `HTTP_SERVICE_INVALID` | VALIDATION_ERROR / 7 | HTTP 名称/路径非法：节点名超过 15 字符或含空格 | 用 15 字符以内的 SICF 节点名，或完整 `/` 路径 |
+| `HTTP_DELETE_UNSUPPORTED` | VALIDATION_ERROR / 7 | 可传输节点 / 无 TADIR 包元数据 / 别名或非原始系统节点 | 在事务 SICF 删除，以便删除记录进传输请求 |
+| `HTTP_SERVICE_HAS_CHILDREN` | VALIDATION_ERROR / 7 | 节点仍有子节点 | 先删除子节点再删父节点 |
+| `HTTP_SERVICE_ROOT_NODE` | VALIDATION_ERROR / 7 | 目标是 SICF 根节点 | 根节点只能在 SICF 中删除 |
+| `HTTP_SERVICE_NOT_AUTHORIZED` | AUTH_ERROR / 5 | SICF 删除权限不足 | 补 S_ICF / 开发权限后重试 |
+| `HTTP_DELETE_FAILED` | SAP_ERROR / 6 | ICF 删除失败（传输记录、TADIR 或数据库错误） | 看 `error.details` 的 SAP 原文 |
 
 ## 真机证据
 
@@ -134,7 +148,8 @@ lock/unlock）：
 
 - **本地文件不会删**：命令只调 SAP 的 delete 端点。删完记得清理 `src/` 下对应文件，否则后续 `push` 会把对象重新建出来。
 - **本地包判定依赖搜索结果的包名**：ADT 搜索没返回 `packageName` 时按非本地包处理并强制要求 `--tr`，不代表对象真的在传输包里。
-- **ICF 路由的删除按 `$` 前缀判定本地包**：`VIEW` / `SHLP` / `TRAN` / `ENQU` / `NROB` 的 ICF handler 接受 `$` 开头本地包（旧 ICF 部署只认 `$TMP`，升级后执行一次 `abap deploy`）；非本地包删除返回 `*_DELETE_UNSUPPORTED`，请在 SE11 操作。
+- **ICF 路由的删除按 `$` 前缀判定本地包**：`VIEW` / `SHLP` / `TRAN` / `ENQU` / `NROB` / `HTTP` 的 ICF handler 接受 `$` 开头本地包（旧 ICF 部署只认 `$TMP`，升级后执行一次 `abap deploy`）；非本地包删除返回 `*_DELETE_UNSUPPORTED`，请在 SE11 / SICF 操作。
+- **HTTP 按 SICF 树删除，不是 ADT**：`DELETE /http/<name>` 只删本地包节点，不做递归——根节点、仍有子节点的节点、可传输节点、别名/非原始系统节点都会被明确拒绝。删除前 handler 会先清 `ICFAPPLCUST` 应用定制行（SAP API 不会自动清），再调用 `cl_icf_tree` 的 `delete_node`；TADIR 行随节点一并删除。
 - **`--tr` 不能随便传**：必须是对象所属的、打开可修改的请求；传不相关或已关闭的请求会被 SAP 拒绝，最终表现为 `DELETE_FAILED`。
 - **`lockReleased: false`**：删除可能已成功但解锁失败；锁可从 SE11 → Utilities → Lock entries 手工清理。DEVC 恒为 `false`（包删除根本不加锁）。
 - **DEVC 不加锁**：先 lock 再 `DELETE /sap/bc/adt/packages/<name>` 会被 SAP 以「包已锁定」拒绝。命令对包直接 DELETE（transportable 包带 `corrNr`）。

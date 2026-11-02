@@ -174,6 +174,16 @@ CLASS zcl_abap_vibe_icf_ddic DEFINITION PUBLIC FINAL CREATE PUBLIC.
     CLASS-METHODS last_message
       RETURNING VALUE(rv_message) TYPE string.
 
+    " ICF DDIC creation paths (DDIF_ENQU_PUT, NUMBER_RANGE_OBJECT_UPDATE plus
+    " the direct TNRO insert) do not write a TADIR row. Write the local $TMP
+    " row explicitly so the object is discoverable and delete never has to
+    " backfill it. Idempotent: an existing local row counts as success; an
+    " existing non-local row is rejected.
+    CLASS-METHODS ensure_local_tadir
+      IMPORTING iv_object     TYPE tadir-object
+                iv_name       TYPE tadir-obj_name
+      RETURNING VALUE(rv_ok)  TYPE abap_bool.
+
     CLASS-METHODS language_code_from_key
       IMPORTING iv_key         TYPE sy-langu
       RETURNING VALUE(rv_code) TYPE string.
@@ -1680,6 +1690,17 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
       RETURN.
     ENDIF.
 
+    " DDIF_ENQU_PUT leaves TADIR untouched, so record the local row now:
+    " without it SE11 search cannot find the object and delete would have to
+    " backfill the row before RS_DD_DELETE_OBJ can run.
+    IF ensure_local_tadir( iv_object = 'ENQU'
+                           iv_name   = CONV tadir-obj_name( lv_name ) ) = abap_false.
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+        error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code    = 'ENQU_CREATE_FAILED'
+                                     message = |ENQU { lv_name } was created but its local $TMP TADIR entry could not be written; re-run create to repair the metadata or delete the lock object in SE11| ) ).
+      RETURN.
+    ENDIF.
+
     es_payload = VALUE zcl_abap_vibe_icf_types=>ty_ddic_create( status = 'success'
                                        data   = VALUE zcl_abap_vibe_icf_types=>ty_ddic_create_data( name   = lv_name
                                                                            type   = 'ENQU'
@@ -1944,6 +1965,17 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
       RETURN.
     ENDIF.
     COMMIT WORK AND WAIT.
+
+    " The direct TNRO/TNROT inserts bypass SNRO, so record the local TADIR row
+    " here as well; otherwise the object is invisible to where-used/search and
+    " delete has to fabricate the package metadata.
+    IF ensure_local_tadir( iv_object = 'NROB'
+                           iv_name   = CONV tadir-obj_name( lv_name ) ) = abap_false.
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+        error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code    = 'NROB_CREATE_FAILED'
+                                     message = |NROB { lv_name } was created but its local $TMP TADIR entry could not be written; re-run create to repair the metadata or delete the number range object in SNRO| ) ).
+      RETURN.
+    ENDIF.
 
     es_payload = VALUE zcl_abap_vibe_icf_types=>ty_ddic_create( status = 'success'
                                        data   = VALUE zcl_abap_vibe_icf_types=>ty_ddic_create_data( name   = lv_name
@@ -2305,9 +2337,13 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
     FIND FIRST OCCURRENCE OF REGEX '"description"\s*:\s*"([^"]*)"' IN iv_payload IGNORING CASE
       SUBMATCHES lv_description.
     IF lv_row_type IS INITIAL.
+      " Inline row structures (lineType.rowStructure) would need the component
+      " list written to DD42V/DD43V, which this ICF write path does not do.
+      " Reject explicitly instead of letting DDIF_TTYP_PUT fail with a generic
+      " rc=4. The full structured-row write stays a later, separate change.
       ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
-                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'VALIDATION_ERROR'
-                                                              message = |TTYP { iv_name } payload has no lineType.rowType| ) ).
+                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'TTYP_ROW_STRUCTURE_UNSUPPORTED'
+                                                              message = |TTYP { iv_name } uses an inline lineType.rowStructure, which the ICF write path cannot persist; use a repository row type (lineType.rowType) or maintain the table type in SE11| ) ).
       RETURN.
     ENDIF.
 
@@ -3116,6 +3152,33 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
     " The NR delete FM can leave the TADIR row behind; drop the local row so
     " repeated deletes and transports do not see an orphan.
     DELETE FROM tadir WHERE pgmid = 'R3TR' AND object = 'NROB' AND obj_name = @iv_name.
+  ENDMETHOD.
+
+  METHOD ensure_local_tadir.
+    " Local objects live in $-prefixed packages and never enter a transport;
+    " the ICF context cannot open the CTS dialog, so anything else is out of
+    " scope here (SE11 / SICF stays canonical).
+    DATA lv_devclass TYPE devclass.
+    CLEAR rv_ok.
+    SELECT SINGLE devclass FROM tadir INTO @lv_devclass
+      WHERE pgmid = 'R3TR' AND object = @iv_object AND obj_name = @iv_name.
+    IF sy-subrc = 0.
+      rv_ok = zcl_abap_vibe_icf_types=>is_local_package( lv_devclass ).
+      RETURN.
+    ENDIF.
+    CALL FUNCTION 'TR_TADIR_INTERFACE'
+      EXPORTING
+        wi_test_modus       = abap_false
+        wi_tadir_pgmid      = 'R3TR'
+        wi_tadir_object     = iv_object
+        wi_tadir_obj_name   = iv_name
+        wi_tadir_author     = sy-uname
+        wi_tadir_devclass   = '$TMP'
+        wi_tadir_masterlang = sy-langu
+        wi_tadir_srcsystem  = CONV srcsystem( sy-sysid )
+      EXCEPTIONS
+        OTHERS              = 1.
+    rv_ok = boolc( sy-subrc = 0 ).
   ENDMETHOD.
 
   METHOD last_message.

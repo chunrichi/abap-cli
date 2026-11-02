@@ -11,12 +11,11 @@
  * Supported types: anything reachable by `client.deleteObject` (CLAS, INTF,
  * PROG, FUGR, FUGR/FF, TABL, STRU, DOMA, DTEL, MSAG, TTYP, DDLS, DDLX, BDEF,
  * DCLS, SRVD, SRVB). DEVC takes the dedicated package branch (`delete-devc.ts`
- * — packages are deleted without a lock); TRAN, VIEW, SHLP, ENQU and NROB go
- * through the bundled ICF service (`DELETE /tran/<tcode>` /
- * `/ddic/{view,shlp,enqu,nrob}/<name>`; the DDIC ones are `$TMP`-only).
- * HTTP (SICF node) has no delete path: ADT does not index SICF nodes, so HTTP
- * fails at resolve (`OBJECT_NOT_FOUND`). Type codes without an ADT delete
- * endpoint surface as `TYPE_NOT_SUPPORTED`.
+ * — packages are deleted without a lock); TRAN, VIEW, SHLP, ENQU, NROB and
+ * HTTP go through the bundled ICF service (`DELETE /tran/<tcode>` /
+ * `/ddic/{view,shlp,enqu,nrob}/<name>` / `/http/<name>`; the DDIC and HTTP
+ * ones are local-package-only). Type codes without an ADT delete endpoint
+ * surface as `TYPE_NOT_SUPPORTED`.
  */
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { IcfClient } from '../../clients/icf-client.js';
@@ -30,6 +29,7 @@ import { runDeleteView } from './delete-view.js';
 import { runDeleteShlp } from './delete-shlp.js';
 import { runDeleteEnqu } from './delete-enqu.js';
 import { runDeleteNrob } from './delete-nrob.js';
+import { runDeleteHttp } from './delete-http.js';
 
 export interface DeleteOptions {
   /** Object type code (CLAS / PROG / ...). Required — `delete` without a type
@@ -104,6 +104,11 @@ export async function runDelete(objectName: string, opts: DeleteOptions): Promis
   }
   if (typeUpper === 'NROB') {
     return runDeleteNrob(objectName, opts);
+  }
+  // HTTP (SICF node) is not an ADT object: deletion runs through the bundled
+  // ICF service, which uses `cl_icf_tree` and accepts local nodes only.
+  if (typeUpper === 'HTTP') {
+    return runDeleteHttp(objectName, opts);
   }
   // TRAN (SE93 transaction codes) has no ADT delete endpoint: a transaction is
   // repository metadata spread over TSTC/TSTCT/TSTCP/TSTCC/TSTCA plus TADIR, so

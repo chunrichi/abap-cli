@@ -11,10 +11,17 @@
 - **BDEF 创建**：`abap create BDEF <name> --file <name>.bdef.json --package <pkg>` 现在可用；命令读取同目录的 `.bdef.abdl` 源码，创建行为定义后写入并激活。源码必须指向已存在的 root entity，或引用可用的 unmanaged 实现类。
 - **ENQU / NROB 删除**：`abap delete <name> --type ENQU|NROB` 通过内置 ICF 服务删除 `$TMP` 本地锁对象 / 编号范围对象；可传输对象仍请在 SE11 / SNRO 删除，以便删除被记录到传输请求。
 - **SRVB 创建/发布**：`abap create SRVB <name> --file <name>.srvb.json --package <pkg>` 从 AFF 元数据创建并激活服务绑定；加 `--publish` 会在激活后调用 ADT publish job。发布是否成功取决于系统是否允许本地发布或是否需要 transport request（不允许时 SAP 返回明确错误，binding 仍已创建）；push/update 不支持。
+- **HTTP（SICF 节点）删除**：`abap delete <name> --type HTTP` 删除 `$` 前缀本地包里的 SICF 节点，节点不存在、根节点、仍有子节点、可传输节点与权限不足分别返回明确错误；可传输节点仍请在事务 SICF 删除，以便删除被记录到传输请求。
+- **本地 ENQU / NROB 创建写入本地元数据**：`$` 前缀包里的锁对象 / 编号范围对象创建后即可在 SE11 / where-used 中检索到，删除时不再需要临时补元数据。
 
 ### Fixed
 
 - **BDEF 拉取路径**：`abap pull <name> --type BDEF` 改走 ADT 的 behavior-definition 资源（旧路径在 S/4HANA 上返回 404）；blueSource 的相对 `source/main` URI 现在会正确绝对化。
+- **HTTP 拉取结果可直接推送**：`abap pull --type HTTP` 写出的文件是严格 AFF 形态（对象名在文件名里，不在 JSON 里），现在 `push` / `create` 会从文件名或命令参数补上对象名，pull → 修改 → push 不再报缺少 `name`。
+
+### Changed
+
+- **HTTP（SICF）写入仅限本地包**：`create` / `push` 不再接受可传输包（此前会忽略包、静默把节点建到 `$TMP`）；可传输 SICF 节点请在事务 SICF 维护。`--tr` 对 HTTP 写入不再生效。
 
 ## [2.0.1] - 2026-11-02
 

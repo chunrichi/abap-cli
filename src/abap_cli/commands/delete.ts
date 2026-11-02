@@ -63,6 +63,12 @@ export const SCHEMA = {
     { code: 'DELETE_FAILED', category: 'SAP_ERROR', exitCode: 6 },
     { code: 'XSLT_DELETE_FAILED', category: 'SAP_ERROR', exitCode: 6 },
     { code: 'XSLT_TRANSPORT_REQUIRED', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'HTTP_SERVICE_INVALID', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'HTTP_SERVICE_HAS_CHILDREN', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'HTTP_SERVICE_ROOT_NODE', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'HTTP_SERVICE_NOT_AUTHORIZED', category: 'AUTH_ERROR', exitCode: 5 },
+    { code: 'HTTP_DELETE_UNSUPPORTED', category: 'VALIDATION_ERROR', exitCode: 7 },
+    { code: 'HTTP_DELETE_FAILED', category: 'SAP_ERROR', exitCode: 6 },
   ],
 };
 

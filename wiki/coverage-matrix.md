@@ -37,9 +37,9 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | 创建/修改 DDIC 数据元素（DTEL） | `create / pull / push DTEL` | ✅ | ICF |
 | 创建/修改透明表（TABL） | `create / pull / push TABL` | ✅ | 三件套 + ICF；AFF 不覆盖索引 |
 | 创建/修改结构（STRU） | `create / pull / push STRU` | ✅ | 三件套 + ICF |
-| 创建/修改锁对象（ENQU） | `create / pull / push / delete ENQU` | ✅ | ICF；`create --file`；delete 仅 `$TMP`（缺失 TADIR 时回填后再 `RS_DD_DELETE_OBJ`）；真机 create/delete 验证 |
-| 创建/修改编号范围对象（NROB） | `create / pull / push / delete NROB` | ✅ | pull 主 ADT + ICF 兜底；`create --file`；delete 仅 `$TMP`（清区间 + `NUMBER_RANGE_OBJECT_DELETE ohne_tp_flag`）；真机 create/delete 验证 |
-| 创建/修改 SICF 节点（HTTP） | `create / pull / push HTTP` | ✅ | ICF |
+| 创建/修改锁对象（ENQU） | `create / pull / push / delete ENQU` | ✅ | ICF；`create --file` 并写本地 TADIR；delete 仅 `$TMP`（TADIR 缺失时回填后再 `RS_DD_DELETE_OBJ`）；真机 create/delete 验证 |
+| 创建/修改编号范围对象（NROB） | `create / pull / push / delete NROB` | ✅ | pull 主 ADT + ICF 兜底；`create --file` 并写本地 TADIR；delete 仅 `$TMP`（清区间 + `NUMBER_RANGE_OBJECT_DELETE ohne_tp_flag`）；真机 create/delete 验证 |
+| 创建/修改 SICF 节点（HTTP） | `create / pull / push / delete HTTP` | ✅ | ICF `/http`；`create --file`；delete 仅 `$` 前缀本地包，拒根节点/有子节点/可传输节点；真机 create/delete 验证 |
 | 创建/修改事务码（SE93 / TRAN） | `create / pull / push / delete TRAN` | ✅ | ICF `/tran` GET/POST/PUT/DELETE；dialog/report/parameter/variant，OO 明确拒绝；真机 23/23 TC |
 | 创建/修改转换程序（XSLT） | `create / pull / push / delete XSLT` | ✅ | ICF `/xslt` + `CL_O2_API_XSLTDESC`；AFF 两件套 `.xslt.json` + `.xslt.xml`；更新=原地更新并保留版本历史；真机 18/18 TC |
 | Table Type（TTYP） | `create / pull / push TTYP` | ✅ | ADT 主通道；ECC 自动 ICF 兜底 |
@@ -178,7 +178,7 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | 检查 ICF 状态 | `deploy status` | ✅ | 版本 + 已部署 |
 | DDIC CRUD（DOMA/DTEL/TABL/STRU/ENQU/NROB） | `pull / create / push / delete` | ✅ | ICF；`/ddic/<type>`；ENQU/NROB delete 仅 `$TMP` |
 | 双通道 DDIC（TTYP/MSAG） | `pull / create / push` | ✅ | ADT 主 + ECC ICF 兜底 |
-| 解析 SICF 节点（HTTP 类型） | `pull / create / push HTTP` | ✅ | ICF |
+| 解析 SICF 节点（HTTP 类型） | `pull / create / push / delete HTTP` | ✅ | ICF；删除仅本地包（见 §1） |
 | 解析事务码（TRAN 类型） | `pull / create / push / delete TRAN` | ✅ | 读写闭环；删除仅 `$TMP`（见 §1） |
 | 数据查询（SELECT） | `select` / `fields` | ✅ | ICF |
 | 报表运行 | `run-report` | ✅ | ICF；经典 list，5000 行/200k 字符 |

@@ -4,7 +4,7 @@ title: abap create
 description: 在 SAP 创建新对象并激活 — 源对象（CLAS/INTF/PROG/FUGR，ADT REST）、DDIC（DOMA/DTEL/TABL/STRU/ENQU/VIEW/SHLP/NROB，--file 走 ICF）、HTTP/SICF 节点、事务码、TTYP/MSAG/DDLS 及 CDS/RAP 配套对象；FUGR 配 --func 可在既有函数组内新建函数模块（FUGR/FF）；--no-activate / --template / --no-pull / --check-only / --audit；--schema 提供 agent 参数自省；create local 为离线草稿（仅 4 类源对象）
 tags: [abap-cli, command, create, clas, intf, prog, fugr, fugr-ff, doma, dtel, tabl, stru, ddic, icf, template, schema]
 created at: 2026-08-07 00:00:00
-changed at: 2026-11-01 21:25:00
+changed at: 2026-11-03 00:25:00
 ---
 
 # abap create
@@ -28,7 +28,7 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 - `<name>`: 对象名（自动转大写；命名空间名如 `/UI2/CL_JSON` 在磁盘上用 AFF 括号 token `(ui2)cl_json`）。本地预校验：≤30 字符、仅 `A-Z 0-9 _`、命名空间形如 `/NS/NAME`（NS ≤10，总长 ≤30），违规 → `VALIDATION_ERROR`（exit 7）
 - `--package <package>`: 目标 SAP 包（必填）
 - `--description <desc>`: 对象描述（必填；有 `--file` 时可选，由 JSON 提供）
-- `--tr <transport>`: 传输请求号；缺省时 `resolveTransport` 解析（非本地包下 DDIC 必须显式给出；本地包 = `$` 前缀，如 `$TMP` / `$CRW`）
+- `--tr <transport>`: 传输请求号；缺省时 `resolveTransport` 解析（非本地包下 DDIC 必须显式给出；本地包 = `$` 前缀，如 `$TMP` / `$CRW`）。HTTP（SICF）写入只支持 `$` 前缀本地包：可传输包会在调用 SAP 前返回 `HTTP_PACKAGE_NOT_SUPPORTED`（exit 7），`--tr` 对 HTTP 不生效
 - `--no-activate`: 创建并写 skeleton 但不激活
 - `--template <template>`: skeleton 模板（`minimal` / `public-method` / `report` / `selection-screen`…）；未知模板 → `INVALID_ARGUMENT`
 - `--no-pull`: 跳过 create-then-pull 本地副本（默认拉取）

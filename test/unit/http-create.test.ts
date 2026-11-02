@@ -79,6 +79,31 @@ describe('022 create HTTP service', () => {
     });
   });
 
+  it('creates from a strictly AFF-shaped file that has no name envelope', async () => {
+    // `abap pull` writes the AFF document without the CLI `name` envelope (the
+    // file name carries the object name), so such a file must be a valid
+    // create template.
+    fs.writeFileSync(path.join(cwd, 'src/zhttp_test.http.json'), JSON.stringify({
+      formatVersion: '1',
+      header: { description: 'Test HTTP service', originalLanguage: 'EN' },
+      generalInformation: { handlerClass: 'ZCL_HTTP_HANDLER', servicePath: '/sap/zhttp_test' },
+    }, null, 2));
+    const program = makeProgram();
+    registerCreateCommand(program);
+    const res = await runCommand(program, [
+      'create', 'HTTP', 'ZHTTP_TEST',
+      '--file', 'src/zhttp_test.http.json',
+      '--package', '$TMP',
+      '--yes', '--json',
+    ], { cwd });
+    expect(res.exitCode).toBeUndefined();
+    expect(icfPostHttp).toHaveBeenCalledWith('ZHTTP_TEST', expect.objectContaining({
+      formatVersion: '1',
+      generalInformation: { handlerClass: 'ZCL_HTTP_HANDLER', url: '/sap/zhttp_test' },
+      package: '$TMP',
+    }));
+  });
+
   it('command-line --description overrides file description', async () => {
     writeHttpJsonFile('ZHTTP_OVR');
     const program = makeProgram();
@@ -124,7 +149,7 @@ describe('022 create HTTP service', () => {
     expect(icfPostHttp).not.toHaveBeenCalled();
   });
 
-  it('reports INVALID_ARGUMENT for non-$TMP package without --tr', async () => {
+  it('rejects a transportable package before calling SAP', async () => {
     writeHttpJsonFile('ZHTTP_NOTMP');
     const program = makeProgram();
     registerCreateCommand(program);
@@ -137,8 +162,8 @@ describe('022 create HTTP service', () => {
     expect(res.exitCode).toBe(7);
     expect(icfPostHttp).not.toHaveBeenCalled();
     const out = JSON.parse(res.stderr);
-    expect(out.error.code).toBe('VALIDATION_ERROR');
-    expect(out.error.message).toContain('transportRequest');
+    expect(out.error.code).toBe('HTTP_PACKAGE_NOT_SUPPORTED');
+    expect(out.error.message).toContain('local packages');
   });
 
   it('ICF failure maps to HTTP_CREATE_FAILED (exit 6)', async () => {

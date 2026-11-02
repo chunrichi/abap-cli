@@ -206,7 +206,10 @@ async function readValidatedHttp(file: string, objectName: string) {
     const m = error instanceof Error ? error.message : String(error);
     throw new CliError('INVALID_ARGUMENT', `Cannot read HTTP service file ${outFile}: ${m}`, { file: outFile });
   }
-  const errors = validateHttpObject(local);
+  // A pulled `<name>.http.json` is strictly AFF-shaped: the object name lives
+  // in the file name, not in the document. The legacy name/namespace guard
+  // still needs it, so inject the resolved name for validation only.
+  const errors = validateHttpObject({ ...local, name: objectName.toUpperCase() });
   if (errors.length > 0) {
     throw new CliError('VALIDATION_ERROR', `Invalid HTTP service definition in ${outFile}: ${errors.join('; ')}`, {
       file: outFile,
@@ -269,16 +272,25 @@ export async function pushHttpFile(
   const local = await readValidatedHttp(file, resolved.objectName);
 
   const wire = httpLocalToWire(local);
-  // Transport: local packages are transport-free (--tr / config / the file's
-  // recorded request are ignored); otherwise --tr > config > recorded > user's
-  // open request.
-  const packageName = (wire.package ?? '').toUpperCase();
-  let transport = '';
-  if (!isLocalPackageName(packageName)) {
-    transport = opts.tr ?? client.getConfig().transport ?? local.transportRequest ?? '';
-    if (!transport) transport = await resolveTransport(client, opts.tr, client.getConfig().transport);
+  // SICF node writes only work in local ($-prefixed) packages: the ICF context
+  // cannot record the change in a transport request, so a transportable package
+  // is rejected before the round-trip. A pulled AFF file carries no package —
+  // the handler then keeps the node's existing local package.
+  const packageName = (wire.package ?? '').trim().toUpperCase();
+  if (packageName !== '' && !isLocalPackageName(packageName)) {
+    throw new CliError('HTTP_PACKAGE_NOT_SUPPORTED', `HTTP services can only be written in local packages starting with $ (got ${packageName}); maintain transportable SICF nodes in transaction SICF`, {
+      object: resolved.objectName,
+      type: 'HTTP',
+      file,
+      nextSteps: [
+        'Use a local package such as $TMP for scratch SICF nodes.',
+        'Maintain transportable SICF nodes in transaction SICF so the change is recorded in a transport request.',
+      ],
+    });
   }
-  wire.transportRequest = transport || undefined;
+  // Local objects never carry a transport request.
+  wire.transportRequest = undefined;
+  const transport = '';
 
   const icf = await IcfClient.create();
   const resp = await icf.postHttp<{ name: string; type: string; action: 'created' | 'updated' }>(resolved.objectName, wire);

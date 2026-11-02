@@ -28,7 +28,7 @@ abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **25 个
 | `VIEW` | 数据库视图 | ICF | `--file`（`view-v1.json`，本地扩展） | ✅ | ✅ | ✅（仅 `$TMP`） | ❌ | `<name>.view.json` |
 | `SHLP` | 搜索帮助 | ICF | `--file`（`shlp-v1.json`，本地扩展；elementary/collective） | ✅ | ✅ | ✅（仅 `$TMP`） | ❌ | `<name>.shlp.json` |
 | `NROB` | 编号范围对象 | ICF（pull 主 ADT + ICF 兜底） | `--file` | ✅ | ✅ | ✅（仅 `$TMP`） | ❌ | `<name>.nrob.json` |
-| `HTTP` | **ICF / SICF 节点** | ICF | `--file` | ✅ | ✅ | ❌（SICF 中删除） | ❌ | `<name>.http.json` |
+| `HTTP` | **ICF / SICF 节点** | ICF | `--file`（仅 `$` 前缀本地包） | ✅ | ✅（仅 `$` 前缀本地包） | ✅（仅 `$` 前缀本地包；根节点/有子节点/可传输节点除外） | ❌ | `<name>.http.json` |
 | `TRAN` | 事务码 (SE93) | ICF | `--file` | ✅ | ✅ | ✅（仅 `$TMP`） | ❌ | `<code>.tran.json` |
 | `XSLT` | 转换程序（XSLT Program） | ICF | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.xslt.{json,xml}` 两件套 |
 | `TTYP` | 表类型 | auto（ADT 主 / ECC ICF 兜底） | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.ttyp.json` + 可选 `<name>.type.abap` |
@@ -60,17 +60,20 @@ abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **25 个
 
 > **类型码是 `HTTP`，它就是 SICF 事务里的 ICF 服务节点**。旧版 `SICF` 别名已在 1.0.0 删除（见 CHANGELOG 的 Removed 段）：`--type SICF` / `create SICF` 不再自动映射为 `HTTP`，会得到未知类型错误。新脚本请直接写 `HTTP`。
 
-`HTTP` 类型可读可写：handler class、URL、描述、父节点校验。
+`HTTP` 类型可读可写：handler class、URL、描述、父节点校验。写入（create / push / delete）仅支持 `$` 前缀本地包——内置 ICF 服务无法把变更记录进传输请求；可传输 SICF 节点请在事务 SICF 维护，CLI 只读查看。
 
 ```bash
-# 拉一个已有 SICF 节点
+# 拉一个已有 SICF 节点（可传输节点也可以，用于只读查看）
 abap pull ZMY_SERVICE --type HTTP --json
 
-# 创建（必须 --file，走真实 SAP）
-abap create HTTP ZMY_SERVICE --file src/zmy_service.http.json --package $TMP --description "My service"
+# 创建（必须 --file，走真实 SAP；只支持本地包）
+abap create HTTP ZMY_SERVICE --file src/zmy_service.http.json --package '$TMP' --description "My service"
 
-# 改完推回
-abap push src/zmy_service.http.json --tr <TR>
+# 改完推回（pulled 文件不带 package 时保留节点现有的本地包）
+abap push src/zmy_service.http.json --yes
+
+# 删除本地 SICF 节点（根节点 / 有子节点 / 可传输节点请在 SICF 删除）
+abap delete ZMY_SERVICE --type HTTP --yes
 ```
 
 `.http.json` 遵循 abap-file-format（`http-v1.json`）的嵌套结构，同时也接受扁平写法：

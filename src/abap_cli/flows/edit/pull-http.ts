@@ -14,7 +14,24 @@ import type { PullOptions, PullResult } from './pull-shared.js';
 
 export async function runPullHttp(objectName: string, opts: PullOptions): Promise<PullResult> {
   const icf = await IcfClient.create();
-  const resp = await icf.getHttp<HttpWirePayload>(objectName);
+  let resp;
+  try {
+    resp = await icf.getHttp<HttpWirePayload>(objectName);
+  } catch (error: unknown) {
+    // A 404 SICF answer surfaces as a CliError from the ICF client; keep the
+    // generic not-found contract used by every other pull flow.
+    if (error instanceof CliError && error.code === 'HTTP_OBJECT_NOT_FOUND') {
+      throw new CliError('OBJECT_NOT_FOUND', `HTTP ${objectName} does not exist`, {
+        object: objectName,
+        type: 'HTTP',
+        nextSteps: [
+          'Verify the HTTP service exists in the target system.',
+          'Run `abap search <name>` to confirm the object name.',
+        ],
+      });
+    }
+    throw error;
+  }
   if (resp.status !== 'success' || !resp.data) {
     const rawCode = resp.error?.code ?? 'SAP_ERROR';
     const code: ErrorCode = rawCode === 'HTTP_OBJECT_NOT_FOUND' ? 'OBJECT_NOT_FOUND' : (rawCode as ErrorCode);

@@ -58,23 +58,34 @@ function writeHttpJson(pkg = 'ZPKG', extra: Record<string, unknown> = {}) {
 }
 
 describe('022 abap push HTTP service (.json via ICF)', () => {
-  it('pushes a .http.json via POST /http/<name> with the resolved transport', async () => {
-    writeHttpJson('ZPKG');
+  it('pushes a .http.json via POST /http/<name> for a local package', async () => {
+    writeHttpJson('$TMP');
     const program = makeProgram();
     registerPushCommand(program);
-    const res = await runCommand(program, ['push', 'src/zhttp_test.http.json', '--tr', 'TRN001', '--yes', '--json'], { cwd });
+    const res = await runCommand(program, ['push', 'src/zhttp_test.http.json', '--yes', '--json'], { cwd });
     expect(res.exitCode).toBeUndefined();
     expect(icfPostHttp).toHaveBeenCalledWith('ZHTTP_TEST', expect.objectContaining({
       name: 'ZHTTP_TEST',
       formatVersion: '1',
       header: { description: 'Test HTTP service', originalLanguage: 'EN' },
       generalInformation: { handlerClass: 'ZCL_HTTP_HANDLER', url: '/sap/zhttp_test' },
-      transportRequest: 'TRN001',
+      package: '$TMP',
+      transportRequest: undefined,
     }));
     const out = JSON.parse(res.stdout);
     expect(out.data.results[0].status).toBe('written');
     expect(out.data.results[0].stage).toBe('ddic-icf');
-    expect(out.data.results[0].transport).toBe('TRN001');
+    expect(out.data.results[0].transport).toBe('');
+  });
+
+  it('rejects a transportable package before calling SAP', async () => {
+    writeHttpJson('ZPKG');
+    const program = makeProgram();
+    registerPushCommand(program);
+    const res = await runCommand(program, ['push', 'src/zhttp_test.http.json', '--tr', 'TRN001', '--yes', '--json'], { cwd });
+    expect(res.exitCode).toBe(7);
+    expect(icfPostHttp).not.toHaveBeenCalled();
+    expect(JSON.parse(res.stderr).error.code).toBe('HTTP_PACKAGE_NOT_SUPPORTED');
   });
 
   it('pushes a $TMP HTTP service with no transport and no --tr', async () => {
@@ -90,6 +101,25 @@ describe('022 abap push HTTP service (.json via ICF)', () => {
     const out = JSON.parse(res.stdout);
     expect(out.data.results[0].status).toBe('written');
     expect(out.data.results[0].transport).toBe('');
+  });
+
+  it('pushes a pulled AFF-shaped file that has no name envelope', async () => {
+    // `abap pull` keeps the local file strictly AFF-shaped, so push must take
+    // the object name from the file name instead of requiring a `name` field.
+    fs.writeFileSync(path.join(cwd, 'src/zhttp_test.http.json'), JSON.stringify({
+      formatVersion: '1',
+      header: { description: 'Test HTTP service', originalLanguage: 'EN' },
+      generalInformation: { handlerClass: 'ZCL_HTTP_HANDLER', servicePath: '/sap/zhttp_test' },
+      package: '$TMP',
+    }, null, 2));
+    const program = makeProgram();
+    registerPushCommand(program);
+    const res = await runCommand(program, ['push', 'src/zhttp_test.http.json', '--yes', '--json'], { cwd });
+    expect(res.exitCode).toBeUndefined();
+    expect(icfPostHttp).toHaveBeenCalledWith('ZHTTP_TEST', expect.objectContaining({
+      generalInformation: { handlerClass: 'ZCL_HTTP_HANDLER', url: '/sap/zhttp_test' },
+    }));
+    expect(JSON.parse(res.stdout).data.results[0].status).toBe('written');
   });
 
   it('rejects --check-only for HTTP files', async () => {

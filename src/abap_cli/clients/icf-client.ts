@@ -102,6 +102,11 @@ export class IcfClient {
     return this.get(`/http/${encodeURIComponent(name)}`);
   }
 
+  /** DELETE /http/<name> — delete a local SICF node. */
+  async deleteHttp<T>(name: string, body?: unknown): Promise<IcfResponse<T>> {
+    return this.request('delete', `/http/${encodeURIComponent(name)}`, body);
+  }
+
   /** POST /tran/<tcode> — create/overwrite a transaction code (SE93). */
   async postTran<T>(tcode: string, body: unknown): Promise<IcfResponse<T>> {
     return this.post(`/tran/${encodeURIComponent(tcode)}`, body);

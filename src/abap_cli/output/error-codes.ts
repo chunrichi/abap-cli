@@ -91,7 +91,14 @@ export type ErrorCode =
   | 'QUERY_FAILED'             // ICF /data/query — runtime dynamic SQL error (SAP_ERROR)
     // HTTP service (SICF node) error codes
     | 'HTTP_CREATE_FAILED'       // ICF /http/<name> POST failure (SAP_ERROR)
-    | 'HTTP_OBJECT_NOT_FOUND'    // ICF /http/<name> GET 404 (NOT_FOUND)
+    | 'HTTP_OBJECT_NOT_FOUND'    // ICF /http/<name> GET/DELETE 404 (NOT_FOUND)
+    | 'HTTP_SERVICE_INVALID'     // malformed /http path or SICF name (VALIDATION_ERROR)
+    | 'HTTP_PACKAGE_NOT_SUPPORTED' // create/push refused: transportable SICF package (VALIDATION_ERROR)
+    | 'HTTP_SERVICE_HAS_CHILDREN' // delete refused: node still has child nodes (VALIDATION_ERROR)
+    | 'HTTP_SERVICE_ROOT_NODE'   // delete refused: SICF root node (VALIDATION_ERROR)
+    | 'HTTP_SERVICE_NOT_AUTHORIZED' // delete refused: SICF authority check (AUTH_ERROR)
+    | 'HTTP_DELETE_UNSUPPORTED'  // delete refused: transported / unmanaged node (VALIDATION_ERROR)
+    | 'HTTP_DELETE_FAILED'       // ICF /http/<name> DELETE failure (SAP_ERROR)
   // abap-file-format three-piece TABL/STRU pull diagnostics
   | 'TABL_DDL_INVALID'          // DDL parse failure (VALIDATION_ERROR/exit 7)
   | 'TABL_ARTIFACT_INCOMPLETE'  // wire missing mainJson or ddicSource (VALIDATION_ERROR/exit 7)
@@ -273,6 +280,13 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   // mappings
   HTTP_CREATE_FAILED: 'SAP_ERROR',
   HTTP_OBJECT_NOT_FOUND: 'NOT_FOUND',
+  HTTP_SERVICE_INVALID: 'VALIDATION_ERROR',
+  HTTP_PACKAGE_NOT_SUPPORTED: 'VALIDATION_ERROR',
+  HTTP_SERVICE_HAS_CHILDREN: 'VALIDATION_ERROR',
+  HTTP_SERVICE_ROOT_NODE: 'VALIDATION_ERROR',
+  HTTP_SERVICE_NOT_AUTHORIZED: 'AUTH_ERROR',
+  HTTP_DELETE_UNSUPPORTED: 'VALIDATION_ERROR',
+  HTTP_DELETE_FAILED: 'SAP_ERROR',
   // — ENQU / NROB ICF routes
   ENQU_CREATE_FAILED: 'SAP_ERROR',
   ENQU_PUSH_FAILED: 'SAP_ERROR',
