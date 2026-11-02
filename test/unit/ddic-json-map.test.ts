@@ -575,4 +575,62 @@ describe('ddic-json-map', () => {
       expect(tablWire.name).toBe('ZTAB_BC');
     });
   });
+
+  describe('foreign keys the ICF write path cannot persist', () => {
+    it('rejects a TABL field with a check table (DD05V/DD08V are never written)', () => {
+      expect(() => localToWire('TABL', {
+        name: 'ZTAB_FK',
+        fields: [
+          { fieldName: 'COUNTRY', dataType: 'CHAR', length: 3, checkTable: 'T005' },
+        ],
+      })).toThrowError(expect.objectContaining({ code: 'TABL_FOREIGN_KEY_UNSUPPORTED' }));
+    });
+
+    it('rejects a STRU field carrying foreignKeys entries from @AbapCatalog.foreignKeys', () => {
+      expect(() => localToWire('STRU', {
+        name: 'ZSTR_FK',
+        fields: [
+          { fieldName: 'COUNTRY', dataType: 'CHAR', length: 3, foreignKeys: [{ checkTable: 'T005', label: 'COUNTRY' }] },
+        ],
+      })).toThrowError(expect.objectContaining({ code: 'TABL_FOREIGN_KEY_UNSUPPORTED' }));
+    });
+
+    it('reports the offending fields in the error details', () => {
+      try {
+        localToWire('TABL', {
+          name: 'ZTAB_FK',
+          fields: [
+            { fieldName: 'COUNTRY', dataType: 'CHAR', length: 3, checkTable: 't005' },
+            { fieldName: 'CITY', dataType: 'CHAR', length: 20, foreignKeys: [{ checkTable: 'T005' }] },
+          ],
+        });
+        throw new Error('expected TABL_FOREIGN_KEY_UNSUPPORTED');
+      } catch (error: unknown) {
+        const details = (error as { details?: Array<{ fieldName: string; checkTable?: string }> }).details;
+        expect(details).toEqual([
+          { fieldName: 'COUNTRY', checkTable: 'T005' },
+          { fieldName: 'CITY', foreignKeys: [{ checkTable: 'T005' }] },
+        ]);
+      }
+    });
+
+    it('ignores foreign keys declared on the client-key column (already stripped)', () => {
+      const wire = localToWire('TABL', {
+        name: 'ZTAB_CLIENT_FK',
+        fields: [
+          { fieldName: 'MANDT', dataType: 'CLNT', length: 3, keyFlag: true, checkTable: 'T000' },
+          { fieldName: 'ID', dataType: 'CHAR', length: 10, keyFlag: true },
+        ],
+      });
+      expect(wire.fields!.map((f) => f.fieldName)).toEqual(['ID']);
+    });
+
+    it('keeps FK-free TABL / STRU payloads unchanged', () => {
+      const wire = localToWire('STRU', {
+        name: 'ZSTR_OK',
+        fields: [{ fieldName: 'FIELD1', dataType: 'CHAR', length: 10 }],
+      });
+      expect(wire.fields).toHaveLength(1);
+    });
+  });
 });

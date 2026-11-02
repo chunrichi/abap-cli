@@ -54,6 +54,8 @@ export type ErrorCode =
   | 'DDIC_OBJECT_NOT_FOUND' // ICF /ddic/<type>/<name> GET 404 (NOT_FOUND)
   | 'DDIC_TABL_FORMAT_UNSUPPORTED' // canonical TABL projection cannot represent the object (VALIDATION_ERROR)
   | 'DTEL_CATEGORY_UNSUPPORTED'    // DTEL dataTypeInformation.category not in {domain, predefinedType, typeRef} (VALIDATION_ERROR)
+  | 'TABL_FOREIGN_KEY_UNSUPPORTED' // TABL/STRU declares a foreign key the ICF write path cannot persist (VALIDATION_ERROR)
+  | 'TTYP_ROW_STRUCTURE_UNSUPPORTED' // TTYP inline rowStructure has no DDIC table-type representation (VALIDATION_ERROR)
   | 'TABT_VALIDATION_FAILED'       // .tabl.settings.json failed tabt-v1.json enum validation (VALIDATION_ERROR)
   | 'TYPE_NOT_SUPPORTED'
   | 'OVERWRITE_REQUIRED'   // NEW
@@ -244,6 +246,8 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   DDIC_NOT_SUPPORTED: 'VALIDATION_ERROR',
   DDIC_TABL_FORMAT_UNSUPPORTED: 'VALIDATION_ERROR',
   DTEL_CATEGORY_UNSUPPORTED: 'VALIDATION_ERROR',
+  TABL_FOREIGN_KEY_UNSUPPORTED: 'VALIDATION_ERROR',
+  TTYP_ROW_STRUCTURE_UNSUPPORTED: 'VALIDATION_ERROR',
   TABT_VALIDATION_FAILED: 'VALIDATION_ERROR',
   DDIC_CREATE_FAILED: 'SAP_ERROR',
   DDIC_OBJECT_NOT_FOUND: 'NOT_FOUND',

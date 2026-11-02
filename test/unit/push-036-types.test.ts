@@ -153,8 +153,30 @@ describe('runPushTtyp', () => {
       lineType: { rowStructure: { fieldName: 'ROW', dataType: 'CHAR', length: 1 } },
     });
 
-    await expect(runPushTtyp(file, { profile: ADT_PROFILE })).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    await expect(runPushTtyp(file, { profile: ADT_PROFILE })).rejects.toMatchObject({
+      code: 'TTYP_ROW_STRUCTURE_UNSUPPORTED',
+    });
     expect(adtGetTtyp).not.toHaveBeenCalled();
+  });
+
+  it('carries the predefined row type length/decimals into the locked PUT body', async () => {
+    await fresh();
+    const { runPushTtyp } = await import('../../src/abap_cli/flows/edit/push-ttyp.js');
+    const file = write('zmy_chars.ttyp.json', {
+      ...TTYP_DOC,
+      lineType: { rowType: 'CHAR', rowTypeLength: 10 },
+    });
+
+    await runPushTtyp(file, { profile: ADT_PROFILE });
+
+    expect(adtUpdateTtyp).toHaveBeenCalledWith(
+      'ZMY_CHARS',
+      expect.stringContaining(
+        '<ttyp:dataType>CHAR</ttyp:dataType><ttyp:length>000010</ttyp:length><ttyp:decimals>000000</ttyp:decimals>',
+      ),
+      'LH1',
+      undefined,
+    );
   });
 
   it('falls back to ICF on an ECC EHP6 kernel', async () => {

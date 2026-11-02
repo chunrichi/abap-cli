@@ -4,7 +4,7 @@ title: TABL — 透明表（数据库表）
 description: TABL 对象的三件套文件格式（main + ddic + settings）、关键字段、已知坑
 tags: [abap-cli, object-type, tabl, ddic, icf, abap-file-format, transparent-table]
 created at: 2026-09-01 00:00:00
-changed at: 2026-10-30 20:00:00
+changed at: 2026-11-03 00:20:00
 ---
 
 # TABL — 透明表（数据库表）
@@ -93,6 +93,7 @@ abap push src/zmy_table.tabl.json --tr DEVK900001 --json
 
 ## 已知坑
 
+- **外键不写入**：ICF 写路径只把 `CHECKTABLE` 放进字段元数据，不写 DD05V / DD08V。本地文档带 `@AbapCatalog.foreignKeys` 块或 DDL 里带 `with foreign key ... check <table>` 时，`create` / `push` 在本地报 `TABL_FOREIGN_KEY_UNSUPPORTED`（exit 7），不会静默丢约束；做法是从本地文档移除外键声明，创建后在 SE11 / ADT 维护外键（MANDT / CLIENT 列上的外键按既有 client 字段过滤规则忽略）
 - **fallback 行为**：create 时如果只给 main JSON（无 ddic/settings），CLI 自动回退到 legacy wire-flat 单文件（向后兼容）
 - **append structure（`.INCLU--AP`）**：pull 时按 024 实现；写入时需要 Z 段 DDIC 后端配合
 - **fixme B（pull.md）**：`<name>.tabl.json` 的 `deliveryClass`/`dataClass`/`sizeCategory` 是否要进 main 还是 settings.json？当前 main 只含 `formatVersion` + `header`，详细在 settings.json

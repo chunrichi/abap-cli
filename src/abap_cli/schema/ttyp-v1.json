@@ -46,18 +46,37 @@
     },
     "lineType": {
       "title": "Line Type",
-      "description": "Either rowType (refers to data-type/structure/table) or rowStructure (inline fields).",
+      "description": "Either rowType (refers to a data type / structure / table / table type, or a predefined DDIC data type such as CHAR / STRING) or rowStructure (inline fields).",
       "type": "object",
       "additionalProperties": false,
       "oneOf": [
         { "required": ["rowType"] },
         { "required": ["rowStructure"] }
       ],
+      "dependentRequired": {
+        "rowTypeLength": ["rowType"],
+        "rowTypeDecimals": ["rowType"]
+      },
       "properties": {
         "rowType": {
           "title": "Row Type Reference",
+          "description": "Row type name: a repository type (data element / structure / table / table type) or a DDIC predefined data type name (CHAR, NUMC, DEC, DATS, INT4, STRING, ...).",
           "type": "string",
           "maxLength": 40
+        },
+        "rowTypeLength": {
+          "title": "Row Type Length",
+          "description": "Length of a predefined row type (ADT ttyp:length). Ignored for a repository row type, whose length SAP derives from the referenced object.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999999
+        },
+        "rowTypeDecimals": {
+          "title": "Row Type Decimals",
+          "description": "Decimals of a predefined row type (ADT ttyp:decimals); only meaningful for DEC / CURR / QUAN and the decfloat types. Ignored for a repository row type.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999999
         },
         "rowStructure": {
           "title": "Inline Row Structure",

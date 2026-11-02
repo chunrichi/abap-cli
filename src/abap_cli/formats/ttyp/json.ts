@@ -33,10 +33,11 @@
  * needs the `adtcore:packageRef`, so `localToWire` takes both as arguments.
  * The artifact itself keeps the shared JSON/schema plumbing.
  *
- * Known limitation: a predefined ABAP row type (`table of string`, `table of
- * char10`) has no faithful local representation — `lineType.rowType` stores the
- * data-type name and the length/decimals from `ttyp:builtInType` are lost.
- * DDIC table types in practice use dictionary row types (ROWKIND S/E/L).
+ * A predefined row type (`table of string`, `table of char10`) keeps its
+ * DDIC data-type name in `lineType.rowType` plus the optional
+ * `lineType.rowTypeLength` / `lineType.rowTypeDecimals` that ADT carries in
+ * `<ttyp:builtInType>`. A dictionary row type has no length/decimals — SAP
+ * derives them from the referenced repository object.
  */
 import { defineJsonArtifact } from '../artifact.js';
 
@@ -44,34 +45,80 @@ export interface TtypLocal {
   formatVersion: '1';
   header: { description: string; originalLanguage: string; abapLanguageVersion?: string };
   accessType: 'standard' | 'sorted' | 'hashed';
-  lineType: { rowType?: string; rowStructure?: { fieldName: string; dataType?: string; length?: number; decimals?: number } };
+  lineType: {
+    rowType?: string;
+    /** Predefined row type only — DDIC data-type length (ADT `<ttyp:length>`). */
+    rowTypeLength?: number;
+    /** Predefined row type only — DDIC data-type decimals (ADT `<ttyp:decimals>`). */
+    rowTypeDecimals?: number;
+    rowStructure?: { fieldName: string; dataType?: string; length?: number; decimals?: number };
+  };
   keyDefinition?: Array<{ keyField: string; descending?: boolean }>;
   /** Primary-key uniqueness when keyDefinition is set (ADT `ttyp:primaryKey/kind`). */
   keyKind?: 'unique' | 'nonUnique';
   rows?: Array<Record<string, unknown>>;
 }
 
-/** ABAP built-in data types that can be used as a table-type row type. */
-const BUILT_IN_TYPES = new Set([
-  'C',
-  'D',
+/**
+ * DDIC predefined data types that can stand as a table-type row type.
+ *
+ * ADT identifies a predefined row type by its DDIC data-type name, never by an
+ * ABAP type code: `table of char10` comes back as `CHAR` with length `000010`,
+ * and sending `C` instead fails activation with "data type C does not exist".
+ * The set mirrors the predefined-type enum of the AFF `dtel-v1.json`.
+ */
+const PREDEFINED_DATA_TYPES = new Set([
+  'ACCP',
+  'CHAR',
+  'CLNT',
+  'CUKY',
+  'CURR',
+  'DATN',
+  'DATS',
+  'DEC',
   'DECFLOAT16',
   'DECFLOAT34',
-  'F',
-  'I',
+  'DF16_DEC',
+  'DF16_RAW',
+  'DF16_SCL',
+  'DF34_DEC',
+  'DF34_RAW',
+  'DF34_SCL',
+  'FLTP',
+  'GEOM_EWKB',
   'INT1',
   'INT2',
   'INT4',
   'INT8',
-  'N',
-  'P',
-  'S',
+  'LANG',
+  'LCHR',
+  'LRAW',
+  'NUMC',
+  'PREC',
+  'QUAN',
+  'RAW',
+  'RAWSTRING',
+  'SSTRING',
   'STRING',
-  'T',
+  'TIMN',
+  'TIMS',
+  'UNIT',
   'UTCLONG',
-  'X',
-  'XSTRING',
+  'VARC',
 ]);
+
+/** Render a length/decimals as the zero-padded 6-digit ADT wire value. */
+function wireLength(value: number | undefined): string {
+  return String(Math.trunc(value ?? 0)).padStart(6, '0');
+}
+
+/** Parse an ADT wire length/decimals; `undefined` for absent / zero / junk. */
+function parseWireLength(raw: string | undefined): number | undefined {
+  if (raw === undefined) return undefined;
+  const parsed = Number(raw.trim());
+  if (!Number.isInteger(parsed) || parsed <= 0) return undefined;
+  return parsed;
+}
 
 /** Read one `adtcore:`-prefixed attribute from the root element. */
 function coreAttribute(xml: string, name: string): string | undefined {
@@ -122,13 +169,24 @@ export function wireToLocal(xml: string): TtypLocal {
   const dataType = ttypTag(builtInType, 'dataType') ?? '';
   const rowType = typeKind === 'predefinedAbapType' ? dataType : typeName || dataType;
 
+  const lineType: TtypLocal['lineType'] = rowType
+    ? { rowType }
+    : { rowStructure: { fieldName: 'DUMMY', dataType: 'CHAR', length: 1 } };
+  if (rowType && typeKind === 'predefinedAbapType') {
+    // Only a predefined row type carries a length/decimals of its own; ADT
+    // leaves them at 000000 for types whose length is fixed or absent
+    // (STRING, INT4, ...), so a zero is "not applicable" and gets omitted.
+    const length = parseWireLength(ttypTag(builtInType, 'length'));
+    const decimals = parseWireLength(ttypTag(builtInType, 'decimals'));
+    if (length !== undefined) lineType.rowTypeLength = length;
+    if (decimals !== undefined) lineType.rowTypeDecimals = decimals;
+  }
+
   const local: TtypLocal = {
     formatVersion: '1',
     header: { description, originalLanguage },
     accessType: ['standard', 'sorted', 'hashed'].includes(accessType) ? accessType : 'standard',
-    lineType: rowType
-      ? { rowType }
-      : { rowStructure: { fieldName: 'DUMMY', dataType: 'CHAR', length: 1 } },
+    lineType,
   };
 
   // Primary key: only `keyComponents` carries an explicit field list; the
@@ -165,11 +223,11 @@ export function localToWire(local: TtypLocal, name: string, opts: LocalToWireOpt
     const rowType = local.lineType.rowType;
     if (rowType) {
       const upper = rowType.toUpperCase();
-      if (BUILT_IN_TYPES.has(upper)) {
+      if (PREDEFINED_DATA_TYPES.has(upper)) {
         return [
           '    <ttyp:typeKind>predefinedAbapType</ttyp:typeKind>',
           '    <ttyp:typeName/>',
-          `    <ttyp:builtInType><ttyp:dataType>${encodeXmlEntities(upper)}</ttyp:dataType><ttyp:length>000000</ttyp:length><ttyp:decimals>000000</ttyp:decimals></ttyp:builtInType>`,
+          `    <ttyp:builtInType><ttyp:dataType>${encodeXmlEntities(upper)}</ttyp:dataType><ttyp:length>${wireLength(local.lineType.rowTypeLength)}</ttyp:length><ttyp:decimals>${wireLength(local.lineType.rowTypeDecimals)}</ttyp:decimals></ttyp:builtInType>`,
         ];
       }
       // Dictionary row type: SAP recomputes builtInType from the referenced
@@ -228,6 +286,16 @@ export function localToWire(local: TtypLocal, name: string, opts: LocalToWireOpt
  *  above — the write side needs the object name and an optional package). */
 export const ttypArtifact = defineJsonArtifact<TtypLocal>({ type: 'TTYP' });
 
+/** Pseudo-DDL token for a row type reference: `char(10)` / `dec(15,2)` for a
+ *  predefined type that carries a length (and decimals), otherwise the bare
+ *  lower-cased name (dictionary reference, or a length-less predefined type). */
+function rowTypeSource(lineType: TtypLocal['lineType']): string {
+  const rowType = (lineType.rowType ?? '').toLowerCase();
+  if (lineType.rowTypeLength === undefined) return rowType;
+  const decimals = lineType.rowTypeDecimals !== undefined ? `,${lineType.rowTypeDecimals}` : '';
+  return `${rowType}(${lineType.rowTypeLength}${decimals})`;
+}
+
 /** Build the pseudo-DDL `define type <name>: ...` sidecar (human readable). */
 export function buildTypeSource(name: string, local: TtypLocal): string {
   const access = local.accessType === 'standard' ? '' : ` ${local.accessType}`;
@@ -236,7 +304,7 @@ export function buildTypeSource(name: string, local: TtypLocal): string {
     ? ` with ${local.keyKind === 'unique' || local.accessType === 'hashed' ? 'unique' : 'non-unique'} key ${key.join(' ')}`
     : '';
   if (local.lineType.rowType) {
-    return `define type ${name.toLowerCase()}:${access} table of ${local.lineType.rowType.toLowerCase()}${keyPart}.`;
+    return `define type ${name.toLowerCase()}:${access} table of ${rowTypeSource(local.lineType)}${keyPart}.`;
   }
   const f = local.lineType.rowStructure!;
   const type = (f.dataType ?? 'CHAR').toLowerCase();

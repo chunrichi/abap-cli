@@ -98,10 +98,19 @@ export async function runPushTtyp(file: string, opts: PushTtypOptions = {}): Pro
     });
   }
   if (doc.lineType.rowStructure) {
-    throw new CliError('VALIDATION_ERROR', 'TTYP lineType.rowStructure is not supported on the ADT channel: a DDIC table type needs a repository row type', {
-      file,
-      nextSteps: ['Replace lineType.rowStructure with lineType.rowType naming a repository type.'],
-    });
+    throw new CliError(
+      'TTYP_ROW_STRUCTURE_UNSUPPORTED',
+      'TTYP lineType.rowStructure is not supported: a DDIC table type needs a repository row type (data element / structure / table / table type), and an inline row structure has no ADT or ICF representation',
+      {
+        file,
+        object: name,
+        type: 'TTYP',
+        nextSteps: [
+          'Maintain the inline row structure in SE11 / ADT, or create a structure and reference it from lineType.rowType.',
+          'Replace lineType.rowStructure with lineType.rowType naming a repository type.',
+        ],
+      },
+    );
   }
   let channel: 'adt' | 'icf' = decision.channel;
   let fallbackReason: PushTtypResult['fallbackReason'];

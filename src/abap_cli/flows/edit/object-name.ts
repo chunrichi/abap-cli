@@ -87,3 +87,34 @@ export function validatePackageName(packageName: string): void {
     ],
   });
 }
+
+/**
+ * Number range object name limit: SAP stores it in `TNRO-NROBJ`, which is
+ * CHAR 10 (domain `NROBJ`). A longer name is silently truncated by the ABAP
+ * layer instead of failing, so `create` / `delete` reject it client-side.
+ */
+export const NROB_NAME_MAX_LENGTH = 10;
+
+/**
+ * Normalize and validate a number range object name. Returns the uppercased
+ * name; throws `NROB_NAME_INVALID` (VALIDATION_ERROR / exit 7) when it is empty
+ * or above the `TNRO-NROBJ` length.
+ */
+export function normalizeNrobName(objectName: string, example = 'ZCLI_TCNR1'): string {
+  const name = normalizeName(objectName);
+  if (!name || name.length > NROB_NAME_MAX_LENGTH) {
+    throw new CliError(
+      'NROB_NAME_INVALID',
+      `NROB name must be 1-${NROB_NAME_MAX_LENGTH} characters (got "${objectName}")`,
+      {
+        object: name,
+        type: 'NROB',
+        nextSteps: [
+          `SAP stores the number range object name in TNRO-NROBJ (CHAR ${NROB_NAME_MAX_LENGTH}); longer names are silently truncated.`,
+        ],
+        example: `abap delete ${example} --type NROB --yes`,
+      },
+    );
+  }
+  return name;
+}

@@ -154,7 +154,7 @@ describe('014 abap push DDIC (.json via ICF)', () => {
     const ddic = [
       'define table ztab_3pc {',
       '  key mandt : abap.clnt not null;',
-      '  country   : abap.char(3) with foreign key [dependent] check t005;',
+      '  country   : abap.char(3);',
       '}',
     ].join('\n');
     fs.writeFileSync(path.join(cwd, 'src/ztab_3pc.tabl.json'), JSON.stringify(main, null, 2));
@@ -170,9 +170,38 @@ describe('014 abap push DDIC (.json via ICF)', () => {
       // clientDependent lives under generalInformation.* (AFF canonical).
       generalInformation: expect.objectContaining({ clientDependent: true }),
       fields: expect.arrayContaining([
-        expect.objectContaining({ fieldName: 'COUNTRY', dataType: 'CHAR', length: 3, checkTable: 'T005' }),
+        expect.objectContaining({ fieldName: 'COUNTRY', dataType: 'CHAR', length: 3 }),
       ]),
     }));
+  });
+
+  it('rejects a TABL whose DDL declares a foreign key (ICF cannot write DD05V/DD08V)', async () => {
+    const main = {
+      formatVersion: '1',
+      header: { description: 'Foreign key table', originalLanguage: 'EN' },
+      name: 'ZTAB_FK',
+      package: 'ZPKG',
+      fields: [],
+    };
+    const ddic = [
+      'define table ztab_fk {',
+      '  key mandt : abap.clnt not null;',
+      '  country   : abap.char(3) with foreign key [dependent] check t005;',
+      '}',
+    ].join('\n');
+    fs.writeFileSync(path.join(cwd, 'src/ztab_fk.tabl.json'), JSON.stringify(main, null, 2));
+    fs.writeFileSync(path.join(cwd, 'src/ztab_fk.tabl.ddic'), ddic);
+    const program = makeProgram();
+    registerPushCommand(program);
+    const res = await runCommand(program, ['push', 'src/ztab_fk.tabl.json', '--tr', 'TRN001', '--yes', '--json'], { cwd });
+
+    expect(res.exitCode).toBe(7);
+    const out = JSON.parse(res.stderr);
+    expect(out.error.code).toBe('TABL_FOREIGN_KEY_UNSUPPORTED');
+    expect(out.error.message).toContain('COUNTRY -> T005');
+    expect(out.error.details.results[0].code).toBe('TABL_FOREIGN_KEY_UNSUPPORTED');
+    expect(out.error.details.results[0].stage).toBe('ddic-icf');
+    expect(icfPostDdic).not.toHaveBeenCalled();
   });
 
   it('032: STRU push accepts three-piece without.tabl.settings.json sidecar', async () => {

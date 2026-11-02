@@ -13,6 +13,7 @@
 - **SRVB 创建/发布**：`abap create SRVB <name> --file <name>.srvb.json --package <pkg>` 从 AFF 元数据创建并激活服务绑定；加 `--publish` 会在激活后调用 ADT publish job。发布是否成功取决于系统是否允许本地发布或是否需要 transport request（不允许时 SAP 返回明确错误，binding 仍已创建）；push/update 不支持。
 - **HTTP（SICF 节点）删除**：`abap delete <name> --type HTTP` 删除 `$` 前缀本地包里的 SICF 节点，节点不存在、根节点、仍有子节点、可传输节点与权限不足分别返回明确错误；可传输节点仍请在事务 SICF 删除，以便删除被记录到传输请求。
 - **本地 ENQU / NROB 创建写入本地元数据**：`$` 前缀包里的锁对象 / 编号范围对象创建后即可在 SE11 / where-used 中检索到，删除时不再需要临时补元数据。
+- **TTYP 预定义行类型的长度/小数**：以 DDIC 内建类型为行类型的表类型（`table of char10`、`table of dec15(2)`）现在能完整 round-trip——`abap pull` 把长度/小数写进本地 JSON 的可选 `lineType.rowTypeLength` / `lineType.rowTypeDecimals`，`abap create` / `abap push` 按同样的值写回 SAP，`.type.abap` 侧车显示为 `table of char(10)`；没有这两个字段的旧文件仍然合法。
 
 ### Fixed
 
@@ -22,6 +23,10 @@
 ### Changed
 
 - **HTTP（SICF）写入仅限本地包**：`create` / `push` 不再接受可传输包（此前会忽略包、静默把节点建到 `$TMP`）；可传输 SICF 节点请在事务 SICF 维护。`--tr` 对 HTTP 写入不再生效。
+- **TTYP 预定义行类型使用 DDIC 数据类型名**：本地 `lineType.rowType` 对预定义类型必须是 DDIC 数据类型名（`CHAR`、`NUMC`、`DEC`、`DATS`、`TIMN`、`INT4`、`STRING`…），不再把 `C` / `I` / `P` 这类 ABAP 类型码当作内建类型——旧写法在 SAP 激活时本来也会因「数据类型不存在」失败。**Migration**：把 `lineType.rowType` 换成对应的 DDIC 数据类型名（`C`→`CHAR`、`N`→`NUMC`、`P`→`DEC`、`D`→`DATS`、`T`→`TIMS`、`F`→`FLTP`、`X`→`RAW`、`I`→`INT4`），长度/小数写进新增的 `rowTypeLength` / `rowTypeDecimals`。
+- **TTYP 内联行结构的错误提示**：`lineType.rowStructure` 仍不支持，但改为专用错误码（exit 7），消息说明内联行结构需在 SE11 / ADT 维护、CLI 只支持 repository 行类型。
+- **TABL / STRU 的外键不再静默丢弃**：本地文档带 `@AbapCatalog.foreignKeys` 或 `with foreign key ... check <table>` 时，`create` / `push` 在本地直接报错（exit 7），提示外键要在 SE11 / ADT 维护或从本地文档移除。此前这些声明被悄悄丢掉、SAP 侧不会有外键，激活也可能失败。没有外键的表 / 结构行为不变。
+- **NROB 名称上限 10 字符**：编号范围对象名是 `TNRO-NROBJ` 键（10 字符），更长的名字会被 SAP 静默截断；`abap create NROB` 和 `abap delete <name> --type NROB` 现在都在本地拒绝超长名称（exit 7）。此前 delete 放行到 20 字符、create 完全不检查长度。
 
 ## [2.0.1] - 2026-11-02
 

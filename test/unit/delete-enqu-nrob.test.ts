@@ -85,23 +85,33 @@ describe('delete NROB', () => {
   it('deletes through ICF without an ADT probe', async () => {
     icfDeleteDdic.mockResolvedValueOnce({
       status: 'success' as const,
-      data: { name: 'ZCLI_TC_NROB', type: 'NROB', action: 'deleted' },
+      data: { name: 'ZCLI_TCN1', type: 'NROB', action: 'deleted' },
       error: null,
     });
-    const res = await run(['delete', 'ZCLI_TC_NROB', '--type', 'NROB']);
+    const res = await run(['delete', 'ZCLI_TCN1', '--type', 'NROB']);
     expect(res.exitCode).toBeUndefined();
-    expect(icfDeleteDdic).toHaveBeenCalledWith('nrob', 'ZCLI_TC_NROB');
-    expect(JSON.parse(res.stdout).data).toMatchObject({ object: 'ZCLI_TC_NROB', type: 'NROB', deleted: true });
+    expect(icfDeleteDdic).toHaveBeenCalledWith('nrob', 'ZCLI_TCN1');
+    expect(JSON.parse(res.stdout).data).toMatchObject({ object: 'ZCLI_TCN1', type: 'NROB', deleted: true });
   });
 
   it('maps a transported NROB to NROB_DELETE_UNSUPPORTED (exit 7)', async () => {
     icfDeleteDdic.mockResolvedValueOnce({
       status: 'error' as const,
       data: null,
-      error: { code: 'NROB_DELETE_UNSUPPORTED', message: 'NROB ZCLI_TC_NROB is in non-local package ZPKG' },
+      error: { code: 'NROB_DELETE_UNSUPPORTED', message: 'NROB ZCLI_TCN1 is in non-local package ZPKG' },
     });
-    const res = await run(['delete', 'ZCLI_TC_NROB', '--type', 'NROB']);
+    const res = await run(['delete', 'ZCLI_TCN1', '--type', 'NROB']);
     expect(res.exitCode).toBe(7);
     expect(JSON.parse(res.stderr).error.code).toBe('NROB_DELETE_UNSUPPORTED');
+  });
+
+  it('rejects a name longer than TNRO-NROBJ (10 chars) before calling SAP', async () => {
+    // 12 characters — the ABAP layer would silently truncate to ZCLI_TCNRO.
+    const res = await run(['delete', 'ZCLI_TCNROBX', '--type', 'NROB']);
+    expect(res.exitCode).toBe(7);
+    const out = JSON.parse(res.stderr);
+    expect(out.error.code).toBe('NROB_NAME_INVALID');
+    expect(out.error.message).toContain('1-10');
+    expect(icfDeleteDdic).not.toHaveBeenCalled();
   });
 });

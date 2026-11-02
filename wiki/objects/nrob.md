@@ -4,7 +4,7 @@ title: NROB — 编号范围对象（Number Range Object）
 description: NROB 对象的 ICF 路由、interval / configuration 字段契约、Z/Y 命名规则
 tags: [abap-cli, object-type, nrob, icf, abap-file-format, number-range, tnro, tnrot]
 created at: 2026-09-16 00:00:00
-changed at: 2026-11-02 23:25:00
+changed at: 2026-11-03 00:20:00
 ---
 
 # NROB — 编号范围对象（Number Range Object）
@@ -82,6 +82,8 @@ AFF schema 要求 `interval` 的六个键都存在；`subType` 的值允许是�
 
 编号范围对象名必须以 `Z` / `Y` / `/` 开头，否则 `create` 在本地即报 `INVALID_ARGUMENT`（exit 2），不发起 SAP 调用。
 
+名称长度上限是 **10 字符**：名字是 `TNRO-NROBJ` 键，域 `NROBJ` 为 CHAR 10（2026-11-03 在 S/4HANA 上通过 ADT 读取域定义实测，与 `TNRO` DDL 的 `object : nrobj` 一致）。超长名字不会被 SAP 拒绝，而是静默截断到前 10 字符（实测传入 12 字符 `ZCLI_TCNROBX` 时创建出 `ZCLI_TCNRO`）；`create` 与 `delete` 现在都在本地预检，超长抛 `NROB_NAME_INVALID`（exit 7），不会发出 SAP 调用。
+
 ## 当前实现状态
 
 **完整 round-trip 已验证**（commit `cb6ff30`，vhcala4hci 2026-09-17）。
@@ -134,7 +136,7 @@ AFF schema 要求 `interval` 的六个键都存在；`subType` 的值允许是�
 3. **CLI 必须把 `name` 放进 wire body** —— ABAP 路径正则 `^/ddic/(...)/(.+)?$` 把 `/ddic/nrob` 的 name 段视为可选；CLI POST `/ddic/nrob`（无名字段）→ `lv_match_name` 空；body 里也得有 `name`，否则 `INVALID_ARGUMENT`。
 4. **`lv_name TYPE nrobj` = CHAR 10** —— 客户端送 12 字符名字，ABAP 自动截到 10，CLI 显示用 SAP 实际写的名字。
 5. **`subType` 非空时必须有检查表、域长 1–6** —— `EBELP`(NUMC 5) / `BUKRS`(CHAR 4) / `KOSAR`(CHAR 1) 都能过；`MATNR`(CHAR 18) / `KUNNR`(CHAR 10) / `BANKN`(无 value table) / `RSNUM`(CHAR 10) 都过不了。空字符串合法：表示不绑定子对象，ICF 创建不要求 `subType` 非空（2026-11-01 起）。
-6. **CLI `nrob.create.name` 静默截断** —— NROB name 截断后 ICF 返回 SAP 实际写的名字（10 字符），CLI 显示就用截断后的名字。如果用户传 `ZNR_VIBE_TEST`（12 字符），返回的 `data.name` 是 `ZNR_VIBE_T`（10 字符），用户需注意。
+6. **CLI 预检 name 长度** —— `nrobj` 是 CHAR 10，超长名字 SAP 会静默截断；`create` / `delete` 现在在本地就拒绝（`NROB_NAME_INVALID`，exit 7），不再把截断后的名字写进 SAP。
 
 ## Round-trip 验证结果
 
@@ -163,6 +165,6 @@ AFF schema 要求 `interval` 的六个键都存在；`subType` 的值允许是�
 - **`$` 前缀本地包（2026-11-01 真机）**：非本地包 + `--tr` 被新 handler 拒绝（`NROB_PACKAGE_NOT_SUPPORTED`，消息改为 "supports local packages (name starts with $) only"）。
 - **不写 NRIV** —— 创建 object 声明后，interval 数据需要 `SNRO` 维护。
 - **不读 NRIV** —— pull 时 `nrobFormat.generate` 不输出 intervals 数组（schema 没暴露）。
-- **name 上限 10 字符** —— `nrobj` 只有 CHAR 10，超长名字会被 SAP 静默截断（CLI 返回实际写入名）；建议创建前就限制在 10 字符内。
+- **name 上限 10 字符** —— `nrobj` 只有 CHAR 10；CLI 已在 create / delete 前预检并拒绝超长名称（`NROB_NAME_INVALID`，exit 7）。
 - **runtime dump 在 CLI 不报 NROB_NOT_FOUND 后** —— NROB_NOT_FOUND 是正常错误（对象不存在），runtime dump 是 5xx 的 SAP HTML；如果看到 5xx 而非 4xx JSON，说明是 ABAP 端缺激活或代码 bug，需要查 `tmp/scripts/probe-icf-incl2.mjs` 重新抓 implementations include 确认部署内容。
 - **删除的 500 dynpro 错误** —— 若看到 `Sending of dynpro SAPLSTRD 0100 ... No window system type`，说明 `NUMBER_RANGE_OBJECT_DELETE` 没传 `ohne_tp_flag='X'`（传输检查试图打开对话框），不是对象损坏。

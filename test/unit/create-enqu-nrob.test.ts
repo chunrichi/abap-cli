@@ -31,4 +31,16 @@ describe('create NROB — local validation', () => {
       code: 'VALIDATION_ERROR',
     });
   });
+
+  it('rejects a name longer than TNRO-NROBJ (10 chars) before any SAP call', async () => {
+    await expect(runCreateNrob('ZCLI_TCNROBX', baseOpts, 'json')).rejects.toMatchObject({
+      code: 'NROB_NAME_INVALID',
+    });
+  });
+
+  it('accepts a 10-character name (length gate passes, --file gate follows)', async () => {
+    await expect(runCreateNrob('ZCLI_TCNR1', baseOpts, 'json')).rejects.toMatchObject({
+      code: 'VALIDATION_ERROR',
+    });
+  });
 });

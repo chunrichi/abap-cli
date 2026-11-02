@@ -47,10 +47,19 @@ export async function runCreateTtyp(
     });
   }
   if (doc.lineType.rowStructure) {
-    throw new CliError('VALIDATION_ERROR', 'TTYP lineType.rowStructure is not supported on the ADT channel: a DDIC table type needs a repository row type (data element / structure / table / table type)', {
-      file: toOutputPath(opts.file),
-      nextSteps: ['Replace lineType.rowStructure with lineType.rowType naming a repository type.'],
-    });
+    throw new CliError(
+      'TTYP_ROW_STRUCTURE_UNSUPPORTED',
+      'TTYP lineType.rowStructure is not supported: a DDIC table type needs a repository row type (data element / structure / table / table type), and an inline row structure has no ADT or ICF representation',
+      {
+        file: toOutputPath(opts.file),
+        object: name,
+        type: 'TTYP',
+        nextSteps: [
+          'Maintain the inline row structure in SE11 / ADT, or create a structure and reference it from lineType.rowType.',
+          'Replace lineType.rowStructure with lineType.rowType naming a repository type.',
+        ],
+      },
+    );
   }
   const profile = await loadChannelProfile();
   const decision = detectChannel(profile, 'ttyp');

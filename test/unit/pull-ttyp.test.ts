@@ -31,6 +31,8 @@ const TTYP_BASIC_XML = `<?xml version="1.0" encoding="utf-8"?><ttyp:tableType ad
 
 const TTYP_HASHED_XML = `<?xml version="1.0" encoding="utf-8"?><ttyp:tableType adtcore:masterLanguage="EN" adtcore:name="ZMY_HASHED" adtcore:type="TTYP/DA" adtcore:description="Hashed table" adtcore:language="EN" xmlns:ttyp="http://www.sap.com/dictionary/tabletype" xmlns:adtcore="http://www.sap.com/adt/core"><ttyp:rowType><ttyp:typeKind>dictionaryType</ttyp:typeKind><ttyp:typeName>ZMY_STRUCT</ttyp:typeName><ttyp:builtInType><ttyp:dataType>STRU</ttyp:dataType><ttyp:length>000000</ttyp:length><ttyp:decimals>000000</ttyp:decimals></ttyp:builtInType><ttyp:rangeType/></ttyp:rowType><ttyp:accessType>hashed</ttyp:accessType><ttyp:primaryKey><ttyp:definition>keyComponents</ttyp:definition><ttyp:kind>unique</ttyp:kind><ttyp:components><ttyp:component ttyp:name="CARRID"/><ttyp:component ttyp:name="CONNID"/></ttyp:components><ttyp:alias/></ttyp:primaryKey></ttyp:tableType>`;
 
+const TTYP_CHAR10_XML = `<?xml version="1.0" encoding="utf-8"?><ttyp:tableType adtcore:masterLanguage="EN" adtcore:name="ZMY_CHARS" adtcore:type="TTYP/DA" adtcore:description="char10 rows" adtcore:language="EN" xmlns:ttyp="http://www.sap.com/dictionary/tabletype" xmlns:adtcore="http://www.sap.com/adt/core"><ttyp:rowType><ttyp:typeKind>predefinedAbapType</ttyp:typeKind><ttyp:typeName/><ttyp:builtInType><ttyp:dataType>CHAR</ttyp:dataType><ttyp:length>000010</ttyp:length><ttyp:decimals>000000</ttyp:decimals></ttyp:builtInType><ttyp:rangeType/></ttyp:rowType><ttyp:accessType>standard</ttyp:accessType><ttyp:primaryKey><ttyp:definition>standard</ttyp:definition><ttyp:kind>nonUnique</ttyp:kind><ttyp:components/><ttyp:alias/></ttyp:primaryKey></ttyp:tableType>`;
+
 const ICF_TTYP_DOC = {
   formatVersion: '1',
   header: { description: 'ECC fallback table type', originalLanguage: 'EN' },
@@ -88,6 +90,22 @@ describe('runPullTtyp — ADT channel', () => {
       { keyField: 'CONNID', descending: false },
     ]);
     expect(result.doc.keyKind).toBe('unique');
+  });
+
+  it('writes the predefined row type length and renders it in the sidecar', async () => {
+    adtGetTtyp.mockResolvedValueOnce(TTYP_CHAR10_XML);
+    const { runPullTtyp } = await import('../../src/abap_cli/flows/edit/pull-ttyp.js');
+    const { clearChannelCache } = await import('../../src/abap_cli/flows/edit/channel-detect.js');
+    clearChannelCache();
+
+    const result = await runPullTtyp('zmy_chars', { profile: ADT_PROFILE, rootDir: root });
+
+    const json = JSON.parse(fs.readFileSync(path.join(root, 'zmy_chars.ttyp.json'), 'utf8'));
+    expect(json.lineType).toEqual({ rowType: 'CHAR', rowTypeLength: 10 });
+    expect(fs.readFileSync(path.join(root, 'zmy_chars.type.abap'), 'utf8')).toBe(
+      'define type zmy_chars: table of char(10).',
+    );
+    expect(result.doc.lineType.rowTypeLength).toBe(10);
   });
 
   it('skips the type.abap sidecar when asked', async () => {

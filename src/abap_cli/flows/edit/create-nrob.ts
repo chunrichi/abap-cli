@@ -5,8 +5,9 @@
  * self-built ICF service. The wire body is a JSON document that mirrors the
  * AFF local shape — the ABAP side translates to `NRIV` rows.
  *
- * NROB namespaces must start with `Z` / `Y` / `/` (general DDIC rule); the
- * 3-character interval name is what the `SNRO` transaction binds to.
+ * NROB namespaces must start with `Z` / `Y` / `/` (general DDIC rule). The
+ * name is the `TNRO-NROBJ` key (CHAR 10), so it is capped below the DDIC
+ * general object-name limit.
  */
 import * as path from 'node:path';
 import { IcfClient } from '../../clients/icf-client.js';
@@ -18,6 +19,7 @@ import { toOutputPath } from '../../core/path-output.js';
 import { affObjectToken } from '../../formats/file-resolver.js';
 import type { CreateOptions } from './create.js';
 import type { CreateHandler } from './routing.js';
+import { normalizeNrobName } from './object-name.js';
 
 const NROB_NAME_PREFIX = /^(Z|Y|\/)/i;
 
@@ -26,7 +28,8 @@ export async function runCreateNrob(
   opts: CreateOptions,
   mode: OutputMode,
 ): Promise<void> {
-  const upper = objectName.trim().toUpperCase();
+  // TNRO-NROBJ is CHAR 10; a longer name is silently truncated SAP-side.
+  const upper = normalizeNrobName(objectName);
   if (!NROB_NAME_PREFIX.test(upper)) {
     throw new CliError(
       'INVALID_ARGUMENT',

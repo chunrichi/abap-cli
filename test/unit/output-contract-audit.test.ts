@@ -101,8 +101,10 @@ describe('output contract audit', () => {
     }
   });
 
-  it('DDIC_TABL_FORMAT_UNSUPPORTED and PULL_PARTIAL_FAILURE map to VALIDATION_ERROR', () => {
+  it('DDIC capability gaps map to VALIDATION_ERROR', () => {
     expect(categoryOf('DDIC_TABL_FORMAT_UNSUPPORTED')).toBe('VALIDATION_ERROR');
+    expect(categoryOf('TABL_FOREIGN_KEY_UNSUPPORTED')).toBe('VALIDATION_ERROR');
+    expect(categoryOf('TTYP_ROW_STRUCTURE_UNSUPPORTED')).toBe('VALIDATION_ERROR');
     expect(categoryOf('PULL_PARTIAL_FAILURE')).toBe('VALIDATION_ERROR');
     expect(EXIT_CODES.VALIDATION_ERROR).toBe(7);
   });

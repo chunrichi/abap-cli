@@ -15,6 +15,12 @@ const HASHED_XML = `<?xml version="1.0" encoding="utf-8"?><ttyp:tableType adtcor
 
 const PREDEFINED_XML = `<?xml version="1.0" encoding="utf-8"?><ttyp:tableType adtcore:masterLanguage="EN" adtcore:name="ZMY_STRINGS" adtcore:type="TTYP/DA" adtcore:description="Predefined row" adtcore:language="EN" xmlns:ttyp="http://www.sap.com/dictionary/tabletype" xmlns:adtcore="http://www.sap.com/adt/core"><ttyp:rowType><ttyp:typeKind>predefinedAbapType</ttyp:typeKind><ttyp:typeName/><ttyp:builtInType><ttyp:dataType>STRING</ttyp:dataType><ttyp:length>000000</ttyp:length><ttyp:decimals>000000</ttyp:decimals></ttyp:builtInType><ttyp:rangeType/></ttyp:rowType><ttyp:accessType>standard</ttyp:accessType><ttyp:primaryKey><ttyp:definition>standard</ttyp:definition><ttyp:kind>nonUnique</ttyp:kind><ttyp:components/><ttyp:alias/></ttyp:primaryKey></ttyp:tableType>`;
 
+/** Real ADT body of a `table of char10` (S/4HANA probe: dataType CHAR, length 000010). */
+const PREDEFINED_CHAR10_XML = `<?xml version="1.0" encoding="utf-8"?><ttyp:tableType adtcore:masterLanguage="EN" adtcore:name="ZMY_CHARS" adtcore:type="TTYP/DA" adtcore:description="char10 rows" adtcore:language="EN" xmlns:ttyp="http://www.sap.com/dictionary/tabletype" xmlns:adtcore="http://www.sap.com/adt/core"><ttyp:rowType><ttyp:typeKind>predefinedAbapType</ttyp:typeKind><ttyp:typeName/><ttyp:builtInType><ttyp:dataType>CHAR</ttyp:dataType><ttyp:length>000010</ttyp:length><ttyp:decimals>000000</ttyp:decimals></ttyp:builtInType><ttyp:rangeType/></ttyp:rowType><ttyp:accessType>standard</ttyp:accessType><ttyp:primaryKey><ttyp:definition>standard</ttyp:definition><ttyp:kind>nonUnique</ttyp:kind><ttyp:components/><ttyp:alias/></ttyp:primaryKey></ttyp:tableType>`;
+
+/** Real ADT body of a `table of dec15(2)` (length + decimals). */
+const PREDEFINED_DEC_XML = `<?xml version="1.0" encoding="utf-8"?><ttyp:tableType adtcore:masterLanguage="EN" adtcore:name="ZMY_DECS" adtcore:type="TTYP/DA" adtcore:description="dec rows" adtcore:language="EN" xmlns:ttyp="http://www.sap.com/dictionary/tabletype" xmlns:adtcore="http://www.sap.com/adt/core"><ttyp:rowType><ttyp:typeKind>predefinedAbapType</ttyp:typeKind><ttyp:typeName/><ttyp:builtInType><ttyp:dataType>DEC</ttyp:dataType><ttyp:length>000015</ttyp:length><ttyp:decimals>000002</ttyp:decimals></ttyp:builtInType><ttyp:rangeType/></ttyp:rowType><ttyp:accessType>standard</ttyp:accessType><ttyp:primaryKey><ttyp:definition>standard</ttyp:definition><ttyp:kind>nonUnique</ttyp:kind><ttyp:components/><ttyp:alias/></ttyp:primaryKey></ttyp:tableType>`;
+
 describe('TTYP wire → local', () => {
   it('parses a standard table type with a dictionary row type', () => {
     const local = wireToLocal(STANDARD_XML);
@@ -40,6 +46,26 @@ describe('TTYP wire → local', () => {
   it('parses a predefined ABAP row type by its data-type name', () => {
     const local = wireToLocal(PREDEFINED_XML);
     expect(local.lineType.rowType).toBe('STRING');
+    // STRING has no length of its own — ADT reports 000000/000000.
+    expect(local.lineType.rowTypeLength).toBeUndefined();
+    expect(local.lineType.rowTypeDecimals).toBeUndefined();
+  });
+
+  it('parses the length of a predefined row type (table of char10)', () => {
+    const local = wireToLocal(PREDEFINED_CHAR10_XML);
+    expect(local.lineType).toEqual({ rowType: 'CHAR', rowTypeLength: 10 });
+  });
+
+  it('parses length + decimals of a predefined row type (table of dec15(2))', () => {
+    const local = wireToLocal(PREDEFINED_DEC_XML);
+    expect(local.lineType).toEqual({ rowType: 'DEC', rowTypeLength: 15, rowTypeDecimals: 2 });
+  });
+
+  it('does not read builtInType length/decimals for a dictionary row type', () => {
+    // SAP recomputes them from the referenced object, so a stale wire value
+    // must never leak into the local document.
+    const xml = STANDARD_XML.replace('<ttyp:length>000000</ttyp:length>', '<ttyp:length>000021</ttyp:length>');
+    expect(wireToLocal(xml).lineType).toEqual({ rowType: 'LVC_S_TABL' });
   });
 });
 
@@ -78,7 +104,49 @@ describe('TTYP local → wire', () => {
     );
     expect(wire).toContain('<ttyp:typeKind>predefinedAbapType</ttyp:typeKind>');
     expect(wire).toContain('<ttyp:dataType>STRING</ttyp:dataType>');
+    expect(wire).toContain('<ttyp:length>000000</ttyp:length><ttyp:decimals>000000</ttyp:decimals>');
     expect(wire).not.toContain('packageRef');
+  });
+
+  it('emits the predefined row type length/decimals as 6-digit wire values', () => {
+    const wire = localToWire(
+      {
+        formatVersion: '1',
+        header: { description: 'char10 rows', originalLanguage: 'EN' },
+        accessType: 'standard',
+        lineType: { rowType: 'char', rowTypeLength: 10 },
+      },
+      'ZMY_CHARS',
+    );
+    expect(wire).toContain('<ttyp:typeKind>predefinedAbapType</ttyp:typeKind>');
+    expect(wire).toContain('<ttyp:dataType>CHAR</ttyp:dataType><ttyp:length>000010</ttyp:length><ttyp:decimals>000000</ttyp:decimals>');
+  });
+
+  it('emits length + decimals for a packed row type', () => {
+    const wire = localToWire(
+      {
+        formatVersion: '1',
+        header: { description: 'dec rows', originalLanguage: 'EN' },
+        accessType: 'standard',
+        lineType: { rowType: 'DEC', rowTypeLength: 15, rowTypeDecimals: 2 },
+      },
+      'ZMY_DECS',
+    );
+    expect(wire).toContain('<ttyp:dataType>DEC</ttyp:dataType><ttyp:length>000015</ttyp:length><ttyp:decimals>000002</ttyp:decimals>');
+  });
+
+  it('ignores rowTypeLength/rowTypeDecimals for a dictionary row type', () => {
+    const wire = localToWire(
+      {
+        formatVersion: '1',
+        header: { description: 'dictionary ref', originalLanguage: 'EN' },
+        accessType: 'standard',
+        lineType: { rowType: 'LVC_S_TABL', rowTypeLength: 21, rowTypeDecimals: 3 },
+      },
+      'ZMY_TTYP',
+    );
+    expect(wire).toContain('<ttyp:typeKind>dictionaryType</ttyp:typeKind>');
+    expect(wire).toContain('<ttyp:dataType>STRU</ttyp:dataType><ttyp:length>000000</ttyp:length><ttyp:decimals>000000</ttyp:decimals>');
   });
 
   it('emits key components with the recorded uniqueness', () => {
@@ -103,6 +171,13 @@ describe('TTYP local → wire', () => {
     const local = wireToLocal(HASHED_XML);
     expect(wireToLocal(localToWire(local, 'FEH_TEST_SFLIGHT_T_HASH_UNIQ'))).toEqual(local);
   });
+
+  it('round-trips a predefined row type with length/decimals', () => {
+    for (const xml of [PREDEFINED_CHAR10_XML, PREDEFINED_DEC_XML, PREDEFINED_XML]) {
+      const local = wireToLocal(xml);
+      expect(wireToLocal(localToWire(local, 'ZMY_TTYP'))).toEqual(local);
+    }
+  });
 });
 
 describe('TTYP sidecar and schema', () => {
@@ -110,6 +185,18 @@ describe('TTYP sidecar and schema', () => {
     const local = wireToLocal(HASHED_XML);
     expect(buildTypeSource('zmy_hashed', local)).toBe(
       'define type zmy_hashed: hashed table of feh_test_sflight_s with unique key carrid connid fldate.',
+    );
+  });
+
+  it('renders the predefined row type length/decimals in the sidecar', () => {
+    expect(buildTypeSource('zmy_chars', wireToLocal(PREDEFINED_CHAR10_XML))).toBe(
+      'define type zmy_chars: table of char(10).',
+    );
+    expect(buildTypeSource('zmy_decs', wireToLocal(PREDEFINED_DEC_XML))).toBe(
+      'define type zmy_decs: table of dec(15,2).',
+    );
+    expect(buildTypeSource('zmy_strings', wireToLocal(PREDEFINED_XML))).toBe(
+      'define type zmy_strings: table of string.',
     );
   });
 
@@ -121,6 +208,43 @@ describe('TTYP sidecar and schema', () => {
       lineType: { rowType: 'string' },
     });
     expect(errors).toEqual([]);
+  });
+
+  it('accepts rowTypeLength/rowTypeDecimals and keeps old files valid', async () => {
+    const withLength = await ttypArtifact.validate({
+      formatVersion: '1',
+      header: { description: 'ok', originalLanguage: 'EN' },
+      accessType: 'standard',
+      lineType: { rowType: 'CHAR', rowTypeLength: 10, rowTypeDecimals: 0 },
+    });
+    expect(withLength).toEqual([]);
+    const legacy = await ttypArtifact.validate({
+      formatVersion: '1',
+      header: { description: 'ok', originalLanguage: 'EN' },
+      accessType: 'standard',
+      lineType: { rowType: 'LVC_S_TABL' },
+    });
+    expect(legacy).toEqual([]);
+  });
+
+  it('rejects a negative rowTypeLength', async () => {
+    const errors = await ttypArtifact.validate({
+      formatVersion: '1',
+      header: { description: 'bad', originalLanguage: 'EN' },
+      accessType: 'standard',
+      lineType: { rowType: 'CHAR', rowTypeLength: -1 },
+    });
+    expect(errors.length).toBeGreaterThan(0);
+  });
+
+  it('rejects rowTypeLength without rowType (inline row structure)', async () => {
+    const errors = await ttypArtifact.validate({
+      formatVersion: '1',
+      header: { description: 'bad', originalLanguage: 'EN' },
+      accessType: 'standard',
+      lineType: { rowStructure: { fieldName: 'ROW', dataType: 'CHAR', length: 1 }, rowTypeLength: 1 },
+    });
+    expect(errors.length).toBeGreaterThan(0);
   });
 
   it('accepts the optional keyKind extension', async () => {

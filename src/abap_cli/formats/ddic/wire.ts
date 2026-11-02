@@ -54,6 +54,40 @@ export function stripClientFields(fields: DdicFieldLocal[] | undefined): DdicFie
   return fields.filter((f) => !isClientFieldName(f.fieldName));
 }
 
+/** One foreign-key declaration that the ICF write path cannot persist. */
+export interface UnsupportedForeignKey {
+  fieldName: string;
+  /** Field-level check table (`with foreign key ... check <table>` / DD03P-CHECKTABLE). */
+  checkTable?: string;
+  /** `@AbapCatalog.foreignKeys` entries attached to the field. */
+  foreignKeys?: Array<{ checkTable: string }>;
+}
+
+/**
+ * Collect foreign-key declarations on a TABL/STRU field list.
+ *
+ * The ICF wire path passes DD03P-CHECKTABLE through, but the foreign-key
+ * definition itself lives in DD05V/DD08V and is never written — accepting the
+ * payload would silently drop the constraints. Client-key columns are already
+ * filtered by {@link stripClientFields}, so an FK declared on MANDT/CLIENT
+ * does not block the payload.
+ */
+export function findUnsupportedForeignKeys(fields: DdicFieldLocal[] | undefined): UnsupportedForeignKey[] {
+  const found: UnsupportedForeignKey[] = [];
+  for (const field of stripClientFields(fields)) {
+    const foreignKeys = Array.isArray(field.foreignKeys) ? field.foreignKeys : [];
+    if (field.checkTable === undefined && foreignKeys.length === 0) continue;
+    found.push({
+      fieldName: String(field.fieldName).toUpperCase(),
+      ...(field.checkTable !== undefined ? { checkTable: String(field.checkTable).toUpperCase() } : {}),
+      ...(foreignKeys.length > 0
+        ? { foreignKeys: foreignKeys.map((fk) => ({ checkTable: String(fk.checkTable).toUpperCase() })) }
+        : {}),
+    });
+  }
+  return found;
+}
+
 /** map abap-file-format field (snake_case, mixed numeric) to wire (camelCase, number). */
 export function localFieldToWire(local: DdicFieldLocal): DdicFieldWire {
   const wire: DdicFieldWire = { fieldName: local.fieldName };
@@ -214,6 +248,31 @@ export function localToWire<T extends DdicSupportedType>(type: T, local: DdicObj
       // `header` and `generalInformation` are forwarded when present so the
       // ICF handler can persist deliveryClass / dataClass / sizeCategory.
       const w = wire as DdicTableSettingsWire;
+      const foreignKeys = findUnsupportedForeignKeys(l.fields as DdicFieldLocal[] | undefined);
+      if (foreignKeys.length > 0) {
+        const detail = foreignKeys
+          .map((fk) => {
+            const targets = [
+              ...(fk.checkTable !== undefined ? [fk.checkTable] : []),
+              ...(fk.foreignKeys ?? []).map((entry) => entry.checkTable),
+            ];
+            return `${fk.fieldName} -> ${[...new Set(targets)].join('/')}`;
+          })
+          .join(', ');
+        throw new CliError(
+          'TABL_FOREIGN_KEY_UNSUPPORTED',
+          `${type} ${String(local.name)} declares foreign keys (${detail}); the ICF write path does not persist DD05V/DD08V and would silently drop them`,
+          {
+            type,
+            object: local.name,
+            details: foreignKeys,
+            nextSteps: [
+              'Remove the @AbapCatalog.foreignKeys block / `with foreign key ... check <table>` clause from the local artifact.',
+              'Maintain the foreign key in SE11 / ADT after the table or structure exists.',
+            ],
+          },
+        );
+      }
       if (Array.isArray(l.fields)) {
         const original = l.fields as DdicFieldLocal[];
         const stripped = stripClientFields(original);

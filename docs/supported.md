@@ -52,7 +52,16 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 
 - `delete` runs lock → delete → unlock. Packages delete without a lock, and `VIEW` / `SHLP` / `TRAN` / `XSLT` / `HTTP` delete through the ICF service.
 - `ENQU` / `NROB` / `HTTP` delete through ICF for `$`-prefixed local packages only; transportable lock objects, number range objects and SICF nodes must be deleted in SE11 / SNRO / SICF so the removal is recorded in a transport.
-- `pull --textpool` adds text-element artifacts: `<name>.<type>.{texts,selections,headings}.en.properties`.
+
+## Text elements (`--textpool`)
+
+`abap pull <name> --textpool --type <CLAS|INTF|PROG|FUGR|TABL|STRU>` adds the object's text elements as `<name>.<type>.{texts,selections,headings}.en.properties`; `abap push` of those `.properties` files writes them back. `--type` is required so the pull cannot silently miss CLAS/INTF/FUGR text elements.
+
+- The route is decided per profile from a capability probe: `abap init` records whether the ADT text-element read/write endpoints are reachable. A profile without a recorded capability uses the conservative defaults — read through ADT, write through ICF.
+- Both routes read text elements; the ICF read endpoint is part of the bundled service and therefore needs `abap deploy` once per system, the ADT route does not.
+- Writing text elements needs the ADT write endpoint. The ICF textpool write endpoint is a stub that always answers `TEXTPOOL_WRITE_UNSUPPORTED`, so on a system whose ADT write probe failed, `abap push <file>.properties` fails with that code (not retryable — maintain the texts in SE38 / SE80 instead).
+- The route is fixed per profile for the whole command; there is no runtime fallback between ADT and ICF.
+- A category the object does not carry (for example a class without selection texts) is skipped with a `TEXTPOOL_CATEGORY_MISSING` warning instead of failing the pull; real SAP errors are reported per category as `failed` entries.
 
 ## Channel routing
 
@@ -65,7 +74,9 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 - `DEVC` — `create` takes `--package` (the super package) and `--description`; there is no `push`, because ADT rejects package updates.
 - `TRAN` — dialog, report, parameter and variant transactions; OO transactions stay in SE93.
 - `VIEW` / `SHLP` — local-extension schemas (`view-v1.json` / `shlp-v1.json`); upstream AFF defines neither.
-- `ENQU` / `NROB` — `create` and `delete` only work in `$`-prefixed local packages (transportable creation/deletion needs a TADIR/transport record). `create` writes the local TADIR row, so the object is discoverable and `delete` does not have to backfill it; ENQU delete then runs `RS_DD_DELETE_OBJ`, NROB delete removes the intervals and calls `NUMBER_RANGE_OBJECT_DELETE`. Delete transported objects in SE11 / SNRO.
+- `ENQU` / `NROB` — `create` and `delete` only work in `$`-prefixed local packages (transportable creation/deletion needs a TADIR/transport record). `create` writes the local TADIR row, so the object is discoverable and `delete` does not have to backfill it; ENQU delete then runs `RS_DD_DELETE_OBJ`, NROB delete removes the intervals and calls `NUMBER_RANGE_OBJECT_DELETE`. Delete transported objects in SE11 / SNRO. `NROB` names are the `TNRO-NROBJ` key (CHAR 10): `create` and `delete` reject longer names locally instead of letting SAP truncate them.
+- `TTYP` — `lineType.rowType` names either a repository type (data element / structure / table / table type) or a DDIC predefined data type (`CHAR`, `NUMC`, `DEC`, `DATS`, `INT4`, `STRING`, …); a predefined row type keeps its length/decimals in `lineType.rowTypeLength` / `lineType.rowTypeDecimals`. ABAP type codes (`C`, `I`, `P`, …) are not DDIC data type names and are not accepted.
+- `TABL` / `STRU` — foreign keys (`@AbapCatalog.foreignKeys` block or a `with foreign key ... check <table>` clause in the DDL sidecar) are not persisted by the bundled ICF service: `create` / `push` reject a payload that carries them (exit 7) instead of dropping the constraints. Maintain foreign keys in SE11 / ADT after the object exists.
 - `DOMA` / `DTEL` — long text is an optional companion file (`<name>.<type>.docu.json`, `docu-v1.json`); `lines: []` deletes the remote long text.
 - `BDEF` — `create` reads the AFF JSON plus the sibling `.bdef.abdl` source, creates the behavior definition through ADT and activates it; the behavior must target an existing root entity (or a valid unmanaged implementation class). `pull` / `push` / `delete` are also available.
 - `SRVB` — metadata only: `create` reads the AFF binding document, posts the ADT binding, activates it, and `--publish` runs the publish job. There is no `push`/update path (the AFF document omits implementation/published/version details); delete uses the generic ADT path and has been verified on a real system. Publishing may depend on the client's transport settings allowing local publish.
@@ -78,7 +89,7 @@ Upstream [abap-file-formats](https://github.com/SAP/abap-file-formats) defines n
 
 | Type | Schema | Kind | Derived from | Official AFF |
 |---|---|---|---|---|
-| `TTYP` | `ttyp-v1.json` | local variant — `keyKind` is a local extension | ADT table-type model (upstream `type-v1.json` is a type pool, not a table type) | No |
+| `TTYP` | `ttyp-v1.json` | local variant — `keyKind` / `rowTypeLength` / `rowTypeDecimals` are local extensions | ADT table-type model (upstream `type-v1.json` is a type pool, not a table type) | No |
 | `VIEW` | `view-v1.json` | local extension | DD25V / DD26V / DD27P / DD28J / DD28V | No |
 | `SHLP` | `shlp-v1.json` | local extension | DD30V / DD31V / DD32P / DD33V | No |
 

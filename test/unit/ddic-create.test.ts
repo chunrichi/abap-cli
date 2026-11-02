@@ -103,6 +103,24 @@ describe('create TABL', () => {
     });
   });
 
+  it('rejects a flat TABL payload that declares a foreign key before calling SAP', async () => {
+    writeTableJson('ZTAB_FK', [
+      { fieldName: 'COUNTRY', dataType: 'CHAR', length: 3, keyFlag: true, checkTable: 'T005' },
+    ]);
+    const program = makeProgram();
+    registerCreateCommand(program);
+    const res = await runCommand(program, [
+      'create', 'TABL', 'ZTAB_FK',
+      '--file', 'src/ztab_test.tabl.json',
+      '--package', '$TMP',
+      '--yes', '--json',
+    ], { cwd });
+    expect(res.exitCode).toBe(7);
+    const out = JSON.parse(res.stderr);
+    expect(out.error.code).toBe('TABL_FOREIGN_KEY_UNSUPPORTED');
+    expect(icfPostDdic).not.toHaveBeenCalled();
+  });
+
   it('auto-prepends MANDT when clientDependent=true', async () => {
     writeTableJson('ZTAB_CLI', [
       { fieldName: 'FIELD1', dataType: 'CHAR', length: 20, keyFlag: true },
