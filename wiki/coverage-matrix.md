@@ -4,7 +4,7 @@ title: SAP 开发任务覆盖率矩阵
 description: abap-cli 当前能 / 不能完成的 SAP 开发任务全景 — 用于未来 spec 选题 + 用户预期管理
 tags: [abap-cli, coverage, roadmap, scope]
 created at: 2026-09-01 00:00:00
-changed at: 2026-11-02 22:10:00
+changed at: 2026-11-02 23:25:00
 ---
 
 # SAP 开发任务覆盖率矩阵
@@ -37,8 +37,8 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | 创建/修改 DDIC 数据元素（DTEL） | `create / pull / push DTEL` | ✅ | ICF |
 | 创建/修改透明表（TABL） | `create / pull / push TABL` | ✅ | 三件套 + ICF；AFF 不覆盖索引 |
 | 创建/修改结构（STRU） | `create / pull / push STRU` | ✅ | 三件套 + ICF |
-| 创建/修改锁对象（ENQU） | `create / pull / push ENQU` | ✅ | ICF；`create --file` |
-| 创建/修改编号范围对象（NROB） | `create / pull / push NROB` | ✅ | pull 主 ADT + ICF 兜底；`create --file` |
+| 创建/修改锁对象（ENQU） | `create / pull / push / delete ENQU` | ✅ | ICF；`create --file`；delete 仅 `$TMP`（缺失 TADIR 时回填后再 `RS_DD_DELETE_OBJ`）；真机 create/delete 验证 |
+| 创建/修改编号范围对象（NROB） | `create / pull / push / delete NROB` | ✅ | pull 主 ADT + ICF 兜底；`create --file`；delete 仅 `$TMP`（清区间 + `NUMBER_RANGE_OBJECT_DELETE ohne_tp_flag`）；真机 create/delete 验证 |
 | 创建/修改 SICF 节点（HTTP） | `create / pull / push HTTP` | ✅ | ICF |
 | 创建/修改事务码（SE93 / TRAN） | `create / pull / push / delete TRAN` | ✅ | ICF `/tran` GET/POST/PUT/DELETE；dialog/report/parameter/variant，OO 明确拒绝；真机 23/23 TC |
 | 创建/修改转换程序（XSLT） | `create / pull / push / delete XSLT` | ✅ | ICF `/xslt` + `CL_O2_API_XSLTDESC`；AFF 两件套 `.xslt.json` + `.xslt.xml`；更新=原地更新并保留版本历史；真机 18/18 TC |
@@ -176,7 +176,7 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 |---|---|---|---|
 | 部署 ICF 服务 | `deploy` | ✅ | on-prem / Steampunk / BTP trial；`--dev` 开发形态 |
 | 检查 ICF 状态 | `deploy status` | ✅ | 版本 + 已部署 |
-| DDIC CRUD（DOMA/DTEL/TABL/STRU/ENQU/NROB） | `pull / create / push` | ✅ | ICF；`/ddic/<type>` |
+| DDIC CRUD（DOMA/DTEL/TABL/STRU/ENQU/NROB） | `pull / create / push / delete` | ✅ | ICF；`/ddic/<type>`；ENQU/NROB delete 仅 `$TMP` |
 | 双通道 DDIC（TTYP/MSAG） | `pull / create / push` | ✅ | ADT 主 + ECC ICF 兜底 |
 | 解析 SICF 节点（HTTP 类型） | `pull / create / push HTTP` | ✅ | ICF |
 | 解析事务码（TRAN 类型） | `pull / create / push / delete TRAN` | ✅ | 读写闭环；删除仅 `$TMP`（见 §1） |

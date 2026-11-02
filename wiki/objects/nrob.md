@@ -4,7 +4,7 @@ title: NROB — 编号范围对象（Number Range Object）
 description: NROB 对象的 ICF 路由、interval / configuration 字段契约、Z/Y 命名规则
 tags: [abap-cli, object-type, nrob, icf, abap-file-format, number-range, tnro, tnrot]
 created at: 2026-09-16 00:00:00
-changed at: 2026-11-01 23:05:00
+changed at: 2026-11-02 23:25:00
 ---
 
 # NROB — 编号范围对象（Number Range Object）
@@ -16,6 +16,7 @@ changed at: 2026-11-01 23:05:00
 | create | `POST /sap/abap_cli/ddic/nrob` |
 | pull | `GET /sap/abap_cli/ddic/nrob/<name>` |
 | push | `GET`（存在性探测）→ `POST /sap/abap_cli/ddic/nrob` |
+| delete | `DELETE /sap/abap_cli/ddic/nrob/<name>`（仅 `$TMP`） |
 
 `abap-adt-api` 没有 NROB 端点（NW 7.93 / S/4HANA 上的 ADT collection 是只读，2026-09-16 实测），ICF 是唯一读写路径。registry 里标 `source: 'ADT'` 并不代表 NROB 有 ADT 写通道：`routing.ts` 里 NROB 的 create / push 固定 `icf`，pull 是 `auto`（ADT 优先 + ICF fallback）。`resolveFile` 给出 `route: 'adt'`，但 `pushOne` 用 `PUSH_ROUTES.NROB`（`aff-json`）在通用源码分支**之前**拦截。pull 路径有 ADT 优先 + ICF fallback（`fallbackReason: 'ECC_EHP6_NO_ADT_NROB'`，2026-09-17 之前是硬编码在 `pull-nrob.ts` 里的字面量；registry 字段已删）。
 
@@ -145,10 +146,23 @@ AFF schema 要求 `interval` 的六个键都存在；`subType` 的值允许是�
 | Missing `numberLengthDomain` | ✗（CLI pre-flight） | — | AFF schema validation 拦截 |
 | `--package ZPKG_FAKE`（非本地包） | ✗（本地校验） | — | `transportRequest is required when package is not a local package` |
 
+## 删除
+
+`DELETE /ddic/nrob/<name>` 只处理 `$TMP` 本地对象：
+
+1. `SELECT` NRIV 的 interval 行（不调用 `NUMBER_RANGE_INTERVAL_LIST`——该 FM 在 ICF 上下文会触发 SNRO 屏幕）；
+2. 用 `NUMBER_RANGE_INTERVAL_UPDATE` + `NUMBER_RANGE_UPDATE_CLOSE` 删除区间；
+3. `NUMBER_RANGE_OBJECT_DELETE` 必须传 `ohne_tp_flag = 'X'`，否则 FM 的传输检查会打开 `SAPLSTRD 0100` 对话框；
+4. 最后清理 TADIR 行。
+
+可传输对象仍请在 SNRO 删除；ICF 对非本地包返回 `NROB_DELETE_UNSUPPORTED`。
+
 ## 当前限制
 
 - **ICF 服务端接受 `$` 前缀本地包**（旧 ICF 部署只认 `$TMP`，升级后执行一次 `abap deploy`）—— transport-bound NROB 仍不支持：需要额外的 `TR_TADIR_INTERFACE` + `RS_CORR_INSERT` 写 TADIR，本轮没实现。
-- **`$` 前缀本地包（2026-11-01 真机）**：非本地包 + `--tr` 被新 handler 拒绝（`NROB_PACKAGE_NOT_SUPPORTED`，消息改为 "supports local packages (name starts with $) only"）；正向创建未做——SNRO/ICF 均无删除通道，会产生无法清理的残留。证据：`tests/261101901-localpkg-icf/`（本地，不入库）。
+- **`$` 前缀本地包（2026-11-01 真机）**：非本地包 + `--tr` 被新 handler 拒绝（`NROB_PACKAGE_NOT_SUPPORTED`，消息改为 "supports local packages (name starts with $) only"）。
 - **不写 NRIV** —— 创建 object 声明后，interval 数据需要 `SNRO` 维护。
 - **不读 NRIV** —— pull 时 `nrobFormat.generate` 不输出 intervals 数组（schema 没暴露）。
+- **name 上限 10 字符** —— `nrobj` 只有 CHAR 10，超长名字会被 SAP 静默截断（CLI 返回实际写入名）；建议创建前就限制在 10 字符内。
 - **runtime dump 在 CLI 不报 NROB_NOT_FOUND 后** —— NROB_NOT_FOUND 是正常错误（对象不存在），runtime dump 是 5xx 的 SAP HTML；如果看到 5xx 而非 4xx JSON，说明是 ABAP 端缺激活或代码 bug，需要查 `tmp/scripts/probe-icf-incl2.mjs` 重新抓 implementations include 确认部署内容。
+- **删除的 500 dynpro 错误** —— 若看到 `Sending of dynpro SAPLSTRD 0100 ... No window system type`，说明 `NUMBER_RANGE_OBJECT_DELETE` 没传 `ohne_tp_flag='X'`（传输检查试图打开对话框），不是对象损坏。

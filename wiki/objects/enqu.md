@@ -4,7 +4,7 @@ title: ENQU — 锁对象（Lock Object）
 description: ENQU 对象的 ICF 路由、primaryTable / lockParameters / lockModules 字段契约、EZ/EY 命名规则
 tags: [abap-cli, object-type, enqu, icf, abap-file-format, lock-object]
 created at: 2026-09-16 00:00:00
-changed at: 2026-11-01 21:35:00
+changed at: 2026-11-02 23:25:00
 ---
 
 # ENQU — 锁对象（Lock Object）
@@ -16,6 +16,7 @@ changed at: 2026-11-01 21:35:00
 | create | `POST /sap/abap_cli/ddic/enqu` |
 | pull | `GET /sap/abap_cli/ddic/enqu/<name>` |
 | push | `GET`（存在性探测）→ `POST /sap/abap_cli/ddic/enqu` |
+| delete | `DELETE /sap/abap_cli/ddic/enqu/<name>`（仅 `$TMP`） |
 
 ENQU 与 TABL / DOMA / DTEL 同走 ICF，没有 ADT 通道：`abap-adt-api` 不暴露锁对象端点，ICF 是唯一路径。registry 里 `source: 'ICF'`，`resolveFile` 直接给出 `route: 'icf'`，`pushOne` 查 `routing.ts` 的 `PUSH_ROUTES.ENQU`（`icf-json`）。
 
@@ -111,9 +112,10 @@ CALL FUNCTION 'DDIF_ENQU_GET'
 | 环节 | 状态 |
 |---|---|
 | `GET /ddic/enqu/<name>`（pull） | **已实现**（上面的 `DDIF_ENQU_GET` 读路径） |
-| `POST /ddic/enqu`（create / push） | 未实现，返回 `ENQU_NOT_IMPLEMENTED` |
+| `POST /ddic/enqu`（create / push） | **已实现**：`DDIF_ENQU_PUT` + `DDIF_ENQU_ACTIVATE`，仅 `$` 前缀本地包 |
+| `DELETE /ddic/enqu/<name>` | **已实现**：缺失 TADIR 时先回填本地 `$TMP` 行，再 `RS_DD_DELETE_OBJ`（objtype `L`）；仅 `$TMP` |
 
-`create` 走 `DDIF_ENQU_PUT`（同样在函数组 `SDIF`，参数为 `name` + `dd25v_wa` + `dd26e_tab` + `dd27p_tab`），待补。
+`delete` 的 TADIR 回填是必要的：ICF 创建的 ENQU 不写 TADIR，`RS_DD_DELETE_OBJ` 的 `RS_ACCESS_PERMISSION` 会尝试打开传输请求对话框并返回 E2/004（Action was canceled）。回填后即可在无 GUI 的 ICF 上下文删除。
 
 两个字段尚未映射，均为 AFF 可选、CLI 读取时默认 `false`：
 
@@ -124,4 +126,5 @@ CALL FUNCTION 'DDIF_ENQU_GET'
 
 ## 真机证据
 
-- **`$` 前缀本地包（2026-11-01，S/4HANA test-system / profile `test`）**：旧 ICF handler 拒绝 `$ZCLI_TC_LP` 中的 ENQU（`ENQU_PACKAGE_NOT_SUPPORTED`）；执行 `abap deploy` 后同一命令创建成功，`transport list --open` 空、E071 0 行。ENQU 目前**没有删除通道**（ADT 不索引锁对象、ICF 无 delete 路由），清理需走 SE11 或临时报表直删 DDIC 行。证据：`tests/261101901-localpkg-icf/`（本地，不入库）。
+- **create（2026-11-01，S/4HANA test-system / profile `test`）**：旧 ICF handler 拒绝 `$ZCLI_TC_LP` 中的 ENQU（`ENQU_PACKAGE_NOT_SUPPORTED`）；执行 `abap deploy` 后同一命令创建成功，`transport list --open` 空、E071 0 行。证据：`tests/261101901-localpkg-icf/`（本地，不入库）。
+- **create → delete（2026-11-02，同一系统）**：`abap create ENQU EZCLI_TC_ENQU2 --file ... --package '$TMP'` 成功；`abap delete EZCLI_TC_ENQU2 --type ENQU` 返回 `deleted: true`，随后 DD25L / TADIR 均无残留。证据：`tests/261102013-enqu-nrob-delete/`（本地，不入库）。

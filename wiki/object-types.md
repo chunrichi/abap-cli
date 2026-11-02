@@ -4,7 +4,7 @@ title: 支持的对象类型
 description: abap CLI 支持的 ABAP 对象类型总览 — 25 个类型码 × create/pull/push/delete 路由（ADT / ICF）与本地 AFF 文件布局
 tags: [abap-cli, object-types, ddic, http, sicf, reference]
 created at: 2026-08-29 10:00:00
-changed at: 2026-11-02 22:10:00
+changed at: 2026-11-02 23:25:00
 ---
 
 # 支持的对象类型
@@ -24,10 +24,10 @@ abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **25 个
 | `STRU` | 结构 | ICF | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.stru.{json,ddic}`（`.settings.json` 仅 TABL 有） |
 | `DOMA` | 域 | ICF | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.doma.json`（可选伴生 `<name>.doma.docu.json`，长文本 0..1） |
 | `DTEL` | 数据元素 | ICF | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.dtel.json`（可选伴生 `<name>.dtel.docu.json`，长文本 0..1） |
-| `ENQU` | 锁对象 | ICF | `--file` | ✅ | ✅ | ❌ | ❌ | `<name>.enqu.json` |
+| `ENQU` | 锁对象 | ICF | `--file` | ✅ | ✅ | ✅（仅 `$TMP`） | ❌ | `<name>.enqu.json` |
 | `VIEW` | 数据库视图 | ICF | `--file`（`view-v1.json`，本地扩展） | ✅ | ✅ | ✅（仅 `$TMP`） | ❌ | `<name>.view.json` |
 | `SHLP` | 搜索帮助 | ICF | `--file`（`shlp-v1.json`，本地扩展；elementary/collective） | ✅ | ✅ | ✅（仅 `$TMP`） | ❌ | `<name>.shlp.json` |
-| `NROB` | 编号范围对象 | ICF（pull 主 ADT + ICF 兜底） | `--file` | ✅ | ✅ | ❌（SNRO 中删除） | ❌ | `<name>.nrob.json` |
+| `NROB` | 编号范围对象 | ICF（pull 主 ADT + ICF 兜底） | `--file` | ✅ | ✅ | ✅（仅 `$TMP`） | ❌ | `<name>.nrob.json` |
 | `HTTP` | **ICF / SICF 节点** | ICF | `--file` | ✅ | ✅ | ❌（SICF 中删除） | ❌ | `<name>.http.json` |
 | `TRAN` | 事务码 (SE93) | ICF | `--file` | ✅ | ✅ | ✅（仅 `$TMP`） | ❌ | `<code>.tran.json` |
 | `XSLT` | 转换程序（XSLT Program） | ICF | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.xslt.{json,xml}` 两件套 |
@@ -43,7 +43,7 @@ abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **25 个
 
 > **`create local` 只支持 `CLAS` / `INTF` / `PROG` / `FUGR`**（`formats/templates.ts` 只有这四类模板），其余类型一律 `TYPE_NOT_SUPPORTED`（exit 7）。`SRVD` / `DCLS` / `DDLX` / `DDLA` 在 SAP 侧可创建（`createObjtype`），但没有本地骨架模板；`create local` 会拒绝它们并提示改用 `abap create <type> --file <aff.json>`。
 > **`create` 的 `--file` 是数据驱动必填项**（`types/registry.ts` 的 `ObjectTypeEntry.requiresFile`）：`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `NROB` / `HTTP` / `TRAN` / `XSLT` / `TTYP` / `MSAG` / `DDLS` / `BDEF` / `SRVB` / `SRVD` / `DCLS` / `DDLX` / `DDLA` 缺 `--file` 直接 `USAGE`（exit 2）。`BDEF` 还需同目录的 `.bdef.abdl` 源码；`SRVB` 创建后可用 `--publish` 发布（publish job 受系统 transport 设置约束），push/update 不支持。
-> **`ENQU` / `NROB` 的 create 仅支持本地包（`$` 前缀）**：可传输创建需要额外写 TADIR 记录，ICF 服务对非本地包直接拒绝（`ENQU_PACKAGE_NOT_SUPPORTED` / `NROB_PACKAGE_NOT_SUPPORTED`）；`ENQU` / `NROB` 都没有 delete 通道（ADT 不索引锁对象，`numberranges` 资源只读，ICF 只删 VIEW/SHLP），删除请在 SE11（ENQU）/ SNRO（NROB）操作。`TEST...` 前缀的包不视为本地。（真机：`$` 前缀本地包中 ENQU 创建成功且无 transport；ENQU/NROB 无删除通道，清理需 SE11/SNRO。证据 `tests/261101901-localpkg-icf/`，本地不入库。）
+> **`ENQU` / `NROB` 的 create/delete 仅支持本地包（`$` 前缀）**：可传输创建/删除需要额外写 TADIR 记录，ICF 服务对非本地包直接拒绝（`ENQU_PACKAGE_NOT_SUPPORTED` / `NROB_PACKAGE_NOT_SUPPORTED`、`ENQU_DELETE_UNSUPPORTED` / `NROB_DELETE_UNSUPPORTED`）。`ENQU` 删除先回填本地 TADIR 行再走 `RS_DD_DELETE_OBJ`；`NROB` 删除清空区间后走 `NUMBER_RANGE_OBJECT_DELETE`。可传输对象请在 SE11（ENQU）/ SNRO（NROB）删除。`TEST...` 前缀的包不视为本地。（真机：`$` 前缀本地包中 ENQU/NROB create → delete 通过，TADIR/DD25L/TNRO 无残留；证据 `tests/261102013-enqu-nrob-delete/`，本地不入库。）
 
 > **`TRAN` 写路径已实现**：ABAP `/tran/<code>` 支持 GET / POST / PUT / DELETE，覆盖 dialog / report（含 report variant）/ parameter / variant 四种事务；OO 事务返回 `TRAN_OO_NOT_SUPPORTED`（规范 FM 没有 class/method 参数，仍用 SE93 维护）。`delete` 只支持 `$TMP` 事务（可传输事务请在 SE93 删除以便记录到请求）。类型页面：[tran](objects/tran.md)。
 > **`XSLT` 两件套**：`<name>.xslt.json`（AFF xslt-v1 元数据）+ `<name>.xslt.xml`（源码）必须成对存在；SAP 侧走 ICF `/xslt/<name>` + `CL_O2_API_XSLTDESC`，更新语义是**原地更新并保留版本历史**（`load` → `set_source` → `save` → `activate`）。行尾统一规范化（SAP 读回多一个 CRLF）。类型页面：[xslt](objects/xslt.md)。

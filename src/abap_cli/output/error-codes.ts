@@ -175,9 +175,16 @@ export type ErrorCode =
   | 'ENQU_CREATE_FAILED'         // ICF /ddic/enqu POST failure (SAP_ERROR)
   | 'ENQU_PUSH_FAILED'           // ICF /ddic/enqu POST failure during push (SAP_ERROR)
   | 'ENQU_PACKAGE_NOT_SUPPORTED' // ENQU create outside a local ($-prefixed) package (VALIDATION_ERROR)
+  | 'ENQU_NAME_INVALID'          // ENQU name missing / too long (VALIDATION_ERROR)
+  | 'ENQU_DELETE_UNSUPPORTED'    // delete of a transported lock object via ICF (VALIDATION_ERROR)
+  | 'ENQU_DELETE_FAILED'         // RS_DD_DELETE_OBJ failure (SAP_ERROR)
+  | 'ENQU_NOT_AUTHORIZED'        // RS_DD_DELETE_OBJ permission failure (AUTH_ERROR)
   | 'NROB_CREATE_FAILED'         // ICF /ddic/nrob POST failure (SAP_ERROR)
   | 'NROB_PUSH_FAILED'           // ICF /ddic/nrob POST failure during push (SAP_ERROR)
   | 'NROB_PACKAGE_NOT_SUPPORTED' // NROB create outside a local ($-prefixed) package (VALIDATION_ERROR)
+  | 'NROB_NAME_INVALID'          // NROB name missing / too long (VALIDATION_ERROR)
+  | 'NROB_DELETE_UNSUPPORTED'    // delete of a transported number range object via ICF (VALIDATION_ERROR)
+  | 'NROB_DELETE_FAILED'         // number-range delete failure (SAP_ERROR)
   | 'ENQU_NOT_IMPLEMENTED'       // ICF handler accepts /ddic/enqu but the SAP-side read/write is not deployed yet (SAP_ERROR)
   | 'NROB_NOT_IMPLEMENTED'       // ICF handler accepts /ddic/nrob but the SAP-side read/write is not deployed yet (SAP_ERROR)
   // bundled-service deploy: dev-class merge into the handler class
@@ -270,9 +277,16 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   ENQU_CREATE_FAILED: 'SAP_ERROR',
   ENQU_PUSH_FAILED: 'SAP_ERROR',
   ENQU_PACKAGE_NOT_SUPPORTED: 'VALIDATION_ERROR',
+  ENQU_NAME_INVALID: 'VALIDATION_ERROR',
+  ENQU_DELETE_UNSUPPORTED: 'VALIDATION_ERROR',
+  ENQU_DELETE_FAILED: 'SAP_ERROR',
+  ENQU_NOT_AUTHORIZED: 'AUTH_ERROR',
   NROB_CREATE_FAILED: 'SAP_ERROR',
   NROB_PUSH_FAILED: 'SAP_ERROR',
   NROB_PACKAGE_NOT_SUPPORTED: 'VALIDATION_ERROR',
+  NROB_NAME_INVALID: 'VALIDATION_ERROR',
+  NROB_DELETE_UNSUPPORTED: 'VALIDATION_ERROR',
+  NROB_DELETE_FAILED: 'SAP_ERROR',
   ENQU_NOT_IMPLEMENTED: 'SAP_ERROR',
   NROB_NOT_IMPLEMENTED: 'SAP_ERROR',
   TABL_DDL_INVALID: 'VALIDATION_ERROR',

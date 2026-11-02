@@ -9,7 +9,7 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 
 ## Type × command matrix
 
-25 types support `create`, all 25 support `pull`, 23 have a `push` path and 22 have a `delete` path. In the matrix:
+25 types support `create`, all 25 support `pull`, 23 have a `push` path and 24 have a `delete` path. In the matrix:
 
 - `--file` marks a `create` that reads a JSON document — write it yourself or `pull` a comparable object first.
 - `$TMP` marks a `delete` that only removes local objects; delete transportable objects in SAP GUI so the deletion is recorded in a transport.
@@ -25,12 +25,12 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 | `DEVC` | Package | ✅ | ✅ | — | ✅ | ADT | `.devc.json` |
 | `DOMA` | Domain | ✅ `--file` | ✅ | ✅ | ✅ | ICF | `.doma.json` (+ `.doma.docu.json`) |
 | `DTEL` | Data element | ✅ `--file` | ✅ | ✅ | ✅ | ICF | `.dtel.json` (+ `.dtel.docu.json`) |
-| `ENQU` | Lock object | ✅ `--file` | ✅ | ✅ | — | ICF | `.enqu.json` |
+| `ENQU` | Lock object | ✅ `--file` | ✅ | ✅ | ✅ `$TMP` | ICF | `.enqu.json` |
 | `FUGR` | Function group | ✅ | ✅ | ✅ | ✅ | ADT | `.fugr.json` + `.fugr.<include>.reps.{json,abap}` + `.fugr.<fm>.func.{json,abap}` |
 | `HTTP` | SICF service node | ✅ `--file` | ✅ | ✅ | — | ICF | `.http.json` |
 | `INTF` | Interface | ✅ | ✅ | ✅ | ✅ | ADT | `.intf.json` + `.intf.abap` |
 | `MSAG` | Message class | ✅ `--file` | ✅ | ✅ | ✅ | auto (ADT / ICF) | `.msag.json` |
-| `NROB` | Number range object | ✅ `--file` | ✅ | ✅ | — | ICF (pull: ADT / ICF) | `.nrob.json` |
+| `NROB` | Number range object | ✅ `--file` | ✅ | ✅ | ✅ `$TMP` | ICF (pull: ADT / ICF) | `.nrob.json` |
 | `PROG` | Program | ✅ | ✅ | ✅ | ✅ | ADT | `.prog.json` + `.prog.abap` (`.prog.include.abap` for include programs) |
 | `SHLP` | Search help | ✅ `--file` | ✅ | ✅ | ✅ `$TMP` | ICF | `.shlp.json` |
 | `SRVD` | Service definition | ✅ `--file` | ✅ | ✅ | ✅ | ADT | `.srvd.json` + `.srvd.acds` |
@@ -51,7 +51,7 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 ## Delete rules
 
 - `delete` runs lock → delete → unlock. Packages delete without a lock, and `VIEW` / `SHLP` / `TRAN` / `XSLT` delete through the ICF service.
-- `HTTP` nodes are removed in SICF, `NROB` objects in SNRO and lock objects (`ENQU`) in SE11 — none of them has a CLI delete path.
+- `ENQU` / `NROB` delete through ICF for `$TMP` objects; transportable lock objects and number range objects must be deleted in SE11 / SNRO so the removal is recorded in a transport. `HTTP` nodes are removed in SICF (no CLI delete path).
 - `pull --textpool` adds text-element artifacts: `<name>.<type>.{texts,selections,headings}.en.properties`.
 
 ## Channel routing
@@ -65,7 +65,7 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 - `DEVC` — `create` takes `--package` (the super package) and `--description`; there is no `push`, because ADT rejects package updates.
 - `TRAN` — dialog, report, parameter and variant transactions; OO transactions stay in SE93.
 - `VIEW` / `SHLP` — local-extension schemas (`view-v1.json` / `shlp-v1.json`); upstream AFF defines neither.
-- `ENQU` / `NROB` — `create` only works into `$`-prefixed local packages (transportable creation needs a TADIR record), and neither has a delete path — remove lock objects in SE11 and number ranges in SNRO.
+- `ENQU` / `NROB` — `create` and `delete` only work in `$`-prefixed local packages (transportable creation/deletion needs a TADIR/transport record). ENQU delete backfills the local TADIR row before running `RS_DD_DELETE_OBJ`; NROB delete removes the intervals and calls `NUMBER_RANGE_OBJECT_DELETE`. Delete transported objects in SE11 / SNRO.
 - `DOMA` / `DTEL` — long text is an optional companion file (`<name>.<type>.docu.json`, `docu-v1.json`); `lines: []` deletes the remote long text.
 - `BDEF` — `create` reads the AFF JSON plus the sibling `.bdef.abdl` source, creates the behavior definition through ADT and activates it; the behavior must target an existing root entity (or a valid unmanaged implementation class). `pull` / `push` / `delete` are also available.
 - `SRVB` — metadata only: `create` reads the AFF binding document, posts the ADT binding, activates it, and `--publish` runs the publish job. There is no `push`/update path (the AFF document omits implementation/published/version details); delete uses the generic ADT path and has been verified on a real system. Publishing may depend on the client's transport settings allowing local publish.

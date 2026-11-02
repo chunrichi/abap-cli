@@ -10,14 +10,13 @@
  *
  * Supported types: anything reachable by `client.deleteObject` (CLAS, INTF,
  * PROG, FUGR, FUGR/FF, TABL, STRU, DOMA, DTEL, MSAG, TTYP, DDLS, DDLX, BDEF,
- * DCLS, SRVD, SRVB, ENQU). DEVC takes the dedicated package branch
- * (`delete-devc.ts` — packages are deleted without a lock); TRAN, VIEW and SHLP
- * go through the bundled ICF service (`DELETE /tran/<tcode>` /
- * `/ddic/view|shlp/<name>`).
- * HTTP (SICF node) and NROB have no delete path: ADT does not index SICF nodes,
- * so HTTP fails at resolve (`OBJECT_NOT_FOUND`), and the ADT `numberranges`
- * resource is read-only for writes, so NROB fails at lock / delete. Type codes
- * without an ADT delete endpoint surface as `TYPE_NOT_SUPPORTED`.
+ * DCLS, SRVD, SRVB). DEVC takes the dedicated package branch (`delete-devc.ts`
+ * — packages are deleted without a lock); TRAN, VIEW, SHLP, ENQU and NROB go
+ * through the bundled ICF service (`DELETE /tran/<tcode>` /
+ * `/ddic/{view,shlp,enqu,nrob}/<name>`; the DDIC ones are `$TMP`-only).
+ * HTTP (SICF node) has no delete path: ADT does not index SICF nodes, so HTTP
+ * fails at resolve (`OBJECT_NOT_FOUND`). Type codes without an ADT delete
+ * endpoint surface as `TYPE_NOT_SUPPORTED`.
  */
 import { AdtClientWrapper } from '../../clients/adt-client.js';
 import { IcfClient } from '../../clients/icf-client.js';
@@ -29,6 +28,8 @@ import { normalizeTypeInput } from '../../cli/type-alias.js';
 import { runDeleteDevc } from './delete-devc.js';
 import { runDeleteView } from './delete-view.js';
 import { runDeleteShlp } from './delete-shlp.js';
+import { runDeleteEnqu } from './delete-enqu.js';
+import { runDeleteNrob } from './delete-nrob.js';
 
 export interface DeleteOptions {
   /** Object type code (CLAS / PROG / ...). Required — `delete` without a type
@@ -94,6 +95,15 @@ export async function runDelete(objectName: string, opts: DeleteOptions): Promis
   // SHLP (DDIC search help) has no ADT delete endpoint either.
   if (typeUpper === 'SHLP') {
     return runDeleteShlp(objectName, opts);
+  }
+  // ENQU (lock object) and NROB (number range object) delete through ICF too;
+  // their native maintenance transactions (SE11 / SNRO) stay canonical for
+  // transported objects.
+  if (typeUpper === 'ENQU') {
+    return runDeleteEnqu(objectName, opts);
+  }
+  if (typeUpper === 'NROB') {
+    return runDeleteNrob(objectName, opts);
   }
   // TRAN (SE93 transaction codes) has no ADT delete endpoint: a transaction is
   // repository metadata spread over TSTC/TSTCT/TSTCP/TSTCC/TSTCA plus TADIR, so

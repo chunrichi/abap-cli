@@ -164,6 +164,13 @@ CLASS zcl_abap_vibe_icf_ddic DEFINITION PUBLIC FINAL CREATE PUBLIC.
       EXPORTING es_payload TYPE zcl_abap_vibe_icf_types=>ty_ddic_delete
                 ev_error   TYPE zcl_abap_vibe_icf_types=>ty_error.
 
+    " NROB (number range object) deletion: interval cleanup + the canonical
+    " NUMBER_RANGE_OBJECT_DELETE, then drop the local TADIR row if the FM
+    " leaves it behind.
+    CLASS-METHODS delete_number_range
+      IMPORTING iv_name  TYPE nrobj
+      EXPORTING ev_error TYPE zcl_abap_vibe_icf_types=>ty_error.
+
     CLASS-METHODS last_message
       RETURNING VALUE(rv_message) TYPE string.
 
@@ -303,11 +310,12 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
 
     DATA lv_package TYPE devclass.
     DATA lv_request TYPE trkorr.
-    " VIEW / SHLP deletion: there is no ADT delete path for these types, so
-    " the CLI DELETEs through this ICF route. RS_DD_DELETE_OBJ is the only
-    " ICF-safe delete (RS_DD_DELETE opens a confirm dynpro).
+    " VIEW / SHLP / ENQU / NROB deletion: there is no ADT delete path for
+    " these types, so the CLI DELETEs through this ICF route. VIEW/SHLP/ENQU
+    " use RS_DD_DELETE_OBJ (RS_DD_DELETE opens a confirm dynpro); NROB uses
+    " the number-range delete FMs.
     IF iv_method = 'DELETE'.
-      IF lv_type = 'VIEW' OR lv_type = 'SHLP'.
+      IF lv_type = 'VIEW' OR lv_type = 'SHLP' OR lv_type = 'ENQU' OR lv_type = 'NROB'.
         delete_ddic_object( EXPORTING iv_type = lv_type
                                       iv_name = lv_name
                             IMPORTING es_payload = DATA(ls_delete_response)
@@ -2839,33 +2847,50 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
     DATA lv_tadir_exists TYPE abap_bool.
     DATA lv_activation_rc TYPE sy-subrc.
     DATA lv_delete_code TYPE string.
+    DATA lv_tadir_inserted TYPE abap_bool.
 
     lv_object_type = to_upper( iv_type ).
     lv_name = to_upper( condense( val = iv_name del = ` ` ) ).
-    IF lv_object_type = 'SHLP'.
-      lv_name_limit    = 30.
-      lv_tadir_object  = 'SHLP'.
-      lv_rs_dd_objtype = 'H'.
-    ELSE.
-      lv_name_limit    = 16.
-      lv_tadir_object  = 'VIEW'.
-      lv_rs_dd_objtype = 'V'.
-    ENDIF.
+    CASE lv_object_type.
+      WHEN 'SHLP'.
+        lv_name_limit    = 30.
+        lv_tadir_object  = 'SHLP'.
+        lv_rs_dd_objtype = 'H'.
+      WHEN 'ENQU'.
+        lv_name_limit    = 16.
+        lv_tadir_object  = 'ENQU'.
+        lv_rs_dd_objtype = 'L'.
+      WHEN 'NROB'.
+        lv_name_limit    = 20.
+        lv_tadir_object  = 'NROB'.
+      WHEN OTHERS.
+        lv_name_limit    = 16.
+        lv_tadir_object  = 'VIEW'.
+        lv_rs_dd_objtype = 'V'.
+    ENDCASE.
     IF lv_name IS INITIAL OR strlen( lv_name ) > lv_name_limit OR lv_name CS ` `.
-      DATA(lv_name_code) = COND string( WHEN lv_object_type = 'SHLP' THEN 'SHLP_NAME_INVALID' ELSE 'VIEW_NAME_INVALID' ).
+      DATA(lv_name_code) = SWITCH string( lv_object_type
+                                            WHEN 'SHLP' THEN 'SHLP_NAME_INVALID'
+                                            WHEN 'ENQU' THEN 'ENQU_NAME_INVALID'
+                                            WHEN 'NROB' THEN 'NROB_NAME_INVALID'
+                                            ELSE 'VIEW_NAME_INVALID' ).
       ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
                                  error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = lv_name_code
                                               message = |{ lv_object_type } name must be a non-empty name of at most { lv_name_limit } characters without whitespace (got '{ lv_name }')| ) ).
       RETURN.
     ENDIF.
     lv_objname = lv_name.
-    IF lv_object_type = 'SHLP'.
-      SELECT SINGLE shlpname FROM dd30l INTO @DATA(lv_existing_shlp)
-        WHERE shlpname = @lv_objname.
-    ELSE.
-      SELECT SINGLE viewname FROM dd25l INTO @DATA(lv_existing_view)
-        WHERE viewname = @lv_objname.
-    ENDIF.
+    CASE lv_object_type.
+      WHEN 'SHLP'.
+        SELECT SINGLE shlpname FROM dd30l INTO @DATA(lv_existing_shlp)
+          WHERE shlpname = @lv_objname.
+      WHEN 'NROB'.
+        SELECT SINGLE object FROM tnro INTO @DATA(lv_existing_nrob)
+          WHERE object = @lv_objname.
+      WHEN OTHERS.
+        SELECT SINGLE viewname FROM dd25l INTO @DATA(lv_existing_view)
+          WHERE viewname = @lv_objname.
+    ENDCASE.
     lv_object_exists = boolc( sy-subrc = 0 ).
     SELECT SINGLE devclass FROM tadir INTO @lv_package
       WHERE pgmid = 'R3TR' AND object = @lv_tadir_object AND obj_name = @lv_objname.
@@ -2879,66 +2904,122 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
     " Removing a repository object from a transport request cannot be recorded
     " from the ICF context (no CTS dialog), so non-local objects stay with SE11.
     IF lv_package IS NOT INITIAL AND zcl_abap_vibe_icf_types=>is_local_package( lv_package ) = abap_false.
-      DATA(lv_unsupported_code) = COND string( WHEN lv_object_type = 'SHLP' THEN 'SHLP_DELETE_UNSUPPORTED' ELSE 'VIEW_DELETE_UNSUPPORTED' ).
+      DATA(lv_unsupported_code) = SWITCH string( lv_object_type
+                                                   WHEN 'SHLP' THEN 'SHLP_DELETE_UNSUPPORTED'
+                                                   WHEN 'ENQU' THEN 'ENQU_DELETE_UNSUPPORTED'
+                                                   WHEN 'NROB' THEN 'NROB_DELETE_UNSUPPORTED'
+                                                   ELSE 'VIEW_DELETE_UNSUPPORTED' ).
       ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
                                  error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = lv_unsupported_code
                                               message = |{ lv_object_type } { lv_name } is in non-local package { lv_package }; delete it in SE11 so the deletion is recorded in a transport request| ) ).
       RETURN.
     ENDIF.
 
+    " An ICF-created ENQU may not have a TADIR row yet; RS_DD_DELETE_OBJ's
+    " transport check then tries to open the request dialog and cancels.
+    " Backfill the local TADIR row before deleting.
+    IF lv_object_type = 'ENQU' AND lv_object_exists = abap_true AND lv_tadir_exists = abap_false.
+      CALL FUNCTION 'TR_TADIR_INTERFACE'
+        EXPORTING wi_test_modus       = abap_false
+                  wi_tadir_pgmid      = 'R3TR'
+                  wi_tadir_object     = 'ENQU'
+                  wi_tadir_obj_name   = CONV tadir-obj_name( lv_name )
+                  wi_tadir_author     = sy-uname
+                  wi_tadir_devclass   = '$TMP'
+                  wi_tadir_masterlang = sy-langu
+                  wi_tadir_srcsystem  = CONV srcsystem( sy-sysid )
+        EXCEPTIONS OTHERS = 1.
+      IF sy-subrc <> 0.
+        ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                   error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'ENQU_DELETE_FAILED'
+                                                message = |ENQU { lv_name } has no TADIR entry and the local $TMP entry could not be created (sy-subrc { sy-subrc })| ) ).
+        RETURN.
+      ENDIF.
+      lv_tadir_inserted = abap_true.
+    ENDIF.
+
     IF lv_object_exists = abap_true.
       " Activate an inactive version first; an already-active object just
-      " returns "nothing to activate" from the activate FM.
-      IF lv_object_type = 'SHLP'.
-        CALL FUNCTION 'DDIF_SHLP_ACTIVATE'
-          EXPORTING name = lv_objname
-          IMPORTING rc   = lv_activation_rc
-          EXCEPTIONS not_found   = 1
-                     put_failure = 2
-                     OTHERS      = 3.
+      " returns "nothing to activate" from the activate FM. ENQU/NROB have no
+      " DDIC activation step (RS_DD_DELETE_OBJ deletes the active ENQU).
+      IF lv_object_type <> 'NROB' AND lv_object_type <> 'ENQU'.
+        CASE lv_object_type.
+          WHEN 'SHLP'.
+            CALL FUNCTION 'DDIF_SHLP_ACTIVATE'
+              EXPORTING name = lv_objname
+              IMPORTING rc   = lv_activation_rc
+              EXCEPTIONS not_found   = 1
+                         put_failure = 2
+                         OTHERS      = 3.
+          WHEN OTHERS.
+            CALL FUNCTION 'DDIF_VIEW_ACTIVATE'
+              EXPORTING name     = lv_objname
+                        auth_chk = abap_true
+              IMPORTING rc       = lv_activation_rc
+              EXCEPTIONS not_found   = 1
+                         put_failure = 2
+                         OTHERS      = 3.
+        ENDCASE.
+        IF sy-subrc <> 0.
+          DATA(lv_activate_failed_code) = SWITCH string( lv_object_type
+                                                            WHEN 'SHLP' THEN 'SHLP_DELETE_FAILED'
+                                                            WHEN 'ENQU' THEN 'ENQU_DELETE_FAILED'
+                                                            ELSE 'VIEW_DELETE_FAILED' ).
+          ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                     error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = lv_activate_failed_code
+                                                  message = |{ lv_object_type } { lv_name } has an inactive version that could not be activated (sy-subrc { sy-subrc }); activate it in SE11 and retry| ) ).
+          RETURN.
+        ENDIF.
+      ENDIF.
+      IF lv_object_type = 'NROB'.
+        delete_number_range( EXPORTING iv_name = CONV nrobj( lv_name )
+                             IMPORTING ev_error = ev_error ).
+        IF ev_error IS NOT INITIAL.
+          RETURN.
+        ENDIF.
       ELSE.
-        CALL FUNCTION 'DDIF_VIEW_ACTIVATE'
-          EXPORTING name     = lv_objname
-                    auth_chk = abap_true
-          IMPORTING rc       = lv_activation_rc
-          EXCEPTIONS not_found   = 1
-                     put_failure = 2
-                     OTHERS      = 3.
-      ENDIF.
-      IF sy-subrc <> 0.
-        DATA(lv_activate_failed_code) = COND string( WHEN lv_object_type = 'SHLP' THEN 'SHLP_DELETE_FAILED' ELSE 'VIEW_DELETE_FAILED' ).
-        ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
-                                   error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = lv_activate_failed_code
-                                                message = |{ lv_object_type } { lv_name } has an inactive version that could not be activated (sy-subrc { sy-subrc }); activate it in SE11 and retry| ) ).
-        RETURN.
-      ENDIF.
-      CALL FUNCTION 'RS_DD_DELETE_OBJ'
-        EXPORTING no_ask  = 'X'
-                  objtype = lv_rs_dd_objtype
-                  objname = lv_objname
-        EXCEPTIONS not_executed         = 1
-                   object_not_found     = 2
-                   object_not_specified = 3
-                   permission_failure   = 4
-                   dialog_needed        = 5
-                   OTHERS               = 6.
-      IF sy-subrc <> 0.
-        DATA(lv_delete_subrc) = sy-subrc.
-        DATA(lv_delete_msg) = last_message( ).
-        IF lv_delete_msg IS INITIAL.
-          lv_delete_msg = |RS_DD_DELETE_OBJ failed for { lv_name } (sy-subrc { lv_delete_subrc })|.
+        CALL FUNCTION 'RS_DD_DELETE_OBJ'
+          EXPORTING no_ask  = 'X'
+                    objtype = lv_rs_dd_objtype
+                    objname = lv_objname
+          EXCEPTIONS not_executed         = 1
+                     object_not_found     = 2
+                     object_not_specified = 3
+                     permission_failure   = 4
+                     dialog_needed        = 5
+                     OTHERS               = 6.
+        IF sy-subrc <> 0.
+          DATA(lv_delete_subrc) = sy-subrc.
+          DATA(lv_delete_msg) = last_message( ).
+          IF lv_delete_msg IS INITIAL.
+            lv_delete_msg = |RS_DD_DELETE_OBJ failed for { lv_name } (sy-subrc { lv_delete_subrc })|.
+          ENDIF.
+          IF lv_tadir_inserted = abap_true.
+            DELETE FROM tadir WHERE pgmid = 'R3TR' AND object = 'ENQU' AND obj_name = @lv_objname.
+          ENDIF.
+          IF lv_delete_subrc = 2.
+            lv_delete_code = 'DDIC_OBJECT_NOT_FOUND'.
+          ELSEIF lv_delete_subrc = 4.
+            lv_delete_code = SWITCH string( lv_object_type
+                                               WHEN 'SHLP' THEN 'SHLP_NOT_AUTHORIZED'
+                                               WHEN 'ENQU' THEN 'ENQU_NOT_AUTHORIZED'
+                                               ELSE 'VIEW_NOT_AUTHORIZED' ).
+          ELSE.
+            lv_delete_code = SWITCH string( lv_object_type
+                                               WHEN 'SHLP' THEN 'SHLP_DELETE_FAILED'
+                                               WHEN 'ENQU' THEN 'ENQU_DELETE_FAILED'
+                                               ELSE 'VIEW_DELETE_FAILED' ).
+          ENDIF.
+          ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                     error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = lv_delete_code
+                                                  message = lv_delete_msg ) ).
+          RETURN.
         ENDIF.
-        IF lv_delete_subrc = 2.
-          lv_delete_code = 'DDIC_OBJECT_NOT_FOUND'.
-        ELSEIF lv_delete_subrc = 4.
-          lv_delete_code = COND string( WHEN lv_object_type = 'SHLP' THEN 'SHLP_NOT_AUTHORIZED' ELSE 'VIEW_NOT_AUTHORIZED' ).
-        ELSE.
-          lv_delete_code = COND string( WHEN lv_object_type = 'SHLP' THEN 'SHLP_DELETE_FAILED' ELSE 'VIEW_DELETE_FAILED' ).
+        " RS_DD does not always drop the TADIR row for ENQU; clean the local
+        " row explicitly, like the NROB helper does.
+        IF lv_object_type = 'ENQU'.
+          DELETE FROM tadir WHERE pgmid = 'R3TR' AND object = 'ENQU' AND obj_name = @lv_objname.
         ENDIF.
-        ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
-                                   error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = lv_delete_code
-                                                message = lv_delete_msg ) ).
-        RETURN.
       ENDIF.
     ELSE.
       " TADIR row without any DDIC object (a PUT that never landed): the delete
@@ -2952,6 +3033,89 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
                                          name   = lv_name
                                          type   = lv_object_type
                                          action = 'deleted' ) ).
+  ENDMETHOD.
+
+  METHOD delete_number_range.
+    " NUMBER_RANGE_OBJECT_DELETE refuses while intervals exist, so remove the
+    " ranges first (same sequence as the abapGit NROB handler).
+    DATA lt_intervals TYPE STANDARD TABLE OF inriv WITH DEFAULT KEY.
+    DATA lt_error_iv TYPE STANDARD TABLE OF inriv WITH DEFAULT KEY.
+    DATA ls_error TYPE inrer.
+    DATA lv_error_occured TYPE c LENGTH 1.
+    DATA lv_delete_message TYPE string.
+
+    " Read the intervals straight from NRIV: NUMBER_RANGE_INTERVAL_LIST touches
+    " the SNRO list screen, which cannot run in the ICF context.
+    SELECT subobject, nrrangenr, toyear, fromnumber, tonumber, nrlevel, externind
+      FROM nriv INTO TABLE @lt_intervals
+      WHERE object = @iv_name.
+    IF lines( lt_intervals ) > 0.
+      LOOP AT lt_intervals ASSIGNING FIELD-SYMBOL(<ls_interval>).
+        CLEAR <ls_interval>-nrlevel.
+        <ls_interval>-procind = 'D'.
+      ENDLOOP.
+      CALL FUNCTION 'NUMBER_RANGE_INTERVAL_UPDATE'
+        EXPORTING object        = iv_name
+        IMPORTING error         = ls_error
+                  error_occured = lv_error_occured
+        TABLES    error_iv      = lt_error_iv
+                  interval      = lt_intervals
+        EXCEPTIONS object_not_found = 1
+                   OTHERS           = 2.
+      IF sy-subrc <> 0 OR lv_error_occured = abap_true.
+        lv_delete_message = last_message( ).
+        IF lv_delete_message IS INITIAL.
+          lv_delete_message = |NUMBER_RANGE_INTERVAL_UPDATE failed for { iv_name } (sy-subrc { sy-subrc })|.
+        ENDIF.
+        ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                   error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'NROB_DELETE_FAILED'
+                                                message = lv_delete_message ) ).
+        RETURN.
+      ENDIF.
+      CALL FUNCTION 'NUMBER_RANGE_UPDATE_CLOSE'
+        EXPORTING object = iv_name
+        EXCEPTIONS no_changes_made        = 1
+                   object_not_initialized = 2
+                   OTHERS                 = 3.
+      IF sy-subrc <> 0.
+        lv_delete_message = last_message( ).
+        IF lv_delete_message IS INITIAL.
+          lv_delete_message = |NUMBER_RANGE_UPDATE_CLOSE failed for { iv_name } (sy-subrc { sy-subrc })|.
+        ENDIF.
+        ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                   error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = 'NROB_DELETE_FAILED'
+                                                message = lv_delete_message ) ).
+        RETURN.
+      ENDIF.
+    ENDIF.
+
+    CALL FUNCTION 'NUMBER_RANGE_OBJECT_DELETE'
+      EXPORTING language     = sy-langu
+                object       = iv_name
+                ohne_tp_flag = 'X'
+      EXCEPTIONS delete_not_allowed = 1
+                 object_not_found   = 2
+                 wrong_indicator    = 3
+                 OTHERS             = 4.
+    IF sy-subrc <> 0.
+      DATA(lv_delete_subrc) = sy-subrc.
+      lv_delete_message = last_message( ).
+      IF lv_delete_message IS INITIAL.
+        lv_delete_message = |NUMBER_RANGE_OBJECT_DELETE failed for { iv_name } (sy-subrc { lv_delete_subrc })|.
+      ENDIF.
+      DATA(lv_nrob_delete_code) = SWITCH string( lv_delete_subrc
+                                                   WHEN 1 THEN 'NROB_DELETE_UNSUPPORTED'
+                                                   WHEN 2 THEN 'DDIC_OBJECT_NOT_FOUND'
+                                                   ELSE 'NROB_DELETE_FAILED' ).
+      ev_error = VALUE zcl_abap_vibe_icf_types=>ty_error( status = 'error'
+                                 error = VALUE zcl_abap_vibe_icf_types=>ty_error_body( code = lv_nrob_delete_code
+                                              message = lv_delete_message ) ).
+      RETURN.
+    ENDIF.
+
+    " The NR delete FM can leave the TADIR row behind; drop the local row so
+    " repeated deletes and transports do not see an orphan.
+    DELETE FROM tadir WHERE pgmid = 'R3TR' AND object = 'NROB' AND obj_name = @iv_name.
   ENDMETHOD.
 
   METHOD last_message.
