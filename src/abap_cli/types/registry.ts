@@ -143,13 +143,18 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
     affSchemaFile: 'srvd-v1.json',
     requiresFile: true,
   },
-  // — Behaviour definition source object (`.abdl`). Pull-only
-  // `abap-adt-api`'s `CreatableTypeIds` has no BDEF entry, so this CLI
-  // cannot create one. Pull writes `<name>.bdef.json` + `<name>.bdef.abdl`.
+  // Behaviour definition source object (`.abdl`). `abap-adt-api`'s
+  // `CreatableTypeIds` has no BDEF entry, but ADT exposes
+  // `POST /sap/bc/adt/bo/behaviordefinitions`; the CLI posts the blueSource
+  // header itself and then writes the `.abdl` source (see clients/bdef.ts).
+  // Create requires `--file`; pull writes `<name>.bdef.json` +
+  // `<name>.bdef.abdl`.
   {
     type: 'BDEF',
     source: 'ADT',
+    createObjtype: 'BDEF/BDO',
     affSchemaFile: 'bdef-v1.json',
+    requiresFile: true,
   },
   // — Three CDS companion types (`.acds`). DCLS carries access
   // control, DDLX metadata extensions, DDLA annotation definitions.

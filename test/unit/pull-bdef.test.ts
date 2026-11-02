@@ -1,7 +1,7 @@
 /**
  * — `runPullBdef` end-to-end: BDEF pull writes
- *   <root>/bdef/<lower>/<lower>.bdef.json
- *   <root>/bdef/<lower>/<lower>.bdef.abdl
+ *   <root>/<lower>.bdef.json
+ *   <root>/<lower>.bdef.abdl
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
@@ -20,7 +20,7 @@ const objectStructureMock = vi.fn(async () => ({
   metaData: {
     'adtcore:description': 'Travel BO',
     'adtcore:masterLanguage': 'EN',
-    'abapsource:sourceUri': 'source/main',
+    'abapsource:sourceUri': './zrb_travel_bdef/source/main',
   },
 }));
 
@@ -62,6 +62,22 @@ describe('runPullBdef', () => {
     const abdl = fs.readFileSync(path.join(dir, 'zrb_travel_bdef.bdef.abdl'), 'utf8');
     expect(abdl).toContain('managed;');
     expect(abdl).toContain('define behavior for ZI_TRAVEL');
+  });
+
+  it('reads the blueSource object URL (not the legacy /bdef/bdefs path)', async () => {
+    const { runPullBdef } = await load();
+    await runPullBdef('zrb_travel_bdef', { rootDir: root });
+    expect(objectStructureMock).toHaveBeenCalledWith(
+      '/sap/bc/adt/bo/behaviordefinitions/zrb_travel_bdef',
+    );
+  });
+
+  it('resolves the collection-relative source URI to an absolute URL', async () => {
+    const { runPullBdef } = await load();
+    await runPullBdef('zrb_travel_bdef', { rootDir: root });
+    expect(getObjectSourceMock).toHaveBeenCalledWith(
+      '/sap/bc/adt/bo/behaviordefinitions/zrb_travel_bdef/source/main',
+    );
   });
 
   it('validates the metadata against bdef-v1.json (AFF pre-validation)', async () => {

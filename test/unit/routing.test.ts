@@ -22,8 +22,7 @@ interface ExpectedRoute {
 
 /**
  * Per-type channel contract. `undefined` means the operation is not supported
- * for that type (SRVB is pull-only metadata; BDEF is pull-only too — no ADT
- * create endpoint).
+ * for that type (SRVB is pull-only metadata).
  */
 const EXPECTED: Record<string, ExpectedRoute> = {
   CLAS: { create: 'adt', pull: 'adt', push: 'adt' },
@@ -46,7 +45,7 @@ const EXPECTED: Record<string, ExpectedRoute> = {
   MSAG: { create: 'auto', pull: 'auto', push: 'auto' },
   DDLS: { create: 'auto', pull: 'auto', push: 'auto' },
   SRVD: { create: 'adt', pull: 'adt', push: 'adt' },
-  BDEF: { create: undefined, pull: 'adt', push: 'adt' },
+  BDEF: { create: 'adt', pull: 'adt', push: 'adt' },
   DCLS: { create: 'adt', pull: 'adt', push: 'adt' },
   DDLX: { create: 'adt', pull: 'adt', push: 'adt' },
   DDLA: { create: 'adt', pull: 'adt', push: 'adt' },

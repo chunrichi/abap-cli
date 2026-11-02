@@ -9,15 +9,15 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 
 ## Type × command matrix
 
-23 types support `create`, all 25 support `pull`, 23 have a `push` path and 22 have a `delete` path. In the matrix:
+24 types support `create`, all 25 support `pull`, 23 have a `push` path and 22 have a `delete` path. In the matrix:
 
 - `--file` marks a `create` that reads a JSON document — write it yourself or `pull` a comparable object first.
 - `$TMP` marks a `delete` that only removes local objects; delete transportable objects in SAP GUI so the deletion is recorded in a transport.
-- `*` marks a `delete` path that exists in the CLI but has not been verified against a real system yet (`BDEF`, `SRVB`).
+- `*` marks a `delete` path that exists in the CLI but has not been verified against a real system yet (`SRVB`).
 
 | Type | Object | Create | Pull | Push | Delete | Channel | Local artifacts in `src/` |
 |---|---|---|---|---|---|---|---|
-| `BDEF` | Behavior definition | — | ✅ | ✅ | ✅ `*` | ADT | `.bdef.json` + `.bdef.abdl` |
+| `BDEF` | Behavior definition | ✅ `--file` | ✅ | ✅ | ✅ | ADT | `.bdef.json` + `.bdef.abdl` |
 | `CLAS` | Class | ✅ | ✅ | ✅ | ✅ | ADT | `.clas.json` + `.clas.abap` + `.clas.{definitions,implementations,macros,testclasses}.abap` |
 | `DCLS` | CDS access control | ✅ `--file` | ✅ | ✅ | ✅ | ADT | `.dcls.json` + `.dcls.acds` |
 | `DDLA` | CDS annotation definition | ✅ `--file` | ✅ | ✅ | ✅ | ADT | `.ddla.json` + `.ddla.acds` |
@@ -46,7 +46,7 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 ## Create rules
 
 - Source objects and `DEVC` create from CLI arguments; `create local` drafts `CLAS` / `INTF` / `PROG` / `FUGR` offline, without a SAP connection.
-- The remaining creatable types are data-driven: `create` requires `--file` with a JSON document in the type's format (`BDEF` and `SRVB` have no CLI create path yet, although ADT exposes endpoints for both; `TTYP` / `VIEW` / `SHLP` use the local schemas below). Companion files shown in the same row belong to the same artifact set.
+- The remaining creatable types are data-driven: `create` requires `--file` with a JSON document in the type's format (`BDEF` also needs the sibling `.bdef.abdl` source; `SRVB` has no CLI create path yet, although ADT exposes a binding endpoint; `TTYP` / `VIEW` / `SHLP` use the local schemas below). Companion files shown in the same row belong to the same artifact set.
 - `abap create --schema <type>` prints the per-type contract, including an example document where one exists.
 
 ## Delete rules
@@ -68,7 +68,7 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 - `VIEW` / `SHLP` — local-extension schemas (`view-v1.json` / `shlp-v1.json`); upstream AFF defines neither.
 - `ENQU` / `NROB` — `create` only works into `$`-prefixed local packages (transportable creation needs a TADIR record), and neither has a delete path — remove lock objects in SE11 and number ranges in SNRO.
 - `DOMA` / `DTEL` — long text is an optional companion file (`<name>.<type>.docu.json`, `docu-v1.json`); `lines: []` deletes the remote long text.
-- `BDEF` — ADT exposes `POST /sap/bc/adt/bo/behaviordefinitions`, but the CLI has not implemented create yet; pull / push / delete only.
+- `BDEF` — `create` reads the AFF JSON plus the sibling `.bdef.abdl` source, creates the behavior definition through ADT and activates it; the behavior must target an existing root entity (or a valid unmanaged implementation class). `pull` / `push` / `delete` are also available.
 - `SRVB` — metadata only; create and publish are not implemented yet, so bindings are created, published and maintained in SAP GUI. Delete uses the generic ADT path and is not yet verified on a real system.
 - `HTTP` — SICF nodes can be created, pulled and pushed; there is no delete path yet — remove the node in SICF.
 - `XSLT` — the `.xslt.json` + `.xslt.xml` pair must exist together; an update replaces the transformation in place and keeps its version history.

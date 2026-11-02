@@ -1,9 +1,9 @@
 /**
  * BDEF (behavior definition) pull.
  *
- * Output:
- *   <rootDir>/bdef/<lower>/<lower>.bdef.json   ← AFF metadata
- *   <rootDir>/bdef/<lower>/<lower>.bdef.abdl   ← ABAP Behavior Language body
+ * Output (AFF flat layout):
+ *   <rootDir>/<lower>.bdef.json   ← AFF metadata
+ *   <rootDir>/<lower>.bdef.abdl   ← ABAP Behavior Language body
  *
  * BDEF objects live in `sourceObjectStrategy()` via the
  * `sourceExtensionForObjectType('BDEF') → '.abdl'` extension map.
@@ -12,6 +12,7 @@
  * `*.bdef.json`).
  */
 import { AdtClientWrapper } from '../../clients/adt-client.js';
+import { bdefObjectUrl } from '../../clients/bdef.js';
 import { pullObject } from './pull-source.js';
 import { affObjectToken } from '../../formats/file-resolver.js';
 import type { PullHandler } from './routing.js';
@@ -39,12 +40,11 @@ export interface PullBdefResult {
 }
 
 export async function runPullBdef(name: string, opts: PullBdefOptions = {}): Promise<PullBdefResult> {
-  const lower = name.toLowerCase();
   const client = await AdtClientWrapper.create();
   const object = {
     name: name.toUpperCase(),
     type: 'BDEF',
-    objectUrl: `/sap/bc/adt/bdef/bdefs/${lower}`,
+    objectUrl: bdefObjectUrl(name),
   };
   const result = await pullObject(client, object, {
     ...(opts.dir ? { dir: opts.dir } : { dir: opts.rootDir ?? process.cwd() }),

@@ -115,13 +115,15 @@ describe('create dispatcher — DCLS / DDLX / DDLA / SRVD happy path', () => {
   });
 });
 
-describe('create dispatcher — BDEF remains pull-only', () => {
-  it('rejects BDEF without --file message pointing to schema (registry has no requiresFile)', async () => {
-    // BDEF in the registry has no createObjtype and no requiresFile, so it
-    // must NOT apply the requiresFile fail-fast. Instead it should fall
-    // through to resolveType which rejects unknown source objects.
-    const res = await run(['create', 'BDEF', 'ZMY_BDEF', '--description', 'x']);
-    expect(res.exitCode).not.toBe(2);
-    expect(JSON.parse(res.stderr).error.message).not.toMatch(/requires --file/);
+describe('create dispatcher — BDEF requires --file (USAGE)', () => {
+  it('rejects BDEF without --file with USAGE (exit 2)', async () => {
+    // BDEF is now a data-driven create type: the AFF JSON + .bdef.abdl pair
+    // is mandatory, so the registry requiresFile fail-fast applies.
+    const res = await run(['create', 'BDEF', 'ZMY_BDEF']);
+    expect(res.exitCode).toBe(2);
+    const out = JSON.parse(res.stderr);
+    expect(out.error.code).toBe('USAGE');
+    expect(out.error.message).toMatch(/requires --file/);
+    expect(createObject).not.toHaveBeenCalled();
   });
 });

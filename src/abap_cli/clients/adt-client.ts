@@ -22,6 +22,12 @@ import { SessionLifecycle } from '../session/manager.js';
 import { SessionHttpClient } from './session-http.js';
 import { registerAdtClient } from '../session/registry.js';
 import { buildCreateWire, type DevcCreateWireOptions } from '../formats/devc/json.js';
+import {
+  BDEF_BASE_PATH,
+  BDEF_MEDIA_TYPE,
+  bdefObjectUrl,
+  buildBdefCreateBody,
+} from './bdef.js';
 
 /** ADT media type of a single package resource. */
 const PACKAGE_MEDIA_TYPE = 'application/vnd.sap.adt.packages.v2+xml';
@@ -471,6 +477,61 @@ export class AdtClientWrapper {
         await this.unLock(objectUrl, handle).catch(() => undefined);
       }
       await this.activate(objectUrl, 'DDLS/DF', name);
+    });
+  }
+
+  /**
+   * Create a BDEF header via the ADT blueSource endpoint.
+   *
+   * `abap-adt-api` has no BDEF entry in its typed `CreatableTypeIds`, so the
+   * CLI posts the body itself (see `clients/bdef.ts`). The header is inactive
+   * until `writeBdefSource` writes the `.abdl` body and activates it.
+   */
+  createBdef(
+    name: string,
+    meta: { packageName: string; description: string; originalLanguage?: string; transport?: string },
+  ): Promise<void> {
+    return this._call(async () => {
+      const body = buildBdefCreateBody({
+        name,
+        packageName: meta.packageName,
+        description: meta.description,
+        originalLanguage: meta.originalLanguage,
+        language: this.config.sap.language,
+      });
+      await this.client.httpClient.request(BDEF_BASE_PATH, {
+        method: 'POST',
+        body,
+        headers: { 'Content-Type': BDEF_MEDIA_TYPE, Accept: BDEF_MEDIA_TYPE },
+        qs: meta.transport ? { corrNr: meta.transport } : {},
+      });
+    });
+  }
+
+  /** Write the `.abdl` source of an existing BDEF: lock → PUT source/main →
+   *  unlock → activate. Same lifecycle as DDLS, against the blueSource URL. */
+  writeBdefSource(name: string, source: string, transport?: string): Promise<void> {
+    return this._call(async () => {
+      const objectUrl = bdefObjectUrl(name);
+      const lock = await this.lock(objectUrl);
+      const handle = lock.LOCK_HANDLE;
+      try {
+        await this.client.httpClient.request(`${objectUrl}/source/main`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'text/plain; charset=utf-8',
+            Accept: 'text/plain',
+          },
+          qs: {
+            ...(handle ? { lockHandle: handle } : {}),
+            ...(transport ? { corrNr: transport } : {}),
+          },
+          body: source,
+        });
+      } finally {
+        await this.unLock(objectUrl, handle).catch(() => undefined);
+      }
+      await this.activate(objectUrl, 'BDEF/BDO', name);
     });
   }
 

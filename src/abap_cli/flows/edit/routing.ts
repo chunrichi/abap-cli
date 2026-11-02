@@ -40,6 +40,7 @@ import { createMsagHandler } from './create-msag.js';
 import { createDdlsHandler } from './create-ddls.js';
 import { createCdsExtensionHandler } from './create-cds-extension.js';
 import { createSrvdHandler } from './create-srvd.js';
+import { createBdefHandler } from './create-bdef.js';
 import { createEnquHandler } from './create-enqu.js';
 import { createNrobHandler } from './create-nrob.js';
 import { createDevcHandler } from './create-devc.js';
@@ -328,7 +329,7 @@ export const TYPE_ROUTES: Readonly<Record<string, TypeRoute>> = {
     push: source(),
   },
   BDEF: {
-    // pull-only: abap-adt-api has no BDEF create endpoint.
+    create: handler('adt', createBdefHandler),
     pull: handler('adt', pullBdefHandler),
     push: source(),
   },

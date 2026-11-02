@@ -245,8 +245,16 @@ function elementKind(type: string): keyof ObjectDescriptions | undefined {
 /**
  * ADT source URIs may be relative to the object URL (e.g. "source/main") on real
  * systems; abap-adt-api requires an absolute /sap/bc/adt/... path.
+ *
+ * Blue-source objects (BDEF) return a collection-relative URI of the form
+ * `./<encoded-name>/source/main`, so a leading `./` resolves against the
+ * collection (the object URL's parent), not against the object itself.
  */
 function absoluteSourceUrl(objectUrl: string, sourceUrl: string): string {
   if (sourceUrl.startsWith('/')) return sourceUrl;
+  if (sourceUrl.startsWith('./')) {
+    const collection = objectUrl.slice(0, objectUrl.lastIndexOf('/'));
+    return `${collection}/${sourceUrl.slice(2)}`;
+  }
   return `${objectUrl.replace(/\/$/, '')}/${sourceUrl}`;
 }
