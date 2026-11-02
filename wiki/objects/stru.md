@@ -4,7 +4,7 @@ title: STRU — 结构（Structure）
 description: STRU 对象与 TABL 同构（DDL + main + settings），但无 MANDT 注入；常被用作 type pool / 内部结构
 tags: [abap-cli, object-type, stru, ddic, icf, abap-file-format, structure]
 created at: 2026-09-01 00:00:00
-changed at: 2026-10-30 20:00:00
+changed at: 2026-11-03 00:45:00
 ---
 
 # STRU — 结构（Structure）
@@ -62,6 +62,7 @@ abap push src/zs_my_struct.stru.json --tr DEVK900001 --json
 
 - **结构中嵌 `MANDT`**：CLI 不会像 TABL 那样自动剥离；如果你想表达 client 字段，明确写在 DDL 内
 - **嵌套结构引用**：跨包结构引用时 `pull` 会拉取被引结构吗？**不会**——只拉显式指定的对象
+- **外键不写入**：与 TABL 相同，ICF 写路径不写 DD05V / DD08V；本地文档带 `@AbapCatalog.foreignKeys` 或 DDL 里带 `with foreign key ... check <table>` 时 `create` / `push` 在本地报 `TABL_FOREIGN_KEY_UNSUPPORTED`（exit 7），创建后在 SE11 / ADT 维护外键
 
 # references
 

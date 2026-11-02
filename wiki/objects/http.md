@@ -4,7 +4,7 @@ title: HTTP — SICF 服务节点（ICF Tree Node）
 description: HTTP 类型的 SICF 节点管理；走 ICF 自建通道
 tags: [abap-cli, object-type, http, sicf, icf, abap-file-format]
 created at: 2026-09-01 00:00:00
-changed at: 2026-11-03 00:10:00
+changed at: 2026-11-03 00:45:00
 ---
 
 # HTTP — SICF 服务节点（ICF Tree Node）
@@ -113,6 +113,12 @@ abap delete ZMY_SERVICE --type HTTP --yes --json
 - **`servicePath` 必须以 `/` 开头**：不写 `/` 时 SAP 端会拒；CLI 不做前缀校验
 - **`handlerClass` 必须存在**：push 时 SAP 端会校验；不存在的类会报 `CLASS_NOT_FOUND`
 - **BTP Steampunk 上 ICF 节点不在本地**：Steampunk SaaS 的 ICF 服务由 BTP 平台管理；CLI 走 source-only + CF destination 提示
+
+## 真机证据
+
+- **create / pull / push / delete 闭环（2026-11-03，S/4HANA profile `test`）**：从严格 AFF 文件（无 `name` 信封）创建 `$TMP` 节点 → TADIR 写入 `SICF` 行（`$TMP`）→ `pull` 得到 AFF 文件 → 原样 `push`（保留节点现有本地包）→ `delete` 成功 → 再 `pull` 返回 `OBJECT_NOT_FOUND`；ICFSERVICE / TADIR / ICFAPPLCUST 无残留。
+- **删除守卫**：缺失节点（`OBJECT_NOT_FOUND`，exit 8）、根节点 `/sap`（`HTTP_SERVICE_ROOT_NODE`）、父节点仍有子节点（`HTTP_SERVICE_HAS_CHILDREN`）、可传输包（`HTTP_PACKAGE_NOT_SUPPORTED` / `HTTP_DELETE_UNSUPPORTED`）均在真机验证；子节点按 `/sap/<parent>/<child>` 路径可单独删除。
+- 证据：本地 `tests/261103001-icf-tail/`（gitignored，本地执行证据，不入库）。
 
 # references
 

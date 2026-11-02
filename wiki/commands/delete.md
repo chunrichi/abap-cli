@@ -139,6 +139,7 @@ lock/unlock）：
 - **ENQU / NROB 删除走 ICF（2026-11-02 真机）**：`abap delete <name> --type ENQU|NROB` 仅支持 `$TMP`。ENQU 的 ICF 创建不写 TADIR，delete 会先回填 `$TMP` TADIR 行再 `RS_DD_DELETE_OBJ`，否则 SAP 返回 E2/004（Action was canceled）。NROB 先按 NRIV 行清区间，再 `NUMBER_RANGE_OBJECT_DELETE` 且必须传 `ohne_tp_flag='X'`，否则会尝试打开 `SAPLSTRD 0100` 传输对话框并 500。删除后 DD25L / TNRO / TADIR 无残留。证据：`tests/261102013-enqu-nrob-delete/`（本地，不入库）。
 - **TRAN（事务码）删除走 ICF `DELETE /tran/<tcode>`**（SE93 没有 ADT 端点）：S/4HANA test-system（profile `test`）上 `abap delete ZCLI_TC_T1 --type TRAN --yes` 成功，TSTC/TSTCT/TSTCP/TSTCC/TSTCA 与 TADIR 行一并清除，随后 `pull` 返回 404。仅 `$TMP` 事务可删；可传输事务返回 `TRAN_DELETE_UNSUPPORTED`（exit 7，请在 SE93 删除以便记录到请求）。证据：`tests/261031003-realsap-tran/`（本地，不入库）。
 - **XSLT（转换程序）未验证**：`DELETE /xslt/<name>` 已实现（`load → set_changeable → delete → save`，API 原语在 $TMP 探针中 rc=0），但端到端真机命令尚未执行（写作时目标系统 stateful 会话受限，`abap deploy` 未完成）。
+- **HTTP（SICF 节点）删除走 ICF `DELETE /http/<name>`（2026-11-03 真机）**：S/4HANA test-system（profile `test`）上 `$TMP` 节点 create → delete 成功，ICFSERVICE / TADIR / ICFAPPLCUST 无残留，随后 `pull` 返回 `OBJECT_NOT_FOUND`（exit 8）；根节点 `/sap` 返回 `HTTP_SERVICE_ROOT_NODE`（exit 7），仍有子节点的父节点返回 `HTTP_SERVICE_HAS_CHILDREN`（先删子节点），可传输包/无 TADIR 元数据返回 `HTTP_DELETE_UNSUPPORTED`（exit 7）。证据：本地 `tests/261103001-icf-tail/`（不入库）。
 - **其它类型未验证**：本页没有记录 CLAS / PROG 等 `abap delete` 在 A4H / S/4HANA 上的真机执行结果。
 - 对象解析依赖的 ADT quickSearch quirk（裸名可能 0 命中，需要 `*NAME*` 回退）在 vhcala4hci（A4H）验证过，见 `src/abap_cli/core/resolve.ts` 注释；删除动作本身未验证。
 
