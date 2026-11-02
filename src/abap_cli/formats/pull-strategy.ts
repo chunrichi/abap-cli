@@ -246,9 +246,15 @@ export function renderServiceBindingMetadata(
   // `ServiceBindingBinding.category` is declared `number` in
   // abap-adt-api/build/api/tablecontents.d.ts. The translation to the
   // AFF enum is direct: 0 → 'ui', 1 → 'webApi', anything else → unknown
-  // (caller throws).
-  const categoryValue = binding.binding?.category;
-  const category = categoryValue === 0 ? 'ui' : categoryValue === 1 ? 'webApi' : undefined;
+  // (caller throws). abap-adt-api's declaration says number, but real wire
+  // payloads (and the parser) return the attribute as a string ("0"/"1").
+  const rawCategory: unknown = binding.binding?.category;
+  const category =
+    rawCategory === 0 || rawCategory === '0'
+      ? 'ui'
+      : rawCategory === 1 || rawCategory === '1'
+        ? 'webApi'
+        : undefined;
   const bindingType = [binding.binding?.type, binding.binding?.version].filter(Boolean).join(' ');
   const services = new Map<string, Array<Record<string, string>>>();
   for (const service of binding.services ?? []) {

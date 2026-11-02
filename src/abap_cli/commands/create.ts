@@ -71,6 +71,7 @@ export function registerCreateCommand(program: Command): void {
     .option('--software-component <swcomp>', 'With DEVC: software component of the new package (default: inherited from the super package)')
     .option('--transport-layer <layer>', 'With DEVC: transport layer of the new package (default: inherited from the super package)')
     .option('--package-type <type>', 'With DEVC: package type — development (default), main, or structure')
+    .option('--publish', 'With SRVB: publish the service binding after activation')
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .option('--yes', 'Confirm in non-interactive mode')
     .action(async (type, name, opts, cmd) => {
@@ -171,6 +172,7 @@ export function createSchema(type?: string): CreateCommandSchema {
       { name: '--software-component', type: 'string', valuePlaceholder: '<swcomp>', description: 'With DEVC: software component of the new package (default: inherited from the super package)' },
       { name: '--transport-layer', type: 'string', valuePlaceholder: '<layer>', description: 'With DEVC: transport layer of the new package (default: inherited from the super package)' },
       { name: '--package-type', type: 'string', valuePlaceholder: '<type>', description: 'With DEVC: package type', allowedValues: ['development', 'main', 'structure'] },
+      { name: '--publish', type: 'boolean', description: 'With SRVB: publish the service binding after activation' },
       schemaOption(),
       { name: '--yes', type: 'boolean', default: false, description: 'Confirm in non-interactive environments.' },
       { name: '--non-interactive', type: 'boolean', default: false, description: 'Alias of --yes.' },

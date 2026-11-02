@@ -620,11 +620,12 @@ abap create <type> <name> [options]
 | `--check-only` | no |  |  | Validate the proposed object without creating it |
 | `--audit` | no |  |  | Include the before-checksum (extra SAP round-trip, off by default) |
 | `--overwrite` | no |  |  | When pulling the new object back, replace an existing local file (default: keep the local draft) |
-| `--file` `<path>` | no |  |  | abap-file-format JSON input (required for TABL/STRU/DOMA/DTEL/ENQU/VIEW/SHLP/NROB/HTTP/TRAN/XSLT/TTYP/MSAG/DDLS/SRVD/BDEF/DCLS/DDLX/DDLA) |
+| `--file` `<path>` | no |  |  | abap-file-format JSON input (required for TABL/STRU/DOMA/DTEL/ENQU/VIEW/SHLP/NROB/HTTP/TRAN/XSLT/TTYP/MSAG/DDLS/SRVB/SRVD/BDEF/DCLS/DDLX/DDLA) |
 | `--func` `<name>` | no |  |  | With FUGR: create a function module (FUGR/FF) inside the existing function group <name> |
 | `--software-component` `<swcomp>` | no |  |  | With DEVC: software component of the new package (default: inherited from the super package) |
 | `--transport-layer` `<layer>` | no |  |  | With DEVC: transport layer of the new package (default: inherited from the super package) |
 | `--package-type` `<type>` | no |  | development, main, structure | With DEVC: package type |
+| `--publish` | no |  |  | With SRVB: publish the service binding after activation |
 | `--yes` | no | `false` |  | Confirm in non-interactive environments. |
 | `--non-interactive` | no | `false` |  | Alias of --yes. |
 

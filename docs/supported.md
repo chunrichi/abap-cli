@@ -9,11 +9,10 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 
 ## Type × command matrix
 
-24 types support `create`, all 25 support `pull`, 23 have a `push` path and 22 have a `delete` path. In the matrix:
+25 types support `create`, all 25 support `pull`, 23 have a `push` path and 22 have a `delete` path. In the matrix:
 
 - `--file` marks a `create` that reads a JSON document — write it yourself or `pull` a comparable object first.
 - `$TMP` marks a `delete` that only removes local objects; delete transportable objects in SAP GUI so the deletion is recorded in a transport.
-- `*` marks a `delete` path that exists in the CLI but has not been verified against a real system yet (`SRVB`).
 
 | Type | Object | Create | Pull | Push | Delete | Channel | Local artifacts in `src/` |
 |---|---|---|---|---|---|---|---|
@@ -35,7 +34,7 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 | `PROG` | Program | ✅ | ✅ | ✅ | ✅ | ADT | `.prog.json` + `.prog.abap` (`.prog.include.abap` for include programs) |
 | `SHLP` | Search help | ✅ `--file` | ✅ | ✅ | ✅ `$TMP` | ICF | `.shlp.json` |
 | `SRVD` | Service definition | ✅ `--file` | ✅ | ✅ | ✅ | ADT | `.srvd.json` + `.srvd.acds` |
-| `SRVB` | Service binding | — | ✅ | — | ✅ `*` | ADT | `.srvb.json` |
+| `SRVB` | Service binding | ✅ `--file` | ✅ | — | ✅ | ADT | `.srvb.json` |
 | `STRU` | Structure | ✅ `--file` | ✅ | ✅ | ✅ | ICF | `.stru.json` + `.stru.ddic` |
 | `TABL` | Transparent table | ✅ `--file` | ✅ | ✅ | ✅ | ICF | `.tabl.json` + `.tabl.ddic` + `.tabl.settings.json` |
 | `TRAN` | Transaction code | ✅ `--file` | ✅ | ✅ | ✅ `$TMP` | ICF | `.tran.json` |
@@ -46,7 +45,7 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 ## Create rules
 
 - Source objects and `DEVC` create from CLI arguments; `create local` drafts `CLAS` / `INTF` / `PROG` / `FUGR` offline, without a SAP connection.
-- The remaining creatable types are data-driven: `create` requires `--file` with a JSON document in the type's format (`BDEF` also needs the sibling `.bdef.abdl` source; `SRVB` has no CLI create path yet, although ADT exposes a binding endpoint; `TTYP` / `VIEW` / `SHLP` use the local schemas below). Companion files shown in the same row belong to the same artifact set.
+- The remaining creatable types are data-driven: `create` requires `--file` with a JSON document in the type's format (`BDEF` also needs the sibling `.bdef.abdl` source; `SRVB` creates a metadata-only binding and can publish it with `--publish`; `TTYP` / `VIEW` / `SHLP` use the local schemas below). Companion files shown in the same row belong to the same artifact set.
 - `abap create --schema <type>` prints the per-type contract, including an example document where one exists.
 
 ## Delete rules
@@ -69,7 +68,7 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 - `ENQU` / `NROB` — `create` only works into `$`-prefixed local packages (transportable creation needs a TADIR record), and neither has a delete path — remove lock objects in SE11 and number ranges in SNRO.
 - `DOMA` / `DTEL` — long text is an optional companion file (`<name>.<type>.docu.json`, `docu-v1.json`); `lines: []` deletes the remote long text.
 - `BDEF` — `create` reads the AFF JSON plus the sibling `.bdef.abdl` source, creates the behavior definition through ADT and activates it; the behavior must target an existing root entity (or a valid unmanaged implementation class). `pull` / `push` / `delete` are also available.
-- `SRVB` — metadata only; create and publish are not implemented yet, so bindings are created, published and maintained in SAP GUI. Delete uses the generic ADT path and is not yet verified on a real system.
+- `SRVB` — metadata only: `create` reads the AFF binding document, posts the ADT binding, activates it, and `--publish` runs the publish job. There is no `push`/update path (the AFF document omits implementation/published/version details); delete uses the generic ADT path and has been verified on a real system. Publishing may depend on the client's transport settings allowing local publish.
 - `HTTP` — SICF nodes can be created, pulled and pushed; there is no delete path yet — remove the node in SICF.
 - `XSLT` — the `.xslt.json` + `.xslt.xml` pair must exist together; an update replaces the transformation in place and keeps its version history.
 

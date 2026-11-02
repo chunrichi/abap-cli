@@ -48,10 +48,9 @@ describe('types/registry.ts (single source of truth)', () => {
     expect(createObjtypeFor('TTYP')).toBeUndefined();
     expect(createObjtypeFor('MSAG')).toBeUndefined();
     expect(createObjtypeFor('DDLS')).toBeUndefined();
-    // (post-review): SRVD / DCLS / DDLX / DDLA / BDEF carry their own
-    // objtype string for create(); SRVB is pull-only because SAP GUI owns
-    // the binding lifecycle.
-    expect(createObjtypeFor('SRVB')).toBeUndefined();
+    // (post-review): SRVD / DCLS / DDLX / DDLA / BDEF / SRVB carry their own
+    // objtype string for create(); SRVB is metadata-only (no push/update).
+    expect(createObjtypeFor('SRVB')).toBe('SRVB/SVB');
     expect(createObjtypeFor('SRVD')).toBe('SRVD/SRV');
     expect(createObjtypeFor('BDEF')).toBe('BDEF/BDO');
     expect(createObjtypeFor('DCLS')).toBe('DCLS/DL');

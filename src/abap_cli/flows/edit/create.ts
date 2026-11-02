@@ -54,6 +54,8 @@ export interface CreateOptions {
   transportLayer?: string;
   /** With type DEVC: package type (development / main / structure; default development). */
   packageType?: string;
+  /** With type SRVB: publish the service binding after activation. */
+  publish?: boolean;
 }
 
 export interface CreateLocalOptions {

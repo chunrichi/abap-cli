@@ -65,8 +65,8 @@ function run(args: string[]) {
   );
 }
 
-describe('create dispatcher — DCLS / DDLX / DDLA / SRVD require --file (USAGE)', () => {
-  it.each(['DCLS', 'DDLX', 'DDLA', 'SRVD'])(
+describe('create dispatcher — DCLS / DDLX / DDLA / SRVD / SRVB / BDEF require --file (USAGE)', () => {
+  it.each(['DCLS', 'DDLX', 'DDLA', 'SRVD', 'SRVB', 'BDEF'])(
     'rejects %s without --file with USAGE (exit 2)',
     async (type) => {
       const res = await run(['create', type, 'ZMY_TEST']);

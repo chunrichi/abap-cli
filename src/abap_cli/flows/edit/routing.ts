@@ -41,6 +41,7 @@ import { createDdlsHandler } from './create-ddls.js';
 import { createCdsExtensionHandler } from './create-cds-extension.js';
 import { createSrvdHandler } from './create-srvd.js';
 import { createBdefHandler } from './create-bdef.js';
+import { createSrvbHandler } from './create-srvb.js';
 import { createEnquHandler } from './create-enqu.js';
 import { createNrobHandler } from './create-nrob.js';
 import { createDevcHandler } from './create-devc.js';
@@ -349,8 +350,12 @@ export const TYPE_ROUTES: Readonly<Record<string, TypeRoute>> = {
     push: source(),
   },
 
-  // Service binding — metadata-only pull (no source, no create/push path yet).
-  SRVB: { pull: source() },
+  // Service binding — metadata-only pull; create posts the ADT binding and
+  // can publish it. Push/update is not supported (AFF is lossy).
+  SRVB: {
+    create: handler('adt', createSrvbHandler),
+    pull: source(),
+  },
 };
 
 /** Full route row for a type code (case-insensitive). */

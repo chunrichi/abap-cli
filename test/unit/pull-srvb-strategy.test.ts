@@ -21,7 +21,8 @@ const SAMPLE_BINDING = {
   name: 'ZMY_BINDING',
   description: 'My binding',
   masterLanguage: 'EN',
-  binding: { type: 'SRVD', version: '1', category: 0, implementation: { name: 'ZCL_UI' } },
+  // Real ADT parser returns attributes as strings; pin the string form.
+  binding: { type: 'SRVD', version: '1', category: '0', implementation: { name: 'ZCL_UI' } },
   services: [
     {
       name: 'ZUI_BINDING',

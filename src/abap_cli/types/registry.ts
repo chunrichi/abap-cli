@@ -127,12 +127,18 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
     channel: { icfFallback: false, eccSupported: false },
   },
   // — Service binding metadata only (no source code). Pull writes a
-  // single `<name>.srvb.json` via `metadataOnlyStrategy`. Bindings are
-  // managed in SAP GUI; the CLI does not create them.
+  // single `<name>.srvb.json` via `metadataOnlyStrategy`. Create posts the
+  // ADT binding resource and activates it; `--publish` runs the publish job.
+  // Push/update is not supported: the AFF document is lossy against the ADT
+  // binding model (implementation/published/minor/patch versions).
   {
     type: 'SRVB',
     source: 'ADT',
+    createObjtype: 'SRVB/SVB',
     affSchemaFile: 'srvb-v1.json',
+    requiresFile: true,
+    pushUnsupportedReason:
+      'service bindings are metadata-only; create with --publish and use the ADT publish/unpublish jobs — push/update is not supported',
   },
   // — Service definition source object (`.acds`). Pull writes
   // `<name>.srvd.json` + `<name>.srvd.acds`. Create requires `--file`.

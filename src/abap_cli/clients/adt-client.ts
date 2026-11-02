@@ -28,9 +28,28 @@ import {
   bdefObjectUrl,
   buildBdefCreateBody,
 } from './bdef.js';
+import {
+  PUBLISH_JOB_ACCEPT,
+  SRVB_BASE_PATH,
+  SRVB_MEDIA_TYPE,
+  buildSrvbCreateBody,
+  parsePublishJobResponse,
+  publishJobAsXmlType,
+  type PublishJobResult,
+} from './srvb.js';
+import type { SrvbLocal } from '../formats/srvb/json.js';
 
 /** ADT media type of a single package resource. */
 const PACKAGE_MEDIA_TYPE = 'application/vnd.sap.adt.packages.v2+xml';
+
+/** Best-effort HTTP status extraction from an `abap-adt-api` request error. */
+function httpStatusOf(error: unknown): number | undefined {
+  const asHttp = error as { err?: unknown; status?: unknown; response?: { status?: unknown } };
+  if (typeof asHttp.err === 'number') return asHttp.err;
+  if (typeof asHttp.status === 'number') return asHttp.status;
+  const status = asHttp.response?.status;
+  return typeof status === 'number' ? status : undefined;
+}
 
 /** Inputs for `POST /sap/bc/adt/packages/validation` (package name preflight). */
 export interface PackageValidationOptions {
@@ -532,6 +551,95 @@ export class AdtClientWrapper {
         await this.unLock(objectUrl, handle).catch(() => undefined);
       }
       await this.activate(objectUrl, 'BDEF/BDO', name);
+    });
+  }
+
+  /**
+   * Create a service binding from the AFF document.
+   *
+   * `abap-adt-api`'s typed creator hard-codes category 0 / version V2, so the
+   * CLI builds the body itself. The binding becomes usable only after
+   * activation (ADR-created bindings report `bindingCreated="false"` until
+   * then).
+   */
+  createSrvb(
+    name: string,
+    doc: SrvbLocal,
+    meta: { packageName: string; transport?: string },
+  ): Promise<void> {
+    return this._call(async () => {
+      const body = buildSrvbCreateBody(doc, {
+        name,
+        packageName: meta.packageName,
+        language: this.config.sap.language,
+      });
+      await this.client.httpClient.request(SRVB_BASE_PATH, {
+        method: 'POST',
+        body,
+        headers: { 'Content-Type': SRVB_MEDIA_TYPE, Accept: SRVB_MEDIA_TYPE },
+        qs: meta.transport ? { corrNr: meta.transport } : {},
+      });
+    });
+  }
+
+  /**
+   * Publish or unpublish an OData service binding.
+   *
+   * ADT uses `/businessservices/{odatav2|odatav4}/{un,}publishjobs` with the
+   * binding name + service version in the query string. On-prem renders the
+   * status only as `application/vnd.sap.as+xml`; a 406/415 is retried once with
+   * the fully-qualified media type (same pattern as the Eclipse ADT client).
+   */
+  publishSrvb(
+    name: string,
+    serviceVersion: string,
+    bindingVersion: string,
+    unpublish = false,
+  ): Promise<PublishJobResult> {
+    return this._call(async () => {
+      const serviceType = bindingVersion.toUpperCase() === 'V2' ? 'odatav2' : 'odatav4';
+      const job = unpublish ? 'unpublishjob' : 'publishjob';
+      const action = unpublish ? 'unpublishjobs' : 'publishjobs';
+      const url =
+        `/sap/bc/adt/businessservices/${serviceType}/${action}` +
+        `?servicename=${encodeURIComponent(name)}&serviceversion=${encodeURIComponent(serviceVersion)}`;
+      const body =
+        '<?xml version="1.0" encoding="UTF-8"?>' +
+        '<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">' +
+        `<adtcore:objectReference adtcore:name="${name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')}"/>` +
+        '</adtcore:objectReferences>';
+      const request = (contentType: string, accept: string) =>
+        this.client.httpClient.request(url, {
+          method: 'POST',
+          body,
+          headers: { 'Content-Type': contentType, Accept: accept },
+        });
+      let response: { body?: unknown };
+      try {
+        response = (await request('application/xml', PUBLISH_JOB_ACCEPT)) as { body?: unknown };
+      } catch (error: unknown) {
+        const status = httpStatusOf(error);
+        if (status !== 406 && status !== 415) throw error;
+        const asXmlType = publishJobAsXmlType(serviceType, job);
+        response = (await request(asXmlType, asXmlType)) as { body?: unknown };
+      }
+      const result = parsePublishJobResponse(String(response.body ?? ''));
+      if (result.severity && result.severity.toUpperCase() !== 'OK') {
+        throw new CliError(
+          'SAP_ERROR',
+          `Service binding ${name} ${unpublish ? 'unpublish' : 'publish'} failed: ${result.shortText || 'SAP returned an error'}` +
+            (result.longText ? ` (${result.longText})` : ''),
+          {
+            details: {
+              object: name,
+              severity: result.severity,
+              shortText: result.shortText,
+              longText: result.longText,
+            },
+          },
+        );
+      }
+      return result;
     });
   }
 

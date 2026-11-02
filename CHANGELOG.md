@@ -9,6 +9,7 @@
 ### Added
 
 - **BDEF 创建**：`abap create BDEF <name> --file <name>.bdef.json --package <pkg>` 现在可用；命令读取同目录的 `.bdef.abdl` 源码，创建行为定义后写入并激活。源码必须指向已存在的 root entity，或引用可用的 unmanaged 实现类。
+- **SRVB 创建/发布**：`abap create SRVB <name> --file <name>.srvb.json --package <pkg>` 从 AFF 元数据创建并激活服务绑定；加 `--publish` 会在激活后调用 ADT publish job。发布是否成功取决于系统是否允许本地发布或是否需要 transport request（不允许时 SAP 返回明确错误，binding 仍已创建）；push/update 不支持。
 
 ### Fixed
 

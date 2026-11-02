@@ -4,7 +4,7 @@ title: SAP 开发任务覆盖率矩阵
 description: abap-cli 当前能 / 不能完成的 SAP 开发任务全景 — 用于未来 spec 选题 + 用户预期管理
 tags: [abap-cli, coverage, roadmap, scope]
 created at: 2026-09-01 00:00:00
-changed at: 2026-11-02 21:48:00
+changed at: 2026-11-02 22:10:00
 ---
 
 # SAP 开发任务覆盖率矩阵
@@ -50,7 +50,7 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | Metadata Extension（DDLX） | `create / pull / push DDLX` | ✅ | ADT；`create --file` |
 | Annotation Definition（DDLA） | `create / pull / push DDLA` | ✅ | ADT；`create --file` |
 | Behavior Definition（BDEF） | `create / pull / push / delete BDEF` | ✅ | ADT blueSource + `.abdl` 源码；`create --file`（需同目录 `.bdef.abdl`）；真机 create/pull/delete 验证 |
-| Service Binding（SRVB） | `pull SRVB` | ⚪ | metadata-only；create/publish 尚无 CLI 路径；binding 在 SAP GUI 管理 |
+| Service Binding（SRVB） | `create / pull / delete SRVB` | ✅ | metadata-only；`create --file`（AFF `srvb-v1`）后激活；`--publish` 走 ADT publish job（受系统 transport 设置约束）；push/update 不支持；真机 create/pull/delete 验证 |
 | Pool/Cluster Table | — | ❌ | 仅 TABL/STRU |
 | 创建/修改数据库视图（VIEW） | `create / pull / push / delete VIEW` | ✅ | ICF `/ddic/view`；自建 `view-v1.json`（本地扩展）；DD25V/DD26V/DD27P/DD28J/DD28V 映射；删除仅 `$TMP`；真机 17/17 TC（join 视图 + 单表视图 create/pull/push/delete + DD26S/DD27S/DD28S 校验） |
 | 创建/修改搜索帮助（SHLP） | `create / pull / push / delete SHLP` | ✅ | ICF `/ddic/shlp`；自建 `shlp-v1.json`（本地扩展）；elementary + collective、参数映射；删除仅 `$TMP`；真机 18/18 TC（create/pull/push/delete + DD30L/DD31S/DD32S/DD33S 校验） |

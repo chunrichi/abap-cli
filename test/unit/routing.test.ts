@@ -49,7 +49,7 @@ const EXPECTED: Record<string, ExpectedRoute> = {
   DCLS: { create: 'adt', pull: 'adt', push: 'adt' },
   DDLX: { create: 'adt', pull: 'adt', push: 'adt' },
   DDLA: { create: 'adt', pull: 'adt', push: 'adt' },
-  SRVB: { create: undefined, pull: 'adt', push: undefined },
+  SRVB: { create: 'adt', pull: 'adt', push: undefined },
 };
 
 const OPS = ['create', 'pull', 'push'] as const;
