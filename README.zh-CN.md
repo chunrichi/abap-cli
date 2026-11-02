@@ -201,49 +201,9 @@ src/(ui2)cl_json.clas.abap                # 命名空间对象 /UI2/CL_JSON
 
 ## 支持的对象类型
 
-25 个类型码，按 ADT REST API 或捆绑 ICF 服务路由：23 种支持 `create`、25 种支持 `pull`、23 种有 `push` 入口、23 种有 `delete` 路径（SICF 节点与编号范围对象分别在 SICF / SNRO 中删除）。每个对象对应一组 abap-file-format（AFF）文件，平铺在 `src/` 下；`<name>` 是 AFF 文件 token（小写；`/UI2/CL_JSON` → `(ui2)cl_json`），`{json,abap}` 表示每个后缀各一个文件，`<group>` / `<fm>` / `<include>` 分别指函数组、函数模块与函数组 include（`sapl<group>`、`l<group>top` 等）。
+25 个类型码，按 ADT REST API 或捆绑 ICF 服务路由：源对象、包、DDIC 对象、SICF 节点、事务码、XSLT 转换、表类型、消息类、CDS 与 RAP 源对象。23 种支持 `create`，25 种支持 `pull`，23 种支持 `push`，23 种支持 `delete`；每个类型对应一组平铺在 `src/` 下的产物文件（多数为官方 AFF，`TTYP` / `VIEW` / `SHLP` 使用本地扩展 schema）。
 
-| 类型 | 对象 | AFF 文件（`src/`） | create | pull | push | delete |
-|---|---|---|---|---|---|---|
-| `CLAS` | 类 | `.clas.json` + `.clas.abap` + `.clas.{definitions,implementations,macros,testclasses}.abap` | ✅ | ✅ | ✅ | ✅ |
-| `INTF` | 接口 | `.intf.json` + `.intf.abap` | ✅ | ✅ | ✅ | ✅ |
-| `PROG` | 程序 | `.prog.json` + `.prog.abap`（include 程序为 `.prog.include.abap`） | ✅ | ✅ | ✅ | ✅ |
-| `FUGR` | 函数组 | `.fugr.json` + `.fugr.<include>.reps.{json,abap}` + `.fugr.<fm>.func.{json,abap}` | ✅ | ✅ | ✅ | ✅ |
-| `DEVC` | 包 | `.devc.json` | ✅ | ✅ | — | ✅ |
-| `TABL` | 透明表 | `.tabl.json` + `.tabl.ddic` + `.tabl.settings.json` | ✅ `--file` | ✅ | ✅ | ✅ |
-| `STRU` | 结构 | `.stru.json` + `.stru.ddic` | ✅ `--file` | ✅ | ✅ | ✅ |
-| `DOMA` | 域 | `.doma.json`（+ `.doma.docu.json`） | ✅ `--file` | ✅ | ✅ | ✅ |
-| `DTEL` | 数据元素 | `.dtel.json`（+ `.dtel.docu.json`） | ✅ `--file` | ✅ | ✅ | ✅ |
-| `ENQU` | 锁对象 | `.enqu.json` | ✅ `--file` | ✅ | ✅ | ✅ |
-| `NROB` | 编号范围对象 | `.nrob.json` | ✅ `--file` | ✅ | ✅ | — |
-| `VIEW` | 数据库视图 | `.view.json` | ✅ `--file` | ✅ | ✅ | ✅ `$TMP` |
-| `SHLP` | 搜索帮助 | `.shlp.json` | ✅ `--file` | ✅ | ✅ | ✅ `$TMP` |
-| `HTTP` | SICF 服务节点 | `.http.json` | ✅ `--file` | ✅ | ✅ | — |
-| `TRAN` | 事务码 | `.tran.json` | ✅ `--file` | ✅ | ✅ | ✅ `$TMP` |
-| `XSLT` | 转换程序 | `.xslt.json` + `.xslt.xml` | ✅ `--file` | ✅ | ✅ | ✅ |
-| `TTYP` | 表类型 | `.ttyp.json`（+ `.type.abap`） | ✅ `--file` | ✅ | ✅ | ✅ |
-| `MSAG` | 消息类 | `.msag.json` | ✅ `--file` | ✅ | ✅ | ✅ |
-| `DDLS` | CDS 视图 | `.ddls.json` + `.ddls.acds` | ✅ `--file` | ✅ | ✅ | ✅ |
-| `SRVD` | 服务定义 | `.srvd.json` + `.srvd.acds` | ✅ `--file` | ✅ | ✅ | ✅ |
-| `BDEF` | 行为定义 | `.bdef.json` + `.bdef.abdl` | — | ✅ | ✅ | ✅ |
-| `DCLS` | CDS 访问控制 | `.dcls.json` + `.dcls.acds` | ✅ `--file` | ✅ | ✅ | ✅ |
-| `DDLX` | CDS 元数据扩展 | `.ddlx.json` + `.ddlx.acds` | ✅ `--file` | ✅ | ✅ | ✅ |
-| `DDLA` | CDS 注解定义 | `.ddla.json` + `.ddla.acds` | ✅ `--file` | ✅ | ✅ | ✅ |
-| `SRVB` | 服务绑定 | `.srvb.json` | — | ✅ | — | ✅ |
-
-`--file` 标记该类型的 `create` 需要读取 AFF JSON 文档（可手写，或先 `pull` 一个同类对象）；同一行里的伴生文件属于同一组产物。源对象与 `DEVC` 直接用命令行参数创建，`create local` 可离线生成 `CLAS` / `INTF` / `PROG` / `FUGR` 草稿。`abap create --schema <type>` 打印该类型的契约，能提供示例文档时一并给出。
-
-`delete` 走 lock → delete → unlock；包不加锁，`VIEW` / `SHLP` / `TRAN` / `XSLT` 走 ICF 服务删除。`$TMP` 表示只能删除本地对象——可传输对象请在 SAP GUI 删除，让删除动作进入传输请求。`pull --textpool` 会额外写出文本元素文件（`<name>.<type>.{texts,selections,headings}.en.properties`）。
-
-路由：源对象、`DEVC`、`TTYP`、`MSAG`、`DDLS`、CDS / RAP 配套对象与 `SRVB` 走 ADT；`TABL` `STRU` `DOMA` `DTEL` `ENQU` `VIEW` `SHLP` `HTTP` `TRAN` `XSLT` 走捆绑 ICF 服务（`abap deploy`）；`TTYP` / `MSAG` 在 ECC EHP5/6 上自动降级到 ICF；`NROB` 的 pull 走 ADT（ICF 兜底）、写入走 ICF；`DDLS` 在 ECC 上直接拒绝（`DDLS_NOT_SUPPORTED_ON_ECC`）。逐类型细节与完整类型 × 命令矩阵见 [wiki/object-types.md](wiki/object-types.md)。
-
-- `DEVC`——`create` 用 `--package`（父包）与 `--description`；没有 `push`，ADT 拒绝包更新。
-- `TRAN`——覆盖 dialog / report / parameter / variant 四类事务；OO 事务仍需在 SE93 维护。
-- `VIEW` / `SHLP`——上游 AFF 没有这两种格式，使用本地扩展 schema（`view-v1.json` / `shlp-v1.json`）。
-- `ENQU` / `NROB`——`create` 只支持 `$TMP`（可传输创建需要 TADIR 记录）；编号范围对象没有 delete 路径，请在 SNRO 中删除。
-- `BDEF`——SAP 不提供 ADT create 端点，只能 pull / push / delete。
-- `SRVB`——仅元数据；binding 在 SAP GUI 创建与维护。
-- `HTTP`——SICF 节点可 create / pull / push，但暂无 delete 路径；节点删除请走 SICF。
+完整类型 × 命令矩阵、产物文件集、通道路由与逐类型注意事项见 **[docs/supported.md](docs/supported.md)**；逐类型细节与真机证据见 [wiki/object-types.md](wiki/object-types.md)。
 
 ---
 
@@ -307,6 +267,7 @@ npm 包内含 6 个 skill 和 1 个 agent 定义：
 - [docs/getting-started.md](docs/getting-started.md)——安装、首次配置、端到端流程
 - [docs/configuration.md](docs/configuration.md)——profile、`.abap.json`、凭证、环境变量
 - [docs/commands.md](docs/commands.md)——生成的命令与参数参考
+- [docs/supported.md](docs/supported.md)——支持的对象类型、产物文件集、通道路由与逐类型注意事项
 - [docs/agent-integration.md](docs/agent-integration.md)——`--json` 信封、错误码、agent 循环
 - [docs/architecture.md](docs/architecture.md)——三层架构与捆绑 ICF 服务
 - [docs/development.md](docs/development.md)——构建、测试、发布、新增命令

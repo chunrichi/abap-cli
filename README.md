@@ -201,49 +201,9 @@ All commands support `--json` (compact) and `--pretty-json` (indented). Every to
 
 ## Supported object types
 
-25 type codes, routed through the ADT REST API or the bundled ICF service: 23 support `create`, all 25 support `pull`, 23 have a `push` path, and 23 have a `delete` path (SICF nodes and number ranges are removed in SICF / SNRO). Each object maps to one abap-file-format (AFF) artifact set written flat under `src/`, with `<name>` as the AFF file token (lowercase; `/UI2/CL_JSON` → `(ui2)cl_json`). `{json,abap}` means one file per suffix, and `<group>` / `<fm>` / `<include>` stand for a function group, function module and function-group include (`sapl<group>`, `l<group>top`, …).
+25 object type codes, routed through the ADT REST API or the bundled ICF service: source objects, packages, DDIC objects, SICF nodes, transaction codes, XSLT transformations, table types, message classes, CDS and RAP sources. 23 types support `create`, all 25 support `pull`, and 23 support `push` / `delete` — each mapping to one artifact set under `src/` (official AFF documents, plus local schemas for `TTYP` / `VIEW` / `SHLP`).
 
-| Type | Object | AFF files in `src/` | create | pull | push | delete |
-|---|---|---|---|---|---|---|
-| `CLAS` | Class | `.clas.json` + `.clas.abap` + `.clas.{definitions,implementations,macros,testclasses}.abap` | ✅ | ✅ | ✅ | ✅ |
-| `INTF` | Interface | `.intf.json` + `.intf.abap` | ✅ | ✅ | ✅ | ✅ |
-| `PROG` | Program | `.prog.json` + `.prog.abap` (`.prog.include.abap` for include programs) | ✅ | ✅ | ✅ | ✅ |
-| `FUGR` | Function group | `.fugr.json` + `.fugr.<include>.reps.{json,abap}` + `.fugr.<fm>.func.{json,abap}` | ✅ | ✅ | ✅ | ✅ |
-| `DEVC` | Package | `.devc.json` | ✅ | ✅ | — | ✅ |
-| `TABL` | Transparent table | `.tabl.json` + `.tabl.ddic` + `.tabl.settings.json` | ✅ `--file` | ✅ | ✅ | ✅ |
-| `STRU` | Structure | `.stru.json` + `.stru.ddic` | ✅ `--file` | ✅ | ✅ | ✅ |
-| `DOMA` | Domain | `.doma.json` (+ `.doma.docu.json`) | ✅ `--file` | ✅ | ✅ | ✅ |
-| `DTEL` | Data element | `.dtel.json` (+ `.dtel.docu.json`) | ✅ `--file` | ✅ | ✅ | ✅ |
-| `ENQU` | Lock object | `.enqu.json` | ✅ `--file` | ✅ | ✅ | ✅ |
-| `NROB` | Number range object | `.nrob.json` | ✅ `--file` | ✅ | ✅ | — |
-| `VIEW` | Database view | `.view.json` | ✅ `--file` | ✅ | ✅ | ✅ `$TMP` |
-| `SHLP` | Search help | `.shlp.json` | ✅ `--file` | ✅ | ✅ | ✅ `$TMP` |
-| `HTTP` | SICF service node | `.http.json` | ✅ `--file` | ✅ | ✅ | — |
-| `TRAN` | Transaction code | `.tran.json` | ✅ `--file` | ✅ | ✅ | ✅ `$TMP` |
-| `XSLT` | Transformation | `.xslt.json` + `.xslt.xml` | ✅ `--file` | ✅ | ✅ | ✅ |
-| `TTYP` | Table type | `.ttyp.json` (+ `.type.abap`) | ✅ `--file` | ✅ | ✅ | ✅ |
-| `MSAG` | Message class | `.msag.json` | ✅ `--file` | ✅ | ✅ | ✅ |
-| `DDLS` | CDS view | `.ddls.json` + `.ddls.acds` | ✅ `--file` | ✅ | ✅ | ✅ |
-| `SRVD` | Service definition | `.srvd.json` + `.srvd.acds` | ✅ `--file` | ✅ | ✅ | ✅ |
-| `BDEF` | Behavior definition | `.bdef.json` + `.bdef.abdl` | — | ✅ | ✅ | ✅ |
-| `DCLS` | CDS access control | `.dcls.json` + `.dcls.acds` | ✅ `--file` | ✅ | ✅ | ✅ |
-| `DDLX` | CDS metadata extension | `.ddlx.json` + `.ddlx.acds` | ✅ `--file` | ✅ | ✅ | ✅ |
-| `DDLA` | CDS annotation definition | `.ddla.json` + `.ddla.acds` | ✅ `--file` | ✅ | ✅ | ✅ |
-| `SRVB` | Service binding | `.srvb.json` | — | ✅ | — | ✅ |
-
-`--file` marks the types whose `create` reads an AFF JSON document (write it yourself or `pull` a comparable object first); companion files shown in the same row belong to the same artifact set. Source objects and `DEVC` create from CLI arguments, and `create local` drafts `CLAS` / `INTF` / `PROG` / `FUGR` offline. `abap create --schema <type>` prints the per-type contract, including an example document where one exists.
-
-`delete` runs lock → delete → unlock; packages delete without a lock, and `VIEW` / `SHLP` / `TRAN` / `XSLT` delete through the ICF service. `$TMP` marks types that can only delete local objects — delete transportable ones in SAP GUI so the deletion is recorded in a transport. `pull --textpool` adds text-element files (`<name>.<type>.{texts,selections,headings}.en.properties`).
-
-Channel routing: source objects, `DEVC`, `TTYP`, `MSAG`, `DDLS`, the CDS / RAP companions and `SRVB` use ADT; `TABL` `STRU` `DOMA` `DTEL` `ENQU` `VIEW` `SHLP` `HTTP` `TRAN` `XSLT` use the bundled ICF service (`abap deploy`); `TTYP` / `MSAG` fall back to ICF on ECC EHP5/6; `NROB` pulls through ADT (ICF fallback) and writes through ICF; `DDLS` is rejected on ECC (`DDLS_NOT_SUPPORTED_ON_ECC`). Per-type gotchas and the full type × command matrix live in [wiki/object-types.md](wiki/object-types.md).
-
-- `DEVC` — `create` takes `--package` (the super package) and `--description`; no `push`, because ADT rejects package updates.
-- `TRAN` — dialog, report, parameter and variant transactions; OO transactions stay in SE93.
-- `VIEW` / `SHLP` — local-extension schemas (`view-v1.json` / `shlp-v1.json`); upstream AFF defines neither.
-- `ENQU` / `NROB` — `create` supports `$TMP` only (transportable creation needs a TADIR entry); number ranges have no delete path, remove them in SNRO.
-- `BDEF` — SAP exposes no ADT create endpoint, so pull / push / delete only.
-- `SRVB` — metadata only; bindings are created and maintained in SAP GUI.
-- `HTTP` — SICF nodes can be created, pulled and pushed, but there is no delete path yet; remove the node in SICF.
+See **[docs/supported.md](docs/supported.md)** for the full type × command matrix, artifact sets, channel routing and per-type caveats; deeper notes and real-system evidence live in [wiki/object-types.md](wiki/object-types.md).
 
 ---
 
@@ -307,6 +267,7 @@ See [SECURITY.md](SECURITY.md) for the reporting process.
 - [docs/getting-started.md](docs/getting-started.md) — install, first-time setup, end-to-end workflow
 - [docs/configuration.md](docs/configuration.md) — profiles, `.abap.json`, credentials, environment variables
 - [docs/commands.md](docs/commands.md) — generated command and flag reference
+- [docs/supported.md](docs/supported.md) — supported object types, artifact sets, channel routing, per-type caveats
 - [docs/agent-integration.md](docs/agent-integration.md) — `--json` envelope, error codes, agent loop
 - [docs/architecture.md](docs/architecture.md) — three-layer design and the bundled ICF service
 - [docs/development.md](docs/development.md) — build, test, release, adding commands

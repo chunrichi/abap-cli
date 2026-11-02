@@ -4,7 +4,7 @@ title: 支持的对象类型
 description: abap CLI 支持的 ABAP 对象类型总览 — 25 个类型码 × create/pull/push/delete 路由（ADT / ICF）与本地 AFF 文件布局
 tags: [abap-cli, object-types, ddic, http, sicf, reference]
 created at: 2026-08-29 10:00:00
-changed at: 2026-11-01 21:35:00
+changed at: 2026-11-02 21:25:00
 ---
 
 # 支持的对象类型
@@ -24,7 +24,7 @@ abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **25 个
 | `STRU` | 结构 | ICF | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.stru.{json,ddic}`（`.settings.json` 仅 TABL 有） |
 | `DOMA` | 域 | ICF | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.doma.json`（可选伴生 `<name>.doma.docu.json`，长文本 0..1） |
 | `DTEL` | 数据元素 | ICF | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.dtel.json`（可选伴生 `<name>.dtel.docu.json`，长文本 0..1） |
-| `ENQU` | 锁对象 | ICF | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.enqu.json` |
+| `ENQU` | 锁对象 | ICF | `--file` | ✅ | ✅ | ❌ | ❌ | `<name>.enqu.json` |
 | `VIEW` | 数据库视图 | ICF | `--file`（`view-v1.json`，本地扩展） | ✅ | ✅ | ✅（仅 `$TMP`） | ❌ | `<name>.view.json` |
 | `SHLP` | 搜索帮助 | ICF | `--file`（`shlp-v1.json`，本地扩展；elementary/collective） | ✅ | ✅ | ✅（仅 `$TMP`） | ❌ | `<name>.shlp.json` |
 | `NROB` | 编号范围对象 | ICF（pull 主 ADT + ICF 兜底） | `--file` | ✅ | ✅ | ❌（SNRO 中删除） | ❌ | `<name>.nrob.json` |
@@ -34,16 +34,18 @@ abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **25 个
 | `TTYP` | 表类型 | auto（ADT 主 / ECC ICF 兜底） | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.ttyp.json` + 可选 `<name>.type.abap` |
 | `MSAG` | 消息类 | auto（ADT 主 / ECC ICF 兜底） | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.msag.json` |
 | `DDLS` | CDS 视图 | ADT | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.ddls.{json,acds}` |
-| `SRVB` | Service Binding (metadata only) | ADT | ❌ | ✅ | ❌ | ✅ | ❌ | `<name>.srvb.json` |
+| `SRVB` | Service Binding (metadata only) | ADT | ❌ | ✅ | ❌ | ✅* | ❌ | `<name>.srvb.json` |
 | `SRVD` | Service Definition | ADT | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.srvd.{json,acds}` |
-| `BDEF` | Behaviour Definition | ADT | ❌（SAP 不接受 CLI 创建 BDEF） | ✅ | ✅ | ✅ | ❌ | `<name>.bdef.{json,abdl}` |
+| `BDEF` | Behaviour Definition | ADT | ❌（CLI 未实现；ADT 有 create 端点） | ✅ | ✅ | ✅* | ❌ | `<name>.bdef.{json,abdl}` |
 | `DCLS` | CDS Access Control | ADT | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.dcls.{json,acds}` |
 | `DDLX` | CDS Metadata Extension | ADT | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.ddlx.{json,acds}` |
 | `DDLA` | CDS Annotation Definition | ADT | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.ddla.{json,acds}` |
 
+> `*` 表示代码中已有该路径、但尚未在真机上验证（`BDEF` / `SRVB` 的 delete）。
+
 > **`create local` 只支持 `CLAS` / `INTF` / `PROG` / `FUGR`**（`formats/templates.ts` 只有这四类模板），其余类型一律 `TYPE_NOT_SUPPORTED`（exit 7）。`SRVD` / `DCLS` / `DDLX` / `DDLA` 在 SAP 侧可创建（`createObjtype`），但没有本地骨架模板；`create local` 会拒绝它们并提示改用 `abap create <type> --file <aff.json>`。
-> **`create` 的 `--file` 是数据驱动必填项**（`types/registry.ts` 的 `ObjectTypeEntry.requiresFile`）：`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `NROB` / `HTTP` / `TRAN` / `XSLT` / `TTYP` / `MSAG` / `DDLS` / `SRVD` / `DCLS` / `DDLX` / `DDLA` 缺 `--file` 直接 `USAGE`（exit 2）。`BDEF` 无法 create（SAP 不接受 CLI 创建），pull / push / delete 可用；`SRVB` 仅 pull 时写元数据（binding 在 SAP GUI 管理，delete 走通用 ADT 路径）。
-> **`ENQU` / `NROB` 的 create 仅支持本地包（`$` 前缀）**：可传输创建需要额外写 TADIR 记录，ICF 服务对非本地包直接拒绝（`ENQU_PACKAGE_NOT_SUPPORTED` / `NROB_PACKAGE_NOT_SUPPORTED`）；`NROB` 也没有 delete 通道（ADT `numberranges` 资源只读，ICF 只删 VIEW/SHLP），删除请在 SNRO 操作。`TEST...` 前缀的包不视为本地。（真机：`$` 前缀本地包中 ENQU 创建成功且无 transport；ENQU/NROB 无删除通道，清理需 SE11/SNRO。证据 `tests/261101901-localpkg-icf/`，本地不入库。）
+> **`create` 的 `--file` 是数据驱动必填项**（`types/registry.ts` 的 `ObjectTypeEntry.requiresFile`）：`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `NROB` / `HTTP` / `TRAN` / `XSLT` / `TTYP` / `MSAG` / `DDLS` / `SRVD` / `DCLS` / `DDLX` / `DDLA` 缺 `--file` 直接 `USAGE`（exit 2）。`BDEF` 尚无 CLI create（ADT 已有 create 端点，CLI 未接入），pull / push / delete 可用；`SRVB` 仅 pull 时写元数据（binding 在 SAP GUI 管理；create/publish 尚无 CLI 路径，delete 走通用 ADT 路径且未真机验证）。
+> **`ENQU` / `NROB` 的 create 仅支持本地包（`$` 前缀）**：可传输创建需要额外写 TADIR 记录，ICF 服务对非本地包直接拒绝（`ENQU_PACKAGE_NOT_SUPPORTED` / `NROB_PACKAGE_NOT_SUPPORTED`）；`ENQU` / `NROB` 都没有 delete 通道（ADT 不索引锁对象，`numberranges` 资源只读，ICF 只删 VIEW/SHLP），删除请在 SE11（ENQU）/ SNRO（NROB）操作。`TEST...` 前缀的包不视为本地。（真机：`$` 前缀本地包中 ENQU 创建成功且无 transport；ENQU/NROB 无删除通道，清理需 SE11/SNRO。证据 `tests/261101901-localpkg-icf/`，本地不入库。）
 
 > **`TRAN` 写路径已实现**：ABAP `/tran/<code>` 支持 GET / POST / PUT / DELETE，覆盖 dialog / report（含 report variant）/ parameter / variant 四种事务；OO 事务返回 `TRAN_OO_NOT_SUPPORTED`（规范 FM 没有 class/method 参数，仍用 SE93 维护）。`delete` 只支持 `$TMP` 事务（可传输事务请在 SE93 删除以便记录到请求）。类型页面：[tran](objects/tran.md)。
 > **`XSLT` 两件套**：`<name>.xslt.json`（AFF xslt-v1 元数据）+ `<name>.xslt.xml`（源码）必须成对存在；SAP 侧走 ICF `/xslt/<name>` + `CL_O2_API_XSLTDESC`，更新语义是**原地更新并保留版本历史**（`load` → `set_source` → `save` → `activate`）。行尾统一规范化（SAP 读回多一个 CRLF）。类型页面：[xslt](objects/xslt.md)。
@@ -135,7 +137,7 @@ abap push src/zmy_service.http.json --tr <TR>
 - `create <type>` 的 `--schema` `allowedValues` 已是全 25 类：`CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, ENQU, VIEW, SHLP, NROB, HTTP, TRAN, XSLT, TTYP, MSAG, DDLS, SRVB, SRVD, BDEF, DCLS, DDLX, DDLA`。
 - `DDIC_NOT_SUPPORTED` (exit 7) → 文件按 ICF 路由、但类型不在 `types/registry.ts` 的 25 类内时触发；已注册类型不会命中。
 - 所有 ICF 路由类型在扩展未部署时都会失败 → 先 `abap deploy status`。
-- CDS 家族（`DDLS`/`DCLS`/`DDLX`/`DDLA`）+ RAP 三件套（`SRVB`/`SRVD`/`BDEF`）走 ADT，**不**经 ICF。`SRVB` 仅 `pull` 写元数据（SAP GUI 管理 binding）；`DDLS` / `SRVD` / `DCLS` / `DDLX` / `DDLA` 支持 create/pull/push；`BDEF` 支持 pull/push/delete（无 create）。
+- CDS 家族（`DDLS`/`DCLS`/`DDLX`/`DDLA`）+ RAP 三件套（`SRVB`/`SRVD`/`BDEF`）走 ADT，**不**经 ICF。`SRVB` 仅 `pull` 写元数据（SAP GUI 管理 binding；create/publish 尚无 CLI 路径）；`DDLS` / `SRVD` / `DCLS` / `DDLX` / `DDLA` 支持 create/pull/push；`BDEF` 支持 pull/push/delete（CLI 尚无 create，ADT 已有 create 端点）。
 
 # More
 

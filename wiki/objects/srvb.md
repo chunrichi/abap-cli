@@ -1,10 +1,10 @@
 ---
 type: object-type
 title: SRVB — 服务绑定（Service Binding）
-description: SRVB 对象的 ADT metadata-only pull、srvb-v1.json 字段来源与"仅 pull"边界
+description: SRVB 对象的 ADT metadata-only pull、srvb-v1.json 字段来源与写路径缺口
 tags: [abap-cli, object-type, srvb, adt, rap, service-binding, abap-file-format]
 created at: 2026-11-01 00:20:00
-changed at: 2026-11-01 00:20:00
+changed at: 2026-11-02 21:25:00
 ---
 
 # SRVB — 服务绑定（Service Binding）
@@ -21,6 +21,8 @@ RAP service binding：把 service definition 暴露成 OData V2/V4 或 UI 服务
 
 binding 由 SAP GUI（或 RAP 工具链）管理，CLI **没有** create / push 路径：
 `types/registry.ts` 没有 `createObjtype`，`flows/edit/routing.ts` 只为 SRVB 注册了 pull。
+ADT 侧已有创建/发布端点（`POST /sap/bc/adt/businessservices/bindings`、
+`publishedstates` 或 `odatav2/publishjobs`），接入 CLI 属于下一阶段工作。
 
 ## 本地文件形态
 
@@ -56,7 +58,7 @@ src/
 | 操作 | 支持 | 说明 |
 |---|---|---|
 | `pull` | ✅ | metadata-only，写单文件 |
-| `create` / `push` | ❌ | binding 由 SAP GUI 管理；CLI 不提供写路径 |
+| `create` / `push` | ❌ | CLI 尚无写路径；binding 由 SAP GUI 管理（ADT 侧已有 create/publish 端点） |
 | `create local` | ❌ | 非源对象，无本地骨架模板 |
 | `delete` | 通用 ADT 删除 | lock → DELETE → unlock，未真机验证 |
 
