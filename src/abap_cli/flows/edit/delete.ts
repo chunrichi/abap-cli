@@ -40,6 +40,9 @@ import { runDeleteSm59 } from './delete-sm59.js';
 import { OA2P_FLOW, SRFC_FLOW, runDeleteUcon } from './ucon-object-flows.js';
 import { isCdsTechType } from '../../formats/cds-tech/json.js';
 import { isAppJobType } from '../../formats/appjob/json.js';
+import { isAuthType } from '../../formats/auth/registry.js';
+import { authSpecOf } from '../../formats/auth/registry.js';
+import { runDeleteAuth } from './delete-auth.js';
 
 export interface DeleteOptions {
   /** Object type code (CLAS / PROG / ...). Required — `delete` without a type
@@ -50,6 +53,8 @@ export interface DeleteOptions {
   tr?: string;
   /** Caller must pass `--yes`; the command layer guards this. */
   yes: boolean;
+  /** With type SUSO: regenerate SAP_ALL/SAP_NEW after the delete (explicit opt-in). */
+  regenerateProfiles?: boolean;
 }
 
 export interface DeleteResult {
@@ -117,6 +122,11 @@ export async function runDelete(objectName: string, opts: DeleteOptions): Promis
   // package is not reported by quickSearch, hence the dedicated branch.
   if (isAppJobType(typeUpper)) {
     return runDeleteAppJob(typeUpper, objectName, opts);
+  }
+  // Authorization-object family — hand-written ICF delete routes
+  // (`/auth/<sub>/<name>`). The SAP handler owns the where-used checks.
+  if (isAuthType(typeUpper)) {
+    return runDeleteAuth(authSpecOf(typeUpper), objectName, opts);
   }
   // VIEW (DDIC database view) has no ADT delete endpoint: deletion runs through
   // the bundled ICF service (RS_DD_DELETE_OBJ, $TMP only).

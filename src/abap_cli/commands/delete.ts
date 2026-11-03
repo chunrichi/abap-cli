@@ -36,6 +36,12 @@ export const SCHEMA = {
       description: 'Transport request number (required for non-local packages).',
     },
     {
+      name: '--regenerate-profiles',
+      type: 'boolean',
+      required: false,
+      description: 'With type SUSO: regenerate SAP_ALL/SAP_NEW after the delete (off by default).',
+    },
+    {
       name: '--yes',
       type: 'boolean',
       required: true,
@@ -82,6 +88,7 @@ export function registerDeleteCommand(program: Command): void {
     // the envelope-schema contract test depends on.
     .option('--type <type>', 'Object type code (CLAS, PROG, INTF, ...). Required for deletion.')
     .option('--tr <request>', 'Transport request number (required for non-local packages)')
+    .option('--regenerate-profiles', 'With type SUSO: regenerate SAP_ALL/SAP_NEW after the delete (off by default)')
     .option('--yes', 'Confirm the deletion. Required for deletion.')
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action(async (object: string | undefined, opts: DeleteOptions & { type?: string; schema?: boolean }, cmd: Command) => {

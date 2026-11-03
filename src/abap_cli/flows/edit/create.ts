@@ -21,6 +21,7 @@ import {
   maxNameLengthFor,
   packageNotApplicableFor,
   requiresFileFor,
+  customNameValidationFor,
 } from '../../types/registry.js';
 import { runCreateFugrFunc } from './create-fugr-func.js';
 import { createRouteFor } from './routing.js';
@@ -58,6 +59,8 @@ export interface CreateOptions {
   packageType?: string;
   /** With type SRVB: publish the service binding after activation. */
   publish?: boolean;
+  /** With type SUSO: regenerate SAP_ALL/SAP_NEW after the write (explicit opt-in). */
+  regenerateProfiles?: boolean;
 }
 
 export interface CreateLocalOptions {
@@ -118,9 +121,12 @@ export async function runCreate(type: string | undefined, name: string | undefin
   // illegal name must not reach SAP as a misleading OBJECT_NOT_FOUND.
   // DEVC has its own name rules (leading `$`, namespaced packages) and
   // validates inside its handler once the software component is known.
-  // SM59 names are RFCDEST CHAR 32 values with a wider character set (`-`, `@`,
-  // `.` occur in real destinations), so its handler owns the rule.
-  if (typeUpper !== 'DEVC' && typeUpper !== 'SM59') {
+  // Types with composite TADIR keys validate the name in their own flow
+  // (`customNameValidation`), because the generic rule only covers plain SAP
+  // object names. SM59 names are RFCDEST CHAR 32 values with a wider character
+  // set (`-`, `@`, `.` occur in real destinations), so its handler owns the
+  // rule.
+  if (typeUpper !== 'DEVC' && typeUpper !== 'SM59' && !customNameValidationFor(typeUpper)) {
     validateObjectName(objectName, undefined, maxNameLengthFor(typeUpper));
   }
 

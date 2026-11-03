@@ -118,6 +118,11 @@ import {
   validateHttpFile,
   validateTranFile,
 } from './push-icf.js';
+import type { AuthTypeCode } from '../../formats/auth/spec.js';
+import { authSpecOf } from '../../formats/auth/registry.js';
+import { runCreateAuth } from './create-auth.js';
+import { runPullAuth } from './pull-auth.js';
+import { runPushAuth, validateAuthFile } from './push-auth.js';
 
 /** SAP channel a write/read uses. */
 export type SapChannel = 'adt' | 'icf';
@@ -213,6 +218,26 @@ function affPushRoute(
       return { transport: opts.tr ?? '', status: 'written', channel: result.channel };
     },
     validate: (file, objectType) => validateAffFile(objectType, file),
+  };
+}
+
+/** Authorization-family create: one ICF handler parameterised by type spec. */
+function authCreateRoute(type: AuthTypeCode): CreateRoute {
+  return handler('icf', ({ name, opts, mode }) => runCreateAuth(authSpecOf(type), name, opts, mode));
+}
+
+/** Authorization-family pull: GET /auth/<sub>/<name> → local JSON document. */
+function authPullRoute(type: AuthTypeCode): PullRoute {
+  return handler('icf', ({ objectName, opts }) => runPullAuth(authSpecOf(type), objectName, opts));
+}
+
+/** Authorization-family push: locked update through PUT /auth/<sub>/<name>. */
+function authPushRoute(type: AuthTypeCode): JsonPushRoute {
+  return {
+    kind: 'icf-json',
+    channel: 'icf',
+    run: ({ client, resolved, file, opts }) => runPushAuth(authSpecOf(type), client, resolved, file, opts),
+    validate: (file) => validateAuthFile(authSpecOf(type), file),
   };
 }
 
@@ -602,6 +627,35 @@ export const TYPE_ROUTES: Readonly<Record<string, TypeRoute>> = {
     create: handler('adt', createAppJobHandler('SAJT')),
     pull: handler('adt', pullAppJobHandler('SAJT')),
     push: appjobPushRoute('SAJT'),
+  },
+
+  // Authorization-object family — no ADT resource / AFF handler on the
+  // reference releases, so one hand-written ICF route per type
+  // (`/auth/<sub>/<name>`); local files are AFF-shaped JSON documents.
+  AUTH: {
+    create: authCreateRoute('AUTH'),
+    pull: authPullRoute('AUTH'),
+    push: authPushRoute('AUTH'),
+  },
+  SUSC: {
+    create: authCreateRoute('SUSC'),
+    pull: authPullRoute('SUSC'),
+    push: authPushRoute('SUSC'),
+  },
+  SUCU: {
+    create: authCreateRoute('SUCU'),
+    pull: authPullRoute('SUCU'),
+    push: authPushRoute('SUCU'),
+  },
+  SUSH: {
+    create: authCreateRoute('SUSH'),
+    pull: authPullRoute('SUSH'),
+    push: authPushRoute('SUSH'),
+  },
+  SUSO: {
+    create: authCreateRoute('SUSO'),
+    pull: authPullRoute('SUSO'),
+    push: authPushRoute('SUSO'),
   },
 };
 

@@ -16,6 +16,8 @@ export interface PushFileOptions {
   failFast?: boolean;
   atomic?: boolean;
   yes?: boolean;
+  /** With SUSO files: regenerate SAP_ALL/SAP_NEW after the write (explicit opt-in). */
+  regenerateProfiles?: boolean;
 }
 
 export interface PushFileResult {

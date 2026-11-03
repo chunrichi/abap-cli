@@ -15,6 +15,7 @@ export const SCHEMA: CommandSchema = {
     { name: '--dry-run', type: 'boolean', description: 'Plan only — no mutating ADT calls.' },
     { name: '--fail-fast', type: 'boolean', description: 'Stop at the first failing file (default: --keep-going).' },
     { name: '--atomic', type: 'boolean', description: 'Validate all files first; write nothing if any file fails validation.' },
+    { name: '--regenerate-profiles', type: 'boolean', description: 'With SUSO files: regenerate SAP_ALL/SAP_NEW after the write (off by default).' },
     { name: '--yes', type: 'boolean', description: 'Confirm in non-interactive mode.' },
     schemaOption(),
   ],
@@ -51,6 +52,7 @@ export function registerPushCommand(program: Command): void {
     .option('--dry-run', 'Plan only — no mutating ADT calls')
     .option('--fail-fast', 'Stop at the first failing file (default: --keep-going)')
     .option('--atomic', 'Validate all files first; write nothing if any file fails validation')
+    .option('--regenerate-profiles', 'With SUSO files: regenerate SAP_ALL/SAP_NEW after the write (off by default)')
     .option('--yes', 'Confirm in non-interactive mode')
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .action(async (files: string[], opts: PushFileOptions, cmd) => {
