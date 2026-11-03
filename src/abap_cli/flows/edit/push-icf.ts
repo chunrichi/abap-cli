@@ -12,7 +12,7 @@ import type { AdtClientWrapper } from '../../clients/adt-client.js';
 import { IcfClient, type IcfResponse } from '../../clients/icf-client.js';
 import { CliError } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
-import { isLocalPackageName, resolveTransport } from '../../core/transport.js';
+import { isLocalPackageName } from '../../core/transport.js';
 import { readDdicObjectForCreate } from '../../formats/ddic/io.js';
 import { localToWire } from '../../formats/ddic/wire.js';
 import { validateDdicObject, validateTabtPayload } from '../../formats/ddic/validate.js';
@@ -33,6 +33,7 @@ import { resolveFile } from '../../formats/file-resolver.js';
 import { isDocuSupportedType } from '../../formats/docu/json.js';
 import { toRelativeOutputPath } from '../../core/path-output.js';
 import { pushDocuCompanion, readDocuCompanion, validateDocuCompanion } from './docu-companion.js';
+import { resolveArtifactPushTransport } from './push-artifact-transport.js';
 import type { JsonPushTarget, PushFileOptions, PushOneResult } from './push-types.js';
 
 /** Push a .json file via the self-built ICF service.
@@ -57,15 +58,16 @@ export async function pushDdicFile(
   // object on SAP. It is POSTed only after the main object POST succeeded.
   const docu = await readDocuCompanion(file, type);
 
-  // Transport: local packages are transport-free (--tr / config / the file's
-  // recorded request are ignored); otherwise --tr > config > recorded > user's
-  // open request.
-  const packageName = (wire.package ?? '').toUpperCase();
-  let transport = '';
-  if (!isLocalPackageName(packageName)) {
-    transport = opts.tr ?? client.getConfig().transport ?? local.transportRequest ?? '';
-    if (!transport) transport = await resolveTransport(client, opts.tr, client.getConfig().transport);
-  }
+  // Transport: a pulled AFF file carries no package, so the existing object's
+  // package decides local-ness; local packages are transport-free (--tr /
+  // config / the file's recorded request are ignored), otherwise
+  // --tr > config > recorded > user's open request.
+  const { packageName, transport } = await resolveArtifactPushTransport(
+    client,
+    { objectName: resolved.objectName, objectType: type, filePackage: wire.package, fileTransport: wire.transportRequest },
+    opts.tr,
+  );
+  if (packageName !== undefined) wire.package = packageName;
   wire.transportRequest = transport || undefined;
 
   const icf = await IcfClient.create();
@@ -323,14 +325,14 @@ export async function pushTranFile(
   const local = await readValidatedTran(file, resolved.objectName);
 
   const wire = tranLocalToWire(local as Parameters<typeof tranLocalToWire>[0]);
-  // Local packages are transport-free (see pushDdicFile); otherwise
-  // --tr > config > recorded request > user's open request.
-  const packageName = (wire.package ?? '').toUpperCase();
-  let transport = '';
-  if (!isLocalPackageName(packageName)) {
-    transport = opts.tr ?? client.getConfig().transport ?? local.transportRequest ?? '';
-    if (!transport) transport = await resolveTransport(client, opts.tr, client.getConfig().transport);
-  }
+  // Transport: a pulled AFF file carries no package, so the existing object's
+  // package decides local-ness (see pushDdicFile).
+  const { packageName, transport } = await resolveArtifactPushTransport(
+    client,
+    { objectName: resolved.objectName, objectType: 'TRAN', filePackage: wire.package, fileTransport: wire.transportRequest },
+    opts.tr,
+  );
+  if (packageName !== undefined) wire.package = packageName;
   wire.transportRequest = transport || undefined;
 
   const icf = await IcfClient.create();

@@ -29,6 +29,10 @@
 
 - **`chko` 的 `hidden` 与 `checkType` 语义**：`parameters[].hidden` 对应 SAP 侧「参数不可修改」，`checkType` 对应检查是否 remote-enabled；`pull` 回读时按 SAP 实际值投影，未设置的默认值（`hidden: false` / `checkType: local`）可能被省略——两种写法等价。
 
+### Fixed
+
+- **本地包 DDIC 更新不再要求 transport**：`abap pull` 写出的 DDIC AFF 三件套（DOMA / DTEL / TABL / STRU）不携带 package，此前在 `$TMP` / `$CRW` 等本地包里“pull → 改字段 → push 已有对象”会被当成可传输对象并报 `NO_TRANSPORT`（exit 7）。现在本地文件没写 package 时，push 先读回目标对象的现有 package：本地包走 transport-free 写入，可传输包仍按 `--tr` > 配置 > 用户请求解析；VIEW / SHLP / TRAN 的更新走同一规则。
+
 ## [2.1.0] - 2026-11-03
 
 本版完成 R1「闭环与真相」收尾（不新增类型码）：HTTP（SICF 节点）现在支持 CLI 删除，并把 HTTP / TTYP / NROB 的本地元数据与写入边界收紧；TTYP 预定义行类型能完整往返长度与小数；TABL / STRU 外键和 TTYP 内联行结构改为本地显式拒绝，不再静默丢弃。本次包含一项 TTYP 本地写法的迁移，见 Changed 段。内置 ICF 服务有改动（服务版本 2.1.0），升级后请执行一次 `abap deploy --yes`。
