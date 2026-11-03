@@ -114,6 +114,12 @@ const TADIR_OBJECT_BY_CLI: Record<string, Omit<TadirMapping, 'cliType'>> = {
   CHKC: { pgmid: 'R3TR', tadirObject: 'CHKC', ddicTabclass: '', channel: 'ADT', affSchema: 'chkc-v1.json', description: 'ATC check category' },
   CHKO: { pgmid: 'R3TR', tadirObject: 'CHKO', ddicTabclass: '', channel: 'ADT', affSchema: 'chko-v1.json', description: 'ATC check (implementing class + parameters)' },
   CHKV: { pgmid: 'R3TR', tadirObject: 'CHKV', ddicTabclass: '', channel: 'ADT', affSchema: 'chkv-v1.json', description: 'ATC check variant (selected checks)' },
+
+  // CDS technical objects (ADT).
+  DTDC: { pgmid: 'R3TR', tadirObject: 'DTDC', ddicTabclass: '', channel: 'ADT', affSchema: 'dtdc-v1.json', description: 'CDS dynamic cache (metadata + .dtdc.acds source)' },
+  DTEB: { pgmid: 'R3TR', tadirObject: 'DTEB', ddicTabclass: '', channel: 'ADT', affSchema: 'dteb-v1.json', description: 'CDS entity buffer (metadata + .dteb.acds source)' },
+  DSFD: { pgmid: 'R3TR', tadirObject: 'DSFD', ddicTabclass: '', channel: 'ADT', affSchema: 'dsfd-v1.json', description: 'CDS scalar function definition (metadata + .dsfd.acds source)' },
+  DSFI: { pgmid: 'R3TR', tadirObject: 'DSFI', ddicTabclass: '', channel: 'ADT', affSchema: 'dsfi-v1.json', description: 'CDS scalar function implementation reference (single AFF JSON)' },
 };
 
 /** Complete catalog in registry-stable order. */

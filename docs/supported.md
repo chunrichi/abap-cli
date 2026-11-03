@@ -1,6 +1,6 @@
 # Supported Object Types
 
-`abap-cli` supports **28 object type codes**. Each type maps to one set of local artifacts written flat under `src/` — official abap-file-format (AFF) documents for most types, repository-local schemas for `TTYP` / `VIEW` / `SHLP` — and is served by one of two channels:
+`abap-cli` supports **32 object type codes**. Each type maps to one set of local artifacts written flat under `src/` — official abap-file-format (AFF) documents for most types, repository-local schemas for `TTYP` / `VIEW` / `SHLP` — and is served by one of two channels:
 
 - **ADT** — the standard ADT REST API: source objects (classes, interfaces, programs, function groups, CDS and RAP sources), packages, table types and message classes.
 - **ICF** — the bundled service under `/sap/abap_cli`, installed once per system with `abap deploy`: DDIC objects, SICF service nodes, transaction codes, XSLT transformations, and the types whose ADT endpoint is missing on older releases.
@@ -9,7 +9,7 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 
 ## Type × command matrix
 
-28 types support `create`, all 28 support `pull`, 26 have a `push` path and 28 have a `delete` path. In the matrix:
+32 types support `create`, all 32 support `pull`, 30 have a `push` path and 32 have a `delete` path. In the matrix:
 
 - `--file` marks a `create` that reads a JSON document — write it yourself or `pull` a comparable object first.
 - `$TMP` marks a `delete` that only removes local objects; delete transportable objects in SAP GUI so the deletion is recorded in a transport.
@@ -20,6 +20,10 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 | `CHKC` | ATC check category | ✅ `--file` | ✅ | ✅ | ✅ | ADT | `.chkc.json` |
 | `CHKO` | ATC check | ✅ `--file` | ✅ | ✅ | ✅ | ADT | `.chko.json` |
 | `CHKV` | ATC check variant | ✅ `--file` | ✅ | ✅ | ✅ | ADT | `.chkv.json` |
+| `DTDC` | Dynamic cache | ✅ `--file` | ✅ | ✅ | ✅ | ADT | `.dtdc.json` + `.dtdc.acds` |
+| `DTEB` | CDS entity buffer | ✅ `--file` | ✅ | ✅ | ✅ | ADT | `.dteb.json` + `.dteb.acds` |
+| `DSFD` | CDS scalar function definition | ✅ `--file` | ✅ | ✅ | ✅ | ADT | `.dsfd.json` + `.dsfd.acds` |
+| `DSFI` | CDS scalar function implementation | ✅ `--file` | ✅ | ✅ | ✅ | ADT | `.dsfi.json` |
 | `CLAS` | Class | ✅ | ✅ | ✅ | ✅ | ADT | `.clas.json` + `.clas.abap` + `.clas.{definitions,implementations,macros,testclasses}.abap` |
 | `DCLS` | CDS access control | ✅ `--file` | ✅ | ✅ | ✅ | ADT | `.dcls.json` + `.dcls.acds` |
 | `DDLA` | CDS annotation definition | ✅ `--file` | ✅ | ✅ | ✅ | ADT | `.ddla.json` + `.ddla.acds` |
@@ -68,7 +72,7 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 
 ## Channel routing
 
-- **ADT** — source objects (`CLAS` `INTF` `PROG` `FUGR`), `DEVC`, `TTYP`, `MSAG`, `DDLS`, the CDS / RAP companions (`SRVD` `BDEF` `DCLS` `DDLX` `DDLA`), `SRVB` and the ATC configuration objects (`CHKC` `CHKO` `CHKV`). `TTYP` and `MSAG` fall back to ICF automatically on ECC EHP5/6.
+- **ADT** — source objects (`CLAS` `INTF` `PROG` `FUGR`), `DEVC`, `TTYP`, `MSAG`, `DDLS`, the CDS / RAP companions (`SRVD` `BDEF` `DCLS` `DDLX` `DDLA`), `SRVB`, the ATC configuration objects (`CHKC` `CHKO` `CHKV`) and the CDS technical objects (`DTDC` `DTEB` `DSFD` `DSFI`). `TTYP` and `MSAG` fall back to ICF automatically on ECC EHP5/6.
 - **ICF** — `TABL` `STRU` `DOMA` `DTEL` `ENQU` `VIEW` `SHLP` `HTTP` `TRAN` `XSLT`, plus the write path of `NROB`; these need `abap deploy` once per system (`abap deploy status` checks the installed version).
 - `NROB` pulls through ADT with an ICF fallback and writes through ICF. `DDLS` is rejected on ECC releases (`DDLS_NOT_SUPPORTED_ON_ECC`).
 
@@ -82,6 +86,8 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 - `TABL` / `STRU` — foreign keys (`@AbapCatalog.foreignKeys` block or a `with foreign key ... check <table>` clause in the DDL sidecar) are not persisted by the bundled ICF service: `create` / `push` reject a payload that carries them (exit 7) instead of dropping the constraints. Maintain foreign keys in SE11 / ADT after the object exists.
 - `DOMA` / `DTEL` — long text is an optional companion file (`<name>.<type>.docu.json`, `docu-v1.json`); `lines: []` deletes the remote long text.
 - `BDEF` — `create` reads the AFF JSON plus the sibling `.bdef.abdl` source, creates the behavior definition through ADT and activates it; the behavior must target an existing root entity (or a valid unmanaged implementation class). `pull` / `push` / `delete` are also available.
+- `DTDC` / `DTEB` / `DSFD` — CDS technical source objects: a header-only AFF metadata document plus an `.acds` sidecar. `create` / `push` write the source and activate (and sync the AFF description through the metadata resource). DTEB activation requires the target view entity to allow buffering (`@AbapCatalog.entityBuffer.definitionAllowed: true`); DSFD writes need SAP's `DD_CDS_DSFD` user parameter enabled (SU3 → Parameter) — without it SAP rejects create/update/delete with a misleading authorization message that the CLI maps to `DSFD_FEATURE_NOT_ENABLED`.
+- `DSFI` — CDS scalar function implementation reference: a single AFF JSON document (its ADT `source/main` *is* the JSON). The object name must end with the engine suffix (`_ANA` on this release); the referenced scalar function definition is the name without the suffix and must exist and be active. `sqlEngine` variants are rejected by the ADT layer on this release even though the AFF schema lists them.
 - `CHKC` / `CHKO` / `CHKV` — ATC configuration objects: check categories, checks and check variants. `create` / `push` write the versioned ADT XML resource and activate it (`--no-activate` stops after the write); `pull` projects the resource back onto the official AFF document. SAP validates the semantics: a `CHKO`'s implementing class must be registered as an active ATC check, and a `CHKV`'s parameters must match that class. `push` / `delete` outside `$`-prefixed packages need `--tr`.
 - `SRVB` — metadata only: `create` reads the AFF binding document, posts the ADT binding, activates it, and `--publish` runs the publish job. There is no `push`/update path (the AFF document omits implementation/published/version details); delete uses the generic ADT path and has been verified on a real system. Publishing may depend on the client's transport settings allowing local publish.
 - `HTTP` — SICF nodes can be pulled anywhere but written (`create` / `push` / `delete`) only in `$`-prefixed local packages; `create` / `push` refuse transportable packages and `delete` refuses the root node, nodes with child nodes and transportable services — maintain those in SICF so the change is recorded in a transport. A pulled `.http.json` is strictly AFF-shaped (the object name lives in the file name), so it is reusable as a `push`/`create` template as-is.

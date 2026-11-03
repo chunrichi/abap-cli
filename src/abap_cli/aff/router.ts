@@ -93,6 +93,15 @@ const SUFFIX_RULES: ReadonlyArray<{ suffix: string; type: string; schemaFile?: s
   { suffix: '.chkc.json', type: 'CHKC' },
   { suffix: '.chko.json', type: 'CHKO' },
   { suffix: '.chkv.json', type: 'CHKV' },
+  // CDS technical objects: DTDC/DTEB/DSFD are JSON + `.acds` source pairs;
+  // DSFI is a single JSON document (its source *is* the AFF JSON).
+  { suffix: '.dtdc.json', type: 'DTDC' },
+  { suffix: '.dtdc.acds', type: 'DTDC' },
+  { suffix: '.dteb.json', type: 'DTEB' },
+  { suffix: '.dteb.acds', type: 'DTEB' },
+  { suffix: '.dsfd.json', type: 'DSFD' },
+  { suffix: '.dsfd.acds', type: 'DSFD' },
+  { suffix: '.dsfi.json', type: 'DSFI' },
 ];
 
 const SUFFIX_INDEX: Map<string, string> = new Map(

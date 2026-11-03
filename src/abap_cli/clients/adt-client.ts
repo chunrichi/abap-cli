@@ -38,8 +38,15 @@ import {
   type PublishJobResult,
 } from './srvb.js';
 import { ATC_TYPE_INFO, atcMediaType, atcObjectUrl, buildAtcBody } from './atc.js';
+import {
+  CDS_TECH_INFO,
+  buildCdsTechCreateBody,
+  cdsTechObjectUrl,
+  cdsTechSourceUrl,
+} from './cds-tech.js';
 import type { SrvbLocal } from '../formats/srvb/json.js';
 import type { AtcLocal, AtcType } from '../formats/atc/json.js';
+import type { CdsTechType } from '../formats/cds-tech/json.js';
 
 /** ADT media type of a single package resource. */
 const PACKAGE_MEDIA_TYPE = 'application/vnd.sap.adt.packages.v2+xml';
@@ -659,6 +666,114 @@ export class AdtClientWrapper {
           },
           body,
         });
+      } finally {
+        await this.unLock(objectUrl, handle).catch(() => undefined);
+      }
+    });
+  }
+
+  // --- CDS technical objects (DTDC / DTEB / DSFD / DSFI) ---
+
+  /** Read the metadata XML of one CDS technical object. */
+  getCdsTechObject(type: CdsTechType, name: string): Promise<string> {
+    return this._call(async () => {
+      const response = await this.client.httpClient.request(cdsTechObjectUrl(type, name), {
+        method: 'GET',
+        headers: { Accept: CDS_TECH_INFO[type].metaMediaType },
+      });
+      return String(response.body ?? '');
+    });
+  }
+
+  /** Read `source/main` — `.acds` text for DTDC/DTEB/DSFD, AFF JSON for DSFI. */
+  getCdsTechSource(type: CdsTechType, name: string): Promise<string> {
+    return this._call(async () => {
+      const response = await this.client.httpClient.request(cdsTechSourceUrl(type, name), {
+        method: 'GET',
+        // The source resource accepts `text/plain` / `application/json`
+        // without parameters; sending the charset-bearing Content-Type value
+        // as Accept makes SAP answer 406.
+        headers: { Accept: type === 'DSFI' ? 'application/json' : 'text/plain' },
+      });
+      return String(response.body ?? '');
+    });
+  }
+
+  /**
+   * Create a CDS technical object (POST collection → inactive object). The
+   * source is written afterwards with {@link writeCdsTechSource}; activation
+   * stays with the caller so `--no-activate` can stop after the write.
+   */
+  createCdsTechObject(
+    type: CdsTechType,
+    name: string,
+    meta: { packageName: string; description: string; transport?: string },
+  ): Promise<void> {
+    return this._call(async () => {
+      const body = buildCdsTechCreateBody(type, name, {
+        packageName: meta.packageName,
+        description: meta.description,
+        language: this.config.sap.language,
+      });
+      await this.client.httpClient.request(CDS_TECH_INFO[type].collection, {
+        method: 'POST',
+        body,
+        headers: { 'Content-Type': CDS_TECH_INFO[type].createMediaType, Accept: '*/*' },
+        qs: meta.transport ? { corrNr: meta.transport } : {},
+      });
+    });
+  }
+
+  /**
+   * Write `source/main`: lock → PUT → unlock. DSFI sends the AFF JSON document
+   * (its source *is* the JSON), the other three send the `.acds` CDS source.
+   */
+  writeCdsTechSource(
+    type: CdsTechType,
+    name: string,
+    source: string,
+    meta: { transport?: string; description?: string } = {},
+  ): Promise<void> {
+    return this._call(async () => {
+      const objectUrl = cdsTechObjectUrl(type, name);
+      const sourceUrl = cdsTechSourceUrl(type, name);
+      const lock = await this.lock(objectUrl);
+      const handle = lock.LOCK_HANDLE;
+      try {
+        await this.client.httpClient.request(sourceUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': CDS_TECH_INFO[type].sourceMediaType,
+            Accept: type === 'DSFI' ? 'application/json' : 'text/plain',
+          },
+          qs: {
+            ...(handle ? { lockHandle: handle } : {}),
+            ...(meta.transport ? { corrNr: meta.transport } : {}),
+          },
+          body: source,
+        });
+        // The AFF header description lives in the object metadata, not in the
+        // source resource: sync it under the same lock so a pull → edit →
+        // push round-trip keeps the description. The metadata PUT marks the
+        // object inactive again; the caller activates afterwards.
+        if (meta.description !== undefined) {
+          const metadataBody = buildCdsTechCreateBody(type, name, {
+            description: meta.description,
+            language: this.config.sap.language,
+          });
+          await this.client.httpClient.request(objectUrl, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': CDS_TECH_INFO[type].metaMediaType,
+              Accept: CDS_TECH_INFO[type].metaMediaType,
+            },
+            qs: {
+              ...(handle ? { lockHandle: handle } : {}),
+              ...(meta.transport ? { corrNr: meta.transport } : {}),
+            },
+            body: metadataBody,
+          });
+        }
       } finally {
         await this.unLock(objectUrl, handle).catch(() => undefined);
       }

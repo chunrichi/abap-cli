@@ -4,7 +4,7 @@ title: 对象类型详细文档索引
 description: 每个 SAP 对象类型的字段契约、命令路径、本地文件形态与示例
 tags: [abap-cli, object-types, reference, clas, intf, prog, fugr, devc, tabl, stru, doma, dtel, enqu, view, shlp, nrob, http, tran, xslt, ttyp, msag, ddls, srvb, srvd, bdef, dcls, ddlx, ddla]
 created at: 2026-09-01 00:00:00
-changed at: 2026-11-03 19:30:00
+changed at: 2026-11-03 20:10:00
 ---
 
 # 对象类型详细文档
@@ -41,6 +41,10 @@ changed at: 2026-11-03 19:30:00
 | `CHKC` | ADT（无兜底） | `src/<name>.chkc.json`（ATC 检查类别） | [chkc.md](chkc.md) |
 | `CHKO` | ADT（无兜底） | `src/<name>.chko.json`（ATC 检查） | [chko.md](chko.md) |
 | `CHKV` | ADT（无兜底） | `src/<name>.chkv.json`（ATC 检查变体） | [chkv.md](chkv.md) |
+| `DTDC` | ADT（无兜底） | `src/<name>.dtdc.{json,acds}` 两件套（CDS 动态缓存） | [dtdc.md](dtdc.md) |
+| `DTEB` | ADT（无兜底） | `src/<name>.dteb.{json,acds}` 两件套（CDS 实体缓冲） | [dteb.md](dteb.md) |
+| `DSFD` | ADT（无兜底） | `src/<name>.dsfd.{json,acds}` 两件套（CDS 标量函数定义） | [dsfd.md](dsfd.md) |
+| `DSFI` | ADT（无兜底） | `src/<name>.dsfi.json` 单 JSON（标量函数实现引用） | [dsfi.md](dsfi.md) |
 
 ## 路由速查
 

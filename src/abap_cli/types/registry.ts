@@ -211,6 +211,37 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
     affSchemaFile: 'chkv-v1.json',
     requiresFile: true,
   },
+  // CDS technical objects. DTDC / DTEB / DSFD are AFF metadata + `.acds`
+  // source pairs; DSFI's `source/main` *is* the AFF JSON document. All four are
+  // ADT-only (no ICF fallback).
+  {
+    type: 'DTDC',
+    source: 'ADT',
+    createObjtype: 'DTDC/DF',
+    affSchemaFile: 'dtdc-v1.json',
+    requiresFile: true,
+  },
+  {
+    type: 'DTEB',
+    source: 'ADT',
+    createObjtype: 'DTEB/DF',
+    affSchemaFile: 'dteb-v1.json',
+    requiresFile: true,
+  },
+  {
+    type: 'DSFD',
+    source: 'ADT',
+    createObjtype: 'DSFD/SCF',
+    affSchemaFile: 'dsfd-v1.json',
+    requiresFile: true,
+  },
+  {
+    type: 'DSFI',
+    source: 'ADT',
+    createObjtype: 'DSFI/SFI',
+    affSchemaFile: 'dsfi-v1.json',
+    requiresFile: true,
+  },
 ] as const;
 
 /** sub-registry types for channel-detect / ICF fallback gating. */
