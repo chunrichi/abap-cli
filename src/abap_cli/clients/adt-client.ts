@@ -44,6 +44,15 @@ import {
   cdsTechObjectUrl,
   cdsTechSourceUrl,
 } from './cds-tech.js';
+import {
+  TYPEGROUP_COLLECTION,
+  TYPEGROUP_MEDIA,
+  TYPEGROUP_OBJTYPE,
+  buildTypegroupBody,
+  typegroupSourceUrl,
+  typegroupUrl,
+  withTypegroupDescription,
+} from './typegroups.js';
 import type { SrvbLocal } from '../formats/srvb/json.js';
 import type { AtcLocal, AtcType } from '../formats/atc/json.js';
 import type { CdsTechType } from '../formats/cds-tech/json.js';
@@ -506,6 +515,98 @@ export class AdtClientWrapper {
       }
       await this.activate(objectUrl, 'DDLS/DF', name);
     });
+  }
+
+  // --- Type pool (TYPE-POOL / TYPES) ---
+
+  /** GET the metadata + `source/main` of one type pool. */
+  getTypegroup(name: string): Promise<{ xml: string; source: string }> {
+    return this._call(async () => {
+      const url = typegroupUrl(name);
+      const meta = await this.client.httpClient.request(url, {
+        method: 'GET',
+        headers: { Accept: TYPEGROUP_MEDIA },
+      });
+      const sourceResp = await this.client.httpClient.request(typegroupSourceUrl(name), {
+        method: 'GET',
+        headers: { Accept: 'text/plain' },
+      });
+      return { xml: String(meta.body ?? ''), source: String(sourceResp.body ?? '') };
+    });
+  }
+
+  /** POST the collection — registers an inactive type pool (no source yet). */
+  createTypegroup(
+    name: string,
+    meta: { packageName: string; description: string; originalLanguage?: string; transport?: string },
+  ): Promise<void> {
+    return this._call(async () => {
+      await this.client.httpClient.request(TYPEGROUP_COLLECTION, {
+        method: 'POST',
+        headers: { 'Content-Type': TYPEGROUP_MEDIA, Accept: '*/*' },
+        qs: meta.transport ? { corrNr: meta.transport } : {},
+        body: buildTypegroupBody(name, {
+          packageName: meta.packageName,
+          description: meta.description,
+          language: this.config.sap.language,
+          originalLanguage: meta.originalLanguage,
+        }),
+      });
+    });
+  }
+
+  /**
+   * Write the ABAP source of an existing type pool: lock → PUT `source/main` →
+   * optional metadata PUT (description sync) → unlock. Activation stays with
+   * the caller so `--no-activate` can stop after the write.
+   */
+  writeTypegroupSource(
+    name: string,
+    source: string,
+    meta: { transport?: string; description?: string } = {},
+  ): Promise<void> {
+    return this._call(async () => {
+      const url = typegroupUrl(name);
+      const lock = await this.lock(url);
+      const handle = lock.LOCK_HANDLE;
+      try {
+        await this.client.httpClient.request(typegroupSourceUrl(name), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'text/plain; charset=utf-8', Accept: 'text/plain' },
+          qs: {
+            ...(handle ? { lockHandle: handle } : {}),
+            ...(meta.transport ? { corrNr: meta.transport } : {}),
+          },
+          body: source,
+        });
+        // The AFF header description lives in the metadata resource; sync it
+        // under the same lock so pull → edit → push keeps it. Send SAP's own
+        // metadata envelope (not a minimal body) so the unicode / syntax
+        // configuration attributes survive the update.
+        if (meta.description !== undefined) {
+          const current = await this.client.httpClient.request(url, {
+            method: 'GET',
+            headers: { Accept: TYPEGROUP_MEDIA },
+          });
+          await this.client.httpClient.request(url, {
+            method: 'PUT',
+            headers: { 'Content-Type': TYPEGROUP_MEDIA, Accept: TYPEGROUP_MEDIA },
+            qs: {
+              ...(handle ? { lockHandle: handle } : {}),
+              ...(meta.transport ? { corrNr: meta.transport } : {}),
+            },
+            body: withTypegroupDescription(String(current.body ?? ''), meta.description),
+          });
+        }
+      } finally {
+        await this.unLock(url, handle).catch(() => undefined);
+      }
+    });
+  }
+
+  /** Activate a type pool after its source was written. */
+  async activateTypegroup(name: string): Promise<void> {
+    await this.activate(typegroupUrl(name), TYPEGROUP_OBJTYPE, name);
   }
 
   /**

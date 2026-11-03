@@ -64,7 +64,7 @@
 ## 六、对象类型补充路线（2026-10 评估）
 
 > 判据：**开发价值 × SAP 侧可行性（ADT / DDIC API）× AFF 成熟度 × agent 闭环收益**。
-> 对比依据：abap-cli 33 类 vs SAP abap-file-formats 上游 102 个类型格式（2026-10-30 HEAD）vs abapGit 168 个 TADIR handler（2026-10-29 HEAD）。
+> 对比依据：abap-cli 34 类 vs SAP abap-file-formats 上游 102 个类型格式（2026-10-30 HEAD）vs abapGit 168 个 TADIR handler（2026-10-29 HEAD）。
 > 本轮范围约定：**P0 不做 transport request 管理（release/delete）；P1 暂不做授权字段（AUTH）**。
 
 ### 6.1 P0：先在现有类型内补完
@@ -88,6 +88,7 @@
 | `CHKC` / `CHKO` / `CHKV` | ADT `/atc/checkcategories|checks|checkvariants`：版本化 XML；create → activate、lock → PUT → activate、lock → DELETE | AFF 官方 `chkc-v1.json` / `chko-v1.json` / `chkv-v1.json`（纯 JSON） | - [x] 已完成（真机 create/pull/push/delete 闭环） |
 | `DTDC` / `DTEB` / `DSFD` / `DSFI` | ADT `/ddic/{dtdc,dteb,dsfd,sources}` + `/ddic/dsfi`：元数据 XML / blueSource + `source/main`；create → write source → activate | AFF 官方 `dtdc-v1` / `dteb-v1` / `dsfd-v1`（元数据 + `.acds`）、`dsfi-v1`（单 JSON） | - [x] 已完成（真机 create/pull/push/delete 闭环） |
 | `DRTY` | ADT `/ddic/drty/sources`：blueSource 元数据 + `source/main`（text/plain）；写入受 `CDS_SIMPLE_TYPES` 用户参数控制 | AFF 官方 `drty-v1.json` + `.drty.acds` | - [x] 已完成（真机 create/pull/push/delete 闭环） |
+| `TYPE`（type pool） | ADT `/ddic/typegroups`：`atypgr:abapTypeGroup` 元数据 + `source/main`（经典 ABAP）；名称上限 5 | AFF 官方 `type-v1.json` + `.type.abap` | - [x] 已完成（真机 create/pull/push/delete 闭环） |
 
 > VIEW / SHLP 因 AFF 上游无格式，需按 TTYP 先例维护本地扩展 schema；可同步向上游 AFF 提 PR，采纳后切回官方 schema。
 
@@ -96,7 +97,7 @@
 - **ENHO / ENHS**（增强/BAdI 相关）：先只读 pull（`CL_ENH_FACTORY`），push 后置；复杂度大
 - **授权族**：`SUSO` / `SUSH` / `SUSI` / `SUCO` / `SIA5` / `SIAD`（AUTH 本轮暂缓）
 - **SVIM / VCLS**（表维护生成器 / 视图簇）：AFF 近 3 个月新增格式；需真机验证 SAP 侧 API
-- **TYPE**（type pool，AFF `type-v1` + `.type.abap`）：前置决策已拍板 —— 把 **TTYP sidecar 迁移到 `<name>.ttyp.type.abap`**（breaking，需 CHANGELOG Migration + 旧文件检测提示），TYPE 与迁移同批落地；尚未实现
+- **TTYP 本地文件收口**：表类型是纯 DDIC 元数据（abapGit 也只序列化元数据），已移除 pull 生成的 `.type.abap` 只读侧车；`.type.abap` 归还给 AFF type pool（`TYPE`）。旧侧车文件被忽略，不再生成。
 - **AFF-stable 27 类中的云/作业/UI 类**（APLO/BGQC/CDBO/COTA/DESD/EVTB/EEEC/GSMP/SAJC/SAJT/SMBC/SWCR/NONT/RONT/UIAD/UIPG/UIST）：接入成本低，但按 BTP/云需求排期
 - **`DRAS` / `DTIX` / `DTSC`**：官方 AFF schema 已在镜像中，但本机 typestructure 无 CREATE、discovery 无 ADT 资源（2026-11-03 实测），等有 ADT 通道的 release 再实现；不硬做 ICF
 - **表单/集成**：`SFPF`（AFF 有格式）、`SSFO`/SAPscript、`IDOC`（AFF 无格式，复杂度高）

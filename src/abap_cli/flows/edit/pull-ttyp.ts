@@ -6,7 +6,7 @@
  *      kernel whose ADT endpoint is not routed falls back to ICF at runtime.
  *   2. Reads the wire body via the chosen transport.
  *   3. Maps wire → local AFF nested shape.
- *   4. Writes `<rootDir>/<lower>.ttyp.json` (+ `.type.abap` source sidecar).
+ *   4. Writes `<rootDir>/<lower>.ttyp.json` (the single local document).
  *
  * push semantics: pull never auto-creates; if the object is missing
  * on the ADT path we surface OBJECT_NOT_FOUND so the agent can route to
@@ -18,7 +18,7 @@ import { IcfClient } from '../../clients/icf-client.js';
 import { CliError } from '../../output/json.js';
 import { detectChannel, isAdtEndpointUnavailable } from './channel-detect.js';
 import type { AdtFallbackReason, SystemProfile } from './channel-detect.js';
-import { ttypArtifact, buildTypeSource, wireToLocal, type TtypLocal } from '../../formats/ttyp/json.js';
+import { ttypArtifact, wireToLocal, type TtypLocal } from '../../formats/ttyp/json.js';
 import { affObjectToken } from '../../formats/file-resolver.js';
 import { loadConfig, findWorkspaceConfig } from '../../config/project-config.js';
 import type { PullHandler } from './routing.js';
@@ -28,8 +28,6 @@ export interface PullTtypOptions {
   profile?: SystemProfile;
   /** Override the rootDir for file writes (defaults to workspace). */
   rootDir?: string;
-  /** Skip the type.abap sidecar when true. */
-  skipTypeAbap?: boolean;
   // Unused / forward-compat fields carried by the PullOptions shape.
   type?: string;
   package?: string;
@@ -108,7 +106,6 @@ export async function runPullTtyp(name: string, opts: PullTtypOptions = {}): Pro
   const root = await resolveRoot(opts);
   const token = affObjectToken(name);
   const jsonPath = path.join(root, `${token}.ttyp.json`);
-  const abapPath = path.join(root, `${token}.type.abap`);
 
   let doc: TtypLocal;
   let channel: 'adt' | 'icf' = decision.channel;
@@ -142,11 +139,6 @@ export async function runPullTtyp(name: string, opts: PullTtypOptions = {}): Pro
 
   const written: string[] = [jsonPath];
   await ttypArtifact.write(jsonPath, doc);
-  if (!opts.skipTypeAbap) {
-    const source = buildTypeSource(lower, doc);
-    await import('node:fs/promises').then((m) => m.writeFile(abapPath, source, 'utf8'));
-    written.push(abapPath);
-  }
 
   return {
     object: upper,

@@ -33,6 +33,7 @@ import { runDeleteHttp } from './delete-http.js';
 import { runDeleteAtc } from './delete-atc.js';
 import { isAtcType } from '../../formats/atc/json.js';
 import { runDeleteCdsTech } from './delete-cds-tech.js';
+import { runDeleteType } from './delete-type.js';
 import { isCdsTechType } from '../../formats/cds-tech/json.js';
 
 export interface DeleteOptions {
@@ -101,6 +102,11 @@ export async function runDelete(objectName: string, opts: DeleteOptions): Promis
   // need their package read from the resource first, same as ATC objects.
   if (isCdsTechType(typeUpper)) {
     return runDeleteCdsTech(typeUpper, objectName, opts);
+  }
+  // Type pools (TYPE/TYPE-POOL) delete through ADT but need their package read
+  // from the metadata resource first.
+  if (typeUpper === 'TYPE') {
+    return runDeleteType(objectName, opts);
   }
   // VIEW (DDIC database view) has no ADT delete endpoint: deletion runs through
   // the bundled ICF service (RS_DD_DELETE_OBJ, $TMP only).

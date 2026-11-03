@@ -121,6 +121,7 @@ const TADIR_OBJECT_BY_CLI: Record<string, Omit<TadirMapping, 'cliType'>> = {
   DSFD: { pgmid: 'R3TR', tadirObject: 'DSFD', ddicTabclass: '', channel: 'ADT', affSchema: 'dsfd-v1.json', description: 'CDS scalar function definition (metadata + .dsfd.acds source)' },
   DSFI: { pgmid: 'R3TR', tadirObject: 'DSFI', ddicTabclass: '', channel: 'ADT', affSchema: 'dsfi-v1.json', description: 'CDS scalar function implementation reference (single AFF JSON)' },
   DRTY: { pgmid: 'R3TR', tadirObject: 'DRTY', ddicTabclass: '', channel: 'ADT', affSchema: 'drty-v1.json', description: 'CDS type (metadata + .drty.acds source; needs CDS_SIMPLE_TYPES user parameter)' },
+  TYPE: { pgmid: 'R3TR', tadirObject: 'TYPE', ddicTabclass: '', channel: 'ADT', affSchema: 'type-v1.json', description: 'Type pool (metadata + .type.abap classic ABAP source; max 5 characters)' },
 };
 
 /** Complete catalog in registry-stable order. */

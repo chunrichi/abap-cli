@@ -251,6 +251,15 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
     affSchemaFile: 'drty-v1.json',
     requiresFile: true,
   },
+  // Type pool (classic ABAP TYPE-POOL / TYPES) — AFF metadata + `.type.abap`
+  // source; ADT `/ddic/typegroups`, object type `TYPE/DG`, max 5 characters.
+  {
+    type: 'TYPE',
+    source: 'ADT',
+    createObjtype: 'TYPE/DG',
+    affSchemaFile: 'type-v1.json',
+    requiresFile: true,
+  },
 ] as const;
 
 /** sub-registry types for channel-detect / ICF fallback gating. */

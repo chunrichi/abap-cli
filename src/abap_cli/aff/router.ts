@@ -80,7 +80,6 @@ const SUFFIX_RULES: ReadonlyArray<{ suffix: string; type: string; schemaFile?: s
   { suffix: '.shlp.json', type: 'SHLP' },
   // dual-channel DDIC + CDS companions.
   { suffix: '.ttyp.json', type: 'TTYP' },
-  { suffix: '.ttyp.type.abap', type: 'TTYP' },
   { suffix: '.msag.json', type: 'MSAG' },
   { suffix: '.ddls.json', type: 'DDLS' },
   { suffix: '.ddls.acds', type: 'DDLS' },
@@ -104,6 +103,9 @@ const SUFFIX_RULES: ReadonlyArray<{ suffix: string; type: string; schemaFile?: s
   { suffix: '.dsfi.json', type: 'DSFI' },
   { suffix: '.drty.json', type: 'DRTY' },
   { suffix: '.drty.acds', type: 'DRTY' },
+  // Type pool: AFF `type.json` metadata + classic ABAP source (`.type.abap`).
+  { suffix: '.type.json', type: 'TYPE' },
+  { suffix: '.type.abap', type: 'TYPE' },
 ];
 
 const SUFFIX_INDEX: Map<string, string> = new Map(

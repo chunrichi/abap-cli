@@ -18,11 +18,11 @@ import {
 } from '../../src/abap_cli/types/registry.js';
 
 describe('types/registry.ts (single source of truth)', () => {
-  it('contains exactly 33 supported types (4 source + DEVC + 4 DDIC + ENQU + VIEW + SHLP + NROB + HTTP + TRAN + XSLT + 3 dual-channel + 6 + 3 ATC + 5 CDS technical)', () => {
+  it('contains exactly 34 supported types (4 source + DEVC + 4 DDIC + ENQU + VIEW + SHLP + NROB + HTTP + TRAN + XSLT + 3 dual-channel + 6 + 3 ATC + 5 CDS technical + TYPE)', () => {
     // added: SRVB (metadata-only), SRVD, BDEF, DCLS, DDLX, DDLA.
     // added: ENQU (lock object, ICF) and NROB (number range object, ICF).
     // added: DEVC (package, ADT package resource; push unsupported).
-    expect(allSupportedTypes()).toHaveLength(33);
+    expect(allSupportedTypes()).toHaveLength(34);
     expect(allSupportedTypes()).toEqual([
       'CLAS', 'INTF', 'PROG', 'FUGR',         // ADT source
       'DEVC',                                  // ADT package resource
@@ -35,6 +35,7 @@ describe('types/registry.ts (single source of truth)', () => {
       'CHKC', 'CHKO', 'CHKV',                  // ATC configuration objects
       'DTDC', 'DTEB', 'DSFD', 'DSFI',          // CDS technical objects
       'DRTY',
+      'TYPE',                                  // type pool
     ]);
   });
 
@@ -69,6 +70,7 @@ describe('types/registry.ts (single source of truth)', () => {
     expect(createObjtypeFor('DSFD')).toBe('DSFD/SCF');
     expect(createObjtypeFor('DSFI')).toBe('DSFI/SFI');
     expect(createObjtypeFor('DRTY')).toBe('DRTY/STY');
+    expect(createObjtypeFor('TYPE')).toBe('TYPE/DG');
   });
 
   it('routes source objects (ADT) and TTYP/MSAG/DDLS dual-channel; TABL/HTTP/TRAN ICF only', () => {
@@ -97,6 +99,7 @@ describe('types/registry.ts (single source of truth)', () => {
     expect(sourceFor('DSFD')).toBe('ADT');
     expect(sourceFor('DSFI')).toBe('ADT');
     expect(sourceFor('DRTY')).toBe('ADT');
+    expect(sourceFor('TYPE')).toBe('ADT');
   });
 
   it('has no type → folder mapping anymore (flat abap-file-format layout)', async () => {

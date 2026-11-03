@@ -2,9 +2,9 @@
 type: reference
 title: 对象类型详细文档索引
 description: 每个 SAP 对象类型的字段契约、命令路径、本地文件形态与示例
-tags: [abap-cli, object-types, reference, clas, intf, prog, fugr, devc, tabl, stru, doma, dtel, enqu, view, shlp, nrob, http, tran, xslt, ttyp, msag, ddls, srvb, srvd, bdef, dcls, ddlx, ddla]
+tags: [abap-cli, object-types, reference, clas, intf, prog, fugr, devc, tabl, stru, doma, dtel, enqu, view, shlp, nrob, http, tran, xslt, ttyp, msag, ddls, srvb, srvd, bdef, dcls, ddlx, ddla, chkc, chko, chkv, dtdc, dteb, dsfd, dsfi, drty, type]
 created at: 2026-09-01 00:00:00
-changed at: 2026-11-03 20:30:00
+changed at: 2026-11-03 21:10:00
 ---
 
 # 对象类型详细文档
@@ -29,7 +29,8 @@ changed at: 2026-11-03 20:30:00
 | `HTTP` | ICF | `src/<name>.http.json`（SICF 节点） | [http.md](http.md) |
 | `TRAN` | ICF | `src/<code>.tran.json`（SE93 事务码） | [tran.md](tran.md) |
 | `XSLT` | ICF | `src/<name>.xslt.{json,xml}` 两件套（转换程序） | [xslt.md](xslt.md) |
-| `TTYP` | ADT + ICF 兜底 | `src/<name>.ttyp.json` + 可选 `src/<name>.type.abap` | [ttyp.md](ttyp.md) |
+| `TTYP` | ADT + ICF 兜底 | `src/<name>.ttyp.json`（纯元数据） | [ttyp.md](ttyp.md) |
+| `TYPE` | ADT（无兜底） | `src/<name>.type.json` + `src/<name>.type.abap` | [type.md](type.md) |
 | `MSAG` | ADT + ICF 兜底 | `src/<name>.msag.json` | [msag.md](msag.md) |
 | `DDLS` | ADT（无兜底） | `src/<name>.ddls.{json,acds}` 两件套 | [ddls.md](ddls.md) |
 | `SRVB` | ADT（无兜底） | `src/<name>.srvb.json`（Service Binding 元数据；仅 pull） | [srvb.md](srvb.md) |

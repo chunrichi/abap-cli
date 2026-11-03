@@ -72,7 +72,7 @@ describe('pull dispatcher — handler registry routing + envelope', () => {
     expect(res.data).toMatchObject({
       object: 'ZMY_TTYP',
       type: 'TTYP',
-      written: 2,
+      written: 1,
       skipped: 0,
       failed: 0,
       channel: 'adt',
@@ -81,7 +81,7 @@ describe('pull dispatcher — handler registry routing + envelope', () => {
       { object: 'ZMY_TTYP', type: 'TTYP', status: 'written', files: expect.any(Array) },
     ]);
     expect(res.data.fallbackReason).toBeUndefined();
-    expect(res.human).toBe('Pulled TTYP ZMY_TTYP via adt; wrote 2 file(s)');
+    expect(res.human).toBe('Pulled TTYP ZMY_TTYP via adt; wrote 1 file(s)');
   });
 
   it('keeps envelope field order written/skipped/failed before channel (test contract)', async () => {
@@ -95,7 +95,7 @@ describe('pull dispatcher — handler registry routing + envelope', () => {
     mockConfig.systemVersion = '731';
     const res = await runPull('ZMY_TTYP', 'TTYP');
     expect(res.data).toMatchObject({ channel: 'icf', fallbackReason: 'ECC_EHP6_NO_ADT_TABLETYPE' });
-    expect(res.human).toBe('Pulled TTYP ZMY_TTYP via icf (ECC_EHP6_NO_ADT_TABLETYPE); wrote 2 file(s)');
+    expect(res.human).toBe('Pulled TTYP ZMY_TTYP via icf (ECC_EHP6_NO_ADT_TABLETYPE); wrote 1 file(s)');
   });
 
   it('routes DDLS through the registry table (ADT only)', async () => {

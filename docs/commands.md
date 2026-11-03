@@ -604,7 +604,7 @@ abap create <type> <name> [options]
 
 | Argument | Required | Values | Description |
 | --- | --- | --- | --- |
-| `type` | yes | CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, ENQU, VIEW, SHLP, NROB, HTTP, TRAN, XSLT, TTYP, MSAG, DDLS, SRVB, SRVD, BDEF, DCLS, DDLX, DDLA, CHKC, CHKO, CHKV, DTDC, DTEB, DSFD, DSFI, DRTY | Object type |
+| `type` | yes | CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, ENQU, VIEW, SHLP, NROB, HTTP, TRAN, XSLT, TTYP, MSAG, DDLS, SRVB, SRVD, BDEF, DCLS, DDLX, DDLA, CHKC, CHKO, CHKV, DTDC, DTEB, DSFD, DSFI, DRTY, TYPE | Object type |
 | `name` | yes |  | Object name |
 
 ### Options
@@ -620,7 +620,7 @@ abap create <type> <name> [options]
 | `--check-only` | no |  |  | Validate the proposed object without creating it |
 | `--audit` | no |  |  | Include the before-checksum (extra SAP round-trip, off by default) |
 | `--overwrite` | no |  |  | When pulling the new object back, replace an existing local file (default: keep the local draft) |
-| `--file` `<path>` | no |  |  | abap-file-format JSON input (required for TABL/STRU/DOMA/DTEL/ENQU/VIEW/SHLP/NROB/HTTP/TRAN/XSLT/TTYP/MSAG/DDLS/SRVB/SRVD/BDEF/DCLS/DDLX/DDLA/CHKC/CHKO/CHKV/DTDC/DTEB/DSFD/DSFI/DRTY) |
+| `--file` `<path>` | no |  |  | abap-file-format JSON input (required for TABL/STRU/DOMA/DTEL/ENQU/VIEW/SHLP/NROB/HTTP/TRAN/XSLT/TTYP/MSAG/DDLS/SRVB/SRVD/BDEF/DCLS/DDLX/DDLA/CHKC/CHKO/CHKV/DTDC/DTEB/DSFD/DSFI/DRTY/TYPE) |
 | `--func` `<name>` | no |  |  | With FUGR: create a function module (FUGR/FF) inside the existing function group <name> |
 | `--software-component` `<swcomp>` | no |  |  | With DEVC: software component of the new package (default: inherited from the super package) |
 | `--transport-layer` `<layer>` | no |  |  | With DEVC: transport layer of the new package (default: inherited from the super package) |

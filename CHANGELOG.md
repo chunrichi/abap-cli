@@ -8,6 +8,12 @@
 
 ### Added
 
+- **TYPE（类型池）**：新增 AFF 官方格式的类型池对象，支持 `create` / `pull` / `push` / `delete`（`.type.json` + `.type.abap`；ADT `/ddic/typegroups`，名称上限 5 字符）。
+
+### Changed
+
+- **TTYP 本地文件收口**：表类型是纯 DDIC 元数据（abapGit 同样只序列化元数据），`pull` 不再生成只读的 `.type.abap` 伪 DDL 侧车；`.type.abap` 归还给 AFF type pool（`TYPE`）。
+
 - **CDS 技术对象**：新增 `DTDC`（动态缓存）、`DTEB`（CDS 实体缓冲）、`DSFD`（CDS 标量函数定义）、`DSFI`（标量函数实现引用）四类对象，支持 `create` / `pull` / `push` / `delete`。前三类为「AFF 元数据 + `.acds` 源码」两件套，`DSFI` 为单个 JSON（其 ADT `source/main` 就是 AFF JSON）；`create` / `push` 写入源码后自动激活（`--no-activate` 只写），并同步 AFF 描述字段。
 - **CDS 简单类型（DRTY）**：在上述四个 CDS 技术对象之外新增 `DRTY`，支持 `create` / `pull` / `push` / `delete`（AFF 元数据 + `.drty.acds` 两件套）。SAP 侧写入受用户参数 `CDS_SIMPLE_TYPES` 控制；未启用时 CLI 报 `DRTY_FEATURE_NOT_ENABLED` 并给出 SU3 启用步骤。
 - **CDS 技术对象接入类型矩阵**：`abap types`、`create --schema` 与 `docs/supported.md` 现列出 33 个类型码。

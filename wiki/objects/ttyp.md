@@ -1,7 +1,7 @@
 ---
 type: object-type
 title: TTYP — 表类型（Table Type）
-description: TTYP 对象的双通道路由、字段契约、可选 .type.abap 侧车文件
+description: TTYP 对象的双通道路由、字段契约与本地 JSON 布局
 tags: [abap-cli, object-type, ttyp, ddic, adt, icf, abap-file-format, table-type]
 created at: 2026-09-04 00:00:00
 changed at: 2026-11-03 00:20:00
@@ -66,11 +66,10 @@ ADT 的创建分两步：`POST /sap/bc/adt/ddic/tabletypes` 只注册对象（�
 
 ```
 src/
-├── zmy_ttyp.ttyp.json    # AFF 嵌套元数据
-└── zmy_ttyp.type.abap    # 可选侧车：define type ... DDL 形式
+└── zmy_ttyp.ttyp.json    # AFF 嵌套元数据（唯一本地文件）
 ```
 
-`.type.abap` 是**只读派生产物**——push 只读 `.ttyp.json`，侧车仅供人阅读与 diff。`pull --skip-type-abap` 可跳过生成。
+表类型是**纯 DDIC 元数据**：abapGit 也只序列化为一个 XML 文件，没有 ABAP 源码副本。早期版本 pull 会额外生成只读的 `.type.abap` 伪 DDL 侧车，该侧车已移除（`.type.abap` 是 AFF type pool 的源码文件名，与 `TYPE` 冲突）；旧文件会被忽略，push 始终只读 `.ttyp.json`。
 
 ## `<name>.ttyp.json` 形状
 
