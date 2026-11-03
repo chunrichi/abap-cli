@@ -213,6 +213,26 @@ export class IcfClient {
     return this.request('delete', path, body);
   }
 
+  /** GET /auth/<sub>/<name> — read one authorization-family document. */
+  async getAuth<T>(sub: string, name: string, query: AuthQuery = {}): Promise<IcfResponse<T>> {
+    return this.get(`${authPath(sub, name)}${authQuery(query)}`);
+  }
+
+  /** POST /auth/<sub>/<name> — create an authorization-family object. */
+  async postAuth<T>(sub: string, name: string, body: unknown, query: AuthQuery = {}): Promise<IcfResponse<T>> {
+    return this.post(`${authPath(sub, name)}${authQuery(query)}`, body);
+  }
+
+  /** PUT /auth/<sub>/<name> — update an authorization-family object. */
+  async putAuth<T>(sub: string, name: string, body: unknown, query: AuthQuery = {}): Promise<IcfResponse<T>> {
+    return this.put(`${authPath(sub, name)}${authQuery(query)}`, body);
+  }
+
+  /** DELETE /auth/<sub>/<name> — delete an authorization-family object. */
+  async deleteAuth<T>(sub: string, name: string, query: AuthQuery = {}): Promise<IcfResponse<T>> {
+    return this.request('delete', `${authPath(sub, name)}${authQuery(query)}`);
+  }
+
   /** GET /tcode/<tcode> — resolve a transaction code to its entry program (read-only). */
   async getTcode<T>(tcode: string): Promise<IcfResponse<T>> {
     return this.get(`/tcode/${encodeURIComponent(tcode)}`);
@@ -335,6 +355,36 @@ function jobdQuery(query: { package?: string; transportRequest?: string }): stri
   const params = new URLSearchParams();
   if (query.package) params.set('package', query.package);
   if (query.transportRequest) params.set('transportRequest', query.transportRequest);
+  const qs = params.toString();
+  return qs ? `?${qs}` : '';
+}
+
+/**
+ * Query parameters accepted by the authorization-family ICF routes
+ * (`/auth/<sub>/<name>`). Package and transport travel out of band because the
+ * AFF documents carry neither; `regenerateProfiles` is the SUSO-only opt-in
+ * for the SAP_ALL/SAP_NEW regeneration.
+ */
+export interface AuthQuery {
+  /** Target package for create/update (required by the server on create). */
+  package?: string;
+  /** Transport request for non-local packages. */
+  transportRequest?: string;
+  /** SUSO only: run PRGN_AFTER_IMP_SUSO_SAP_ALL after the write. */
+  regenerateProfiles?: boolean;
+}
+
+/** Path of one `/auth/<sub>/<name>` route (both segments URL-encoded). */
+function authPath(sub: string, name: string): string {
+  return `/auth/${encodeURIComponent(sub.trim().toLowerCase())}/${encodeURIComponent(name)}`;
+}
+
+/** Query string for one `/auth/...` request. */
+function authQuery(query: AuthQuery): string {
+  const params = new URLSearchParams();
+  if (query.package) params.set('package', query.package);
+  if (query.transportRequest) params.set('transportRequest', query.transportRequest);
+  if (query.regenerateProfiles) params.set('regenerateProfiles', 'true');
   const qs = params.toString();
   return qs ? `?${qs}` : '';
 }

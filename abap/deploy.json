@@ -84,6 +84,30 @@
     {
       "global": "ZCL_ABAP_VIBE_ICF_JOBD",
       "local": "lcl_jobd"
+    },
+    {
+      "global": "ZCL_ABAP_VIBE_ICF_AUTH_COMMON",
+      "local": "lcl_auth_common"
+    },
+    {
+      "global": "ZCL_ABAP_VIBE_ICF_AUTH",
+      "local": "lcl_auth"
+    },
+    {
+      "global": "ZCL_ABAP_VIBE_ICF_SUSC",
+      "local": "lcl_susc"
+    },
+    {
+      "global": "ZCL_ABAP_VIBE_ICF_SUCU",
+      "local": "lcl_sucu"
+    },
+    {
+      "global": "ZCL_ABAP_VIBE_ICF_SUSH",
+      "local": "lcl_sush"
+    },
+    {
+      "global": "ZCL_ABAP_VIBE_ICF_SUSO",
+      "local": "lcl_suso"
     }
   ],
   "standalone": [

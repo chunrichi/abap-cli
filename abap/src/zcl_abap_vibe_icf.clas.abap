@@ -60,6 +60,20 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
                                        iv_code   = 'REPORT_RUN_FAILED'
                                        iv_msg    = |dispatch_run runtime error: { lx_run_dispatch->get_text( ) }| ).
       ENDTRY.
+    ELSEIF lv_path CP '/auth/auth/*'.
+      " Authorization-object family: none of these types has an ADT resource on
+      " the supported releases or an AFF handler, so each one is a hand-written
+      " ICF route (abapGit handler ports); the shared helpers live in
+      " zcl_abap_vibe_icf_auth_common.
+      zcl_abap_vibe_icf_auth=>dispatch( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
+    ELSEIF lv_path CP '/auth/susc/*'.
+      zcl_abap_vibe_icf_susc=>dispatch( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
+    ELSEIF lv_path CP '/auth/sucu/*'.
+      zcl_abap_vibe_icf_sucu=>dispatch( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
+    ELSEIF lv_path CP '/auth/sush/*'.
+      zcl_abap_vibe_icf_sush=>dispatch( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
+    ELSEIF lv_path CP '/auth/suso/*'.
+      zcl_abap_vibe_icf_suso=>dispatch( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
     ELSEIF lv_path CP '/mime/*'.
       zcl_abap_vibe_icf_mime=>dispatch_mime( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
     ELSEIF lv_path CP '/jobd/*'.
