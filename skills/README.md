@@ -47,7 +47,7 @@ npx abap-cli init --agent agents    # 或 copilot / claude / cursor / generic
 |---|---|---|---|
 | `agents` | `.agents/skills/` | `.agents/agents/` | — |
 | `copilot` | `.github/skills/` | `.github/agents/` | — |
-| `claude` | `.claude/skills/` | `.claude/agents/` | 根 `CLAUDE.md` |
+| `claude` | `.claude/skills/` | `.claude/agents/` | — |
 | `cursor` | `.cursor/skills/` | `.cursor/agents/` | `.cursor/rules/abap.mdc` |
 | `generic` | `.agents/skills/` | `.agents/agents/` | 同 `agents`（早期名称） |
 

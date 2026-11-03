@@ -121,7 +121,7 @@ function rewriteOne(vendorDir: string): (p: string) => string {
   return (p: string) => {
     if (p.startsWith(`${vendorDir}/`)) return p;
     if (p.startsWith('skills/') || p.startsWith('agents/')) return `${vendorDir}/${p}`;
-    // Already vendor-prefixed overlays (CLAUDE.md, .cursor/rules/abap.mdc) — leave alone.
+    // Already vendor-prefixed overlays (.cursor/rules/abap.mdc) — leave alone.
     return p;
   };
 }
@@ -158,17 +158,6 @@ function scaffoldGeneric(
   copyOne(root, 'agents/abap-developer.agent.md', base, force, out);
 }
 
-/** Claude overlay: write `CLAUDE.md` at workspace root (Claude Code discovery). */
-function scaffoldClaude(force: boolean, out: ScaffoldingResult): void {
-  const target = path.join(process.cwd(), 'CLAUDE.md');
-  if (fs.existsSync(target) && !force) {
-    out.skipped.push('CLAUDE.md');
-    return;
-  }
-  fs.writeFileSync(target, CLAUDE_MD_TEMPLATE, 'utf-8');
-  out.written.push('CLAUDE.md');
-}
-
 /** Cursor overlay: write `.cursor/rules/abap.mdc` (Cursor rule format). */
 function scaffoldCursor(force: boolean, out: ScaffoldingResult): void {
   const dir = path.join(process.cwd(), '.cursor', 'rules');
@@ -187,14 +176,14 @@ function scaffoldCursor(force: boolean, out: ScaffoldingResult): void {
  *
  * Path layout (after `init --agent <target>`):
  *   copilot → .github/skills/<skill>/  +  .github/agents/abap-developer.agent.md
- *   claude  → .claude/skills/<skill>/  +  .claude/agents/abap-developer.agent.md  +  CLAUDE.md
+ *   claude  → .claude/skills/<skill>/  +  .claude/agents/abap-developer.agent.md
  *   cursor  → .cursor/skills/<skill>/  +  .cursor/agents/abap-developer.agent.md  +  .cursor/rules/abap.mdc
  *   agents  → .agents/skills/<skill>/  +  .agents/agents/abap-developer.agent.md
  *   generic → same as `agents` (earlier neutral fallback, kept for compatibility)
  *
- * Never writes `AGENTS.md` or `copilot-instructions.md` (those are repo-level
- * files, not user-workspace context). Idempotent: re-runs are no-ops unless
- * `force=true`.
+ * Never writes `AGENTS.md`, `CLAUDE.md`, or `copilot-instructions.md` (those are
+ * repo-level files, not user-workspace context). Idempotent: re-runs are no-ops
+ * unless `force=true`.
  */
 export async function scaffoldAgents(target: AgentTarget, force: boolean): Promise<ScaffoldingResult> {
   if (!AGENT_TARGETS.includes(target)) {
@@ -207,12 +196,10 @@ export async function scaffoldAgents(target: AgentTarget, force: boolean): Promi
   const root = bundledDir();
   const vendorDir = VENDOR_DIR[target];
   scaffoldGeneric(root, vendorDir, force, out);
-  if (target === 'claude') {
-    scaffoldClaude(force, out);
-  } else if (target === 'cursor') {
+  if (target === 'cursor') {
     scaffoldCursor(force, out);
   }
-  // agents / generic / copilot: base tree only, no vendor overlay.
+  // agents / generic / copilot / claude: base tree only, no vendor overlay.
   rewritePaths(out, vendorDir);
   // P0: normalize every emitted path to POSIX separators (Windows path contract).
   return {
@@ -220,15 +207,6 @@ export async function scaffoldAgents(target: AgentTarget, force: boolean): Promi
     skipped: out.skipped.map(toOutputPath),
   };
 }
-
-const CLAUDE_MD_TEMPLATE = `# abap-cli — Claude Code integration
-
-This workspace uses abap-cli. Run \`abap --help\` to see all commands. Claude should
-prefer \`abap <command> --json\` for machine-readable output.
-
-Skills live under \`.claude/skills/\` (5 skills: abap-cli meta + abap-cli-setup / -search / -edit / -data).
-The abap-developer agent (\`.claude/agents/abap-developer.agent.md\`) orchestrates them.
-`;
 
 const CURSOR_MDC_TEMPLATE = `---
 description: abap-cli usage in this workspace
@@ -238,5 +216,5 @@ alwaysApply: true
 
 This workspace uses abap-cli. Run \`abap --help\` for the full command tree. Always prefer \`abap <command> --json\`.
 
-Skills live under \`.cursor/skills/\` (5 skills: abap-cli meta + abap-cli-setup / -search / -edit / -data).
+Skills live under \`.cursor/skills/\` (6 skills: abap-cli meta + abap-cli-setup / -search / -edit / -data / -performance).
 `;

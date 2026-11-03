@@ -57,10 +57,10 @@ describe('init --agent (scaffoldAgents)', () => {
       expectFile(path.join(cwd, vendorDir, 'agents', 'abap-developer.agent.md'));
     });
 
-    it('claude also writes CLAUDE.md at workspace root', async () => {
+    it('claude does NOT write a root CLAUDE.md (no duplicate instruction source)', async () => {
       const result = await scaffoldAgents('claude', false);
-      expect(result.written).toContain('CLAUDE.md');
-      expectFile(path.join(cwd, 'CLAUDE.md'));
+      expect(result.written).not.toContain('CLAUDE.md');
+      expectNoFile(path.join(cwd, 'CLAUDE.md'));
     });
 
     it('cursor also writes .cursor/rules/abap.mdc', async () => {
@@ -161,15 +161,15 @@ describe('init --agent (scaffoldAgents)', () => {
       expect(result.written.some((p) => p.startsWith('skills/') || p.startsWith('agents/'))).toBe(false);
     });
 
-    it('claude: skills/agents paths are vendor-prefixed; CLAUDE.md is left unprefixed (overlay)', async () => {
+    it('claude: skills/agents paths are vendor-prefixed; no root overlay', async () => {
       const result = await scaffoldAgents('claude', false);
       // skills/* / agents/* paths get the .claude/ prefix.
       const skillAgent = result.written.filter((p) => /^(skills|agents)\//.test(p));
       expect(skillAgent).toEqual([]);
       const skillAgentPrefixed = result.written.filter((p) => p.startsWith('.claude/skills/') || p.startsWith('.claude/agents/'));
       expect(skillAgentPrefixed.length).toBeGreaterThan(0);
-      // CLAUDE.md is an overlay that lives at workspace root by design.
-      expect(result.written).toContain('CLAUDE.md');
+      // Claude Code discovers .claude/skills and .claude/agents directly; no CLAUDE.md is generated.
+      expect(result.written).not.toContain('CLAUDE.md');
     });
 
     it('cursor: skills/agents paths are vendor-prefixed; .cursor/rules/abap.mdc is left unprefixed', async () => {

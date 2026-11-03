@@ -46,6 +46,8 @@ changed at: 2026-11-01 00:20:00
 - [run](commands/run.md) — 在 SAP 端执行类（classrun / 静态方法反射），返回 stdout 与退出码
 - [select](commands/select.md) — 表数据只读查询（SE16N 等价，走 ICF `/data/query`）
 - [activate](commands/activate.md) — 激活对象的所有 inactive items（method/OSI 层级）
+- [publish](commands/publish.md) — 发布服务绑定（SRVB）的本地 OData endpoint
+- [unpublish](commands/unpublish.md) — 取消发布服务绑定（SRVB）的本地 OData endpoint
 
 ### 传输管理
 

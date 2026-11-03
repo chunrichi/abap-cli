@@ -122,6 +122,18 @@ export const COMMAND_SPECS: LazyCommandSpec[] = [
     load: () => import('../commands/tcode.js').then((m) => ({ register: m.registerTcodeCommand })),
   },
   {
+    name: 'publish',
+    scope: 'sap',
+    description: 'Publish a service binding (SRVB) — activate its local OData endpoint via the ADT publish job',
+    load: () => import('../commands/publish.js').then((m) => ({ register: m.registerPublishCommand })),
+  },
+  {
+    name: 'unpublish',
+    scope: 'sap',
+    description: 'Unpublish a service binding (SRVB) — deactivate its local OData endpoint via the ADT unpublish job',
+    load: () => import('../commands/publish.js').then((m) => ({ register: m.registerUnpublishCommand })),
+  },
+  {
     name: 'activate',
     description: 'Activate inactive ABAP objects',
     load: () => import('../commands/activate.js').then((m) => ({ register: m.registerActivateCommand })),

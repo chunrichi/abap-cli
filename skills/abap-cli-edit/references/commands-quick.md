@@ -150,6 +150,48 @@ abap activate <object> [options]
   abap activate ZCL_FOO --type CLAS --yes
   ```
 
+## `abap publish`
+
+Publish the local OData endpoint of a service binding (ADT publish job).
+
+```bash
+abap publish <object-name> [options]
+```
+
+
+
+- Publish a service binding
+
+  ```bash
+  abap publish ZUI_MY_SERVICE
+  ```
+- Publish and print the full envelope
+
+  ```bash
+  abap publish ZUI_MY_SERVICE --json
+  ```
+
+## `abap unpublish`
+
+Unpublish the local OData endpoint of a service binding (ADT unpublish job).
+
+```bash
+abap unpublish <object-name> [options]
+```
+
+
+
+- Unpublish a service binding
+
+  ```bash
+  abap unpublish ZUI_MY_SERVICE
+  ```
+- Unpublish and print the full envelope
+
+  ```bash
+  abap unpublish ZUI_MY_SERVICE --json
+  ```
+
 ## `abap create local`
 
 Subcommand; see the parent command reference (`abap create --help`).

@@ -9,6 +9,7 @@
  * The typed `abap-adt-api` creator hard-codes category 0 / version V2, so the
  * CLI builds the body itself from the AFF document.
  */
+import { XMLParser } from 'fast-xml-parser';
 import type { SrvbLocal } from '../formats/srvb/json.js';
 import { CliError } from '../output/json.js';
 
@@ -147,4 +148,81 @@ export function publishJobAsXmlType(
   job: 'publishjob' | 'unpublishjob',
 ): string {
   return `application/vnd.sap.as+xml; charset=UTF-8; dataname=com.sap.adt.businessservices.${serviceType}.${job}`;
+}
+
+
+/** Projection of the ADT service-binding metadata needed by publish jobs. */
+export interface SrvbMetadata {
+  name: string;
+  /** OData service version (`srvb:content@srvb:version`, e.g. `0001`). */
+  serviceVersion: string;
+  /** Binding protocol version (`srvb:binding@srvb:version`, e.g. `V2`/`V4`). */
+  bindingVersion: string;
+  /** Whether the local service endpoint is currently published. */
+  published: boolean;
+  /** Referenced service definition, when present. */
+  serviceDefinition?: string;
+}
+
+type XmlNode = Record<string, unknown>;
+
+const srvbParser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: '@_',
+  removeNSPrefix: true,
+  parseTagValue: false,
+  parseAttributeValue: false,
+  trimValues: true,
+});
+
+function asNode(value: unknown): XmlNode {
+  return value !== null && typeof value === 'object' ? (value as XmlNode) : {};
+}
+
+function attr(node: XmlNode, name: string): string | undefined {
+  const value = node[`@_${name}`];
+  return value === undefined || value === null ? undefined : String(value);
+}
+
+/** First child of a node, tolerating both single-object and array shapes. */
+function first(value: unknown): XmlNode | undefined {
+  if (Array.isArray(value)) return value.length > 0 ? asNode(value[0]) : undefined;
+  if (value === undefined || value === null) return undefined;
+  return asNode(value);
+}
+
+/**
+ * Parse the `srvb:serviceBinding` metadata envelope.
+ *
+ * The publish job needs the OData service version and the binding protocol
+ * version; both are derived from the metadata rather than from local files, so
+ * `publish` can run on an existing binding without pulling it first.
+ */
+export function parseSrvbMetadata(xml: string): SrvbMetadata {
+  let parsed: XmlNode;
+  try {
+    parsed = srvbParser.parse(xml) as XmlNode;
+  } catch (error) {
+    throw new CliError('SAP_ERROR', `Unexpected SRVB response from SAP: XML parse failed: ${error instanceof Error ? error.message : String(error)}`, {
+      type: 'SRVB',
+    });
+  }
+  const root = parsed.serviceBinding;
+  if (root === undefined) {
+    throw new CliError('SAP_ERROR', 'Unexpected SRVB response from SAP: expected <srvb:serviceBinding> root element', {
+      type: 'SRVB',
+    });
+  }
+  const node = asNode(root);
+  const services = first(node.services);
+  const content = services ? first(services.content) : undefined;
+  const binding = first(node.binding);
+  const serviceDefinition = content ? first(content.serviceDefinition) : undefined;
+  return {
+    name: attr(node, 'name') ?? '',
+    serviceVersion: content ? (attr(content, 'version') ?? '') : '',
+    bindingVersion: binding ? (attr(binding, 'version') ?? '') : '',
+    published: attr(node, 'published') === 'true',
+    ...(serviceDefinition ? { serviceDefinition: attr(serviceDefinition, 'name') } : {}),
+  };
 }

@@ -123,6 +123,6 @@ meta 没有专属错误码：`report-stuck` 只用公共错误码。
 
 ## 权威来源
 
-- 仓库总索引：[`skills/README.md`](../README.md)
+- 仓库总索引：[`skills/README.md`](https://github.com/chunrichi/abap-cli/blob/main/skills/README.md)
 - 路由表的"数据视图"：4 个领域 skill 的 `metadata.commands`
 - 端到端编排：[`agents/abap-developer.agent.md`](../../agents/abap-developer.agent.md)

@@ -25,6 +25,8 @@ Per-command knowledge pages (prerequisites, gotchas, real-system evidence) live 
 | `abap inspect` | [inspect.md](inspect.md) | View ABAP object metadata |
 | `abap where-used` | [where-used.md](where-used.md) | Find SAP object references (read-only) |
 | `abap tcode` | [tcode.md](tcode.md) | Resolve transaction code to its ABAP entry program (read-only) |
+| `abap publish` | [publish.md](publish.md) | Publish a service binding (SRVB) — activate its local OData endpoint via the ADT publish job |
+| `abap unpublish` | [unpublish.md](unpublish.md) | Unpublish a service binding (SRVB) — deactivate its local OData endpoint via the ADT unpublish job |
 | `abap activate` | [activate.md](activate.md) | Activate inactive ABAP objects |
 | `abap diff` | [diff.md](diff.md) | Compare local files against SAP |
 | `abap dumps` | [dumps.md](dumps.md) | List recent ST22 ABAP runtime dumps (read-only) |

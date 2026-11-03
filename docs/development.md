@@ -95,7 +95,7 @@ Then run the workflows from [Getting Started](getting-started.md) against the mo
 
 ```
 abap/                     # bundled ICF service — development tree of global classes
-├── src/                  # 19 AFF classes (one <name>.clas.abap + canonical <name>.clas.json each)
+├── src/                  # 20 AFF classes (one <name>.clas.abap + canonical <name>.clas.json each)
 └── deploy.json           # manifest: handler / merged global→lcl_* map / standalone classes
 src/abap_cli/
 ├── index.ts              # commander entry: global options + lifecycle hooks
@@ -118,8 +118,8 @@ src/abap_cli/
 
 The bundled ICF service ships in two forms generated from the same sources (decision record: [012](../wiki/design-decisions/012-icf-dev-global-release-merged.md)):
 
-- **Development form** — `abap/src/` is a tree of normal global classes: handler `zcl_abap_vibe_icf`, shared types `zcl_abap_vibe_icf_types`, ten domain helpers (`response` / `mime` / `http` / `ddic` / `textpool` / `tcode` / `data` / `fields` / `version` / `run`), five `zcl_abap_vibe_*_format` renderers, and the standalone `zcl_abap_vibe_icf_setup` / `zcl_abap_vibe_runner`. Each class is one `<name>.clas.abap` (definition + implementation) plus a canonical `<name>.clas.json`; there are no committed handler `definitions` / `implementations` includes.
-- **Release form** — `abap deploy` merges the 16 helper classes into the handler as `lcl_*` local classes (3 global objects on SAP). `abap/deploy.json` is the single manifest: `handler`, `merged[]` (global name → local `lcl_*` name), `standalone[]`.
+- **Development form** — `abap/src/` is a tree of normal global classes: handler `zcl_abap_vibe_icf`, shared types `zcl_abap_vibe_icf_types`, eleven domain helpers (`response` / `mime` / `http` / `ddic` / `textpool` / `tcode` / `data` / `fields` / `version` / `run` / `xslt`), five `zcl_abap_vibe_*_format` renderers, and the standalone `zcl_abap_vibe_icf_setup` / `zcl_abap_vibe_runner`. Each class is one `<name>.clas.abap` (definition + implementation) plus a canonical `<name>.clas.json`; there are no committed handler `definitions` / `implementations` includes.
+- **Release form** — `abap deploy` merges the 17 merged classes (shared types + 16 helpers) into the handler as `lcl_*` local classes (3 global objects on SAP). `abap/deploy.json` is the single manifest: `handler`, `merged[]` (global name → local `lcl_*` name), `standalone[]`.
 - **Merger** — `src/abap_cli/flows/edit/deploy-merge.ts` is pure (strings in / strings out): manifest validation, class-header downgrade, `zcl_*` → `lcl_*` rename, dependency topological sort, deterministic output, leftover-global guard. Covered by unit tests in `test/unit/deploy-merge*.test.ts`; it is not an ABAP compiler, so real syntax errors surface on the first activation.
 
 Loop for a single-class change:
@@ -127,7 +127,7 @@ Loop for a single-class change:
 ```bash
 # 1. iterate: push and activate the development form on a maintainer system
 abap push abap/src/zcl_abap_vibe_icf_data.clas.abap --yes   # or:
-abap deploy --dev --yes                                  # all 19 globals, dependency order
+abap deploy --dev --yes                                  # all 20 globals, dependency order
 
 # 2. verify the class itself, then the endpoint
 abap inspect ZCL_ABAP_VIBE_ICF_DATA --activation --json
@@ -215,9 +215,9 @@ export function registerMyCommand(program: Command): void {
 
 - **一个 PR 一个交付单元**：短期分支 `feat|fix|refactor|docs|chore/<slug>`；PR 标题 = squash 后的 commit subject；合并即删分支。禁止直接 push main（ruleset 会拒）；分支落后 main 时用 `gh pr update-branch <pr>`（或本地 rebase）后再合并；required check `verify` 必须绿。
 - **Commit 消息**：Conventional Commits；subject 英文祈使句 ≤72 字符；body 用纯文本段落写 why / 影响面 / 验证（**不要**把 `## Why` / `## What` / `## Verification` 这类 PR 模板标题写进 commit body）；不写任务/spec/bug 编号（GitHub squash 自动追加的 `(#N)` 是平台行为，不要手动再写）；`Co-authored-by` / `Signed-off-by` 只用于真实协同，不要给自己伪造 trailer。breaking 用 `BREAKING CHANGE:` footer + `CHANGELOG.md` 的 `Removed (breaking)` + Migration。
-- **验证闸门**：源码/测试改动跑 `npm run verify`；命令 schema/命令面改动先 `npm run build && npm run docs:build` 并提交生成物；docs/wiki/脚本改动跑 `npm run docs:check`；`abap/**` / ICF 改动必须在 A4H 在线时走 `abap-testing` skill 的六阶段真机回归，离线就明确写「未跑真机」。
+- **验证闸门**：源码/测试改动跑 `npm run verify`；命令 schema/命令面改动先 `npm run build && npm run docs:build` 并提交生成物；docs/wiki/脚本改动跑 `npm run docs:check`；`abap/**` / ICF 改动必须在默认系统 profile `test`（S/4HANA）上走 `abap-testing` skill 的六阶段真机回归；只有 ECC 专属行为才需要 A4H，A4H 离线时明确写「未跑真机」并标 BLOCKED。
 - **文档同步**：结构性改动（新增/删除模块、契约或流程变化）必须同步 `docs/architecture.md`、相关 `wiki/design-decisions/00X-*.md`（推进/关闭某决策时更新「当前代价 / 后果」，删掉过时的「下一步」）、`docs/development.md` 与 `wiki/commands/`。只改 `src/` + `test/` 会让设计决策过期。
-- **会话交接**：结束前更新 `tmp/handoff/YYYYMMDD-HHMM-<status>-<topic>.md`，保证 HEAD hash、已完成、下一步、事实快照（npm 锁定期 / A4H / CI）互相一致，并附可直接粘贴的第一条命令。
+- **会话交接**：结束前更新 `tmp/handoff/YYYYMMDD-HHMM-<status>-<topic>.md`，保证 HEAD hash、已完成、下一步、事实快照（npm 锁定期 / 默认系统 profile `test` / A4H（仅 ECC 项）/ CI）互相一致，并附可直接粘贴的第一条命令。
 - **依赖升级**：patch/minor 以 `verify` 绿为准；major 单独 PR，失败则关闭并留下可复现证据（失败测试 + 错误信息），不要强行合并。
 - **交付前自检**：分支命名 + `git status` 干净；`verify` 绿；生成物已重建并提交；架构 / 设计决策 / 交接文档已同步；commit 格式合规；PR CI 绿后 squash merge。
 

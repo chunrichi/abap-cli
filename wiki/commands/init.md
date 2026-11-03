@@ -4,7 +4,7 @@ title: abap init
 description: 工作区唯一入口 — 绑定/修改/自省 .abap.json、脚手架 AI agent 上下文；裸 abap init 进入交互向导
 tags: [abap-cli, command, init, workspace, profile, agent]
 created at: 2026-08-17 00:00:00
-changed at: 2026-10-31 22:40:00
+changed at: 2026-11-03 21:33:00
 ---
 
 # abap init
@@ -73,7 +73,7 @@ abap init --agent agents|copilot|claude|cursor|generic [--force]
 |---|---|
 | `agents` | `.agents/skills/<name>/` + `.agents/agents/abap-developer.agent.md`（通用目标） |
 | `copilot` | `.github/skills/<name>/` + `.github/agents/abap-developer.agent.md` |
-| `claude`  | `.claude/skills/<name>/` + `.claude/agents/abap-developer.agent.md` + `CLAUDE.md` |
+| `claude`  | `.claude/skills/<name>/` + `.claude/agents/abap-developer.agent.md` |
 | `cursor`  | `.cursor/skills/<name>/` + `.cursor/agents/abap-developer.agent.md` + `.cursor/rules/abap.mdc` |
 | `generic` | 与 `agents` 相同（早期中性 fallback，保留兼容） |
 
@@ -159,8 +159,7 @@ abap init --agent copilot --force
       ".claude/skills/abap-cli-search/SKILL.md",
       ".claude/skills/abap-cli-edit/SKILL.md",
       ".claude/skills/abap-cli-data/SKILL.md",
-      ".claude/agents/abap-developer.agent.md",
-      "CLAUDE.md"
+      ".claude/agents/abap-developer.agent.md"
     ],
     "skipped": []
   }
