@@ -16,7 +16,7 @@ import { toRelativeOutputPath } from '../../core/path-output.js';
 import { resolveFile } from '../../formats/file-resolver.js';
 import type { AuthTypeSpec } from '../../formats/auth/spec.js';
 import type { JsonPushTarget, PushFileOptions, PushOneResult } from './push-types.js';
-import { assertAuthFileSuffix, authTransportFor, readSidePackage, rethrowAuthIcfError } from './auth-shared.js';
+import { assertAuthFileSuffix, authTransportFor, authWriteTimeout, readSidePackage, rethrowAuthIcfError } from './auth-shared.js';
 
 interface AuthWriteResponse {
   name?: string;
@@ -116,7 +116,7 @@ export async function runPushAuth<TLocal>(
 
   let resp;
   try {
-    resp = await icf.putAuth<AuthWriteResponse>(spec.route, name, wire, query);
+    resp = await icf.putAuth<AuthWriteResponse>(spec.route, name, wire, query, authWriteTimeout(opts.regenerateProfiles));
   } catch (error: unknown) {
     rethrowAuthIcfError(spec, error, { action: 'update', objectName: name, file: displayPath });
   }
@@ -129,5 +129,9 @@ export async function runPushAuth<TLocal>(
       nextSteps: ['Fix the cause above and re-run.'],
     });
   }
-  return { transport: transport ?? '', status: 'written' };
+  return {
+    transport: transport ?? '',
+    status: 'written',
+    ...(resp.data.profilesRegenerated !== undefined ? { profilesRegenerated: resp.data.profilesRegenerated } : {}),
+  };
 }

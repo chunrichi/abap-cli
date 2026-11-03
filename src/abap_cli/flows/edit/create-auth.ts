@@ -15,7 +15,7 @@ import { toOutputPath } from '../../core/path-output.js';
 import { isLocalPackageName } from '../../core/transport.js';
 import type { AuthTypeSpec } from '../../formats/auth/spec.js';
 import type { CreateOptions } from './create.js';
-import { assertAuthFileSuffix, authTransportFor, rethrowAuthIcfError } from './auth-shared.js';
+import { assertAuthFileSuffix, authTransportFor, authWriteTimeout, rethrowAuthIcfError } from './auth-shared.js';
 
 /** Write envelope the family routes answer for POST/PUT/DELETE. */
 interface AuthWriteResponse {
@@ -111,7 +111,7 @@ export async function runCreateAuth<TLocal>(
   const icf = await IcfClient.create();
   let resp;
   try {
-    resp = await icf.postAuth<AuthWriteResponse>(spec.route, name, wire, query);
+    resp = await icf.postAuth<AuthWriteResponse>(spec.route, name, wire, query, authWriteTimeout(opts.regenerateProfiles));
   } catch (error: unknown) {
     rethrowAuthIcfError(spec, error, { action: 'create', objectName: name, file: displayPath });
   }

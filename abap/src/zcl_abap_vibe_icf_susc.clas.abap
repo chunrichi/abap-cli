@@ -512,7 +512,10 @@ CLASS zcl_abap_vibe_icf_susc IMPLEMENTATION.
     SELECT SINGLE laiso FROM t002 INTO @rv_iso_language WHERE spras = @iv_sap_language.
     IF sy-subrc <> 0 OR rv_iso_language IS INITIAL.
       rv_iso_language = 'en'.
+      RETURN.
     ENDIF.
+    " T002 stores the ISO code upper case; the AFF header convention is lower case.
+    rv_iso_language = to_lower( rv_iso_language ).
   ENDMETHOD.
 
   METHOD respond_invalid.

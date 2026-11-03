@@ -218,19 +218,21 @@ export class IcfClient {
     return this.get(`${authPath(sub, name)}${authQuery(query)}`);
   }
 
-  /** POST /auth/<sub>/<name> — create an authorization-family object. */
-  async postAuth<T>(sub: string, name: string, body: unknown, query: AuthQuery = {}): Promise<IcfResponse<T>> {
-    return this.post(`${authPath(sub, name)}${authQuery(query)}`, body);
+  /** POST /auth/<sub>/<name> — create an authorization-family object.
+   *  `timeoutMs` overrides the client timeout (the SUSO opt-in profile
+   *  regeneration takes tens of seconds). */
+  async postAuth<T>(sub: string, name: string, body: unknown, query: AuthQuery = {}, timeoutMs?: number): Promise<IcfResponse<T>> {
+    return this.request('post', `${authPath(sub, name)}${authQuery(query)}`, body, timeoutMs);
   }
 
   /** PUT /auth/<sub>/<name> — update an authorization-family object. */
-  async putAuth<T>(sub: string, name: string, body: unknown, query: AuthQuery = {}): Promise<IcfResponse<T>> {
-    return this.put(`${authPath(sub, name)}${authQuery(query)}`, body);
+  async putAuth<T>(sub: string, name: string, body: unknown, query: AuthQuery = {}, timeoutMs?: number): Promise<IcfResponse<T>> {
+    return this.request('put', `${authPath(sub, name)}${authQuery(query)}`, body, timeoutMs);
   }
 
   /** DELETE /auth/<sub>/<name> — delete an authorization-family object. */
-  async deleteAuth<T>(sub: string, name: string, query: AuthQuery = {}): Promise<IcfResponse<T>> {
-    return this.request('delete', `${authPath(sub, name)}${authQuery(query)}`);
+  async deleteAuth<T>(sub: string, name: string, query: AuthQuery = {}, timeoutMs?: number): Promise<IcfResponse<T>> {
+    return this.request('delete', `${authPath(sub, name)}${authQuery(query)}`, undefined, timeoutMs);
   }
 
   /** GET /tcode/<tcode> — resolve a transaction code to its entry program (read-only). */
@@ -315,9 +317,9 @@ export class IcfClient {
   }
 
   /** Run one HTTP call and normalize transport errors into a CliError. */
-  private async request<T>(method: 'get' | 'post' | 'put' | 'delete', path: string, body?: unknown): Promise<IcfResponse<T>> {
+  private async request<T>(method: 'get' | 'post' | 'put' | 'delete', path: string, body?: unknown, timeoutMs?: number): Promise<IcfResponse<T>> {
     try {
-      const resp = await this.send<T>(method, path, body);
+      const resp = await this.send<T>(method, path, body, timeoutMs);
       return resp.data;
     } catch (error: unknown) {
       return this.normalizeError(error);
@@ -325,11 +327,17 @@ export class IcfClient {
   }
 
   /** Low-level send used by `request` (single attempt, no cookie fallback). */
-  private async send<T>(method: 'get' | 'post' | 'put' | 'delete', path: string, body?: unknown): Promise<AxiosResponse<IcfResponse<T>>> {
-    if (method === 'get') return this.http.get<IcfResponse<T>>(path);
-    if (method === 'post') return this.http.post<IcfResponse<T>>(path, body);
-    if (method === 'delete') return this.http.delete<IcfResponse<T>>(path, { data: body });
-    return this.http.put<IcfResponse<T>>(path, body);
+  private async send<T>(
+    method: 'get' | 'post' | 'put' | 'delete',
+    path: string,
+    body?: unknown,
+    timeoutMs?: number,
+  ): Promise<AxiosResponse<IcfResponse<T>>> {
+    const config = timeoutMs === undefined ? undefined : { timeout: timeoutMs };
+    if (method === 'get') return this.http.get<IcfResponse<T>>(path, config);
+    if (method === 'post') return this.http.post<IcfResponse<T>>(path, body, config);
+    if (method === 'delete') return this.http.delete<IcfResponse<T>>(path, { data: body, ...config });
+    return this.http.put<IcfResponse<T>>(path, body, config);
   }
 
   private normalizeError(error: unknown): never {

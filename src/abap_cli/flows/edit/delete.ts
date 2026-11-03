@@ -65,6 +65,8 @@ export interface DeleteResult {
     deleted: boolean;
     transport?: string;
     lockReleased: boolean;
+    /** SUSO only: whether the opt-in SAP_ALL/SAP_NEW regeneration ran successfully. */
+    profilesRegenerated?: boolean;
   };
   human: string;
 }

@@ -3,11 +3,20 @@
 These JSON schemas are vendored from the SAP `abap-file-formats` repository
 (https://github.com/SAP/abap-file-formats), commit `5bd63fdecb8b4a03c73b1433a36b779c0c9b1121`.
 
-Every file except `ttyp-v1.json`, `view-v1.json`, `shlp-v1.json`, `jobd-v1.json`, `sm59-v1.json`,
-`srfc-v1.json` and `oa2p-v1.json` is a byte-for-byte copy of the upstream schema with the same name.
-Those seven are local extensions: upstream has no TTYP, view, search-help, application job definition,
-SM59-destination, UCON RFC service or OAuth 2.0 client profile schema at this commit, so the files are
-handcrafted here and `scripts/sync-aff-schema.sh` never overwrites them.
+Every file except `ttyp-v1.json`, `view-v1.json`, `shlp-v1.json`, `jobd-v1.json`,
+`sm59-v1.json`, `srfc-v1.json`, `oa2p-v1.json`, `auth-v1.json`, `susc-v1.json`,
+`sucu-v1.json` and `suso-v1.json` is a byte-for-byte copy of the upstream schema
+with the same name. Those eleven are local extensions or local variants: the
+pinned upstream commit has no TTYP, view, search-help, application job
+definition, SM59-destination, UCON RFC service, OAuth 2.0 client profile or
+authorization-family documents that fit the objects abap-cli manages, so the
+files are handcrafted here and `scripts/sync-aff-schema.sh` never overwrites
+them.
+
+One exception to the pinned commit: `sush-v1.json` (authorization defaults,
+SU22) was vendored from upstream `6c21748fa4b806d1002c88cc268f4ca2f6633474`,
+because the authorization formats were added upstream after the pinned commit.
+A future full sync re-vendors it together with the other upstream schemas.
 
 The set is intentionally minimal — only the schemas abap-cli resolves through
 `schemaPathFor()` in `src/abap_cli/aff/schema-paths.ts` (the map behind
@@ -57,6 +66,11 @@ The set is intentionally minimal — only the schemas abap-cli resolves through
 | `type-v1.json` | TYPE | `file-formats/type/type-v1.json` | |
 | `sajc-v1.json` | SAJC | `file-formats/sajc/sajc-v1.json` | application job catalog entry |
 | `sajt-v1.json` | SAJT | `file-formats/sajt/sajt-v1.json` | application job template |
+| `sush-v1.json` | SUSH | `file-formats/sush/sush-v1.json` | authorization defaults (SU22); vendored from the later commit above |
+| `auth-v1.json` | AUTH | `file-formats/auth/auth-v1.json` | **local variant**, keeps the upstream property names and adds `generalInformation.searchHelpExit` / `activityField` (AUTHX fields AFF does not model) |
+| `susc-v1.json` | SUSC | — | **local extension**, handcrafted from TOBC / TOBCT (no upstream SUSC format) |
+| `sucu-v1.json` | SUCU | — | **local extension**, handcrafted from TBRG_AUTH / TBRG_AUTHT (no upstream SUCU format) |
+| `suso-v1.json` | SUSO | — | **local extension**, handcrafted from TOBJ / TOBJT / TACTZ / TOBJVOR* / TOBJ_ATTR / DOKU (upstream `suso-v1.json` is a lossy logical model: no long text, no SAP_NEW values, no FBLOCK/CONVERSION) |
 | `xslt-v1.json` | XSLT | `file-formats/xslt/xslt-v1.json` | |
 
 `docu-v1.json` is a **companion** schema, not an object type: it validates the
@@ -79,6 +93,13 @@ UCON RFC service and OAuth 2.0 client profile types (`/srfc/<name>`,
 `/oa2p/<name>`). All six are excluded from the sync script's `FILES` list; treat
 them like source code (review edits, add tests).
 
+The authorization-object family keeps the same rule: `auth-v1.json` is a local
+variant of the upstream schema (two AUTHX fields are missing upstream),
+`susc-v1.json` / `sucu-v1.json` / `suso-v1.json` are local extensions (no
+upstream format, or a lossy upstream model), and `sush-v1.json` is the upstream
+format reused as-is. The ICF handlers in `abap/src/zcl_abap_vibe_icf_{auth,
+susc,sucu,sush,suso}.clas.abap` are the wire contract for these documents.
+
 `nrob-v1.json` used to be a hand-edited copy that added
 `header.originalLanguage` `maxLength`/`pattern` constraints and
 `interval.percentWarning` `multipleOf: 0.1`, on top of older description text
@@ -97,6 +118,8 @@ be retained per the MIT terms.
 
 Run `bash scripts/sync-aff-schema.sh <new-sha>` (or omit the SHA to pull the
 latest `main`). The script clones upstream, copies the `FILES` list (one
-upstream schema per consumed type, `ttyp-v1.json` excluded), refreshes
-`LICENSE`, and rewrites the commit reference above. A local mirror avoids the
-network clone: `UPSTREAM=/path/to/abap-file-formats bash scripts/sync-aff-schema.sh <sha>`.
+upstream schema per consumed type; the local extensions listed above are
+excluded), refreshes `LICENSE`, and rewrites the commit reference above. A full
+sync also re-vendors `sush-v1.json` and makes the "later commit" note obsolete.
+A local mirror avoids the network clone:
+`UPSTREAM=/path/to/abap-file-formats bash scripts/sync-aff-schema.sh <sha>`.

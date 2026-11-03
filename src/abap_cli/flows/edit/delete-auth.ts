@@ -12,13 +12,14 @@ import { CliError } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
 import type { AuthTypeSpec } from '../../formats/auth/spec.js';
 import type { DeleteOptions, DeleteResult } from './delete.js';
-import { authTransportFor, readSidePackage, rethrowAuthIcfError } from './auth-shared.js';
+import { authTransportFor, authWriteTimeout, readSidePackage, rethrowAuthIcfError } from './auth-shared.js';
 
 interface AuthDeleteResponse {
   name?: string;
   type?: string;
   action?: string;
   package?: string;
+  profilesRegenerated?: boolean;
 }
 
 export async function runDeleteAuth<TLocal>(spec: AuthTypeSpec<TLocal>, objectName: string, opts: DeleteOptions): Promise<DeleteResult> {
@@ -46,7 +47,7 @@ export async function runDeleteAuth<TLocal>(spec: AuthTypeSpec<TLocal>, objectNa
 
   let resp;
   try {
-    resp = await icf.deleteAuth<AuthDeleteResponse>(spec.route, name, query);
+    resp = await icf.deleteAuth<AuthDeleteResponse>(spec.route, name, query, authWriteTimeout(opts.regenerateProfiles));
   } catch (error: unknown) {
     rethrowAuthIcfError(spec, error, { action: 'delete', objectName: name });
   }
@@ -67,6 +68,7 @@ export async function runDeleteAuth<TLocal>(spec: AuthTypeSpec<TLocal>, objectNa
       deleted: true,
       ...(transport ? { transport } : {}),
       lockReleased: true,
+      ...(resp.data.profilesRegenerated !== undefined ? { profilesRegenerated: resp.data.profilesRegenerated } : {}),
     },
     human: `Deleted ${spec.type} ${name}`,
   };

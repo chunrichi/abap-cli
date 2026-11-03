@@ -15,6 +15,18 @@ import { authFileSuffix, type AuthTypeSpec } from '../../formats/auth/spec.js';
 
 export type AuthAction = 'create' | 'update' | 'delete';
 
+/**
+ * Client timeout for a write that regenerates SAP_ALL/SAP_NEW: the
+ * `PRGN_AFTER_IMP_SUSO_SAP_ALL` call takes tens of seconds on the reference
+ * system, far above the default 30 s ICF timeout.
+ */
+export const AUTH_REGENERATION_TIMEOUT_MS = 180_000;
+
+/** Per-request timeout for one family write (`undefined` keeps the default). */
+export function authWriteTimeout(regenerateProfiles: boolean | undefined): number | undefined {
+  return regenerateProfiles ? AUTH_REGENERATION_TIMEOUT_MS : undefined;
+}
+
 /** Normalize and validate the transport rule for one family write/delete. */
 export function authTransportFor<TLocal>(
   spec: AuthTypeSpec<TLocal>,

@@ -39,8 +39,11 @@ VENDOR="$ROOT/src/abap_cli/schema"
 
 # Files to copy: one per router.ts type, plus the TABL settings schema.
 # Keep this list in sync with SUFFIX_RULES in src/abap_cli/aff/router.ts.
-# ttyp-v1.json is deliberately absent: upstream has no TTYP JSON schema, so
-# that file is handcrafted here and must survive a sync untouched.
+# The local extensions are deliberately absent and must survive a sync
+# untouched: ttyp-v1.json (no upstream TTYP schema), view-v1.json,
+# shlp-v1.json, auth-v1.json (local variant with two extra AUTHX fields),
+# susc-v1.json, sucu-v1.json and suso-v1.json (no upstream format / lossy
+# upstream model). See src/abap_cli/schema/README.md.
 FILES=(
   "clas/clas-v1.json"
   "intf/intf-v1.json"
