@@ -126,6 +126,17 @@ const TADIR_OBJECT_BY_CLI: Record<string, Omit<TadirMapping, 'cliType'>> = {
   // Transformation (XSLT program)
   XSLT: { pgmid: 'R3TR', tadirObject: 'XSLT', ddicTabclass: '', channel: 'ICF', affSchema: 'xslt-v1.json', description: 'Transformation / XSLT program (O2XSLTDESC; AFF pair .xslt.json + .xslt.xml)' },
 
+  // Generic AFF object types — the official abap-file-format document is the
+  // wire document (no field mapping). Transport is type-specific: the four ADT
+  // types use their blueSource resource (`source/main` is the AFF JSON);
+  // ENHO/ENHS are read-only through the self-built ICF /aff endpoint.
+  APLO: { pgmid: 'R3TR', tadirObject: 'APLO', ddicTabclass: '', channel: 'ADT', affSchema: 'aplo-v1.json', description: 'Application log object (official AFF JSON over ADT blueSource)' },
+  CHDO: { pgmid: 'R3TR', tadirObject: 'CHDO', ddicTabclass: '', channel: 'ADT', affSchema: 'chdo-v1.json', description: 'Change document object (official AFF JSON over ADT blueSource)' },
+  EVTB: { pgmid: 'R3TR', tadirObject: 'EVTB', ddicTabclass: '', channel: 'ADT', affSchema: 'evtb-v1.json', description: 'Event binding (official AFF JSON over ADT blueSource)' },
+  SMBC: { pgmid: 'R3TR', tadirObject: 'SMBC', ddicTabclass: '', channel: 'ADT', affSchema: 'smbc-v1.json', description: 'Business configuration maintenance object (official AFF JSON over ADT blueSource)' },
+  ENHO: { pgmid: 'R3TR', tadirObject: 'ENHO', ddicTabclass: '', channel: 'ICF', affSchema: 'enho-v1.json', description: 'Enhancement implementation (official AFF JSON; read-only /aff, BAdIs)' },
+  ENHS: { pgmid: 'R3TR', tadirObject: 'ENHS', ddicTabclass: '', channel: 'ICF', affSchema: 'enhs-v1.json', description: 'Enhancement spot (official AFF JSON; read-only /aff, BAdIs)' },
+
   // ATC configuration objects (ADT; versioned XML resources over AFF JSON).
   CHKC: { pgmid: 'R3TR', tadirObject: 'CHKC', ddicTabclass: '', channel: 'ADT', affSchema: 'chkc-v1.json', description: 'ATC check category' },
   CHKO: { pgmid: 'R3TR', tadirObject: 'CHKO', ddicTabclass: '', channel: 'ADT', affSchema: 'chko-v1.json', description: 'ATC check (implementing class + parameters)' },

@@ -8,7 +8,14 @@
 
 本版新增 `abap whoami`、授权对象族 5 个类型 `AUTH` / `SUSC` / `SUCU` / `SUSH` / `SUSO`（SU20 授权字段 / SU21 授权对象类 / 授权组 / SU22 授权缺省值分配 / SU21 授权对象），以及 `SM59`、`SRFC`、`OA2P` 与 `JOBD` 四个类型，分别管理 SM59 HTTP destination、UCON RFC service、OAuth 2.0 client profile 与 SM36 应用作业定义。`whoami` 的连接身份由 SAP 系统返回，而不是读取本地 profile 配置，因此配置与真实会话不一致、或将来接入 SSO 等认证方式时依然准确；授权对象族把 SU20 / SU21 / SU22 的授权字段、对象类、授权组、授权缺省值分配和授权对象纳入 pull → 编辑 → push 闭环。内置 ICF 服务相应新增身份端点、SM59 / SRFC / OA2P / JOBD 端点与 `/auth/<type>/<name>` 授权对象路由，CLI 与 ICF 服务版本线统一到 2.6.0；升级后执行一次 `abap deploy --yes` 才能使用这些能力，部署前 `abap deploy status` 会显示 outdated（`abap types` 现列出 45 类）。
 
+本版同时把 6 类 basis 配置对象纳入 `abap types`：应用日志对象、更改文档对象、事件绑定、业务配置维护对象，以及 BAdI 实现 / BAdI 增强点。它们统一使用官方 AFF JSON 作为本地格式；前四类通过 ADT 的 AFF 源资源（source/main 即官方 AFF 文档）完成 create / pull / push / delete，BAdI 实现与增强点在本参考 release 上只能读取（SAP 的 AFF 序列化器不写这两类），因此提供 pull，写入留待后续版本。内置 ICF 服务新增通用 AFF 读取端点并把服务版本升到 2.4.0：使用 `ENHO` / `ENHS` 的 `pull` 前需要执行一次 `abap deploy --yes`，其余新类型不依赖 ICF 服务。
+
 ### Added
+
+- **AFF basis 对象（第一批）**：新增 `APLO`（应用日志对象）、`CHDO`（更改文档对象）、`EVTB`（事件绑定）、`SMBC`（业务配置维护对象）四类对象，支持 `create` / `pull` / `push` / `delete`。本地文件就是官方 abap-file-format JSON（`<name>.<type>.json`，命名空间写作 `(ns)name`），文件名与对象名一致，`pull` 出来可直接改完 `push`；新建需要 `--file` 指定 JSON 文档，`$` 前缀本地包无需 transport，可传输包必须显式 `--tr`。`APLO` 保存即激活；`CHDO` / `EVTB` / `SMBC` 保存后需要激活，CLI 会在写入后自动激活并把 SAP 的校验错误原样返回（例如事件绑定引用的 BO 事件已被占用、业务配置对象引用的服务绑定不存在）。`CHDO` 的对象名沿用 SAP 的 16 字符限制、`APLO` 为 20 字符（超长名在本地先拒绝，不落 SAP 500）。`SMBC` 的写入依赖目标系统已有可用的服务绑定。
+- **AFF basis 对象（第二批，只读接入）**：新增 `ENHO`（BAdI 实现）与 `ENHS`（BAdI 增强点）两类对象，支持 `pull`，本地文件为官方 AFF JSON（`<name>.enho.json` / `<name>.enhs.json`）。参考 release 上 SAP 的 AFF 框架对这两类只做序列化、不做反序列化，因此本版不提供 `create` / `push` / `delete`；命令会给出明确说明，后续版本补写入适配。读取通过内置 ICF 服务的通用 AFF 端点完成，使用前需要执行一次 `abap deploy --yes`。
+
+- **通用 AFF 读取端点**：内置 ICF 服务新增 `/aff/<TYPE>/<NAME>` 只读端点，按 SAP 自带的 AFF 对象处理器把对象序列化成完整文件集合并以 JSON 返回；服务版本升到 2.4.0。CLI 用它读取 `ENHO` / `ENHS`，升级后执行一次 `abap deploy --yes` 即可。
 
 - **`abap whoami`**：由 SAP 系统返回当前连接的实际身份——登录用户、系统 ID / 客户端，以及应用服务器 / 数据库 / OS / ABAP release；输出同时带上工作区 profile 与 endpoint。身份取自 SAP 会话而不是本地 profile 配置，因此在切换 profile、CI 注入配置或将来接入 SSO 等认证方式时都能反映真实登录身份。命令需要已部署新版内置 ICF 服务：服务未安装或版本过旧时会提示先执行 `abap deploy --yes`；`abap whoami --schema --json` 不连 SAP。
 - **`SM59`（SM59 HTTP destination）**：新增 `SM59` 类型，管理 SM59 中「HTTP 连接到外部服务器」的目的地，支持 `create` / `pull` / `push` / `delete`。本地文件 `<name>.sm59.json` 可编辑描述、目标主机、端口、协议（HTTP/HTTPS）与路径前缀，`pull` 也能读取系统里已有的 HTTP destination 作为起点。SM59 目的地是客户端无关的系统级配置：没有 package，也不能记录 transport，因此这些命令不接受 `--package` / `--tr`（传了会明确报错，而不是静默忽略）；`create` 不需要 package，创建后所有 client 都能看到该目的地。注意 `push` 是整份目的地定义的覆盖写，而当前只建模了上述常用字段：SSL 证书、代理、登录过程等高级选项不会随文件往返，写入后按 SAP 默认值生效；`pull` 读取已有目的地后 `push` 也会覆盖这些高级设置，请在用途明确的测试目的地或新建目的地上使用。其它 SM59 类型（RFC destination 等）与 UCON HTTP service 不在本版范围内；UCON RFC service（`SRFC`）与 OAuth2 profile（`OA2P`）作为独立类型提供（见下）。

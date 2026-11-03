@@ -108,6 +108,10 @@
     {
       "global": "ZCL_ABAP_VIBE_ICF_SUSO",
       "local": "lcl_suso"
+    },
+    {
+      "global": "ZCL_ABAP_VIBE_ICF_AFF",
+      "local": "lcl_aff"
     }
   ],
   "standalone": [

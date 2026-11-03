@@ -81,6 +81,8 @@ describe('schema-paths priority chain', () => {
         'TYPE',
         // — application jobs.
         'SAJC', 'SAJT',
+        // — AFF-over-ICF objects (generic /aff endpoint).
+        'APLO', 'CHDO', 'EVTB', 'SMBC', 'ENHO', 'ENHS',
       ]),
     );
     // TABT is exposed as a schema key for the .settings.json override path.
@@ -101,7 +103,8 @@ describe('schema-paths priority chain', () => {
     // added SRFC / OA2P (UCON RFC service / OAuth2 profile) = 43 total.
     // added JOBD (application job definition, local extension) = 44 total.
     // added AUTH / SUSC / SUCU / SUSH / SUSO (authorization family) = 49 total.
-    expect(types).toHaveLength(49);
+    // added APLO / CHDO / EVTB / SMBC / ENHO / ENHS (generic AFF bundle) = 55 total.
+    expect(types).toHaveLength(55);
   });
 
   it('bundled root contains every supported schema', () => {

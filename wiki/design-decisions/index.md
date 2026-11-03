@@ -4,7 +4,7 @@ title: 设计决策录
 description: abap-cli 关键架构与契约决策的「为什么」— 决策 / 被否决方案 / 当前代价，便于新人和 agent 快速理解项目取舍
 tags: [abap-cli, design-decisions, architecture, adr]
 created at: 2026-09-01 00:00:00
-changed at: 2026-11-01 12:10:00
+changed at: 2026-11-04 02:32:00
 ---
 
 # 设计决策录（Design Decisions）
@@ -29,6 +29,7 @@ changed at: 2026-11-01 12:10:00
 | [013](013-github-issues-feedback.md) | 反馈改走 GitHub Issues，删除自建反馈服务 | 删除 `abap feedback` 与自建 issue HTTP 契约；agent 用 GitHub MCP / `gh` / token / 预填 URL 提 issue，离线留档仍用 `report-stuck` |
 | [014](014-profile-input-hardening.md) | profile 输入在写入前归一化与校验 | URL 只存 origin、profile 名限字符集、交互/参数同一套校验、textpool 探测定向、`init` 字段更新走 merge |
 | [015](015-session-lifecycle.md) | 会话复用的存储与生命周期 | 只有 durable 存储 + 完整会话身份（含 `sap-contextid`）+ 未被连续拒绝才保留会话；移除 `$TMPDIR` 兜底，新增工作区存储与结构化降级告警 |
+| [016](016-aff-over-icf-vs-adt-bluesource.md) | AFF 对象按能力拆分通道 | `APLO` / `CHDO` / `EVTB` / `SMBC` 走 ADT blueSource（`source/main` 即官方 AFF JSON，读写全生命周期）；`ENHO` / `ENHS` 保留 ICF `/aff` 只读 pull（AFF handler 写/删不完整），写入留后续 SEEF 适配 |
 
 ## 阅读顺序建议
 
@@ -41,6 +42,7 @@ changed at: 2026-11-01 12:10:00
 - 改 keychain / 凭据存储：先读 [011](011-macos-keychain-native-backend.md)（历史认证背景见 [009](009-basic-auth-only.md)）
 - 改会话复用 / SM04 相关行为：先读 [015](015-session-lifecycle.md)
 - 改内置 ICF 服务的源码布局 / deploy 形态：先读 [012](012-icf-dev-global-release-merged.md)
+- 改 AFF 对象（APLO/CHDO/EVTB/SMBC/ENHO/ENHS）的通道与能力：先读 [016](016-aff-over-icf-vs-adt-bluesource.md)
 - 改反馈链路 / 反馈文档：先读 [013](013-github-issues-feedback.md)
 - 改 profile / init 的输入与配置写入：先读 [014](014-profile-input-hardening.md)（认证边界见 [009](009-basic-auth-only.md)）
 

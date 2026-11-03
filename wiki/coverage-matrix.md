@@ -4,14 +4,14 @@ title: SAP 开发任务覆盖率矩阵
 description: abap-cli 当前能 / 不能完成的 SAP 开发任务全景 — 用于未来 spec 选题 + 用户预期管理
 tags: [abap-cli, coverage, roadmap, scope]
 created at: 2026-09-01 00:00:00
-changed at: 2026-11-04 00:32:00
+changed at: 2026-11-04 02:42:00
 ---
 
 # SAP 开发任务覆盖率矩阵
 
 abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的开发工作**。本页是一份**诚实快照**——按 SAP 开发任务分类，给出当前覆盖度与缺口。对象类型补充的排序与取舍见 [roadmap](roadmap.md)。
 
-> 当前规模：**32 个顶层命令**、**45 个对象类型**（45 类可 create、45 类可 pull、43 类有 push 入口）、**6 个 skill + 1 个 agent**。基线：`v2.6.0` + 授权对象族（AUTH / SUSC / SUCU / SUSH / SUSO）/ 应用作业定义（JOBD）/ UCON RFC service（SRFC）/ OAuth 2.0 client profile（OA2P）/ SM59 HTTP 目标（RFCTYPE=G）/ 连接身份（whoami）/ SRVB 发布命令 / 本地 ATC / CDS 技术 / 类型池 / 应用作业扩展。
+> 当前规模：**32 个顶层命令**、**51 个对象类型**（49 类可 create、51 类可 pull、47 类有 push 入口）、**6 个 skill + 1 个 agent**。基线：`v2.6.0` + AFF 对象（ADT blueSource 读写 + ENHO/ENHS 只读 pull）/ 授权对象族（AUTH / SUSC / SUCU / SUSH / SUSO）/ 应用作业定义（JOBD）/ UCON RFC service（SRFC）/ OAuth 2.0 client profile（OA2P）/ SM59 HTTP 目标（RFCTYPE=G）/ 连接身份（whoami）/ SRVB 发布命令 / 本地 ATC / CDS 技术 / 类型池 / 应用作业扩展。
 
 ## 评分图例
 
@@ -61,12 +61,14 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | CDS 简单类型（DRTY） | `create / pull / push / delete DRTY` | ✅ | ADT `/ddic/drty/sources`；AFF 元数据 + `.acds`；写入需 `CDS_SIMPLE_TYPES` 用户参数；真机闭环 |
 | 类型池（TYPE） | `create / pull / push / delete TYPE` | ✅ | ADT `/ddic/typegroups`（`TYPE/DG`，名称 ≤5）；AFF 官方 `type-v1.json` + `.type.abap` 经典 ABAP 源码；真机闭环 |
 | 应用作业目录/模板（SAJC / SAJT） | `create / pull / push / delete SAJC|SAJT` | ✅ | ADT `/applicationjob/{catalogs,templates}` blueSource + `source/main` JSON；本地 AFF 单 JSON（官方 `sajc-v1` / `sajt-v1`）；参考 release 为旧扁平模型，CLI 做双向转换、不可表达字段显式报错；名称 ≤40；真机闭环 |
+| AFF 对象 · ADT blueSource（APLO / CHDO / EVTB / SMBC） | `create / pull / push / delete` | ✅ | ADT blueSource：`source/main` 即官方 AFF JSON（lock / 保存即激活 / transport 由 ADT 承担）；本地即官方 AFF v1 单 JSON；APLO / CHDO / EVTB 真机 create/pull/push/delete 闭环；SMBC 参考系统无对象、未真机验证（需先有 SRVB service binding） |
+| AFF 对象 · ICF 只读（ENHO / ENHS） | `pull` | 🟡 | ICF `GET /aff/<TYPE>/<name>`（SAP AFF 框架序列化）；**仅 pull**：SAP AFF handler 对这两类只读（保存空实现 / 删除断言），`create` / `push` / `delete` 不支持，写入需 SEEF API 适配（后续）；pull 已真机验证；仅覆盖 BAdI 范围 |
 | CDS 方面 / 字典调优索引 / 静态缓存（DRAS / DTIX / DTSC） | — | ❌（延后） | 官方 AFF schema 存在，但本机 typestructure 无 CREATE 能力、discovery 无 REST 资源；等有 ADT 通道的 release |
 | Pool/Cluster Table | — | ❌ | 仅 TABL/STRU |
 | 创建/修改数据库视图（VIEW） | `create / pull / push / delete VIEW` | ✅ | ICF `/ddic/view`；自建 `view-v1.json`（本地扩展）；DD25V/DD26V/DD27P/DD28J/DD28V 映射；删除仅 `$TMP`；真机 17/17 TC（join 视图 + 单表视图 create/pull/push/delete + DD26S/DD27S/DD28S 校验） |
 | 创建/修改搜索帮助（SHLP） | `create / pull / push / delete SHLP` | ✅ | ICF `/ddic/shlp`；自建 `shlp-v1.json`（本地扩展）；elementary + collective、参数映射；删除仅 `$TMP`；真机 18/18 TC（create/pull/push/delete + DD30L/DD31S/DD32S/DD33S 校验） |
 | Authorization Object / Field（AUTH / SUSO） | — | ❌ | 候选补充类型，见 roadmap |
-| Enhancement（ENHO / ENHS） | — | ❌ | 候选补充类型，见 roadmap |
+| Enhancement（ENHO / ENHS）写路径 | — | ❌（已知限制） | AFF handler 只读：create/push/delete 需 SEEF API 适配（后续独立排期）；pull 已支持（见上） |
 | BAdI 定义/实现 | — | ❌ | 可用 `where-used` 查引用 |
 | AMDP 类 / CDS Table Function | — | ❌ | |
 | 创建/删除包（DEVC） | `create / pull / delete DEVC` | ✅ | ADT `DEVC/K`；软件组件 LOCAL 的包名须以 `$`/`TEST` 开头；**push 不支持**（ADT 拒绝 `PUT`），改包需 SAP GUI 或删后重建 |
@@ -79,7 +81,7 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 
 **覆盖率**：基础开发对象（CLAS / INTF / PROG / FUGR / DOMA / DTEL / TABL / STRU / ENQU / VIEW / SHLP / NROB / HTTP / XSLT / TTYP / MSAG / DDLS / CDS-RAP 5 类）已形成 create/pull/push 闭环；`DEVC` 的 create / pull / delete 闭环也已打通（push 因 ADT 无更新端点而不支持）。
 
-高级/遗留对象（AUTH / ENHO-ENHS / BAdI / AMDP / forms / Web Dynpro / IDoc / Workflow / STRANS）= **0/9** ❌；VIEW、SHLP、XSLT 均已完成（真机 ✅）。
+高级/遗留对象（AUTH / BAdI / AMDP / forms / Web Dynpro / IDoc / Workflow / STRANS）= **0/8** ❌；VIEW、SHLP、XSLT 均已完成（真机 ✅）。AFF 对象已接入：APLO / CHDO / EVTB / SMBC 走 ADT blueSource 读写（前三类真机闭环，SMBC 未验证），ENHO / ENHS 走 ICF 只读 pull（写路径为已知限制，后续 SEEF 适配）。
 
 ---
 
@@ -188,6 +190,7 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | 部署 ICF 服务 | `deploy` | ✅ | on-prem / Steampunk / BTP trial；`--dev` 开发形态 |
 | 检查 ICF 状态 | `deploy status` | ✅ | 版本 + 已部署 |
 | DDIC CRUD（DOMA/DTEL/TABL/STRU/ENQU/NROB） | `pull / create / push / delete` | ✅ | ICF；`/ddic/<type>`；ENQU/NROB delete 仅 `$TMP` |
+| AFF 只读端点（ENHO/ENHS pull） | `pull` | ✅ | ICF；`GET /aff/<TYPE>/<name>`，SAP 自带 AFF 框架序列化；create/push/delete 不支持（已知限制） |
 | 双通道 DDIC（TTYP/MSAG） | `pull / create / push` | ✅ | ADT 主 + ECC ICF 兜底 |
 | 解析 SICF 节点（HTTP 类型） | `pull / create / push / delete HTTP` | ✅ | ICF；删除仅本地包（见 §1） |
 | 解析事务码（TRAN 类型） | `pull / create / push / delete TRAN` | ✅ | 读写闭环；删除仅 `$TMP`（见 §1） |
@@ -200,7 +203,7 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | tcode wrapper | `tcode` | ✅ | ICF |
 | MIME Repository | `mime create / delete / push` | ✅ | ICF；当前只有 folder/resources 两类端点 |
 
-**覆盖率**：11/11（TRAN 写路径已实现；OO 事务按规范拒绝）。
+**覆盖率**：12/12（TRAN 写路径已实现；OO 事务按规范拒绝；AFF 对象按通道拆分：ADT blueSource 四类读写、ENHO/ENHS ICF 只读 pull）。
 
 ---
 
@@ -225,7 +228,8 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 
 | 缺失能力 | 价值 | 工作量 | 状态 / 去向 |
 |---|---|---|---|
-| ENHO / ENHS（增强） | 中-高 | 大 | 先只读 pull，再 push；见 roadmap |
+| ENHO / ENHS 写路径（create / push / delete，SEEF API 适配） | 中 | 大 | AFF handler 对这两类只读（保存空实现 / 删除断言）；需 `CL_ENH_FACTORY` + ADT persist + `ENH_WB_ACTIVATE`，后续独立排期；当前 pull 可用、写请在 SE80/SE11 维护 |
+| ENHO / ENHS 的非 BAdI 部分（source-code plug-in / 其他增强工具） | 中 | 大 | 官方 AFF 只覆盖 BAdI，非 BAdI 增强无 AFF 格式 |
 | AUTH / SUSO 授权对象 | 中 | 中-大 | 本轮按约定暂不做；见 roadmap |
 | TRAN OO 事务写入 | 中 | 中 | 规范 FM `RPY_TRANSACTION_INSERT` 无 class/method 参数；需 SE93 BDC，ICF 上下文不可用，继续走 SE93 |
 | Cross-reference / where-used 全集 | 中 | 中-大 | 需 REPS 全文扫描 |
@@ -255,7 +259,7 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | DTEL | 3 | 3 | 0 | 0 |
 | DEVC / HTTP / TRAN / TTYP / MSAG / DDLS | 各 1 | 各 1 | 0 | 0 |
 
-> 尚无 fixture 的类型：AUTH / SUSC / SUCU / SUSH / SUSO / AUTH / SUSC / SUCU / SUSH / SUSO / AUTH / SUSC / SUCU / SUSH / SUSO / AUTH / SUSC / SUCU / SUSH / SUSO / ENQU / NROB / VIEW / SHLP / SM59 / SRFC / OA2P / XSLT / SRVB / BDEF / CHKC / CHKO / CHKV / DTDC / DTEB / DSFD / DSFI / DRTY / TYPE；SRVD / DCLS / DDLA / DDLX 的 fixture 已存在，但 `aff/router.ts` 没有对应后缀规则，`validate:aff` 不覆盖它们。补类型时应同步补 fixture。
+> 尚无 fixture 的类型：AUTH / SUSC / SUCU / SUSH / SUSO / AUTH / SUSC / SUCU / SUSH / SUSO / AUTH / SUSC / SUCU / SUSH / SUSO / AUTH / SUSC / SUCU / SUSH / SUSO / ENQU / NROB / VIEW / SHLP / SM59 / SRFC / OA2P / XSLT / SRVB / BDEF / CHKC / CHKO / CHKV / DTDC / DTEB / DSFD / DSFI / DRTY / TYPE；SRVD / DCLS / DDLA / DDLX 的 fixture 已存在，但 `aff/router.ts` 没有对应后缀规则，`validate:aff` 不覆盖它们。补类型时应同步补 fixture。 APLO / CHDO / EVTB / SMBC / ENHO / ENHS 的 schema 合规用例内嵌上游 example（`test/unit/schema-compliance/`），不占 `test/fixtures`；SM59 / SRFC / OA2P / JOBD / 授权族使用本地扩展 schema 或上游变体，见 `src/abap_cli/schema/README.md`。
 
 ### Schema paths
 
@@ -279,6 +283,7 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | TTYP | `src/abap_cli/schema/ttyp-v1.json`（上游无此格式，本地维护） |
 | MSAG | `src/abap_cli/schema/msag-v1.json` |
 | DDLS / SRVD / BDEF / DCLS / DDLX / DDLA | 同名 `*-v1.json` |
+| APLO / CHDO / EVTB / SMBC / ENHO / ENHS | `src/abap_cli/schema/{aplo,chdo,evtb,smbc,enho,enhs}-v1.json` |
 
 Companion files (TABL/STRU `.settings.json`) validate against `tabt-v1.json`。PROG 与 HTTP fixture 为手写样本（引入 fixture 时上游 abap-file-format 尚未提供 examples）。
 

@@ -17,6 +17,23 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
 
     IF lv_path IS INITIAL OR lv_path = '/'.
       zcl_abap_vibe_icf_response=>handle_root( io_server = server iv_method = lv_method ).
+    ELSEIF lv_path CP '/aff/*'.
+      " Generic AFF object endpoint (APLO/CHDO/EVTB/SMBC/ENHO/ENHS). Every
+      " AFF framework call inside the helper is dynamic, so this handler still
+      " compiles on releases without SAFF_CORE; the route then answers
+      " AFF_UNSUPPORTED instead of failing deployment.
+      TRY.
+          zcl_abap_vibe_icf_aff=>dispatch_aff( io_server = server
+                                                    iv_path   = lv_path
+                                                    iv_method = lv_method
+                                                    iv_body   = lv_body ).
+        CATCH cx_root INTO DATA(lx_aff_dispatch).
+          zcl_abap_vibe_icf_response=>respond_error( io_server = server
+                                       iv_status = 500
+                                       iv_reason = 'Internal Server Error'
+                                       iv_code   = 'AFF_DISPATCH_FAILED'
+                                       iv_msg    = |dispatch_aff runtime error: { lx_aff_dispatch->get_text( ) }| ).
+      ENDTRY.
     ELSEIF lv_path CP '/ddic/*'.
       zcl_abap_vibe_icf_ddic=>dispatch_ddic( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
     ELSEIF lv_path CP '/textpool/*'.

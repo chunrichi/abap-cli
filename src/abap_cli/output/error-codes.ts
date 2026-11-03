@@ -261,6 +261,23 @@ export type ErrorCode =
   | 'AFF_SCHEMA_INVALID'        // canonical schema file present but unparseable (VALIDATION_ERROR/exit 7)
   | 'AFF_SCHEMA_COMPILE_ERROR'  // ajv compile raised (VALIDATION_ERROR/exit 7)
   | 'AFF_FIXTURE_INVALID'       // a fixture failed schema validation (VALIDATION_ERROR/exit 7)
+  // generic AFF-over-ICF channel (/aff/<TYPE>/<NAME>) — codes mirror the endpoint
+  | 'AFF_NOT_FOUND'             // object does not exist in TADIR/serializer (NOT_FOUND/exit 8)
+  | 'AFF_SERVICE_INVALID'       // /aff path malformed — type/name missing (VALIDATION_ERROR/exit 7)
+  | 'AFF_UNSUPPORTED'           // release has no AFF handler for the type (SAP_ERROR/exit 6)
+  | 'AFF_WRITE_UNSUPPORTED'     // endpoint deployed without the create/update path yet (SAP_ERROR/exit 6)
+  | 'AFF_DELETE_UNSUPPORTED'    // endpoint deployed without the delete path yet (SAP_ERROR/exit 6)
+  | 'AFF_TYPE_INVALID'          // type code is not a valid TADIR object type (VALIDATION_ERROR/exit 7)
+  | 'AFF_NAME_INVALID'          // object name missing/too long/illegal (VALIDATION_ERROR/exit 7)
+  | 'AFF_READ_FAILED'           // AFF serialization failed server-side (SAP_ERROR/exit 6)
+  | 'AFF_ALREADY_EXISTS'        // POST on an existing object (VALIDATION_ERROR/exit 7)
+  | 'AFF_PACKAGE_REQUIRED'      // POST without a target package (VALIDATION_ERROR/exit 7)
+  | 'AFF_FILE_INVALID'          // bundle file set/names/JSON malformed (VALIDATION_ERROR/exit 7)
+  | 'AFF_TRANSPORT_REQUIRED'    // non-local write/delete without a request (VALIDATION_ERROR/exit 7)
+  | 'AFF_LOCKED'                // object locked by another user (LOCKED/exit 9)
+  | 'AFF_WRITE_FAILED'          // AFF deserialization failed server-side (SAP_ERROR/exit 6)
+  | 'AFF_ACTIVATION_FAILED'     // deserialized object could not be activated (VALIDATION_ERROR/exit 7)
+  | 'AFF_DELETE_FAILED'         // AFF delete failed server-side (SAP_ERROR/exit 6)
   | 'DOCU_PUSH_FAILED'          // ICF POST /ddic/<type>/<name>/docu failure (SAP_ERROR/exit 6)
   | 'SESSION_JAR_DECRYPT_FAILED' // AES-GCM tag mismatch / corrupt blob / wrong system hash (VALIDATION_ERROR)
   | 'SESSION_INVALID'            // SAP 401/403/440 after cookie inject — caller should re-login (VALIDATION_ERROR)
@@ -609,6 +626,23 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   AFF_SCHEMA_INVALID: 'VALIDATION_ERROR',
   AFF_SCHEMA_COMPILE_ERROR: 'VALIDATION_ERROR',
   AFF_FIXTURE_INVALID: 'VALIDATION_ERROR',
+  // generic AFF-over-ICF channel
+  AFF_NOT_FOUND: 'NOT_FOUND',
+  AFF_SERVICE_INVALID: 'VALIDATION_ERROR',
+  AFF_UNSUPPORTED: 'SAP_ERROR',
+  AFF_WRITE_UNSUPPORTED: 'SAP_ERROR',
+  AFF_DELETE_UNSUPPORTED: 'SAP_ERROR',
+  AFF_TYPE_INVALID: 'VALIDATION_ERROR',
+  AFF_NAME_INVALID: 'VALIDATION_ERROR',
+  AFF_READ_FAILED: 'SAP_ERROR',
+  AFF_ALREADY_EXISTS: 'VALIDATION_ERROR',
+  AFF_PACKAGE_REQUIRED: 'VALIDATION_ERROR',
+  AFF_FILE_INVALID: 'VALIDATION_ERROR',
+  AFF_TRANSPORT_REQUIRED: 'VALIDATION_ERROR',
+  AFF_LOCKED: 'LOCKED',
+  AFF_WRITE_FAILED: 'SAP_ERROR',
+  AFF_ACTIVATION_FAILED: 'VALIDATION_ERROR',
+  AFF_DELETE_FAILED: 'SAP_ERROR',
   DOCU_PUSH_FAILED: 'SAP_ERROR',
   SESSION_JAR_DECRYPT_FAILED: 'VALIDATION_ERROR',
   SESSION_INVALID: 'VALIDATION_ERROR',

@@ -1,10 +1,10 @@
 ---
 type: reference
 title: 对象类型详细文档索引
-description: 每个 SAP 对象类型的字段契约、命令路径、本地文件形态与示例（45 个类型）
-tags: [abap-cli, object-types, reference, clas, intf, prog, fugr, devc, tabl, stru, doma, dtel, enqu, view, shlp, jobd, nrob, http, tran, xslt, sm59, ttyp, msag, ddls, srvb, srvd, bdef, dcls, ddlx, ddla, chkc, chko, chkv, dtdc, dteb, dsfd, dsfi, drty, type, sajc, sajt, srfc, oa2p, auth, susc, sucu, sush, suso]
+description: 每个 SAP 对象类型的字段契约、命令路径、本地文件形态与示例（51 个类型）
+tags: [abap-cli, object-types, reference, clas, intf, prog, fugr, devc, tabl, stru, doma, dtel, enqu, view, shlp, jobd, nrob, http, tran, xslt, sm59, ttyp, msag, ddls, srvb, srvd, bdef, dcls, ddlx, ddla, chkc, chko, chkv, dtdc, dteb, dsfd, dsfi, drty, type, sajc, sajt, srfc, oa2p, auth, susc, sucu, sush, suso, aplo, chdo, evtb, smbc, enho, enhs]
 created at: 2026-09-01 00:00:00
-changed at: 2026-11-04 00:33:00
+changed at: 2026-11-04 02:42:00
 ---
 
 # 对象类型详细文档
@@ -13,6 +13,12 @@ changed at: 2026-11-04 00:33:00
 
 | 类型 | 路由 | 本地文件形态（平铺 `src/`） | 文档 |
 |---|---|---|---|
+| `APLO` | ADT（blueSource，AFF JSON 即 `source/main`） | `src/<name>.aplo.json`（应用日志对象） | [aplo.md](aplo.md) |
+| `CHDO` | ADT（blueSource） | `src/<name>.chdo.json`（更改凭证对象） | [chdo.md](chdo.md) |
+| `EVTB` | ADT（blueSource） | `src/<name>.evtb.json`（事件绑定） | [evtb.md](evtb.md) |
+| `SMBC` | ADT（blueSource；参考系统无对象，未真机验证） | `src/<name>.smbc.json`（业务配置维护对象） | [smbc.md](smbc.md) |
+| `ENHO` | ICF `/aff`（**仅 pull**） | `src/<name>.enho.json`（增强实现，仅 BAdI；只读） | [enho.md](enho.md) |
+| `ENHS` | ICF `/aff`（**仅 pull**） | `src/<name>.enhs.json`（增强点，仅 BAdI；只读） | [enhs.md](enhs.md) |
 | `CLAS` | ADT | `src/<name>.clas.json` + 各 include `src/<name>.clas.<subtype>.abap` | [clas.md](clas.md) |
 | `INTF` | ADT | `src/<name>.intf.json` + `src/<name>.intf.abap` | [intf.md](intf.md) |
 | `PROG` | ADT | `src/<name>.prog.json` + `src/<name>.prog.abap` | [prog.md](prog.md) |
@@ -63,12 +69,14 @@ changed at: 2026-11-04 00:33:00
 
 - **ADT**（源对象）：无需 ICF 部署；直接打 SAP ADT REST API；走 `abap-adt-api` 库
 - **ICF** 自建（DDIC/HTTP/TRAN/VIEW/SHLP/XSLT/JOBD/授权族）：需要先 `abap deploy`；走 `/sap/abap_cli/<domain>/<type>/<name>`（VIEW 为 `/ddic/view/<name>`，SHLP 为 `/ddic/shlp/<name>`，XSLT 为 `/xslt/<name>`，授权族为 `/auth/<sub>/<name>`）
+- **ADT blueSource（AFF）**（APLO/CHDO/EVTB/SMBC）：对象的 `source/main` 就是官方 AFF JSON，ADT 负责 lock / 激活 / transport；create / pull / push / delete 全支持（SMBC 参考系统无对象未验证）
+- **ICF `/aff`（AFF 只读）**（ENHO/ENHS）：需要先 `abap deploy`；`GET /aff/<TYPE>/<name>` 由 SAP AFF 框架序列化，**仅 pull**；这两类的 AFF handler 写/删实现不完整，`create` / `push` / `delete` 不支持
 - **ADT + ICF 兜底**（TTYP/MSAG）：优先 ADT；ECC EHP5/6 内核（< 753）自动切 ICF，现代内核缺 ADT 端点时运行时降级，envelope 写 `data.channel` + `data.fallbackReason`
 - **ADT 无兜底**（DDLS / SRVD / BDEF / DCLS / DDLX / DDLA / SRVB）：不发起 ICF 调用；DDLS 在旧内核直接硬错 `DDLS_NOT_SUPPORTED_ON_ECC`（exit 64）
 
 ## 详细决策
 
-AFF 原生扁平布局的「为什么」见 [design-decisions/010-aff-flat-layout.md](../design-decisions/010-aff-flat-layout.md)（[003](../design-decisions/003-typesubdir-layout.md) 是已被取代的历史决策）；DDIC 走 ICF 而非 ADT 的「为什么」见 [design-decisions/002-icf-bypass-ddic.md](../design-decisions/002-icf-bypass-ddic.md)。
+AFF 原生扁平布局的「为什么」见 [design-decisions/010-aff-flat-layout.md](../design-decisions/010-aff-flat-layout.md)（[003](../design-decisions/003-typesubdir-layout.md) 是已被取代的历史决策）；DDIC 走 ICF 而非 ADT 的「为什么」见 [design-decisions/002-icf-bypass-ddic.md](../design-decisions/002-icf-bypass-ddic.md)；AFF 对象按能力拆分 ADT blueSource / ICF 只读的「为什么」见 [design-decisions/016-aff-over-icf-vs-adt-bluesource.md](../design-decisions/016-aff-over-icf-vs-adt-bluesource.md)。
 
 # references
 

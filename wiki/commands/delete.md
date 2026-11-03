@@ -23,7 +23,7 @@ abap delete --schema --json
 ## Options
 
 - `<object>`: SAP 对象名（如 `ZCL_MY_CLASS`），不是本地文件名；内部走 ADT quickSearch 解析成对象 URL。
-- `--type <type>`: **必填**。对象类型码（`CLAS` / `PROG` / `INTF` / `FUGR` / `DEVC` / `TABL` / `VIEW` / `SHLP` / `JOBD` / `TRAN` / `HTTP` / `SM59` / `SRFC` / `OA2P` / ... / `XSLT`），大小写不敏感。`DEVC` 走独立删除路径（包资源按名字直接寻址，不依赖 quickSearch，也不加锁）；`VIEW` / `SHLP` / `ENQU` / `NROB` / `HTTP` / `SM59` 走 ICF delete：VIEW/SHLP 先激活 inactive 版本再 `RS_DD_DELETE_OBJ`，ENQU 先回填本地 TADIR 再 `RS_DD_DELETE_OBJ`，NROB 清区间后 `NUMBER_RANGE_OBJECT_DELETE`，HTTP 用 `cl_icf_tree` 删 SICF 节点（根节点 / 有子节点 / 可传输节点拒绝），SM59 走 `DELETE /sm59/<name>`（`CL_DEST_FACTORY=>delete`，无需 transport）；JOBD 走 ICF `DELETE /jobd/<name>`（先清 STJR 数据行再删 TADIR；可传输对象需要 `--tr`，但插件上下文无法写 CTS 删除条目）；SRFC / OA2P 走 ICF `DELETE /srfc|oa2p/<name>`，package 从 ICF GET 读取，非本地包需要 `--tr`（SRFC 用 UCON API factory 删除，OA2P 用 Workbench 持久化类删除，且被 client 分配的 OA2P profile 拒绝删除）。
+- `--type <type>`: **必填**。对象类型码（`CLAS` / `PROG` / `INTF` / `FUGR` / `DEVC` / `TABL` / `VIEW` / `SHLP` / `JOBD` / `TRAN` / `HTTP` / `SM59` / `SRFC` / `OA2P` / ... / `XSLT`），大小写不敏感。`DEVC` 走独立删除路径（包资源按名字直接寻址，不依赖 quickSearch，也不加锁）；`VIEW` / `SHLP` / `ENQU` / `NROB` / `HTTP` / `SM59` 走 ICF delete：VIEW/SHLP 先激活 inactive 版本再 `RS_DD_DELETE_OBJ`，ENQU 先回填本地 TADIR 再 `RS_DD_DELETE_OBJ`，NROB 清区间后 `NUMBER_RANGE_OBJECT_DELETE`，HTTP 用 `cl_icf_tree` 删 SICF 节点（根节点 / 有子节点 / 可传输节点拒绝），SM59 走 `DELETE /sm59/<name>`（`CL_DEST_FACTORY=>delete`，无需 transport）；JOBD 走 ICF `DELETE /jobd/<name>`（先清 STJR 数据行再删 TADIR；可传输对象需要 `--tr`，但插件上下文无法写 CTS 删除条目）；SRFC / OA2P 走 ICF `DELETE /srfc|oa2p/<name>`，package 从 ICF GET 读取，非本地包需要 `--tr`（SRFC 用 UCON API factory 删除，OA2P 用 Workbench 持久化类删除，且被 client 分配的 OA2P profile 拒绝删除）。 `APLO` / `CHDO` / `EVTB` / `SMBC` 走 ADT blueSource 删除（GET 元数据取包 → DELETE，不加锁）：`$` 前缀本地包免 transport，可传输包需 `--tr`。`ENHO` / `ENHS` **不支持 delete**（只读类型，AFF handler 的删除实现为空/断言），本地即报 `VALIDATION_ERROR`（exit 7），请在 Eclipse ADT / SE80 / SEEF 维护。
 - `--tr <request>`: 传输请求号。本地包对象可省略；其它包必填。
 - `--yes`: **必填**。显式确认删除；无 TTY 时缺失直接报 `USAGE`。
 - `--schema`: 打印本命令参数 schema 并退出，不调用 SAP。
@@ -91,7 +91,7 @@ abap delete ZCLI_OA2P_DEMO --type OA2P --tr NDK900123 --yes --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap delete", "version": "2.3.0", "timestamp": "2026-10-31T05:20:11.482Z", "durationMs": 1432, "warnings": [] },
+  "meta": { "command": "abap delete", "version": "2.4.0", "timestamp": "2026-10-31T05:20:11.482Z", "durationMs": 1432, "warnings": [] },
   "data": { "object": "ZCL_ZR_CHK9", "type": "CLAS", "packageName": "$TMP", "deleted": true, "lockReleased": true }
 }
 ```
@@ -102,7 +102,7 @@ lock/unlock）：
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap delete", "version": "2.3.0", "timestamp": "2026-10-31T08:09:44.747Z", "durationMs": 1490, "warnings": [] },
+  "meta": { "command": "abap delete", "version": "2.4.0", "timestamp": "2026-10-31T08:09:44.747Z", "durationMs": 1490, "warnings": [] },
   "data": { "object": "$ZCLI_TC_PKG10", "type": "DEVC", "packageName": "$TMP", "deleted": true, "lockReleased": false }
 }
 ```
@@ -112,7 +112,7 @@ lock/unlock）：
 ```json
 {
   "status": "error",
-  "meta": { "command": "abap delete", "version": "2.3.0", "timestamp": "2026-10-31T05:21:03.117Z", "durationMs": 803, "warnings": [] },
+  "meta": { "command": "abap delete", "version": "2.4.0", "timestamp": "2026-10-31T05:21:03.117Z", "durationMs": 803, "warnings": [] },
   "error": {
     "code": "MISSING_TRANSPORT", "category": "USAGE",
     "message": "Object ZCL_MY_CLASS is in package ZDEV; --tr is required",

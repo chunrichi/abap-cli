@@ -24,6 +24,8 @@ import type { ErrorCode } from '../../output/error-codes.js';
 import { isLocalPackageName } from '../../core/transport.js';
 import { resolveObject } from '../../core/resolve.js';
 import { normalizeTypeInput } from '../../cli/type-alias.js';
+import { deleteUnsupportedReasonFor, isAffBundleType } from '../../types/registry.js';
+import { runDeleteAff } from './delete-aff.js';
 import { runDeleteDevc } from './delete-devc.js';
 import { runDeleteJobd } from './delete-jobd.js';
 import { runDeleteView } from './delete-view.js';
@@ -61,6 +63,8 @@ export interface DeleteResult {
   data: {
     object: string;
     type: string;
+    /** Transport channel used for AFF object types (absent for other types). */
+    channel?: 'adt' | 'icf';
     packageName?: string;
     deleted: boolean;
     transport?: string;
@@ -103,6 +107,20 @@ export async function runDelete(objectName: string, opts: DeleteOptions): Promis
   // name directly).
   if (typeUpper === 'DEVC') {
     return runDeleteDevc(objectName, opts);
+  }
+  // Generic AFF object types: APLO/CHDO/EVTB/SMBC delete through their ADT
+  // blueSource resource, ENHO/ENHS are read-only (the AFF reference framework
+  // has no delete implementation), so the dispatcher rejects them locally.
+  if (isAffBundleType(typeUpper)) {
+    const unsupported = deleteUnsupportedReasonFor(typeUpper);
+    if (unsupported) {
+      throw new CliError('VALIDATION_ERROR', `Cannot delete ${typeUpper}: ${unsupported}`, {
+        object: objectName,
+        type: typeUpper,
+        nextSteps: [`Pull the object if needed: abap pull ${objectName} --type ${typeUpper}`],
+      });
+    }
+    return runDeleteAff(objectName, typeUpper, opts);
   }
   // ATC configuration objects (CHKC / CHKO / CHKV) delete through ADT, but
   // need their package read from the resource first (quickSearch does not

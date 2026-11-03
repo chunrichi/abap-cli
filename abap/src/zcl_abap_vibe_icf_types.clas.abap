@@ -854,6 +854,50 @@ TYPES:
     status TYPE string,
     data   TYPE ty_jobd_write_data,
   END OF ty_jobd_write.
+  " ----- Generic AFF object bundle (AFF over ICF) -----
+  " One wire document carries the complete AFF file set of one repository
+  " object. The SAP-side AFF object handlers may serialize more than one file
+  " (and sub objects) for a single object, so `files` is a list rather than a
+  " single document:
+  "   GET response:  { status, data: { type, name, package, masterLanguage,
+  "                                    files: [ { name, content } ] } }
+  "   POST/PUT body: { package, transportRequest, files: [ { name, content } ] }
+  " `content` is the UTF-8 file text as a string; binary companions are out of
+  " scope for these types.
+TYPES:
+  BEGIN OF ty_aff_file,
+    name    TYPE string,
+    content TYPE string,
+  END OF ty_aff_file,
+  tt_aff_file TYPE STANDARD TABLE OF ty_aff_file WITH EMPTY KEY,
+  BEGIN OF ty_aff_data,
+    type            TYPE string,
+    name            TYPE string,
+    package         TYPE string,
+    master_language TYPE string,
+    files           TYPE tt_aff_file,
+  END OF ty_aff_data,
+  BEGIN OF ty_aff_get,
+    status TYPE string,
+    data   TYPE ty_aff_data,
+  END OF ty_aff_get,
+  BEGIN OF ty_aff_write_request,
+    package           TYPE string,
+    transport_request TYPE string,
+    files             TYPE tt_aff_file,
+  END OF ty_aff_write_request,
+  BEGIN OF ty_aff_write_data,
+    type      TYPE string,
+    name      TYPE string,
+    package   TYPE string,
+    action    TYPE string,
+    activated TYPE abap_bool,
+    files     TYPE string_table,
+  END OF ty_aff_write_data,
+  BEGIN OF ty_aff_write,
+    status TYPE string,
+    data   TYPE ty_aff_write_data,
+  END OF ty_aff_write.
 
   " ----- local package predicate -----
   CLASS-METHODS is_local_package

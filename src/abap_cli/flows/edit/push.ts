@@ -35,12 +35,12 @@ import { pushObject, type PushStage } from './push-object.js';
 import { pushFugrOne } from './push-fugr.js';
 import { pushTextpoolFile } from './push-textpool.js';
 import { orderTargetsByDependency } from './push-order.js';
-import { deduplicateTablArtifactTargets, deduplicateXsltArtifactTargets } from './push-dedup.js';
+import { deduplicateTablArtifactTargets, deduplicateXsltArtifactTargets, deduplicateAffBundleTargets } from './push-dedup.js';
 import { toRelativeOutputPath } from '../../core/path-output.js';
 import { pushRouteFor } from './routing.js';
 import { isDocuSupportedType } from '../../formats/docu/json.js';
 import { hasDocuCompanion } from './docu-companion.js';
-import { pushUnsupportedReasonFor } from '../../types/registry.js';
+import { isAffBundleType, pushUnsupportedReasonFor } from '../../types/registry.js';
 import type { PushFileOptions, PushFileResult, PushOneResult } from './push-types.js';
 
 /**
@@ -51,10 +51,14 @@ import type { PushFileOptions, PushFileResult, PushOneResult } from './push-type
 function rejectUnsupportedPushType(objectType: string): void {
   const reason = pushUnsupportedReasonFor(objectType);
   if (!reason) return;
-  throw new CliError('TYPE_NOT_SUPPORTED', `Cannot push ${objectType} changes: ${reason}`, {
+  // Read-only AFF types (ENHO / ENHS) are a capability statement, not an
+  // unknown type: keep them in the VALIDATION_ERROR category (exit 7) with the
+  // registry's reason. Legacy read-only types keep TYPE_NOT_SUPPORTED.
+  const code = isAffBundleType(objectType) ? 'VALIDATION_ERROR' : 'TYPE_NOT_SUPPORTED';
+  throw new CliError(code, `Cannot push ${objectType} changes: ${reason}`, {
     type: objectType,
     nextSteps: [
-      `Type ${objectType} is read-only in abap-cli; edit the object in SAP GUI if supported there.`,
+      `Type ${objectType} is read-only in abap-cli; edit the object in SAP GUI / Eclipse ADT if supported there.`,
       'Re-create the object instead: pull, edit, `abap delete`, `abap create`.',
     ],
   });
@@ -159,6 +163,8 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
   target.files = deduplicateTablArtifactTargets(target.files);
   // Same for the XSLT pair (`.xslt.json` + `.xslt.xml`): one SAP object.
   target.files = deduplicateXsltArtifactTargets(target.files);
+  // And for generic AFF bundles: any file of an object pushes its whole group.
+  target.files = deduplicateAffBundleTargets(target.files);
 
   // dependency order so DDIC prerequisites push before the objects that
   // reference them (DOMA → DTEL → TABL → ... → HTTP). Stable for same priority.
@@ -210,7 +216,7 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
     try {
       const resolved = preparePushTarget(file);
       const client = await getClient();
-      const { transport, status, docu, profilesRegenerated } = await dispatchPushFile(client, resolved, file, opts, onStage, onWarning);
+      const { transport, status, docu, channel, profilesRegenerated } = await dispatchPushFile(client, resolved, file, opts, onStage, onWarning);
       if (opts.dryRun) {
         results.push({ file, status: 'dry-run', plan: stages, written: false, activated: false, ...(docu ? { docu } : {}) });
       } else {
@@ -219,6 +225,7 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
         results.push({
           file,
           status: resolvedStatus,
+          ...(channel ? { channel } : {}),
           transport,
           stage: stages[stages.length - 1],
           written: !opts.checkOnly,

@@ -200,6 +200,35 @@ describe('validate:aff failure contract', () => {
   });
 });
 
+describe('validate:aff AFF-over-ICF routing', () => {
+  it('routes `.aplo.json` to the vendored APLO schema', async () => {
+    const aplo = writeJson('zcli_log.aplo.json', {
+      formatVersion: '1',
+      header: { description: 'ok', originalLanguage: 'en' },
+      subobjects: [{ name: 'SUB1' }],
+    });
+    const res = await run(['validate:aff', path.relative(ROOT, aplo), '--json']);
+    expect(res.exitCode).toBeUndefined();
+    const parsed = JSON.parse(res.stdout);
+    expect(parsed.data.summary).toEqual({ pass: 1, warn: 0, fail: 0 });
+    expect(parsed.data.files).toEqual([
+      { status: 'pass', path: path.posix.join(TMP_REL, 'zcli_log.aplo.json'), type: 'APLO' },
+    ]);
+  });
+
+  it('routes `.enhs.json` and reports its schema failure', async () => {
+    const bad = writeJson('zcli_spot.enhs.json', {
+      formatVersion: '1',
+      header: { description: 'missing configuration', originalLanguage: 'en' },
+    });
+    const res = await run(['validate:aff', path.relative(ROOT, bad), '--json']);
+    expect(res.exitCode).toBe(7);
+    const parsed = JSON.parse(res.stderr);
+    expect(parsed.error.details.files[0].type).toBe('ENHS');
+    expect(parsed.error.details.files[0].status).toBe('fail');
+  });
+});
+
 describe('validate:aff flow + schema contract', () => {
   it('runValidateAff rejects an empty target list with USAGE', async () => {
     await expect(runValidateAff([])).rejects.toMatchObject({ code: 'USAGE' });

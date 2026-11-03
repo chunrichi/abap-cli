@@ -58,6 +58,13 @@ const viewStore = new Map();
 const jobdStore = new Map();
 // SHLP (search help) store — key = shlp name, value = shlp-v1 wire document.
 const shlpStore = new Map();
+// Generic AFF bundle store — key = `<TYPE>:<NAME>`, value = { type, name,
+// package, masterLanguage, files: [{ name, content }] }. SAP's AFF framework
+// owns the file set, so the mock keeps names/contents verbatim: what the CLI
+// posts is exactly what GET serves back (round-trip contract).
+const affStore = new Map();
+// AFF types served by the generic /aff endpoint on the mock release.
+const AFF_TYPES = new Set(['APLO', 'CHDO', 'EVTB', 'SMBC', 'ENHO', 'ENHS']);
 // 014: textpool store — key = `<TYPE>:<OBJ>:<CATEGORY>`, value = array of { id, text }.
 const textpoolStore = new Map();
 // 015: remote source store — key = `<TYPE>:<OBJ>`, value = source string served by /version-source.
@@ -144,6 +151,16 @@ const APPJOB_COLLECTIONS = {
   '/sap/bc/adt/applicationjob/catalogs': 'SAJC',
   '/sap/bc/adt/applicationjob/templates': 'SAJT',
 };
+// Generic AFF objects over ADT blueSource resources — collection → CLI type.
+// `source/main` of each resource *is* the object's official AFF JSON document.
+const ADT_AFF_COLLECTIONS = {
+  '/sap/bc/adt/applicationlog/objects': 'APLO',
+  '/sap/bc/adt/changedocuments/objects': 'CHDO',
+  '/sap/bc/adt/businessservices/evtbevb': 'EVTB',
+  '/sap/bc/adt/bct/smbctyp': 'SMBC',
+};
+// ADT AFF store — key = `<TYPE>:<NAME>`, value = { metaXml, source, packageName }.
+const adtAffStore = new Map();
 const APPJOB_SCHEMAS = {
   legacy: {
     SAJC: { formatVersion: {}, header: {}, className: {}, reportName: {}, checkExitClass: {}, valueHelpExitClass: {} },
@@ -2568,6 +2585,123 @@ const server = http.createServer(async (req, res) => {
       return err(405, 'METHOD_NOT_ALLOWED', `${req.method} not supported on /oa2p/${name}`);
     }
 
+    // Generic AFF endpoint: /sap/abap_cli/aff/<TYPE>/<NAME>
+    // (GET serialize / POST create / PUT update / DELETE).
+    // Mirrors the bundled handler contract: TADIR type + name validation, the
+    // same JSON envelope as the other ICF routes, `$`-prefixed packages are
+    // transport-free, everything else needs a transport request, POST is
+    // create-only (409 on an existing object), and multi-file bundles carry a
+    // `files[]` list of { name, content } (UTF-8 text, not base64).
+    const aff = /^\/sap\/abap_cli\/aff\/([^/]+)\/(.+)$/.exec(path);
+    if (aff) {
+      const affType = decodeURIComponent(aff[1]).toUpperCase();
+      const affName = decodeURIComponent(aff[2]).toUpperCase();
+      const affKey = `${affType}:${affName}`;
+      const affError = (code, message) =>
+        ok(res, JSON.stringify({ status: 'error', error: { code, message } }), 'application/json');
+      if (!AFF_TYPES.has(affType)) {
+        return affError('AFF_TYPE_INVALID', `AFF object type ${affType} is not supported by this release`);
+      }
+      if (!/^[A-Z0-9_/]+$/.test(affName) || affName.length > 40) {
+        return affError('AFF_NAME_INVALID', `AFF object name ${affName} is invalid`);
+      }
+      if (req.method === 'GET') {
+        if (!affStore.has(affKey)) {
+          return affError('AFF_NOT_FOUND', `${affType} ${affName} not found`);
+        }
+        const stored = affStore.get(affKey);
+        return ok(res, JSON.stringify({
+          status: 'success',
+          data: {
+            type: stored.type,
+            name: stored.name,
+            package: stored.package,
+            masterLanguage: stored.masterLanguage,
+            files: stored.files,
+          },
+        }), 'application/json');
+      }
+      if (req.method === 'POST' || req.method === 'PUT') {
+        const rawBody = await readBody(req);
+        let payload;
+        try {
+          payload = JSON.parse(rawBody);
+        } catch (_e) {
+          return affError('AFF_FILE_INVALID', 'request body is not valid JSON');
+        }
+        const files = Array.isArray(payload && payload.files) ? payload.files : [];
+        if (files.length === 0) {
+          return affError('AFF_FILE_INVALID', 'files[] must carry at least the main AFF document');
+        }
+        for (const file of files) {
+          if (!file || typeof file.name !== 'string' || !file.name || typeof file.content !== 'string') {
+            return affError('AFF_FILE_INVALID', 'each file needs a name and a UTF-8 content string');
+          }
+          if (file.name.endsWith('.json')) {
+            try {
+              JSON.parse(file.content);
+            } catch (_e) {
+              return affError('AFF_FILE_INVALID', `${file.name} is not valid JSON`);
+            }
+          }
+        }
+        const existed = affStore.has(affKey);
+        if (req.method === 'POST' && existed) {
+          return affError('AFF_ALREADY_EXISTS', `${affType} ${affName} already exists`);
+        }
+        if (req.method === 'PUT' && !existed) {
+          return affError('AFF_NOT_FOUND', `${affType} ${affName} not found`);
+        }
+        const requestedPackage = String(payload.package || '').trim().toUpperCase();
+        let packageName;
+        if (req.method === 'POST') {
+          if (!requestedPackage) {
+            return affError('AFF_PACKAGE_REQUIRED', 'package is required to create an AFF object');
+          }
+          packageName = requestedPackage;
+        } else {
+          packageName = existed ? affStore.get(affKey).package : (requestedPackage || '$TMP');
+        }
+        if (!isLocalPackage(packageName) && !payload.transportRequest) {
+          return affError('AFF_TRANSPORT_REQUIRED', `transportRequest is required for non-local package ${packageName}`);
+        }
+        const stored = {
+          type: affType,
+          name: affName,
+          package: packageName,
+          masterLanguage: 'E',
+          files: files.map((file) => ({ name: String(file.name), content: String(file.content) })),
+        };
+        affStore.set(affKey, stored);
+        return ok(res, JSON.stringify({
+          status: 'success',
+          data: {
+            type: affType,
+            name: affName,
+            package: packageName,
+            action: existed ? 'updated' : 'created',
+            activated: true,
+            files: stored.files.map((file) => file.name),
+          },
+        }), 'application/json');
+      }
+      if (req.method === 'DELETE') {
+        if (!affStore.has(affKey)) {
+          return affError('AFF_NOT_FOUND', `${affType} ${affName} not found`);
+        }
+        const stored = affStore.get(affKey);
+        if (!isLocalPackage(stored.package) && !q.get('transportRequest')) {
+          return affError('AFF_TRANSPORT_REQUIRED', `transportRequest is required for non-local package ${stored.package}`);
+        }
+        affStore.delete(affKey);
+        return ok(res, JSON.stringify({
+          status: 'success',
+          data: { type: affType, name: affName, package: stored.package, action: 'deleted' },
+        }), 'application/json');
+      }
+      return affError('METHOD_NOT_ALLOWED', `${req.method} not supported on /aff/${affType}/${affName}`);
+    }
+
     // 014: /sap/abap_cli/textpool/<category>?object=<name>&type=<type> (GET read / POST write).
     const textpool = /^\/sap\/abap_cli\/textpool\/(texts|selections|headings)$/.exec(path);
     if (textpool) {
@@ -3402,6 +3536,87 @@ const server = http.createServer(async (req, res) => {
           return adtError(res, 403, `${type} ${name} is not locked by this session`);
         }
         appjobStore.delete(key);
+        objects.delete(name);
+        return ok(res, '');
+      }
+    }
+
+    // Generic AFF objects over ADT blueSource resources
+    // (APLO / CHDO / EVTB / SMBC). `source/main` is the official AFF JSON, so
+    // the mock mirrors the real contract: POST collection (create) /
+    // GET metadata / GET source / locked PUT source (+ activation through the
+    // generic /activation handler) / DELETE object.
+    const adtAffMatch = /^(\/sap\/bc\/adt\/(?:applicationlog\/objects|changedocuments\/objects|businessservices\/evtbevb|bct\/smbctyp))(?:\/([^/]+))?(\/source\/main)?$/.exec(path);
+    if (adtAffMatch) {
+      const collection = adtAffMatch[1];
+      const type = ADT_AFF_COLLECTIONS[collection];
+      const rawName = adtAffMatch[2];
+      const isSource = Boolean(adtAffMatch[3]);
+      const name = rawName ? rawName.toUpperCase() : undefined;
+      const key = name ? `${type}:${name}` : '';
+      const objectUrl = name ? `${collection}/${name.toLowerCase()}` : collection;
+      if (req.method === 'POST' && !name) {
+        const body = await readBody(req);
+        const objectName = /adtcore:name="([^"]+)"/.exec(body)?.[1]?.toUpperCase();
+        if (!objectName) return adtError(res, 400, `Missing adtcore:name in ${type} create body`);
+        if (adtAffStore.has(`${type}:${objectName}`)) {
+          return adtError(res, 409, `${type} ${objectName} already exists`);
+        }
+        const packageName = /adtcore:packageRef[^>]*adtcore:name="([^"]+)"/.exec(body)?.[1] || '$TMP';
+        const description = /adtcore:description="([^"]*)"/.exec(body)?.[1] || '';
+        adtAffStore.set(`${type}:${objectName}`, { metaXml: body, source: '', packageName });
+        const obj = addObject(objectName, type, `${collection}/${objectName.toLowerCase()}`, description, [], { packageName });
+        obj.inactive = true;
+        return ok(res, body);
+      }
+      if (name && isSource && req.method === 'GET') {
+        const stored = adtAffStore.get(key);
+        if (!stored) return adtError(res, 404, `${type} ${name} source not found`);
+        return ok(res, stored.source, 'application/json');
+      }
+      if (name && isSource && req.method === 'PUT') {
+        const stored = adtAffStore.get(key);
+        if (!stored) return adtError(res, 404, `${type} ${name} source not found`);
+        const obj = byObjectUrl(objectUrl);
+        if (!obj || !obj.lockedBy || obj.lockedBy.lockHandle !== q.get('lockHandle')) {
+          return adtError(res, 403, `${type} ${name} is not locked by this session`);
+        }
+        const body = await readBody(req);
+        try {
+          JSON.parse(body);
+        } catch {
+          return adtError(res, 400, `${type} ${name}: source/main is not a JSON document`);
+        }
+        stored.source = body;
+        return ok(res, body, 'application/json');
+      }
+      if (name && !isSource && req.method === 'GET') {
+        const stored = adtAffStore.get(key);
+        if (!stored) return adtError(res, 404, `${type} ${name} not found`);
+        // Metadata PUTs omit the package reference but real ADT keeps serving
+        // it; re-inject it so the CLI's transport rule sees the package.
+        let meta = stored.metaXml;
+        if (stored.packageName && !/adtcore:packageRef/.test(meta)) {
+          meta = meta.replace(/<\/([A-Za-z0-9]+:[A-Za-z0-9]+)>$/, `<adtcore:packageRef adtcore:name="${stored.packageName}"/></$1>`);
+        }
+        return ok(res, meta);
+      }
+      if (name && !isSource && req.method === 'PUT') {
+        const stored = adtAffStore.get(key);
+        if (!stored) return adtError(res, 404, `${type} ${name} not found`);
+        const obj = byObjectUrl(objectUrl);
+        if (!obj || !obj.lockedBy || obj.lockedBy.lockHandle !== q.get('lockHandle')) {
+          return adtError(res, 403, `${type} ${name} is not locked by this session`);
+        }
+        stored.metaXml = await readBody(req);
+        const desc = /adtcore:description="([^"]*)"/.exec(stored.metaXml)?.[1];
+        if (desc !== undefined) obj.description = desc;
+        return ok(res, stored.metaXml);
+      }
+      if (name && !isSource && req.method === 'DELETE') {
+        const stored = adtAffStore.get(key);
+        if (!stored) return adtError(res, 404, `${type} ${name} not found`);
+        adtAffStore.delete(key);
         objects.delete(name);
         return ok(res, '');
       }

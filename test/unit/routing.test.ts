@@ -70,6 +70,13 @@ const EXPECTED: Record<string, ExpectedRoute> = {
   SUCU: { create: 'icf', pull: 'icf', push: 'icf' },
   SUSH: { create: 'icf', pull: 'icf', push: 'icf' },
   SUSO: { create: 'icf', pull: 'icf', push: 'icf' },
+  // Generic AFF objects: four over ADT blueSource, two read-only over ICF.
+  APLO: { create: 'adt', pull: 'adt', push: 'adt' },
+  CHDO: { create: 'adt', pull: 'adt', push: 'adt' },
+  EVTB: { create: 'adt', pull: 'adt', push: 'adt' },
+  SMBC: { create: 'adt', pull: 'adt', push: 'adt' },
+  ENHO: { create: undefined, pull: 'icf', push: undefined },
+  ENHS: { create: undefined, pull: 'icf', push: undefined },
 };
 
 const OPS = ['create', 'pull', 'push'] as const;

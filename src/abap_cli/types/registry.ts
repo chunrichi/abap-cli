@@ -62,7 +62,34 @@ export interface ObjectTypeEntry {
    * `validateObjectName` fail-fast.
    */
   customNameValidation?: boolean;
+  /**
+   * Generic AFF object channel: the local state is the official AFF document
+   * of the object (`<object-token>.<type-lower>.json`, written verbatim as SAP
+   * serializes it). The transport is type-specific:
+   *
+   *   - `'adt-blue'` — ADT blueSource resource whose `source/main` *is* the AFF
+   *     JSON (same create/pull/push/delete pattern as SAJC/SAJT); plain ADT
+   *     lock/corrNr semantics.
+   *   - `'icf'` — bundled ICF `/aff/<TYPE>/<NAME>` endpoint, currently read-only
+   *     (pull) for the types served by SAP's AFF reference framework without a
+   *     write/delete implementation.
+   *
+   * The flag is the single switch the routing rows, the flows, the delete
+   * coordinator and the push deduper read.
+   */
+  affChannel?: AffChannel;
+  /**
+   * Why `abap create` cannot run for this type (read-only types only). The
+   * dispatcher turns it into `TYPE_NOT_SUPPORTED` with this text so the
+   * limitation is stated in one place (mirrors `pushUnsupportedReason`).
+   */
+  createUnsupportedReason?: string;
+  /** Why `abap delete` cannot run for this type (read-only types only). */
+  deleteUnsupportedReason?: string;
 }
+
+/** Transport channel of a generic AFF object type. */
+export type AffChannel = 'adt-blue' | 'icf';
 
 /** per-type capability hints for channel-detect. */
 export interface ChannelCapability {
@@ -168,6 +195,50 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
   // Transformation (XSLT program) via ICF `/xslt/<name>`. The AFF layout is a
   // pair: `<name>.xslt.json` (metadata) + `<name>.xslt.xml` (source).
   { type: 'XSLT', source: 'ICF', affSchemaFile: 'xslt-v1.json', requiresFile: true },
+  // Generic AFF object types. The official AFF JSON *is* the wire document, so
+  // there is no field mapping: the CLI ships the local document verbatim.
+  // Transport differs per type (see `affChannel`):
+  //   - APLO / CHDO / EVTB / SMBC: ADT blueSource resources whose `source/main`
+  //     is the AFF document — create/pull/push/delete use the standard ADT
+  //     lock/corrNr lifecycle (same module family as SAJC/SAJT).
+  //   - ENHO / ENHS: read-only through the bundled ICF `/aff` endpoint; SAP's
+  //     AFF reference framework has no write/delete implementation for
+  //     enhancement spots/implementations, so only pull is exposed.
+  // Object-name limits measured on the reference release: TADIR-OBJ_NAME is
+  // CHAR 40, but the APLO handler addresses C(20) and CHDO rejects names above
+  // 16, so the CLI fails those locally instead of forwarding the SAP error.
+  { type: 'APLO', source: 'ADT', affSchemaFile: 'aplo-v1.json', requiresFile: true, affChannel: 'adt-blue', maxNameLength: 20 },
+  { type: 'CHDO', source: 'ADT', affSchemaFile: 'chdo-v1.json', requiresFile: true, affChannel: 'adt-blue', maxNameLength: 16 },
+  { type: 'EVTB', source: 'ADT', affSchemaFile: 'evtb-v1.json', requiresFile: true, affChannel: 'adt-blue', maxNameLength: 40 },
+  { type: 'SMBC', source: 'ADT', affSchemaFile: 'smbc-v1.json', requiresFile: true, affChannel: 'adt-blue', maxNameLength: 40 },
+  {
+    type: 'ENHO',
+    source: 'ICF',
+    affSchemaFile: 'enho-v1.json',
+    requiresFile: true,
+    affChannel: 'icf',
+    maxNameLength: 40,
+    createUnsupportedReason:
+      'enhancement implementations are read-only in abap-cli: SAP\'s AFF reference framework rejects new-object deserialization (can_handle requires an active ENHHEADER row) and ADT exposes no create resource; maintain them in Eclipse ADT/SEEF',
+    pushUnsupportedReason:
+      'enhancement implementations are read-only in abap-cli: the AFF reference framework has no update implementation behind the ICF endpoint; edit them in Eclipse ADT/SEEF',
+    deleteUnsupportedReason:
+      'enhancement implementations cannot be deleted through abap-cli: the AFF reference framework\'s delete implementation is a no-op; delete them in Eclipse ADT/SEEF',
+  },
+  {
+    type: 'ENHS',
+    source: 'ICF',
+    affSchemaFile: 'enhs-v1.json',
+    requiresFile: true,
+    affChannel: 'icf',
+    maxNameLength: 40,
+    createUnsupportedReason:
+      'enhancement spots are read-only in abap-cli: SAP\'s AFF reference framework rejects new-object deserialization (can_handle requires an active ENHSPOTHEADER row) and ADT exposes no create resource; maintain them in Eclipse ADT/SEEF',
+    pushUnsupportedReason:
+      'enhancement spots are read-only in abap-cli: the AFF reference framework has no update implementation behind the ICF endpoint; edit them in Eclipse ADT/SEEF',
+    deleteUnsupportedReason:
+      'enhancement spots cannot be deleted through abap-cli: the AFF reference framework\'s delete implementation is an assertion (unimplemented); delete them in Eclipse ADT/SEEF',
+  },
   // dual-channel DDIC + CDS.
   // TTYP — handcrafted schema (upstream type-v1.json is type-pool, not table-type).
   {
@@ -455,4 +526,58 @@ export function isHttpSupportedType(t: string): t is HttpSupportedType {
 /** Narrow an arbitrary type string to the supported Transaction types. */
 export function isTranSupportedType(t: string): t is TranSupportedType {
   return (TRAN_TYPES as readonly string[]).includes(t);
+}
+
+/** Canonical codes of the generic AFF object channel. */
+export type AffBundleType = 'APLO' | 'CHDO' | 'EVTB' | 'SMBC' | 'ENHO' | 'ENHS';
+
+/** AFF object types in registry order (single source: the `affChannel` field). */
+export const AFF_BUNDLE_TYPES: readonly AffBundleType[] = TYPE_REGISTRY
+  .filter((e) => e.affChannel !== undefined)
+  .map((e) => e.type as AffBundleType);
+
+/**
+ * Resolve a type code to the generic AFF object channel, or `undefined` when
+ * the type is served by another flow. Case-insensitive.
+ */
+export function affBundleTypeFor(type: string | undefined): AffBundleType | undefined {
+  if (!type) return undefined;
+  const primary = type.split('/')[0]!.toUpperCase();
+  return INDEX[primary]?.affChannel !== undefined ? (primary as AffBundleType) : undefined;
+}
+
+/** Transport channel of an AFF object type (undefined for non-AFF types). */
+export function affChannelFor(type: string | undefined): AffChannel | undefined {
+  if (!type) return undefined;
+  const primary = type.split('/')[0]!.toUpperCase();
+  return INDEX[primary]?.affChannel;
+}
+
+/** Whether the type is a generic AFF object type. */
+export function isAffBundleType(type: string | undefined): boolean {
+  return affBundleTypeFor(type) !== undefined;
+}
+
+/**
+ * Why `abap create` cannot run for this type (read-only AFF types only), or
+ * `undefined` when create is supported / the type is unknown.
+ */
+export function createUnsupportedReasonFor(type: string): string | undefined {
+  const primary = type.split('/')[0]!.toUpperCase();
+  return INDEX[primary]?.createUnsupportedReason;
+}
+
+/**
+ * Why `abap delete` cannot run for this type (read-only AFF types only), or
+ * `undefined` when delete is supported / the type is unknown.
+ */
+export function deleteUnsupportedReasonFor(type: string): string | undefined {
+  const primary = type.split('/')[0]!.toUpperCase();
+  return INDEX[primary]?.deleteUnsupportedReason;
+}
+
+/** AFF schema filename registered for a type (undefined for unknown types). */
+export function affSchemaFileFor(type: string): string | undefined {
+  const primary = type.split('/')[0]!.toUpperCase();
+  return INDEX[primary]?.affSchemaFile;
 }

@@ -71,7 +71,19 @@ The set is intentionally minimal — only the schemas abap-cli resolves through
 | `susc-v1.json` | SUSC | — | **local extension**, handcrafted from TOBC / TOBCT (no upstream SUSC format) |
 | `sucu-v1.json` | SUCU | — | **local extension**, handcrafted from TBRG_AUTH / TBRG_AUTHT (no upstream SUCU format) |
 | `suso-v1.json` | SUSO | — | **local extension**, handcrafted from TOBJ / TOBJT / TACTZ / TOBJVOR* / TOBJ_ATTR / DOKU (upstream `suso-v1.json` is a lossy logical model: no long text, no SAP_NEW values, no FBLOCK/CONVERSION) |
+| `aplo-v1.json` | APLO | `file-formats/aplo/aplo-v1.json` | application log object |
+| `chdo-v1.json` | CHDO | `file-formats/chdo/chdo-v1.json` @ `d371351` | **reference-release variant** — the reference release emits the pre-2022-10 CHDO document (`generatedObject` at the root, `databaseInsertions`/`databaseDeletions` flags on table entries); upstream main renamed those fields, so the sync script deliberately keeps this file pinned |
+| `evtb-v1.json` | EVTB | `file-formats/evtb/evtb-v1.json` | event binding |
+| `smbc-v1.json` | SMBC | `file-formats/smbc/smbc-v1.json` | business configuration maintenance object |
+| `enho-v1.json` | ENHO | `file-formats/enho/enho-v1.json` @ `aa640dd` | **reference-release variant** — the reference release emits the pre-2026-06 ENHO document (`enhancementSpot`/`referencedObjects` at the root); upstream main changed the BAdI implementation layout, so the sync script deliberately keeps this file pinned |
+| `enhs-v1.json` | ENHS | `file-formats/enhs/enhs-v1.json` | enhancement spot (BAdI definitions only) |
 | `xslt-v1.json` | XSLT | `file-formats/xslt/xslt-v1.json` | |
+| `aplo-v1.json` | APLO | `file-formats/aplo/aplo-v1.json` | application log object |
+| `chdo-v1.json` | CHDO | `file-formats/chdo/chdo-v1.json` | change document object |
+| `evtb-v1.json` | EVTB | `file-formats/evtb/evtb-v1.json` | event binding |
+| `smbc-v1.json` | SMBC | `file-formats/smbc/smbc-v1.json` | business configuration maintenance object type |
+| `enho-v1.json` | ENHO | `file-formats/enho/enho-v1.json` | enhancement implementation (BAdI implementations only) |
+| `enhs-v1.json` | ENHS | `file-formats/enhs/enhs-v1.json` | enhancement spot (BAdI definitions only) |
 
 `docu-v1.json` is a **companion** schema, not an object type: it validates the
 0..1 long-text files `<name>.doma.docu.json` / `<name>.dtel.docu.json` that sit
@@ -99,6 +111,13 @@ variant of the upstream schema (two AUTHX fields are missing upstream),
 upstream format, or a lossy upstream model), and `sush-v1.json` is the upstream
 format reused as-is. The ICF handlers in `abap/src/zcl_abap_vibe_icf_{auth,
 susc,sucu,sush,suso}.clas.abap` are the wire contract for these documents.
+`chdo-v1.json` and `enho-v1.json` are pinned to older upstream commits
+(`d371351`, `aa640dd`) because the reference release implements the older v1
+document for those two types: `pull` must validate what the system actually
+serializes, and the sync script would otherwise reintroduce the evolved upstream
+schema and reject round-trip documents. Both are excluded from the `FILES`
+list above; bump the pins only together with a reference release that serves the
+newer format.
 
 `nrob-v1.json` used to be a hand-edited copy that added
 `header.originalLanguage` `maxLength`/`pattern` constraints and

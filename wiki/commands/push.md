@@ -191,6 +191,8 @@ abap push src/zmy_xslt.xslt.json src/zmy_xslt.xslt.xml --yes   # 两件一起给
 | `zmy_tran.tran.json` | icf | 事务码（SE93），POST `/tran/<code>`；push 前 GET 探测存在性。**SAP 侧写端点当前返回 501（`TRAN_WRITE_NOT_IMPLEMENTED`），写路径端到端不可用** |
 | `zmy_xslt.xslt.json` / `zmy_xslt.xslt.xml` | icf | XSLT 转换程序，POST `/xslt/<name>`；两件套任一文件都可作为入口（自动读同名伴生），push 前 GET 探测存在性；**push 只更新**，不创建 |
 | `zmy_ttyp.ttyp.json` / `zmy_msag.msag.json` / `zmy_view.ddls.json` / `zmy_nrob.nrob.json` | 通道路由（adt 或 icf 分支） | 双通道类型，`channel-detect` 决定 ADT / ICF；NROB 固定走 ICF |
+| `zmy_log.aplo.json` / `.chdo.json` / `.evtb.json` / `.smbc.json` | adt（blueSource） | AFF 对象：`source/main` 就是官方 AFF JSON，lock → PUT → 保存即激活 → unlock；非 `$` 前缀本地包需要 `--tr`；`--dry-run` 只出计划不写 SAP |
+| `zmy_impl.enho.json` / `zmy_spot.enhs.json` | — | **被拒绝**：`ENHO` / `ENHS` 是只读类型（SAP AFF handler 的 save/delete 不完整），push 不支持，本地即报 `TYPE_NOT_SUPPORTED`（exit 7）；它们的文件只能由 `abap pull` 生成，维护请在 Eclipse ADT / SE80 / SEEF |
 | `zprog.prog.texts.en.properties`（`texts`/`selections`/`headings`） | textpool | 文本元素，混合模式路由；写仅在 ADT text-elements 写端点可用时成功 |
 | `zmy_pkg.devc.json` | — | **被拒绝**：DEVC 是只读类型（ADT 资源控制器拒绝 `PUT /sap/bc/adt/packages/<name>`），`TYPE_NOT_SUPPORTED`（exit 7）。改包用 SAP GUI，或 `delete` 后重建 |
 
