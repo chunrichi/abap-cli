@@ -51,7 +51,7 @@ describe('abap init interactive — stored-password fallback', () => {
   it('when no stored password exists, the typed password is persisted to the keychain', async () => {
     const program = makeProgram();
     registerInitCommand(program);
-    const res = await runCommand(program, ['init', 'init', '--json'], { cwd, isTTY: true });
+    const res = await runCommand(program, ['init', '--json'], { cwd, isTTY: true });
     expect(res.exitCode).toBeUndefined();
 
     // Asked to use the stored password, found none, typed a new one.
@@ -68,7 +68,7 @@ describe('abap init interactive — stored-password fallback', () => {
     getPassword.mockResolvedValue('stored-pw');
     const program = makeProgram();
     registerInitCommand(program);
-    const res = await runCommand(program, ['init', 'init', '--json'], { cwd, isTTY: true });
+    const res = await runCommand(program, ['init', '--json'], { cwd, isTTY: true });
     expect(res.exitCode).toBeUndefined();
     expect(passwordMock).not.toHaveBeenCalled();
     expect(storePassword).not.toHaveBeenCalled();

@@ -4,6 +4,7 @@ import * as path from 'path';
 import { fileURLToPath } from 'node:url';
 import { Command } from 'commander';
 import {
+  primeLazyCommands,
   registerLazyCommands,
   type LazyCommandSpec,
 } from '../../src/abap_cli/registry/lazy.js';
@@ -138,6 +139,60 @@ describe('lazy command registration', () => {
     expect(res.stdout).toContain('--all');
     expect(res.exitCode).toBe(0);
     expect(loads).toEqual(['team']);
+  });
+});
+
+describe('lazy command priming', () => {
+  it('imports nothing for root help, --version, unknown commands, or no args', async () => {
+    const loads: string[] = [];
+    const program = makeProgram().version('0.0.0');
+    registerLazyCommands(program, [helloSpec(loads)]);
+    await primeLazyCommands(program, ['--help']);
+    await primeLazyCommands(program, ['--version']);
+    await primeLazyCommands(program, ['nope']);
+    await primeLazyCommands(program, []);
+    expect(loads).toEqual([]);
+  });
+
+  it('primes the command addressed through `help <cmd>`', async () => {
+    const loads: string[] = [];
+    const program = makeLazyProgram([helloSpec(loads)]);
+    await primeLazyCommands(program, ['help', 'hello']);
+    expect(loads).toEqual(['hello']);
+  });
+
+  it('skips root options before the command name', async () => {
+    const loads: string[] = [];
+    const program = makeLazyProgram([helloSpec(loads)]);
+    const res = await runCommand(program, ['--json', 'hello', 'world']);
+    expect(res.stdout).toContain('HI world');
+    expect(loads).toEqual(['hello']);
+  });
+
+  it('keeps the root command order after priming', async () => {
+    const loads: string[] = [];
+    const quiet = (name: string): LazyCommandSpec => ({
+      name,
+      description: name,
+      load: async () => ({
+        register: (p: Command) => {
+          p.command(name).description(name);
+        },
+      }),
+    });
+    const program = makeProgram();
+    registerLazyCommands(program, [quiet('alpha'), helloSpec(loads), quiet('zeta')]);
+    const names = () => program.commands.map((c) => c.name());
+    expect(names()).toEqual(['alpha', 'hello', 'zeta']);
+    await primeLazyCommands(program, ['hello', 'world']);
+    expect(names()).toEqual(['alpha', 'hello', 'zeta']);
+  });
+
+  it('fails loudly when a lazy command is dispatched without priming', async () => {
+    const program = makeLazyProgram([helloSpec([])]);
+    await expect(program.parseAsync(['hello'], { from: 'user' })).rejects.toThrow(
+      /dispatched without being primed/,
+    );
   });
 });
 

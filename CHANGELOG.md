@@ -45,6 +45,7 @@
 - **TTYP 内联行结构的错误提示**：`lineType.rowStructure` 仍不支持，但改为专用错误码（exit 7），消息说明内联行结构需在 SE11 / ADT 维护、CLI 只支持 repository 行类型。
 - **TABL / STRU 的外键不再静默丢弃**：本地文档带 `@AbapCatalog.foreignKeys` 或 `with foreign key ... check <table>` 时，`create` / `push` 在本地直接报错（exit 7），提示外键要在 SE11 / ADT 维护或从本地文档移除。此前这些声明被悄悄丢掉、SAP 侧不会有外键，激活也可能失败。没有外键的表 / 结构行为不变。
 - **NROB 名称上限 10 字符**：编号范围对象名是 `TNRO-NROBJ` 键（10 字符），更长的名字会被 SAP 静默截断；`abap create NROB` 和 `abap delete <name> --type NROB` 现在都在本地拒绝超长名称（exit 7）。此前 delete 放行到 20 字符、create 完全不检查长度。
+- **多余位置参数改为报错**：命令后跟了该命令不接受的位置参数时，现在返回 `USAGE` 错误（退出码 2），不再静默忽略（例如 `abap types CLAS extra`）。**Migration**：删掉多余的位置参数；此前依赖「多余参数被忽略」的脚本需要先修正。
 
 ## [2.0.1] - 2026-11-02
 
