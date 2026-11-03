@@ -25,6 +25,7 @@ import { isLocalPackageName } from '../../core/transport.js';
 import { resolveObject } from '../../core/resolve.js';
 import { normalizeTypeInput } from '../../cli/type-alias.js';
 import { runDeleteDevc } from './delete-devc.js';
+import { runDeleteJobd } from './delete-jobd.js';
 import { runDeleteView } from './delete-view.js';
 import { runDeleteShlp } from './delete-shlp.js';
 import { runDeleteEnqu } from './delete-enqu.js';
@@ -119,6 +120,10 @@ export async function runDelete(objectName: string, opts: DeleteOptions): Promis
   // the bundled ICF service (RS_DD_DELETE_OBJ, $TMP only).
   if (typeUpper === 'VIEW') {
     return runDeleteView(objectName, opts);
+  }
+  // JOBD (application job definition) is served by the ICF service.
+  if (typeUpper === 'JOBD') {
+    return runDeleteJobd(objectName, opts);
   }
   // SHLP (DDIC search help) has no ADT delete endpoint either.
   if (typeUpper === 'SHLP') {

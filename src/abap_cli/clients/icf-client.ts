@@ -137,6 +137,39 @@ export class IcfClient {
     return this.request('delete', `/tran/${encodeURIComponent(tcode)}`, body);
   }
 
+  /** GET /jobd/<name> — read an application job definition (SM36) as wire JSON. */
+  async getJobd<T>(name: string): Promise<IcfResponse<T>> {
+    return this.get(`/jobd/${encodeURIComponent(name)}`);
+  }
+
+  /** POST /jobd/<name> — create an application job definition.
+   *  `package` and `transportRequest` are query parameters (the document has no
+   *  package field). */
+  async postJobd<T>(
+    name: string,
+    body: unknown,
+    query: { package?: string; transportRequest?: string } = {},
+  ): Promise<IcfResponse<T>> {
+    return this.post(`/jobd/${encodeURIComponent(name)}${jobdQuery(query)}`, body);
+  }
+
+  /** PUT /jobd/<name> — update an existing application job definition. */
+  async putJobd<T>(
+    name: string,
+    body: unknown,
+    query: { transportRequest?: string } = {},
+  ): Promise<IcfResponse<T>> {
+    return this.put(`/jobd/${encodeURIComponent(name)}${jobdQuery(query)}`, body);
+  }
+
+  /** DELETE /jobd/<name> — delete an application job definition. */
+  async deleteJobd<T>(
+    name: string,
+    query: { transportRequest?: string } = {},
+  ): Promise<IcfResponse<T>> {
+    return this.request('delete', `/jobd/${encodeURIComponent(name)}${jobdQuery(query)}`);
+  }
+
   /** GET /tcode/<tcode> — resolve a transaction code to its entry program (read-only). */
   async getTcode<T>(tcode: string): Promise<IcfResponse<T>> {
     return this.get(`/tcode/${encodeURIComponent(tcode)}`);
@@ -252,6 +285,15 @@ export class IcfClient {
     throw toHttpError(error);
   }
 
+}
+
+/** Query string for the JOBD route (package/transport request). */
+function jobdQuery(query: { package?: string; transportRequest?: string }): string {
+  const params = new URLSearchParams();
+  if (query.package) params.set('package', query.package);
+  if (query.transportRequest) params.set('transportRequest', query.transportRequest);
+  const qs = params.toString();
+  return qs ? `?${qs}` : '';
 }
 
 /**

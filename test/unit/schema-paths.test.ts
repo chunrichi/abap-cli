@@ -81,6 +81,8 @@ describe('schema-paths priority chain', () => {
         'TYPE',
         // — application jobs.
         'SAJC', 'SAJT',
+        // — application job definitions (local extension, ICF only).
+        'JOBD',
       ]),
     );
     // TABT is exposed as a schema key for the .settings.json override path.
@@ -97,7 +99,8 @@ describe('schema-paths priority chain', () => {
     // added DRTY = 37 total.
     // added TYPE (type pool) = 38 total.
     // added SAJC / SAJT (application jobs) = 40 total.
-    expect(types).toHaveLength(40);
+    // added JOBD (application job definition, local extension) = 41 total.
+    expect(types).toHaveLength(41);
   });
 
   it('bundled root contains every supported schema', () => {

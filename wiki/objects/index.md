@@ -2,7 +2,7 @@
 type: reference
 title: 对象类型详细文档索引
 description: 每个 SAP 对象类型的字段契约、命令路径、本地文件形态与示例
-tags: [abap-cli, object-types, reference, clas, intf, prog, fugr, devc, tabl, stru, doma, dtel, enqu, view, shlp, nrob, http, tran, xslt, ttyp, msag, ddls, srvb, srvd, bdef, dcls, ddlx, ddla, chkc, chko, chkv, dtdc, dteb, dsfd, dsfi, drty, type, sajc, sajt]
+tags: [abap-cli, object-types, reference, clas, intf, prog, fugr, devc, tabl, stru, doma, dtel, enqu, view, shlp, jobd, nrob, http, tran, xslt, ttyp, msag, ddls, srvb, srvd, bdef, dcls, ddlx, ddla, chkc, chko, chkv, dtdc, dteb, dsfd, dsfi, drty, type, sajc, sajt]
 created at: 2026-09-01 00:00:00
 changed at: 2026-11-03 21:55:00
 ---
@@ -33,6 +33,7 @@ changed at: 2026-11-03 21:55:00
 | `TYPE` | ADT（无兜底） | `src/<name>.type.json` + `src/<name>.type.abap` | [type.md](type.md) |
 | `SAJC` | ADT（无兜底） | `src/<name>.sajc.json`（应用作业目录条目，AFF 单 JSON） | [sajc.md](sajc.md) |
 | `SAJT` | ADT（无兜底） | `src/<name>.sajt.json`（应用作业模板，AFF 单 JSON） | [sajt.md](sajt.md) |
+| `JOBD` | ICF（自建端点，无 ADT 资源） | `src/<name>.jobd.json`（应用作业定义，本地扩展 `jobd-v1.json`） | [jobd.md](jobd.md) |
 | `MSAG` | ADT + ICF 兜底 | `src/<name>.msag.json` | [msag.md](msag.md) |
 | `DDLS` | ADT（无兜底） | `src/<name>.ddls.{json,acds}` 两件套 | [ddls.md](ddls.md) |
 | `SRVB` | ADT（无兜底） | `src/<name>.srvb.json`（Service Binding 元数据；create / pull / delete，无 push） | [srvb.md](srvb.md) |
@@ -53,7 +54,7 @@ changed at: 2026-11-03 21:55:00
 ## 路由速查
 
 - **ADT**（源对象）：无需 ICF 部署；直接打 SAP ADT REST API；走 `abap-adt-api` 库
-- **ICF** 自建（DDIC/HTTP/TRAN/VIEW/SHLP/XSLT）：需要先 `abap deploy`；走 `/sap/abap_cli/<domain>/<type>/<name>`（VIEW 为 `/ddic/view/<name>`，SHLP 为 `/ddic/shlp/<name>`，XSLT 为 `/xslt/<name>`）
+- **ICF** 自建（DDIC/HTTP/TRAN/VIEW/SHLP/XSLT/JOBD）：需要先 `abap deploy`；走 `/sap/abap_cli/<domain>/<type>/<name>`（VIEW 为 `/ddic/view/<name>`，SHLP 为 `/ddic/shlp/<name>`，XSLT 为 `/xslt/<name>`）
 - **ADT + ICF 兜底**（TTYP/MSAG）：优先 ADT；ECC EHP5/6 内核（< 753）自动切 ICF，现代内核缺 ADT 端点时运行时降级，envelope 写 `data.channel` + `data.fallbackReason`
 - **ADT 无兜底**（DDLS / SRVD / BDEF / DCLS / DDLX / DDLA / SRVB）：不发起 ICF 调用；DDLS 在旧内核直接硬错 `DDLS_NOT_SUPPORTED_ON_ECC`（exit 64）
 

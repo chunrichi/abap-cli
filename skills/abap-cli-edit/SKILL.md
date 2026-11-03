@@ -76,7 +76,7 @@ AFF 写盘前 gate（纯本地，不进 SAP）
 
 ## 支持的对象类型（权威列表）
 
-写命令支持的类型以 `src/abap_cli/types/registry.ts` 为准（当前 **36 个注册类型码**；`DEVC` 有 create/pull/delete 无 push，`SRVB` 有 create/pull/delete 无 push），CDS/RAP 有子集限制。完整类型表见 [abap-cli wiki object-types](https://github.com/chunrichi/abap-cli/blob/main/wiki/object-types.md)；本节只列**写路径能力**。
+写命令支持的类型以 `src/abap_cli/types/registry.ts` 为准（当前 **37 个注册类型码**；`DEVC` 有 create/pull/delete 无 push，`SRVB` 有 create/pull/delete 无 push），CDS/RAP 有子集限制。完整类型表见 [abap-cli wiki object-types](https://github.com/chunrichi/abap-cli/blob/main/wiki/object-types.md)；本节只列**写路径能力**。
 
 | 类型码 | 对象 | 路由 | `create` | `pull` | `push` | `create local` |
 |---|---|---|---|---|---|---|
@@ -118,7 +118,7 @@ AFF 写盘前 gate（纯本地，不进 SAP）
 - **ICF 通道类型**（`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `NROB` / `HTTP` / `TRAN`）依赖内置 ICF 服务已部署——失败先跳 `abap-cli-setup` 跑 `deploy status`。`TTYP` / `MSAG` 在旧内核（ECC EHP5/6）也降级走同一 ICF 服务；`DDLS` 无兜底。
 - **`TTYP` / `MSAG` / `DDLS`**（双通道降级）：envelope 多 `data.channel: 'adt' | 'icf'` 与 `data.fallbackReason`（`'ECC_EHP6_NO_ADT_TABLETYPE'` / `'ECC_EHP6_NO_ADT_MESSAGECLASS'`；TTYP / MSAG 在现代内核上缺 ADT 端点时为 `'ADT_ENDPOINT_UNAVAILABLE'`）；ECC EHP5/6 自动降级 ICF；`DDLS` ECC 旧内核硬错 `DDLS_NOT_SUPPORTED_ON_ECC`（exit 64），不静默降级。
 - **DDIC 三件套（TABL/STRU）**：`--file` 指向 main `.tabl.json`，CLI 自动读同目录 `.tabl.ddic`（DDL 真值）与可选 `.tabl.settings.json`；详见下方 TABL vs STRU 注解差异。
-- **`create` 的未知类型报错已由 registry 驱动**：会列出全部 36 个注册类型码，无需再记住"哪些没被列进文案"。真正受限的是 `create local`（只 CLAS/INTF/PROG/FUGR）。
+- **`create` 的未知类型报错已由 registry 驱动**：会列出全部 37 个注册类型码，无需再记住"哪些没被列进文案"。真正受限的是 `create local`（只 CLAS/INTF/PROG/FUGR）。
 
 ### 错误码全集（本 skill 涉及）
 
@@ -172,7 +172,7 @@ CLI 解析器（[tabl-artifact.ts:parseTablDdic](https://github.com/chunrichi/ab
 | `NO_TRANSPORT` (exit 7) | 跳 `abap-cli-setup`：`transport list` / `transport create` → `--tr` 重试 |
 | `DDIC_NOT_SUPPORTED` (exit 7) | 类型不在白名单（DOMA/DTEL/TABL/STRU 之外）；看上方类型表 |
 | `FILE_EXISTS` (exit 2) | `pull --overwrite` 或 `--skip-existing` |
-| `TYPE_NOT_SUPPORTED` (exit 7) | 以上方类型表为准；未知类型的报错已列出全部 36 个注册类型。`create local` 只支持 CLAS/INTF/PROG/FUGR |
+| `TYPE_NOT_SUPPORTED` (exit 7) | 以上方类型表为准；未知类型的报错已列出全部 37 个注册类型。`create local` 只支持 CLAS/INTF/PROG/FUGR |
 | `PUSH_FAILED` (exit 7) | `data.stage` 指示失败环节（lock/write/activate/unlock） |
 | `READONLY_METADATA` (exit 7) | 推的是源码对象的元数据 `.json`；改推 `.abap` / `.acds` 源码文件（`validate:aff` 只校验元数据） |
 | `HTTP_CREATE_FAILED` (exit 6) | HTTP 服务（SICF 节点）写失败；看 `error.details`，校对 handlerClass / servicePath / 父节点是否存在 |

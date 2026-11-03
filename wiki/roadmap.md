@@ -64,7 +64,7 @@
 ## 六、对象类型补充路线（2026-10 评估）
 
 > 判据：**开发价值 × SAP 侧可行性（ADT / DDIC API）× AFF 成熟度 × agent 闭环收益**。
-> 对比依据：abap-cli 36 类 vs SAP abap-file-formats 上游 102 个类型格式（2026-10-30 HEAD）vs abapGit 168 个 TADIR handler（2026-10-29 HEAD）。
+> 对比依据：abap-cli 37 类 vs SAP abap-file-formats 上游 102 个类型格式（2026-10-30 HEAD）vs abapGit 168 个 TADIR handler（2026-10-29 HEAD）。
 > 本轮范围约定：**P0 不做 transport request 管理（release/delete）；P1 暂不做授权字段（AUTH）**。
 
 ### 6.1 P0：先在现有类型内补完
@@ -100,7 +100,7 @@
 - **SVIM / VCLS**（表维护生成器 / 视图簇）：AFF 近 3 个月新增格式；需真机验证 SAP 侧 API
 - **TTYP 本地文件收口**：表类型是纯 DDIC 元数据（abapGit 也只序列化元数据），已移除 pull 生成的 `.type.abap` 只读侧车；`.type.abap` 归还给 AFF type pool（`TYPE`）。旧侧车文件被忽略，不再生成。
 - **AFF-stable 27 类中的云/UI 类**（APLO/BGQC/CDBO/COTA/DESD/EVTB/EEEC/GSMP/SMBC/SWCR/NONT/RONT/UIAD/UIPG/UIST）：接入成本低，但按 BTP/云需求排期（`SAJC` / `SAJT` 已完成）。
-- **`JOBD`（Technical Job Definition）**：abapGit 有 handler，但没有官方 AFF 格式，参考 release 也没有 ADT 资源；要落地需自建本地 schema + ICF 端点，独立评估。
+- ~~**`JOBD`（Technical Job Definition）**：abapGit 有 handler，但没有官方 AFF 格式，参考 release 也没有 ADT 资源~~ → **已落地**：本地扩展 `jobd-v1.json` + ICF `/jobd/<name>`（`CL_JR_JOB_DEFINITION`），create/pull/push/delete 真机验证通过。
 - **`PINF` / `SCP1` / 授权族（SUSO 等）/ SM59 目标（`HTTP` destination / `SRFC` / `OA2P`）**：参考 release 没有可用 ADT 通道，暂不支持。
 - **`DRAS` / `DTIX` / `DTSC`**：官方 AFF schema 已在镜像中，但本机 typestructure 无 CREATE、discovery 无 ADT 资源（2026-11-03 实测），等有 ADT 通道的 release 再实现；不硬做 ICF
 - **表单/集成**：`SFPF`（AFF 有格式）、`SSFO`/SAPscript、`IDOC`（AFF 无格式，复杂度高）

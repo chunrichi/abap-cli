@@ -11,7 +11,7 @@ changed at: 2026-11-03 21:55:00
 
 abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的开发工作**。本页是一份**诚实快照**——按 SAP 开发任务分类，给出当前覆盖度与缺口。对象类型补充的排序与取舍见 [roadmap](roadmap.md)。
 
-> 当前规模：**31 个顶层命令**、**36 个对象类型**（36 类可 create、36 类可 pull、34 类有 push 入口）、**6 个 skill + 1 个 agent**。基线：`v2.2.0` + SRVB 发布命令 / 本地 ATC / CDS 技术 / 类型池 / 应用作业扩展。
+> 当前规模：**31 个顶层命令**、**37 个对象类型**（37 类可 create、37 类可 pull、35 类有 push 入口）、**6 个 skill + 1 个 agent**。基线：`v2.2.0` + SRVB 发布命令 / 本地 ATC / CDS 技术 / 类型池 / 应用作业扩展。
 
 ## 评分图例
 
@@ -42,6 +42,7 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | 创建/修改 SICF 节点（HTTP） | `create / pull / push / delete HTTP` | ✅ | ICF `/http`；`create --file`；delete 仅 `$` 前缀本地包，拒根节点/有子节点/可传输节点；真机 create/delete 验证 |
 | 创建/修改事务码（SE93 / TRAN） | `create / pull / push / delete TRAN` | ✅ | ICF `/tran` GET/POST/PUT/DELETE；dialog/report/parameter/variant，OO 明确拒绝；真机 23/23 TC |
 | 创建/修改转换程序（XSLT） | `create / pull / push / delete XSLT` | ✅ | ICF `/xslt` + `CL_O2_API_XSLTDESC`；AFF 两件套 `.xslt.json` + `.xslt.xml`；更新=原地更新并保留版本历史；真机 18/18 TC |
+| 创建/修改应用作业定义（SM36） | `create / pull / push / delete JOBD` | ✅ | ICF `/jobd` + `CL_JR_JOB_DEFINITION`；本地扩展 `jobd-v1.json`；`RS_CORR_INSERT` 记录 TADIR/传输；真机见测试证据 |
 | Table Type（TTYP） | `create / pull / push TTYP` | ✅ | ADT 主通道；ECC 自动 ICF 兜底 |
 | 消息类（MSAG） | `create / pull / push MSAG` | ✅ | ADT 主通道；ECC 自动 ICF 兜底 |
 | CDS View（DDLS） | `create / pull / push DDLS` | ✅ | 仅 ADT；ECC 旧内核硬错 `DDLS_NOT_SUPPORTED_ON_ECC` |

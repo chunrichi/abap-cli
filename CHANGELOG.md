@@ -12,6 +12,7 @@
 
 ### Added
 
+- **JOBD（应用作业定义，SM36）**：参考 release 没有 ADT 资源、上游 AFF 也没有官方 schema，因此用本地扩展 `jobd-v1.json` + 自建 ICF 端点 `/jobd/<name>` 实现 `create` / `pull` / `push` / `delete`（配方参考 abapGit 的 `CL_JR_JOB_DEFINITION` handler）。文档镜像 `TY_JOB_DEFINITION`（`STJR_JOBD_ROOT` + `STJR_JOBD_TREP`）去掉系统字段；`package` 是只读元数据。写入即保存激活（`--no-activate` 被拒绝）；TADIR / 传输记录用 `RS_CORR_INSERT`（可传输包要 `--tr`，`$` 本地包免传输），类的 `CREATE_JD` / `MODIFY_JD` 负责落库、handler 再修回真实包；删除先清数据再删 TADIR（TR/692 约束）。名称上限 32 字符。类型矩阵增至 37 类；需要 `abap deploy` 安装新的 ICF 服务版本。
 - **`abap publish` / `abap unpublish`**：服务绑定的本地 OData endpoint 发布 / 取消发布命令。服务版本与协议版本从绑定元数据推导，按 V2 / V4 自动选择端点，可重复执行；绑定不存在时报对象未找到，元数据缺版本时报校验错误并提示先 `pull` / `inspect`。
 - **TYPE（类型池）**：新增 AFF 官方格式的类型池对象，支持 `create` / `pull` / `push` / `delete`（`.type.json` 元数据 + `.type.abap` 源码，名称上限 5 字符）。`TYPES` 名必须带 `<池名>_` 前缀；`push` 只替换描述、保留 SAP 的 Unicode 检查标记，避免后续激活失败。
 - **ATC 检查配置对象**：新增 `CHKC`（检查类别）、`CHKO`（检查）、`CHKV`（检查变体）三类对象，支持 `create` / `pull` / `push` / `delete` 全生命周期。`create` / `push` 写入后自动激活（`--no-activate` 只写不激活）；检查变体的 `selectedChecks` 参数（普通值、结构化值、值列表、range 列表）可无损往返。SAP 侧前置条件按原样返回：`CHKO` 的实现类需注册为活动的 ATC 检查且参数 id 匹配，`CHKV` 的参数需与实现类一致。

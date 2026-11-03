@@ -78,6 +78,8 @@ const SUFFIX_RULES: ReadonlyArray<{ suffix: string; type: string; schemaFile?: s
   { suffix: '.xslt.xml', type: 'XSLT' },
   // Search help local-extension document (upstream AFF has no SHLP format).
   { suffix: '.shlp.json', type: 'SHLP' },
+  // Application job definition local-extension document (no upstream AFF).
+  { suffix: '.jobd.json', type: 'JOBD' },
   // dual-channel DDIC + CDS companions.
   { suffix: '.ttyp.json', type: 'TTYP' },
   { suffix: '.msag.json', type: 'MSAG' },

@@ -49,6 +49,9 @@ const SCHEMA_FILE: Record<string, string> = {
   VIEW: 'view-v1.json',
   // Search help — local extension (upstream AFF has no SHLP schema).
   SHLP: 'shlp-v1.json',
+  // Application job definition (SM36) — local extension (upstream AFF has no
+  // JOBD schema; the object is served by the bundled ICF /jobd route).
+  JOBD: 'jobd-v1.json',
   NROB: 'nrob-v1.json',
   // Package (DEVC) metadata read from the ADT package resource.
   DEVC: 'devc-v1.json',

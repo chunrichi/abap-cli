@@ -96,6 +96,10 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
   // Search help (SE11 search help). Upstream AFF has no SHLP schema, so
   // `shlp-v1.json` is a local extension (see schema/README.md).
   { type: 'SHLP', source: 'ICF', affSchemaFile: 'shlp-v1.json', requiresFile: true },
+  // Application job definition (SM36). Upstream AFF has no JOBD schema and the
+  // reference releases expose no ADT resource, so `jobd-v1.json` is a local
+  // extension served by the bundled ICF service (`/jobd/<name>`).
+  { type: 'JOBD', source: 'ICF', affSchemaFile: 'jobd-v1.json', requiresFile: true, maxNameLength: 32 },
   { type: 'NROB', source: 'ADT', affSchemaFile: 'nrob-v1.json', requiresFile: true },
   // HTTP service (SICF node) via ICF. originally wrote a local
   // skeleton when --file was absent; that path was removed (refactor decision

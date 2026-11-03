@@ -68,6 +68,10 @@
     {
       "global": "ZCL_ABAP_VIBE_ICF_XSLT",
       "local": "lcl_xslt"
+    },
+    {
+      "global": "ZCL_ABAP_VIBE_ICF_JOBD",
+      "local": "lcl_jobd"
     }
   ],
   "standalone": [

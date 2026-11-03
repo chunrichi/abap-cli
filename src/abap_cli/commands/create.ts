@@ -6,6 +6,7 @@ import { normalizeTypeInput } from '../cli/type-alias.js';
 import { getDdicJsonExample } from '../formats/ddic/examples.js';
 import { getViewJsonExample } from '../formats/view/json.js';
 import { getShlpJsonExample } from '../formats/shlp/json.js';
+import { getJobdJsonExample } from '../formats/jobd/json.js';
 import type { DdicSupportedType } from '../formats/ddic/types.js';
 import { listTemplates } from '../formats/templates.js';
 import {
@@ -215,7 +216,9 @@ export function createSchema(type?: string): CreateCommandSchema {
       ? 'VIEW (DDIC database view) is created through the self-built ICF service (/ddic/view). Requires --file with a local-extension view-v1 JSON: header.description, viewClass, rootTable, tables[] and fields[]; joinConditions[] for a multi-table view.'
       : t === 'SHLP'
         ? 'SHLP (DDIC search help) is created through the self-built ICF service (/ddic/shlp). Requires --file with a local-extension shlp-v1 JSON: kind (elementary/collective), header.description and parameters[]; an elementary search help also needs selectionMethod, a collective one needs includedSearchHelps[] and parameterMappings[].'
-        : isDdic
+        : t === 'JOBD'
+          ? 'JOBD (application job definition, SM36) is created through the self-built ICF service (/jobd/<name>). Requires --file with a local-extension jobd-v1 JSON. Writes save and activate in one step; --no-activate is not supported.'
+          : isDdic
           ? `DDIC type ${t} created via the self-built ICF service. Requires --file <abap-file-format JSON> with top-level fields: name, description, fields[].`
           : t === 'XSLT'
             ? `Type XSLT requires --file <name>.xslt.json (AFF xslt-v1 metadata); the sibling <name>.xslt.xml source must exist in the same directory. Created via the self-built ICF service at /xslt/<name>.`
@@ -224,9 +227,11 @@ export function createSchema(type?: string): CreateCommandSchema {
       ? getViewJsonExample()
       : t === 'SHLP'
         ? getShlpJsonExample()
-        : isDdic
-          ? getDdicJsonExample(t as DdicSupportedType)
-          : undefined;
+        : t === 'JOBD'
+          ? getJobdJsonExample()
+          : isDdic
+            ? getDdicJsonExample(t as DdicSupportedType)
+            : undefined;
     return {
       ...base,
       type: t,
