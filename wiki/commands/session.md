@@ -47,7 +47,7 @@ abap session reset --yes
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap session info", "version": "2.0.1", "warnings": [] },
+  "meta": { "command": "abap session info", "version": "2.1.0", "warnings": [] },
   "data": {
     "policy": "reuse",
     "policySource": "default",

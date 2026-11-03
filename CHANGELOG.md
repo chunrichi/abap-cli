@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-11-03
+
+本版完成 R1「闭环与真相」收尾（不新增类型码）：HTTP（SICF 节点）现在支持 CLI 删除，并把 HTTP / TTYP / NROB 的本地元数据与写入边界收紧；TTYP 预定义行类型能完整往返长度与小数；TABL / STRU 外键和 TTYP 内联行结构改为本地显式拒绝，不再静默丢弃。本次包含一项 TTYP 本地写法的迁移，见 Changed 段。内置 ICF 服务有改动（服务版本 2.1.0），升级后请执行一次 `abap deploy --yes`。
+
 ### Added
 
 - **BDEF 创建**：`abap create BDEF <name> --file <name>.bdef.json --package <pkg>` 现在可用；命令读取同目录的 `.bdef.abdl` 源码，创建行为定义后写入并激活。源码必须指向已存在的 root entity，或引用可用的 unmanaged 实现类。

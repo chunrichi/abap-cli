@@ -27,8 +27,8 @@ export const ICF_BASE_PATH = '/sap/abap_cli';
  *  package.json == ICF service == CHANGELOG).
  *  Root version check stays backward compatible.
  *  2.0.0: ICF handler runs stateless (no SAP user session per request).
- *  2.0.1: NROB create accepts an empty subType (no sub-object number ranges). */
-export const ICF_SERVICE_VERSION = '2.0.1';
+ *  2.1.0: NROB create accepts an empty subType (no sub-object number ranges). */
+export const ICF_SERVICE_VERSION = '2.1.0';
 
 export type IcfDeploymentStatus = 'not_deployed' | 'current' | 'outdated' | 'unreachable';
 

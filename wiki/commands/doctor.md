@@ -59,7 +59,7 @@ abap doctor [--verbose] [--strict] [--fix [--yes]]
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap doctor", "version": "2.0.1", "timestamp": "2026-11-01T00:00:00.000Z", "durationMs": 18, "warnings": [] },
+  "meta": { "command": "abap doctor", "version": "2.1.0", "timestamp": "2026-11-01T00:00:00.000Z", "durationMs": 18, "warnings": [] },
   "data": {
     "ok": false,
     "environment": [
