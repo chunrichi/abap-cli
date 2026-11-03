@@ -2,7 +2,7 @@
 name: abap-cli
 description: abap-cli 用户的 agent 路由层 — 根据用户意图分发到 4 个领域 skill（abap-cli-setup / -search / -edit / -data）与 1 个方法论 skill（abap-cli-performance）；并处理 agent 元任务：卡死用 `report-stuck` 本地留痕，CLI 反馈 / bug 直接提 GitHub issue（无内置命令）。use when asking "这个查询该看哪个 skill" 或 agent 收到模糊意图需要先做路由决策；agent 自身做完一轮任务想提交反馈或遇到不可恢复卡死想留痕。
 metadata:
-  version: "2.1.0"
+  version: "2.2.0"
   scope: meta
   commands: [report-stuck]
 ---
@@ -24,14 +24,14 @@ metadata:
 |---|---|---|
 | 配置 / 接 SAP / 加 profile / 诊断 / 传输请求 / 部署 ICF / 看 session / 查类型映射 | `abap-cli-setup` | `init` `profile` `doctor` `transport` `deploy` `session` `types` |
 | 查对象元数据 / where-used / 业务码 / 拉取对账 / 状态只读 / 看 ST22 dump | `abap-cli-search` | `search` `where-used` `inspect` `tcode` `diff` `status` `dumps` |
-| 拉对象 / 改 / 推 / 语法检查 / 激活 / 创建 / 删除 / 列举 / MIME / AFF 校验 | `abap-cli-edit` | `pull` `push` `check` `create` `activate` `delete` `list` `mime` `validate:aff` |
+| 拉对象 / 改 / 推 / 语法检查 / 激活 / 创建 / 删除 / 列举 / MIME / AFF 校验 / 服务绑定发布 | `abap-cli-edit` | `pull` `push` `check` `create` `activate` `publish` `unpublish` `delete` `list` `mime` `validate:aff` |
 | 跑类 / 查表 / 列表字段 / 跑报表 / 跑 ABAP Unit / 翻页 select | `abap-cli-data` | `select` `fields` `run` `run-report` `test` |
 | ABAP 性能 review / 慢路径诊断 / 优化建议 | `abap-cli-performance` | （方法论 skill，不直接管命令） |
 | Agent 卡死留痕（不依赖 SAP） | `abap-cli`（meta） | `report-stuck` |
 | Agent 提交反馈 / bug | `abap-cli`（meta） | GitHub Issues（无 CLI 命令，见下） |
 | 意图模糊 / 不确定归哪类 | `abap-cli`（meta） | （路由查询本身） |
 
-> **同一命令唯一归属**：4 个领域 skill 的 `metadata.commands` 集合互不相交，合计 28 条；再加 meta 的 1 条（`report-stuck`），共 29 个 CLI 命令（详见 `skills/README.md`）。
+> **同一命令唯一归属**：4 个领域 skill 的 `metadata.commands` 集合互不相交，合计 30 条；再加 meta 的 1 条（`report-stuck`），共 31 个 CLI 命令（详见 `skills/README.md`）。
 >
 > **`abap-cli-performance` 例外**：它是方法论 skill，不声明 `metadata.commands`；它触发的只读命令（`search / inspect / pull / check / select`）归属上表 4 个领域 skill。本 skill 全程不写对象。
 
