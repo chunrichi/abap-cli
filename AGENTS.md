@@ -59,10 +59,6 @@
 - 当前不在线，且未配置 profile；只在验证 ECC 专属行为（TTYP/MSAG 的 ICF fallback、旧内核端点）时探测
   `nc -z -w 2 vhcala4hci 50000`，不作为每次会话的默认检查项；未验证的 A4H 项标 BLOCKED。
 
-## 可联调的 BTP Trial 环境
-
-- 工作目录: `tmp/trial`
-
 ## Agent 上下文布局
 
 - 仓库合约：根 `AGENTS.md`（本文件）。

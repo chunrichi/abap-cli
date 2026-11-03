@@ -58,6 +58,6 @@ metadata:
 - [skills/abap-cli-edit/SKILL.md](../skills/abap-cli-edit/SKILL.md)
 - [skills/abap-cli-data/SKILL.md](../skills/abap-cli-data/SKILL.md)
 - [skills/abap-cli-performance/SKILL.md](../skills/abap-cli-performance/SKILL.md)（性能方法论）
-- Skill 索引：[skills/README.md](../skills/README.md)
-- Agent 集成：[docs/agent-integration.md](../docs/agent-integration.md)
-- 仓库合约：[AGENTS.md](../AGENTS.md)
+- Skill 索引：[skills/README.md](https://github.com/chunrichi/abap-cli/blob/main/skills/README.md)
+- Agent 集成：[docs/agent-integration.md](https://github.com/chunrichi/abap-cli/blob/main/docs/agent-integration.md)
+- 仓库合约：[AGENTS.md](https://github.com/chunrichi/abap-cli/blob/main/AGENTS.md)
