@@ -222,6 +222,16 @@ export type ErrorCode =
   // CDS technical objects (DTDC / DTEB / DSFD / DSFI)
   | 'DSFD_FEATURE_NOT_ENABLED'  // SAP user parameter DD_CDS_DSFD not set; DSFD writes are rejected (VALIDATION_ERROR)
   | 'DRTY_FEATURE_NOT_ENABLED'  // SAP user parameter CDS_SIMPLE_TYPES not set; DRTY writes are rejected (VALIDATION_ERROR)
+  // SM59 (HTTP destination) ICF /sm59 route — local-extension sm59-v1 document
+  | 'SM59_OBJECT_NOT_FOUND'     // destination does not exist (GET / DELETE) (NOT_FOUND)
+  | 'SM59_TYPE_NOT_SUPPORTED'   // destination exists but RFCTYPE is not G (VALIDATION_ERROR)
+  | 'SM59_NAME_INVALID'         // destination name empty, >32 chars, or illegal characters (VALIDATION_ERROR)
+  | 'SM59_UNSUPPORTED'          // release lacks the SRFC_DESTAPI maintenance classes (VALIDATION_ERROR)
+  | 'SM59_INVALID_PAYLOAD'      // malformed JSON body / not an sm59-v1 document (VALIDATION_ERROR)
+  | 'SM59_WRITE_FAILED'         // create/update through the SM59 maintenance API failed (SAP_ERROR)
+  | 'SM59_READ_FAILED'          // read/delete through the SM59 maintenance API failed (SAP_ERROR)
+  // ICF route dispatch — HTTP method not supported by the endpoint (e.g. 405)
+  | 'METHOD_NOT_ALLOWED'        // ICF route received an unsupported HTTP method (VALIDATION_ERROR)
   ;
 
 const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
@@ -414,6 +424,15 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   XSLT_OBJECT_EXISTS: 'SAP_ERROR',
   DSFD_FEATURE_NOT_ENABLED: 'VALIDATION_ERROR',
   DRTY_FEATURE_NOT_ENABLED: 'VALIDATION_ERROR',
+  // — SM59 HTTP destinations
+  SM59_OBJECT_NOT_FOUND: 'NOT_FOUND',
+  SM59_TYPE_NOT_SUPPORTED: 'VALIDATION_ERROR',
+  SM59_NAME_INVALID: 'VALIDATION_ERROR',
+  SM59_UNSUPPORTED: 'VALIDATION_ERROR',
+  SM59_INVALID_PAYLOAD: 'VALIDATION_ERROR',
+  SM59_WRITE_FAILED: 'SAP_ERROR',
+  SM59_READ_FAILED: 'SAP_ERROR',
+  METHOD_NOT_ALLOWED: 'VALIDATION_ERROR',
 };
 
 export function categoryOf(code: ErrorCode): ErrorCategory {

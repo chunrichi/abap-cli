@@ -47,6 +47,7 @@ import type { JsonPushTarget, PushFileOptions, PushOneResult } from './push-type
 import { createDdicHandler } from './create-ddic.js';
 import { createHttpHandler } from './create-http.js';
 import { createTranHandler } from './create-tran.js';
+import { createSm59Handler } from './create-sm59.js';
 import { createTtypHandler } from './create-ttyp.js';
 import { createMsagHandler } from './create-msag.js';
 import { createDdlsHandler } from './create-ddls.js';
@@ -88,11 +89,13 @@ import { runPullShlp } from './pull-shlp.js';
 import { runPullDdic } from './pull-ddic.js';
 import { runPullHttp } from './pull-http.js';
 import { runPullTran } from './pull-transport.js';
+import { runPullSm59 } from './pull-sm59.js';
 import { runPushTtyp } from './push-ttyp.js';
 import { runPushMsag } from './push-msag.js';
 import { runPushDdls } from './push-ddls.js';
 import { runPushEnqu } from './push-enqu.js';
 import { runPushNrob } from './push-nrob.js';
+import { pushSm59File, validateSm59File } from './push-sm59.js';
 import { pushViewFile, validateViewFile } from './push-view.js';
 import { pushShlpFile, validateShlpFile } from './push-shlp.js';
 import {
@@ -406,6 +409,20 @@ export const TYPE_ROUTES: Readonly<Record<string, TypeRoute>> = {
       channel: 'icf',
       run: ({ client, resolved, file, opts }) => pushTranFile(client, resolved, file, opts),
       validate: (file) => validateTranFile(file),
+    },
+  },
+  // SM59 HTTP destination (RFCTYPE='G') — local-extension `sm59-v1` document
+  // served by the bundled ICF service (`/sm59/<name>`). Destinations are
+  // client-independent system-table entries: no package, no TADIR object, no
+  // transport path, hence `packageNotApplicable` in the registry.
+  SM59: {
+    create: handler('icf', createSm59Handler),
+    pull: handler('icf', ({ objectName, opts }) => runPullSm59(objectName, opts)),
+    push: {
+      kind: 'icf-json',
+      channel: 'icf',
+      run: ({ client, resolved, file, opts }) => pushSm59File(client, resolved, file, opts),
+      validate: (file) => validateSm59File(file),
     },
   },
   // Transformation (XSLT program) — ICF `/xslt/<name>`; AFF pair

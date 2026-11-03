@@ -1,10 +1,10 @@
 ---
 type: command
 title: abap pull
-description: 从 SAP 下载对象到本地文件 — 支持源码对象、包批量、DDIC JSON（含 DOMA/DTEL 长文本伴生）、textpool 与远程版本拉取
-tags: [abap-cli, command, pull, download, abap-file-format, ddic, docu, textpool, version-management]
+description: 从 SAP 下载对象到本地文件 — 支持源码对象、包批量、DDIC JSON（含 DOMA/DTEL 长文本伴生）、SM59 HTTP 目标、textpool 与远程版本拉取
+tags: [abap-cli, command, pull, download, abap-file-format, ddic, docu, sm59, textpool, version-management]
 created at: 2026-08-06 23:21:15
-changed at: 2026-11-01 00:26:00
+changed at: 2026-11-04 00:45:00
 ---
 
 # abap pull
@@ -23,7 +23,7 @@ abap pull --help
 ## Options
 
 - `[object-name]`: 要下载的对象名（如 `ZCL_MY_CLASS`）
-- `--type <type>`: 对象类型（CLAS、PROG、INTF、FUGR、DOMA、DTEL、TABL、STRU、VIEW、SHLP、TRAN、XSLT 等）
+- `--type <type>`: 对象类型（CLAS、PROG、INTF、FUGR、DOMA、DTEL、TABL、STRU、VIEW、SHLP、TRAN、XSLT、SM59 等）
 - `--package <package>`: 下载某包下的所有对象（分页，默认 limit 20）
 - `--limit <n>`: `--package` 的批量页大小（默认 `SEARCH_RESULT_LIMIT`）
 - `--page <n>`: `--package` 的批量页码（1 起，默认 1）
@@ -51,6 +51,7 @@ abap pull --help
 5. **DDIC 类型**（DOMA/DTEL/TABL/STRU/ENQU/VIEW/SHLP/NROB）— 走 ICF `GET /ddic/<type>/<name>`，`wireToLocal` 转成本地 JSON，写为 `src/<name>.<type>.json`（TABL/STRU 为三件套；VIEW/SHLP 为单文件本地扩展 `view-v1` / `shlp-v1`）。DOMA/DTEL 随后再 GET `/ddic/<type>/<name>/docu`，有长文本时写 `<name>.<type>.docu.json`（见「DOMA/DTEL 长文本伴生」）。
 6. **通道路由类型**（TTYP/MSAG/DDLS）— 见下节。
 7. **包（DEVC）** — 见下节「Package（DEVC）」：`GET /sap/bc/adt/packages/<name>`，单文件落盘，无批量选择器差异。
+8. **SM59（HTTP 目标）** — 见下节「SM59（HTTP 目标）」：ICF `GET /sm59/<name>`，单文件 `src/<name>.sm59.json`。
 
 ### 新增 TTYP / MSAG / DDLS（双通道）
 
@@ -97,7 +98,28 @@ abap pull ZMY_XSLT --type XSLT            # 首次
 abap pull ZMY_XSLT --type XSLT --overwrite  # 覆盖本地修改前请确认
 ```
 
-### Function modules（FUGR/FF）— PR4 归一化
+### SM59（HTTP 目标）
+
+`--type SM59` 走 ICF `GET /sap/abap_cli/sm59/<name>`，写**单文件**本地扩展文档 `src/<name>.sm59.json`（`sm59-v1.json`）：
+
+```json
+{
+  "formatVersion": "1",
+  "description": "HTTPS Destination for SAP Note Download",
+  "targetHost": "notesdownloads.sap.com",
+  "port": 443,
+  "protocol": "HTTPS",
+  "pathPrefix": ""
+}
+```
+
+- 只支持 `RFCTYPE='G'`（HTTP connection to external server）；其它 SM59 连接类型返回 `SM59_TYPE_NOT_SUPPORTED`（exit 7），不会输出文件。
+- 目标不存在 → NOT_FOUND（exit 8）。`--overwrite` / `--skip-existing` 与其它单文件类型语义一致。
+- 描述按语言存 `RFCDOC`：读会话语言行，为空时回退到任意已有语言行，因此 pull SAP 自带的英文目标仍能拿到文本。
+- `port` 由 handler 返回整数；SAP 条目没有 service number 时可能缺省。
+- SM59 没有 package / transport 概念：pull 是纯只读，不需要 `--tr`。
+
+## Function modules（FUGR/FF）— PR4 归一化
 
 `abap pull <fm>` 时若 `<fm>` 解析为 `FUGR/FF`（function module），`runPull` 在 `resolveObject` 之后调用 [`normalizeFugrFunctionModule`](../../src/abap_cli/flows/edit/pull-fugr-ff.ts)：
 

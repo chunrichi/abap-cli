@@ -1,15 +1,15 @@
 # Supported Object Types
 
-`abap-cli` supports **36 object type codes**. Each type maps to one set of local artifacts written flat under `src/` — official abap-file-format (AFF) documents for most types, repository-local schemas for `TTYP` / `VIEW` / `SHLP` — and is served by one of two channels:
+`abap-cli` supports **37 object type codes**. Each type maps to one set of local artifacts written flat under `src/` — official abap-file-format (AFF) documents for most types, repository-local schemas for `TTYP` / `VIEW` / `SHLP` / `SM59` — and is served by one of two channels:
 
 - **ADT** — the standard ADT REST API: source objects (classes, interfaces, programs, function groups, CDS and RAP sources), packages, table types, message classes and application jobs.
-- **ICF** — the bundled service under `/sap/abap_cli`, installed once per system with `abap deploy`: DDIC objects, SICF service nodes, transaction codes, XSLT transformations, and the types whose ADT endpoint is missing on older releases.
+- **ICF** — the bundled service under `/sap/abap_cli`, installed once per system with `abap deploy`: DDIC objects, SICF service nodes, transaction codes, XSLT transformations, SM59 HTTP destinations and the types whose ADT endpoint is missing on older releases.
 
 Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content_type>].<ext>` — there are no type or object subdirectories. `<name>` is the AFF file token (lowercase; `/UI2/CL_JSON` → `(ui2)cl_json`), `{json,abap}` means one file per suffix, and `<group>` / `<fm>` / `<include>` stand for a function group, function module and function-group include (`sapl<group>`, `l<group>top`, …).
 
 ## Type × command matrix
 
-36 types support `create`, all 36 support `pull`, 34 have a `push` path and 36 have a `delete` path. In the matrix:
+37 types support `create`, all 37 support `pull`, 35 have a `push` path and 37 have a `delete` path. In the matrix:
 
 - `--file` marks a `create` that reads a JSON document — write it yourself or `pull` a comparable object first.
 - `$TMP` marks a `delete` that only removes local objects; delete transportable objects in SAP GUI so the deletion is recorded in a transport.
@@ -41,6 +41,7 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 | `NROB` | Number range object | ✅ `--file` | ✅ | ✅ | ✅ `$TMP` | ICF (pull: ADT / ICF) | `.nrob.json` |
 | `PROG` | Program | ✅ | ✅ | ✅ | ✅ | ADT | `.prog.json` + `.prog.abap` (`.prog.include.abap` for include programs) |
 | `SHLP` | Search help | ✅ `--file` | ✅ | ✅ | ✅ `$TMP` | ICF | `.shlp.json` |
+| `SM59` | HTTP destination (RFCTYPE `G`) | ✅ `--file` | ✅ | ✅ | ✅ | ICF | `.sm59.json` |
 | `SRVD` | Service definition | ✅ `--file` | ✅ | ✅ | ✅ | ADT | `.srvd.json` + `.srvd.acds` |
 | `SRVB` | Service binding | ✅ `--file` | ✅ | — | ✅ | ADT | `.srvb.json` |
 | `STRU` | Structure | ✅ `--file` | ✅ | ✅ | ✅ | ICF | `.stru.json` + `.stru.ddic` |
@@ -57,11 +58,13 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 
 - Source objects and `DEVC` create from CLI arguments; `create local` drafts `CLAS` / `INTF` / `PROG` / `FUGR` offline, without a SAP connection.
 - The remaining creatable types are data-driven: `create` requires `--file` with a JSON document in the type's format (`BDEF` also needs the sibling `.bdef.abdl` source; `SRVB` creates a metadata-only binding and can publish it with `--publish`; `TTYP` / `VIEW` / `SHLP` use the local schemas below). Table types are metadata-only (no ABAP companion); type pools pair `.type.json` with the classic `.type.abap` source. Companion files shown in the same row belong to the same artifact set.
+- `SM59` has no package / transport envelope (destinations live in the client-independent system table `RFCDES`): `create` / `push` / `delete` reject an explicit `--package` or `--tr` instead of silently dropping it, and the local file name must be `<name>.sm59.json`.
 - `abap create --schema <type>` prints the per-type contract, including an example document where one exists.
 
 ## Delete rules
 
-- `delete` runs lock → delete → unlock. Packages delete without a lock, and `VIEW` / `SHLP` / `TRAN` / `XSLT` / `HTTP` delete through the ICF service. ATC configuration objects read their package from the ADT resource and require `--tr` outside `$`-prefixed packages, like the other transportable types.
+- `delete` runs lock → delete → unlock. Packages delete without a lock, and `VIEW` / `SHLP` / `TRAN` / `XSLT` / `HTTP` / `SM59` delete through the ICF service. ATC configuration objects read their package from the ADT resource and require `--tr` outside `$`-prefixed packages, like the other transportable types.
+- `SM59` destinations have no package: a delete drops the `RFCDES` / `RFCDOC` rows directly and needs no transport argument.
 - `ENQU` / `NROB` / `HTTP` delete through ICF for `$`-prefixed local packages only; transportable lock objects, number range objects and SICF nodes must be deleted in SE11 / SNRO / SICF so the removal is recorded in a transport.
 
 ## Text elements (`--textpool`)
@@ -77,7 +80,7 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 ## Channel routing
 
 - **ADT** — source objects (`CLAS` `INTF` `PROG` `FUGR`), `DEVC`, `TTYP`, `MSAG`, `DDLS`, `TYPE`, the CDS / RAP companions (`SRVD` `BDEF` `DCLS` `DDLX` `DDLA`), `SRVB`, the ATC configuration objects (`CHKC` `CHKO` `CHKV`), the CDS technical objects (`DTDC` `DTEB` `DSFD` `DSFI`) and application jobs (`SAJC` `SAJT`). `TTYP` and `MSAG` fall back to ICF automatically on ECC EHP5/6.
-- **ICF** — `TABL` `STRU` `DOMA` `DTEL` `ENQU` `VIEW` `SHLP` `HTTP` `TRAN` `XSLT`, plus the write path of `NROB`; these need `abap deploy` once per system (`abap deploy status` checks the installed version).
+- **ICF** — `TABL` `STRU` `DOMA` `DTEL` `ENQU` `VIEW` `SHLP` `HTTP` `TRAN` `XSLT` `SM59`, plus the write path of `NROB`; these need `abap deploy` once per system (`abap deploy status` checks the installed version).
 - `NROB` pulls through ADT with an ICF fallback and writes through ICF. `DDLS` is rejected on ECC releases (`DDLS_NOT_SUPPORTED_ON_ECC`).
 
 ## Per-type notes
@@ -98,6 +101,7 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 - `CHKC` / `CHKO` / `CHKV` — ATC configuration objects: check categories, checks and check variants. `create` / `push` write the versioned ADT XML resource and activate it (`--no-activate` stops after the write); `pull` projects the resource back onto the official AFF document. SAP validates the semantics: a `CHKO`'s implementing class must be registered as an active ATC check, and a `CHKV`'s parameters must match that class. `push` / `delete` outside `$`-prefixed packages need `--tr`.
 - `SRVB` — metadata only: `create` reads the AFF binding document, posts the ADT binding, activates it, and `--publish` runs the publish job. There is no `push`/update path (the AFF document omits implementation/published/version details); delete uses the generic ADT path and has been verified on a real system. Publishing may depend on the client's transport settings allowing local publish.
 - `HTTP` — SICF nodes can be pulled anywhere but written (`create` / `push` / `delete`) only in `$`-prefixed local packages; `create` / `push` refuse transportable packages and `delete` refuses the root node, nodes with child nodes and transportable services — maintain those in SICF so the change is recorded in a transport. A pulled `.http.json` is strictly AFF-shaped (the object name lives in the file name), so it is reusable as a `push`/`create` template as-is.
+- `SM59` — SM59 HTTP destinations (`RFCTYPE='G'`): target host, port, protocol and path prefix plus the description (≤ 72 chars, `RFCDOC`). `create` needs `--file`, and the file name must be `<name>.sm59.json` (the object name lives in the file name). Create uses the SM59 maintenance-API defaults for options the v1 model does not carry; push loads and keeps the API-known attribute values, but the maintenance API rebuilds `RFCOPTIONS` on save, so legacy option codes on SAP-shipped destinations are dropped. Destinations are client-independent `RFCDES` entries with no package and no CTS path: `--package` / `--tr` are rejected, and the destination must be created per system. Other SM59 destination types (RFC connection `3`, `I`, `T`, `L`, …) are rejected with `SM59_TYPE_NOT_SUPPORTED`.
 - `XSLT` — the `.xslt.json` + `.xslt.xml` pair must exist together; an update replaces the transformation in place and keeps its version history.
 
 ## Local schema extensions
@@ -110,6 +114,7 @@ Upstream [abap-file-formats](https://github.com/SAP/abap-file-formats) defines n
 | `TYPE` | `type-v1.json` | official upstream AFF type pool schema | ADT `/ddic/typegroups` (`TYPE/DG`) | No |
 | `VIEW` | `view-v1.json` | local extension | DD25V / DD26V / DD27P / DD28J / DD28V | No |
 | `SHLP` | `shlp-v1.json` | local extension | DD30V / DD31V / DD32P / DD33V | No |
+| `SM59` | `sm59-v1.json` | local extension — the SM59 HTTP destination main screen (`targetHost` / `port` / `protocol` / `pathPrefix` / `description`) | RFCDES (`RFCOPTIONS` / `RFCOPTIONT`) + RFCDOC | No |
 
 `SAJC` / `SAJT` vendor the official upstream AFF schemas, but the reference release serves the older flat JSON model; the CLI keeps the AFF document local and translates at the ADT boundary (see the per-type notes above).
 
@@ -120,7 +125,7 @@ All three keep the AFF conventions (`formatVersion` + `header`, flat `<name>.<ty
 | Object type | Status |
 |---|---|
 | `AUTH` / `SUSO` authorization objects | Not supported — candidate for a future release |
-| `JOBD` technical job definitions, `PINF` package interfaces, `SCP1` BC sets, Fiori launchpad (`UIAD` / `UIST` / `UIPG`), SM59 destinations / `SRFC` / `OA2P` | Not supported on the reference release — abapGit serializes them, but this CLI has no AFF or ADT channel for them yet; tracked for a future release |
+| `JOBD` technical job definitions, `PINF` package interfaces, `SCP1` BC sets, Fiori launchpad (`UIAD` / `UIST` / `UIPG`), non-HTTP SM59 destinations, the UCON HTTP service, UCON RFC services (`SRFC`), OAuth2 profiles (`OA2P`) | Not supported on the reference release — abapGit serializes them, but this CLI has no AFF or ADT channel for them yet; tracked for a future release. `SM59` itself covers HTTP destinations (`RFCTYPE='G'`) only. |
 | Enhancements (`ENHO` / `ENHS`), BAdIs | Not supported — use `where-used` to find references |
 | AMDP classes, CDS table functions | Not supported |
 | SAPscript, Smart Forms, Adobe forms | Not supported |

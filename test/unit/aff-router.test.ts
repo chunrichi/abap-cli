@@ -32,6 +32,15 @@ describe('aff-router', () => {
     expect(routeType('src/zcli_tc_view.view.json')).toBe('VIEW');
   });
 
+  it('routes the SM59 HTTP-destination document (local extension)', () => {
+    const routed = routeAffSchema('zsm59_demo.sm59.json');
+    expect(routed).toEqual({ type: 'SM59', isJson: true, schemaFile: 'sm59-v1.json' });
+    expect(routeType('src/zsm59_demo.sm59.json')).toBe('SM59');
+    // Must not shadow the neighbouring TRAN / HTTP suffixes.
+    expect(routeType('zsm59_demo.tran.json')).toBe('TRAN');
+    expect(routeType('zsm59_demo.http.json')).toBe('HTTP');
+  });
+
   it('routes the DEVC package document', () => {
     const routed = routeAffSchema('zmy_package.devc.json');
     expect(routed).toEqual({ type: 'DEVC', isJson: true, schemaFile: 'devc-v1.json' });

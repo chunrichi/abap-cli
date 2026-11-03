@@ -154,6 +154,21 @@ export class IcfClient {
     return this.request('delete', `/tran/${encodeURIComponent(tcode)}`, body);
   }
 
+  /** GET /sm59/<name> — read an SM59 HTTP destination (RFCTYPE=G) as wire JSON. */
+  async getSm59<T>(name: string): Promise<IcfResponse<T>> {
+    return this.get(`/sm59/${encodeURIComponent(name)}`);
+  }
+
+  /** POST /sm59/<name> — create or overwrite an SM59 HTTP destination. */
+  async postSm59<T>(name: string, body: unknown): Promise<IcfResponse<T>> {
+    return this.post(`/sm59/${encodeURIComponent(name)}`, body);
+  }
+
+  /** DELETE /sm59/<name> — delete an SM59 HTTP destination. */
+  async deleteSm59<T>(name: string): Promise<IcfResponse<T>> {
+    return this.request('delete', `/sm59/${encodeURIComponent(name)}`);
+  }
+
   /** GET /tcode/<tcode> — resolve a transaction code to its entry program (read-only). */
   async getTcode<T>(tcode: string): Promise<IcfResponse<T>> {
     return this.get(`/tcode/${encodeURIComponent(tcode)}`);

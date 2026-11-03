@@ -19,6 +19,7 @@ import {
   isTranSupportedType,
   allSupportedTypes,
   maxNameLengthFor,
+  packageNotApplicableFor,
   requiresFileFor,
 } from '../../types/registry.js';
 import { runCreateFugrFunc } from './create-fugr-func.js';
@@ -75,27 +76,36 @@ export async function runCreate(type: string | undefined, name: string | undefin
       example: 'abap create CLAS ZCL_MY_CLASS --package ZPKG --description "desc"',
     });
   }
-  if (!opts.package) {
+  const typeUpper = type.toUpperCase();
+  // SM59 destinations (and any future `packageNotApplicable` type) live outside
+  // the package/transport model: there is no package to record, so --package
+  // must not be required. Their flows reject an explicit --package instead of
+  // silently ignoring it.
+  if (!opts.package && !packageNotApplicableFor(typeUpper)) {
     throw new CliError('USAGE', "Missing required option '--package <package>'", {
       example: 'abap create CLAS ZCL_MY_CLASS --package ZPKG --description "desc"',
     });
   }
   // When --file is provided the description is supplied via the JSON file
   // (works for any DDIC type, including deferred ones like TTYP).
-  if (!opts.description && !opts.file) {
+  // Package-less types (SM59) do not take a --description requirement at all:
+  // with no --file the actionable requires-file error below must win.
+  if (!opts.description && !opts.file && !packageNotApplicableFor(typeUpper)) {
     throw new CliError('USAGE', "Missing required option '--description <desc>'", {
       example: 'abap create CLAS ZCL_MY_CLASS --package ZPKG --description "desc"',
     });
   }
-  const typeUpper = type.toUpperCase();
   const objectName = normalizeName(name);
   // Data-driven fail-fast (registry `requiresFile`): DDIC / HTTP / TRAN /
   // TTYP / MSAG / DDLS have no skeleton path, so refuse BEFORE the write
   // confirmation prompt rather than asking for a confirmation that can only
   // end in a USAGE error.
   if (requiresFileFor(typeUpper) && !opts.file) {
+    // SM59 (and any future package-less type) has no --package: keep the example
+    // runnable instead of advertising a flag the flow rejects.
+    const packageFlag = packageNotApplicableFor(typeUpper) ? '' : ' --package $TMP';
     throw new CliError('USAGE', `Type ${typeUpper} requires --file <path> with an abap-file-format JSON`, {
-      example: `abap create ${typeUpper} ${objectName} --file src/${affObjectToken(objectName)}.${typeUpper.toLowerCase()}.json --package $TMP --yes`,
+      example: `abap create ${typeUpper} ${objectName} --file src/${affObjectToken(objectName)}.${typeUpper.toLowerCase()}.json${packageFlag} --yes`,
     });
   }
   requireWriteConfirmation(
@@ -108,7 +118,11 @@ export async function runCreate(type: string | undefined, name: string | undefin
   // illegal name must not reach SAP as a misleading OBJECT_NOT_FOUND.
   // DEVC has its own name rules (leading `$`, namespaced packages) and
   // validates inside its handler once the software component is known.
-  if (typeUpper !== 'DEVC') validateObjectName(objectName, undefined, maxNameLengthFor(typeUpper));
+  // SM59 names are RFCDEST CHAR 32 values with a wider character set (`-`, `@`,
+  // `.` occur in real destinations), so its handler owns the rule.
+  if (typeUpper !== 'DEVC' && typeUpper !== 'SM59') {
+    validateObjectName(objectName, undefined, maxNameLengthFor(typeUpper));
+  }
 
   // Per-type create handlers (DDIC / HTTP / TRAN / TTYP / MSAG / DDLS / CDS
   // companions / ENQU / NROB) come from the explicit routing table.

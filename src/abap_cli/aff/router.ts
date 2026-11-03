@@ -21,6 +21,7 @@
  *   *.nrob.json                        → NROB
  *   *.http.json / *.http.*.json        → HTTP
  *   *.tran.json / *.tran.*.json        → TRAN
+ *   *.sm59.json                        → SM59
  *   *.xslt.json / *.xslt.xml           → XSLT  (metadata + source pair)
  *   *.devc.json                        → DEVC
  *
@@ -71,6 +72,8 @@ const SUFFIX_RULES: ReadonlyArray<{ suffix: string; type: string; schemaFile?: s
   { suffix: '.dtel.json', type: 'DTEL' },
   { suffix: '.http.json', type: 'HTTP' },
   { suffix: '.tran.json', type: 'TRAN' },
+  // SM59 HTTP destination local-extension document (no upstream AFF format).
+  { suffix: '.sm59.json', type: 'SM59' },
   // Database view local-extension document (upstream AFF has no view format).
   { suffix: '.view.json', type: 'VIEW' },
   // Transformation pair: metadata + source companion.

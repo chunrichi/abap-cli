@@ -1,0 +1,51 @@
+{
+  "$comment": "Local extension: upstream SAP abap-file-formats has no SM59 destination format and SM59 has no TADIR object. Field names map to the SM59 HTTP connection maintenance view (target host, port, protocol, path prefix, description stored in RFCDES/RFCOPTIONS and RFCDOC); the ICF /sm59/<name> wire document mirrors this shape.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SM59 HTTP Destination Properties",
+  "description": "ABAP SM59 HTTP connection to external server (RFCDES entry with RFCTYPE=G)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["formatVersion", "targetHost", "protocol"],
+  "properties": {
+    "formatVersion": {
+      "title": "ABAP File Format Version",
+      "type": "string",
+      "const": "1"
+    },
+    "description": {
+      "title": "Description",
+      "description": "Destination short text (RFCDOC_D, CHAR 72, single line). Empty when the destination carries no description.",
+      "type": "string",
+      "maxLength": 72,
+      "pattern": "^[^\r\n]*$"
+    },
+    "targetHost": {
+      "title": "Target Host",
+      "description": "Host name or IP address of the target server (SM59 'Target Host'). SAP stores up to 1024 characters (RFCHOST_EXT); the CLI caps this local document at 255.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "port": {
+      "title": "Port",
+      "description": "TCP port of the target server ('Service No.'). Defaults to 443 for HTTPS and 80 for HTTP when omitted.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    },
+    "protocol": {
+      "title": "Protocol",
+      "description": "HTTP or HTTPS. HTTPS enables TLS for the destination.",
+      "type": "string",
+      "enum": ["HTTP", "HTTPS"],
+      "enumTitles": ["HTTP", "HTTPS (TLS)"],
+      "default": "HTTPS"
+    },
+    "pathPrefix": {
+      "title": "Path Prefix",
+      "description": "Path prefix prepended to every request URL (SM59 'Path Prefix'), e.g. /api.",
+      "type": "string",
+      "maxLength": 255
+    }
+  }
+}

@@ -27,6 +27,9 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
       zcl_abap_vibe_icf_tcode=>dispatch_tcode( io_server = server iv_path = lv_path iv_method = lv_method ).
     ELSEIF lv_path CP '/tran/*'.
       zcl_abap_vibe_icf_tcode=>dispatch_tran( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
+    ELSEIF lv_path CP '/sm59/*'.
+      " SM59 HTTP destinations (RFCTYPE='G') through the standard SRFC_DESTAPI.
+      zcl_abap_vibe_icf_sm59=>dispatch_sm59( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
     ELSEIF lv_path CP '/data/*'.
       " Read-only table data query (SE16N equivalent).
       TRY.

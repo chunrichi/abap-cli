@@ -107,6 +107,11 @@ const TADIR_OBJECT_BY_CLI: Record<string, Omit<TadirMapping, 'cliType'>> = {
   // Transaction code (SE93)
   TRAN: { pgmid: 'R3TR', tadirObject: 'TRAN', ddicTabclass: '', channel: 'ICF', affSchema: 'tran-v1.json', description: 'Transaction code (TSTC/TSTCC)' },
 
+  // SM59 HTTP destination. Destinations are client-independent entries in the
+  // system table RFCDES (RFCTYPE='G'): they have no TADIR object, no package
+  // and no transport path, so `tadirObject` is the catalog's empty value.
+  SM59: { pgmid: 'R3TR', tadirObject: '', ddicTabclass: '', channel: 'ICF', affSchema: 'sm59-v1.json', description: 'HTTP destination (SM59/RFCDES, RFCTYPE=G) — local-extension sm59-v1 document; client-independent system table, no TADIR object, not transportable' },
+
   // Transformation (XSLT program)
   XSLT: { pgmid: 'R3TR', tadirObject: 'XSLT', ddicTabclass: '', channel: 'ICF', affSchema: 'xslt-v1.json', description: 'Transformation / XSLT program (O2XSLTDESC; AFF pair .xslt.json + .xslt.xml)' },
 
