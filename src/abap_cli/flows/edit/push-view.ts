@@ -12,10 +12,10 @@ import type { AdtClientWrapper } from '../../clients/adt-client.js';
 import { IcfClient } from '../../clients/icf-client.js';
 import { CliError } from '../../output/json.js';
 import type { ErrorCode } from '../../output/error-codes.js';
-import { isLocalPackageName, resolveTransport } from '../../core/transport.js';
 import { toRelativeOutputPath } from '../../core/path-output.js';
 import { resolveFile } from '../../formats/file-resolver.js';
 import { viewArtifact, type ViewLocal } from '../../formats/view/json.js';
+import { resolveArtifactPushTransport } from './push-artifact-transport.js';
 import type { JsonPushTarget, PushFileOptions, PushOneResult } from './push-types.js';
 
 /** Read + validate a view-v1 JSON file (shared with the `--atomic` phase-1 gate). */
@@ -50,12 +50,14 @@ export async function pushViewFile(
 
   const wire = viewArtifact.toWire(local);
   wire.name = objectName;
-  // Transport: --tr > config > file's recorded package rule > user's open request.
-  const packageName = (wire.package ?? '').toUpperCase();
-  let transport = opts.tr ?? client.getConfig().transport ?? '';
-  if (!transport && !isLocalPackageName(packageName)) {
-    transport = await resolveTransport(client, opts.tr, client.getConfig().transport);
-  }
+  // Transport: a pulled AFF file carries no package, so the existing object's
+  // package decides local-ness (see push-artifact-transport.ts).
+  const { packageName, transport } = await resolveArtifactPushTransport(
+    client,
+    { objectName, objectType: 'VIEW', filePackage: wire.package, fileTransport: wire.transportRequest },
+    opts.tr,
+  );
+  if (packageName !== undefined) wire.package = packageName;
   wire.transportRequest = transport || undefined;
 
   const icf = await IcfClient.create();

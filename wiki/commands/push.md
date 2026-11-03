@@ -72,6 +72,15 @@ abap push [options] [files...]
 2. **本地包对象**（search 命中 `adtcore:packageName` 为 `$` 前缀，如 `$TMP`、`$CRW`，经 `ResolvedObject.packageName` 携带）— transport-free，空 transport 推送，无需 `--tr`（与 `abap deploy` 的本地包规则一致）。显式传了非空 `--tr` → **告警 + 忽略**（`meta.warnings` 的 `PUSH_TR_IGNORED_TMP`，exit 不变），不会真的绑定到任何请求。
 3. 其余未绑定非本地包对象：`--tr` > 项目 config `transport` > 用户第一个可修改请求（`userTransports`）> `NO_TRANSPORT`（exit 7）。
 
+AFF `.json` 工件（DDIC / VIEW / SHLP / TRAN）不经过 `resolveObjectTransport`：`abap pull` 产物遵循 AFF，文件里没有 `package` 字段。因此这类 push 在本地文件未声明 package 时，先用 ADT repository search 读回目标对象的现有 package，再套用同一套规则：
+
+- 文件里显式写了 `package`（手写 / 旧格式）→ 以文件为准，不做搜索；
+- 目标对象在 `$` 前缀本地包 → transport-free，`transportRequest` 不写入 wire（本地对象不应被记录进任何请求）；
+- 目标对象在可传输包 → `--tr` > config > 文件里记录的值 > 用户第一个可修改请求 > `NO_TRANSPORT`；
+- 目标对象搜索不到（例如该类型的搜索端点不可用）→ 退回旧规则：给了 `--tr` 照常写，否则 `NO_TRANSPORT`。
+
+解析出的 package 会写回 ICF wire，SAP 侧按它落 TADIR / DDIF 记录，避免“更新已有对象”退回服务端 `$TMP` 默认值。
+
 > **ICF 服务端**：ENQU / NROB 创建、XSLT 创建、VIEW / SHLP / TRAN 删除同样按 `$` 前缀判定本地包（旧 ICF 部署只认 `$TMP`，升级后执行一次 `abap deploy`）。`TEST...` 这类非 `$` 开头的包不视为本地，仍需 `--tr`。
 
 `--dry-run` 不查真实请求，用 `--tr` > config > `'DRY_RUN'` 占位。每文件 JSON 结果带该文件实际解析到的 `transport`。
