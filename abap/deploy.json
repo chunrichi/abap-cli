@@ -72,6 +72,14 @@
     {
       "global": "ZCL_ABAP_VIBE_ICF_XSLT",
       "local": "lcl_xslt"
+    },
+    {
+      "global": "ZCL_ABAP_VIBE_ICF_SRFC",
+      "local": "lcl_srfc"
+    },
+    {
+      "global": "ZCL_ABAP_VIBE_ICF_OA2P",
+      "local": "lcl_oa2p"
     }
   ],
   "standalone": [

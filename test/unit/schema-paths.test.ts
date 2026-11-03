@@ -54,11 +54,11 @@ describe('schema-paths priority chain', () => {
     );
   });
 
-  it('affSupportedTypes matches the router table (16 + 6 + 2 + VIEW + XSLT + SHLP + DOCU + ATC + CDS technical + TYPE)', () => {
+  it('affSupportedTypes matches the router table (16 + 6 + 2 + VIEW + XSLT + SHLP + DOCU + ATC + CDS technical + TYPE + UCON)', () => {
     const types = affSupportedTypes();
     expect(types).toEqual(
       expect.arrayContaining([
-        'CLAS', 'INTF', 'PROG', 'FUGR', 'TABL', 'STRU', 'TABT', 'DOMA', 'DTEL', 'HTTP', 'TRAN', 'SM59', 'XSLT',
+        'CLAS', 'INTF', 'PROG', 'FUGR', 'TABL', 'STRU', 'TABT', 'DOMA', 'DTEL', 'HTTP', 'TRAN', 'SM59', 'SRFC', 'OA2P', 'XSLT',
         // channel-routed types.
         'TTYP', 'MSAG', 'DDLS',
         // FUGR companion schemas for.reps.json and.func.json files.
@@ -98,7 +98,8 @@ describe('schema-paths priority chain', () => {
     // added TYPE (type pool) = 38 total.
     // added SAJC / SAJT (application jobs) = 40 total.
     // added SM59 (HTTP destination local extension) = 41 total.
-    expect(types).toHaveLength(41);
+    // added SRFC / OA2P (UCON RFC service / OAuth2 profile) = 43 total.
+    expect(types).toHaveLength(43);
   });
 
   it('bundled root contains every supported schema', () => {

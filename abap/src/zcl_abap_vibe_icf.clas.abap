@@ -30,6 +30,12 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
     ELSEIF lv_path CP '/sm59/*'.
       " SM59 HTTP destinations (RFCTYPE='G') through the standard SRFC_DESTAPI.
       zcl_abap_vibe_icf_sm59=>dispatch_sm59( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
+    ELSEIF lv_path CP '/srfc/*'.
+      " UCON RFC services (SRFC) through the public UCON RFC service API.
+      zcl_abap_vibe_icf_srfc=>dispatch_srfc( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
+    ELSEIF lv_path CP '/oa2p/*'.
+      " OAuth 2.0 client profiles (OA2P) through the Workbench persistence classes.
+      zcl_abap_vibe_icf_oa2p=>dispatch_oa2p( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
     ELSEIF lv_path CP '/data/*'.
       " Read-only table data query (SE16N equivalent).
       TRY.

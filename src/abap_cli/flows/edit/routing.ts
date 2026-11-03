@@ -96,6 +96,15 @@ import { runPushDdls } from './push-ddls.js';
 import { runPushEnqu } from './push-enqu.js';
 import { runPushNrob } from './push-nrob.js';
 import { pushSm59File, validateSm59File } from './push-sm59.js';
+import {
+  OA2P_FLOW,
+  SRFC_FLOW,
+  pushUconFile,
+  runCreateUcon,
+  runDeleteUcon,
+  runPullUcon,
+  validateUconFile,
+} from './ucon-object-flows.js';
 import { pushViewFile, validateViewFile } from './push-view.js';
 import { pushShlpFile, validateShlpFile } from './push-shlp.js';
 import {
@@ -423,6 +432,30 @@ export const TYPE_ROUTES: Readonly<Record<string, TypeRoute>> = {
       channel: 'icf',
       run: ({ client, resolved, file, opts }) => pushSm59File(client, resolved, file, opts),
       validate: (file) => validateSm59File(file),
+    },
+  },
+  // UCON RFC service / OAuth 2.0 client profile — Workbench objects served by
+  // the bundled ICF service (`/srfc/<name>`, `/oa2p/<name>`). Both carry TADIR
+  // entries and are transportable, so the shared flows resolve package /
+  // transport exactly like the ICF DDIC types.
+  SRFC: {
+    create: handler('icf', ({ name, opts, mode }) => runCreateUcon(SRFC_FLOW, name, opts, mode)),
+    pull: handler('icf', ({ objectName, opts }) => runPullUcon(SRFC_FLOW, objectName, opts)),
+    push: {
+      kind: 'icf-json',
+      channel: 'icf',
+      run: ({ client, resolved, file, opts }) => pushUconFile(SRFC_FLOW, client, resolved, file, opts),
+      validate: (file) => validateUconFile(SRFC_FLOW, file),
+    },
+  },
+  OA2P: {
+    create: handler('icf', ({ name, opts, mode }) => runCreateUcon(OA2P_FLOW, name, opts, mode)),
+    pull: handler('icf', ({ objectName, opts }) => runPullUcon(OA2P_FLOW, objectName, opts)),
+    push: {
+      kind: 'icf-json',
+      channel: 'icf',
+      run: ({ client, resolved, file, opts }) => pushUconFile(OA2P_FLOW, client, resolved, file, opts),
+      validate: (file) => validateUconFile(OA2P_FLOW, file),
     },
   },
   // Transformation (XSLT program) — ICF `/xslt/<name>`; AFF pair

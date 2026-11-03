@@ -132,7 +132,7 @@ skills/<name>/
 
 ## 版本
 
-- **CLI 版本**：`2.4.0`
+- **CLI 版本**：`2.5.0`
 - **类型注册表**：37 个类型码（`src/abap_cli/types/registry.ts`）
 - **agentskills.io 标准**：<https://agentskills.io/>
 

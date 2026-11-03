@@ -1,7 +1,7 @@
 ---
 type: command
 title: abap pull
-description: 从 SAP 下载对象到本地文件 — 支持源码对象、包批量、DDIC JSON（含 DOMA/DTEL 长文本伴生）、SM59 HTTP 目标、textpool 与远程版本拉取
+description: 从 SAP 下载对象到本地文件 — 支持源码对象、包批量、DDIC JSON（含 DOMA/DTEL 长文本伴生）、SM59 HTTP 目标、UCON RFC service / OAuth 2.0 client profile、textpool 与远程版本拉取
 tags: [abap-cli, command, pull, download, abap-file-format, ddic, docu, sm59, textpool, version-management]
 created at: 2026-08-06 23:21:15
 changed at: 2026-11-04 00:45:00
@@ -52,6 +52,7 @@ abap pull --help
 6. **通道路由类型**（TTYP/MSAG/DDLS）— 见下节。
 7. **包（DEVC）** — 见下节「Package（DEVC）」：`GET /sap/bc/adt/packages/<name>`，单文件落盘，无批量选择器差异。
 8. **SM59（HTTP 目标）** — 见下节「SM59（HTTP 目标）」：ICF `GET /sm59/<name>`，单文件 `src/<name>.sm59.json`。
+9. **SRFC / OA2P（UCON 对象）** — ICF `GET /srfc/<name>` / `GET /oa2p/<name>`，单文件 `src/<name>.srfc.json` / `src/<name>.oa2p.json`（本地扩展 schema；不含 `name` / `package` / admin 字段，可直接作为 create / push 模板）。
 
 ### 新增 TTYP / MSAG / DDLS（双通道）
 

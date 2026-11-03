@@ -123,6 +123,27 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
     maxNameLength: 32,
     packageNotApplicable: true,
   },
+  // UCON RFC service (SRFC) via ICF `/srfc/<name>`. Upstream AFF has no SRFC
+  // format, so `srfc-v1.json` is a local extension. RFC services are TADIR
+  // objects backed by UCONRFCSERVHEAD/UCONRFCSERVTEXT: package and transport
+  // request apply (local packages are transport-free). UCONRFCSERVID is CHAR 30.
+  {
+    type: 'SRFC',
+    source: 'ICF',
+    affSchemaFile: 'srfc-v1.json',
+    requiresFile: true,
+    maxNameLength: 30,
+  },
+  // OAuth 2.0 client profile (OA2P) via ICF `/oa2p/<name>`. Upstream AFF has no
+  // OA2P format, so `oa2p-v1.json` is a local extension. Profiles are TADIR
+  // objects backed by OA2C_PROFILES/OA2P_SCOPES; OA2C_PROFILE is CHAR 30.
+  {
+    type: 'OA2P',
+    source: 'ICF',
+    affSchemaFile: 'oa2p-v1.json',
+    requiresFile: true,
+    maxNameLength: 30,
+  },
   // Transformation (XSLT program) via ICF `/xslt/<name>`. The AFF layout is a
   // pair: `<name>.xslt.json` (metadata) + `<name>.xslt.xml` (source).
   { type: 'XSLT', source: 'ICF', affSchemaFile: 'xslt-v1.json', requiresFile: true },

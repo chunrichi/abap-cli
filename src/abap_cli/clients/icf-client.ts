@@ -169,6 +169,17 @@ export class IcfClient {
     return this.request('delete', `/sm59/${encodeURIComponent(name)}`);
   }
 
+  /**
+   * DELETE an ICF JSON route that has no dedicated typed wrapper yet.
+   *
+   * The UCON object flows (SRFC / OA2P) build their route from the object type
+   * spec, so a path-based escape hatch keeps the shared implementation honest
+   * instead of duplicating two typed wrappers.
+   */
+  async deleteIcfRoute<T>(path: string, body?: unknown): Promise<IcfResponse<T>> {
+    return this.request('delete', path, body);
+  }
+
   /** GET /tcode/<tcode> — resolve a transaction code to its entry program (read-only). */
   async getTcode<T>(tcode: string): Promise<IcfResponse<T>> {
     return this.get(`/tcode/${encodeURIComponent(tcode)}`);

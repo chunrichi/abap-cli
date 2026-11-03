@@ -6,12 +6,14 @@
 
 ## [Unreleased]
 
-本版新增 `abap whoami`：连接身份由 SAP 系统返回，而不是读取本地 profile 配置，因此配置与真实会话不一致、或将来接入 SSO 等认证方式时依然准确。本版同时新增 `SM59` 类型，用于管理 SM59 的 HTTP destination 连接配置。内置 ICF 服务相应新增身份端点与 SM59 端点，CLI 与 ICF 服务版本线统一到 2.4.0；升级后执行一次 `abap deploy --yes` 才能使用这些能力，部署前 `abap deploy status` 会显示 outdated。
+本版新增 `abap whoami`：连接身份由 SAP 系统返回，而不是读取本地 profile 配置，因此配置与真实会话不一致、或将来接入 SSO 等认证方式时依然准确。本版还新增 `SM59`、`SRFC` 与 `OA2P` 三个类型，分别管理 SM59 HTTP destination、UCON RFC service 与 OAuth 2.0 client profile。内置 ICF 服务相应新增身份端点及这三个类型的端点，CLI 与 ICF 服务版本线统一到 2.5.0；升级后执行一次 `abap deploy --yes` 才能使用这些能力，部署前 `abap deploy status` 会显示 outdated。
 
 ### Added
 
 - **`abap whoami`**：由 SAP 系统返回当前连接的实际身份——登录用户、系统 ID / 客户端，以及应用服务器 / 数据库 / OS / ABAP release；输出同时带上工作区 profile 与 endpoint。身份取自 SAP 会话而不是本地 profile 配置，因此在切换 profile、CI 注入配置或将来接入 SSO 等认证方式时都能反映真实登录身份。命令需要已部署新版内置 ICF 服务：服务未安装或版本过旧时会提示先执行 `abap deploy --yes`；`abap whoami --schema --json` 不连 SAP。
-- **`SM59`（SM59 HTTP destination）**：新增 `SM59` 类型，管理 SM59 中「HTTP 连接到外部服务器」的目的地，支持 `create` / `pull` / `push` / `delete`。本地文件 `<name>.sm59.json` 可编辑描述、目标主机、端口、协议（HTTP/HTTPS）与路径前缀，`pull` 也能读取系统里已有的 HTTP destination 作为起点。SM59 目的地是客户端无关的系统级配置：没有 package，也不能记录 transport，因此这些命令不接受 `--package` / `--tr`（传了会明确报错，而不是静默忽略）；`create` 不需要 package，创建后所有 client 都能看到该目的地。注意 `push` 是整份目的地定义的覆盖写，而当前只建模了上述常用字段：SSL 证书、代理、登录过程等高级选项不会随文件往返，写入后按 SAP 默认值生效；`pull` 读取已有目的地后 `push` 也会覆盖这些高级设置，请在用途明确的测试目的地或新建目的地上使用。其它 SM59 类型（RFC destination、UCON HTTP/RFC service、OAuth2 profile）不在本版范围内。
+- **`SM59`（SM59 HTTP destination）**：新增 `SM59` 类型，管理 SM59 中「HTTP 连接到外部服务器」的目的地，支持 `create` / `pull` / `push` / `delete`。本地文件 `<name>.sm59.json` 可编辑描述、目标主机、端口、协议（HTTP/HTTPS）与路径前缀，`pull` 也能读取系统里已有的 HTTP destination 作为起点。SM59 目的地是客户端无关的系统级配置：没有 package，也不能记录 transport，因此这些命令不接受 `--package` / `--tr`（传了会明确报错，而不是静默忽略）；`create` 不需要 package，创建后所有 client 都能看到该目的地。注意 `push` 是整份目的地定义的覆盖写，而当前只建模了上述常用字段：SSL 证书、代理、登录过程等高级选项不会随文件往返，写入后按 SAP 默认值生效；`pull` 读取已有目的地后 `push` 也会覆盖这些高级设置，请在用途明确的测试目的地或新建目的地上使用。其它 SM59 类型（RFC destination 等）与 UCON HTTP service 不在本版范围内；UCON RFC service（`SRFC`）与 OAuth2 profile（`OA2P`）作为独立类型提供（见下）。
+- **`SRFC`（UCON RFC service）**：新增 `SRFC` 类型，管理 Unified Connectivity 中「RFC service」条目，支持 `create` / `pull` / `push` / `delete`。本地文件 `<name>.srfc.json` 建模 function module、scope（`E` / `O` / `P` / `S`，可省略）、默认 UCON profile 与短文本；`create` 要求 function module 存在且 RFC-enabled，`defaultProfile` 必须存在于 `UCONPROFHEAD`。RFC service 是 TADIR 对象：`--package` / `--tr` 适用，本地 `$` 开头包不需传输请求；写入后刷新 UCON RFC 运行时缓存，使服务无需重启立即生效。注意：短文本按会话语言读写（其它语言行不被修改）；创建时留空 description 会生成与 UCONCOCKPIT 相同的默认文本；communication assembly / RFC profile 的维护不在本类型范围。`create` / `push` 会校验 SAP 侧字段（FM 是否存在 / RFC-enabled、profile 是否存在），错误直接返回而不是静默跳过。
+- **`OA2P`（OAuth 2.0 client profile）**：新增 `OA2P` 类型，管理 OAuth 2.0 client profile，支持 `create` / `pull` / `push` / `delete`。本地文件 `<name>.oa2p.json` 建模 service provider type（必须已在 `OA2C_TYPES` 配置）、scopes 列表与 `noAuthCheck` 标志；profile 是 TADIR 对象，`--package` / `--tr` 适用。删除前会检查 profile 是否仍被 OAuth 2.0 client 使用（被使用时拒绝并提示先在 OA2C_CONFIG 解除分配）。注意：profile 没有描述字段（`--description` 不适用）；provider 专属配置对象是无状态的，不在文件里往返；OAuth 2.0 client 与 profile 的分配关系仍在 OA2C_CONFIG 维护。
 
 ## [2.2.0] - 2026-11-03
 

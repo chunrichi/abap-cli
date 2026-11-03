@@ -30,6 +30,8 @@ changed at: 2026-11-04 00:33:00
 | `TRAN` | ICF | `src/<code>.tran.json`（SE93 事务码） | [tran.md](tran.md) |
 | `XSLT` | ICF | `src/<name>.xslt.{json,xml}` 两件套（转换程序） | [xslt.md](xslt.md) |
 | `SM59` | ICF | `src/<name>.sm59.json`（SM59 HTTP 目标，RFCTYPE='G'，本地扩展 `sm59-v1.json`） | [sm59.md](sm59.md) |
+| `SRFC` | ICF | `src/<name>.srfc.json`（UCON RFC service，本地扩展 `srfc-v1.json`） | [srfc.md](srfc.md) |
+| `OA2P` | ICF | `src/<name>.oa2p.json`（OAuth 2.0 client profile，本地扩展 `oa2p-v1.json`） | [oa2p.md](oa2p.md) |
 | `TTYP` | ADT + ICF 兜底 | `src/<name>.ttyp.json`（纯元数据） | [ttyp.md](ttyp.md) |
 | `TYPE` | ADT（无兜底） | `src/<name>.type.json` + `src/<name>.type.abap` | [type.md](type.md) |
 | `SAJC` | ADT（无兜底） | `src/<name>.sajc.json`（应用作业目录条目，AFF 单 JSON） | [sajc.md](sajc.md) |
