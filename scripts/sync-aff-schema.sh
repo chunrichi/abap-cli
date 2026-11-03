@@ -90,6 +90,8 @@ FILES=(
   # Application jobs (SAJC catalog entry / SAJT template; ADT
   # /applicationjob/* blueSource with a JSON `source/main`).
   "sajc/sajc-v1.json"
+  # authorization-default assignment (SUSH) — added for the authorization family
+  "sush/sush-v1.json"
   "sajt/sajt-v1.json"
 )
 

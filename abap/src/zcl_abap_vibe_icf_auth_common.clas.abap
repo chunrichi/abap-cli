@@ -49,6 +49,7 @@ CLASS zcl_abap_vibe_icf_auth_common DEFINITION PUBLIC FINAL CREATE PUBLIC.
                 iv_transport    TYPE trkorr
                 iv_mode         TYPE char1
                 iv_prefix       TYPE string
+                iv_master_language TYPE sy-langu DEFAULT sy-langu
       EXPORTING ev_author       TYPE sy-uname
                 ev_http_code    TYPE i
                 ev_code         TYPE string
@@ -145,7 +146,7 @@ CLASS zcl_abap_vibe_icf_auth_common IMPLEMENTATION.
         object                   = iv_name
         object_class             = iv_tadir_object
         devclass                 = iv_package
-        master_language          = sy-langu
+        master_language          = iv_master_language
         korrnum                  = lv_korrnum
         mode                     = iv_mode
         global_lock              = abap_true

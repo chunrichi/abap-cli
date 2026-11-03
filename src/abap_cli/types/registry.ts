@@ -120,8 +120,8 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
   // (`/auth/<sub>/<name>`) ported from the abapGit handlers. The local file is
   // an AFF-shaped JSON document (upstream auth/suso/sush schemas where the
   // field model fits, local extensions for susc/sucu).
-  { type: 'AUTH', source: 'ICF', affSchemaFile: 'auth-v1.json', requiresFile: true, maxNameLength: 30 },
-  { type: 'SUSC', source: 'ICF', affSchemaFile: 'susc-v1.json', requiresFile: true, maxNameLength: 4 },
+  { type: 'AUTH', source: 'ICF', affSchemaFile: 'auth-v1.json', requiresFile: true, maxNameLength: 30, customNameValidation: true },
+  { type: 'SUSC', source: 'ICF', affSchemaFile: 'susc-v1.json', requiresFile: true, maxNameLength: 4, customNameValidation: true },
   { type: 'SUCU', source: 'ICF', affSchemaFile: 'sucu-v1.json', requiresFile: true, customNameValidation: true },
   { type: 'SUSH', source: 'ICF', affSchemaFile: 'sush-v1.json', requiresFile: true, customNameValidation: true },
   { type: 'SUSO', source: 'ICF', affSchemaFile: 'suso-v1.json', requiresFile: true, maxNameLength: 10 },
