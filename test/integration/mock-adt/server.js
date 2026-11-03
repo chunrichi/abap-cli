@@ -126,6 +126,16 @@ const cdsTechStore = new Map();
 // value = { metaXml, source, packageName }. `source` is the ADT JSON document
 // served on `source/main`; its shape follows MOCK_APPJOB_MODEL.
 const appjobStore = new Map();
+// Authorization-object family (AUTH / SUSC / SUCU / SUSH / SUSO): hand-written
+// ICF routes under `/sap/abap_cli/auth/<sub>/<name>`. One in-memory map per
+// sub-route: key = canonical object name (upper case), value =
+// { document, package, whereUsed }. GET answers the document plus the read-side
+// `name` / `package` metadata the CLI strips before writing the local
+// `<token>.<sub>.json` file; writes answer the shared
+// `{name,type,action,package,activated:false}` envelope.
+const authStores = { auth: new Map(), susc: new Map(), sucu: new Map(), sush: new Map(), suso: new Map() };
+// `/auth/<sub>` route segment → CLI type code (the sub-route names are frozen).
+const AUTH_TYPE_BY_SUB = { auth: 'AUTH', susc: 'SUSC', sucu: 'SUCU', sush: 'SUSH', suso: 'SUSO' };
 // Which application-job JSON model the mock system serves: 'legacy' (flat
 // className/reportName documents, the SAP_BASIS 757 reference release) or
 // 'nested' (the AFF v1 generalInformation model).
@@ -156,6 +166,279 @@ function isLocalPackage(pkg) {
   const name = String(pkg || '').trim();
   return name === '' || name.startsWith('$');
 }
+
+// ---------- authorization-object family (AUTH / SUSC / SUCU / SUSH / SUSO) ----------
+// Name, document and transport rules mirror the per-type ICF handlers:
+// canonical names are upper case (SUCU keeps its 40-character padded TADIR
+// composite as the canonical form), writes validate the document shape and the
+// package / transport rule, errors use the shared `<TYPE>_*` code family with
+// the handler's HTTP status mapping.
+// Authorization objects the SUCU handler checks against TOBJ (check table).
+const AUTH_TOBJ_FIXTURES = new Set(['S_TABU_DIS', 'S_RFC', 'S_TCODE', 'S_DEVELOP', 'S_PROGRAM']);
+
+/** Canonicalize one family object name (the CLI sends the canonical form). */
+function canonicalAuthName(type, rawName) {
+  if (type !== 'SUCU') return rawName.trim().toUpperCase();
+  // SUCU: the canonical name is the 40-char TADIR composite (BRGRU padded to 30
+  // + OBJECT padded to 10, both left-justified). Compact `BRGRU~OBJECT` /
+  // `BRGRU/OBJECT` aliases are accepted the same way `normalizeName` does.
+  const upper = String(rawName || '').toUpperCase();
+  if (upper.length === 40) return upper;
+  const compact = upper.trim();
+  if (!compact) return compact;
+  const splitAt = Math.max(compact.lastIndexOf('~'), compact.lastIndexOf('/'));
+  const group = splitAt > 0 ? compact.slice(0, splitAt) : compact;
+  const object = splitAt > 0 ? compact.slice(splitAt + 1) : '';
+  if (!object) return compact;
+  return `${group.padEnd(30)}${object.padEnd(10)}`;
+}
+
+/** Validate one canonical family object name against the SAP-side rules. */
+function authNameValid(type, name) {
+  switch (type) {
+    case 'AUTH':
+      return name.length <= 30 && /^\/?[A-Z0-9_]+(\/[A-Z0-9_]+)*$/.test(name);
+    case 'SUSC':
+      // TOBC-OCLSS is CHAR 4: plain 1-4 chars or the `/XXX` namespace form.
+      return /^(?:[A-Z0-9][A-Z0-9_-]{0,3}|\/[A-Z0-9_-]{3})$/.test(name);
+    case 'SUCU': {
+      if (name.length !== 40) return false;
+      const group = name.slice(0, 30).trimEnd();
+      const object = name.slice(30).trimEnd();
+      return (
+        /^[A-Z0-9_/]+$/.test(group) &&
+        group.length <= 30 &&
+        /^[A-Z0-9_/]+$/.test(object) &&
+        object.length >= 1 &&
+        object.length <= 10
+      );
+    }
+    case 'SUSH': {
+      // Canonical `<NAME>.<TYPE>` (NAME CHAR 30, TYPE in RF/TR/HT/HS).
+      const dot = name.lastIndexOf('.');
+      if (dot < 1) return false;
+      const application = name.slice(0, dot);
+      const keyType = name.slice(dot + 1);
+      return ['RF', 'TR', 'HT', 'HS'].includes(keyType) && application.length <= 30 && /^[A-Z0-9_/]+$/.test(application);
+    }
+    case 'SUSO':
+      // XUOBJECT is CHAR 10; customer objects start with Z/Y or a namespace.
+      return name.length <= 10 && /^(?:Z|Y|\/)[A-Z0-9_/]*$/.test(name);
+    default:
+      return false;
+  }
+}
+
+/** SUCU document → canonical padded name (build-side name agreement check). */
+function sucuNameFromDocument(document) {
+  const general = (document && document.generalInformation) || {};
+  const group = String(general.authorizationGroup || '').trim().toUpperCase();
+  const object = String(general.authorizationObject || '').trim().toUpperCase();
+  if (!group || !object) return undefined;
+  return `${group.padEnd(30)}${object.padEnd(10)}`;
+}
+
+/**
+ * Minimal server-side document validation per type. The CLI validates against
+ * the same JSON schema before sending, so this is defense in depth: malformed
+ * bodies and name/document disagreements still map to `<TYPE>_INVALID_PAYLOAD`.
+ */
+function authPayloadError(type, document) {
+  switch (type) {
+    case 'AUTH': {
+      const general = (document && document.generalInformation) || {};
+      if (typeof general.dataElement !== 'string' || !general.dataElement.trim()) {
+        return 'generalInformation.dataElement is required';
+      }
+      if (!document || document.formatVersion !== '1') return 'formatVersion must be "1"';
+      return undefined;
+    }
+    case 'SUSC': {
+      const header = (document && document.header) || {};
+      if (typeof header.description !== 'string') return 'header.description is required';
+      if (typeof header.originalLanguage !== 'string' || !/^[A-Za-z]{2}$/.test(header.originalLanguage)) {
+        return 'header.originalLanguage must be a two-letter ISO language code';
+      }
+      if (!document || document.formatVersion !== '1') return 'formatVersion must be "1"';
+      return undefined;
+    }
+    case 'SUCU': {
+      const header = (document && document.header) || {};
+      if (!document || document.formatVersion !== '1') return 'formatVersion must be "1"';
+      if (typeof header.description !== 'string') return 'header.description is required';
+      if (typeof header.originalLanguage !== 'string' || !/^[A-Z]{2}$/i.test(header.originalLanguage)) {
+        return 'header.originalLanguage must be a two-letter ISO language code';
+      }
+      const padded = sucuNameFromDocument(document);
+      if (!padded) return 'generalInformation.authorizationGroup/authorizationObject are required';
+      const general = document.generalInformation || {};
+      if (!AUTH_TOBJ_FIXTURES.has(String(general.authorizationObject).trim().toUpperCase())) {
+        return `authorization object ${general.authorizationObject} does not exist (TOBJ check table)`;
+      }
+      return undefined;
+    }
+    case 'SUSH': {
+      const general = (document && document.generalInformation) || {};
+      if (typeof general.applicationName !== 'string' || !general.applicationName.trim()) {
+        return 'generalInformation.applicationName is required';
+      }
+      if (typeof general.applicationType !== 'string' || !general.applicationType.trim()) {
+        return 'generalInformation.applicationType is required';
+      }
+      if (typeof general.maintenanceMode !== 'string' || !general.maintenanceMode.trim()) {
+        return 'generalInformation.maintenanceMode is required';
+      }
+      if (document.authorizationObjects !== undefined && !Array.isArray(document.authorizationObjects)) {
+        return 'authorizationObjects must be an array';
+      }
+      return undefined;
+    }
+    case 'SUSO': {
+      if (!document || document.formatVersion !== '1') return 'formatVersion must be "1"';
+      const header = (document && document.header) || {};
+      if (typeof header.description !== 'string') return 'header.description is required';
+      const general = (document && document.generalInformation) || {};
+      if (typeof general.objectClass !== 'string' || !general.objectClass.trim()) {
+        return 'generalInformation.objectClass is required';
+      }
+      if (!Array.isArray(document.authorizationFields) || document.authorizationFields.length === 0) {
+        return 'authorizationFields must contain at least one field';
+      }
+      return undefined;
+    }
+    default:
+      return 'unknown authorization-family type';
+  }
+}
+
+/**
+ * Package / transport rule of the family writes.
+ *
+ * `$`-prefixed packages are transport-free (a stray request is dropped);
+ * everything else needs an explicit request, mirroring the shared
+ * `transport_rule` helper on the SAP side.
+ */
+function authTransportError(type, packageName, transport, verb) {
+  if (isLocalPackage(packageName)) return undefined;
+  if (!transport) {
+    return {
+      code: `${type}_TRANSPORT_REQUIRED`,
+      message: `transportRequest is required for ${type} ${verb} in package ${packageName}`,
+    };
+  }
+  if (!/^[A-Z0-9][A-Z0-9_]{2,19}$/.test(transport)) {
+    return {
+      code: `${type}_TRANSPORT_INVALID`,
+      message: `transportRequest ${transport} is not a valid request number`,
+    };
+  }
+  return undefined;
+}
+
+/** Read one JSON request body; undefined when it is not a JSON object. */
+function authParseJson(body) {
+  try {
+    const parsed = JSON.parse(body);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : undefined;
+  } catch (_e) {
+    return undefined;
+  }
+}
+
+/** Error envelope with the real handler's HTTP status mapping. */
+function authError(res, status, code, message) {
+  res.writeHead(status, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ status: 'error', error: { code, message } }));
+}
+
+/** GET envelope: stored document + the read-side `name` / `package` metadata. */
+function authGetData(stored, name) {
+  return { ...stored.document, name, package: stored.package };
+}
+
+/** Write envelope shared by POST / PUT / DELETE. */
+function authWriteData(type, name, action, packageName, regenerate) {
+  return {
+    name,
+    type,
+    action,
+    package: packageName,
+    activated: false,
+    // SUSO only, and only when the explicit opt-in asked for it (default: skipped).
+    ...(type === 'SUSO' && regenerate ? { profilesRegenerated: true } : {}),
+  };
+}
+
+// Standard objects seeded read-only: they exercise the read path and the
+// where-used / delivered-object delete refusal without a prior create. The
+// real handlers refuse these deletes with `<TYPE>_DELETE_REFUSED` (AUTH / SUSC /
+// SUSO) or `SUCU_DELETE_UNSUPPORTED` (non-local package).
+(function seedAuthFixtures() {
+  const seed = (sub, name, packageName, document, options = {}) =>
+    authStores[sub].set(name, { document, package: packageName, whereUsed: options.whereUsed === true });
+  seed(
+    'auth',
+    'VKORG',
+    'VA',
+    {
+      formatVersion: '1',
+      generalInformation: { dataElement: 'VKORG', searchHelpExit: '', activityField: false },
+      alternativeSearchHelp: { checkTable: 'TVKO' },
+    },
+    { whereUsed: true },
+  );
+  seed(
+    'susc',
+    'CV',
+    'S_BASIS',
+    { formatVersion: '1', header: { description: 'Authorization objects for document management', originalLanguage: 'en' } },
+    { whereUsed: true },
+  );
+  seed(
+    'sucu',
+    `${'CMMFDOR'.padEnd(30)}${'S_TABU_DIS'.padEnd(10)}`,
+    'FS_CMM_CDOTE_ORDER_REQUEST',
+    {
+      formatVersion: '1',
+      header: { description: 'Authorization group for commodity derivative orders', originalLanguage: 'EN' },
+      generalInformation: { authorizationGroup: 'CMMFDOR', authorizationObject: 'S_TABU_DIS' },
+      texts: [{ language: 'DE', description: 'Berechtigungsgruppe für Warentermingeschäfte' }],
+    },
+  );
+  seed('sush', 'OCS_GET_INSTALLED_COMPS.RF', 'SPAM', {
+    formatVersion: '1',
+    header: { description: 'R3TR FUNC OCS_GET_INSTALLED_COMPS', originalLanguage: 'en', abapLanguageVersion: 'standard' },
+    generalInformation: {
+      applicationName: 'OCS_GET_INSTALLED_COMPS',
+      applicationType: 'FUNC',
+      maintenanceMode: 'noDefaultValues',
+      defaultValuesRequired: 'yes',
+    },
+    authorizationObjects: [
+      {
+        authObjectName: 'S_RFC',
+        maintenanceStatus: 'defaultWithValues',
+        authObjectFieldValues: [{ authFieldName: 'RFC_TYPE', authFieldLowValue: 'FUGR' }],
+      },
+    ],
+  });
+  seed(
+    'suso',
+    '/AIF/CDLOG',
+    '/AIF/ERROR_CHANGE',
+    {
+      formatVersion: '1',
+      header: { description: 'AIF application log', originalLanguage: 'EN', abapLanguageVersion: 'standard' },
+      generalInformation: { objectClass: 'AAAT', fieldBlock: '', conversion: false },
+      authorizationFields: [{ authorizationField: 'ACTVT' }],
+      permittedActivities: [{ activity: '70' }],
+      objectAttributes: { criticality: 'notCritical', classCopyToDefaultData: 'withoutRestriction' },
+      sapNewRelevance: { isRelevantToSapNew: false, values: [] },
+      classificationForCdsBdef: { usageInOwnAuthContext: 'notSpecified', usageInPrivilegedBdefMode: 'notSpecified' },
+    },
+    { whereUsed: true },
+  );
+})();
 // Tracks whether the DDIC POST handler saw a pre-existing entry (used to derive
 // data.action = 'updated' vs 'created'). Local to the request handler.
 let ddicStore_existed_before = false;
@@ -1829,6 +2112,183 @@ const server = http.createServer(async (req, res) => {
         return ok(res, JSON.stringify({ status: 'success', data: { name: xsltName, action: 'deleted' } }), 'application/json');
       }
       return ok(res, JSON.stringify({ status: 'error', error: { code: 'METHOD_NOT_ALLOWED', message: `${req.method} not supported on /xslt/${xsltName}` } }), 'application/json');
+    }
+
+    // Authorization-object family (AUTH / SUSC / SUCU / SUSH / SUSO) — the
+    // hand-written ICF routes `/sap/abap_cli/auth/<sub>/<name>`:
+    //   GET one JSON document, POST create, PUT update (existing only), DELETE.
+    // Package / transport request travel as query parameters (the documents
+    // carry neither); `$`-prefixed packages are transport-free. Statuses follow
+    // the shared handler mapping: 400 validation/payload/transport, 404 not
+    // found, 405 method, 409 already exists / delete refused, 500 SAP failure,
+    // 501 release does not support the type.
+    const authRoot = /^\/sap\/abap_cli\/auth\/([^/]+)(?:\/(.*))?$/.exec(path);
+    if (authRoot) {
+      const sub = decodeURIComponent(authRoot[1]).toLowerCase();
+      const authType = AUTH_TYPE_BY_SUB[sub];
+      if (!authType) {
+        return authError(res, 404, 'NOT_FOUND', `unknown authorization-family route: /auth/${sub}`);
+      }
+      const store = authStores[sub];
+      let rawName;
+      try {
+        rawName = decodeURIComponent(authRoot[2] ?? '');
+      } catch (_e) {
+        return authError(res, 400, `${authType}_NAME_INVALID`, 'object name is not valid URL encoding');
+      }
+      const name = canonicalAuthName(authType, rawName);
+      if (!name || !authNameValid(authType, name)) {
+        return authError(res, 400, `${authType}_NAME_INVALID`, `${authType} object name "${rawName.trim()}" is invalid`);
+      }
+      const queryPackage = (q.get('package') || '').trim().toUpperCase();
+      const queryTransport = ((q.get('transportRequest') || q.get('tr') || '').trim()).toUpperCase();
+      // SUSO profile regeneration is an explicit opt-in; anything but `true`
+      // (the default) leaves the SAP_ALL/SAP_NEW data untouched.
+      const regenerate = (q.get('regenerateProfiles') || '').trim().toLowerCase() === 'true';
+
+      if (req.method === 'GET') {
+        const stored = store.get(name);
+        if (!stored) {
+          return authError(res, 404, `${authType}_NOT_FOUND`, `${authType} object ${name.trim()} does not exist`);
+        }
+        return ok(res, JSON.stringify({ status: 'success', data: authGetData(stored, name) }), 'application/json');
+      }
+
+      if (req.method === 'POST') {
+        const body = await readBody(req);
+        const document = authParseJson(body);
+        if (!document) {
+          return authError(res, 400, `${authType}_INVALID_PAYLOAD`, 'request body is not a JSON document');
+        }
+        if (!queryPackage) {
+          return authError(res, 400, `${authType}_INVALID_PAYLOAD`, 'package query parameter is required');
+        }
+        const payloadError = authPayloadError(authType, document);
+        if (payloadError) {
+          return authError(res, 400, `${authType}_INVALID_PAYLOAD`, payloadError);
+        }
+        // SUCU: the URL name and the document's two key fields must agree.
+        if (authType === 'SUCU') {
+          const documentName = sucuNameFromDocument(document);
+          if (documentName !== name) {
+            return authError(res, 400, 'SUCU_INVALID_PAYLOAD', 'object name in the URL and in generalInformation do not match');
+          }
+        }
+        // SUSH: only `RF` applications can be created through the route. The
+        // other key types are SAP-computed hashes of the leading object.
+        if (authType === 'SUSH') {
+          if (!name.endsWith('.RF')) {
+            return authError(
+              res,
+              400,
+              'SUSH_UNSUPPORTED',
+              'only RF (RFC-enabled function module) applications can be created; create the leading object first and pull its key',
+            );
+          }
+          if (String((document.generalInformation || {}).applicationType).toUpperCase() !== 'FUNC') {
+            return authError(res, 400, 'SUSH_INVALID_PAYLOAD', 'an RF application must declare applicationType "FUNC"');
+          }
+        }
+        const transportError = authTransportError(authType, queryPackage, queryTransport, 'create');
+        if (transportError) {
+          return authError(res, 400, transportError.code, transportError.message);
+        }
+        if (store.has(name)) {
+          return authError(res, 409, `${authType}_ALREADY_EXISTS`, `${authType} object ${name.trim()} already exists`);
+        }
+        const stored = { document, package: queryPackage, whereUsed: false };
+        store.set(name, stored);
+        return ok(
+          res,
+          JSON.stringify({ status: 'success', data: authWriteData(authType, name, 'created', stored.package, regenerate) }),
+          'application/json',
+        );
+      }
+
+      if (req.method === 'PUT') {
+        const stored = store.get(name);
+        if (!stored) {
+          return authError(res, 404, `${authType}_NOT_FOUND`, `${authType} object ${name.trim()} does not exist`);
+        }
+        const body = await readBody(req);
+        const document = authParseJson(body);
+        if (!document) {
+          return authError(res, 400, `${authType}_INVALID_PAYLOAD`, 'request body is not a JSON document');
+        }
+        const payloadError = authPayloadError(authType, document);
+        if (payloadError) {
+          return authError(res, 400, `${authType}_INVALID_PAYLOAD`, payloadError);
+        }
+        if (authType === 'SUCU') {
+          const documentName = sucuNameFromDocument(document);
+          if (documentName !== name) {
+            return authError(res, 400, 'SUCU_INVALID_PAYLOAD', 'object name in the URL and in generalInformation do not match');
+          }
+        }
+        // SUSH: the leading application is immutable; only the SU22 payload
+        // (maintenance mode / authorization objects) can change.
+        if (authType === 'SUSH') {
+          const previous = (stored.document.generalInformation || {});
+          const next = (document.generalInformation || {});
+          if (previous.applicationName !== next.applicationName || previous.applicationType !== next.applicationType) {
+            return authError(res, 400, 'SUSH_INVALID_PAYLOAD', 'the leading application of an existing SUSH object cannot change');
+          }
+        }
+        const targetPackage = queryPackage || stored.package;
+        if (!targetPackage) {
+          return authError(res, 400, `${authType}_INVALID_PAYLOAD`, 'package could not be resolved for this object');
+        }
+        const transportError = authTransportError(authType, targetPackage, queryTransport, 'update');
+        if (transportError) {
+          return authError(res, 400, transportError.code, transportError.message);
+        }
+        stored.document = document;
+        stored.package = targetPackage;
+        return ok(
+          res,
+          JSON.stringify({ status: 'success', data: authWriteData(authType, name, 'updated', stored.package, regenerate) }),
+          'application/json',
+        );
+      }
+
+      if (req.method === 'DELETE') {
+        const stored = store.get(name);
+        if (!stored) {
+          return authError(res, 404, `${authType}_NOT_FOUND`, `${authType} object ${name.trim()} does not exist`);
+        }
+        const transportError = authTransportError(authType, stored.package, queryTransport, 'delete');
+        if (transportError) {
+          return authError(res, 400, transportError.code, transportError.message);
+        }
+        // Non-local SUCU objects cannot record a CTS delete entry from the ICF
+        // session (TRAN/JOBD precedent): refuse and point at the GUI.
+        if (authType === 'SUCU' && !isLocalPackage(stored.package)) {
+          return authError(
+            res,
+            400,
+            'SUCU_DELETE_UNSUPPORTED',
+            `authorization group in package ${stored.package} cannot be deleted through the ICF service; delete it in SU21/SM30 so the removal is recorded in a request`,
+          );
+        }
+        // Where-used / delivered-object guards of the real handlers happen
+        // before any mutation and surface as a validation error.
+        if (stored.whereUsed) {
+          return authError(
+            res,
+            409,
+            `${authType}_DELETE_REFUSED`,
+            `${authType} object ${name.trim()} is still referenced by authorizations, roles or objects and cannot be deleted`,
+          );
+        }
+        store.delete(name);
+        return ok(
+          res,
+          JSON.stringify({ status: 'success', data: authWriteData(authType, name, 'deleted', stored.package, regenerate) }),
+          'application/json',
+        );
+      }
+
+      return authError(res, 405, 'METHOD_NOT_ALLOWED', `${req.method} not supported on /auth/${sub}/<name>`);
     }
 
     // /sap/abap_cli/sm59/<name> (GET pull / POST upsert / DELETE) — frozen wire

@@ -1,0 +1,238 @@
+{
+  "$comment": "Local extension: upstream SAP abap-file-formats models SUSO (authorization object) without the DOKU 'UO' long text, the per-release TOBJVOR/TOBJVORDAT SAP_NEW data, TOBJ-FBLOCK/CONVERSION and the third (unset) criticality state, so a lossless pull/push round trip needs this local document. AFF section and enum names are kept where they map exactly; the deviating/added fields are documented in tmp/auth-family/designs/suso.md. Verified on S/4HANA SAP_BASIS 757: GET/POST/PUT/DELETE /sap/abap_cli/auth/suso/<name>. Server-managed fields (TOBJ-BNAME, TOBJ_ATTR modifier/date/time, TOBJVOR modifier/date/time, package) are not part of the document.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Authorization Object Properties",
+  "description": "ABAP authorization object (SU21, TOBJ* tables + DOKU UO long text) properties",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["formatVersion", "header", "generalInformation", "authorizationFields"],
+  "properties": {
+    "formatVersion": {
+      "title": "ABAP File Format Version",
+      "type": "string",
+      "const": "1"
+    },
+    "header": {
+      "title": "Header",
+      "description": "Object header (TOBJT short text + TOBJ_ATTR ABAP language version)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "originalLanguage"],
+      "properties": {
+        "description": {
+          "title": "Description",
+          "description": "Short text of the authorization object (TOBJT-TTEXT, XUTEXT CHAR 60) in originalLanguage.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "originalLanguage": {
+          "title": "Original Language",
+          "description": "Two-letter ISO code of the short/long text language (language of the TOBJT and DOKU UO rows that are written).",
+          "type": "string",
+          "pattern": "^[A-Za-z]{2}$"
+        },
+        "abapLanguageVersion": {
+          "title": "ABAP Language Version",
+          "description": "ABAP language version recorded in TOBJ_ATTR-ABAP_LANGUAGE_VERSION.",
+          "type": "string",
+          "enum": ["standard", "keyUser", "cloudDevelopment"],
+          "enumTitles": ["Standard", "ABAP for Key Users", "ABAP Cloud Development"],
+          "default": "standard"
+        }
+      }
+    },
+    "generalInformation": {
+      "title": "General Information",
+      "description": "Authorization object class and legacy TOBJ flags",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["objectClass"],
+      "properties": {
+        "objectClass": {
+          "title": "Object Class",
+          "description": "TOBJ-OCLSS (XUOBJCLASS CHAR 4): authorization object class from TOBCT, e.g. AAAT for test objects. Delivered values are not blank-padded, so the field carries 1-4 characters (e.g. \"AIF\").",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4,
+          "pattern": "^[A-Za-z0-9_/]{1,4}$"
+        },
+        "fieldBlock": {
+          "title": "Field Block",
+          "description": "TOBJ-FBLOCK (CHAR 8), delivered-object legacy flag; empty for ordinary objects.",
+          "type": "string",
+          "maxLength": 8
+        },
+        "conversion": {
+          "title": "Conversion Flag",
+          "description": "TOBJ-CONVERSION = 'X' (legacy objects only).",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "authorizationFields": {
+      "title": "Authorization Fields",
+      "description": "Ordered TOBJ-FIEL1..FIEL0 (XUFIELD CHAR 10); at least one, at most ten.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": {
+        "title": "Authorization Field",
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["authorizationField"],
+        "properties": {
+          "authorizationField": {
+            "title": "Authorization Field",
+            "description": "Authorization field name (AUTHX-FIELDNAME, e.g. ACTVT, BUKRS).",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10
+          }
+        }
+      }
+    },
+    "permittedActivities": {
+      "title": "Permitted Activities",
+      "description": "TACTZ-BROBJ/ACTVT rows (ACTIV_AUTH CHAR 2). Only meaningful when ACTVT is part of authorizationFields.",
+      "type": "array",
+      "items": {
+        "title": "Permitted Activity",
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["activity"],
+        "properties": {
+          "activity": {
+            "title": "Activity",
+            "description": "Activity value from TACT (e.g. 01, 02, 03, 06).",
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2
+          }
+        }
+      }
+    },
+    "objectAttributes": {
+      "title": "Object Attributes",
+      "description": "TOBJVORFLG object-level flags.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "criticality": {
+          "title": "Criticality",
+          "description": "TOBJVORFLG-FLAG3 (XUCRIT): critical objects cannot be set to 'No Authorization Check' by default.",
+          "type": "string",
+          "enum": ["critical", "notCritical", "notSpecified"],
+          "enumTitles": ["Critical", "Not Critical", "Not Specified"],
+          "default": "notSpecified"
+        },
+        "classCopyToDefaultData": {
+          "title": "Classification for Copy to Default Data",
+          "description": "TOBJVORFLG-FLAG2 (SUSO_TRACE_FLAG) as used by SU22 trace data.",
+          "type": "string",
+          "enum": [
+            "withoutRestriction",
+            "ifInSameApplComponent",
+            "ifInSameSoftwareComponent",
+            "ifInSameSoftwarePackage",
+            "notCopiedFromTraceData"
+          ],
+          "enumTitles": [
+            "Without restriction",
+            "If application and object are in the same application component",
+            "If application and object are in the same software component",
+            "If application and object are in the same software package",
+            "Not copied from trace data"
+          ],
+          "default": "withoutRestriction"
+        }
+      }
+    },
+    "sapNewRelevance": {
+      "title": "SAP New Relevance",
+      "description": "TOBJVORFLG-FLAG1 plus the per-release TOBJVOR/TOBJVORDAT proposal values.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "isRelevantToSapNew": {
+          "title": "Relevant to SAP_NEW",
+          "description": "TOBJVORFLG-FLAG1 = 'X'.",
+          "type": "boolean",
+          "default": false
+        },
+        "values": {
+          "title": "SAP_NEW Values",
+          "description": "TOBJVORDAT rows (per release, line and field value range).",
+          "type": "array",
+          "items": {
+            "title": "SAP_NEW Value",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["release"],
+            "properties": {
+              "release": {
+                "title": "Release",
+                "description": "TOBJVORDAT-RELEASE (SYSAPRL), e.g. 757.",
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4
+              },
+              "lineNumber": {
+                "title": "Line Number",
+                "description": "TOBJVORDAT-LFDNR (LFDNR CHAR 3), zeros padded on write.",
+                "type": "string",
+                "maxLength": 3
+              },
+              "field": {
+                "title": "Authorization Field",
+                "description": "TOBJVORDAT-FIELD (XUFIELD).",
+                "type": "string",
+                "maxLength": 10
+              },
+              "low": {
+                "title": "Lower Limit",
+                "description": "TOBJVORDAT-LOW (XUVAL CHAR 40).",
+                "type": "string",
+                "maxLength": 40
+              },
+              "high": {
+                "title": "Upper Limit",
+                "description": "TOBJVORDAT-HIGH (XUVAL CHAR 40).",
+                "type": "string",
+                "maxLength": 40
+              }
+            }
+          }
+        }
+      }
+    },
+    "classificationForCdsBdef": {
+      "title": "Classification for ABAP CDS Behavior Definitions",
+      "description": "TOBJVORFLG-FLAG4/FLAG5 (XUOWN_CONTEXT / XUPRIVILEGED).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "usageInOwnAuthContext": {
+          "title": "Usage in the OWN Authorization Context",
+          "description": "TOBJVORFLG-FLAG4.",
+          "type": "string",
+          "enum": ["notSpecified", "notAllowed", "allowed", "inSameSoftwareComponent"],
+          "default": "notSpecified"
+        },
+        "usageInPrivilegedBdefMode": {
+          "title": "Usage in the Privileged BDEF Mode",
+          "description": "TOBJVORFLG-FLAG5.",
+          "type": "string",
+          "enum": ["notSpecified", "notAllowed", "allowed"],
+          "default": "notSpecified"
+        }
+      }
+    },
+    "longText": {
+      "title": "Long Text",
+      "description": "Documentation long text (DOKU id 'UO', object = authorization object name) as raw lines joined with '\\n'; each line is at most 72 characters (DOKTL-DOKTEXT). SAPscript control lines such as &DEFINITION& are kept verbatim. An empty/absent value removes the documentation on write.",
+      "type": "string"
+    }
+  }
+}
