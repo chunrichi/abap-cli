@@ -35,12 +35,15 @@ vi.mock('../../src/abap_cli/clients/icf-client.js', () => ({
   },
 }));
 
-// DDIC push never touches ADT — the client is created but unused.
+// Pushed files carry no package in the abap-file-format case: the flow reads
+// the target object's package back from ADT repository search.
+const searchObject = vi.fn();
+const userTransports = vi.fn();
+const getConfig = vi.fn();
+
 vi.mock('../../src/abap_cli/clients/adt-client.js', () => ({
   AdtClientWrapper: {
-    create: async () => ({
-      getConfig: () => ({ sap: { username: 'MOCKUSER' }, transport: '' }),
-    }),
+    create: async () => ({ searchObject, userTransports, getConfig }),
   },
 }));
 
@@ -49,7 +52,17 @@ beforeEach(() => {
   vi.clearAllMocks();
   cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'push-ddic-'));
   fs.mkdirSync(path.join(cwd, 'src'), { recursive: true });
+  // Default: the object is not discoverable through ADT search and the user
+  // has no open requests; tests that push a package-less file override these.
+  searchObject.mockResolvedValue([]);
+  userTransports.mockResolvedValue({ workbench: [], customizing: [] });
+  getConfig.mockReturnValue({ sap: { username: 'MOCKUSER' }, transport: '' });
 });
+
+/** ADT repository-search hit for `resolveObject()`. */
+function searchHit(name: string, type: string, packageName: string) {
+  return { 'adtcore:name': name, 'adtcore:type': type, 'adtcore:uri': `/sap/bc/adt/ddic/tables/${name.toLowerCase()}`, 'adtcore:packageName': packageName };
+}
 
 function writeTableJson(pkg = 'ZPKG', extra: Record<string, unknown> = {}) {
   // AFF canonical — settings under generalInformation.*.
@@ -280,5 +293,95 @@ describe('014 abap push DDIC (.json via ICF)', () => {
     const out = JSON.parse(res.stderr);
     expect(out.error.code).toBe('ICF_UNAVAILABLE');
     expect(icfPostDdic).not.toHaveBeenCalled();
+  });
+
+  it('resolves a pulled package-less artifact to the local target package (transport-free)', async () => {
+    // abap pull writes header-only main JSON + DDL/settings sidecars; no package.
+    fs.writeFileSync(path.join(cwd, 'src/ztab_local.tabl.json'), JSON.stringify({
+      formatVersion: '1',
+      header: { description: 'Local three-piece', originalLanguage: 'EN' },
+    }, null, 2));
+    fs.writeFileSync(path.join(cwd, 'src/ztab_local.tabl.ddic'), [
+      'define table ztab_local {',
+      '  key mandt : abap.clnt not null;',
+      '  key id    : abap.char(10) not null;',
+      '  status    : abap.char(10);',
+      '}',
+    ].join('\n'));
+    searchObject.mockResolvedValue([searchHit('ZTAB_LOCAL', 'TABL/DT', '$CRW')]);
+
+    const program = makeProgram();
+    registerPushCommand(program);
+    const res = await runCommand(program, ['push', 'src/ztab_local.tabl.json', '--yes', '--json'], { cwd });
+
+    expect(res.exitCode).toBeUndefined();
+    expect(icfPostDdic).toHaveBeenCalledWith('tabl', expect.objectContaining({
+      name: 'ZTAB_LOCAL',
+      package: '$CRW',
+      transportRequest: undefined,
+    }));
+    // A local package never needs the user's open-request lookup.
+    expect(userTransports).not.toHaveBeenCalled();
+    const out = JSON.parse(res.stdout);
+    expect(out.data.results[0].status).toBe('written');
+    expect(out.data.results[0].transport).toBe('');
+  });
+
+  it('resolves a pulled package-less artifact to a transportable target and uses --tr', async () => {
+    fs.writeFileSync(path.join(cwd, 'src/ztab_remote.tabl.json'), JSON.stringify({
+      formatVersion: '1',
+      header: { description: 'Remote three-piece', originalLanguage: 'EN' },
+    }, null, 2));
+    fs.writeFileSync(path.join(cwd, 'src/ztab_remote.tabl.ddic'), [
+      'define table ztab_remote {',
+      '  key mandt : abap.clnt not null;',
+      '  country   : abap.char(3);',
+      '}',
+    ].join('\n'));
+    searchObject.mockResolvedValue([searchHit('ZTAB_REMOTE', 'TABL/DT', 'ZPKG')]);
+
+    const program = makeProgram();
+    registerPushCommand(program);
+    const res = await runCommand(program, ['push', 'src/ztab_remote.tabl.json', '--tr', 'TRN001', '--yes', '--json'], { cwd });
+
+    expect(res.exitCode).toBeUndefined();
+    expect(icfPostDdic).toHaveBeenCalledWith('tabl', expect.objectContaining({
+      name: 'ZTAB_REMOTE',
+      package: 'ZPKG',
+      transportRequest: 'TRN001',
+    }));
+  });
+
+  it('raises NO_TRANSPORT for a package-less transportable target with no request available', async () => {
+    fs.writeFileSync(path.join(cwd, 'src/ztab_remote.tabl.json'), JSON.stringify({
+      formatVersion: '1',
+      header: { description: 'Remote three-piece', originalLanguage: 'EN' },
+    }, null, 2));
+    fs.writeFileSync(path.join(cwd, 'src/ztab_remote.tabl.ddic'), [
+      'define table ztab_remote {',
+      '  key mandt : abap.clnt not null;',
+      '  country   : abap.char(3);',
+      '}',
+    ].join('\n'));
+    searchObject.mockResolvedValue([searchHit('ZTAB_REMOTE', 'TABL/DT', 'ZPKG')]);
+
+    const program = makeProgram();
+    registerPushCommand(program);
+    const res = await runCommand(program, ['push', 'src/ztab_remote.tabl.json', '--yes', '--json'], { cwd });
+
+    expect(res.exitCode).toBe(7);
+    expect(JSON.parse(res.stderr).error.code).toBe('NO_TRANSPORT');
+    // Transport resolution happens before the ICF existence probe: zero SAP writes.
+    expect(icfPostDdic).not.toHaveBeenCalled();
+    expect(icfGetDdic).not.toHaveBeenCalled();
+  });
+
+  it('keeps the file package authoritative and skips the SAP search when present', async () => {
+    writeTableJson('$TMP');
+    const program = makeProgram();
+    registerPushCommand(program);
+    const res = await runCommand(program, ['push', 'src/ztab_test.tabl.json', '--yes', '--json'], { cwd });
+    expect(res.exitCode).toBeUndefined();
+    expect(searchObject).not.toHaveBeenCalled();
   });
 });

@@ -2061,8 +2061,42 @@ const server = http.createServer(async (req, res) => {
               packageName: p.name,
             }))
         : [];
+      // DDIC objects written through the ICF service are repository-searchable
+      // in real SAP (the CLI resolves an update target's package that way), so
+      // mirror them here: ddicStore is the mock's DDIC source of truth.
+      const DDIC_SEARCH_TYPE = {
+        TABL: 'TABL/DT',
+        STRU: 'STRU/DS',
+        DOMA: 'DOMA/DD',
+        DTEL: 'DTEL/DE',
+      };
+      const DDIC_SEARCH_PATH = {
+        TABL: 'tables',
+        STRU: 'structures',
+        DOMA: 'domains',
+        DTEL: 'dataelements',
+      };
+      const ddicMatches = [...ddicStore.entries()]
+        .map(([key, obj]) => {
+          const ddicType = key.split(':')[0];
+          const name = String(obj.name || key.slice(ddicType.length + 1)).toUpperCase();
+          const description = obj.description || (obj.header && obj.header.description) || '';
+          return {
+            name,
+            type: DDIC_SEARCH_TYPE[ddicType] || ddicType,
+            objectUrl: `/sap/bc/adt/ddic/${DDIC_SEARCH_PATH[ddicType] || ddicType.toLowerCase()}/${name.toLowerCase()}`,
+            description,
+            packageName: obj.package || '$TMP',
+          };
+        })
+        .filter((o) => {
+          const nameOk = !query || o.name.includes(query) || query.includes(o.name);
+          const typeOk = !type || o.type === type || o.type.startsWith(type);
+          return nameOk && typeOk;
+        });
       const matches = [
         ...packageMatches,
+        ...ddicMatches,
         ...[...objects.values()].filter((o) => {
           const nameOk = !query || o.name.includes(query) || query.includes(o.name);
           const typeOk = !type || o.type === type || o.type.startsWith(type);
