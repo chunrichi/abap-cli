@@ -136,7 +136,7 @@ graph LR
 ```
 
 - **ADT channel** — source objects (CLAS / INTF / PROG / FUGR / CDS / RAP) use the standard ADT REST API: search, source read/write, lock, syntax check, activation, transports, where-used.
-- **ICF channel** — DDIC objects, SICF nodes and transaction codes, table data, reports, MIME, remote version pulls, textpool reads on releases without the ADT text-elements endpoint, and the runtime wrapper use the bundled ABAP service, deployed with `abap deploy`. It exposes `/ddic/*`, `/http/*`, `/tran/*`, `/tcode/*`, `/data/*`, `/run/*`, `/mime/*`, `/textpool/*`, `/version-source*` and `/_class-check*`.
+- **ICF channel** — DDIC objects, SICF nodes and transaction codes, table data, reports, MIME, remote version pulls, textpool reads on releases without the ADT text-elements endpoint, the runtime wrapper and the system-side connection identity use the bundled ABAP service, deployed with `abap deploy`. It exposes `/ddic/*`, `/http/*`, `/tran/*`, `/tcode/*`, `/data/*`, `/run/*`, `/mime/*`, `/textpool/*`, `/version-source*`, `/whoami` and `/_class-check*`.
 
 The release form of the service installs **3 global classes** (handler + setup + runtime wrapper); `abap deploy --dev` installs the full 20-class development tree for maintainers. The ICF node is created idempotently by the setup class, so `abap deploy` can be re-run safely.
 
@@ -168,6 +168,7 @@ No type or object subdirectories, and namespaced objects use the AFF bracket tok
 | `abap profile` | Manage global connection profiles: `list` / `show` / `add` / `set` / `test` / `delete` / `export` / `import` |
 | `abap doctor` | Diagnose environment and configuration (read-only and offline — use `abap profile test` for connectivity); `--fix` applies safe fixes |
 | `abap session` | Inspect the session cookie jar for the active profile (`session info`) |
+| `abap whoami` | Print the identity reported by the SAP system itself — user, system/client, and application server / database / OS / ABAP release, plus the workspace profile and endpoint; requires the bundled ICF service |
 | `abap deploy` | Deploy the bundled ICF service (`status` probes the installed version; `--dev` installs the development form) |
 | `abap transport` | `list` (`--open`) / `create` / `show` / `resolve` / `assign` transport requests |
 | `abap pull <object>` | Download an object, a package or a transport to AFF files (`--type`, `--package`, `--tr`, `--remote`, `--textpool`, `--active`, `--dir`, `--overwrite`, `--include-tests`) |
@@ -215,7 +216,7 @@ See **[docs/supported.md](docs/supported.md)** for the full type × command matr
 
 ```jsonc
 // success — stdout, exit 0
-{ "status": "success", "meta": { "command": "abap pull", "version": "2.2.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { /* ... */ } }
+{ "status": "success", "meta": { "command": "abap pull", "version": "2.3.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { /* ... */ } }
 
 // failure — stderr, non-zero exit, stdout stays empty
 { "status": "error", "meta": { /* ... */ }, "error": { "code": "NO_TRANSPORT", "category": "VALIDATION_ERROR", "message": "..." } }

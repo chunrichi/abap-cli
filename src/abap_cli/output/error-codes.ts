@@ -76,6 +76,7 @@ export type ErrorCode =
   | 'LOCAL_CLASS_NOT_RUNNABLE'// class name contains `~` (local class) (SAP_ERROR)
   | 'OBJECT_NOT_ACTIVE'       // target class is inactive (SAP_ERROR)
   | 'WRAPPER_NOT_DEPLOYED'    // ZCL_ABAP_VIBE_RUNNER missing on target system (NOT_FOUND)
+  | 'ICF_IDENTITY_UNAVAILABLE' // ICF /whoami route missing — bundled service not deployed / outdated (NOT_FOUND)
   | 'TIMEOUT'                 // classrun exceeded --timeout (SAP_ERROR)
   | 'WRAPPER_INPUT_UNAVAILABLE' // SAP classrun endpoint does not inject method args (SAP_ERROR)
   // read-only table data query error codes
@@ -270,6 +271,7 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   LOCAL_CLASS_NOT_RUNNABLE: 'SAP_ERROR',
   OBJECT_NOT_ACTIVE: 'SAP_ERROR',
   WRAPPER_NOT_DEPLOYED: 'NOT_FOUND',
+  ICF_IDENTITY_UNAVAILABLE: 'NOT_FOUND',
   TIMEOUT: 'SAP_ERROR',
   WRAPPER_INPUT_UNAVAILABLE: 'SAP_ERROR',
   // mappings

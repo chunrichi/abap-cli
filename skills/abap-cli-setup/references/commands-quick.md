@@ -107,6 +107,27 @@ abap doctor [options]
   abap doctor --strict --json
   ```
 
+## `abap whoami`
+
+Show the identity the SAP system reports for the current connection (user / system / client), read from the bundled ICF service.
+
+```bash
+abap whoami
+```
+
+
+
+- Show the system-reported identity of the current connection
+
+  ```bash
+  abap whoami
+  ```
+- Agent integration: compact JSON identity
+
+  ```bash
+  abap whoami --json
+  ```
+
 ## `abap transport`
 
 Manage SAP transport requests (list / create / show / resolve / assign / check / release).

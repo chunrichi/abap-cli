@@ -5,6 +5,7 @@ import { CliError } from '../output/json.js';
 import type { ErrorCode } from '../output/error-codes.js';
 import { classifyHttpError } from './http-error.js';
 import { ICF_BASE_PATH } from './icf-version.js';
+import { ICF_WHOAMI_PATH, type SystemIdentity } from './system-identity.js';
 
 export interface IcfResponse<T = unknown> {
   status: 'success' | 'error';
@@ -19,8 +20,10 @@ export interface IcfResponse<T = unknown> {
 export class IcfClient {
   private http: AxiosInstance;
   private baseUrl: string;
+  private config: ProjectConfig;
 
   private constructor(config: ProjectConfig, auth: { password: string; options: import('abap-adt-api').ClientOptions }) {
+    this.config = config;
     this.baseUrl = `${config.sap.url}${ICF_BASE_PATH}`;
 
     // Reuse the SAME artefacts `buildBasicAuth()` produces for ADT — the TLS
@@ -52,6 +55,20 @@ export class IcfClient {
     const config = await loadConfig();
     const authOpts = buildBasicAuth(config.sap);
     return new IcfClient(config, authOpts);
+  }
+
+  /** Resolved project config this client connects with (profile name / endpoint). */
+  getConfig(): ProjectConfig {
+    return this.config;
+  }
+
+  /**
+   * GET /whoami — identity of the SAP session behind the request, answered by
+   * the bundled ICF service from `sy-uname` & friends. Auth-method agnostic: it
+   * reports what the system authenticated, not what the profile config says.
+   */
+  async getSystemIdentity(): Promise<IcfResponse<SystemIdentity>> {
+    return this.get<SystemIdentity>(ICF_WHOAMI_PATH);
   }
 
   async get<T>(path: string): Promise<IcfResponse<T>> {

@@ -4,14 +4,14 @@ title: SAP 开发任务覆盖率矩阵
 description: abap-cli 当前能 / 不能完成的 SAP 开发任务全景 — 用于未来 spec 选题 + 用户预期管理
 tags: [abap-cli, coverage, roadmap, scope]
 created at: 2026-09-01 00:00:00
-changed at: 2026-11-03 21:55:00
+changed at: 2026-11-03 23:12:31
 ---
 
 # SAP 开发任务覆盖率矩阵
 
 abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的开发工作**。本页是一份**诚实快照**——按 SAP 开发任务分类，给出当前覆盖度与缺口。对象类型补充的排序与取舍见 [roadmap](roadmap.md)。
 
-> 当前规模：**31 个顶层命令**、**36 个对象类型**（36 类可 create、36 类可 pull、34 类有 push 入口）、**6 个 skill + 1 个 agent**。基线：`v2.2.0` + SRVB 发布命令 / 本地 ATC / CDS 技术 / 类型池 / 应用作业扩展。
+> 当前规模：**32 个顶层命令**、**36 个对象类型**（36 类可 create、36 类可 pull、34 类有 push 入口）、**6 个 skill + 1 个 agent**。基线：`v2.3.0` + 连接身份（whoami）/ SRVB 发布命令 / 本地 ATC / CDS 技术 / 类型池 / 应用作业扩展。
 
 ## 评分图例
 
@@ -202,10 +202,10 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | 任务 | 命令 | 覆盖 | 备注 |
 |---|---|---|---|
 | Doctor（环境诊断） | `doctor` | ✅ | `--fix` 自动修 |
-| --schema（命令 schema 自描述） | `--schema` | ✅ | 全部 31 命令 |
+| --schema（命令 schema 自描述） | `--schema` | ✅ | 全部 32 命令 |
 | --json / --pretty-json | `--json / --pretty-json` | ✅ | 全部命令 |
 | Skill bundle | `init --agent` | ✅ | agents/copilot/claude/cursor/generic |
-| Wiki | `wiki/` | ✅ | 94 篇（命令页 31 个） |
+| Wiki | `wiki/` | ✅ | 95 篇（命令页 32 个） |
 | 命令文档生成 | `scripts/gen-docs.mjs`（docs:check 入 verify） | ✅ | 单一事实源 |
 | 错误码自描述 | `CliError.references` | ✅ | 指向 skills/.../references/errors.md |
 | Release notes | `CHANGELOG.md` | ✅ | Keep a Changelog |

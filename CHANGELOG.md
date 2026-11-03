@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+本版新增 `abap whoami`：连接身份由 SAP 系统返回，而不是读取本地 profile 配置，因此配置与真实会话不一致、或将来接入 SSO 等认证方式时依然准确。为此内置 ICF 服务新增身份端点，CLI 与 ICF 服务版本线统一到 2.3.0；升级后执行一次 `abap deploy --yes` 才能使用该命令，部署前 `abap deploy status` 会显示 outdated。
+
+### Added
+
+- **`abap whoami`**：由 SAP 系统返回当前连接的实际身份——登录用户、系统 ID / 客户端，以及应用服务器 / 数据库 / OS / ABAP release；输出同时带上工作区 profile 与 endpoint。身份取自 SAP 会话而不是本地 profile 配置，因此在切换 profile、CI 注入配置或将来接入 SSO 等认证方式时都能反映真实登录身份。命令需要已部署新版内置 ICF 服务：服务未安装或版本过旧时会提示先执行 `abap deploy --yes`；`abap whoami --schema --json` 不连 SAP。
+
 ## [2.2.0] - 2026-11-03
 
 本版把对象面扩到 ATC 检查配置、CDS 技术对象、CDS 简单类型、类型池和应用作业目录（新增 11 个类型码，`abap types` 现列出 36 类），新增 `abap publish` / `abap unpublish` 两个服务绑定发布命令，并修正本地包 DDIC 对象 push 的 transport 判定。没有移除命令或参数，但有两处行为收紧需要留意（多余位置参数改为报错、TTYP 不再生成 `.type.abap` 侧车），见 Changed。内置 ICF 服务版本随 CLI 统一到 2.2.0，服务端行为没有变化；`abap deploy status` 会提示 outdated，需要时可执行一次 `abap deploy --yes` 对齐版本号。

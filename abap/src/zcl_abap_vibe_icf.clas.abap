@@ -58,6 +58,10 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
       zcl_abap_vibe_icf_xslt=>dispatch_xslt( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
     ELSEIF lv_path CP '/version-source*'.
       zcl_abap_vibe_icf_version=>dispatch_version_management( io_server = server iv_path = lv_path iv_method = lv_method ).
+    ELSEIF lv_path CP '/whoami*'.
+      " System-side identity of the authenticated session (works for basic auth
+      " today and for any future SSO / ticket mechanism).
+      zcl_abap_vibe_icf_response=>handle_whoami( io_server = server iv_method = lv_method ).
     ELSEIF lv_path CP '/_class-check*'.
       zcl_abap_vibe_icf_response=>handle_class_check( io_server = server ).
     ELSE.
