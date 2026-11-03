@@ -39,6 +39,8 @@ Every command supports `--json` (compact envelope, default for agents) and `--pr
 | `abap inspect` | sap | View ABAP object metadata |
 | `abap where-used` | sap | Find SAP object references (read-only) |
 | `abap tcode` | sap | Resolve transaction code to its ABAP entry program (read-only) |
+| `abap publish` | sap | Publish a service binding (SRVB) — activate its local OData endpoint via the ADT publish job |
+| `abap unpublish` | sap | Unpublish a service binding (SRVB) — deactivate its local OData endpoint via the ADT unpublish job |
 | `abap activate` | sap | Activate inactive ABAP objects |
 | `abap diff` | sap | Compare local files against SAP |
 | `abap dumps` | sap | List recent ST22 ABAP runtime dumps (read-only) |
@@ -961,6 +963,68 @@ abap tcode <tcode> [--json]
 
   ```bash
   abap tcode SE38 --json
+  ```
+
+## `abap publish`
+
+Publish the local OData endpoint of a service binding (ADT publish job).
+
+```bash
+abap publish <object-name> [options]
+```
+
+### Arguments
+
+| Argument | Required | Values | Description |
+| --- | --- | --- | --- |
+| `object-name` | yes |  | Service binding name (e.g. ZUI_MY_SERVICE). |
+
+### Options
+
+
+
+### Examples
+
+- Publish a service binding
+
+  ```bash
+  abap publish ZUI_MY_SERVICE
+  ```
+- Publish and print the full envelope
+
+  ```bash
+  abap publish ZUI_MY_SERVICE --json
+  ```
+
+## `abap unpublish`
+
+Unpublish the local OData endpoint of a service binding (ADT unpublish job).
+
+```bash
+abap unpublish <object-name> [options]
+```
+
+### Arguments
+
+| Argument | Required | Values | Description |
+| --- | --- | --- | --- |
+| `object-name` | yes |  | Service binding name (e.g. ZUI_MY_SERVICE). |
+
+### Options
+
+
+
+### Examples
+
+- Unpublish a service binding
+
+  ```bash
+  abap unpublish ZUI_MY_SERVICE
+  ```
+- Unpublish and print the full envelope
+
+  ```bash
+  abap unpublish ZUI_MY_SERVICE --json
   ```
 
 ## `abap activate`

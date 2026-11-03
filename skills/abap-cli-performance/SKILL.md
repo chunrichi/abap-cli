@@ -127,6 +127,6 @@ metadata:
 
 ## 权威来源
 
-- 仓库索引：[`skills/README.md`](../README.md)
+- 仓库索引：[`skills/README.md`](https://github.com/chunrichi/abap-cli/blob/main/skills/README.md)
 - 入口路由：[`skills/abap-cli/SKILL.md`](../abap-cli/SKILL.md)
 - 端到端编排：[`agents/abap-developer.agent.md`](../../agents/abap-developer.agent.md)

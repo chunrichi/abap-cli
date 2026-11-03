@@ -76,6 +76,29 @@ const packages = new Map();
 // The XML body posted by the CLI is stored verbatim and served back on GET, so
 // the AFF projection is exercised on the CLI side (same contract as real ADT).
 const atcObjects = new Map();
+// Service bindings (SRVB) — name → { description, packageName, serviceName,
+// serviceVersion, bindingVersion, published }.
+const srvbStore = new Map();
+
+/** Metadata envelope the CLI's publish flow reads. */
+function srvbMetadataXml(stored) {
+  return (
+    '<?xml version="1.0" encoding="utf-8"?>' +
+    `<srvb:serviceBinding srvb:published="${stored.published}" srvb:bindingCreated="true"` +
+    ` adtcore:name="${stored.name}" adtcore:type="SRVB/SVB" adtcore:version="active"` +
+    ` adtcore:description="${stored.description}"` +
+    ' xmlns:srvb="http://www.sap.com/adt/ddic/ServiceBindings" xmlns:adtcore="http://www.sap.com/adt/core">' +
+    `<adtcore:packageRef adtcore:name="${stored.packageName}"/>` +
+    `<srvb:services srvb:name="${stored.serviceName}">` +
+    `<srvb:content srvb:version="${stored.serviceVersion}">` +
+    '<srvb:serviceDefinition adtcore:name="ZCLI_MOCK_SRVD"/>' +
+    '</srvb:content></srvb:services>' +
+    `<srvb:binding srvb:type="ODATA" srvb:version="${stored.bindingVersion}" srvb:category="0">` +
+    `<srvb:implementation adtcore:name="${stored.name}"/>` +
+    '</srvb:binding></srvb:serviceBinding>'
+  );
+}
+
 // Type pools (TYPE-POOL / TYPE) — name → { metaXml, source, packageName }.
 const typegroupStore = new Map();
 // CDS technical objects — key = `<TYPE>:<NAME>`, value = { metaXml, source, packageName }.
@@ -2139,6 +2162,65 @@ const server = http.createServer(async (req, res) => {
         objects.delete(name);
         return ok(res, '');
       }
+    }
+
+    // Service bindings (SRVB): metadata-only resource + local publish jobs.
+    const srvbMatch = /^\/sap\/bc\/adt\/businessservices\/bindings(?:\/([^/]+))?$/.exec(path);
+    if (srvbMatch) {
+      const srvbName = srvbMatch[1]?.toUpperCase();
+      const srvbUrl = srvbName ? `/sap/bc/adt/businessservices/bindings/${srvbName.toLowerCase()}` : '';
+      if (req.method === 'POST' && !srvbName) {
+        const body = await readBody(req);
+        const created = /adtcore:name="([^"]+)"/.exec(body)?.[1]?.toUpperCase();
+        if (!created) return adtError(res, 400, 'Missing adtcore:name in service-binding create body');
+        const description = /adtcore:description="([^"]*)"/.exec(body)?.[1] || '';
+        const packageName = /adtcore:packageRef[^>]*adtcore:name="([^"]+)"/.exec(body)?.[1] || '$TMP';
+        const serviceVersion = /srvb:content[^>]*srvb:version="([^"]+)"/.exec(body)?.[1] || '0001';
+        const bindingVersion = /srvb:binding[^>]*srvb:version="([^"]+)"/.exec(body)?.[1] || 'V2';
+        const serviceName = /srvb:services srvb:name="([^"]+)"/.exec(body)?.[1] || created;
+        const stored = { name: created, description, packageName, serviceName, serviceVersion, bindingVersion, published: false };
+        srvbStore.set(created, stored);
+        const obj = addObject(created, 'SRVB', srvbUrl, description, [], { packageName });
+        obj.inactive = true;
+        return ok(res, '', 'text/plain');
+      }
+      if (srvbName && req.method === 'GET') {
+        const stored = srvbStore.get(srvbName);
+        if (!stored) return adtError(res, 404, `Service binding ${srvbName} not found`);
+        return ok(res, srvbMetadataXml(stored));
+      }
+      if (srvbName && req.method === 'DELETE') {
+        const obj = byObjectUrl(srvbUrl);
+        if (!obj || !obj.lockedBy || obj.lockedBy.lockHandle !== q.get('lockHandle')) {
+          return adtError(res, 403, `Service binding ${srvbName} is not locked by this session`);
+        }
+        srvbStore.delete(srvbName);
+        objects.delete(srvbName);
+        return ok(res, '');
+      }
+    }
+
+    // Publish / unpublish jobs — {odatav2|odatav4}/{un,}publishjobs.
+    const publishJobMatch = /^\/sap\/bc\/adt\/businessservices\/(odatav2|odatav4)\/(un)?publishjobs$/.exec(path);
+    if (publishJobMatch && req.method === 'POST') {
+      const serviceName = (q.get('servicename') || '').toUpperCase();
+      const stored = srvbStore.get(serviceName);
+      if (!stored) return adtError(res, 404, `Service ${serviceName} not found`);
+      // The CLI must pick the protocol matching the binding version.
+      const expectedType = stored.bindingVersion.toUpperCase() === 'V2' ? 'odatav2' : 'odatav4';
+      if (publishJobMatch[1] !== expectedType) {
+        return adtError(res, 400, `Binding ${serviceName} is ${stored.bindingVersion}, not ${publishJobMatch[1]}`);
+      }
+      const unpublish = Boolean(publishJobMatch[2]);
+      stored.published = !unpublish;
+      return ok(
+        res,
+        '<?xml version="1.0" encoding="UTF-8"?>' +
+          '<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>' +
+          '<SEVERITY>OK</SEVERITY>' +
+          `<SHORT_TEXT>${unpublish ? 'un-published' : 'published'} ${serviceName} locally</SHORT_TEXT>` +
+          '<LONG_TEXT></LONG_TEXT></asx:values></asx:abap>',
+      );
     }
 
     // Type pools (TYPE / TYPE-POOL): /sap/bc/adt/ddic/typegroups.

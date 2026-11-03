@@ -1,11 +1,11 @@
 ---
 name: abap-cli-edit
-description: abap-cli 写路径 — 拉（`pull`）/ 推（`push`）/ 语法检查（`check`）/ 创建（`create` / `create local`）/ 激活（`activate`）/ 删除（`delete`）/ 列举（`list`）/ MIME Repository CRUD（`mime create` / `mime delete` / `mime push`）/ AFF 校验（`validate:aff`），含 DDIC CRUD（DOMA / DTEL / TABL / STRU）与 ICF/SICF 服务节点（类型码 `HTTP`），经 `pull --type` / `create --file` / `push *.json`。use when asking how to change a SAP object / download an ABAP class / push a local file / run syntax check / create or delete an object / activate inactive parts / audit a package for scratch work / edit a DDIC definition / create or edit an ICF SICF HTTP service node / upload or delete MIME resources in SE80 / validate an AFF canonical JSON before pushing / which object types the CLI supports.
+description: abap-cli 写路径 — 拉（`pull`）/ 推（`push`）/ 语法检查（`check`）/ 创建（`create` / `create local`）/ 激活（`activate`）/ 删除（`delete`）/ 列举（`list`）/ 服务绑定发布（`publish` / `unpublish`）/ MIME Repository CRUD（`mime create` / `mime delete` / `mime push`）/ AFF 校验（`validate:aff`），含 DDIC CRUD（DOMA / DTEL / TABL / STRU）与 ICF/SICF 服务节点（类型码 `HTTP`），经 `pull --type` / `create --file` / `push *.json`。use when asking how to change a SAP object / download an ABAP class / push a local file / run syntax check / create or delete an object / activate inactive parts / publish or unpublish an OData service binding endpoint / audit a package for scratch work / edit a DDIC definition / create or edit an ICF SICF HTTP service node / upload or delete MIME resources in SE80 / validate an AFF canonical JSON before pushing / which object types the CLI supports.
 metadata:
   version: "2.1.0"
   scope: sap
-  commands: [pull, push, check, create, activate, "create local", mime, "validate:aff", delete, list]
-  tags: [write, lock, transport, ddic, http, sicf, mime, aff, cleanup, audit]
+  commands: [pull, push, check, create, activate, publish, unpublish, "create local", mime, "validate:aff", delete, list]
+  tags: [write, lock, transport, ddic, http, sicf, srvb, publish, mime, aff, cleanup, audit]
 ---
 
 # abap-cli-edit — 写路径（含 DDIC + MIME + AFF 校验）
@@ -29,6 +29,7 @@ metadata:
 - DDIC 定义 CRUD：`pull <name> --type DOMA|DTEL|TABL|STRU`、`create <type> <name> --file <json>`、`push <name>.<type>.json`。TABL/STRU 现在遵循 abap-file-format 三件套（`--file` 指向 main `.tabl.json` + 同目录 `.tabl.ddic` + 可选 `.tabl.settings.json`）；只有 main JSON 时回落 legacy wire-flat（详见 workflow.md 变体 2）。**写新 TABL/STRU 时直接 `cp` [assets/tabl-templates](./assets/tabl-templates/README.md) 里的 DDL 骨架**（5 个场景：透明表 / include / 货币金额 / 数量单位 / STRU），别凭空写 `@AbapCatalog.*` 注释
 - 上传 UI 资产（JavaScript / CSS / 图片 / 模板）到 SAP MIME Repository（SE80）→ `mime create / push`；删 MIME 目录走 `mime delete --recursive`
 - 写盘前用官方 AFF schema 严格校验本地 JSON（CLAS / INTF / PROG / FUGR / TABL / STRU / DOMA / DTEL / HTTP / TRAN / TTYP / MSAG / DDLS）→ `validate:aff <file-or-dir> --json`（纯本地 ajv + Draft 2020-12，**不进 SAP**；CI / pretest gate）。退出码即结论：`0` 通过（含 WARN）、`2` 参数/路径错误、`7` 校验失败（`error.details.files[]` 列出每个失败文件与 `missingCompanions`）
+- 发布/取消发布 OData 服务绑定（SRVB）的本地 endpoint：`abap publish <SRVB>` / `abap unpublish <SRVB>`（ADT publish/unpublish job；版本从绑定元数据推导）
 - 清理或审计 SAP 上的对象：列出包内对象用 `list --package <pkg> [--type <type>]`（只读）；删除单个对象用 `delete <name> --type <type> [--tr <req>] --yes`（lock → delete → unlock，必传 `--yes`，非本地包（`$` 前缀之外）必传 `--tr`，与 `push` 语义一致）。常用于删除一次性探针类 / $TMP 草稿清理 / 批量接管前先看包
 
 ## 决策树

@@ -35,6 +35,7 @@ import {
   buildSrvbCreateBody,
   parsePublishJobResponse,
   publishJobAsXmlType,
+  srvbObjectUrl,
   type PublishJobResult,
 } from './srvb.js';
 import { ATC_TYPE_INFO, atcMediaType, atcObjectUrl, buildAtcBody } from './atc.js';
@@ -878,6 +879,18 @@ export class AdtClientWrapper {
       } finally {
         await this.unLock(objectUrl, handle).catch(() => undefined);
       }
+    });
+  }
+
+  /** GET the service-binding metadata envelope (publish/unpublish derive the
+   *  service + binding versions from it). */
+  getSrvbMetadata(name: string): Promise<string> {
+    return this._call(async () => {
+      const response = await this.client.httpClient.request(srvbObjectUrl(name), {
+        method: 'GET',
+        headers: { Accept: SRVB_MEDIA_TYPE },
+      });
+      return String(response.body ?? '');
     });
   }
 

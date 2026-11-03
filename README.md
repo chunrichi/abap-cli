@@ -119,7 +119,7 @@ For a transported install into your own package, pass `--package <pkg> --tr <req
 abap init --agent agents    # agents | copilot | claude | cursor | generic
 ```
 
-This copies the 6 skills and the `abap-developer` agent definition into the target directory — `.agents/` for the vendor-neutral `agents` target, or `.github/`, `.claude/`, `.cursor/` for the vendor targets — plus a `CLAUDE.md` or `.cursor/rules/abap.mdc` overlay where the vendor needs one (`generic` is the earlier name for `agents`). See [skills/README.md](skills/README.md) for the layout and the skill routing table.
+This copies the 6 skills and the `abap-developer` agent definition into the target directory — `.agents/` for the vendor-neutral `agents` target, or `.github/`, `.claude/`, `.cursor/` for the vendor targets — plus a `.cursor/rules/abap.mdc` overlay for `cursor` (`generic` is the earlier name for `agents`). See [skills/README.md](skills/README.md) for the layout and the skill routing table.
 
 ---
 
@@ -176,6 +176,8 @@ No type or object subdirectories, and namespaced objects use the AFF bracket tok
 | `abap create <type> <name>` | Create and activate an object (`--package`, `--description`, `--tr`, `--file`, `--template`, `--check-only`, `--audit`); `--func <name>` adds a function module to an existing function group |
 | `abap create local <type> <name>` | Generate an offline AFF draft skeleton for CLAS / INTF / PROG / FUGR, no SAP connection |
 | `abap activate <object>` | Activate all inactive items of an object (repairs stale activation) |
+| `abap publish <object>` | Publish the local OData endpoint of a service binding (SRVB) |
+| `abap unpublish <object>` | Unpublish the local OData endpoint of a service binding (SRVB) |
 | `abap delete <object>` | Delete an object: lock → delete → unlock (`--type`, `--tr`, `--yes`) |
 | `abap mime` | `create` / `delete` (`--recursive`) / `push` MIME repository folders and files |
 | `abap validate:aff` | Validate AFF JSON files against the official vendored schemas, locally (`--wire <wire-dir>`) |

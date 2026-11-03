@@ -9,14 +9,6 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../
 const skillsRoot = path.join(repoRoot, 'skills');
 const agentsRoot = path.join(repoRoot, 'agents');
 
-// CLI 命令清单（与 src/abap_cli/registry/commands.ts 的 COMMAND_SPECS 对齐）
-const EXPECTED_COMMANDS = new Set([
-  'doctor', 'transport',
-  'search', 'where-used', 'pull', 'push', 'check', 'create', 'activate', 'inspect', 'diff', 'status',
-  'select', 'run', 'tcode', 'deploy',
-  // 'create local' 子命令特殊处理
-]);
-
 interface SkillInfo {
   dirName: string;
   dirPath: string;
@@ -197,7 +189,7 @@ describe('skill bundle structural audit', () => {
     for (const cmd of expected) {
       expect(allCommands.has(cmd), `${cmd} 未被任何 skill 覆盖`).toBe(true);
     }
-    // `create local` 是 create 的子命令，会以字符串形式被加进来（不计入 17）
+    // `create local` 是 create 的子命令，会以字符串形式被加进来（不计入顶层命令数）
     expect(allCommands.size).toBeGreaterThanOrEqual(expected.length);
     // 但要确保没有额外的"伪命令"——只允许 expected + `create local`（子命令）
     const expectedSet = new Set(expected);

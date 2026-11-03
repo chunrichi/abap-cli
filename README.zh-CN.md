@@ -119,7 +119,7 @@ abap deploy status     # 确认 SAP 侧版本与当前 CLI 一致
 abap init --agent agents    # agents | copilot | claude | cursor | generic
 ```
 
-把 6 个 skill 与 `abap-developer` agent 定义拷到对应 target 目录——vendor 中立的 `agents` 目标写 `.agents/`，厂商目标写 `.github/`、`.claude/`、`.cursor/`——需要时还会写 `CLAUDE.md` 或 `.cursor/rules/abap.mdc` 覆盖文件（`generic` 是 `agents` 的早期名称）。目录结构与路由表见 [skills/README.md](skills/README.md)。
+把 6 个 skill 与 `abap-developer` agent 定义拷到对应 target 目录——vendor 中立的 `agents` 目标写 `.agents/`，厂商目标写 `.github/`、`.claude/`、`.cursor/`——`cursor` 目标额外写 `.cursor/rules/abap.mdc` 覆盖文件（`generic` 是 `agents` 的早期名称）。目录结构与路由表见 [skills/README.md](skills/README.md)。
 
 ---
 
@@ -176,6 +176,8 @@ src/(ui2)cl_json.clas.abap                # 命名空间对象 /UI2/CL_JSON
 | `abap create <type> <name>` | 在 SAP 创建并激活对象（`--package`、`--description`、`--tr`、`--file`、`--template`、`--check-only`、`--audit`）；`--func <name>` 在已有函数组里加函数模块 |
 | `abap create local <type> <name>` | 离线生成 AFF 草稿骨架，仅支持 CLAS / INTF / PROG / FUGR，不连 SAP |
 | `abap activate <object>` | 激活对象的所有 inactive items（修复陈旧未激活） |
+| `abap publish <object>` | 发布服务绑定（SRVB）的本地 OData endpoint |
+| `abap unpublish <object>` | 取消发布服务绑定（SRVB）的本地 OData endpoint |
 | `abap delete <object>` | 删除对象：锁 → 删除 → 解锁（`--type`、`--tr`、`--yes`） |
 | `abap mime` | `create` / `delete`（`--recursive`）/ `push` MIME 仓库目录与文件 |
 | `abap validate:aff` | 按官方 vendored schema 本地校验 AFF JSON 文件（`--wire <wire-dir>`） |
