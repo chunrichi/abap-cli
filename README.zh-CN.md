@@ -52,7 +52,7 @@ abap push src/zcl_my_class.clas.abap --tr DEVK900001    # 锁 → 写 → 激活
 ## 能做什么
 
 - **就地在本地编辑**——`pull` 把对象拉成 abap-file-format 文件树，用编辑器改，`push` 写回（锁 → 写 → 激活 → 解锁）；写之前可以先 `check` 和 `diff`。
-- **覆盖 36 种对象类型**——类、接口、程序、函数组；包；DDIC 表、结构、域、数据元素、数据库视图、搜索帮助、锁对象、编号范围对象；SICF 节点、事务码、XSLT 转换程序；表类型、消息类、CDS 视图及 CDS / RAP 配套对象；ATC 检查配置对象；CDS 技术对象；类型池；应用程序作业目录条目与模板。其中 36 种支持 create、36 种支持 pull、34 种有 push 入口、36 种有 delete 路径；`DEVC` 支持 create / pull / delete（无 push），`SRVB` 仅元数据，`SAJC` / `SAJT` 写入即激活。
+- **覆盖 37 种对象类型**——类、接口、程序、函数组；包；DDIC 表、结构、域、数据元素、数据库视图、搜索帮助、锁对象、编号范围对象；SICF 节点、事务码、XSLT 转换程序、SM59 HTTP 目标；表类型、消息类、CDS 视图及 CDS / RAP 配套对象；ATC 检查配置对象；CDS 技术对象；类型池；应用程序作业目录条目与模板。其中 37 种支持 create、37 种支持 pull、35 种有 push 入口、37 种有 delete 路径；`DEVC` 支持 create / pull / delete（无 push），`SRVB` 仅元数据，`SAJC` / `SAJT` 写入即激活。
 - **只读探查 SAP**——`search`、`inspect`、`where-used`、`tcode`、`list`、`dumps`、`fields`、`select`、`run-report` 都不改系统。
 - **运行与验证**——`abap run` 执行类（classrun）或 PUBLIC STATIC 方法；`abap run-report` 返回列表输出；`abap select` 就是 SE16N 的等价物。
 - **管理传输**——`transport list / create / show / resolve / assign`，`push` 时按对象自动解析。
@@ -204,7 +204,7 @@ src/(ui2)cl_json.clas.abap                # 命名空间对象 /UI2/CL_JSON
 
 ## 支持的对象类型
 
-36 个类型码，按 ADT REST API 或捆绑 ICF 服务路由：源对象、包、DDIC 对象、SICF 节点、事务码、XSLT 转换、表类型、消息类、CDS 与 RAP 源对象、ATC 检查配置对象、CDS 技术对象、类型池，以及应用程序作业。36 种支持 `create`，36 种支持 `pull`，34 种支持 `push`，36 种支持 `delete`；每个类型对应一组平铺在 `src/` 下的产物文件（多数为官方 AFF，`TTYP` / `VIEW` / `SHLP` 使用本地扩展 schema）。
+37 个类型码，按 ADT REST API 或捆绑 ICF 服务路由：源对象、包、DDIC 对象、SICF 节点、事务码、XSLT 转换、SM59 HTTP 目标、表类型、消息类、CDS 与 RAP 源对象、ATC 检查配置对象、CDS 技术对象、类型池，以及应用程序作业。37 种支持 `create`，37 种支持 `pull`，35 种支持 `push`，37 种支持 `delete`；每个类型对应一组平铺在 `src/` 下的产物文件（多数为官方 AFF，`TTYP` / `VIEW` / `SHLP` / `SM59` 使用本地扩展 schema）。
 
 完整类型 × 命令矩阵、产物文件集、通道路由与逐类型注意事项见 **[docs/supported.md](docs/supported.md)**；逐类型细节与真机证据见 [wiki/object-types.md](wiki/object-types.md)。
 
@@ -261,6 +261,7 @@ npm 包内含 6 个 skill 和 1 个 agent 定义：
 - 仅 basic 认证：不支持 X.509 客户端证书、浏览器 SSO、OAuth password grant 与 Kerberos。
 - DDIC、表数据 / 报表类命令以及 `run --method` 需要先 `abap deploy` 一次；较旧的 ECC 版本 ADT 端点更少（CDS 会以 `DDLS_NOT_SUPPORTED_ON_ECC` 拒绝）。
 - 当 ADT 没有非交互式 text-elements 写端点时，textpool 写入不可用（`TEXTPOOL_WRITE_UNSUPPORTED`）。
+- SM59 只覆盖 HTTP 目标（`RFCTYPE='G'`）；其他 SM59 目标类型、UCON HTTP service、UCON RFC service（`SRFC`）与 OAuth2 profile（`OA2P`）不在范围内。本地文档只建模 target host / port / protocol / path prefix / description——高级 SM59 选项（登录数据、代理、SSL 证书、HTTP version / timeout 等）不由 CLI 编辑；对 SAP 自带目标执行 push 会丢掉维护 API 不认识的 legacy option 代码。目标是 client-independent 系统表 `RFCDES` 的条目，没有 package、也无法记录到传输请求——`create` / `push` / `delete` 显式拒绝 `--package` / `--tr`，不会静默忽略。
 - 目前不支持：增强（ENHO）、SAPscript / Smart Forms、Web Dynpro、BAdI、IDoc / workflow。诚实的覆盖快照见 [wiki/coverage-matrix.md](wiki/coverage-matrix.md)。
 
 ---

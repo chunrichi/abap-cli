@@ -1,10 +1,10 @@
 ---
 type: command
 title: abap delete
-description: "从 SAP 删除单个 ABAP 对象（lock → delete → unlock）：--type 必填消歧、--yes 显式确认、非本地包对象必须用 --tr 指定传输请求。"
-tags: [abap-cli, command, delete, adt, lock, transport, cleanup]
+description: "从 SAP 删除单个 ABAP 对象（lock → delete → unlock）：--type 必填消歧、--yes 显式确认、非本地包对象必须用 --tr 指定传输请求；SM59 / DEVC 等无 transport 的路径单独处理。"
+tags: [abap-cli, command, delete, adt, lock, transport, sm59, cleanup]
 created at: 2026-10-29 14:30:14
-changed at: 2026-11-03 19:20:00
+changed at: 2026-11-04 00:45:00
 ---
 
 # abap delete
@@ -23,7 +23,7 @@ abap delete --schema --json
 ## Options
 
 - `<object>`: SAP 对象名（如 `ZCL_MY_CLASS`），不是本地文件名；内部走 ADT quickSearch 解析成对象 URL。
-- `--type <type>`: **必填**。对象类型码（`CLAS` / `PROG` / `INTF` / `FUGR` / `DEVC` / `TABL` / `VIEW` / `SHLP` / `TRAN` / `HTTP` / ... / `XSLT`），大小写不敏感。`DEVC` 走独立删除路径（包资源按名字直接寻址，不依赖 quickSearch，也不加锁）；`VIEW` / `SHLP` / `ENQU` / `NROB` / `HTTP` 走 ICF delete（本地 `$` 前缀包）：VIEW/SHLP 先激活 inactive 版本再 `RS_DD_DELETE_OBJ`，ENQU 先回填本地 TADIR 再 `RS_DD_DELETE_OBJ`，NROB 清区间后 `NUMBER_RANGE_OBJECT_DELETE`，HTTP 用 `cl_icf_tree` 删 SICF 节点（根节点 / 有子节点 / 可传输节点拒绝）。
+- `--type <type>`: **必填**。对象类型码（`CLAS` / `PROG` / `INTF` / `FUGR` / `DEVC` / `TABL` / `VIEW` / `SHLP` / `TRAN` / `HTTP` / `SM59` / ... / `XSLT`），大小写不敏感。`DEVC` 走独立删除路径（包资源按名字直接寻址，不依赖 quickSearch，也不加锁）；`VIEW` / `SHLP` / `ENQU` / `NROB` / `HTTP` / `SM59` 走 ICF delete：VIEW/SHLP 先激活 inactive 版本再 `RS_DD_DELETE_OBJ`，ENQU 先回填本地 TADIR 再 `RS_DD_DELETE_OBJ`，NROB 清区间后 `NUMBER_RANGE_OBJECT_DELETE`，HTTP 用 `cl_icf_tree` 删 SICF 节点（根节点 / 有子节点 / 可传输节点拒绝），SM59 走 `DELETE /sm59/<name>`（`CL_DEST_FACTORY=>delete`，无需 transport）。
 - `--tr <request>`: 传输请求号。本地包对象可省略；其它包必填。
 - `--yes`: **必填**。显式确认删除；无 TTY 时缺失直接报 `USAGE`。
 - `--schema`: 打印本命令参数 schema 并退出，不调用 SAP。
@@ -70,6 +70,14 @@ abap delete ZMY_SERVICE --type HTTP --yes --json
 
 # 也可以直接给 SICF 路径
 abap delete /sap/zmy_service --type HTTP --yes --json
+```
+
+```bash
+# 删除 SM59 HTTP 目标（client-independent 系统表条目：无 package、无 transport，不能带 --tr）
+abap delete ZCLI_SM59_DEMO --type SM59 --yes --json
+
+# 非 HTTP 目标（RFCTYPE != G）会被拒绝：SM59_TYPE_NOT_SUPPORTED（exit 7）
+# 目标不存在 → NOT_FOUND（exit 8）；带 --tr → TYPE_NOT_SUPPORTED（exit 7）
 ```
 
 ## Expected Output

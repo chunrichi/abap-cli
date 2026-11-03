@@ -64,7 +64,7 @@
 ## 六、对象类型补充路线（2026-10 评估）
 
 > 判据：**开发价值 × SAP 侧可行性（ADT / DDIC API）× AFF 成熟度 × agent 闭环收益**。
-> 对比依据：abap-cli 36 类 vs SAP abap-file-formats 上游 102 个类型格式（2026-10-30 HEAD）vs abapGit 168 个 TADIR handler（2026-10-29 HEAD）。
+> 对比依据：abap-cli 37 类 vs SAP abap-file-formats 上游 102 个类型格式（2026-10-30 HEAD）vs abapGit 168 个 TADIR handler（2026-10-29 HEAD）。
 > 本轮范围约定：**P0 不做 transport request 管理（release/delete）；P1 暂不做授权字段（AUTH）**。
 
 ### 6.1 P0：先在现有类型内补完
@@ -90,6 +90,7 @@
 | `DRTY` | ADT `/ddic/drty/sources`：blueSource 元数据 + `source/main`（text/plain）；写入受 `CDS_SIMPLE_TYPES` 用户参数控制 | AFF 官方 `drty-v1.json` + `.drty.acds` | - [x] 已完成（真机 create/pull/push/delete 闭环） |
 | `TYPE`（type pool） | ADT `/ddic/typegroups`：`atypgr:abapTypeGroup` 元数据 + `source/main`（经典 ABAP）；名称上限 5 | AFF 官方 `type-v1.json` + `.type.abap` | - [x] 已完成（真机 create/pull/push/delete 闭环） |
 | `SAJC` / `SAJT` | ADT `/applicationjob/{catalogs,templates}`：blueSource 元数据 + `source/main`（JSON 文档，随 release 有扁平/嵌套两种模型） | AFF 官方 `sajc-v1.json` / `sajt-v1.json`（单 JSON） | - [x] 已完成（参考 release 旧模型 + mock 双模型；真机 create/pull/push/delete 闭环） |
+| `SM59`（HTTP destination） | ICF `/sm59`：标准维护 API `SRFC_DESTAPI`（`CL_DEST_FACTORY` / `CL_DEST_ROOT` / `CL_DEST_HTTP_EXT`，RFCTYPE='G'；删除 `CL_DEST_FACTORY=>delete`），dialog-free | 自建 `sm59-v1.json`（AFF 无此格式；targetHost / port / protocol / pathPrefix / description，描述 ≤72） | - [x] 已完成（ABAP/CLI/mock/unit/integration + 真机闭环；无 package/传输，legacy RFCOPTIONS 不保留） |
 
 > VIEW / SHLP 因 AFF 上游无格式，需按 TTYP 先例维护本地扩展 schema；可同步向上游 AFF 提 PR，采纳后切回官方 schema。
 
@@ -101,7 +102,7 @@
 - **TTYP 本地文件收口**：表类型是纯 DDIC 元数据（abapGit 也只序列化元数据），已移除 pull 生成的 `.type.abap` 只读侧车；`.type.abap` 归还给 AFF type pool（`TYPE`）。旧侧车文件被忽略，不再生成。
 - **AFF-stable 27 类中的云/UI 类**（APLO/BGQC/CDBO/COTA/DESD/EVTB/EEEC/GSMP/SMBC/SWCR/NONT/RONT/UIAD/UIPG/UIST）：接入成本低，但按 BTP/云需求排期（`SAJC` / `SAJT` 已完成）。
 - **`JOBD`（Technical Job Definition）**：abapGit 有 handler，但没有官方 AFF 格式，参考 release 也没有 ADT 资源；要落地需自建本地 schema + ICF 端点，独立评估。
-- **`PINF` / `SCP1` / 授权族（SUSO 等）/ SM59 目标（`HTTP` destination / `SRFC` / `OA2P`）**：参考 release 没有可用 ADT 通道，暂不支持。
+- **`PINF` / `SCP1` / 授权族（SUSO 等）/ SM59 其它目标类型（RFC 连接 `3`·`I`·`T`·`L`）/ UCON HTTP service / UCON RFC service（`SRFC`）/ OAuth2 profile（`OA2P`）**：参考 release 没有可用 ADT 通道，暂不支持；SM59 HTTP 目标（RFCTYPE='G'）已完成。
 - **`DRAS` / `DTIX` / `DTSC`**：官方 AFF schema 已在镜像中，但本机 typestructure 无 CREATE、discovery 无 ADT 资源（2026-11-03 实测），等有 ADT 通道的 release 再实现；不硬做 ICF
 - **表单/集成**：`SFPF`（AFF 有格式）、`SSFO`/SAPscript、`IDOC`（AFF 无格式，复杂度高）
 

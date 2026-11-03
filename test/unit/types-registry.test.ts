@@ -7,6 +7,7 @@ import {
   TYPE_REGISTRY,
   allSupportedTypes,
   maxNameLengthFor,
+  packageNotApplicableFor,
   createObjtypeFor,
   sourceFor,
   isSupportedType,
@@ -19,17 +20,17 @@ import {
 } from '../../src/abap_cli/types/registry.js';
 
 describe('types/registry.ts (single source of truth)', () => {
-  it('contains exactly 36 supported types (4 source + DEVC + 4 DDIC + ENQU + VIEW + SHLP + NROB + HTTP + TRAN + XSLT + 3 dual-channel + 6 + 3 ATC + 5 CDS technical + TYPE + 2 application jobs)', () => {
+  it('contains exactly 37 supported types (4 source + DEVC + 4 DDIC + ENQU + VIEW + SHLP + NROB + HTTP + TRAN + SM59 + XSLT + 3 dual-channel + 6 + 3 ATC + 5 CDS technical + TYPE + 2 application jobs)', () => {
     // added: SRVB (metadata-only), SRVD, BDEF, DCLS, DDLX, DDLA.
     // added: ENQU (lock object, ICF) and NROB (number range object, ICF).
     // added: DEVC (package, ADT package resource; push unsupported).
-    expect(allSupportedTypes()).toHaveLength(36);
+    expect(allSupportedTypes()).toHaveLength(37);
     expect(allSupportedTypes()).toEqual([
       'CLAS', 'INTF', 'PROG', 'FUGR',         // ADT source
       'DEVC',                                  // ADT package resource
       'TABL', 'STRU', 'DOMA', 'DTEL',         // ICF DDIC
       'ENQU', 'VIEW', 'SHLP', 'NROB',          // — ICF DDIC family
-      'HTTP', 'TRAN', 'XSLT',                  // ICF
+      'HTTP', 'TRAN', 'SM59', 'XSLT',          // ICF (SM59 = HTTP destination)
       'TTYP', 'MSAG', 'DDLS',                  // dual-channel
       'SRVB', 'SRVD', 'BDEF',                  // /
       'DCLS', 'DDLX', 'DDLA',
@@ -82,6 +83,8 @@ describe('types/registry.ts (single source of truth)', () => {
     // Application-job names are 40 characters (typestructure OBJNAME_MAXLENGTH).
     expect(maxNameLengthFor('SAJC')).toBe(40);
     expect(maxNameLengthFor('sajt')).toBe(40);
+    // SM59 destinations are RFCDEST (CHAR 32).
+    expect(maxNameLengthFor('SM59')).toBe(32);
     expect(maxNameLengthFor('CLAS')).toBeUndefined();
     expect(maxNameLengthFor('TYPE')).toBeUndefined();
   });
@@ -94,6 +97,8 @@ describe('types/registry.ts (single source of truth)', () => {
     expect(sourceFor('TABL')).toBe('ICF');
     expect(sourceFor('HTTP')).toBe('ICF');
     expect(sourceFor('TRAN')).toBe('ICF');
+    // SM59 HTTP destinations are served by the ICF /sm59 route.
+    expect(sourceFor('SM59')).toBe('ICF');
     // VIEW is a local-extension AFF document served by the ICF service.
     expect(sourceFor('VIEW')).toBe('ICF');
     expect(sourceFor('SHLP')).toBe('ICF');
@@ -113,6 +118,13 @@ describe('types/registry.ts (single source of truth)', () => {
     expect(sourceFor('DSFI')).toBe('ADT');
     expect(sourceFor('DRTY')).toBe('ADT');
     expect(sourceFor('TYPE')).toBe('ADT');
+  });
+
+  it('marks SM59 as outside the package/transport model', () => {
+    // RFCDES is a client-independent system table: no TADIR object, no package.
+    expect(packageNotApplicableFor('SM59')).toBe(true);
+    expect(packageNotApplicableFor('CLAS')).toBe(false);
+    expect(packageNotApplicableFor('TABL')).toBe(false);
   });
 
   it('has no type → folder mapping anymore (flat abap-file-format layout)', async () => {

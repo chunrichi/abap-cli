@@ -47,6 +47,14 @@ export interface ObjectTypeEntry {
    * this text so the limitation is stated in one place.
    */
   pushUnsupportedReason?: string;
+  /**
+   * True when the object type lives outside the package/transport model: SM59
+   * destinations are client-independent entries in the system table RFCDES, so
+   * they have no TADIR object, no package and cannot be transported. `create`
+   * must not require `--package` for such types, and the flows reject an
+   * explicit `--package` / `--tr` instead of silently dropping it.
+   */
+  packageNotApplicable?: boolean;
 }
 
 /** per-type capability hints for channel-detect. */
@@ -103,6 +111,18 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
   { type: 'HTTP', source: 'ICF', affSchemaFile: 'http-v1.json', requiresFile: true },
   // Transaction code (SE93) via ICF
   { type: 'TRAN', source: 'ICF', affSchemaFile: 'tran-v1.json', requiresFile: true },
+  // SM59 HTTP destination (RFCTYPE='G') via ICF `/sm59/<name>`. Upstream AFF
+  // has no SM59 format, so `sm59-v1.json` is a local extension. Destinations
+  // are client-independent system-table entries (RFCDES): no TADIR object, no
+  // package, no transport path, hence `packageNotApplicable`. RFCDEST is CHAR 32.
+  {
+    type: 'SM59',
+    source: 'ICF',
+    affSchemaFile: 'sm59-v1.json',
+    requiresFile: true,
+    maxNameLength: 32,
+    packageNotApplicable: true,
+  },
   // Transformation (XSLT program) via ICF `/xslt/<name>`. The AFF layout is a
   // pair: `<name>.xslt.json` (metadata) + `<name>.xslt.xml` (source).
   { type: 'XSLT', source: 'ICF', affSchemaFile: 'xslt-v1.json', requiresFile: true },
@@ -341,6 +361,17 @@ export function pushUnsupportedReasonFor(type: string): string | undefined {
 export function maxNameLengthFor(type: string): number | undefined {
   const primary = type.split('/')[0]!.toUpperCase();
   return INDEX[primary]?.maxNameLength;
+}
+
+/**
+ * Whether the type lives outside the package/transport model (currently SM59:
+ * client-independent RFCDES entries). `create` skips the `--package`
+ * requirement for these types; their flows reject explicit package/transport
+ * flags instead of ignoring them.
+ */
+export function packageNotApplicableFor(type: string): boolean {
+  const primary = type.split('/')[0]!.toUpperCase();
+  return INDEX[primary]?.packageNotApplicable === true;
 }
 
 /** Return all supported type codes (uppercase, in registry order). */

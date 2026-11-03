@@ -6,6 +6,7 @@ import { normalizeTypeInput } from '../cli/type-alias.js';
 import { getDdicJsonExample } from '../formats/ddic/examples.js';
 import { getViewJsonExample } from '../formats/view/json.js';
 import { getShlpJsonExample } from '../formats/shlp/json.js';
+import { getSm59JsonExample } from '../formats/sm59/json.js';
 import type { DdicSupportedType } from '../formats/ddic/types.js';
 import { listTemplates } from '../formats/templates.js';
 import {
@@ -211,22 +212,47 @@ export function createSchema(type?: string): CreateCommandSchema {
   if (requiresFileFor(t)) {
     const route = sourceFor(t) === 'ICF' ? ('icf' as const) : undefined;
     const isDdic = isDdicSupportedType(t);
+    // SM59 destinations live outside the package/transport model: the type
+    // dimension of the schema states which flags are not applicable instead of
+    // silently accepting them.
+    const isSm59 = t === 'SM59';
     const message = t === 'VIEW'
       ? 'VIEW (DDIC database view) is created through the self-built ICF service (/ddic/view). Requires --file with a local-extension view-v1 JSON: header.description, viewClass, rootTable, tables[] and fields[]; joinConditions[] for a multi-table view.'
       : t === 'SHLP'
         ? 'SHLP (DDIC search help) is created through the self-built ICF service (/ddic/shlp). Requires --file with a local-extension shlp-v1 JSON: kind (elementary/collective), header.description and parameters[]; an elementary search help also needs selectionMethod, a collective one needs includedSearchHelps[] and parameterMappings[].'
-        : isDdic
-          ? `DDIC type ${t} created via the self-built ICF service. Requires --file <abap-file-format JSON> with top-level fields: name, description, fields[].`
-          : t === 'XSLT'
-            ? `Type XSLT requires --file <name>.xslt.json (AFF xslt-v1 metadata); the sibling <name>.xslt.xml source must exist in the same directory. Created via the self-built ICF service at /xslt/<name>.`
-            : `Type ${t} requires --file <abap-file-format JSON>. No local skeleton path exists; write the JSON first, then create.`;
+        : isSm59
+          ? 'SM59 (HTTP destination, RFCTYPE=G) is created through the self-built ICF service (/sm59/<name>). Requires --file with a local-extension sm59-v1 JSON: targetHost, protocol (HTTP/HTTPS), optional port, pathPrefix and description. Destinations are client-independent system-table entries: --package and --tr are not applicable (no TADIR object, no transport), and there is no activation step. Names are RFCDEST (max 32 chars); SAP rejects its reserved/internal name patterns — maintain those directly in SM59.'
+          : isDdic
+            ? `DDIC type ${t} created via the self-built ICF service. Requires --file <abap-file-format JSON> with top-level fields: name, description, fields[].`
+            : t === 'XSLT'
+              ? `Type XSLT requires --file <name>.xslt.json (AFF xslt-v1 metadata); the sibling <name>.xslt.xml source must exist in the same directory. Created via the self-built ICF service at /xslt/<name>.`
+              : `Type ${t} requires --file <abap-file-format JSON>. No local skeleton path exists; write the JSON first, then create.`;
     const exampleJson = t === 'VIEW'
       ? getViewJsonExample()
       : t === 'SHLP'
         ? getShlpJsonExample()
-        : isDdic
-          ? getDdicJsonExample(t as DdicSupportedType)
-          : undefined;
+        : isSm59
+          ? getSm59JsonExample()
+          : isDdic
+            ? getDdicJsonExample(t as DdicSupportedType)
+            : undefined;
+    const typeOptions = isSm59
+      ? base.options.map((o) => {
+          if (o.name === '--package') {
+            return { ...o, required: false, description: 'Not applicable for SM59: destinations are client-independent system-table entries with no package' };
+          }
+          if (o.name === '--tr') {
+            return { ...o, description: 'Not applicable for SM59: destinations cannot be transported' };
+          }
+          if (o.name === '--description') {
+            return { ...o, required: false, description: 'Optional override of the document description' };
+          }
+          if (o.name === '--no-activate') {
+            return { ...o, description: 'Not applicable for SM59: destinations have no activation step' };
+          }
+          return o;
+        })
+      : base.options;
     return {
       ...base,
       type: t,
@@ -235,7 +261,7 @@ export function createSchema(type?: string): CreateCommandSchema {
       message,
       ...(exampleJson !== undefined ? { exampleJson } : {}),
       options: [
-        ...base.options,
+        ...typeOptions,
         {
           name: '--file',
           type: 'string',
@@ -243,7 +269,9 @@ export function createSchema(type?: string): CreateCommandSchema {
           required: true,
           description: isDdic
             ? 'abap-file-format DDIC JSON input (top-level fields; see exampleJson)'
-            : `abap-file-format ${t} JSON input`,
+            : isSm59
+              ? 'local-extension sm59-v1 JSON input (see exampleJson)'
+              : `abap-file-format ${t} JSON input`,
         },
       ],
     };

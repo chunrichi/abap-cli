@@ -26,6 +26,7 @@ describe('types-catalog', () => {
     expect(codes).toContain('STRU');
     expect(codes).toContain('HTTP');
     expect(codes).toContain('TRAN');
+    expect(codes).toContain('SM59');
     expect(codes.length).toBeGreaterThanOrEqual(20);
   });
 
@@ -36,6 +37,17 @@ describe('types-catalog', () => {
     // Sanity: TABL and TRAN are 1:1.
     expect(tadirObjectFor('TABL')).toBe('TABL');
     expect(tadirObjectFor('TRAN')).toBe('TRAN');
+  });
+
+  it('represents SM59 (no TADIR object) with the catalog empty value', () => {
+    const row = typeCatalog().find((r) => r.cliType === 'SM59');
+    expect(row).toBeDefined();
+    // RFCDES is a client-independent system table: no TADIR object, no package.
+    expect(row?.tadirObject).toBe('');
+    expect(row?.channel).toBe('ICF');
+    expect(row?.affSchema).toBe('sm59-v1.json');
+    expect(row?.description).toContain('not transportable');
+    expect(tadirObjectFor('SM59')).toBe('');
   });
 
   it('exposes the DDIC tabclass filter for STRU', () => {

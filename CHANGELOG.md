@@ -6,11 +6,12 @@
 
 ## [Unreleased]
 
-本版新增 `abap whoami`：连接身份由 SAP 系统返回，而不是读取本地 profile 配置，因此配置与真实会话不一致、或将来接入 SSO 等认证方式时依然准确。为此内置 ICF 服务新增身份端点，CLI 与 ICF 服务版本线统一到 2.3.0；升级后执行一次 `abap deploy --yes` 才能使用该命令，部署前 `abap deploy status` 会显示 outdated。
+本版新增 `abap whoami`：连接身份由 SAP 系统返回，而不是读取本地 profile 配置，因此配置与真实会话不一致、或将来接入 SSO 等认证方式时依然准确。本版同时新增 `SM59` 类型，用于管理 SM59 的 HTTP destination 连接配置。内置 ICF 服务相应新增身份端点与 SM59 端点，CLI 与 ICF 服务版本线统一到 2.4.0；升级后执行一次 `abap deploy --yes` 才能使用这些能力，部署前 `abap deploy status` 会显示 outdated。
 
 ### Added
 
 - **`abap whoami`**：由 SAP 系统返回当前连接的实际身份——登录用户、系统 ID / 客户端，以及应用服务器 / 数据库 / OS / ABAP release；输出同时带上工作区 profile 与 endpoint。身份取自 SAP 会话而不是本地 profile 配置，因此在切换 profile、CI 注入配置或将来接入 SSO 等认证方式时都能反映真实登录身份。命令需要已部署新版内置 ICF 服务：服务未安装或版本过旧时会提示先执行 `abap deploy --yes`；`abap whoami --schema --json` 不连 SAP。
+- **`SM59`（SM59 HTTP destination）**：新增 `SM59` 类型，管理 SM59 中「HTTP 连接到外部服务器」的目的地，支持 `create` / `pull` / `push` / `delete`。本地文件 `<name>.sm59.json` 可编辑描述、目标主机、端口、协议（HTTP/HTTPS）与路径前缀，`pull` 也能读取系统里已有的 HTTP destination 作为起点。SM59 目的地是客户端无关的系统级配置：没有 package，也不能记录 transport，因此这些命令不接受 `--package` / `--tr`（传了会明确报错，而不是静默忽略）；`create` 不需要 package，创建后所有 client 都能看到该目的地。注意 `push` 是整份目的地定义的覆盖写，而当前只建模了上述常用字段：SSL 证书、代理、登录过程等高级选项不会随文件往返，写入后按 SAP 默认值生效；`pull` 读取已有目的地后 `push` 也会覆盖这些高级设置，请在用途明确的测试目的地或新建目的地上使用。其它 SM59 类型（RFC destination、UCON HTTP/RFC service、OAuth2 profile）不在本版范围内。
 
 ## [2.2.0] - 2026-11-03
 

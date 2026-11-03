@@ -58,7 +58,7 @@ describe('schema-paths priority chain', () => {
     const types = affSupportedTypes();
     expect(types).toEqual(
       expect.arrayContaining([
-        'CLAS', 'INTF', 'PROG', 'FUGR', 'TABL', 'STRU', 'TABT', 'DOMA', 'DTEL', 'HTTP', 'TRAN', 'XSLT',
+        'CLAS', 'INTF', 'PROG', 'FUGR', 'TABL', 'STRU', 'TABT', 'DOMA', 'DTEL', 'HTTP', 'TRAN', 'SM59', 'XSLT',
         // channel-routed types.
         'TTYP', 'MSAG', 'DDLS',
         // FUGR companion schemas for.reps.json and.func.json files.
@@ -97,7 +97,8 @@ describe('schema-paths priority chain', () => {
     // added DRTY = 37 total.
     // added TYPE (type pool) = 38 total.
     // added SAJC / SAJT (application jobs) = 40 total.
-    expect(types).toHaveLength(40);
+    // added SM59 (HTTP destination local extension) = 41 total.
+    expect(types).toHaveLength(41);
   });
 
   it('bundled root contains every supported schema', () => {

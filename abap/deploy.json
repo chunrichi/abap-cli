@@ -30,6 +30,10 @@
       "local": "lcl_tcode"
     },
     {
+      "global": "ZCL_ABAP_VIBE_ICF_SM59",
+      "local": "lcl_sm59"
+    },
+    {
       "global": "ZCL_ABAP_VIBE_ICF_DATA",
       "local": "lcl_data"
     },

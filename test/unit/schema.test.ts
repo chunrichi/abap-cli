@@ -105,7 +105,7 @@ describe('abap create --schema (introspection)', () => {
       'DEVC',
       'TABL', 'STRU', 'DOMA', 'DTEL',
       'ENQU', 'VIEW', 'SHLP', 'NROB',
-      'HTTP', 'TRAN', 'XSLT',
+      'HTTP', 'TRAN', 'SM59', 'XSLT',
       'TTYP', 'MSAG', 'DDLS',
       'SRVB', 'SRVD', 'BDEF', 'DCLS', 'DDLX', 'DDLA',
       'CHKC', 'CHKO', 'CHKV',
@@ -198,6 +198,28 @@ describe('abap create --schema (introspection)', () => {
       );
       expect(requiredFile, `expected ${t} --schema to declare a required --file`).toBeDefined();
     }
+  });
+
+  it('reports SM59 as an ICF destination type without a package requirement', async () => {
+    const program = makeProgram();
+    registerCreateCommand(program);
+    const res = await runCommand(program, ['create', '--schema', 'SM59']);
+    expect(res.exitCode).toBeUndefined();
+    const { data } = parseStdout(res);
+    expect(data).toMatchObject({ type: 'SM59', supported: true, route: 'icf' });
+    expect(data.exampleJson).toContain('.sm59.json');
+    expect(data.exampleJson).toContain('targetHost');
+    // Destinations are client-independent system-table entries.
+    expect(data.options.find((o: { name: string }) => o.name === '--package').required).toBe(false);
+    expect(data.options.find((o: { name: string }) => o.name === '--package').description).toContain('Not applicable');
+    expect(data.options.find((o: { name: string }) => o.name === '--tr').description).toContain('cannot be transported');
+    // The document is still mandatory; the type-specific branch re-declares
+    // --file with required:true on top of the general option list (same shape
+    // as VIEW / SHLP / TTYP).
+    expect(
+      data.options.find((o: { name: string; required?: boolean }) => o.name === '--file' && o.required === true),
+    ).toBeDefined();
+    expect(createObject).not.toHaveBeenCalled();
   });
 
   it('reports unknown types as unsupported (TYPE_NOT_SUPPORTED)', async () => {
