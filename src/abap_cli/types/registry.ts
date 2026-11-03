@@ -186,6 +186,31 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
     affSchemaFile: 'ddla-v1.json',
     requiresFile: true,
   },
+  // ATC configuration objects — pure-JSON AFF documents carried over
+  // versioned ADT XML resources (chkcv1 / chkov1 / chkvv4). Create posts the
+  // collection and needs an explicit activate; push is a locked PUT. No ICF
+  // fallback exists for these resources.
+  {
+    type: 'CHKC',
+    source: 'ADT',
+    createObjtype: 'CHKC/TYP',
+    affSchemaFile: 'chkc-v1.json',
+    requiresFile: true,
+  },
+  {
+    type: 'CHKO',
+    source: 'ADT',
+    createObjtype: 'CHKO/TYP',
+    affSchemaFile: 'chko-v1.json',
+    requiresFile: true,
+  },
+  {
+    type: 'CHKV',
+    source: 'ADT',
+    createObjtype: 'CHKV/TYP',
+    affSchemaFile: 'chkv-v1.json',
+    requiresFile: true,
+  },
 ] as const;
 
 /** sub-registry types for channel-detect / ICF fallback gating. */

@@ -4,7 +4,7 @@ title: 对象类型详细文档索引
 description: 每个 SAP 对象类型的字段契约、命令路径、本地文件形态与示例
 tags: [abap-cli, object-types, reference, clas, intf, prog, fugr, devc, tabl, stru, doma, dtel, enqu, view, shlp, nrob, http, tran, xslt, ttyp, msag, ddls, srvb, srvd, bdef, dcls, ddlx, ddla]
 created at: 2026-09-01 00:00:00
-changed at: 2026-11-01 00:20:00
+changed at: 2026-11-03 19:30:00
 ---
 
 # 对象类型详细文档
@@ -38,6 +38,9 @@ changed at: 2026-11-01 00:20:00
 | `DCLS` | ADT（无兜底） | `src/<name>.dcls.{json,acds}` 两件套（CDS Access Control） | [dcls.md](dcls.md) |
 | `DDLX` | ADT（无兜底） | `src/<name>.ddlx.{json,acds}` 两件套（CDS Metadata Extension） | [ddlx.md](ddlx.md) |
 | `DDLA` | ADT（无兜底） | `src/<name>.ddla.{json,acds}` 两件套（CDS Annotation Definition） | [ddla.md](ddla.md) |
+| `CHKC` | ADT（无兜底） | `src/<name>.chkc.json`（ATC 检查类别） | [chkc.md](chkc.md) |
+| `CHKO` | ADT（无兜底） | `src/<name>.chko.json`（ATC 检查） | [chko.md](chko.md) |
+| `CHKV` | ADT（无兜底） | `src/<name>.chkv.json`（ATC 检查变体） | [chkv.md](chkv.md) |
 
 ## 路由速查
 

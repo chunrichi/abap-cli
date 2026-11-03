@@ -28,6 +28,7 @@ import { msagArtifact } from '../../formats/msag/json.js';
 import { ddlsArtifact } from '../../formats/ddls/json.js';
 import { enquArtifact } from '../../formats/enqu/json.js';
 import { nrobArtifact } from '../../formats/nrob/json.js';
+import { chkcArtifact, chkoArtifact, chkvArtifact, type AtcType } from '../../formats/atc/json.js';
 import type { JsonArtifact } from '../../formats/artifact.js';
 import type { CreateOptions } from './create.js';
 import type { PullOptions, PullResult, TypePullResult } from './pull-shared.js';
@@ -42,6 +43,9 @@ import { createCdsExtensionHandler } from './create-cds-extension.js';
 import { createSrvdHandler } from './create-srvd.js';
 import { createBdefHandler } from './create-bdef.js';
 import { createSrvbHandler } from './create-srvb.js';
+import { createAtcHandler } from './create-atc.js';
+import { pullAtcHandler } from './pull-atc.js';
+import { runPushAtc } from './push-atc.js';
 import { createEnquHandler } from './create-enqu.js';
 import { createNrobHandler } from './create-nrob.js';
 import { createDevcHandler } from './create-devc.js';
@@ -184,6 +188,9 @@ const AFF_ARTIFACTS: Readonly<Record<string, JsonArtifact<unknown>>> = {
   DDLS: ddlsArtifact,
   ENQU: enquArtifact,
   NROB: nrobArtifact,
+  CHKC: chkcArtifact,
+  CHKO: chkoArtifact,
+  CHKV: chkvArtifact,
 };
 
 /** AFF validator for one channel-routed type (mirrors the create/pull sides). */
@@ -194,6 +201,19 @@ async function validateAffFile(objectType: string, file: string): Promise<void> 
   }
   const errors = await artifact.validate(await artifact.read(path.resolve(process.cwd(), file)));
   if (errors.length > 0) throw new CliError('VALIDATION_ERROR', errors.join('; '));
+}
+
+/** ATC ADT write route: locked PUT, then activation unless --no-activate. */
+function atcPushRoute(type: AtcType): JsonPushRoute {
+  return {
+    kind: 'aff-json',
+    channel: 'adt',
+    run: async ({ client, file, opts }) => {
+      await runPushAtc(client, type, file, { transport: opts.tr, activate: opts.activate });
+      return { transport: opts.tr ?? '', channel: 'adt' };
+    },
+    validate: (file, objectType) => validateAffFile(objectType, file),
+  };
 }
 
 /**
@@ -355,6 +375,24 @@ export const TYPE_ROUTES: Readonly<Record<string, TypeRoute>> = {
   SRVB: {
     create: handler('adt', createSrvbHandler),
     pull: source(),
+  },
+
+  // ATC configuration objects — pure-JSON AFF over versioned ADT XML
+  // resources. Create needs an explicit activate; push is a locked PUT.
+  CHKC: {
+    create: handler('adt', createAtcHandler('CHKC')),
+    pull: handler('adt', pullAtcHandler('CHKC')),
+    push: atcPushRoute('CHKC'),
+  },
+  CHKO: {
+    create: handler('adt', createAtcHandler('CHKO')),
+    pull: handler('adt', pullAtcHandler('CHKO')),
+    push: atcPushRoute('CHKO'),
+  },
+  CHKV: {
+    create: handler('adt', createAtcHandler('CHKV')),
+    pull: handler('adt', pullAtcHandler('CHKV')),
+    push: atcPushRoute('CHKV'),
   },
 };
 
