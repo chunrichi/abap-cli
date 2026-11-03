@@ -116,23 +116,23 @@ skills/<name>/
 - `abap-cli-data`：`WRAPPER_NOT_DEPLOYED` / `WRAPPER_INPUT_UNAVAILABLE` / `METHOD_NOT_SUPPORTED` / `METHOD_FAILED` / `CLASS_NOT_RUNNABLE` / `LOCAL_CLASS_NOT_RUNNABLE` / `TABLE_NOT_FOUND` / `TABLE_TYPE_NOT_SUPPORTED` / `INVALID_FIELD` / `INVALID_WHERE` / `LIMIT_EXCEEDED` / `OFFSET_EXCEEDED` / `QUERY_FAILED` / `TIMEOUT` / `TEST_FAILED`
 - `abap-cli-edit`：`LOCK_FAILED` / `LOCKED` / `SYNTAX_ERROR` / `OBJECT_NOT_ACTIVE` / `ACTIVATION_FAILED` / `DDIC_NOT_SUPPORTED` / `TYPE_NOT_SUPPORTED` / `CHANNEL_DETECTION_FAILED` / `DDLS_NOT_SUPPORTED_ON_ECC` / `PUSH_FAILED`
 - `abap-cli-search`：`OBJECT_NOT_FOUND` / `TCODE_NOT_FOUND` / `AUTH_ERROR` / `TCODE_NOT_AUTHORIZED` / `AMBIGUOUS_OBJECT`
-- `abap-cli-setup`：`CONFIG_ERROR` / `TLS_ERROR` / `NO_TRANSPORT` / `SESSION_INVALID` / `SESSION_JAR_DECRYPT_FAILED`
+- `abap-cli-setup`：`CONFIG_ERROR` / `TLS_ERROR` / `NO_TRANSPORT` / `SESSION_INVALID` / `SESSION_JAR_DECRYPT_FAILED` / `ICF_IDENTITY_UNAVAILABLE`
 - `abap-cli`（meta）：无专属错误码（`report-stuck` 只用公共 `USAGE`）
 - 公共错误（`INVALID_ARGUMENT` / `USAGE` / `VALIDATION_ERROR` / `SAP_ERROR` 等）在涉及它的每个 skill 中各自内联，不做 cross-reference
 
-## 命令覆盖核对（31 CLI 命令）
+## 命令覆盖核对（32 CLI 命令）
 
-- ✅ `abap-cli-setup`：`init` `profile` `doctor` `transport` `deploy` `session` `types` — **7 顶层**
+- ✅ `abap-cli-setup`：`init` `profile` `doctor` `whoami` `transport` `deploy` `session` `types` — **8 顶层**
 - ✅ `abap-cli-search`：`search` `where-used` `inspect` `tcode` `diff` `status` `dumps` — **7 顶层**
 - ✅ `abap-cli-edit`：`pull` `push` `check` `create`（含 `create local`）`activate` `publish` `unpublish` `delete` `list` `mime` `validate:aff` — **11 顶层 + `create local` 子命令**
 - ✅ `abap-cli-data`：`select` `fields` `run` `run-report` `test` — **5 顶层**
 - ✅ `abap-cli`（meta）：`report-stuck` — **1 顶层**
 - ✅ `abap-cli-performance`：方法论 skill，不占顶层命令
-- **合计**：7 + 7 + 11 + 5 + 1 = **31 顶层命令**（与 `src/abap_cli/registry/commands.ts` 的 `COMMAND_SPECS` 1:1，由 `npm run check-skills-drift` 校验）
+- **合计**：8 + 7 + 11 + 5 + 1 = **32 顶层命令**（与 `src/abap_cli/registry/commands.ts` 的 `COMMAND_SPECS` 1:1，由 `npm run check-skills-drift` 校验）
 
 ## 版本
 
-- **CLI 版本**：`2.2.0`
+- **CLI 版本**：`2.3.0`
 - **类型注册表**：36 个类型码（`src/abap_cli/types/registry.ts`）
 - **agentskills.io 标准**：<https://agentskills.io/>
 

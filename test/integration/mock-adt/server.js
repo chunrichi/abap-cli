@@ -37,6 +37,9 @@ const DDIC_FAIL = process.env.MOCK_DDIC_FAIL === '1';
 const REMOTE_MISSING = process.env.MOCK_REMOTE_MISSING === '1';
 // Deployed abap_cli version served by the mock root (mirrors CLI ICF_SERVICE_VERSION).
 const ICF_SERVICE_VERSION = process.env.MOCK_ICF_VERSION || '0.4.0';
+// MOCK_ICF_OLD=1 → simulate a deployed service from before /whoami existed:
+// the identity route answers the old handler's 404 NOT_FOUND envelope.
+const ICF_OLD = process.env.MOCK_ICF_OLD === '1';
 const NOW = '2026-08-01T00:00:00Z';
 const CURRENT_USER = 'MOCKUSER';
 let putCount = 0; // global PUT counter (MOCK_ATOMIC_FAIL fails on the 2nd write)
@@ -1197,6 +1200,29 @@ const server = http.createServer(async (req, res) => {
     if (path === '/sap/abap_cli/') {
       if (ICF_FAIL) return adtError(res, 500, 'Simulated ICF failure (MOCK_ICF_FAIL=1)');
       return ok(res, JSON.stringify({ status: 'success', data: { service: 'abap_cli', version: ICF_SERVICE_VERSION } }), 'application/json');
+    }
+
+    // /sap/abap_cli/whoami — system-side identity of the authenticated session
+    // (`abap whoami`). Mirrors the ABAP handler's sy-* projection.
+    if (path === '/sap/abap_cli/whoami' && req.method === 'GET') {
+      if (ICF_OLD) {
+        const body = JSON.stringify({
+          status: 'error',
+          error: { code: 'NOT_FOUND', message: 'unknown path: /sap/abap_cli/whoami' },
+        });
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        return res.end(body);
+      }
+      const identity = {
+        user: CURRENT_USER,
+        systemId: 'S4H',
+        client: '100',
+        applicationServer: 'mockhost',
+        database: 'HDB',
+        os: 'Linux',
+        abapRelease: '757',
+      };
+      return ok(res, JSON.stringify({ status: 'success', data: identity }), 'application/json');
     }
 
     // ADT classrun (runClass) — simulates the remote ICF setup execution (013)

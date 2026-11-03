@@ -28,8 +28,9 @@ export const ICF_BASE_PATH = '/sap/abap_cli';
  *  Root version check stays backward compatible.
  *  2.0.0: ICF handler runs stateless (no SAP user session per request).
  *  2.1.0: NROB create accepts an empty subType (no sub-object number ranges).
- *  2.2.0: no ICF handler change; version stays unified with the CLI release. */
-export const ICF_SERVICE_VERSION = '2.2.0';
+ *  2.2.0: no ICF handler change; version stays unified with the CLI release.
+ *  2.3.0: GET /whoami reports the session identity from the SAP system. */
+export const ICF_SERVICE_VERSION = '2.3.0';
 
 export type IcfDeploymentStatus = 'not_deployed' | 'current' | 'outdated' | 'unreachable';
 

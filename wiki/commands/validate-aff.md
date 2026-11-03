@@ -42,7 +42,7 @@ abap validate:aff <file-or-dir> [--wire <wire-dir>] [--json | --pretty-json]
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap validate:aff", "version": "2.2.0", "timestamp": "2026-11-01T00:00:00.000Z", "durationMs": 34, "warnings": [] },
+  "meta": { "command": "abap validate:aff", "version": "2.3.0", "timestamp": "2026-11-01T00:00:00.000Z", "durationMs": 34, "warnings": [] },
   "data": {
     "summary": { "pass": 2, "warn": 0, "fail": 0 },
     "files": [
@@ -58,7 +58,7 @@ abap validate:aff <file-or-dir> [--wire <wire-dir>] [--json | --pretty-json]
 ```json
 {
   "status": "error",
-  "meta": { "command": "abap validate:aff", "version": "2.2.0", "timestamp": "2026-11-01T00:00:00.000Z", "durationMs": 35, "warnings": [] },
+  "meta": { "command": "abap validate:aff", "version": "2.3.0", "timestamp": "2026-11-01T00:00:00.000Z", "durationMs": 35, "warnings": [] },
   "error": {
     "code": "VALIDATION_ERROR",
     "category": "VALIDATION_ERROR",

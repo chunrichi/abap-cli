@@ -1,15 +1,15 @@
 ---
 name: abap-cli-setup
-description: abap-cli 接入、诊断与基础设施就绪 — 配置工作区（`abap init` / `profile`）、诊断环境（`abap doctor`）、管理传输请求（`abap transport`）、部署/探测自带 ICF 服务（`abap deploy` / `abap deploy status`）、查看 / 重置 SAP 会话存储（`abap session info` / `abap session reset`）、查阅 CLI ↔ TADIR 类型映射（`abap types`）。use when asking how to connect to SAP / configure a workspace / add a system profile / diagnose the CLI environment / list / create / show / resolve / assign a transport request / install or upgrade the bundled ICF service / check whether the bundled ICF service is current / inspect or reset the SAP session store / debug a 400 "session timed out" auth error / what TADIR OBJECT a CLI type code maps to.
+description: abap-cli 接入、诊断与基础设施就绪 — 配置工作区（`abap init` / `profile`）、诊断环境（`abap doctor`）、由 SAP 系统返回实际连接身份（`abap whoami`，需已部署新版 ICF 服务）、管理传输请求（`abap transport`）、部署/探测自带 ICF 服务（`abap deploy` / `abap deploy status`）、查看 / 重置 SAP 会话存储（`abap session info` / `abap session reset`）、查阅 CLI ↔ TADIR 类型映射（`abap types`）。use when asking how to connect to SAP / configure a workspace / add a system profile / diagnose the CLI environment / check which system, client and user the workspace is actually logged on as — reported by the SAP system itself, so it keeps working when SSO or other auth methods are added — / list / create / show / resolve / assign a transport request / install or upgrade the bundled ICF service / check whether the bundled ICF service is current / inspect or reset the SAP session store / debug a 400 "session timed out" auth error / what TADIR OBJECT a CLI type code maps to.
 metadata:
-  version: "2.2.0"
+  version: "2.3.0"
   scope: workspace-and-sap
-  commands: [init, profile, doctor, transport, deploy, session, types]
+  commands: [init, profile, doctor, whoami, transport, deploy, session, types]
 ---
 
 # abap-cli-setup — 接入、诊断与基础设施就绪
 
-`workspace-and-sap` scope — 7 个命令管工作区配置、profile 凭证、本地诊断、SAP 传输请求、ICF 服务部署、session 会话存储查看/重置。本 skill **不**管对象操作（拉 / 推 / 查 / 跑）—— 那走 `abap-cli-search` / `abap-cli-edit` / `abap-cli-data`。
+`workspace-and-sap` scope — 8 个命令管工作区配置、profile 凭证、本地诊断、系统侧连接身份确认、SAP 传输请求、ICF 服务部署、session 会话存储查看/重置。本 skill **不**管对象操作（拉 / 推 / 查 / 跑）—— 那走 `abap-cli-search` / `abap-cli-edit` / `abap-cli-data`。
 
 ## 接入前提
 
@@ -21,6 +21,7 @@ metadata:
 - 第一次使用 abap-cli，需要配置 SAP 系统
 - 切换 SAP 系统或多系统切换
 - 怀疑配置 / 连接 / 环境有问题，需要系统诊断
+- 不确定当前工作区实际连的是哪个 SAP 系统 / 客户端 / 用户（切换 profile 或 CI 注入配置之后）→ `abap whoami`（身份由 SAP 系统返回，需已部署新版 ICF 服务；`abap deploy status` 报 `not_deployed` / `outdated` 时先 `abap deploy --yes`）
 - 推送对象前缺传输请求，需要 `transport list` 查 + `transport create` 建
 - 把现有对象绑到指定传输请求（`transport assign`）或查对象的请求归属（`transport resolve`）
 - 第一次跑 `abap-cli-data` 的 `run` / `select` 之前，要部署 bundled ICF 服务
@@ -50,6 +51,9 @@ metadata:
 │   └── → abap deploy --yes（升级）→ 重跑领域 skill
 ├── 要写 query TADIR 或理解 "CLI X 是 TADIR Y" 的映射？
 │   └── → abap types [STRU] [--tadir-object]    # 纯本地；揭示 HTTP↔SICF、STRU↔TABL+INTTAB 等坑
+├── 不确定当前实际连的是哪个系统 / 客户端 / 用户？
+│   ├── ICF 服务 current？→ abap whoami [--json]    # 身份由 SAP 系统返回；打印 user / SID+client / 服务器信息
+│   └── not_deployed / outdated → abap deploy --yes → abap whoami
 └── debug 400 "Session Timed Out" auth 错误？
     └── → abap session info [--profile <name>] --json    # 确认 cookie jar 状态；session jar 内容用 AES-256-GCM 加密（keychain）
 ```
@@ -81,7 +85,7 @@ metadata:
 
 ## references（按需加载）
 
-- [references/commands-quick.md](./references/commands-quick.md) — 7 命令完整速查
+- [references/commands-quick.md](./references/commands-quick.md) — 8 命令完整速查
 - [references/errors.md](./references/errors.md) — 本 skill 错误码全表
 
 ## scripts / assets

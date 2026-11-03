@@ -136,7 +136,7 @@ graph LR
 ```
 
 - **ADT 通道**——源对象（CLAS / INTF / PROG / FUGR / CDS / RAP）走标准 ADT REST API：搜索、源码读写、加锁、语法检查、激活、传输、where-used。
-- **ICF 通道**——DDIC 对象、SICF 节点与事务码、表数据、报表、MIME、远程版本拉取、无 ADT text-elements 端点时的 textpool 读取，以及运行时 wrapper 走捆绑 ABAP 服务，由 `abap deploy` 安装。端点包括 `/ddic/*`、`/http/*`、`/tran/*`、`/tcode/*`、`/data/*`、`/run/*`、`/mime/*`、`/textpool/*`、`/version-source*` 与 `/_class-check*`。
+- **ICF 通道**——DDIC 对象、SICF 节点与事务码、表数据、报表、MIME、远程版本拉取、无 ADT text-elements 端点时的 textpool 读取、运行时 wrapper，以及由系统返回的连接身份走捆绑 ABAP 服务，由 `abap deploy` 安装。端点包括 `/ddic/*`、`/http/*`、`/tran/*`、`/tcode/*`、`/data/*`、`/run/*`、`/mime/*`、`/textpool/*`、`/version-source*`、`/whoami` 与 `/_class-check*`。
 
 发布形态只装 **3 个全局类**（handler + setup + 运行时 wrapper）；`abap deploy --dev` 装完整的 20 类开发形态供维护者使用。ICF 节点由 setup 类幂等创建，所以 `abap deploy` 可以安全重跑。
 
@@ -168,6 +168,7 @@ src/(ui2)cl_json.clas.abap                # 命名空间对象 /UI2/CL_JSON
 | `abap profile` | 管理全局连接 profile：`list` / `show` / `add` / `set` / `test` / `delete` / `export` / `import` |
 | `abap doctor` | 诊断环境与配置（只读且不连 SAP——连通性用 `abap profile test`）；`--fix` 应用安全修复 |
 | `abap session` | 查看当前 profile 的会话 cookie jar（`session info`） |
+| `abap whoami` | 打印由 SAP 系统返回的连接身份——用户、系统 / 客户端，以及应用服务器 / 数据库 / OS / ABAP release；附带工作区 profile 与 endpoint，需要内置 ICF 服务 |
 | `abap deploy` | 部署捆绑 ICF 服务（`status` 探测 SAP 侧已装版本；`--dev` 安装开发形态） |
 | `abap transport` | `list`（`--open`）/ `create` / `show` / `resolve` / `assign` 传输请求 |
 | `abap pull <object>` | 把对象、包或整个 transport 拉成本地 AFF 文件（`--type`、`--package`、`--tr`、`--remote`、`--textpool`、`--active`、`--dir`、`--overwrite`、`--include-tests`） |
@@ -215,7 +216,7 @@ src/(ui2)cl_json.clas.abap                # 命名空间对象 /UI2/CL_JSON
 
 ```jsonc
 // 成功 — 写 stdout，exit 0
-{ "status": "success", "meta": { "command": "abap pull", "version": "2.2.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { /* ... */ } }
+{ "status": "success", "meta": { "command": "abap pull", "version": "2.3.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { /* ... */ } }
 
 // 失败 — 写 stderr，非零退出码，stdout 保持为空
 { "status": "error", "meta": { /* ... */ }, "error": { "code": "NO_TRANSPORT", "category": "VALIDATION_ERROR", "message": "..." } }
