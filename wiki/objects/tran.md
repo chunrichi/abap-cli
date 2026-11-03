@@ -4,7 +4,7 @@ title: TRAN — 事务码（SE93 Transaction Code）
 description: TRAN 对象的路由、5 种 transactionType、读写映射、已知限制与真机证据
 tags: [abap-cli, object-type, tran, icf, abap-file-format, transaction, se93]
 created at: 2026-09-01 00:00:00
-changed at: 2026-11-01 21:35:00
+changed at: 2026-11-03 19:20:00
 ---
 
 # TRAN — 事务码（SE93 Transaction Code）
@@ -154,7 +154,7 @@ abap delete ZMY_TRAN --type TRAN --yes --json
 
 ## 真机证据
 
-S/4HANA `test-system`（profile `test`，client 100）：
+S/4HANA 测试系统（profile `test`）：
 `create` → `pull` → `push` → `pull` → `delete` 全闭环，dialog / report /
 report+variant / parameter / variant 五种形状，23/23 TC PASS，TSTC/TSTCP/TSTCC/TADIR
 逐项核对（例如 parameter：`/*SE16 DATABROWSE-TABLENAME=TSTC;`；variant：

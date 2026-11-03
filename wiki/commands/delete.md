@@ -4,7 +4,7 @@ title: abap delete
 description: "从 SAP 删除单个 ABAP 对象（lock → delete → unlock）：--type 必填消歧、--yes 显式确认、非本地包对象必须用 --tr 指定传输请求。"
 tags: [abap-cli, command, delete, adt, lock, transport, cleanup]
 created at: 2026-10-29 14:30:14
-changed at: 2026-11-03 00:15:00
+changed at: 2026-11-03 19:20:00
 ---
 
 # abap delete
@@ -133,13 +133,13 @@ lock/unlock）：
 ## 真机证据
 
 - **`$` 前缀本地包（2026-11-01）**：在 `$ZCLI_TC_LP2`（父 `$TMP`）中 TRAN / XSLT / VIEW / SHLP 的 delete 全部 PASS，`transport list --open` 空；旧 ICF 部署只认 `$TMP`，升级后需一次 `abap deploy`。证据：`tests/261101901-localpkg-icf/`（本地，不入库）。
-- **VIEW（数据库视图）**：`abap delete <name> --type VIEW` 走 ICF `DELETE /ddic/view/<name>`；仅 `$TMP` 视图可删（可传输视图返回 `VIEW_DELETE_UNSUPPORTED`，exit 7，请在 SE11 删除）。已在 S/4HANA test-system（profile `test`）验证：`$TMP` 视图删除成功（`deleted + lockReleased`），DD25L/DD26S/DD27S/DD28S/TADIR 无残留；`V_T001`（package FBZ）被 `VIEW_DELETE_UNSUPPORTED` 拦截且未发起 DELETE。证据：`tests/261031006-realsap-view/`（本地，不入库）。
-- **DEVC（包）已在 S/4HANA test-system（profile `test`）验证**：`$TMP` 下真实创建 `$ZCLI_TC_PKG10` 后 `abap delete '$ZCLI_TC_PKG10' --type DEVC --yes --json` 成功（复用创建命令的会话时 SAP 先报「包已锁定」，命令自动 logout + 新会话重试后成功），随后 `pull` 返回 404；非 LOCAL 包（ZLOCAL）在缺 `--tr` 时被 `MISSING_TRANSPORT`（exit 2）拦截、未发起删除。证据：`tests/261031002-realsap-devc/`（本地，不入库）。
+- **VIEW（数据库视图）**：`abap delete <name> --type VIEW` 走 ICF `DELETE /ddic/view/<name>`；仅 `$TMP` 视图可删（可传输视图返回 `VIEW_DELETE_UNSUPPORTED`，exit 7，请在 SE11 删除）。已在 S/4HANA 测试系统（profile `test`）验证：`$TMP` 视图删除成功（`deleted + lockReleased`），DD25L/DD26S/DD27S/DD28S/TADIR 无残留；`V_T001`（package FBZ）被 `VIEW_DELETE_UNSUPPORTED` 拦截且未发起 DELETE。证据：`tests/261031006-realsap-view/`（本地，不入库）。
+- **DEVC（包）已在 S/4HANA 测试系统（profile `test`）验证**：`$TMP` 下真实创建 `$ZCLI_TC_PKG10` 后 `abap delete '$ZCLI_TC_PKG10' --type DEVC --yes --json` 成功（复用创建命令的会话时 SAP 先报「包已锁定」，命令自动 logout + 新会话重试后成功），随后 `pull` 返回 404；非 LOCAL 包（ZLOCAL）在缺 `--tr` 时被 `MISSING_TRANSPORT`（exit 2）拦截、未发起删除。证据：`tests/261031002-realsap-devc/`（本地，不入库）。
 - **SHLP（搜索帮助）删除走 ICF `DELETE /ddic/shlp/<name>`**：仅 `$TMP` 搜索帮助可删（先激活 inactive 版本，再 `RS_DD_DELETE_OBJ(objtype='H', no_ask='X')`）；可传输搜索帮助返回 `SHLP_DELETE_UNSUPPORTED`（exit 7，请在 SE11 删除以便记录到请求）。证据：`tests/261031007-realsap-shlp/`（本地，不入库）。
 - **ENQU / NROB 删除走 ICF（2026-11-02 真机）**：`abap delete <name> --type ENQU|NROB` 仅支持 `$TMP`。ENQU 的 ICF 创建不写 TADIR，delete 会先回填 `$TMP` TADIR 行再 `RS_DD_DELETE_OBJ`，否则 SAP 返回 E2/004（Action was canceled）。NROB 先按 NRIV 行清区间，再 `NUMBER_RANGE_OBJECT_DELETE` 且必须传 `ohne_tp_flag='X'`，否则会尝试打开 `SAPLSTRD 0100` 传输对话框并 500。删除后 DD25L / TNRO / TADIR 无残留。证据：`tests/261102013-enqu-nrob-delete/`（本地，不入库）。
-- **TRAN（事务码）删除走 ICF `DELETE /tran/<tcode>`**（SE93 没有 ADT 端点）：S/4HANA test-system（profile `test`）上 `abap delete ZCLI_TC_T1 --type TRAN --yes` 成功，TSTC/TSTCT/TSTCP/TSTCC/TSTCA 与 TADIR 行一并清除，随后 `pull` 返回 404。仅 `$TMP` 事务可删；可传输事务返回 `TRAN_DELETE_UNSUPPORTED`（exit 7，请在 SE93 删除以便记录到请求）。证据：`tests/261031003-realsap-tran/`（本地，不入库）。
+- **TRAN（事务码）删除走 ICF `DELETE /tran/<tcode>`**（SE93 没有 ADT 端点）：S/4HANA 测试系统（profile `test`）上 `abap delete ZCLI_TC_T1 --type TRAN --yes` 成功，TSTC/TSTCT/TSTCP/TSTCC/TSTCA 与 TADIR 行一并清除，随后 `pull` 返回 404。仅 `$TMP` 事务可删；可传输事务返回 `TRAN_DELETE_UNSUPPORTED`（exit 7，请在 SE93 删除以便记录到请求）。证据：`tests/261031003-realsap-tran/`（本地，不入库）。
 - **XSLT（转换程序）未验证**：`DELETE /xslt/<name>` 已实现（`load → set_changeable → delete → save`，API 原语在 $TMP 探针中 rc=0），但端到端真机命令尚未执行（写作时目标系统 stateful 会话受限，`abap deploy` 未完成）。
-- **HTTP（SICF 节点）删除走 ICF `DELETE /http/<name>`（2026-11-03 真机）**：S/4HANA test-system（profile `test`）上 `$TMP` 节点 create → delete 成功，ICFSERVICE / TADIR / ICFAPPLCUST 无残留，随后 `pull` 返回 `OBJECT_NOT_FOUND`（exit 8）；根节点 `/sap` 返回 `HTTP_SERVICE_ROOT_NODE`（exit 7），仍有子节点的父节点返回 `HTTP_SERVICE_HAS_CHILDREN`（先删子节点），可传输包/无 TADIR 元数据返回 `HTTP_DELETE_UNSUPPORTED`（exit 7）。证据：本地 `tests/261103001-icf-tail/`（不入库）。
+- **HTTP（SICF 节点）删除走 ICF `DELETE /http/<name>`（2026-11-03 真机）**：S/4HANA 测试系统（profile `test`）上 `$TMP` 节点 create → delete 成功，ICFSERVICE / TADIR / ICFAPPLCUST 无残留，随后 `pull` 返回 `OBJECT_NOT_FOUND`（exit 8）；根节点 `/sap` 返回 `HTTP_SERVICE_ROOT_NODE`（exit 7），仍有子节点的父节点返回 `HTTP_SERVICE_HAS_CHILDREN`（先删子节点），可传输包/无 TADIR 元数据返回 `HTTP_DELETE_UNSUPPORTED`（exit 7）。证据：本地 `tests/261103001-icf-tail/`（不入库）。
 - **其它类型未验证**：本页没有记录 CLAS / PROG 等 `abap delete` 在 A4H / S/4HANA 上的真机执行结果。
 - 对象解析依赖的 ADT quickSearch quirk（裸名可能 0 命中，需要 `*NAME*` 回退）在 vhcala4hci（A4H）验证过，见 `src/abap_cli/core/resolve.ts` 注释；删除动作本身未验证。
 

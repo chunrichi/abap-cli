@@ -4,7 +4,7 @@ title: VIEW — 数据库视图（Database View）
 description: VIEW 对象的 ICF 路由、自建 view-v1 字段契约（DD25V/DD26V/DD27P/DD28J/DD28V）、写路径与本地包（`$` 前缀）删除
 tags: [abap-cli, object-type, view, icf, abap-file-format, database-view]
 created at: 2026-10-31 18:00:00
-changed at: 2026-11-01 21:35:00
+changed at: 2026-11-03 19:20:00
 ---
 
 # VIEW — 数据库视图（Database View）
@@ -183,7 +183,7 @@ abap delete ZCLI_TC_VIEW --type VIEW --yes --json
 
 ## 真机验证
 
-在 S/4HANA test-system（profile `test`，client 100，test-user）按
+在 S/4HANA 测试系统（profile `test`）按
 `abap-testing` 六阶段跑通（2026-10-31）：
 
 - **create** 两表 join 视图（MARA + MAKT，$TMP）→ `action=created`；

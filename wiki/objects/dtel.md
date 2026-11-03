@@ -4,7 +4,7 @@ title: DTEL — 数据元素（Data Element）
 description: DTEL 对象的字段契约、单 JSON 嵌套结构、长文本伴生文件、与 DOMA 的关系
 tags: [abap-cli, object-type, dtel, ddic, icf, abap-file-format, data-element]
 created at: 2026-09-01 00:00:00
-changed at: 2026-10-31 17:45:00
+changed at: 2026-11-03 19:20:00
 ---
 
 # DTEL — 数据元素（Data Element）
@@ -118,7 +118,7 @@ abap push src/zmy_dtel.dtel.json --tr DEVK900001 --json
 
 ## 真机证据
 
-S/4HANA `test-system`（profile `test`，client 100，`$TMP` + `ZCLI_TC_*`）：
+S/4HANA 测试系统（profile `test`，`$TMP` + `ZCLI_TC_*`）：
 
 - ICF `GET/POST /ddic/dtel/<name>/docu` 闭环：push 伴生（`H1` + 普通行）→ `docu: "saved"` → pull 逐字节比对 **EQUAL**；`validate:aff` PASS。
 - `lines: []` push → `docu: "deleted"`；再次 pull 不写伴生、删除陈旧本地文件（`DOCU_LOCAL_STALE_REMOVED`），DOKIL/DOKTL 无残留。

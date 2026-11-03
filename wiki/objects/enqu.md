@@ -4,7 +4,7 @@ title: ENQU — 锁对象（Lock Object）
 description: ENQU 对象的 ICF 路由、primaryTable / lockParameters / lockModules 字段契约、EZ/EY 命名规则
 tags: [abap-cli, object-type, enqu, icf, abap-file-format, lock-object]
 created at: 2026-09-16 00:00:00
-changed at: 2026-11-02 23:25:00
+changed at: 2026-11-03 19:20:00
 ---
 
 # ENQU — 锁对象（Lock Object）
@@ -126,5 +126,5 @@ CALL FUNCTION 'DDIF_ENQU_GET'
 
 ## 真机证据
 
-- **create（2026-11-01，S/4HANA test-system / profile `test`）**：旧 ICF handler 拒绝 `$ZCLI_TC_LP` 中的 ENQU（`ENQU_PACKAGE_NOT_SUPPORTED`）；执行 `abap deploy` 后同一命令创建成功，`transport list --open` 空、E071 0 行。证据：`tests/261101901-localpkg-icf/`（本地，不入库）。
+- **create（2026-11-01，S/4HANA 测试系统 / profile `test`）**：旧 ICF handler 拒绝 `$ZCLI_TC_LP` 中的 ENQU（`ENQU_PACKAGE_NOT_SUPPORTED`）；执行 `abap deploy` 后同一命令创建成功，`transport list --open` 空、E071 0 行。证据：`tests/261101901-localpkg-icf/`（本地，不入库）。
 - **create → delete（2026-11-02，同一系统）**：`abap create ENQU EZCLI_TC_ENQU2 --file ... --package '$TMP'` 成功；`abap delete EZCLI_TC_ENQU2 --type ENQU` 返回 `deleted: true`，随后 DD25L / TADIR 均无残留。证据：`tests/261102013-enqu-nrob-delete/`（本地，不入库）。

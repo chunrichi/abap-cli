@@ -4,7 +4,7 @@ title: XSLT — 转换程序（Transformation / XSLT Program）
 description: XSLT 对象的路由、AFF 两件套布局、字段映射、行尾规范化、更新语义（删除+重建）与命令示例
 tags: [abap-cli, object-type, xslt, icf, abap-file-format, transformation]
 created at: 2026-10-31 17:50:00
-changed at: 2026-11-01 21:35:00
+changed at: 2026-11-03 19:20:00
 ---
 
 # XSLT — 转换程序（Transformation / XSLT Program）
@@ -155,8 +155,8 @@ abap delete ZMY_XSLT --type XSLT --yes
 
 ## 真机证据
 
-- **API 探针（S/4HANA test-system，profile `test`，$TMP）**：`CL_O2_API_XSLTDESC` 的 `exists` / `load` / `create` / `save` / `activate` / `get_attributes` / `get_source_string` / `delete` 全链路 rc=0；读回源码以 CRLF 拼接且末尾多一个换行。证据：`tmp/research/261031-api-probes/xslt.md` 与 `evidence/xslt-api-class/`（本地，不入库）。
-- **CLI + ICF `/xslt` 六阶段（真机 PASS）**：S/4HANA test-system（profile `test`）上 deploy release form（17 merged classes）→ 真机 TC01–TC18 全 PASS：create/upsert、pull 两件套与行尾规范化、push 修改、激活失败恢复、delete、404、清理。关键结论：**update = 原地 `set_source`（保留版本历史）**；create 用 `create_new` 行表；save↔activate 之间 commit。证据：`tests/261031008-realsap-xslt/`（本地，不入库）。
+- **API 探针（S/4HANA 测试系统，profile `test`，$TMP）**：`CL_O2_API_XSLTDESC` 的 `exists` / `load` / `create` / `save` / `activate` / `get_attributes` / `get_source_string` / `delete` 全链路 rc=0；读回源码以 CRLF 拼接且末尾多一个换行。证据：`tmp/research/261031-api-probes/xslt.md` 与 `evidence/xslt-api-class/`（本地，不入库）。
+- **CLI + ICF `/xslt` 六阶段（真机 PASS）**：S/4HANA 测试系统（profile `test`）上 deploy release form（17 merged classes）→ 真机 TC01–TC18 全 PASS：create/upsert、pull 两件套与行尾规范化、push 修改、激活失败恢复、delete、404、清理。关键结论：**update = 原地 `set_source`（保留版本历史）**；create 用 `create_new` 行表；save↔activate 之间 commit。证据：`tests/261031008-realsap-xslt/`（本地，不入库）。
 - **mock 集成测试**：`test/integration/xslt-lifecycle.test.ts` 覆盖 create → pull（CRLF 读回规范化）→ push 修改 → pull → 两件套去重 → delete → 404 全链路。
 
 - **`$` 前缀本地包（2026-11-01）**：在 `$ZCLI_TC_LP2`（父 `$TMP`，LOCAL 组件）中 create/delete 均 PASS，`transport list --open` 空、E071 0 行；旧 ICF 部署只认 `$TMP`，升级后需一次 `abap deploy`。证据：`tests/261101901-localpkg-icf/`（本地，不入库）。

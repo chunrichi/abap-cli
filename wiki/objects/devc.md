@@ -4,7 +4,7 @@ title: DEVC — 包（Package）
 description: DEVC 对象的 ADT 路由、devc-v1.json 字段契约、wire 字段映射、LOCAL 命名约束与 push 不支持的原因
 tags: [abap-cli, object-type, devc, package, adt, abap-file-format]
 created at: 2026-10-31 16:20:00
-changed at: 2026-11-01 21:30:00
+changed at: 2026-11-03 19:20:00
 ---
 
 # DEVC — 包（Package）
@@ -128,7 +128,7 @@ create-then-pull，写 `src/<name>.devc.json`（`--no-pull` 关闭，`--overwrit
 
 ## 真机证据
 
-在 S/4HANA（test-system，profile `test`）验证：
+在 S/4HANA（测试系统，profile `test`）验证：
 
 - `pull` 三种形状：`$TMP`（LOCAL）、`ZDEV098`（superPackage + cloud 语言版本）、`/ACCGO/ACMCM_BW`
   （命名空间 + switch + applicationComponent + useAccesses + transportLayer）。

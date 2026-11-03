@@ -4,7 +4,7 @@ title: SHLP — 搜索帮助（Search Help）
 description: SHLP 对象的 ICF 路由、自建 shlp-v1 字段契约（DD30V/DD31V/DD32P/DD33V）、elementary/collective 写路径与本地包（`$` 前缀）删除
 tags: [abap-cli, object-type, shlp, icf, abap-file-format, search-help]
 created at: 2026-10-31 18:50:00
-changed at: 2026-11-01 21:35:00
+changed at: 2026-11-03 19:20:00
 ---
 
 # SHLP — 搜索帮助（Search Help）
@@ -211,7 +211,7 @@ abap delete ZCLI_TC_SHLP --type SHLP --yes --json
 
 ## 真机验证
 
-已在 S/4HANA test-system（profile `test`，client 100，test-user）按
+已在 S/4HANA 测试系统（profile `test`）按
 `abap-testing` 六阶段跑通（2026-10-31，18/18 TC PASS）：
 
 - **create elementary**（`T002`/`T002T`，$TMP）→ `action=created`；

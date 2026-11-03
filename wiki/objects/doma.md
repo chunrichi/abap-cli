@@ -4,7 +4,7 @@ title: DOMA — 域（Domain）
 description: DOMA 对象的字段契约、单 JSON 嵌套结构、长文本伴生文件与关键字段
 tags: [abap-cli, object-type, doma, ddic, icf, abap-file-format, domain]
 created at: 2026-09-01 00:00:00
-changed at: 2026-10-31 17:45:00
+changed at: 2026-11-03 19:20:00
 ---
 
 # DOMA — 域（Domain）
@@ -117,7 +117,7 @@ abap push src/zmy_doma.doma.json --tr DEVK900001 --json
 
 ## 真机证据
 
-S/4HANA `test-system`（profile `test`，client 100，`$TMP` + `ZCLI_TC_*`，release form handler）：
+S/4HANA 测试系统（profile `test`，`$TMP` + `ZCLI_TC_*`，release form handler）：
 
 - ICF `GET/POST /ddic/doma/<name>/docu` 闭环：push 5 行长文本 → `data.results[].docu: "saved"` → pull 逐字节比对 **EQUAL**；72 字符整行、`&DEFINITION&` / `<DS:GLOS.…>` / `</>` SAPscript 标记、行内 TAB、行首 4 空格缩进、`format: "H1"` 与空 format 段落都原样保留。
 - `validate:aff` 对拉回的 `<name>.doma.docu.json` PASS（`type: "DOCU"`）。
