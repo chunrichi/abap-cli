@@ -18,7 +18,7 @@ import {
   buildDsfiSource,
   cdsTechObjectUrl,
   parseCdsTechMeta,
-  rethrowDsfdFeatureError,
+  rethrowCdsFeatureError,
   validateDsfiDocument,
 } from '../../clients/cds-tech.js';
 import { CliError } from '../../output/json.js';
@@ -183,7 +183,6 @@ export async function runPushCdsTech(
     }
     return { object: name, channel: 'adt', action: 'updated', activated };
   } catch (error) {
-    if (type === 'DSFD') rethrowDsfdFeatureError(error);
-    throw error;
+    rethrowCdsFeatureError(type, error);
   }
 }

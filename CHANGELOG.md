@@ -9,7 +9,9 @@
 ### Added
 
 - **CDS 技术对象**：新增 `DTDC`（动态缓存）、`DTEB`（CDS 实体缓冲）、`DSFD`（CDS 标量函数定义）、`DSFI`（标量函数实现引用）四类对象，支持 `create` / `pull` / `push` / `delete`。前三类为「AFF 元数据 + `.acds` 源码」两件套，`DSFI` 为单个 JSON（其 ADT `source/main` 就是 AFF JSON）；`create` / `push` 写入源码后自动激活（`--no-activate` 只写），并同步 AFF 描述字段。
-- **CDS 技术对象接入类型矩阵**：`abap types`、`create --schema` 与 `docs/supported.md` 现列出 32 个类型码。
+- **CDS 简单类型（DRTY）**：在上述四个 CDS 技术对象之外新增 `DRTY`，支持 `create` / `pull` / `push` / `delete`（AFF 元数据 + `.drty.acds` 两件套）。SAP 侧写入受用户参数 `CDS_SIMPLE_TYPES` 控制；未启用时 CLI 报 `DRTY_FEATURE_NOT_ENABLED` 并给出 SU3 启用步骤。
+- **CDS 技术对象接入类型矩阵**：`abap types`、`create --schema` 与 `docs/supported.md` 现列出 33 个类型码。
+- **未接入**：`DRAS`（方面）/ `DTIX`（字典调优索引）/ `DTSC`（字典调优静态缓存）虽有官方 AFF schema，但参考 S/4HANA release 未提供 ADT 读写资源，暂不支持。
 
 - **ATC 检查配置对象**：新增 `CHKC`（检查类别）、`CHKO`（检查）、`CHKV`（检查变体）三类对象，支持 `create` / `pull` / `push` / `delete` 全生命周期。本地用官方 abap-file-format JSON（`<name>.chkc.json` / `.chko.json` / `.chkv.json`），`create` / `push` 写入后自动激活（`--no-activate` 只写不激活）。检查变体的 `selectedChecks` 参数（普通值、结构化值、值列表、range 列表）可无损往返。
 - **ATC 配置对象接入类型矩阵**：`abap types`、`create --schema` 与 `docs/supported.md` 现列出 28 个类型码。

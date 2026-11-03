@@ -2140,7 +2140,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     // CDS technical objects (DTDC / DTEB / DSFD / DSFI).
-    const cdsMatch = /^\/sap\/bc\/adt\/ddic\/(dtdc|dteb|dsfd)\/sources(?:\/([^/]+))?(\/source\/main)?$/.exec(path);
+    const cdsMatch = /^\/sap\/bc\/adt\/ddic\/(dtdc|dteb|dsfd|drty)\/sources(?:\/([^/]+))?(\/source\/main)?$/.exec(path);
     const dsfiMatch = /^\/sap\/bc\/adt\/ddic\/dsfi(?:\/([^/]+))?(\/source\/main)?$/.exec(path);
     if (cdsMatch || dsfiMatch) {
       const type = cdsMatch ? cdsMatch[1].toUpperCase() : 'DSFI';

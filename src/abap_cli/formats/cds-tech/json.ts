@@ -16,7 +16,7 @@
 import { defineJsonArtifact, type JsonArtifact } from '../artifact.js';
 
 /** AFF object type codes for the CDS technical group. */
-export const CDS_TECH_TYPES = ['DTDC', 'DTEB', 'DSFD', 'DSFI'] as const;
+export const CDS_TECH_TYPES = ['DTDC', 'DTEB', 'DSFD', 'DSFI', 'DRTY'] as const;
 export type CdsTechType = (typeof CDS_TECH_TYPES)[number];
 
 /** True for DTDC / DTEB / DSFD / DSFI. */
@@ -53,6 +53,12 @@ export interface DsfdLocal {
   header: CdsTechHeader;
 }
 
+/** `drty-v1.json` — CDS type (metadata only; source in the `.acds`). */
+export interface DrtyLocal {
+  formatVersion: '1';
+  header: CdsTechHeader;
+}
+
 /** `dsfi-v1.json` — scalar function implementation reference (single JSON). */
 export interface DsfiSqlPropertiesLocal {
   /** AMDP implementation reference, e.g. `ZCL_DSFI_EXAMPLE=>EXECUTE`. */
@@ -73,7 +79,7 @@ export interface DsfiLocal {
 }
 
 /** Local document union for callers that are type-agnostic. */
-export type CdsTechLocal = DtdcLocal | DtebLocal | DsfdLocal | DsfiLocal;
+export type CdsTechLocal = DtdcLocal | DtebLocal | DsfdLocal | DsfiLocal | DrtyLocal;
 
 /** `dtdc-v1.json` artifact plumbing. */
 export const dtdcArtifact = defineJsonArtifact<DtdcLocal>({ type: 'DTDC' });
@@ -83,6 +89,8 @@ export const dtebArtifact = defineJsonArtifact<DtebLocal>({ type: 'DTEB' });
 export const dsfdArtifact = defineJsonArtifact<DsfdLocal>({ type: 'DSFD' });
 /** `dsfi-v1.json` artifact plumbing. */
 export const dsfiArtifact = defineJsonArtifact<DsfiLocal>({ type: 'DSFI' });
+/** `drty-v1.json` artifact plumbing. */
+export const drtyArtifact = defineJsonArtifact<DrtyLocal>({ type: 'DRTY' });
 
 /** Per-type artifact lookup used by the create / pull / push flows. */
 export function cdsTechArtifactFor(type: CdsTechType): JsonArtifact<CdsTechLocal> {
@@ -93,7 +101,9 @@ export function cdsTechArtifactFor(type: CdsTechType): JsonArtifact<CdsTechLocal
         ? dtebArtifact
         : type === 'DSFD'
           ? dsfdArtifact
-          : dsfiArtifact
+          : type === 'DSFI'
+            ? dsfiArtifact
+            : drtyArtifact
   ) as unknown as JsonArtifact<CdsTechLocal>;
 }
 

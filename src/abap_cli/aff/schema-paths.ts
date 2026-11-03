@@ -81,6 +81,8 @@ const SCHEMA_FILE: Record<string, string> = {
   DTEB: 'dteb-v1.json',
   DSFD: 'dsfd-v1.json',
   DSFI: 'dsfi-v1.json',
+  // CDS type (simple type); same metadata + `.acds` layout as DSFD.
+  DRTY: 'drty-v1.json',
 };
 
 /** Resolve the bundled-schema directory shipped with the package.

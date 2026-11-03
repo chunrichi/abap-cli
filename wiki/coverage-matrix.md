@@ -4,14 +4,14 @@ title: SAP 开发任务覆盖率矩阵
 description: abap-cli 当前能 / 不能完成的 SAP 开发任务全景 — 用于未来 spec 选题 + 用户预期管理
 tags: [abap-cli, coverage, roadmap, scope]
 created at: 2026-09-01 00:00:00
-changed at: 2026-11-03 20:10:00
+changed at: 2026-11-03 20:30:00
 ---
 
 # SAP 开发任务覆盖率矩阵
 
 abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的开发工作**。本页是一份**诚实快照**——按 SAP 开发任务分类，给出当前覆盖度与缺口。对象类型补充的排序与取舍见 [roadmap](roadmap.md)。
 
-> 当前规模：**29 个顶层命令**、**32 个对象类型**（32 类可 create、32 类可 pull、30 类有 push 入口）、**6 个 skill + 1 个 agent**。基线：`v2.1.0` + 本地 ATC / CDS 技术类型扩展。
+> 当前规模：**29 个顶层命令**、**33 个对象类型**（33 类可 create、33 类可 pull、31 类有 push 入口）、**6 个 skill + 1 个 agent**。基线：`v2.1.0` + 本地 ATC / CDS 技术类型扩展。
 
 ## 评分图例
 
@@ -54,6 +54,8 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | ATC 检查配置（CHKC / CHKO / CHKV） | `create / pull / push / delete CHKC|CHKO|CHKV` | ✅ | ADT `/atc/checkcategories|checks|checkvariants` 版本化 XML；AFF 官方 schema（`chkc-v1` / `chko-v1` / `chkv-v1`）；create/update 后需激活；真机 create/pull/push/delete 闭环 |
 | CDS 技术对象（DTDC / DTEB / DSFD） | `create / pull / push / delete` | ✅ | ADT `/ddic/{dtdc,dteb,dsfd}/sources`；AFF 元数据 + `.acds` 源码；DTEB 需可缓冲 view entity、DSFD 需 `DD_CDS_DSFD` 用户参数；真机闭环 |
 | CDS 标量函数实现（DSFI） | `create / pull / push / delete DSFI` | ✅ | ADT `/ddic/dsfi`；`source/main` 即 AFF JSON；名称须 `<函数>_ANA`，引用 DSFD 须已激活；真机闭环 |
+| CDS 简单类型（DRTY） | `create / pull / push / delete DRTY` | ✅ | ADT `/ddic/drty/sources`；AFF 元数据 + `.acds`；写入需 `CDS_SIMPLE_TYPES` 用户参数；真机闭环 |
+| CDS 方面 / 字典调优索引 / 静态缓存（DRAS / DTIX / DTSC） | — | ❌（延后） | 官方 AFF schema 存在，但本机 typestructure 无 CREATE 能力、discovery 无 REST 资源；等有 ADT 通道的 release |
 | Pool/Cluster Table | — | ❌ | 仅 TABL/STRU |
 | 创建/修改数据库视图（VIEW） | `create / pull / push / delete VIEW` | ✅ | ICF `/ddic/view`；自建 `view-v1.json`（本地扩展）；DD25V/DD26V/DD27P/DD28J/DD28V 映射；删除仅 `$TMP`；真机 17/17 TC（join 视图 + 单表视图 create/pull/push/delete + DD26S/DD27S/DD28S 校验） |
 | 创建/修改搜索帮助（SHLP） | `create / pull / push / delete SHLP` | ✅ | ICF `/ddic/shlp`；自建 `shlp-v1.json`（本地扩展）；elementary + collective、参数映射；删除仅 `$TMP`；真机 18/18 TC（create/pull/push/delete + DD30L/DD31S/DD32S/DD33S 校验） |
@@ -244,7 +246,7 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | DTEL | 3 | 3 | 0 | 0 |
 | DEVC / HTTP / TRAN / TTYP / MSAG / DDLS | 各 1 | 各 1 | 0 | 0 |
 
-> 尚无 fixture 的类型：ENQU / NROB / VIEW / SHLP / XSLT / SRVB / BDEF / CHKC / CHKO / CHKV / DTDC / DTEB / DSFD / DSFI；SRVD / DCLS / DDLA / DDLX 的 fixture 已存在，但 `aff/router.ts` 没有对应后缀规则，`validate:aff` 不覆盖它们。补类型时应同步补 fixture。
+> 尚无 fixture 的类型：ENQU / NROB / VIEW / SHLP / XSLT / SRVB / BDEF / CHKC / CHKO / CHKV / DTDC / DTEB / DSFD / DSFI / DRTY；SRVD / DCLS / DDLA / DDLX 的 fixture 已存在，但 `aff/router.ts` 没有对应后缀规则，`validate:aff` 不覆盖它们。补类型时应同步补 fixture。
 
 ### Schema paths
 

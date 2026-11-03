@@ -220,6 +220,7 @@ export type ErrorCode =
   | 'XSLT_OBJECT_EXISTS'        // create_new_from_string object_already_existing (SAP_ERROR)
   // CDS technical objects (DTDC / DTEB / DSFD / DSFI)
   | 'DSFD_FEATURE_NOT_ENABLED'  // SAP user parameter DD_CDS_DSFD not set; DSFD writes are rejected (VALIDATION_ERROR)
+  | 'DRTY_FEATURE_NOT_ENABLED'  // SAP user parameter CDS_SIMPLE_TYPES not set; DRTY writes are rejected (VALIDATION_ERROR)
   ;
 
 const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
@@ -410,6 +411,7 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   XSLT_TRANSPORT_REQUIRED: 'VALIDATION_ERROR',
   XSLT_OBJECT_EXISTS: 'SAP_ERROR',
   DSFD_FEATURE_NOT_ENABLED: 'VALIDATION_ERROR',
+  DRTY_FEATURE_NOT_ENABLED: 'VALIDATION_ERROR',
 };
 
 export function categoryOf(code: ErrorCode): ErrorCategory {

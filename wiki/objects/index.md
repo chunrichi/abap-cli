@@ -4,7 +4,7 @@ title: 对象类型详细文档索引
 description: 每个 SAP 对象类型的字段契约、命令路径、本地文件形态与示例
 tags: [abap-cli, object-types, reference, clas, intf, prog, fugr, devc, tabl, stru, doma, dtel, enqu, view, shlp, nrob, http, tran, xslt, ttyp, msag, ddls, srvb, srvd, bdef, dcls, ddlx, ddla]
 created at: 2026-09-01 00:00:00
-changed at: 2026-11-03 20:10:00
+changed at: 2026-11-03 20:30:00
 ---
 
 # 对象类型详细文档
@@ -45,6 +45,7 @@ changed at: 2026-11-03 20:10:00
 | `DTEB` | ADT（无兜底） | `src/<name>.dteb.{json,acds}` 两件套（CDS 实体缓冲） | [dteb.md](dteb.md) |
 | `DSFD` | ADT（无兜底） | `src/<name>.dsfd.{json,acds}` 两件套（CDS 标量函数定义） | [dsfd.md](dsfd.md) |
 | `DSFI` | ADT（无兜底） | `src/<name>.dsfi.json` 单 JSON（标量函数实现引用） | [dsfi.md](dsfi.md) |
+| `DRTY` | ADT（无兜底） | `src/<name>.drty.{json,acds}` 两件套（CDS 简单类型） | [drty.md](drty.md) |
 
 ## 路由速查
 
