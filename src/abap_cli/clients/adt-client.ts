@@ -998,7 +998,7 @@ export class AdtClientWrapper {
    * is responsible for projecting it into the AFF `<name>.srvb.json`
    * shape via `formats/pull-strategy.ts#renderServiceBindingMetadata`.
    *
-   * abap-adt-api 8.4.1 does not expose a typed `serviceBinding()` method,
+   * abap-adt-api does not expose a typed `serviceBinding()` method,
    * so we round-trip through `httpClient.request()` and parse the
    * `application/vnd.sap.adt.businessservices.servicebinding.v2+xml` body
    * via the package's `parseServiceBinding`.
@@ -1027,7 +1027,7 @@ export class AdtClientWrapper {
   /**
    * Run an ABAP class as an application (ADT classrun, e.g. ICF setup).
    * optional second `params` argument forwards classrun input
-   * as JSON body — the underlying abap-adt-api 8.4.1 `runClass(name)` does
+   * as JSON body — the underlying abap-adt-api `runClass(name)` does
    * not accept body params, so this wrapper goes through `AdtHTTP.request`
    * with a JSON body when `params` is provided. The SAP-side wrapper reads
    * via `IF_OO_ADT_CLASSRUN~MAIN`. When `params` is omitted the existing

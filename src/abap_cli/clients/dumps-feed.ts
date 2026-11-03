@@ -1,10 +1,9 @@
 /**
  * Wire request + Atom parse for the read-only ADT runtime-dumps feed
- * `GET /sap/bc/adt/runtime/dumps`. The library's own `dumps(h, query)` sends
- * the whole query as `$query=...`, which the server rejects with HTTP 400
- * "Data is invalid and could not be converted"; this module sends OData
- * `$top` / `$filter` as direct URL parameters instead and mirrors the
- * library's Atom parsing so callers keep the `DumpsFeed` shape.
+ * `GET /sap/bc/adt/runtime/dumps`. The library's own `dumps(h, query)` only
+ * forwards a pre-built query string and models no typed limit/user filter;
+ * this module builds the OData `$top` / `$filter` parameters itself and
+ * mirrors the library's Atom parsing so callers keep the `DumpsFeed` shape.
  */
 import type { Dump, DumpsFeed } from 'abap-adt-api';
 import type { HttpClientResponse, RequestOptions } from 'abap-adt-api/build/AdtHTTP.js';
@@ -74,6 +73,8 @@ function parseEntry(entry: any): Dump {
     links: xmlArray(entry, 'link').map(xmlNodeAttr),
     id: entry?.id ?? '',
     author: entry?.author?.name?.trim() || undefined,
+    title: entry?.title ?? '',
+    updated: parseJsonDate(entry?.updated ?? ''),
     text: summary?.['#text'] ?? '',
     type: summary?.['@_type'] ?? 'text',
   };
