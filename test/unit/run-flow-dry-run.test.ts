@@ -5,6 +5,16 @@ import { makeProgram, runCommand } from './cli-helper.js';
 
 // decision — --dry-run prints the envelope without any SAP call.
 
+// If the command ever tried to reach SAP, AdtClientWrapper.create would be
+// called — make it throw so the dry-run path is proven SAP-free.
+vi.mock('../../src/abap_cli/clients/adt-client.js', () => ({
+  AdtClientWrapper: {
+    create: () => {
+      throw new Error('dry-run must not create a client');
+    },
+  },
+}));
+
 describe('run-flow dry-run', () => {
   it('buildDryRun returns wouldRun=true, dryRun=true, empty output, no SAP', () => {
     const dry = buildDryRun('ZCL_MY_THING', { method: 'compute', args: '{"x":3}' });
@@ -24,15 +34,6 @@ describe('run-flow dry-run', () => {
   });
 
   it('command layer short-circuits before creating any SAP client', async () => {
-    // If the command ever tried to reach SAP, AdtClientWrapper.create would be
-    // called — make it throw so the dry-run path is proven SAP-free.
-    vi.mock('../../src/abap_cli/clients/adt-client.js', () => ({
-      AdtClientWrapper: {
-        create: () => {
-          throw new Error('dry-run must not create a client');
-        },
-      },
-    }));
     const program = makeProgram();
     registerRunCommand(program);
     const res = await runCommand(program, ['run', 'ZCL_X', '--method', 'x', '--dry-run', '--json']);
