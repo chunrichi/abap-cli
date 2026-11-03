@@ -54,7 +54,7 @@
   "license": "MIT",
   "dependencies": {
     "@clack/prompts": "^1.7.0",
-    "abap-adt-api": "^8.4.1",
+    "abap-adt-api": "^9.2.0",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
     "axios": "^1.7.0",

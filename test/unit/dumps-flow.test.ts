@@ -24,6 +24,8 @@ function feedEntry(overrides: Partial<DumpsFeed['dumps'][number]>): DumpsFeed['d
     categories: [{ term: 'TIME_OUT', label: 'ABAP runtime error' }],
     links: [],
     author: 'DEVELOPER',
+    title: 'Runtime Error TIME_OUT in program ZCL_TEST->RUN',
+    updated: new Date('2026-08-31T12:00:00.000Z'),
     text: 'Runtime error TIME_OUT in program ZCL_TEST->RUN',
     type: 'text',
     ...overrides,

@@ -3,7 +3,7 @@
  *
  * Background
  * ----------
- * `abap-adt-api@8.4.1` (build/api/objectcreator.js) hard-codes
+ * `abap-adt-api`'s objectcreator (build/api/objectcreator.js) hard-codes
  * `Content-Type: application/*` on the create POST. That wildcard works on
  * classic on-prem ECC, but BTP ABAP trial rejects the create body with:
  *

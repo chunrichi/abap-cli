@@ -23,6 +23,8 @@ const ATOM_FEED = `<?xml version="1.0" encoding="utf-8"?>
     <atom:category term="OBJECTS_OBJREF_NOT_ASSIGNED_NO" label="ABAP runtime error"/>
     <atom:category term="CL_ADT_REST_COMP_CNT_HANDLER==CP" label="Terminated ABAP program"/>
     <atom:id>DUMP-ID-1</atom:id>
+    <atom:title>Runtime Error TIME_OUT in program ZCL_TEST</atom:title>
+    <atom:updated>2026-09-02T15:30:53Z</atom:updated>
     <atom:link href="adt://A4H/sap/bc/adt/runtime/dump/1" rel="self" type="text/plain"/>
     <atom:summary type="html">&lt;p&gt;Access using a &apos;Z&apos; reference variable is not possible&lt;/p&gt;</atom:summary>
   </atom:entry>
@@ -114,6 +116,8 @@ describe('dumps-feed: parseDumpsFeed', () => {
     const [first, second, third] = feed.dumps;
     expect(first.id).toBe('DUMP-ID-1');
     expect(first.author).toBe('DEVELOPER');
+    expect(first.title).toBe('Runtime Error TIME_OUT in program ZCL_TEST');
+    expect(first.updated.toISOString()).toBe('2026-09-02T15:30:53.000Z');
     expect(first.categories).toEqual([
       { term: 'OBJECTS_OBJREF_NOT_ASSIGNED_NO', label: 'ABAP runtime error' },
       { term: 'CL_ADT_REST_COMP_CNT_HANDLER==CP', label: 'Terminated ABAP program' },
@@ -125,8 +129,9 @@ describe('dumps-feed: parseDumpsFeed', () => {
     expect(second.text).toBe('Cannot convert "abc" to a number');
     expect(second.type).toBe('text');
 
-    // Entry without author/summary still projects.
+    // Entry without author/title/summary still projects.
     expect(third.author).toBeUndefined();
+    expect(third.title).toBe('');
     expect(third.text).toBe('');
   });
 
