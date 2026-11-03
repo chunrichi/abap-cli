@@ -25,6 +25,7 @@ import type { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError, type OutputMode } from '../../output/json.js';
 import type { DdicSupportedType } from '../../types/registry.js';
 import { ttypArtifact } from '../../formats/ttyp/json.js';
+import { typeArtifact } from '../../formats/type/json.js';
 import { msagArtifact } from '../../formats/msag/json.js';
 import { ddlsArtifact } from '../../formats/ddls/json.js';
 import { enquArtifact } from '../../formats/enqu/json.js';
@@ -58,6 +59,9 @@ import { runPushAtc } from './push-atc.js';
 import { createCdsTechHandler } from './create-cds-tech.js';
 import { pullCdsTechHandler } from './pull-cds-tech.js';
 import { runPushCdsTech } from './push-cds-tech.js';
+import { createTypeHandler } from './create-type.js';
+import { pullTypeHandler } from './pull-type.js';
+import { runPushType } from './push-type.js';
 import { createEnquHandler } from './create-enqu.js';
 import { createNrobHandler } from './create-nrob.js';
 import { createDevcHandler } from './create-devc.js';
@@ -208,6 +212,7 @@ const AFF_ARTIFACTS: Readonly<Record<string, JsonArtifact<unknown>>> = {
   DSFD: dsfdArtifact,
   DSFI: dsfiArtifact,
   DRTY: drtyArtifact,
+  TYPE: typeArtifact,
 };
 
 /** AFF validator for one channel-routed type (mirrors the create/pull sides). */
@@ -258,6 +263,30 @@ function cdsTechPushRoute(type: CdsTechType): JsonPushRoute {
       return { transport: opts.tr ?? '', channel: 'adt' };
     },
     validate: (file, objectType) => validateCdsTechFile(file, objectType),
+  };
+}
+
+/**
+ * Type-pool push: `.type.abap` is the source companion of `.type.json`. Pushing
+ * it on its own is rejected, but `--atomic` validation must only check the
+ * companion is non-empty instead of trying to JSON-parse it.
+ */
+function typePushRoute(): JsonPushRoute {
+  return {
+    kind: 'aff-json',
+    channel: 'adt',
+    run: async ({ file, opts }) => {
+      await runPushType(file, { transport: opts.tr, activate: opts.activate });
+      return { transport: opts.tr ?? '', channel: 'adt' };
+    },
+    validate: async (file, objectType) => {
+      if (path.basename(file).toLowerCase().endsWith('.type.abap')) {
+        const content = await readFile(file, 'utf8');
+        if (!content.trim()) throw new CliError('VALIDATION_ERROR', `Empty TYPE source companion: ${path.basename(file)}`);
+        return;
+      }
+      await validateAffFile(objectType, file);
+    },
   };
 }
 
@@ -466,6 +495,11 @@ export const TYPE_ROUTES: Readonly<Record<string, TypeRoute>> = {
     create: handler('adt', createCdsTechHandler('DRTY')),
     pull: handler('adt', pullCdsTechHandler('DRTY')),
     push: cdsTechPushRoute('DRTY'),
+  },
+  TYPE: {
+    create: handler('adt', createTypeHandler),
+    pull: handler('adt', pullTypeHandler),
+    push: typePushRoute(),
   },
 };
 

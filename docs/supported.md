@@ -1,6 +1,6 @@
 # Supported Object Types
 
-`abap-cli` supports **33 object type codes**. Each type maps to one set of local artifacts written flat under `src/` — official abap-file-format (AFF) documents for most types, repository-local schemas for `TTYP` / `VIEW` / `SHLP` — and is served by one of two channels:
+`abap-cli` supports **34 object type codes**. Each type maps to one set of local artifacts written flat under `src/` — official abap-file-format (AFF) documents for most types, repository-local schemas for `TTYP` / `VIEW` / `SHLP` — and is served by one of two channels:
 
 - **ADT** — the standard ADT REST API: source objects (classes, interfaces, programs, function groups, CDS and RAP sources), packages, table types and message classes.
 - **ICF** — the bundled service under `/sap/abap_cli`, installed once per system with `abap deploy`: DDIC objects, SICF service nodes, transaction codes, XSLT transformations, and the types whose ADT endpoint is missing on older releases.
@@ -9,7 +9,7 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 
 ## Type × command matrix
 
-33 types support `create`, all 33 support `pull`, 31 have a `push` path and 33 have a `delete` path. In the matrix:
+34 types support `create`, all 34 support `pull`, 32 have a `push` path and 34 have a `delete` path. In the matrix:
 
 - `--file` marks a `create` that reads a JSON document — write it yourself or `pull` a comparable object first.
 - `$TMP` marks a `delete` that only removes local objects; delete transportable objects in SAP GUI so the deletion is recorded in a transport.
@@ -46,14 +46,15 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 | `STRU` | Structure | ✅ `--file` | ✅ | ✅ | ✅ | ICF | `.stru.json` + `.stru.ddic` |
 | `TABL` | Transparent table | ✅ `--file` | ✅ | ✅ | ✅ | ICF | `.tabl.json` + `.tabl.ddic` + `.tabl.settings.json` |
 | `TRAN` | Transaction code | ✅ `--file` | ✅ | ✅ | ✅ `$TMP` | ICF | `.tran.json` |
-| `TTYP` | Table type | ✅ `--file` | ✅ | ✅ | ✅ | auto (ADT / ICF) | `.ttyp.json` (+ `.type.abap`) |
+| `TTYP` | Table type | ✅ `--file` | ✅ | ✅ | ✅ | auto (ADT / ICF) | `.ttyp.json` |
+| `TYPE` | Type pool (`TYPE-POOL` / `TYPES`) | ✅ `--file` | ✅ | ✅ | ✅ | ADT | `.type.json` + `.type.abap` |
 | `VIEW` | Database view | ✅ `--file` | ✅ | ✅ | ✅ `$TMP` | ICF | `.view.json` |
 | `XSLT` | Transformation | ✅ `--file` | ✅ | ✅ | ✅ | ICF | `.xslt.json` + `.xslt.xml` |
 
 ## Create rules
 
 - Source objects and `DEVC` create from CLI arguments; `create local` drafts `CLAS` / `INTF` / `PROG` / `FUGR` offline, without a SAP connection.
-- The remaining creatable types are data-driven: `create` requires `--file` with a JSON document in the type's format (`BDEF` also needs the sibling `.bdef.abdl` source; `SRVB` creates a metadata-only binding and can publish it with `--publish`; `TTYP` / `VIEW` / `SHLP` use the local schemas below). Companion files shown in the same row belong to the same artifact set.
+- The remaining creatable types are data-driven: `create` requires `--file` with a JSON document in the type's format (`BDEF` also needs the sibling `.bdef.abdl` source; `SRVB` creates a metadata-only binding and can publish it with `--publish`; `TTYP` / `VIEW` / `SHLP` use the local schemas below). Table types are metadata-only (no ABAP companion); type pools pair `.type.json` with the classic `.type.abap` source. Companion files shown in the same row belong to the same artifact set.
 - `abap create --schema <type>` prints the per-type contract, including an example document where one exists.
 
 ## Delete rules
@@ -73,7 +74,7 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 
 ## Channel routing
 
-- **ADT** — source objects (`CLAS` `INTF` `PROG` `FUGR`), `DEVC`, `TTYP`, `MSAG`, `DDLS`, the CDS / RAP companions (`SRVD` `BDEF` `DCLS` `DDLX` `DDLA`), `SRVB`, the ATC configuration objects (`CHKC` `CHKO` `CHKV`) and the CDS technical objects (`DTDC` `DTEB` `DSFD` `DSFI`). `TTYP` and `MSAG` fall back to ICF automatically on ECC EHP5/6.
+- **ADT** — source objects (`CLAS` `INTF` `PROG` `FUGR`), `DEVC`, `TTYP`, `MSAG`, `DDLS`, `TYPE`, the CDS / RAP companions (`SRVD` `BDEF` `DCLS` `DDLX` `DDLA`), `SRVB`, the ATC configuration objects (`CHKC` `CHKO` `CHKV`) and the CDS technical objects (`DTDC` `DTEB` `DSFD` `DSFI`). `TTYP` and `MSAG` fall back to ICF automatically on ECC EHP5/6.
 - **ICF** — `TABL` `STRU` `DOMA` `DTEL` `ENQU` `VIEW` `SHLP` `HTTP` `TRAN` `XSLT`, plus the write path of `NROB`; these need `abap deploy` once per system (`abap deploy status` checks the installed version).
 - `NROB` pulls through ADT with an ICF fallback and writes through ICF. `DDLS` is rejected on ECC releases (`DDLS_NOT_SUPPORTED_ON_ECC`).
 
@@ -83,6 +84,7 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 - `TRAN` — dialog, report, parameter and variant transactions; OO transactions stay in SE93.
 - `VIEW` / `SHLP` — local-extension schemas (`view-v1.json` / `shlp-v1.json`); upstream AFF defines neither.
 - `ENQU` / `NROB` — `create` and `delete` only work in `$`-prefixed local packages (transportable creation/deletion needs a TADIR/transport record). `create` writes the local TADIR row, so the object is discoverable and `delete` does not have to backfill it; ENQU delete then runs `RS_DD_DELETE_OBJ`, NROB delete removes the intervals and calls `NUMBER_RANGE_OBJECT_DELETE`. Delete transported objects in SE11 / SNRO. `NROB` names are the `TNRO-NROBJ` key (CHAR 10): `create` and `delete` reject longer names locally instead of letting SAP truncate them.
+- `TYPE` — type pool (`TYPE-POOL <name>.` / `TYPES …`): AFF header `type-v1.json` plus the classic `.type.abap` source. Type pools are limited to five characters; create writes the source through ADT `/ddic/typegroups` and activates it.
 - `TTYP` — `lineType.rowType` names either a repository type (data element / structure / table / table type) or a DDIC predefined data type (`CHAR`, `NUMC`, `DEC`, `DATS`, `INT4`, `STRING`, …); a predefined row type keeps its length/decimals in `lineType.rowTypeLength` / `lineType.rowTypeDecimals`. ABAP type codes (`C`, `I`, `P`, …) are not DDIC data type names and are not accepted.
 - `TABL` / `STRU` — foreign keys (`@AbapCatalog.foreignKeys` block or a `with foreign key ... check <table>` clause in the DDL sidecar) are not persisted by the bundled ICF service: `create` / `push` reject a payload that carries them (exit 7) instead of dropping the constraints. Maintain foreign keys in SE11 / ADT after the object exists.
 - `DOMA` / `DTEL` — long text is an optional companion file (`<name>.<type>.docu.json`, `docu-v1.json`); `lines: []` deletes the remote long text.
@@ -101,7 +103,8 @@ Upstream [abap-file-formats](https://github.com/SAP/abap-file-formats) defines n
 
 | Type | Schema | Kind | Derived from | Official AFF |
 |---|---|---|---|---|
-| `TTYP` | `ttyp-v1.json` | local variant — `keyKind` / `rowTypeLength` / `rowTypeDecimals` are local extensions | ADT table-type model (upstream `type-v1.json` is a type pool, not a table type) | No |
+| `TTYP` | `ttyp-v1.json` | local variant — `keyKind` / `rowTypeLength` / `rowTypeDecimals` are local extensions | ADT table-type model (upstream `type-v1.json` is the type pool; table types have no upstream AFF) | No |
+| `TYPE` | `type-v1.json` | official upstream AFF type pool schema | ADT `/ddic/typegroups` (`TYPE/DG`) | No |
 | `VIEW` | `view-v1.json` | local extension | DD25V / DD26V / DD27P / DD28J / DD28V | No |
 | `SHLP` | `shlp-v1.json` | local extension | DD30V / DD31V / DD32P / DD33V | No |
 

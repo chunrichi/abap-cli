@@ -68,7 +68,7 @@ cp agents/abap-developer.agent.md <your-project>/.claude/agents/
 | **`abap-cli`** | meta | `report-stuck` | 入口路由层：按意图分发到 4 个领域 skill + 1 个方法论 skill；本地卡死留痕；CLI 反馈直接提 GitHub issue |
 | **`abap-cli-setup`** | workspace-and-sap | `init` `profile` `doctor` `transport` `deploy` `session` `types` | 环境就绪：工作区、凭证、诊断、传输请求、ICF 部署、session、TADIR 映射 |
 | **`abap-cli-search`** | sap（只读） | `search` `where-used` `inspect` `tcode` `diff` `status` `dumps` | 元数据探查：不改对象、不加锁、不写 transport；`dumps` 列 ST22 dump |
-| **`abap-cli-edit`** | sap（写） | `pull` `push` `check` `create`（含 `create local`）`activate` `delete` `list` `mime` `validate:aff` | 写路径：源码/DDIC/MIME 的拉取、创建、修改、推送、激活、删除；类型码以 `src/abap_cli/types/registry.ts` 为准（当前 33 个注册类型，`DEVC` / `SRVB` 有 create/pull/delete 但无 push） |
+| **`abap-cli-edit`** | sap（写） | `pull` `push` `check` `create`（含 `create local`）`activate` `delete` `list` `mime` `validate:aff` | 写路径：源码/DDIC/MIME 的拉取、创建、修改、推送、激活、删除；类型码以 `src/abap_cli/types/registry.ts` 为准（当前 34 个注册类型，`DEVC` / `SRVB` 有 create/pull/delete 但无 push） |
 | **`abap-cli-data`** | sap（只读消费） | `select` `fields` `run` `run-report` `test` | 运行时消费：查表/字段、跑类、跑报表、跑 ABAP Unit；全程只读 |
 | **`abap-cli-performance`** | abap-performance-review | （方法论；触发只读命令 `search` / `inspect` / `pull` / `check` / `select`） | ABAP 性能 review：慢路径诊断、分平台建议、`check` / ATC 核验 |
 

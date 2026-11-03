@@ -58,7 +58,7 @@ abap pull --help
 
 | 类型 | 主通道（kernel ≥ 753） | 兜底（kernel < 753） | 落盘 |
 |---|---|---|---|
-| TTYP | ADT `/sap/bc/adt/ddic/tabletypes/<name>` | ICF `/ddic/ttyp/<name>` | `<name>.ttyp.json` + 可选 `<name>.type.abap` |
+| TTYP | ADT `/sap/bc/adt/ddic/tabletypes/<name>` | ICF `/ddic/ttyp/<name>` | `<name>.ttyp.json` |
 | MSAG | ADT `/sap/bc/adt/messageclass/<name>` | ICF `/ddic/msag/<name>` | `<name>.msag.json` |
 | DDLS | ADT `/sap/bc/adt/ddic/ddl/sources/<name>` | **无兜底** → 硬错 | `<name>.ddls.json` + `<name>.ddls.acds` |
 

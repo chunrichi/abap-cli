@@ -56,7 +56,7 @@ afterEach(() => {
 });
 
 describe('runPullTtyp — ADT channel', () => {
-  it('pulls via ADT and writes the json + type.abap pair', async () => {
+  it('pulls via ADT and writes the json document', async () => {
     const { runPullTtyp } = await import('../../src/abap_cli/flows/edit/pull-ttyp.js');
     const { clearChannelCache } = await import('../../src/abap_cli/flows/edit/channel-detect.js');
     clearChannelCache();
@@ -68,12 +68,12 @@ describe('runPullTtyp — ADT channel', () => {
     expect(result.object).toBe('ZMY_TTYP');
     expect(adtGetTtyp).toHaveBeenCalledTimes(1);
     expect(icfGet).not.toHaveBeenCalled();
-    expect(result.files).toHaveLength(2);
+    expect(result.files).toHaveLength(1);
 
     const json = JSON.parse(fs.readFileSync(path.join(root, 'zmy_ttyp.ttyp.json'), 'utf8'));
     expect(json.accessType).toBe('standard');
     expect(json.lineType.rowType).toBe('LVC_S_TABL');
-    expect(fs.existsSync(path.join(root, 'zmy_ttyp.type.abap'))).toBe(true);
+    expect(fs.existsSync(path.join(root, 'zmy_ttyp.type.abap'))).toBe(false);
   });
 
   it('carries the keyDefinition array for hashed tables', async () => {
@@ -102,22 +102,9 @@ describe('runPullTtyp — ADT channel', () => {
 
     const json = JSON.parse(fs.readFileSync(path.join(root, 'zmy_chars.ttyp.json'), 'utf8'));
     expect(json.lineType).toEqual({ rowType: 'CHAR', rowTypeLength: 10 });
-    expect(fs.readFileSync(path.join(root, 'zmy_chars.type.abap'), 'utf8')).toBe(
-      'define type zmy_chars: table of char(10).',
-    );
     expect(result.doc.lineType.rowTypeLength).toBe(10);
   });
 
-  it('skips the type.abap sidecar when asked', async () => {
-    const { runPullTtyp } = await import('../../src/abap_cli/flows/edit/pull-ttyp.js');
-    const { clearChannelCache } = await import('../../src/abap_cli/flows/edit/channel-detect.js');
-    clearChannelCache();
-
-    const result = await runPullTtyp('zmy_ttyp', { profile: ADT_PROFILE, rootDir: root, skipTypeAbap: true });
-
-    expect(result.files).toHaveLength(1);
-    expect(fs.existsSync(path.join(root, 'zmy_ttyp.type.abap'))).toBe(false);
-  });
 });
 
 describe('runPullTtyp — runtime ADT endpoint fallback', () => {

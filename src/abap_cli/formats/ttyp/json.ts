@@ -2,9 +2,9 @@
  * TTYP local-file ↔ ADT wire-format mapping.
  *
  * Local file: `*.ttyp.json` (AFF nested — `formatVersion / header /
- * accessType / lineType / keyDefinition? / keyKind? / rows?`), plus a
- * `*.type.abap` sidecar with the pseudo-DDL `define type ...` form (human
- * readable only — push always rebuilds the ADT document from the JSON).
+ * accessType / lineType / keyDefinition? / keyKind? / rows?`). Table types are
+ * pure DDIC metadata — there is no ABAP source companion (abapGit serializes
+ * them as a single XML file for the same reason).
  *
  * Wire: the ADT DDIC table-type document returned by
  * `/sap/bc/adt/ddic/tabletypes/<name>` (shape verified against a live
@@ -286,28 +286,3 @@ export function localToWire(local: TtypLocal, name: string, opts: LocalToWireOpt
  *  above — the write side needs the object name and an optional package). */
 export const ttypArtifact = defineJsonArtifact<TtypLocal>({ type: 'TTYP' });
 
-/** Pseudo-DDL token for a row type reference: `char(10)` / `dec(15,2)` for a
- *  predefined type that carries a length (and decimals), otherwise the bare
- *  lower-cased name (dictionary reference, or a length-less predefined type). */
-function rowTypeSource(lineType: TtypLocal['lineType']): string {
-  const rowType = (lineType.rowType ?? '').toLowerCase();
-  if (lineType.rowTypeLength === undefined) return rowType;
-  const decimals = lineType.rowTypeDecimals !== undefined ? `,${lineType.rowTypeDecimals}` : '';
-  return `${rowType}(${lineType.rowTypeLength}${decimals})`;
-}
-
-/** Build the pseudo-DDL `define type <name>: ...` sidecar (human readable). */
-export function buildTypeSource(name: string, local: TtypLocal): string {
-  const access = local.accessType === 'standard' ? '' : ` ${local.accessType}`;
-  const key = (local.keyDefinition ?? []).map((k) => k.keyField.toLowerCase());
-  const keyPart = key.length > 0
-    ? ` with ${local.keyKind === 'unique' || local.accessType === 'hashed' ? 'unique' : 'non-unique'} key ${key.join(' ')}`
-    : '';
-  if (local.lineType.rowType) {
-    return `define type ${name.toLowerCase()}:${access} table of ${rowTypeSource(local.lineType)}${keyPart}.`;
-  }
-  const f = local.lineType.rowStructure!;
-  const type = (f.dataType ?? 'CHAR').toLowerCase();
-  const len = f.length !== undefined ? ` LENGTH ${f.length}` : '';
-  return `define type ${name.toLowerCase()}:${access} table of begin of line, ${f.fieldName.toLowerCase()} type ${type}${len}, end of line${keyPart}.`;
-}

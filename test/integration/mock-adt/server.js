@@ -76,6 +76,8 @@ const packages = new Map();
 // The XML body posted by the CLI is stored verbatim and served back on GET, so
 // the AFF projection is exercised on the CLI side (same contract as real ADT).
 const atcObjects = new Map();
+// Type pools (TYPE-POOL / TYPE) — name → { metaXml, source, packageName }.
+const typegroupStore = new Map();
 // CDS technical objects — key = `<TYPE>:<NAME>`, value = { metaXml, source, packageName }.
 // DTDC/DTEB/DSFD store an XML metadata envelope + `.acds` source text; DSFI
 // stores a blueSource envelope + the AFF JSON document as its source.
@@ -2135,6 +2137,77 @@ const server = http.createServer(async (req, res) => {
         }
         atcObjects.delete(key);
         objects.delete(name);
+        return ok(res, '');
+      }
+    }
+
+    // Type pools (TYPE / TYPE-POOL): /sap/bc/adt/ddic/typegroups.
+    const typegroupMatch = /^\/sap\/bc\/adt\/ddic\/typegroups(?:\/([^/]+))?(\/source\/main)?$/.exec(path);
+    if (typegroupMatch) {
+      const tgName = typegroupMatch[1]?.toUpperCase();
+      const tgSource = Boolean(typegroupMatch[2]);
+      const tgKey = tgName ?? '';
+      const tgUrl = tgName ? `/sap/bc/adt/ddic/typegroups/${tgName.toLowerCase()}` : '';
+      if (req.method === 'POST' && !tgName) {
+        const body = await readBody(req);
+        const created = /adtcore:name="([^"]+)"/.exec(body)?.[1]?.toUpperCase();
+        if (!created) return adtError(res, 400, 'Missing adtcore:name in type-group create body');
+        if (typegroupStore.has(created)) return adtError(res, 400, `Type group ${created} already exists`);
+        const packageName = /adtcore:packageRef[^>]*adtcore:name="([^"]+)"/.exec(body)?.[1] || '$TMP';
+        const description = /adtcore:description="([^"]*)"/.exec(body)?.[1] || '';
+        typegroupStore.set(created, { metaXml: body, source: '', packageName });
+        const createdUrl = `/sap/bc/adt/ddic/typegroups/${created.toLowerCase()}`;
+        const obj = addObject(created, 'TYPE', createdUrl, description, [], { packageName });
+        obj.inactive = true;
+        return ok(res, body);
+      }
+      if (tgName && tgSource && req.method === 'GET') {
+        const stored = typegroupStore.get(tgKey);
+        if (!stored) return adtError(res, 404, `Type group ${tgName} source not found`);
+        return ok(res, stored.source, 'text/plain; charset=utf-8');
+      }
+      if (tgName && tgSource && req.method === 'PUT') {
+        const stored = typegroupStore.get(tgKey);
+        if (!stored) return adtError(res, 404, `Type group ${tgName} not found`);
+        const obj = byObjectUrl(tgUrl);
+        if (!obj || !obj.lockedBy || obj.lockedBy.lockHandle !== q.get('lockHandle')) {
+          return adtError(res, 403, `Type group ${tgName} is not locked by this session`);
+        }
+        stored.source = await readBody(req);
+        return ok(res, stored.source, 'text/plain; charset=utf-8');
+      }
+      if (tgName && !tgSource && req.method === 'GET') {
+        const stored = typegroupStore.get(tgKey);
+        if (!stored) return adtError(res, 404, `Type group ${tgName} not found`);
+        let meta = stored.metaXml;
+        if (stored.packageName && !/adtcore:packageRef/.test(meta)) {
+          meta = meta.replace(/<\/([A-Za-z0-9]+:[A-Za-z0-9]+)>$/, `<adtcore:packageRef adtcore:name="${stored.packageName}"/></$1>`);
+        }
+        return ok(res, meta);
+      }
+      if (tgName && !tgSource && req.method === 'PUT') {
+        const stored = typegroupStore.get(tgKey);
+        if (!stored) return adtError(res, 404, `Type group ${tgName} not found`);
+        const obj = byObjectUrl(tgUrl);
+        if (!obj || !obj.lockedBy || obj.lockedBy.lockHandle !== q.get('lockHandle')) {
+          return adtError(res, 403, `Type group ${tgName} is not locked by this session`);
+        }
+        stored.metaXml = await readBody(req);
+        const desc = /adtcore:description="([^"]*)"/.exec(stored.metaXml)?.[1];
+        if (desc !== undefined) obj.description = desc;
+        const pkg = /adtcore:packageRef[^>]*adtcore:name="([^"]+)"/.exec(stored.metaXml)?.[1];
+        if (pkg) stored.packageName = pkg;
+        return ok(res, stored.metaXml);
+      }
+      if (tgName && !tgSource && req.method === 'DELETE') {
+        const stored = typegroupStore.get(tgKey);
+        if (!stored) return adtError(res, 404, `Type group ${tgName} not found`);
+        const obj = byObjectUrl(tgUrl);
+        if (!obj || !obj.lockedBy || obj.lockedBy.lockHandle !== q.get('lockHandle')) {
+          return adtError(res, 403, `Type group ${tgName} is not locked by this session`);
+        }
+        typegroupStore.delete(tgKey);
+        objects.delete(tgName);
         return ok(res, '');
       }
     }

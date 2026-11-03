@@ -83,6 +83,8 @@ const SCHEMA_FILE: Record<string, string> = {
   DSFI: 'dsfi-v1.json',
   // CDS type (simple type); same metadata + `.acds` layout as DSFD.
   DRTY: 'drty-v1.json',
+  // Type pool (classic ABAP TYPE-POOL source); AFF `type-v1.json` + `.type.abap`.
+  TYPE: 'type-v1.json',
 };
 
 /** Resolve the bundled-schema directory shipped with the package.
