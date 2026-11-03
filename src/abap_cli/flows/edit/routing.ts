@@ -20,6 +20,7 @@
  * type is now one row here plus its handler module.
  */
 import * as path from 'node:path';
+import { readFile } from 'node:fs/promises';
 import type { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError, type OutputMode } from '../../output/json.js';
 import type { DdicSupportedType } from '../../types/registry.js';
@@ -29,6 +30,13 @@ import { ddlsArtifact } from '../../formats/ddls/json.js';
 import { enquArtifact } from '../../formats/enqu/json.js';
 import { nrobArtifact } from '../../formats/nrob/json.js';
 import { chkcArtifact, chkoArtifact, chkvArtifact, type AtcType } from '../../formats/atc/json.js';
+import {
+  dtdcArtifact,
+  dtebArtifact,
+  dsfdArtifact,
+  dsfiArtifact,
+  type CdsTechType,
+} from '../../formats/cds-tech/json.js';
 import type { JsonArtifact } from '../../formats/artifact.js';
 import type { CreateOptions } from './create.js';
 import type { PullOptions, PullResult, TypePullResult } from './pull-shared.js';
@@ -46,6 +54,9 @@ import { createSrvbHandler } from './create-srvb.js';
 import { createAtcHandler } from './create-atc.js';
 import { pullAtcHandler } from './pull-atc.js';
 import { runPushAtc } from './push-atc.js';
+import { createCdsTechHandler } from './create-cds-tech.js';
+import { pullCdsTechHandler } from './pull-cds-tech.js';
+import { runPushCdsTech } from './push-cds-tech.js';
 import { createEnquHandler } from './create-enqu.js';
 import { createNrobHandler } from './create-nrob.js';
 import { createDevcHandler } from './create-devc.js';
@@ -191,6 +202,10 @@ const AFF_ARTIFACTS: Readonly<Record<string, JsonArtifact<unknown>>> = {
   CHKC: chkcArtifact,
   CHKO: chkoArtifact,
   CHKV: chkvArtifact,
+  DTDC: dtdcArtifact,
+  DTEB: dtebArtifact,
+  DSFD: dsfdArtifact,
+  DSFI: dsfiArtifact,
 };
 
 /** AFF validator for one channel-routed type (mirrors the create/pull sides). */
@@ -213,6 +228,34 @@ function atcPushRoute(type: AtcType): JsonPushRoute {
       return { transport: opts.tr ?? '', channel: 'adt' };
     },
     validate: (file, objectType) => validateAffFile(objectType, file),
+  };
+}
+
+/**
+ * CDS technical objects: `.acds` sidecars are read together with their JSON
+ * document, so `--atomic` validates the JSON against the AFF schema and only
+ * checks the sidecar is non-empty.
+ */
+async function validateCdsTechFile(file: string, objectType: string): Promise<void> {
+  const resolved = path.basename(file).toLowerCase();
+  if (resolved.endsWith('.acds')) {
+    const content = await readFile(file, 'utf8');
+    if (!content.trim()) throw new CliError('VALIDATION_ERROR', `Empty source sidecar: ${path.basename(file)}`);
+    return;
+  }
+  await validateAffFile(objectType, file);
+}
+
+/** CDS technical ADT write route: locked source PUT, then activation. */
+function cdsTechPushRoute(type: CdsTechType): JsonPushRoute {
+  return {
+    kind: 'aff-json',
+    channel: 'adt',
+    run: async ({ client, file, opts }) => {
+      await runPushCdsTech(client, type, file, { transport: opts.tr, activate: opts.activate });
+      return { transport: opts.tr ?? '', channel: 'adt' };
+    },
+    validate: (file, objectType) => validateCdsTechFile(file, objectType),
   };
 }
 
@@ -393,6 +436,29 @@ export const TYPE_ROUTES: Readonly<Record<string, TypeRoute>> = {
     create: handler('adt', createAtcHandler('CHKV')),
     pull: handler('adt', pullAtcHandler('CHKV')),
     push: atcPushRoute('CHKV'),
+  },
+
+  // CDS technical objects — metadata + `.acds` source pairs (DSFI: single
+  // AFF JSON document). No ICF fallback.
+  DTDC: {
+    create: handler('adt', createCdsTechHandler('DTDC')),
+    pull: handler('adt', pullCdsTechHandler('DTDC')),
+    push: cdsTechPushRoute('DTDC'),
+  },
+  DTEB: {
+    create: handler('adt', createCdsTechHandler('DTEB')),
+    pull: handler('adt', pullCdsTechHandler('DTEB')),
+    push: cdsTechPushRoute('DTEB'),
+  },
+  DSFD: {
+    create: handler('adt', createCdsTechHandler('DSFD')),
+    pull: handler('adt', pullCdsTechHandler('DSFD')),
+    push: cdsTechPushRoute('DSFD'),
+  },
+  DSFI: {
+    create: handler('adt', createCdsTechHandler('DSFI')),
+    pull: handler('adt', pullCdsTechHandler('DSFI')),
+    push: cdsTechPushRoute('DSFI'),
   },
 };
 

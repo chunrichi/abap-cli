@@ -78,6 +78,11 @@ FILES=(
   "chkc/chkc-v1.json"
   "chko/chko-v1.json"
   "chkv/chkv-v1.json"
+  # CDS technical objects (DTDC/DTEB/DSFD/DSFI).
+  "dtdc/dtdc-v1.json"
+  "dteb/dteb-v1.json"
+  "dsfd/dsfd-v1.json"
+  "dsfi/dsfi-v1.json"
 )
 
 echo ">> Copying ${#FILES[@]} schema files"

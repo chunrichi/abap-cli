@@ -54,7 +54,7 @@ describe('schema-paths priority chain', () => {
     );
   });
 
-  it('affSupportedTypes matches the router table (16 + 6 + 2 + VIEW + XSLT + SHLP + DOCU + ATC types)', () => {
+  it('affSupportedTypes matches the router table (16 + 6 + 2 + VIEW + XSLT + SHLP + DOCU + ATC + CDS technical types)', () => {
     const types = affSupportedTypes();
     expect(types).toEqual(
       expect.arrayContaining([
@@ -76,6 +76,8 @@ describe('schema-paths priority chain', () => {
         'DOCU',
         // — ATC configuration objects.
         'CHKC', 'CHKO', 'CHKV',
+        // — CDS technical objects.
+        'DTDC', 'DTEB', 'DSFD', 'DSFI',
       ]),
     );
     // TABT is exposed as a schema key for the .settings.json override path.
@@ -88,7 +90,8 @@ describe('schema-paths priority chain', () => {
     // added XSLT = 28 total.
     // added SHLP (local extension) = 29 total.
     // added CHKC / CHKO / CHKV = 32 total.
-    expect(types).toHaveLength(32);
+    // added DTDC / DTEB / DSFD / DSFI = 36 total.
+    expect(types).toHaveLength(36);
   });
 
   it('bundled root contains every supported schema', () => {
