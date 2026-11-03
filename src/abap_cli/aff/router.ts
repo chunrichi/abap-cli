@@ -102,6 +102,8 @@ const SUFFIX_RULES: ReadonlyArray<{ suffix: string; type: string; schemaFile?: s
   { suffix: '.dsfd.json', type: 'DSFD' },
   { suffix: '.dsfd.acds', type: 'DSFD' },
   { suffix: '.dsfi.json', type: 'DSFI' },
+  { suffix: '.drty.json', type: 'DRTY' },
+  { suffix: '.drty.acds', type: 'DRTY' },
 ];
 
 const SUFFIX_INDEX: Map<string, string> = new Map(

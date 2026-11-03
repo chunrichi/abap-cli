@@ -242,6 +242,15 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
     affSchemaFile: 'dsfi-v1.json',
     requiresFile: true,
   },
+  // CDS type (simple type) — metadata + `.acds` source; gated by SAP's
+  // CDS_SIMPLE_TYPES user parameter.
+  {
+    type: 'DRTY',
+    source: 'ADT',
+    createObjtype: 'DRTY/STY',
+    affSchemaFile: 'drty-v1.json',
+    requiresFile: true,
+  },
 ] as const;
 
 /** sub-registry types for channel-detect / ICF fallback gating. */

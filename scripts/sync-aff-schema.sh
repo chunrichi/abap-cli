@@ -83,6 +83,8 @@ FILES=(
   "dteb/dteb-v1.json"
   "dsfd/dsfd-v1.json"
   "dsfi/dsfi-v1.json"
+  # CDS types (DRTY); DRAS/DTIX/DTSC have no ADT channel on the reference release.
+  "drty/drty-v1.json"
 )
 
 echo ">> Copying ${#FILES[@]} schema files"

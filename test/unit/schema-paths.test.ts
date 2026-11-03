@@ -77,7 +77,7 @@ describe('schema-paths priority chain', () => {
         // — ATC configuration objects.
         'CHKC', 'CHKO', 'CHKV',
         // — CDS technical objects.
-        'DTDC', 'DTEB', 'DSFD', 'DSFI',
+        'DTDC', 'DTEB', 'DSFD', 'DSFI', 'DRTY',
       ]),
     );
     // TABT is exposed as a schema key for the .settings.json override path.
@@ -91,7 +91,8 @@ describe('schema-paths priority chain', () => {
     // added SHLP (local extension) = 29 total.
     // added CHKC / CHKO / CHKV = 32 total.
     // added DTDC / DTEB / DSFD / DSFI = 36 total.
-    expect(types).toHaveLength(36);
+    // added DRTY = 37 total.
+    expect(types).toHaveLength(37);
   });
 
   it('bundled root contains every supported schema', () => {

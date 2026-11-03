@@ -1,6 +1,6 @@
 # Supported Object Types
 
-`abap-cli` supports **32 object type codes**. Each type maps to one set of local artifacts written flat under `src/` — official abap-file-format (AFF) documents for most types, repository-local schemas for `TTYP` / `VIEW` / `SHLP` — and is served by one of two channels:
+`abap-cli` supports **33 object type codes**. Each type maps to one set of local artifacts written flat under `src/` — official abap-file-format (AFF) documents for most types, repository-local schemas for `TTYP` / `VIEW` / `SHLP` — and is served by one of two channels:
 
 - **ADT** — the standard ADT REST API: source objects (classes, interfaces, programs, function groups, CDS and RAP sources), packages, table types and message classes.
 - **ICF** — the bundled service under `/sap/abap_cli`, installed once per system with `abap deploy`: DDIC objects, SICF service nodes, transaction codes, XSLT transformations, and the types whose ADT endpoint is missing on older releases.
@@ -9,7 +9,7 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 
 ## Type × command matrix
 
-32 types support `create`, all 32 support `pull`, 30 have a `push` path and 32 have a `delete` path. In the matrix:
+33 types support `create`, all 33 support `pull`, 31 have a `push` path and 33 have a `delete` path. In the matrix:
 
 - `--file` marks a `create` that reads a JSON document — write it yourself or `pull` a comparable object first.
 - `$TMP` marks a `delete` that only removes local objects; delete transportable objects in SAP GUI so the deletion is recorded in a transport.
@@ -24,6 +24,7 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 | `DTEB` | CDS entity buffer | ✅ `--file` | ✅ | ✅ | ✅ | ADT | `.dteb.json` + `.dteb.acds` |
 | `DSFD` | CDS scalar function definition | ✅ `--file` | ✅ | ✅ | ✅ | ADT | `.dsfd.json` + `.dsfd.acds` |
 | `DSFI` | CDS scalar function implementation | ✅ `--file` | ✅ | ✅ | ✅ | ADT | `.dsfi.json` |
+| `DRTY` | CDS type (simple type) | ✅ `--file` | ✅ | ✅ | ✅ | ADT | `.drty.json` + `.drty.acds` |
 | `CLAS` | Class | ✅ | ✅ | ✅ | ✅ | ADT | `.clas.json` + `.clas.abap` + `.clas.{definitions,implementations,macros,testclasses}.abap` |
 | `DCLS` | CDS access control | ✅ `--file` | ✅ | ✅ | ✅ | ADT | `.dcls.json` + `.dcls.acds` |
 | `DDLA` | CDS annotation definition | ✅ `--file` | ✅ | ✅ | ✅ | ADT | `.ddla.json` + `.ddla.acds` |
@@ -86,6 +87,7 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 - `TABL` / `STRU` — foreign keys (`@AbapCatalog.foreignKeys` block or a `with foreign key ... check <table>` clause in the DDL sidecar) are not persisted by the bundled ICF service: `create` / `push` reject a payload that carries them (exit 7) instead of dropping the constraints. Maintain foreign keys in SE11 / ADT after the object exists.
 - `DOMA` / `DTEL` — long text is an optional companion file (`<name>.<type>.docu.json`, `docu-v1.json`); `lines: []` deletes the remote long text.
 - `BDEF` — `create` reads the AFF JSON plus the sibling `.bdef.abdl` source, creates the behavior definition through ADT and activates it; the behavior must target an existing root entity (or a valid unmanaged implementation class). `pull` / `push` / `delete` are also available.
+- `DRTY` — CDS type (simple type): the same metadata + `.acds` layout as `DSFD`. Writes are behind SAP's `CDS_SIMPLE_TYPES` user parameter (SU3 → Parameter); without it SAP answers `CDS types are not yet supported`, which the CLI maps to `DRTY_FEATURE_NOT_ENABLED`.
 - `DTDC` / `DTEB` / `DSFD` — CDS technical source objects: a header-only AFF metadata document plus an `.acds` sidecar. `create` / `push` write the source and activate (and sync the AFF description through the metadata resource). DTEB activation requires the target view entity to allow buffering (`@AbapCatalog.entityBuffer.definitionAllowed: true`); DSFD writes need SAP's `DD_CDS_DSFD` user parameter enabled (SU3 → Parameter) — without it SAP rejects create/update/delete with a misleading authorization message that the CLI maps to `DSFD_FEATURE_NOT_ENABLED`.
 - `DSFI` — CDS scalar function implementation reference: a single AFF JSON document (its ADT `source/main` *is* the JSON). The object name must end with the engine suffix (`_ANA` on this release); the referenced scalar function definition is the name without the suffix and must exist and be active. `sqlEngine` variants are rejected by the ADT layer on this release even though the AFF schema lists them.
 - `CHKC` / `CHKO` / `CHKV` — ATC configuration objects: check categories, checks and check variants. `create` / `push` write the versioned ADT XML resource and activate it (`--no-activate` stops after the write); `pull` projects the resource back onto the official AFF document. SAP validates the semantics: a `CHKO`'s implementing class must be registered as an active ATC check, and a `CHKV`'s parameters must match that class. `push` / `delete` outside `$`-prefixed packages need `--tr`.
@@ -116,6 +118,7 @@ All three keep the AFF conventions (`formatVersion` + `header`, flat `<name>.<ty
 | Web Dynpro, ITS, BSP | Not supported |
 | IDoc / ALE configuration, workflow | Not supported |
 | Pool / cluster tables | Not supported — only `TABL` / `STRU` |
+| CDS aspect (`DRAS`), dictionary tuning index (`DTIX`), dictionary tuning static cache (`DTSC`) | Not supported on the reference release — official AFF schemas exist, but the S/4HANA release tested exposes no ADT read/write resources for them (no `typestructure` create capability and no discovery collections). Deferred until a release with ADT support. |
 | Simple Transformations (`STRANS`) | Not supported — XSLT programs only |
 | Package update (`push DEVC`) | Not possible — ADT rejects package updates; change the package in SAP GUI or delete and recreate it |
 | OO transactions (`TRAN`) | Not possible — maintain them in SE93 |

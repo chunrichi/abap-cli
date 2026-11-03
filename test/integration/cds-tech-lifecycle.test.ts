@@ -120,11 +120,13 @@ function parseEnvelope(result: { stdout: string; stderr: string }): Record<strin
 const DTDC = 'ZCLI_MOCK_DTDC';
 const DTEB = 'ZCLI_MOCK_DTEB';
 const DSFD = 'ZCLI_MOCK_FUNC';
+const DRTY = 'ZCLI_MOCK_DRTY';
 const DSFI = 'ZCLI_MOCK_FUNC_ANA';
 
 const DTDC_SOURCE = 'define dynamic cache ZCLI_MOCK_DTDC on spfli\n{\n   sum(fltime)\n}\n\ncreation configurable default off\n';
 const DTEB_SOURCE = 'define view entity buffer on ZCLI_MOCK_VIEW\n  layer core\n  type single\n';
 const DSFD_SOURCE = 'define scalar function zcli_mock_func\n  with parameters\n    p1 : abap.int1\n  returns abap.int4;\n';
+const DRTY_SOURCE = "@EndUserText.label : 'mock type'\ndefine type zcli_mock_drty : abap.char( 10 );\n";
 
 function writeSourcePair(name: string, type: string, description: string, source: string): string {
   const token = name.toLowerCase();
@@ -170,17 +172,18 @@ describe.skipIf(!hasBuiltCli)('CDS technical objects lifecycle (mock ADT)', () =
         DTEB: writeSourcePair(DTEB, 'DTEB', 'mock entity buffer', DTEB_SOURCE),
         DSFD: writeSourcePair(DSFD, 'DSFD', 'mock scalar function', DSFD_SOURCE),
         DSFI: writeDsfi(DSFI, 'mock scalar function impl', DSFD, 'analyticalEngine'),
+        DRTY: writeSourcePair(DRTY, 'DRTY', 'mock CDS type', DRTY_SOURCE),
       };
 
       // DSFI references DSFD: create DSFD first.
-      for (const [type, name] of [['DTDC', DTDC], ['DTEB', DTEB], ['DSFD', DSFD], ['DSFI', DSFI]] as const) {
+      for (const [type, name] of [['DTDC', DTDC], ['DTEB', DTEB], ['DSFD', DSFD], ['DSFI', DSFI], ['DRTY', DRTY]] as const) {
         const create = await runCli(['create', type, name, '--file', files[type], '--package', '$TMP', '--yes', '--json']);
         expect(create.exit, create.stderr || create.stdout).toBe(0);
         expect(parseEnvelope(create).data).toMatchObject({ object: name, type, action: 'created', channel: 'adt', activated: true });
       }
 
       // Pull: source types write the pair, DSFI a single document.
-      for (const [type, name] of [['DTDC', DTDC], ['DTEB', DTEB], ['DSFD', DSFD], ['DSFI', DSFI]] as const) {
+      for (const [type, name] of [['DTDC', DTDC], ['DTEB', DTEB], ['DSFD', DSFD], ['DSFI', DSFI], ['DRTY', DRTY]] as const) {
         const token = name.toLowerCase();
         rmSync(join(TMP_PROJECT, `src/${token}.${type.toLowerCase()}.json`), { force: true });
         rmSync(join(TMP_PROJECT, `src/${token}.${type.toLowerCase()}.acds`), { force: true });
@@ -189,6 +192,7 @@ describe.skipIf(!hasBuiltCli)('CDS technical objects lifecycle (mock ADT)', () =
         expect(parseEnvelope(pull).data).toMatchObject({ type, channel: 'adt' });
       }
       expect(readFileSync(join(TMP_PROJECT, `src/${DTDC.toLowerCase()}.dtdc.acds`), 'utf8')).toBe(DTDC_SOURCE);
+      expect(readFileSync(join(TMP_PROJECT, `src/${DRTY.toLowerCase()}.drty.acds`), 'utf8')).toBe(DRTY_SOURCE);
       const pulledDsfi = JSON.parse(readFileSync(join(TMP_PROJECT, `src/${DSFI.toLowerCase()}.dsfi.json`), 'utf8'));
       expect(pulledDsfi).toMatchObject({ scalarFunctionName: DSFD, engine: 'analyticalEngine' });
 
@@ -212,7 +216,7 @@ describe.skipIf(!hasBuiltCli)('CDS technical objects lifecycle (mock ADT)', () =
       expect(parseEnvelope(sidecarPush).error).toMatchObject({ code: 'INVALID_ARGUMENT' });
 
       // Delete in dependency order (DSFI → DSFD, DTEB/DTDC independent).
-      for (const [type, name] of [['DSFI', DSFI], ['DSFD', DSFD], ['DTEB', DTEB], ['DTDC', DTDC]] as const) {
+      for (const [type, name] of [['DSFI', DSFI], ['DSFD', DSFD], ['DTEB', DTEB], ['DRTY', DRTY], ['DTDC', DTDC]] as const) {
         const del = await runCli(['delete', name, '--type', type, '--yes', '--json']);
         expect(del.exit, del.stderr || del.stdout).toBe(0);
         expect(parseEnvelope(del).data).toMatchObject({ object: name, type, packageName: '$TMP', deleted: true });

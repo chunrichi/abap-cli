@@ -35,6 +35,7 @@ import {
   dtebArtifact,
   dsfdArtifact,
   dsfiArtifact,
+  drtyArtifact,
   type CdsTechType,
 } from '../../formats/cds-tech/json.js';
 import type { JsonArtifact } from '../../formats/artifact.js';
@@ -206,6 +207,7 @@ const AFF_ARTIFACTS: Readonly<Record<string, JsonArtifact<unknown>>> = {
   DTEB: dtebArtifact,
   DSFD: dsfdArtifact,
   DSFI: dsfiArtifact,
+  DRTY: drtyArtifact,
 };
 
 /** AFF validator for one channel-routed type (mirrors the create/pull sides). */
@@ -459,6 +461,11 @@ export const TYPE_ROUTES: Readonly<Record<string, TypeRoute>> = {
     create: handler('adt', createCdsTechHandler('DSFI')),
     pull: handler('adt', pullCdsTechHandler('DSFI')),
     push: cdsTechPushRoute('DSFI'),
+  },
+  DRTY: {
+    create: handler('adt', createCdsTechHandler('DRTY')),
+    pull: handler('adt', pullCdsTechHandler('DRTY')),
+    push: cdsTechPushRoute('DRTY'),
   },
 };
 

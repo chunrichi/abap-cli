@@ -8,7 +8,7 @@
  * misleading SAP authorization message is mapped to an actionable error.
  */
 import { AdtClientWrapper } from '../../clients/adt-client.js';
-import { cdsTechObjectUrl, parseCdsTechMeta, rethrowDsfdFeatureError } from '../../clients/cds-tech.js';
+import { cdsTechObjectUrl, parseCdsTechMeta, rethrowCdsFeatureError } from '../../clients/cds-tech.js';
 import { CliError } from '../../output/json.js';
 import { isLocalPackageName } from '../../core/transport.js';
 import type { CdsTechType } from '../../formats/cds-tech/json.js';
@@ -55,8 +55,7 @@ export async function runDeleteCdsTech(type: CdsTechType, objectName: string, op
     }
     await client.deleteObject(objectUrl, lockHandle, opts.tr);
   } catch (error) {
-    if (type === 'DSFD') rethrowDsfdFeatureError(error);
-    throw error;
+    rethrowCdsFeatureError(type, error);
   } finally {
     if (lockHandle) {
       await client.unLock(objectUrl, lockHandle).catch(() => undefined);

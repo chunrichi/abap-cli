@@ -14,12 +14,15 @@ import {
   cdsTechSourceUrl,
   parseCdsTechMeta,
   parseDsfiSource,
+  rethrowCdsFeatureError,
   rethrowDsfdFeatureError,
+  rethrowDrtyFeatureError,
   validateDsfiDocument,
 } from '../../src/abap_cli/clients/cds-tech.js';
 import {
   dsfdArtifact,
   dsfiArtifact,
+  drtyArtifact,
   dtdcArtifact,
   dtebArtifact,
   type DsfiLocal,
@@ -74,6 +77,14 @@ describe('CDS technical wire → AFF header', () => {
     expect(parseCdsTechMeta('DSFD', DSFD_XML).header.abapLanguageVersion).toBeUndefined();
   });
 
+  it('projects the DRTY blueSource metadata header', () => {
+    const drtyXml = DSFD_XML.replace('DSFD/SCF', 'DRTY/STY').replace('probe scalar function', 'probe CDS type');
+    expect(parseCdsTechMeta('DRTY', drtyXml)).toEqual({
+      header: { description: 'probe CDS type', originalLanguage: 'en' },
+      packageName: '$TMP',
+    });
+  });
+
   it('rejects a body without the expected root element', () => {
     expect(() => parseCdsTechMeta('DSFD', DTDC_XML)).toThrowError(/expected <blueSource>/);
   });
@@ -94,8 +105,8 @@ describe('create body', () => {
     expect(body).toContain('<adtcore:packageRef adtcore:name="$TMP"/>');
   });
 
-  it('builds a blueSource body for DSFD / DSFI', () => {
-    for (const type of ['DSFD', 'DSFI'] as const) {
+  it('builds a blueSource body for DSFD / DSFI / DRTY', () => {
+    for (const type of ['DSFD', 'DSFI', 'DRTY'] as const) {
       const body = buildCdsTechCreateBody(type, 'ZCLI_TC_X', { description: 'd', packageName: 'ZPKG', language: 'EN' });
       expect(body).toContain('<blue:blueSource');
       expect(body).toContain(`adtcore:type="${CDS_TECH_INFO[type].objtype}"`);
@@ -115,6 +126,8 @@ describe('create body', () => {
     expect(CDS_TECH_INFO.DSFD.createMediaType).toBe('application/vnd.sap.adt.blues.v1+xml');
     expect(CDS_TECH_INFO.DSFD.featureParameter).toBe('DD_CDS_DSFD');
     expect(CDS_TECH_INFO.DSFI.sourceMediaType).toBe('application/json');
+    expect(CDS_TECH_INFO.DRTY.objtype).toBe('DRTY/STY');
+    expect(CDS_TECH_INFO.DRTY.featureParameter).toBe('CDS_SIMPLE_TYPES');
   });
 });
 
@@ -188,6 +201,19 @@ describe('DSFI document', () => {
     const other = new CliError('SAP_ERROR', 'something else');
     expect(() => rethrowDsfdFeatureError(other)).toThrowError(other);
   });
+
+  it('maps the SAP DRTY feature gate and routes the mapping per type', () => {
+    const sapError = new CliError('SAP_ERROR', 'CDS types are not yet supported');
+    try {
+      rethrowDrtyFeatureError(sapError);
+      throw new Error('should have thrown');
+    } catch (error) {
+      expect((error as CliError).code).toBe('DRTY_FEATURE_NOT_ENABLED');
+      expect((error as CliError).nextSteps?.join(' ')).toContain('CDS_SIMPLE_TYPES');
+    }
+    expect(() => rethrowCdsFeatureError('DRTY', sapError)).toThrowError(/CDS simple types/);
+    expect(() => rethrowCdsFeatureError('DSFD', new CliError('SAP_ERROR', 'Insufficient authorizations for modifying CDS Scalar Function X'))).toThrowError(/CDS scalar function/);
+  });
 });
 
 describe('AFF schema validation', () => {
@@ -195,6 +221,7 @@ describe('AFF schema validation', () => {
     expect(await dtdcArtifact.validate({ formatVersion: '1', header: { description: 'x', originalLanguage: 'en' } })).toEqual([]);
     expect(await dtebArtifact.validate({ formatVersion: '1', header: { description: 'x', originalLanguage: 'en' } })).toEqual([]);
     expect(await dsfdArtifact.validate({ formatVersion: '1', header: { description: 'x', originalLanguage: 'en' } })).toEqual([]);
+    expect(await drtyArtifact.validate({ formatVersion: '1', header: { description: 'x', originalLanguage: 'en' } })).toEqual([]);
     expect(
       await dsfiArtifact.validate({
         formatVersion: '1',

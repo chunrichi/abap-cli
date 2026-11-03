@@ -13,7 +13,7 @@
  */
 import * as path from 'node:path';
 import { AdtClientWrapper } from '../../clients/adt-client.js';
-import { cdsTechObjectUrl, rethrowDsfdFeatureError, validateDsfiDocument, buildDsfiSource } from '../../clients/cds-tech.js';
+import { cdsTechObjectUrl, rethrowCdsFeatureError, validateDsfiDocument, buildDsfiSource } from '../../clients/cds-tech.js';
 import { CliError, printResult, type OutputMode } from '../../output/json.js';
 import { cdsTechArtifactFor, type CdsTechLocal, type CdsTechType, type DsfiLocal } from '../../formats/cds-tech/json.js';
 import { toOutputPath } from '../../core/path-output.js';
@@ -132,8 +132,7 @@ export async function runCreateCdsTech(
       await client.activate(cdsTechObjectUrl(type, name), CDS_TECH_INFO[type].objtype, name);
     }
   } catch (error) {
-    if (type === 'DSFD') rethrowDsfdFeatureError(error);
-    throw error;
+    rethrowCdsFeatureError(type, error);
   }
   printResult(
     mode,

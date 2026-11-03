@@ -52,7 +52,7 @@ export interface CdsTechInfo {
   /** ADT name length limit (from typestructure). */
   readonly maxNameLength: number;
   /** SAP user parameter that gates writes, when one exists. */
-  readonly featureParameter?: 'DD_CDS_DSFD';
+  readonly featureParameter?: 'DD_CDS_DSFD' | 'CDS_SIMPLE_TYPES';
 }
 
 /** Endpoint + media type per CDS technical object type. */
@@ -93,6 +93,16 @@ export const CDS_TECH_INFO: Record<CdsTechType, CdsTechInfo> = {
     sourceMediaType: 'application/json',
     hasSourceSidecar: false,
     maxNameLength: 40,
+  },
+  DRTY: {
+    objtype: 'DRTY/STY',
+    collection: '/sap/bc/adt/ddic/drty/sources',
+    createMediaType: BLUE_MEDIA_TYPE,
+    metaMediaType: BLUE_MEDIA_TYPE,
+    sourceMediaType: 'text/plain; charset=utf-8',
+    hasSourceSidecar: true,
+    maxNameLength: 40,
+    featureParameter: 'CDS_SIMPLE_TYPES',
   },
 };
 
@@ -159,6 +169,7 @@ export function buildCdsTechCreateBody(type: CdsTechType, name: string, meta: Cd
       );
     case 'DSFD':
     case 'DSFI':
+    case 'DRTY':
       return '<?xml version="1.0" encoding="utf-8"?>' + `<blue:blueSource xmlns:blue="${BLUE_NS}" xmlns:adtcore="${ADT_CORE_NS}"${attrs}>${pkg}</blue:blueSource>`;
   }
 }
@@ -382,5 +393,35 @@ export function rethrowDsfdFeatureError(error: unknown): never {
       },
     );
   }
+  throw error;
+}
+
+/**
+ * DRTY (CDS simple type) is behind the `CDS_SIMPLE_TYPES` user parameter on
+ * this release. Without it SAP rejects the write with "CDS types are not yet
+ * supported" from the DRTY handler.
+ */
+export function rethrowDrtyFeatureError(error: unknown): never {
+  if (error instanceof CliError && /CDS types are not yet supported/i.test(error.message)) {
+    throw new CliError(
+      'DRTY_FEATURE_NOT_ENABLED',
+      'SAP rejected the DRTY write because CDS simple types are not enabled for this user',
+      {
+        details: { sapMessage: error.message },
+        nextSteps: [
+          'In SAP GUI, run SU3 → Parameter tab and add ID `CDS_SIMPLE_TYPES` with value `X` (then save).',
+          'Or enable it for the session with an ABAP helper that runs SET PARAMETER ID \'CDS_SIMPLE_TYPES\' FIELD \'X\'.',
+          'This is a SAP-side feature switch, not an abap-cli authorization problem.',
+        ],
+      },
+    );
+  }
+  throw error;
+}
+
+/** Route the SAP feature-gate mapping per CDS technical type. */
+export function rethrowCdsFeatureError(type: CdsTechType, error: unknown): never {
+  if (type === 'DSFD') rethrowDsfdFeatureError(error);
+  if (type === 'DRTY') rethrowDrtyFeatureError(error);
   throw error;
 }
