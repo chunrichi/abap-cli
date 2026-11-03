@@ -29,4 +29,18 @@ describe('process-level help/version', () => {
     expect(stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
     expect(stdout).not.toContain('"status"');
   });
+
+  it.skipIf(!hasBuiltCli)('rejects extra positional arguments with a usage error', async () => {
+    const failure = (await run(process.execPath, [
+      cliEntry,
+      'types',
+      'CLAS',
+      'extra',
+      '--json',
+    ]).catch((error: unknown) => error)) as { code?: number; stdout?: string; stderr?: string };
+    expect(failure.code).toBe(2);
+    expect(failure.stdout).toBe('');
+    expect(failure.stderr).toContain('"code":"USAGE"');
+    expect(failure.stderr).toContain('too many arguments');
+  });
 });

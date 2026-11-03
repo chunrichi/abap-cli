@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { Command } from 'commander';
 import { setProgram, buildMeta } from './output/meta.js';
 import { CliExit } from './output/exit.js';
-import { registerLazyCommands } from './registry/lazy.js';
+import { primeLazyCommands, registerLazyCommands } from './registry/lazy.js';
 import { COMMAND_SPECS } from './registry/commands.js';
 import { handleTopLevelError } from './top-error.js';
 import { loadConfig } from './config/project-config.js';
@@ -27,7 +27,10 @@ program
   .description('CLI tool for ABAP vibe coding — agent-driven ABAP development')
   .version(version)
   .option('--json', 'Output in JSON format (compact, default for agents)')
-  .option('--pretty-json', 'Output in pretty JSON format (overrides --json)');
+  .option('--pretty-json', 'Output in pretty JSON format (overrides --json)')
+  // Extra operands are a usage error, never silently ignored. Declared here so
+  // the contract does not drift with the parser's defaults.
+  .allowExcessArguments(false);
 
 // 顶层错误处理：commander 抛错（缺参/未知选项）由这里归一化为
 // 结构化错误；--help/--version 让 commander 自己写 stdout（包含 addHelpText
@@ -97,9 +100,10 @@ async function releaseSessionsBeforeExit(): Promise<void> {
 }
 
 try {
-  // parseAsync: lazy commands dispatch through an async _parseCommand,
-  // so commander's sync help/error throws surface as rejections that only
-  // parseAsync (which awaits the chain) re-throws into this catch block.
+  // Resolve the addressed command before parsing: the lazy stub is replaced by
+  // its module's real registration here, using commander's public API only.
+  // Root help / --version / unknown commands match no spec and stay import-free.
+  await primeLazyCommands(program, process.argv.slice(2));
   await program.parseAsync();
 } catch (error: unknown) {
   await releaseSessionsBeforeExit();

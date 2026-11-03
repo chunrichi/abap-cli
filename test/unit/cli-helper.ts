@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { vi } from 'vitest';
 import { CliExit } from '../../src/abap_cli/output/exit.js';
+import { primeLazyCommands } from '../../src/abap_cli/registry/lazy.js';
 
 /** Thrown instead of process.exit so tests can capture the exit code. */
 export class ExitSignal extends Error {
@@ -41,6 +42,9 @@ export async function runCommand(
 
   let exitCode: number | undefined;
   try {
+    // Mirror the production entry point: the lazy command addressed by args is
+    // imported and registered before commander parses them.
+    await primeLazyCommands(program, args);
     await program.parseAsync(args, { from: 'user' });
   } catch (error) {
     if (error instanceof ExitSignal) exitCode = error.code;
