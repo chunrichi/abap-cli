@@ -106,4 +106,4 @@
 
 ### 6.5 新增类型的实现约定
 
-1. `types/registry.ts` 加类型元数据 → 2. `flows/edit/routing.ts#TYPE_ROUTES` 加 create/pull/push 路由（`test/unit/routing.test.ts` 防漂移）→ 3. `formats/<type>/` artifact → 4. schema（AFF 优先；无 AFF 则本地扩展并在 `schema/README.md` 标注）→ 5. 必要时扩展 ICF handler / ADT wrapper → 6. 测试（unit + integration + `tests/` 真机证据）→ 7. `wiki/objects/<type>.md` + 命中矩阵 + `npm run build && npm run docs:build && npm run verify`。DDIC 类必须在 A4H 在线时按 `abap-testing` skill 跑真机回归。
+1. `types/registry.ts` 加类型元数据 → 2. `flows/edit/routing.ts#TYPE_ROUTES` 加 create/pull/push 路由（`test/unit/routing.test.ts` 防漂移）→ 3. `formats/<type>/` artifact → 4. schema（AFF 优先；无 AFF 则本地扩展并在 `schema/README.md` 标注）→ 5. 必要时扩展 ICF handler / ADT wrapper → 6. 测试（unit + integration + `tests/` 真机证据）→ 7. `wiki/objects/<type>.md` + 命中矩阵 + `npm run build && npm run docs:build && npm run verify`。DDIC 类的真机回归在默认系统 profile `test`（S/4HANA）上按 `abap-testing` skill 执行；只有 ECC fallback 项才需要 A4H（离线时标注 BLOCKED）。

@@ -44,13 +44,20 @@
 - pre-push hook 已配置在 `.githooks/`；首次克隆需执行 `bash scripts/setup-hooks.sh`。
 - `check-skills-drift` 覆盖命令名 / SKILL 版本 / 脚本 spawn 参数 / ICF 版本 / 退役命令 / agent 版本 / README 版本；`docs:check` 覆盖生成物漂移、相对链接死链、wiki 命令页 frontmatter 与章节契约、以及 `--help` 选项 ⊆ `--schema` 契约。两者都不校验每句散文，别把绿灯当成文档全对。
 
-## 可联调的 on-prem 环境
+## 可联调的环境
 
-- URL: http://vhcala4hci:50000
-- User: developer
-- Client: 001
-- Password: 见本地 `.abap.json` / keychain（不入库）
-- 工作目录: `tmp/s4h`
+### 默认系统（S/4HANA，profile `test`）
+
+- Profile: `test`（`abap profile list --json` 中 `current: true`）；连接参数见本地 profile 配置 / OS keychain，不入库
+- 工作目录: `tmp/s4h`（`.abap.json` → `{"system":"test"}`）
+- 日常开发、真机回归、`abap deploy` 都以它为准；会话开始只检查默认系统是否可达：
+  `(cd tmp/s4h && abap profile test test --json)`。
+- 其他 profile 按需使用，默认 `test`。
+
+### 备用：A4H（ECC）
+
+- 当前不在线，且未配置 profile；只在验证 ECC 专属行为（TTYP/MSAG 的 ICF fallback、旧内核端点）时探测
+  `nc -z -w 2 vhcala4hci 50000`，不作为每次会话的默认检查项；未验证的 A4H 项标 BLOCKED。
 
 ## 可联调的 BTP Trial 环境
 
