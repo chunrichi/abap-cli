@@ -10,7 +10,7 @@ Welcome to the **abap-cli** documentation — a CLI tool for agent-driven ABAP d
 ## Reference
 
 - [Commands](commands.md) — full command reference with options and JSON output
-- [Supported Object Types](supported.md) — the 34 type codes, type × command matrix, artifact sets and channel routing
+- [Supported Object Types](supported.md) — the 36 type codes, type × command matrix, artifact sets and channel routing
 - [Architecture](architecture.md) — the three-layer design (CLI / SAP / Agent)
 - [Agent Integration](agent-integration.md) — using `--json` output for AI agents and the create → pull → edit → push loop
 

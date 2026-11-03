@@ -59,6 +59,8 @@ const EXPECTED: Record<string, ExpectedRoute> = {
   DSFI: { create: 'adt', pull: 'adt', push: 'adt' },
   DRTY: { create: 'adt', pull: 'adt', push: 'adt' },
   TYPE: { create: 'adt', pull: 'adt', push: 'adt' },
+  SAJC: { create: 'adt', pull: 'adt', push: 'adt' },
+  SAJT: { create: 'adt', pull: 'adt', push: 'adt' },
 };
 
 const OPS = ['create', 'pull', 'push'] as const;

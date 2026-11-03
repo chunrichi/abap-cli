@@ -87,6 +87,10 @@ FILES=(
   "drty/drty-v1.json"
   # Type pool (classic ABAP TYPE-POOL; ADT /ddic/typegroups).
   "type/type-v1.json"
+  # Application jobs (SAJC catalog entry / SAJT template; ADT
+  # /applicationjob/* blueSource with a JSON `source/main`).
+  "sajc/sajc-v1.json"
+  "sajt/sajt-v1.json"
 )
 
 echo ">> Copying ${#FILES[@]} schema files"

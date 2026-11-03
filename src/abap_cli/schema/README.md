@@ -50,6 +50,8 @@ The set is intentionally minimal — only the schemas abap-cli resolves through
 | `dsfi-v1.json` | DSFI | `file-formats/dsfi/dsfi-v1.json` | |
 | `drty-v1.json` | DRTY | `file-formats/drty/drty-v1.json` | |
 | `type-v1.json` | TYPE | `file-formats/type/type-v1.json` | |
+| `sajc-v1.json` | SAJC | `file-formats/sajc/sajc-v1.json` | application job catalog entry |
+| `sajt-v1.json` | SAJT | `file-formats/sajt/sajt-v1.json` | application job template |
 | `xslt-v1.json` | XSLT | `file-formats/xslt/xslt-v1.json` | |
 
 `docu-v1.json` is a **companion** schema, not an object type: it validates the

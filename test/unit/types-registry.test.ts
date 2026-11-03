@@ -6,6 +6,7 @@ import { describe, it, expect } from 'vitest';
 import {
   TYPE_REGISTRY,
   allSupportedTypes,
+  maxNameLengthFor,
   createObjtypeFor,
   sourceFor,
   isSupportedType,
@@ -18,11 +19,11 @@ import {
 } from '../../src/abap_cli/types/registry.js';
 
 describe('types/registry.ts (single source of truth)', () => {
-  it('contains exactly 34 supported types (4 source + DEVC + 4 DDIC + ENQU + VIEW + SHLP + NROB + HTTP + TRAN + XSLT + 3 dual-channel + 6 + 3 ATC + 5 CDS technical + TYPE)', () => {
+  it('contains exactly 36 supported types (4 source + DEVC + 4 DDIC + ENQU + VIEW + SHLP + NROB + HTTP + TRAN + XSLT + 3 dual-channel + 6 + 3 ATC + 5 CDS technical + TYPE + 2 application jobs)', () => {
     // added: SRVB (metadata-only), SRVD, BDEF, DCLS, DDLX, DDLA.
     // added: ENQU (lock object, ICF) and NROB (number range object, ICF).
     // added: DEVC (package, ADT package resource; push unsupported).
-    expect(allSupportedTypes()).toHaveLength(34);
+    expect(allSupportedTypes()).toHaveLength(36);
     expect(allSupportedTypes()).toEqual([
       'CLAS', 'INTF', 'PROG', 'FUGR',         // ADT source
       'DEVC',                                  // ADT package resource
@@ -36,6 +37,7 @@ describe('types/registry.ts (single source of truth)', () => {
       'DTDC', 'DTEB', 'DSFD', 'DSFI',          // CDS technical objects
       'DRTY',
       'TYPE',                                  // type pool
+      'SAJC', 'SAJT',                          // application jobs
     ]);
   });
 
@@ -71,6 +73,17 @@ describe('types/registry.ts (single source of truth)', () => {
     expect(createObjtypeFor('DSFI')).toBe('DSFI/SFI');
     expect(createObjtypeFor('DRTY')).toBe('DRTY/STY');
     expect(createObjtypeFor('TYPE')).toBe('TYPE/DG');
+    // Application jobs carry the plain ADT type code (no /subtype).
+    expect(createObjtypeFor('SAJC')).toBe('SAJC');
+    expect(createObjtypeFor('SAJT')).toBe('SAJT');
+  });
+
+  it('exposes the per-type object-name limit only where it differs from 30', () => {
+    // Application-job names are 40 characters (typestructure OBJNAME_MAXLENGTH).
+    expect(maxNameLengthFor('SAJC')).toBe(40);
+    expect(maxNameLengthFor('sajt')).toBe(40);
+    expect(maxNameLengthFor('CLAS')).toBeUndefined();
+    expect(maxNameLengthFor('TYPE')).toBeUndefined();
   });
 
   it('routes source objects (ADT) and TTYP/MSAG/DDLS dual-channel; TABL/HTTP/TRAN ICF only', () => {

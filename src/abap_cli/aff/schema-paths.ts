@@ -85,6 +85,10 @@ const SCHEMA_FILE: Record<string, string> = {
   DRTY: 'drty-v1.json',
   // Type pool (classic ABAP TYPE-POOL source); AFF `type-v1.json` + `.type.abap`.
   TYPE: 'type-v1.json',
+  // Application jobs: AFF `sajc-v1` / `sajt-v1` documents (ADT JSON source
+  // resources; see clients/appjob.ts for the release-specific wire mapping).
+  SAJC: 'sajc-v1.json',
+  SAJT: 'sajt-v1.json',
 };
 
 /** Resolve the bundled-schema directory shipped with the package.

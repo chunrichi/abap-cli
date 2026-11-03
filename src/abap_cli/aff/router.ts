@@ -106,6 +106,10 @@ const SUFFIX_RULES: ReadonlyArray<{ suffix: string; type: string; schemaFile?: s
   // Type pool: AFF `type.json` metadata + classic ABAP source (`.type.abap`).
   { suffix: '.type.json', type: 'TYPE' },
   { suffix: '.type.abap', type: 'TYPE' },
+  // Application jobs: single JSON document carried over ADT blueSource +
+  // `source/main` (SAJC catalog entry / SAJT template).
+  { suffix: '.sajc.json', type: 'SAJC' },
+  { suffix: '.sajt.json', type: 'SAJT' },
 ];
 
 const SUFFIX_INDEX: Map<string, string> = new Map(

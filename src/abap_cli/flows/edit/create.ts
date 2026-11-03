@@ -18,6 +18,7 @@ import {
   isHttpSupportedType,
   isTranSupportedType,
   allSupportedTypes,
+  maxNameLengthFor,
   requiresFileFor,
 } from '../../types/registry.js';
 import { runCreateFugrFunc } from './create-fugr-func.js';
@@ -107,7 +108,7 @@ export async function runCreate(type: string | undefined, name: string | undefin
   // illegal name must not reach SAP as a misleading OBJECT_NOT_FOUND.
   // DEVC has its own name rules (leading `$`, namespaced packages) and
   // validates inside its handler once the software component is known.
-  if (typeUpper !== 'DEVC') validateObjectName(objectName);
+  if (typeUpper !== 'DEVC') validateObjectName(objectName, undefined, maxNameLengthFor(typeUpper));
 
   // Per-type create handlers (DDIC / HTTP / TRAN / TTYP / MSAG / DDLS / CDS
   // companions / ENQU / NROB) come from the explicit routing table.
