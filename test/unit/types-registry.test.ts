@@ -18,11 +18,11 @@ import {
 } from '../../src/abap_cli/types/registry.js';
 
 describe('types/registry.ts (single source of truth)', () => {
-  it('contains exactly 25 supported types (4 source + DEVC + 4 DDIC + ENQU + VIEW + SHLP + NROB + HTTP + TRAN + XSLT + 3 dual-channel + 6 )', () => {
+  it('contains exactly 28 supported types (4 source + DEVC + 4 DDIC + ENQU + VIEW + SHLP + NROB + HTTP + TRAN + XSLT + 3 dual-channel + 6 + 3 ATC)', () => {
     // added: SRVB (metadata-only), SRVD, BDEF, DCLS, DDLX, DDLA.
     // added: ENQU (lock object, ICF) and NROB (number range object, ICF).
     // added: DEVC (package, ADT package resource; push unsupported).
-    expect(allSupportedTypes()).toHaveLength(25);
+    expect(allSupportedTypes()).toHaveLength(28);
     expect(allSupportedTypes()).toEqual([
       'CLAS', 'INTF', 'PROG', 'FUGR',         // ADT source
       'DEVC',                                  // ADT package resource
@@ -32,6 +32,7 @@ describe('types/registry.ts (single source of truth)', () => {
       'TTYP', 'MSAG', 'DDLS',                  // dual-channel
       'SRVB', 'SRVD', 'BDEF',                  // /
       'DCLS', 'DDLX', 'DDLA',
+      'CHKC', 'CHKO', 'CHKV',                  // ATC configuration objects
     ]);
   });
 
@@ -56,6 +57,10 @@ describe('types/registry.ts (single source of truth)', () => {
     expect(createObjtypeFor('DCLS')).toBe('DCLS/DL');
     expect(createObjtypeFor('DDLX')).toBe('DDLX/EX');
     expect(createObjtypeFor('DDLA')).toBe('DDLA/ADF');
+    // ATC configuration objects carry the objtype reported by typestructure.
+    expect(createObjtypeFor('CHKC')).toBe('CHKC/TYP');
+    expect(createObjtypeFor('CHKO')).toBe('CHKO/TYP');
+    expect(createObjtypeFor('CHKV')).toBe('CHKV/TYP');
   });
 
   it('routes source objects (ADT) and TTYP/MSAG/DDLS dual-channel; TABL/HTTP/TRAN ICF only', () => {
@@ -74,6 +79,10 @@ describe('types/registry.ts (single source of truth)', () => {
     expect(sourceFor('TTYP')).toBe('ADT');
     expect(sourceFor('MSAG')).toBe('ADT');
     expect(sourceFor('DDLS')).toBe('ADT');
+    // ATC configuration objects are ADT-only (no ICF fallback).
+    expect(sourceFor('CHKC')).toBe('ADT');
+    expect(sourceFor('CHKO')).toBe('ADT');
+    expect(sourceFor('CHKV')).toBe('ADT');
   });
 
   it('has no type → folder mapping anymore (flat abap-file-format layout)', async () => {

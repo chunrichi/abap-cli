@@ -75,7 +75,7 @@ AFF 写盘前 gate（纯本地，不进 SAP）
 
 ## 支持的对象类型（权威列表）
 
-写命令支持的类型以 `src/abap_cli/types/registry.ts` 为准（当前 **25 个注册类型码**；`SRVB` 等部分类型仅支持 pull，CDS/RAP 有子集限制）。完整类型表见 [abap-cli wiki object-types](https://github.com/chunrichi/abap-cli/blob/main/wiki/object-types.md)；本节只列**写路径能力**。
+写命令支持的类型以 `src/abap_cli/types/registry.ts` 为准（当前 **28 个注册类型码**；`DEVC` 有 create/pull/delete 无 push，`SRVB` 有 create/pull/delete 无 push），CDS/RAP 有子集限制。完整类型表见 [abap-cli wiki object-types](https://github.com/chunrichi/abap-cli/blob/main/wiki/object-types.md)；本节只列**写路径能力**。
 
 | 类型码 | 对象 | 路由 | `create` | `pull` | `push` | `create local` |
 |---|---|---|---|---|---|---|
@@ -88,27 +88,29 @@ AFF 写盘前 gate（纯本地，不进 SAP）
 | `HTTP` | **ICF / SICF 节点** | ICF | ✅（须 `--file`） | ✅ | ✅ | ❌（`TYPE_NOT_SUPPORTED`） |
 | `TRAN` | 事务码 (SE93) | ICF | ✅（须 `--file`） | ✅ | ✅ | ❌（`TYPE_NOT_SUPPORTED`） |
 | `ENQU` / `NROB` | 锁对象 / 号段对象 | ICF（`NROB` 的 `pull` 为 ADT 主路径 + ICF fallback） | ✅（须 `--file`） | ✅ | ✅ | ❌（`TYPE_NOT_SUPPORTED`） |
+| `CHKC` / `CHKO` / `CHKV` | ATC 检查类别 / 检查 / 检查变体 | ADT（仅） | ✅（须 `--file`） | ✅ | ✅ | ❌（`TYPE_NOT_SUPPORTED`） |
 
-> `create` 的 `--file` 是 **registry 数据驱动**的必填项（`ObjectTypeEntry.requiresFile`），对 `TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `NROB` / `HTTP` / `TRAN` / `TTYP` / `MSAG` / `DDLS` 都适用；缺 `--file` 报 `USAGE`（exit 2），且该检查在写确认提示**之前**。`HTTP` 已没有"无 `--file` 落本地骨架"的旧路径（旧的无 --file 落本地骨架路径已删除）。
+> `create` 的 `--file` 是 **registry 数据驱动**的必填项（`ObjectTypeEntry.requiresFile`），对 `TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `NROB` / `HTTP` / `TRAN` / `TTYP` / `MSAG` / `DDLS` / `SRVB` / `SRVD` / `BDEF` / `DCLS` / `DDLX` / `DDLA` / `CHKC` / `CHKO` / `CHKV` 都适用；缺 `--file` 报 `USAGE`（exit 2），且该检查在写确认提示**之前**。`HTTP` 已没有"无 `--file` 落本地骨架"的旧路径（旧的无 --file 落本地骨架路径已删除）。
 >
 > `create local` 只支持 **`CLAS` / `INTF` / `PROG` / `FUGR`**（`formats/templates.ts` 只有这四类模板），其余类型一律 `TYPE_NOT_SUPPORTED`（exit 7）。`TTYP` / `MSAG` / `DDLS` 要起草稿就手写（或 `pull` 一份）AFF JSON 后走 `create --file`，别指望 `create local`。
 
-### 仅 pull（不能 create / push / create local）
+### 无 push（有 create / pull / delete）
 
 | 类型码 | 对象 | 路由 | 备注 |
 |---|---|---|---|
-| `SRVB` | Service Binding metadata | ADT | SAP GUI 管理；pull 写 `<name>.srvb.json` |
+| `SRVB` | Service Binding metadata | ADT | `create --file` 后激活，`--publish` 可发布；AFF 文档对 ADT binding 有损，push/update 不支持 |
+| `DEVC` | 包（Package） | ADT | ADT 无包更新端点，不能 push；create / pull / delete 可用 |
 
 ### CDS / RAP 扩展（写路径能力与 FUGR 一致；走 child-lock + activate）
 
-`SRVD` / `DCLS` / `DDLX` / `DDLA` — 这四类支持 `create / pull / push`（`create` 走 `--file` 必填 + companion `.acds` sidecar，pull/push 文件布局与 FUGR 平行：child-lock + parent activate）。**`create local` 不支持**（同样 `TYPE_NOT_SUPPORTED`）。**`BDEF` 是 pull-only**：SAP 不接受 CLI 创建 BDEF，所以只有 `pull / push`，`create` 在 schema 里仍作为 `allowedValues` 暴露但报 `TYPE_NOT_SUPPORTED`。详细见 [abap-cli wiki object-types](https://github.com/chunrichi/abap-cli/blob/main/wiki/object-types.md) 与各命令 schema。
+`SRVD` / `DCLS` / `DDLX` / `DDLA` — 这四类支持 `create / pull / push`（`create` 走 `--file` 必填 + companion `.acds` sidecar，pull/push 文件布局与 FUGR 平行：child-lock + parent activate）。**`create local` 不支持**（同样 `TYPE_NOT_SUPPORTED`）。**`BDEF` 支持 `create / pull / push / delete`**：`create` 读取 `.bdef.json` + 同目录 `.bdef.abdl` 源码并激活。详细见 [abap-cli wiki object-types](https://github.com/chunrichi/abap-cli/blob/main/wiki/object-types.md) 与各命令 schema。
 
 ### 关键说明
 
 - **ICF 通道类型**（`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `NROB` / `HTTP` / `TRAN`）依赖内置 ICF 服务已部署——失败先跳 `abap-cli-setup` 跑 `deploy status`。`TTYP` / `MSAG` 在旧内核（ECC EHP5/6）也降级走同一 ICF 服务；`DDLS` 无兜底。
 - **`TTYP` / `MSAG` / `DDLS`**（双通道降级）：envelope 多 `data.channel: 'adt' | 'icf'` 与 `data.fallbackReason`（`'ECC_EHP6_NO_ADT_TABLETYPE'` / `'ECC_EHP6_NO_ADT_MESSAGECLASS'`；TTYP / MSAG 在现代内核上缺 ADT 端点时为 `'ADT_ENDPOINT_UNAVAILABLE'`）；ECC EHP5/6 自动降级 ICF；`DDLS` ECC 旧内核硬错 `DDLS_NOT_SUPPORTED_ON_ECC`（exit 64），不静默降级。
 - **DDIC 三件套（TABL/STRU）**：`--file` 指向 main `.tabl.json`，CLI 自动读同目录 `.tabl.ddic`（DDL 真值）与可选 `.tabl.settings.json`；详见下方 TABL vs STRU 注解差异。
-- **`create` 的未知类型报错已由 registry 驱动**：会列出全部 25 个注册类型码，无需再记住"哪些没被列进文案"。真正受限的是 `create local`（只 CLAS/INTF/PROG/FUGR）。
+- **`create` 的未知类型报错已由 registry 驱动**：会列出全部 28 个注册类型码，无需再记住"哪些没被列进文案"。真正受限的是 `create local`（只 CLAS/INTF/PROG/FUGR）。
 
 ### 错误码全集（本 skill 涉及）
 
@@ -162,7 +164,7 @@ CLI 解析器（[tabl-artifact.ts:parseTablDdic](https://github.com/chunrichi/ab
 | `NO_TRANSPORT` (exit 7) | 跳 `abap-cli-setup`：`transport list` / `transport create` → `--tr` 重试 |
 | `DDIC_NOT_SUPPORTED` (exit 7) | 类型不在白名单（DOMA/DTEL/TABL/STRU 之外）；看上方类型表 |
 | `FILE_EXISTS` (exit 2) | `pull --overwrite` 或 `--skip-existing` |
-| `TYPE_NOT_SUPPORTED` (exit 7) | 以上方类型表为准；未知类型的报错已列出全部 25 个注册类型。`create local` 只支持 CLAS/INTF/PROG/FUGR |
+| `TYPE_NOT_SUPPORTED` (exit 7) | 以上方类型表为准；未知类型的报错已列出全部 28 个注册类型。`create local` 只支持 CLAS/INTF/PROG/FUGR |
 | `PUSH_FAILED` (exit 7) | `data.stage` 指示失败环节（lock/write/activate/unlock） |
 | `READONLY_METADATA` (exit 7) | 推的是源码对象的元数据 `.json`；改推 `.abap` / `.acds` 源码文件（`validate:aff` 只校验元数据） |
 | `HTTP_CREATE_FAILED` (exit 6) | HTTP 服务（SICF 节点）写失败；看 `error.details`，校对 handlerClass / servicePath / 父节点是否存在 |

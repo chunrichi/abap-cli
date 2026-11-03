@@ -109,6 +109,11 @@ const TADIR_OBJECT_BY_CLI: Record<string, Omit<TadirMapping, 'cliType'>> = {
 
   // Transformation (XSLT program)
   XSLT: { pgmid: 'R3TR', tadirObject: 'XSLT', ddicTabclass: '', channel: 'ICF', affSchema: 'xslt-v1.json', description: 'Transformation / XSLT program (O2XSLTDESC; AFF pair .xslt.json + .xslt.xml)' },
+
+  // ATC configuration objects (ADT; versioned XML resources over AFF JSON).
+  CHKC: { pgmid: 'R3TR', tadirObject: 'CHKC', ddicTabclass: '', channel: 'ADT', affSchema: 'chkc-v1.json', description: 'ATC check category' },
+  CHKO: { pgmid: 'R3TR', tadirObject: 'CHKO', ddicTabclass: '', channel: 'ADT', affSchema: 'chko-v1.json', description: 'ATC check (implementing class + parameters)' },
+  CHKV: { pgmid: 'R3TR', tadirObject: 'CHKV', ddicTabclass: '', channel: 'ADT', affSchema: 'chkv-v1.json', description: 'ATC check variant (selected checks)' },
 };
 
 /** Complete catalog in registry-stable order. */

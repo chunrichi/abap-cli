@@ -89,6 +89,10 @@ const SUFFIX_RULES: ReadonlyArray<{ suffix: string; type: string; schemaFile?: s
   { suffix: '.nrob.json', type: 'NROB' },
   // Package (DEVC) local document.
   { suffix: '.devc.json', type: 'DEVC' },
+  // ATC configuration objects (category / check / variant).
+  { suffix: '.chkc.json', type: 'CHKC' },
+  { suffix: '.chko.json', type: 'CHKO' },
+  { suffix: '.chkv.json', type: 'CHKV' },
 ];
 
 const SUFFIX_INDEX: Map<string, string> = new Map(

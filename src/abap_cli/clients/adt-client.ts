@@ -37,7 +37,9 @@ import {
   publishJobAsXmlType,
   type PublishJobResult,
 } from './srvb.js';
+import { ATC_TYPE_INFO, atcMediaType, atcObjectUrl, buildAtcBody } from './atc.js';
 import type { SrvbLocal } from '../formats/srvb/json.js';
+import type { AtcLocal, AtcType } from '../formats/atc/json.js';
 
 /** ADT media type of a single package resource. */
 const PACKAGE_MEDIA_TYPE = 'application/vnd.sap.adt.packages.v2+xml';
@@ -579,6 +581,87 @@ export class AdtClientWrapper {
         headers: { 'Content-Type': SRVB_MEDIA_TYPE, Accept: SRVB_MEDIA_TYPE },
         qs: meta.transport ? { corrNr: meta.transport } : {},
       });
+    });
+  }
+
+  // --- ATC configuration objects (CHKC / CHKO / CHKV) ---
+
+  /**
+   * Read the raw XML of one ATC configuration object.
+   *
+   * The three ADT resources are versioned XML envelopes; the caller projects
+   * them onto the AFF document with `parseAtcObject`. `abap-adt-api` has no
+   * endpoint for these types, so the request goes through the session HTTP
+   * client directly.
+   */
+  getAtcObject(type: AtcType, name: string): Promise<string> {
+    return this._call(async () => {
+      const response = await this.client.httpClient.request(atcObjectUrl(type, name), {
+        method: 'GET',
+        headers: { Accept: atcMediaType(type) },
+      });
+      return String(response.body ?? '');
+    });
+  }
+
+  /**
+   * Create an ATC configuration object (POST collection → inactive object).
+   *
+   * The object stays inactive until the caller activates it; `create-atc.ts`
+   * owns that split so `--no-activate` can stop after the write.
+   */
+  createAtcObject(
+    type: AtcType,
+    name: string,
+    doc: AtcLocal,
+    meta: { packageName: string; transport?: string },
+  ): Promise<void> {
+    return this._call(async () => {
+      const body = buildAtcBody(type, name, doc, {
+        packageName: meta.packageName,
+        language: this.config.sap.language,
+      });
+      await this.client.httpClient.request(ATC_TYPE_INFO[type].basePath, {
+        method: 'POST',
+        body,
+        headers: { 'Content-Type': atcMediaType(type), Accept: atcMediaType(type) },
+        qs: meta.transport ? { corrNr: meta.transport } : {},
+      });
+    });
+  }
+
+  /**
+   * Update an existing ATC configuration object: lock → PUT resource →
+   * unlock. Activation is a separate step because a failed activation must
+   * still release the lock and surface as "written but inactive".
+   */
+  updateAtcObject(
+    type: AtcType,
+    name: string,
+    doc: AtcLocal,
+    meta: { packageName?: string; transport?: string },
+  ): Promise<void> {
+    return this._call(async () => {
+      const objectUrl = atcObjectUrl(type, name);
+      const lock = await this.lock(objectUrl);
+      const handle = lock.LOCK_HANDLE;
+      try {
+        const body = buildAtcBody(type, name, doc, {
+          ...(meta.packageName ? { packageName: meta.packageName } : {}),
+          language: this.config.sap.language,
+        });
+        await this.client.httpClient.request(objectUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': atcMediaType(type), Accept: atcMediaType(type) },
+          qs: {
+            ...(handle ? { lockHandle: handle } : {}),
+            ...(meta.transport ? { corrNr: meta.transport } : {}),
+          },
+          body,
+        });
+      } finally {
+        await this.unLock(objectUrl, handle).catch(() => undefined);
+      }
     });
   }
 

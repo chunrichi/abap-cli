@@ -52,7 +52,7 @@ If you would otherwise script the ADT REST API yourself, `abap-cli` packages the
 ## What you can do
 
 - **Edit in place** — `pull` any object into an abap-file-format tree, edit it with your editor, `push` it back with lock → write → activate → unlock. `check` and `diff` before you write.
-- **Cover 25 object types** — classes, interfaces, programs and function groups; packages; DDIC tables, structures, domains, data elements, database views, search helps, lock objects and number ranges; SICF nodes, transaction codes and XSLT transformations; table types, message classes, CDS views and the CDS / RAP companions. 23 support create, all 25 support pull, 23 have a push path, and 23 have a delete path; `DEVC` supports create / pull / delete (no push), `BDEF` is pull / push / delete (no create) and `SRVB` metadata-only.
+- **Cover 28 object types** — classes, interfaces, programs and function groups; packages; DDIC tables, structures, domains, data elements, database views, search helps, lock objects and number ranges; SICF nodes, transaction codes and XSLT transformations; table types, message classes, CDS views and the CDS / RAP companions; ATC check categories, checks and check variants. 28 support create, all 28 support pull, 26 have a push path, and 28 have a delete path; `DEVC` supports create / pull / delete (no push), and `SRVB` is metadata-only.
 - **Read SAP safely** — `search`, `inspect`, `where-used`, `tcode`, `list`, `dumps`, `fields`, `select` and `run-report` never change the system.
 - **Run and verify** — `abap run` executes a class (classrun) or a PUBLIC STATIC method; `abap run-report` returns list output; `abap select` is the SE16N equivalent.
 - **Manage transports** — `transport list / create / show / resolve / assign`, with per-object resolution during `push`.
@@ -201,7 +201,7 @@ All commands support `--json` (compact) and `--pretty-json` (indented). Every to
 
 ## Supported object types
 
-25 object type codes, routed through the ADT REST API or the bundled ICF service: source objects, packages, DDIC objects, SICF nodes, transaction codes, XSLT transformations, table types, message classes, CDS and RAP sources. 23 types support `create`, all 25 support `pull`, and 23 support `push` / `delete` — each mapping to one artifact set under `src/` (official AFF documents, plus local schemas for `TTYP` / `VIEW` / `SHLP`).
+28 object type codes, routed through the ADT REST API or the bundled ICF service: source objects, packages, DDIC objects, SICF nodes, transaction codes, XSLT transformations, table types, message classes, CDS and RAP sources, and ATC configuration objects. 28 types support `create`, all 28 support `pull`, 26 support `push`, and 28 support `delete` — each mapping to one artifact set under `src/` (official AFF documents, plus local schemas for `TTYP` / `VIEW` / `SHLP`).
 
 See **[docs/supported.md](docs/supported.md)** for the full type × command matrix, artifact sets, channel routing and per-type caveats; deeper notes and real-system evidence live in [wiki/object-types.md](wiki/object-types.md).
 

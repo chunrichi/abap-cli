@@ -6,6 +6,15 @@
 
 ## [Unreleased]
 
+### Added
+
+- **ATC 检查配置对象**：新增 `CHKC`（检查类别）、`CHKO`（检查）、`CHKV`（检查变体）三类对象，支持 `create` / `pull` / `push` / `delete` 全生命周期。本地用官方 abap-file-format JSON（`<name>.chkc.json` / `.chko.json` / `.chkv.json`），`create` / `push` 写入后自动激活（`--no-activate` 只写不激活）。检查变体的 `selectedChecks` 参数（普通值、结构化值、值列表、range 列表）可无损往返。
+- **ATC 配置对象接入类型矩阵**：`abap types`、`create --schema` 与 `docs/supported.md` 现列出 28 个类型码。
+
+### Changed
+
+- **`chko` 的 `hidden` 与 `checkType` 语义**：`parameters[].hidden` 对应 SAP 侧「参数不可修改」，`checkType` 对应检查是否 remote-enabled；`pull` 回读时按 SAP 实际值投影，未设置的默认值（`hidden: false` / `checkType: local`）可能被省略——两种写法等价。
+
 ## [2.1.0] - 2026-11-03
 
 本版完成 R1「闭环与真相」收尾（不新增类型码）：HTTP（SICF 节点）现在支持 CLI 删除，并把 HTTP / TTYP / NROB 的本地元数据与写入边界收紧；TTYP 预定义行类型能完整往返长度与小数；TABL / STRU 外键和 TTYP 内联行结构改为本地显式拒绝，不再静默丢弃。本次包含一项 TTYP 本地写法的迁移，见 Changed 段。内置 ICF 服务有改动（服务版本 2.1.0），升级后请执行一次 `abap deploy --yes`。

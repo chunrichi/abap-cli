@@ -72,6 +72,16 @@ const tableStore = new Map();
 // DEVC: package store — key = package name (upper), value = package metadata.
 // Served by GET/POST/DELETE /sap/bc/adt/packages and the search endpoint.
 const packages = new Map();
+// ATC configuration objects — key = `<TYPE>:<NAME>`, value = { xml, packageName }.
+// The XML body posted by the CLI is stored verbatim and served back on GET, so
+// the AFF projection is exercised on the CLI side (same contract as real ADT).
+const atcObjects = new Map();
+// ADT collection path → CLI type code for the ATC configuration resources.
+const ATC_COLLECTIONS = {
+  '/sap/bc/adt/atc/checkcategories': 'CHKC',
+  '/sap/bc/adt/atc/checks': 'CHKO',
+  '/sap/bc/adt/atc/checkvariants': 'CHKV',
+};
 // ICF write rules mirror the ABAP handler: only `$`-prefixed packages are
 // LOCAL (transport-free); an empty package means "use $TMP", hence local.
 function isLocalPackage(pkg) {
@@ -540,7 +550,14 @@ function readBody(req) {
 }
 
 function ok(res, body, type = 'application/xml') {
-  res.writeHead(200, { 'Content-Type': type });
+  // ADT lock/PUT/activate require a stateful session; real SAP hands one out at
+  // login via the SAP_SESSIONID cookie. Emit it on every response so the CLI
+  // keeps the client in stateful mode (it only turns stateful when the login
+  // response carries that cookie).
+  res.writeHead(200, {
+    'Content-Type': type,
+    'Set-Cookie': 'SAP_SESSIONID_S4H_100=mocksession; Path=/',
+  });
   res.end(body);
 }
 
@@ -2059,6 +2076,62 @@ const server = http.createServer(async (req, res) => {
         // this flag below.
         obj.inactive = true;
         return ok(res, '', 'application/xml');
+      }
+    }
+
+    // ATC configuration objects (CHKC / CHKO / CHKV) — versioned XML resources.
+    // The lifecycle mirrors real ADT: POST the collection, GET/PUT/DELETE the
+    // per-object URL, with a locked PUT and an explicit activation.
+    const atcMatch = /^\/sap\/bc\/adt\/atc\/(checkcategories|checks|checkvariants)(?:\/([^/]+))?$/.exec(path);
+    if (atcMatch) {
+      const type = ATC_COLLECTIONS[`/sap/bc/adt/atc/${atcMatch[1]}`];
+      const name = atcMatch[2] ? decodeURIComponent(atcMatch[2]).toUpperCase() : undefined;
+      const key = name ? `${type}:${name}` : '';
+      if (req.method === 'POST' && !name) {
+        const body = await readBody(req);
+        const objectName = /adtcore:name="([^"]+)"/.exec(body)?.[1]?.toUpperCase();
+        if (!objectName) return adtError(res, 400, 'Missing adtcore:name in ATC create body');
+        if (atcObjects.has(`${type}:${objectName}`)) {
+          return adtError(res, 409, `${type} ${objectName} already exists`);
+        }
+        const packageName = /adtcore:packageRef[^>]*adtcore:name="([^"]+)"/.exec(body)?.[1] || '$TMP';
+        atcObjects.set(`${type}:${objectName}`, { xml: body, packageName });
+        const obj = addObject(
+          objectName,
+          type,
+          `/sap/bc/adt/atc/${atcMatch[1]}/${objectName.toLowerCase()}`,
+          /adtcore:description="([^"]*)"/.exec(body)?.[1] || '',
+          [],
+          { packageName },
+        );
+        obj.inactive = true;
+        return ok(res, body);
+      }
+      if (req.method === 'GET' && name) {
+        const stored = atcObjects.get(key);
+        if (!stored) return adtError(res, 404, `${type} ${name} not found`);
+        return ok(res, stored.xml);
+      }
+      if (req.method === 'PUT' && name) {
+        const stored = atcObjects.get(key);
+        if (!stored) return adtError(res, 404, `${type} ${name} not found`);
+        const obj = byObjectUrl(path);
+        if (!obj || !obj.lockedBy || obj.lockedBy.lockHandle !== q.get('lockHandle')) {
+          return adtError(res, 403, `${type} ${name} is not locked by this session`);
+        }
+        stored.xml = await readBody(req);
+        return ok(res, stored.xml);
+      }
+      if (req.method === 'DELETE' && name) {
+        const stored = atcObjects.get(key);
+        if (!stored) return adtError(res, 404, `${type} ${name} not found`);
+        const obj = byObjectUrl(path);
+        if (!obj || !obj.lockedBy || obj.lockedBy.lockHandle !== q.get('lockHandle')) {
+          return adtError(res, 403, `${type} ${name} is not locked by this session`);
+        }
+        atcObjects.delete(key);
+        objects.delete(name);
+        return ok(res, '');
       }
     }
 
