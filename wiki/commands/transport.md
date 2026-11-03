@@ -235,7 +235,7 @@ abap transport release DEVK900001 --yes --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap transport check", "version": "2.1.0", "timestamp": "2026-11-01T00:20:00.000Z", "durationMs": 220, "warnings": [] },
+  "meta": { "command": "abap transport check", "version": "2.2.0", "timestamp": "2026-11-01T00:20:00.000Z", "durationMs": 220, "warnings": [] },
   "data": {
     "object": "ZCL_DEMO",
     "ok": true,
@@ -251,7 +251,7 @@ abap transport release DEVK900001 --yes --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap transport check", "version": "2.1.0", "timestamp": "2026-11-01T00:20:00.000Z", "durationMs": 210, "warnings": [] },
+  "meta": { "command": "abap transport check", "version": "2.2.0", "timestamp": "2026-11-01T00:20:00.000Z", "durationMs": 210, "warnings": [] },
   "data": {
     "object": "ZCL_DEMO",
     "ok": false,
@@ -267,7 +267,7 @@ abap transport release DEVK900001 --yes --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap transport release", "version": "2.1.0", "timestamp": "2026-11-01T00:20:00.000Z", "durationMs": 900, "warnings": [] },
+  "meta": { "command": "abap transport release", "version": "2.2.0", "timestamp": "2026-11-01T00:20:00.000Z", "durationMs": 900, "warnings": [] },
   "data": {
     "transport": "DEVK900001",
     "released": true,
@@ -283,7 +283,7 @@ abap transport release DEVK900001 --yes --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap transport release", "version": "2.1.0", "timestamp": "2026-11-01T00:20:00.000Z", "durationMs": 15, "warnings": [] },
+  "meta": { "command": "abap transport release", "version": "2.2.0", "timestamp": "2026-11-01T00:20:00.000Z", "durationMs": 15, "warnings": [] },
   "data": { "transport": "DEVK900001", "dryRun": true, "released": false }
 }
 ```

@@ -6,33 +6,30 @@
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-11-03
+
+本版把对象面扩到 ATC 检查配置、CDS 技术对象、CDS 简单类型、类型池和应用作业目录（新增 11 个类型码，`abap types` 现列出 36 类），新增 `abap publish` / `abap unpublish` 两个服务绑定发布命令，并修正本地包 DDIC 对象 push 的 transport 判定。没有移除命令或参数，但有两处行为收紧需要留意（多余位置参数改为报错、TTYP 不再生成 `.type.abap` 侧车），见 Changed。内置 ICF 服务版本随 CLI 统一到 2.2.0，服务端行为没有变化；`abap deploy status` 会提示 outdated，需要时可执行一次 `abap deploy --yes` 对齐版本号。
+
 ### Added
 
-- **`abap publish` / `abap unpublish`**：服务绑定（SRVB）的本地 OData endpoint 发布/取消发布独立命令。版本从 ADT 绑定元数据推导，按 `V2`/`V4` 自动选择端点，支持幂等重复执行；缺绑定报 `OBJECT_NOT_FOUND`。
-
-- **TYPE（类型池）**：新增 AFF 官方格式的类型池对象，支持 `create` / `pull` / `push` / `delete`（`.type.json` + `.type.abap`；ADT `/ddic/typegroups`，名称上限 5 字符）。
-- **应用作业（SAJC / SAJT）**：新增应用作业目录条目与模板两类对象，支持 `create` / `pull` / `push` / `delete`（`<name>.sajc.json` / `<name>.sajt.json`，官方 AFF v1 单 JSON；名称上限 40 字符）。本地文件保持当前 AFF 模型，SAP 侧在读 / 写时适配目标 release 的 JSON 模型；目标系统无法表达的字段（目录条目的 `sections` / `groups` / `parameters`、模板的 `singleValueParameters`、通知退出类）按字段名报错而不是静默丢弃。目录条目引用的执行类、模板引用的目录条目由 SAP 在保存时校验，CLI 把 SAP 的通用拒绝映射为可操作的提示。写入即保存激活（SAP 侧没有 inactive 版本），因此 `--no-activate` 在该类型上会被拒绝；`create --check-only` 只做本地校验。名称上限 40 字符（通用上限 30 的本类型放宽）。
-
-### Changed
-
-- **TTYP 本地文件收口**：表类型是纯 DDIC 元数据（abapGit 同样只序列化元数据），`pull` 不再生成只读的 `.type.abap` 伪 DDL 侧车；`.type.abap` 归还给 AFF type pool（`TYPE`）。
-- **`abap init --agent claude` 不再生成根 `CLAUDE.md`**：Claude Code 直接使用 `.claude/skills/` 与 `.claude/agents/`；已有 `CLAUDE.md` 不会被修改或删除。
-
-- **CDS 技术对象**：新增 `DTDC`（动态缓存）、`DTEB`（CDS 实体缓冲）、`DSFD`（CDS 标量函数定义）、`DSFI`（标量函数实现引用）四类对象，支持 `create` / `pull` / `push` / `delete`。前三类为「AFF 元数据 + `.acds` 源码」两件套，`DSFI` 为单个 JSON（其 ADT `source/main` 就是 AFF JSON）；`create` / `push` 写入源码后自动激活（`--no-activate` 只写），并同步 AFF 描述字段。
-- **CDS 简单类型（DRTY）**：在上述四个 CDS 技术对象之外新增 `DRTY`，支持 `create` / `pull` / `push` / `delete`（AFF 元数据 + `.drty.acds` 两件套）。SAP 侧写入受用户参数 `CDS_SIMPLE_TYPES` 控制；未启用时 CLI 报 `DRTY_FEATURE_NOT_ENABLED` 并给出 SU3 启用步骤。
-- **CDS 技术对象接入类型矩阵**：`abap types`、`create --schema` 与 `docs/supported.md` 并入 CDS 技术对象（类型矩阵当前 36 个类型码）。
-- **未接入**：`DRAS`（方面）/ `DTIX`（字典调优索引）/ `DTSC`（字典调优静态缓存）虽有官方 AFF schema，但参考 S/4HANA release 未提供 ADT 读写资源，暂不支持。
-
-- **ATC 检查配置对象**：新增 `CHKC`（检查类别）、`CHKO`（检查）、`CHKV`（检查变体）三类对象，支持 `create` / `pull` / `push` / `delete` 全生命周期。本地用官方 abap-file-format JSON（`<name>.chkc.json` / `.chko.json` / `.chkv.json`），`create` / `push` 写入后自动激活（`--no-activate` 只写不激活）。检查变体的 `selectedChecks` 参数（普通值、结构化值、值列表、range 列表）可无损往返。
-- **ATC 配置对象接入类型矩阵**：`abap types`、`create --schema` 与 `docs/supported.md` 已列出 ATC 检查配置对象。
+- **`abap publish` / `abap unpublish`**：服务绑定的本地 OData endpoint 发布 / 取消发布命令。服务版本与协议版本从绑定元数据推导，按 V2 / V4 自动选择端点，可重复执行；绑定不存在时报对象未找到，元数据缺版本时报校验错误并提示先 `pull` / `inspect`。
+- **TYPE（类型池）**：新增 AFF 官方格式的类型池对象，支持 `create` / `pull` / `push` / `delete`（`.type.json` 元数据 + `.type.abap` 源码，名称上限 5 字符）。`TYPES` 名必须带 `<池名>_` 前缀；`push` 只替换描述、保留 SAP 的 Unicode 检查标记，避免后续激活失败。
+- **ATC 检查配置对象**：新增 `CHKC`（检查类别）、`CHKO`（检查）、`CHKV`（检查变体）三类对象，支持 `create` / `pull` / `push` / `delete` 全生命周期。`create` / `push` 写入后自动激活（`--no-activate` 只写不激活）；检查变体的 `selectedChecks` 参数（普通值、结构化值、值列表、range 列表）可无损往返。SAP 侧前置条件按原样返回：`CHKO` 的实现类需注册为活动的 ATC 检查且参数 id 匹配，`CHKV` 的参数需与实现类一致。
+- **CDS 技术对象**：新增 `DTDC`（动态缓存）、`DTEB`（CDS 实体缓冲）、`DSFD`（CDS 标量函数定义）、`DSFI`（标量函数实现引用）四类对象，支持 `create` / `pull` / `push` / `delete`。`DTDC` / `DTEB` / `DSFD` 为「AFF 元数据 + `.acds` 源码」两件套，`DSFI` 为单个 AFF JSON；`create` / `push` 写入源码后自动激活并同步描述，round-trip 不丢描述。SAP 侧门禁直接暴露：`DSFD` 需要启用用户参数 `DD_CDS_DSFD`，`DTEB` 要求目标视图实体允许缓冲，`DSFI` 名称需带本 release 的引擎后缀（`_ANA`）且引用的 `DSFD` 已激活。`DRAS`（方面）、`DTIX`（字典调优索引）、`DTSC`（字典调优静态缓存）虽有官方 AFF schema，但参考 S/4HANA release 没有对应的 ADT 读写资源，暂不支持。
+- **CDS 简单类型（DRTY）**：新增 `DRTY`，支持 `create` / `pull` / `push` / `delete`（AFF 元数据 + `.drty.acds` 两件套）。SAP 侧写入受用户参数 `CDS_SIMPLE_TYPES` 控制；未启用时直接报错并给出 SU3 启用步骤（该检查在 SAP 侧按会话缓存，启用后需新会话生效）。
+- **应用作业（SAJC / SAJT）**：新增应用作业目录条目与模板两类对象，支持 `create` / `pull` / `push` / `delete`（`.sajc.json` / `.sajt.json`，官方 AFF 单 JSON，名称上限 40 字符）。本地文件始终是当前 AFF 模型，CLI 按目标 SAP release 的 JSON 模型在读写时转换：目标系统表达不了的字段按字段名报错、不静默丢弃；目录条目引用的执行类、模板引用的目录条目由 SAP 在保存时校验。SAP 侧写入即保存并激活、没有 inactive 版本，因此 `--no-activate` 会被拒绝，`create --check-only` 只做本地校验。
 
 ### Changed
 
+- **TTYP 本地文件收口**：表类型是纯 DDIC 元数据（abapGit 同样只序列化元数据），`pull` 只写 `<name>.ttyp.json`，不再生成只读的 `.type.abap` 伪 DDL 侧车；`.type.abap` 归还给类型池（`TYPE`）。已有的 `.type.abap` 不会被改写或删除，`push` 也不读取它，无需迁移。
+- **`abap dumps --json` 增加 `title` / `updated`**：运行时 dump 列表现在返回标题与最后更新时间，便于按时间排序和定位问题；按既有字段读取的消费方不受影响。
 - **`chko` 的 `hidden` 与 `checkType` 语义**：`parameters[].hidden` 对应 SAP 侧「参数不可修改」，`checkType` 对应检查是否 remote-enabled；`pull` 回读时按 SAP 实际值投影，未设置的默认值（`hidden: false` / `checkType: local`）可能被省略——两种写法等价。
+- **`abap init --agent claude` 不再生成根 `CLAUDE.md`**：Claude Code 直接使用 `.claude/skills/` 与 `.claude/agents/`；已有 `CLAUDE.md` 不会被修改或删除。
+- **多余位置参数改为报错**：命令后跟了该命令不接受的位置参数时，现在返回用法错误（退出码 2），不再静默忽略（例如 `abap types CLAS extra`）。**Migration**：删掉多余的位置参数；此前依赖「多余参数被忽略」的脚本需要先修正。
 
 ### Fixed
 
-- **本地包 DDIC 更新不再要求 transport**：`abap pull` 写出的 DDIC AFF 三件套（DOMA / DTEL / TABL / STRU）不携带 package，此前在 `$TMP` / `$CRW` 等本地包里“pull → 改字段 → push 已有对象”会被当成可传输对象并报 `NO_TRANSPORT`（exit 7）。现在本地文件没写 package 时，push 先读回目标对象的现有 package：本地包走 transport-free 写入，可传输包仍按 `--tr` > 配置 > 用户请求解析；VIEW / SHLP / TRAN 的更新走同一规则。
+- **本地包 DDIC 更新不再要求 transport**：`abap pull` 写出的 DDIC AFF 三件套（DOMA / DTEL / TABL / STRU）不携带 package，此前在 `$TMP` / `$CRW` 等本地包里“pull → 改字段 → push 已有对象”会被当成可传输对象并报缺少 transport（exit 7）。现在本地文件没写 package 时，push 先读回目标对象的现有 package：本地包走 transport-free 写入，可传输包仍按 `--tr` > 配置 > 用户请求解析；VIEW / SHLP / TRAN 的更新走同一规则。
 
 ## [2.1.0] - 2026-11-03
 

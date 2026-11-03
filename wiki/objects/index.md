@@ -35,9 +35,9 @@ changed at: 2026-11-03 21:55:00
 | `SAJT` | ADT（无兜底） | `src/<name>.sajt.json`（应用作业模板，AFF 单 JSON） | [sajt.md](sajt.md) |
 | `MSAG` | ADT + ICF 兜底 | `src/<name>.msag.json` | [msag.md](msag.md) |
 | `DDLS` | ADT（无兜底） | `src/<name>.ddls.{json,acds}` 两件套 | [ddls.md](ddls.md) |
-| `SRVB` | ADT（无兜底） | `src/<name>.srvb.json`（Service Binding 元数据；仅 pull） | [srvb.md](srvb.md) |
+| `SRVB` | ADT（无兜底） | `src/<name>.srvb.json`（Service Binding 元数据；create / pull / delete，无 push） | [srvb.md](srvb.md) |
 | `SRVD` | ADT（无兜底） | `src/<name>.srvd.{json,acds}` 两件套（Service Definition） | [srvd.md](srvd.md) |
-| `BDEF` | ADT（无兜底） | `src/<name>.bdef.{json,abdl}` 两件套（Behavior Definition；pull + push） | [bdef.md](bdef.md) |
+| `BDEF` | ADT（无兜底） | `src/<name>.bdef.{json,abdl}` 两件套（Behavior Definition；create / pull / push / delete） | [bdef.md](bdef.md) |
 | `DCLS` | ADT（无兜底） | `src/<name>.dcls.{json,acds}` 两件套（CDS Access Control） | [dcls.md](dcls.md) |
 | `DDLX` | ADT（无兜底） | `src/<name>.ddlx.{json,acds}` 两件套（CDS Metadata Extension） | [ddlx.md](ddlx.md) |
 | `DDLA` | ADT（无兜底） | `src/<name>.ddla.{json,acds}` 两件套（CDS Annotation Definition） | [ddla.md](ddla.md) |
