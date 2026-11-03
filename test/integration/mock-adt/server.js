@@ -72,6 +72,20 @@ const tableStore = new Map();
 // DEVC: package store — key = package name (upper), value = package metadata.
 // Served by GET/POST/DELETE /sap/bc/adt/packages and the search endpoint.
 const packages = new Map();
+// ATC configuration objects — key = `<TYPE>:<NAME>`, value = { xml, packageName }.
+// The XML body posted by the CLI is stored verbatim and served back on GET, so
+// the AFF projection is exercised on the CLI side (same contract as real ADT).
+const atcObjects = new Map();
+// CDS technical objects — key = `<TYPE>:<NAME>`, value = { metaXml, source, packageName }.
+// DTDC/DTEB/DSFD store an XML metadata envelope + `.acds` source text; DSFI
+// stores a blueSource envelope + the AFF JSON document as its source.
+const cdsTechStore = new Map();
+// ADT collection path → CLI type code for the ATC configuration resources.
+const ATC_COLLECTIONS = {
+  '/sap/bc/adt/atc/checkcategories': 'CHKC',
+  '/sap/bc/adt/atc/checks': 'CHKO',
+  '/sap/bc/adt/atc/checkvariants': 'CHKV',
+};
 // ICF write rules mirror the ABAP handler: only `$`-prefixed packages are
 // LOCAL (transport-free); an empty package means "use $TMP", hence local.
 function isLocalPackage(pkg) {
@@ -540,7 +554,14 @@ function readBody(req) {
 }
 
 function ok(res, body, type = 'application/xml') {
-  res.writeHead(200, { 'Content-Type': type });
+  // ADT lock/PUT/activate require a stateful session; real SAP hands one out at
+  // login via the SAP_SESSIONID cookie. Emit it on every response so the CLI
+  // keeps the client in stateful mode (it only turns stateful when the login
+  // response carries that cookie).
+  res.writeHead(200, {
+    'Content-Type': type,
+    'Set-Cookie': 'SAP_SESSIONID_S4H_100=mocksession; Path=/',
+  });
   res.end(body);
 }
 
@@ -2059,6 +2080,148 @@ const server = http.createServer(async (req, res) => {
         // this flag below.
         obj.inactive = true;
         return ok(res, '', 'application/xml');
+      }
+    }
+
+    // ATC configuration objects (CHKC / CHKO / CHKV) — versioned XML resources.
+    // The lifecycle mirrors real ADT: POST the collection, GET/PUT/DELETE the
+    // per-object URL, with a locked PUT and an explicit activation.
+    const atcMatch = /^\/sap\/bc\/adt\/atc\/(checkcategories|checks|checkvariants)(?:\/([^/]+))?$/.exec(path);
+    if (atcMatch) {
+      const type = ATC_COLLECTIONS[`/sap/bc/adt/atc/${atcMatch[1]}`];
+      const name = atcMatch[2] ? decodeURIComponent(atcMatch[2]).toUpperCase() : undefined;
+      const key = name ? `${type}:${name}` : '';
+      if (req.method === 'POST' && !name) {
+        const body = await readBody(req);
+        const objectName = /adtcore:name="([^"]+)"/.exec(body)?.[1]?.toUpperCase();
+        if (!objectName) return adtError(res, 400, 'Missing adtcore:name in ATC create body');
+        if (atcObjects.has(`${type}:${objectName}`)) {
+          return adtError(res, 409, `${type} ${objectName} already exists`);
+        }
+        const packageName = /adtcore:packageRef[^>]*adtcore:name="([^"]+)"/.exec(body)?.[1] || '$TMP';
+        atcObjects.set(`${type}:${objectName}`, { xml: body, packageName });
+        const obj = addObject(
+          objectName,
+          type,
+          `/sap/bc/adt/atc/${atcMatch[1]}/${objectName.toLowerCase()}`,
+          /adtcore:description="([^"]*)"/.exec(body)?.[1] || '',
+          [],
+          { packageName },
+        );
+        obj.inactive = true;
+        return ok(res, body);
+      }
+      if (req.method === 'GET' && name) {
+        const stored = atcObjects.get(key);
+        if (!stored) return adtError(res, 404, `${type} ${name} not found`);
+        return ok(res, stored.xml);
+      }
+      if (req.method === 'PUT' && name) {
+        const stored = atcObjects.get(key);
+        if (!stored) return adtError(res, 404, `${type} ${name} not found`);
+        const obj = byObjectUrl(path);
+        if (!obj || !obj.lockedBy || obj.lockedBy.lockHandle !== q.get('lockHandle')) {
+          return adtError(res, 403, `${type} ${name} is not locked by this session`);
+        }
+        stored.xml = await readBody(req);
+        return ok(res, stored.xml);
+      }
+      if (req.method === 'DELETE' && name) {
+        const stored = atcObjects.get(key);
+        if (!stored) return adtError(res, 404, `${type} ${name} not found`);
+        const obj = byObjectUrl(path);
+        if (!obj || !obj.lockedBy || obj.lockedBy.lockHandle !== q.get('lockHandle')) {
+          return adtError(res, 403, `${type} ${name} is not locked by this session`);
+        }
+        atcObjects.delete(key);
+        objects.delete(name);
+        return ok(res, '');
+      }
+    }
+
+    // CDS technical objects (DTDC / DTEB / DSFD / DSFI).
+    const cdsMatch = /^\/sap\/bc\/adt\/ddic\/(dtdc|dteb|dsfd)\/sources(?:\/([^/]+))?(\/source\/main)?$/.exec(path);
+    const dsfiMatch = /^\/sap\/bc\/adt\/ddic\/dsfi(?:\/([^/]+))?(\/source\/main)?$/.exec(path);
+    if (cdsMatch || dsfiMatch) {
+      const type = cdsMatch ? cdsMatch[1].toUpperCase() : 'DSFI';
+      const name = (cdsMatch ? cdsMatch[2] : dsfiMatch[1])?.toUpperCase();
+      const isSource = Boolean((cdsMatch ? cdsMatch[3] : dsfiMatch[2]));
+      const key = name ? `${type}:${name}` : '';
+      const objectUrl = name
+        ? (cdsMatch ? `/sap/bc/adt/ddic/${cdsMatch[1]}/sources/${name.toLowerCase()}` : `/sap/bc/adt/ddic/dsfi/${name.toLowerCase()}`)
+        : '';
+      if (req.method === 'POST' && !name) {
+        const body = await readBody(req);
+        const objectName = /adtcore:name="([^"]+)"/.exec(body)?.[1]?.toUpperCase();
+        if (!objectName) return adtError(res, 400, 'Missing adtcore:name in CDS technical create body');
+        if (cdsTechStore.has(`${type}:${objectName}`)) {
+          return adtError(res, 409, `${type} ${objectName} already exists`);
+        }
+        const packageName = /adtcore:packageRef[^>]*adtcore:name="([^"]+)"/.exec(body)?.[1] || '$TMP';
+        const description = /adtcore:description="([^"]*)"/.exec(body)?.[1] || '';
+        cdsTechStore.set(`${type}:${objectName}`, { metaXml: body, source: '', packageName });
+        const obj = addObject(
+          objectName,
+          type,
+          cdsMatch ? `/sap/bc/adt/ddic/${cdsMatch[1]}/sources/${objectName.toLowerCase()}` : `/sap/bc/adt/ddic/dsfi/${objectName.toLowerCase()}`,
+          description,
+          [],
+          { packageName },
+        );
+        obj.inactive = true;
+        return ok(res, body);
+      }
+      if (name && isSource && req.method === 'GET') {
+        const stored = cdsTechStore.get(key);
+        if (!stored) return adtError(res, 404, `${type} ${name} source not found`);
+        return ok(res, stored.source, type === 'DSFI' ? 'application/json' : 'text/plain; charset=utf-8');
+      }
+      if (name && isSource && req.method === 'PUT') {
+        const stored = cdsTechStore.get(key);
+        if (!stored) return adtError(res, 404, `${type} ${name} source not found`);
+        const obj = byObjectUrl(objectUrl);
+        if (!obj || !obj.lockedBy || obj.lockedBy.lockHandle !== q.get('lockHandle')) {
+          return adtError(res, 403, `${type} ${name} is not locked by this session`);
+        }
+        stored.source = await readBody(req);
+        return ok(res, stored.source, type === 'DSFI' ? 'application/json' : 'text/plain; charset=utf-8');
+      }
+      if (name && !isSource && req.method === 'GET') {
+        const stored = cdsTechStore.get(key);
+        if (!stored) return adtError(res, 404, `${type} ${name} not found`);
+        // Metadata PUTs omit the package reference but real ADT keeps serving
+        // it; re-inject it so the CLI's transport rule sees the package.
+        let meta = stored.metaXml;
+        if (stored.packageName && !/adtcore:packageRef/.test(meta)) {
+          meta = meta.replace(/<\/([A-Za-z0-9]+:[A-Za-z0-9]+)>$/, `<adtcore:packageRef adtcore:name="${stored.packageName}"/></$1>`);
+        }
+        return ok(res, meta);
+      }
+      if (name && !isSource && req.method === 'PUT') {
+        const stored = cdsTechStore.get(key);
+        if (!stored) return adtError(res, 404, `${type} ${name} not found`);
+        const obj = byObjectUrl(objectUrl);
+        if (!obj || !obj.lockedBy || obj.lockedBy.lockHandle !== q.get('lockHandle')) {
+          return adtError(res, 403, `${type} ${name} is not locked by this session`);
+        }
+        stored.metaXml = await readBody(req);
+        const desc = /adtcore:description="([^"]*)"/.exec(stored.metaXml)?.[1];
+        if (desc !== undefined) obj.description = desc;
+        // Metadata PUTs omit the package reference; ADT keeps the package.
+        const pkg = /adtcore:packageRef[^>]*adtcore:name="([^"]+)"/.exec(stored.metaXml)?.[1];
+        if (pkg) stored.packageName = pkg;
+        return ok(res, stored.metaXml);
+      }
+      if (name && !isSource && req.method === 'DELETE') {
+        const stored = cdsTechStore.get(key);
+        if (!stored) return adtError(res, 404, `${type} ${name} not found`);
+        const obj = byObjectUrl(objectUrl);
+        if (!obj || !obj.lockedBy || obj.lockedBy.lockHandle !== q.get('lockHandle')) {
+          return adtError(res, 403, `${type} ${name} is not locked by this session`);
+        }
+        cdsTechStore.delete(key);
+        objects.delete(name);
+        return ok(res, '');
       }
     }
 

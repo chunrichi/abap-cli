@@ -30,6 +30,10 @@ import { runDeleteShlp } from './delete-shlp.js';
 import { runDeleteEnqu } from './delete-enqu.js';
 import { runDeleteNrob } from './delete-nrob.js';
 import { runDeleteHttp } from './delete-http.js';
+import { runDeleteAtc } from './delete-atc.js';
+import { isAtcType } from '../../formats/atc/json.js';
+import { runDeleteCdsTech } from './delete-cds-tech.js';
+import { isCdsTechType } from '../../formats/cds-tech/json.js';
 
 export interface DeleteOptions {
   /** Object type code (CLAS / PROG / ...). Required — `delete` without a type
@@ -86,6 +90,17 @@ export async function runDelete(objectName: string, opts: DeleteOptions): Promis
   // name directly).
   if (typeUpper === 'DEVC') {
     return runDeleteDevc(objectName, opts);
+  }
+  // ATC configuration objects (CHKC / CHKO / CHKV) delete through ADT, but
+  // need their package read from the resource first (quickSearch does not
+  // report it), hence the dedicated branch.
+  if (isAtcType(typeUpper)) {
+    return runDeleteAtc(typeUpper, objectName, opts);
+  }
+  // CDS technical objects (DTDC / DTEB / DSFD / DSFI) delete through ADT but
+  // need their package read from the resource first, same as ATC objects.
+  if (isCdsTechType(typeUpper)) {
+    return runDeleteCdsTech(typeUpper, objectName, opts);
   }
   // VIEW (DDIC database view) has no ADT delete endpoint: deletion runs through
   // the bundled ICF service (RS_DD_DELETE_OBJ, $TMP only).

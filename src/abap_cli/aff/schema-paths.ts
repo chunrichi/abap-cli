@@ -71,6 +71,16 @@ const SCHEMA_FILE: Record<string, string> = {
   DCLS: 'dcls-v1.json',
   DDLX: 'ddlx-v1.json',
   DDLA: 'ddla-v1.json',
+  // ATC configuration objects (pure-JSON AFF; ADT wire is a v1/v4 XML envelope).
+  CHKC: 'chkc-v1.json',
+  CHKO: 'chko-v1.json',
+  CHKV: 'chkv-v1.json',
+  // CDS technical objects (DTDC/DTEB/DSFD carry an `.acds` sidecar; DSFI is
+  // a single JSON document whose source *is* the AFF JSON).
+  DTDC: 'dtdc-v1.json',
+  DTEB: 'dteb-v1.json',
+  DSFD: 'dsfd-v1.json',
+  DSFI: 'dsfi-v1.json',
 };
 
 /** Resolve the bundled-schema directory shipped with the package.

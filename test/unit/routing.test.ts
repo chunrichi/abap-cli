@@ -50,6 +50,13 @@ const EXPECTED: Record<string, ExpectedRoute> = {
   DDLX: { create: 'adt', pull: 'adt', push: 'adt' },
   DDLA: { create: 'adt', pull: 'adt', push: 'adt' },
   SRVB: { create: 'adt', pull: 'adt', push: undefined },
+  CHKC: { create: 'adt', pull: 'adt', push: 'adt' },
+  CHKO: { create: 'adt', pull: 'adt', push: 'adt' },
+  CHKV: { create: 'adt', pull: 'adt', push: 'adt' },
+  DTDC: { create: 'adt', pull: 'adt', push: 'adt' },
+  DTEB: { create: 'adt', pull: 'adt', push: 'adt' },
+  DSFD: { create: 'adt', pull: 'adt', push: 'adt' },
+  DSFI: { create: 'adt', pull: 'adt', push: 'adt' },
 };
 
 const OPS = ['create', 'pull', 'push'] as const;

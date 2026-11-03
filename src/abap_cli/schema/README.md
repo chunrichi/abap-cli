@@ -41,6 +41,13 @@ The set is intentionally minimal — only the schemas abap-cli resolves through
 | `dcls-v1.json` | DCLS | `file-formats/dcls/dcls-v1.json` | |
 | `ddlx-v1.json` | DDLX | `file-formats/ddlx/ddlx-v1.json` | |
 | `ddla-v1.json` | DDLA | `file-formats/ddla/ddla-v1.json` | |
+| `chkc-v1.json` | CHKC | `file-formats/chkc/chkc-v1.json` | |
+| `chko-v1.json` | CHKO | `file-formats/chko/chko-v1.json` | |
+| `chkv-v1.json` | CHKV | `file-formats/chkv/chkv-v1.json` | |
+| `dtdc-v1.json` | DTDC | `file-formats/dtdc/dtdc-v1.json` | |
+| `dteb-v1.json` | DTEB | `file-formats/dteb/dteb-v1.json` | |
+| `dsfd-v1.json` | DSFD | `file-formats/dsfd/dsfd-v1.json` | |
+| `dsfi-v1.json` | DSFI | `file-formats/dsfi/dsfi-v1.json` | |
 | `xslt-v1.json` | XSLT | `file-formats/xslt/xslt-v1.json` | |
 
 `docu-v1.json` is a **companion** schema, not an object type: it validates the

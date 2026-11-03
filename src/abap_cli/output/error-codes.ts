@@ -218,6 +218,8 @@ export type ErrorCode =
   | 'XSLT_SOURCE_LINE_TOO_LONG' // source line above O2PAGELINE-LINE CHAR 255 (VALIDATION_ERROR)
   | 'XSLT_TRANSPORT_REQUIRED'   // transportable package write/delete without a request (VALIDATION_ERROR)
   | 'XSLT_OBJECT_EXISTS'        // create_new_from_string object_already_existing (SAP_ERROR)
+  // CDS technical objects (DTDC / DTEB / DSFD / DSFI)
+  | 'DSFD_FEATURE_NOT_ENABLED'  // SAP user parameter DD_CDS_DSFD not set; DSFD writes are rejected (VALIDATION_ERROR)
   ;
 
 const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
@@ -407,6 +409,7 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   XSLT_SOURCE_LINE_TOO_LONG: 'VALIDATION_ERROR',
   XSLT_TRANSPORT_REQUIRED: 'VALIDATION_ERROR',
   XSLT_OBJECT_EXISTS: 'SAP_ERROR',
+  DSFD_FEATURE_NOT_ENABLED: 'VALIDATION_ERROR',
 };
 
 export function categoryOf(code: ErrorCode): ErrorCategory {
