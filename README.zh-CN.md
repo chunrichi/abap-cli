@@ -52,7 +52,7 @@ abap push src/zcl_my_class.clas.abap --tr DEVK900001    # 锁 → 写 → 激活
 ## 能做什么
 
 - **就地在本地编辑**——`pull` 把对象拉成 abap-file-format 文件树，用编辑器改，`push` 写回（锁 → 写 → 激活 → 解锁）；写之前可以先 `check` 和 `diff`。
-- **覆盖 25 种对象类型**——类、接口、程序、函数组；包；DDIC 表、结构、域、数据元素、数据库视图、搜索帮助、锁对象、编号范围对象；SICF 节点、事务码、XSLT 转换程序；表类型、消息类、CDS 视图及 CDS / RAP 配套对象。其中 23 种支持 create、25 种支持 pull、23 种有 push 入口、23 种有 delete 路径；`DEVC` 支持 create / pull / delete（无 push），`BDEF` 支持 pull / push / delete（无 create），`SRVB` 仅元数据拉取。
+- **覆盖 36 种对象类型**——类、接口、程序、函数组；包；DDIC 表、结构、域、数据元素、数据库视图、搜索帮助、锁对象、编号范围对象；SICF 节点、事务码、XSLT 转换程序；表类型、消息类、CDS 视图及 CDS / RAP 配套对象；ATC 检查配置对象；CDS 技术对象；类型池；应用程序作业目录条目与模板。其中 36 种支持 create、36 种支持 pull、34 种有 push 入口、36 种有 delete 路径；`DEVC` 支持 create / pull / delete（无 push），`SRVB` 仅元数据，`SAJC` / `SAJT` 写入即激活。
 - **只读探查 SAP**——`search`、`inspect`、`where-used`、`tcode`、`list`、`dumps`、`fields`、`select`、`run-report` 都不改系统。
 - **运行与验证**——`abap run` 执行类（classrun）或 PUBLIC STATIC 方法；`abap run-report` 返回列表输出；`abap select` 就是 SE16N 的等价物。
 - **管理传输**——`transport list / create / show / resolve / assign`，`push` 时按对象自动解析。
@@ -203,7 +203,7 @@ src/(ui2)cl_json.clas.abap                # 命名空间对象 /UI2/CL_JSON
 
 ## 支持的对象类型
 
-34 个类型码，按 ADT REST API 或捆绑 ICF 服务路由：源对象、包、DDIC 对象、SICF 节点、事务码、XSLT 转换、表类型、消息类、CDS 与 RAP 源对象、ATC 检查配置对象、CDS 技术对象，以及类型池。34 种支持 `create`，34 种支持 `pull`，32 种支持 `push`，34 种支持 `delete`；每个类型对应一组平铺在 `src/` 下的产物文件（多数为官方 AFF，`TTYP` / `VIEW` / `SHLP` 使用本地扩展 schema）。
+36 个类型码，按 ADT REST API 或捆绑 ICF 服务路由：源对象、包、DDIC 对象、SICF 节点、事务码、XSLT 转换、表类型、消息类、CDS 与 RAP 源对象、ATC 检查配置对象、CDS 技术对象、类型池，以及应用程序作业。36 种支持 `create`，36 种支持 `pull`，34 种支持 `push`，36 种支持 `delete`；每个类型对应一组平铺在 `src/` 下的产物文件（多数为官方 AFF，`TTYP` / `VIEW` / `SHLP` 使用本地扩展 schema）。
 
 完整类型 × 命令矩阵、产物文件集、通道路由与逐类型注意事项见 **[docs/supported.md](docs/supported.md)**；逐类型细节与真机证据见 [wiki/object-types.md](wiki/object-types.md)。
 

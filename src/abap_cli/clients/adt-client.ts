@@ -46,6 +46,16 @@ import {
   cdsTechSourceUrl,
 } from './cds-tech.js';
 import {
+  APPJOB_INFO,
+  APPJOB_MEDIA_TYPE,
+  APPJOB_SCHEMA_MEDIA_TYPE,
+  APPJOB_SOURCE_MEDIA_TYPE,
+  appJobObjectUrl,
+  appJobSchemaUrl,
+  appJobSourceUrl,
+  buildAppJobCreateBody,
+} from './appjob.js';
+import {
   TYPEGROUP_COLLECTION,
   TYPEGROUP_MEDIA,
   TYPEGROUP_OBJTYPE,
@@ -57,6 +67,7 @@ import {
 import type { SrvbLocal } from '../formats/srvb/json.js';
 import type { AtcLocal, AtcType } from '../formats/atc/json.js';
 import type { CdsTechType } from '../formats/cds-tech/json.js';
+import type { AppJobType } from '../formats/appjob/json.js';
 
 /** ADT media type of a single package resource. */
 const PACKAGE_MEDIA_TYPE = 'application/vnd.sap.adt.packages.v2+xml';
@@ -891,6 +902,120 @@ export class AdtClientWrapper {
         headers: { Accept: SRVB_MEDIA_TYPE },
       });
       return String(response.body ?? '');
+    });
+  }
+
+  // --- Application jobs (SAJC / SAJT) ---
+
+  /**
+   * Read the ADT object-type JSON schema. It is both the JSON model capability
+   * probe (nested vs flat release variants) and a cheap existence-independent
+   * check that this release serves the type at all.
+   */
+  getAppJobSchema(type: AppJobType): Promise<string> {
+    return this._call(async () => {
+      const response = await this.client.httpClient.request(appJobSchemaUrl(type), {
+        method: 'GET',
+        headers: { Accept: APPJOB_SCHEMA_MEDIA_TYPE },
+      });
+      return String(response.body ?? '');
+    });
+  }
+
+  /** Read the blueSource metadata XML of one application-job object. */
+  getAppJobObject(type: AppJobType, name: string): Promise<string> {
+    return this._call(async () => {
+      const response = await this.client.httpClient.request(appJobObjectUrl(type, name), {
+        method: 'GET',
+        headers: { Accept: APPJOB_MEDIA_TYPE },
+      });
+      return String(response.body ?? '');
+    });
+  }
+
+  /** Read `source/main` — the object's JSON document. */
+  getAppJobSource(type: AppJobType, name: string): Promise<string> {
+    return this._call(async () => {
+      const response = await this.client.httpClient.request(appJobSourceUrl(type, name), {
+        method: 'GET',
+        headers: { Accept: APPJOB_SOURCE_MEDIA_TYPE },
+      });
+      return String(response.body ?? '');
+    });
+  }
+
+  /**
+   * Create an application-job object (POST collection). The JSON document is
+   * written afterwards with {@link writeAppJobSource}; that write also activates
+   * the object (these resources never create an inactive version).
+   */
+  createAppJobObject(
+    type: AppJobType,
+    name: string,
+    meta: { packageName: string; description: string; transport?: string; originalLanguage?: string },
+  ): Promise<void> {
+    return this._call(async () => {
+      const body = buildAppJobCreateBody(type, name, {
+        packageName: meta.packageName,
+        description: meta.description,
+        language: this.config.sap.language,
+        originalLanguage: meta.originalLanguage,
+      });
+      await this.client.httpClient.request(APPJOB_INFO[type].collection, {
+        method: 'POST',
+        body,
+        headers: { 'Content-Type': APPJOB_MEDIA_TYPE, Accept: '*/*' },
+        qs: meta.transport ? { corrNr: meta.transport } : {},
+      });
+    });
+  }
+
+  /**
+   * Write `source/main`: lock → PUT JSON → metadata description sync → unlock.
+   * The header description lives in the object metadata, not in the document,
+   * so a pull → edit → push round-trip keeps them in sync. The PUT is also the
+   * save: these resources never create an inactive version, so no activation
+   * request follows.
+   */
+  writeAppJobSource(
+    type: AppJobType,
+    name: string,
+    source: string,
+    meta: { transport?: string; description?: string; originalLanguage?: string } = {},
+  ): Promise<void> {
+    return this._call(async () => {
+      const objectUrl = appJobObjectUrl(type, name);
+      const lock = await this.lock(objectUrl);
+      const handle = lock.LOCK_HANDLE;
+      try {
+        await this.client.httpClient.request(appJobSourceUrl(type, name), {
+          method: 'PUT',
+          headers: { 'Content-Type': APPJOB_SOURCE_MEDIA_TYPE, Accept: APPJOB_SOURCE_MEDIA_TYPE },
+          qs: {
+            ...(handle ? { lockHandle: handle } : {}),
+            ...(meta.transport ? { corrNr: meta.transport } : {}),
+          },
+          body: source,
+        });
+        if (meta.description !== undefined) {
+          const metadataBody = buildAppJobCreateBody(type, name, {
+            description: meta.description,
+            language: this.config.sap.language,
+            originalLanguage: meta.originalLanguage,
+          });
+          await this.client.httpClient.request(objectUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': APPJOB_MEDIA_TYPE, Accept: APPJOB_MEDIA_TYPE },
+            qs: {
+              ...(handle ? { lockHandle: handle } : {}),
+              ...(meta.transport ? { corrNr: meta.transport } : {}),
+            },
+            body: metadataBody,
+          });
+        }
+      } finally {
+        await this.unLock(objectUrl, handle).catch(() => undefined);
+      }
     });
   }
 

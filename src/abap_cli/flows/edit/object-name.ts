@@ -36,13 +36,17 @@ export function normalizeName(name: string): string {
  * @param example Optional example name used in `nextSteps` when the caller
  *   has a more relevant one (e.g. a function group).
  */
-export function validateObjectName(objectName: string, example = 'ZCL_MY_CLASS'): void {
+export function validateObjectName(
+  objectName: string,
+  example = 'ZCL_MY_CLASS',
+  maxLength = OBJECT_NAME_MAX_LENGTH,
+): void {
   const namespaced = objectName.startsWith('/');
   let reason: string;
   if (!objectName) {
     reason = 'name is empty';
-  } else if (objectName.length > OBJECT_NAME_MAX_LENGTH) {
-    reason = `name is ${objectName.length} characters; SAP object names are at most ${OBJECT_NAME_MAX_LENGTH}`;
+  } else if (objectName.length > maxLength) {
+    reason = `name is ${objectName.length} characters; this object type allows at most ${maxLength}`;
   } else if (namespaced ? !NAMESPACED_OBJECT_NAME.test(objectName) : !OBJECT_NAME_SEGMENT.test(objectName)) {
     reason = namespaced
       ? 'namespaced names must look like /<NS>/<NAME> with a namespace of up to 10 characters and only A-Z 0-9 _'
@@ -54,7 +58,7 @@ export function validateObjectName(objectName: string, example = 'ZCL_MY_CLASS')
     object: objectName,
     details: [reason],
     nextSteps: [
-      `Use at most ${OBJECT_NAME_MAX_LENGTH} characters from A-Z 0-9 _ (namespaced: /<NS>/<NAME>), e.g. ${example}.`,
+      `Use at most ${maxLength} characters from A-Z 0-9 _ (namespaced: /<NS>/<NAME>), e.g. ${example}.`,
     ],
   });
 }

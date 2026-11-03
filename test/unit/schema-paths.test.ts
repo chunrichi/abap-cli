@@ -79,6 +79,8 @@ describe('schema-paths priority chain', () => {
         // — CDS technical objects.
         'DTDC', 'DTEB', 'DSFD', 'DSFI', 'DRTY',
         'TYPE',
+        // — application jobs.
+        'SAJC', 'SAJT',
       ]),
     );
     // TABT is exposed as a schema key for the .settings.json override path.
@@ -94,7 +96,8 @@ describe('schema-paths priority chain', () => {
     // added DTDC / DTEB / DSFD / DSFI = 36 total.
     // added DRTY = 37 total.
     // added TYPE (type pool) = 38 total.
-    expect(types).toHaveLength(38);
+    // added SAJC / SAJT (application jobs) = 40 total.
+    expect(types).toHaveLength(40);
   });
 
   it('bundled root contains every supported schema', () => {

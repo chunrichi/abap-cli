@@ -39,6 +39,7 @@ import {
   drtyArtifact,
   type CdsTechType,
 } from '../../formats/cds-tech/json.js';
+import { sajcArtifact, sajtArtifact, type AppJobType } from '../../formats/appjob/json.js';
 import type { JsonArtifact } from '../../formats/artifact.js';
 import type { CreateOptions } from './create.js';
 import type { PullOptions, PullResult, TypePullResult } from './pull-shared.js';
@@ -62,6 +63,9 @@ import { runPushCdsTech } from './push-cds-tech.js';
 import { createTypeHandler } from './create-type.js';
 import { pullTypeHandler } from './pull-type.js';
 import { runPushType } from './push-type.js';
+import { createAppJobHandler } from './create-appjob.js';
+import { pullAppJobHandler } from './pull-appjob.js';
+import { runPushAppJob } from './push-appjob.js';
 import { createEnquHandler } from './create-enqu.js';
 import { createNrobHandler } from './create-nrob.js';
 import { createDevcHandler } from './create-devc.js';
@@ -213,6 +217,8 @@ const AFF_ARTIFACTS: Readonly<Record<string, JsonArtifact<unknown>>> = {
   DSFI: dsfiArtifact,
   DRTY: drtyArtifact,
   TYPE: typeArtifact,
+  SAJC: sajcArtifact as unknown as JsonArtifact<unknown>,
+  SAJT: sajtArtifact as unknown as JsonArtifact<unknown>,
 };
 
 /** AFF validator for one channel-routed type (mirrors the create/pull sides). */
@@ -287,6 +293,22 @@ function typePushRoute(): JsonPushRoute {
       }
       await validateAffFile(objectType, file);
     },
+  };
+}
+
+/**
+ * Application-job push: the `source/main` PUT runs under a lock and the
+ * metadata description is synced in the same lock, then activation follows.
+ */
+function appjobPushRoute(type: AppJobType): JsonPushRoute {
+  return {
+    kind: 'aff-json',
+    channel: 'adt',
+    run: async ({ client, file, opts }) => {
+      await runPushAppJob(client, type, file, { transport: opts.tr, activate: opts.activate });
+      return { transport: opts.tr ?? '', channel: 'adt' };
+    },
+    validate: (file, objectType) => validateAffFile(objectType, file),
   };
 }
 
@@ -500,6 +522,20 @@ export const TYPE_ROUTES: Readonly<Record<string, TypeRoute>> = {
     create: handler('adt', createTypeHandler),
     pull: handler('adt', pullTypeHandler),
     push: typePushRoute(),
+  },
+
+  // Application jobs — single AFF JSON document served as the object's JSON
+  // source (`/sap/bc/adt/applicationjob/{catalogs,templates}`, blueSource
+  // create + locked `source/main` PUT + activation). ADT only.
+  SAJC: {
+    create: handler('adt', createAppJobHandler('SAJC')),
+    pull: handler('adt', pullAppJobHandler('SAJC')),
+    push: appjobPushRoute('SAJC'),
+  },
+  SAJT: {
+    create: handler('adt', createAppJobHandler('SAJT')),
+    pull: handler('adt', pullAppJobHandler('SAJT')),
+    push: appjobPushRoute('SAJT'),
   },
 };
 

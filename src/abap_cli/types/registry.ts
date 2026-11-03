@@ -35,6 +35,13 @@ export interface ObjectTypeEntry {
   /** dual-channel capability (ICF fallback + ECC support). */
   channel?: ChannelCapability;
   /**
+   * SAP-side object-name length limit when it differs from the generic 30.
+   * Application-job names are 40 characters (typestructure OBJNAME_MAXLENGTH),
+   * so the shared `validateObjectName` fail-fast would otherwise reject legal
+   * names before the type-specific flow runs.
+   */
+  maxNameLength?: number;
+  /**
    * Why `abap push` cannot send this type's local artifact to SAP. Present only
    * for read-only types; the push flow turns it into `TYPE_NOT_SUPPORTED` with
    * this text so the limitation is stated in one place.
@@ -260,6 +267,28 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
     affSchemaFile: 'type-v1.json',
     requiresFile: true,
   },
+  // Application jobs (SM36 / Application Jobs family) — single AFF JSON
+  // document carried over the ADT blueSource resources
+  // `/sap/bc/adt/applicationjob/{catalogs,templates}`; `source/main` is the
+  // object's JSON document. Names are limited to 40 characters. The local AFF
+  // v1 document is translated to the release-specific JSON model at write time
+  // (see `formats/appjob/wire.ts`).
+  {
+    type: 'SAJC',
+    source: 'ADT',
+    createObjtype: 'SAJC',
+    affSchemaFile: 'sajc-v1.json',
+    requiresFile: true,
+    maxNameLength: 40,
+  },
+  {
+    type: 'SAJT',
+    source: 'ADT',
+    createObjtype: 'SAJT',
+    affSchemaFile: 'sajt-v1.json',
+    requiresFile: true,
+    maxNameLength: 40,
+  },
 ] as const;
 
 /** sub-registry types for channel-detect / ICF fallback gating. */
@@ -306,6 +335,12 @@ export function isSupportedType(type: string): boolean {
 export function pushUnsupportedReasonFor(type: string): string | undefined {
   const primary = type.split('/')[0]!.toUpperCase();
   return INDEX[primary]?.pushUnsupportedReason;
+}
+
+/** Object-name length limit for a type (generic SAP limit when unset). */
+export function maxNameLengthFor(type: string): number | undefined {
+  const primary = type.split('/')[0]!.toUpperCase();
+  return INDEX[primary]?.maxNameLength;
 }
 
 /** Return all supported type codes (uppercase, in registry order). */

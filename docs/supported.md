@@ -1,15 +1,15 @@
 # Supported Object Types
 
-`abap-cli` supports **34 object type codes**. Each type maps to one set of local artifacts written flat under `src/` — official abap-file-format (AFF) documents for most types, repository-local schemas for `TTYP` / `VIEW` / `SHLP` — and is served by one of two channels:
+`abap-cli` supports **36 object type codes**. Each type maps to one set of local artifacts written flat under `src/` — official abap-file-format (AFF) documents for most types, repository-local schemas for `TTYP` / `VIEW` / `SHLP` — and is served by one of two channels:
 
-- **ADT** — the standard ADT REST API: source objects (classes, interfaces, programs, function groups, CDS and RAP sources), packages, table types and message classes.
+- **ADT** — the standard ADT REST API: source objects (classes, interfaces, programs, function groups, CDS and RAP sources), packages, table types, message classes and application jobs.
 - **ICF** — the bundled service under `/sap/abap_cli`, installed once per system with `abap deploy`: DDIC objects, SICF service nodes, transaction codes, XSLT transformations, and the types whose ADT endpoint is missing on older releases.
 
 Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content_type>].<ext>` — there are no type or object subdirectories. `<name>` is the AFF file token (lowercase; `/UI2/CL_JSON` → `(ui2)cl_json`), `{json,abap}` means one file per suffix, and `<group>` / `<fm>` / `<include>` stand for a function group, function module and function-group include (`sapl<group>`, `l<group>top`, …).
 
 ## Type × command matrix
 
-34 types support `create`, all 34 support `pull`, 32 have a `push` path and 34 have a `delete` path. In the matrix:
+36 types support `create`, all 36 support `pull`, 34 have a `push` path and 36 have a `delete` path. In the matrix:
 
 - `--file` marks a `create` that reads a JSON document — write it yourself or `pull` a comparable object first.
 - `$TMP` marks a `delete` that only removes local objects; delete transportable objects in SAP GUI so the deletion is recorded in a transport.
@@ -48,6 +48,8 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 | `TRAN` | Transaction code | ✅ `--file` | ✅ | ✅ | ✅ `$TMP` | ICF | `.tran.json` |
 | `TTYP` | Table type | ✅ `--file` | ✅ | ✅ | ✅ | auto (ADT / ICF) | `.ttyp.json` |
 | `TYPE` | Type pool (`TYPE-POOL` / `TYPES`) | ✅ `--file` | ✅ | ✅ | ✅ | ADT | `.type.json` + `.type.abap` |
+| `SAJC` | Application job catalog entry | ✅ `--file` | ✅ | ✅ | ✅ | ADT | `.sajc.json` |
+| `SAJT` | Application job template | ✅ `--file` | ✅ | ✅ | ✅ | ADT | `.sajt.json` |
 | `VIEW` | Database view | ✅ `--file` | ✅ | ✅ | ✅ `$TMP` | ICF | `.view.json` |
 | `XSLT` | Transformation | ✅ `--file` | ✅ | ✅ | ✅ | ICF | `.xslt.json` + `.xslt.xml` |
 
@@ -74,7 +76,7 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 
 ## Channel routing
 
-- **ADT** — source objects (`CLAS` `INTF` `PROG` `FUGR`), `DEVC`, `TTYP`, `MSAG`, `DDLS`, `TYPE`, the CDS / RAP companions (`SRVD` `BDEF` `DCLS` `DDLX` `DDLA`), `SRVB`, the ATC configuration objects (`CHKC` `CHKO` `CHKV`) and the CDS technical objects (`DTDC` `DTEB` `DSFD` `DSFI`). `TTYP` and `MSAG` fall back to ICF automatically on ECC EHP5/6.
+- **ADT** — source objects (`CLAS` `INTF` `PROG` `FUGR`), `DEVC`, `TTYP`, `MSAG`, `DDLS`, `TYPE`, the CDS / RAP companions (`SRVD` `BDEF` `DCLS` `DDLX` `DDLA`), `SRVB`, the ATC configuration objects (`CHKC` `CHKO` `CHKV`), the CDS technical objects (`DTDC` `DTEB` `DSFD` `DSFI`) and application jobs (`SAJC` `SAJT`). `TTYP` and `MSAG` fall back to ICF automatically on ECC EHP5/6.
 - **ICF** — `TABL` `STRU` `DOMA` `DTEL` `ENQU` `VIEW` `SHLP` `HTTP` `TRAN` `XSLT`, plus the write path of `NROB`; these need `abap deploy` once per system (`abap deploy status` checks the installed version).
 - `NROB` pulls through ADT with an ICF fallback and writes through ICF. `DDLS` is rejected on ECC releases (`DDLS_NOT_SUPPORTED_ON_ECC`).
 
@@ -85,6 +87,7 @@ Local artifacts follow the AFF flat layout `<name>.<type>[.<sub_type>][.<content
 - `VIEW` / `SHLP` — local-extension schemas (`view-v1.json` / `shlp-v1.json`); upstream AFF defines neither.
 - `ENQU` / `NROB` — `create` and `delete` only work in `$`-prefixed local packages (transportable creation/deletion needs a TADIR/transport record). `create` writes the local TADIR row, so the object is discoverable and `delete` does not have to backfill it; ENQU delete then runs `RS_DD_DELETE_OBJ`, NROB delete removes the intervals and calls `NUMBER_RANGE_OBJECT_DELETE`. Delete transported objects in SE11 / SNRO. `NROB` names are the `TNRO-NROBJ` key (CHAR 10): `create` and `delete` reject longer names locally instead of letting SAP truncate them.
 - `TYPE` — type pool (`TYPE-POOL <name>.` / `TYPES …`): AFF header `type-v1.json` plus the classic `.type.abap` source. Type pools are limited to five characters; create writes the source through ADT `/ddic/typegroups` and activates it.
+- `SAJC` / `SAJT` — application job family: one official AFF JSON document per object (`<name>.sajc.json` catalog entry, `<name>.sajt.json` template) carried over the ADT `/sap/bc/adt/applicationjob/{catalogs,templates}` blueSource resources. `create` / `push` write the JSON as the object source; the ADT resource saves and activates in one step (no inactive version exists), so `--no-activate` is rejected and `create --check-only` only validates locally. Names are limited to 40 characters (the generic SAP limit is 30). The object's master language follows the session/logon language, so a pull may report the profile language in `header.originalLanguage`. A catalog entry references the class with the execute method (`generalInformation.className`) or a report (`generalInformation.programName`); a template references an existing active catalog entry (`generalInformation.catalogName`). SAP validates those references at save time, and the CLI turns its generic save rejection into a pointer to the referenced object. The local file is the current AFF v1 document; older releases (the reference S/4HANA system serves the flat `className`/`reportName` model) get a translated document, and AFF fields that release cannot store (catalog `sections` / `groups` / `parameters`, template `singleValueParameters`, notification exit class) are rejected with the field names instead of being dropped.
 - `TTYP` — `lineType.rowType` names either a repository type (data element / structure / table / table type) or a DDIC predefined data type (`CHAR`, `NUMC`, `DEC`, `DATS`, `INT4`, `STRING`, …); a predefined row type keeps its length/decimals in `lineType.rowTypeLength` / `lineType.rowTypeDecimals`. ABAP type codes (`C`, `I`, `P`, …) are not DDIC data type names and are not accepted.
 - `TABL` / `STRU` — foreign keys (`@AbapCatalog.foreignKeys` block or a `with foreign key ... check <table>` clause in the DDL sidecar) are not persisted by the bundled ICF service: `create` / `push` reject a payload that carries them (exit 7) instead of dropping the constraints. Maintain foreign keys in SE11 / ADT after the object exists.
 - `DOMA` / `DTEL` — long text is an optional companion file (`<name>.<type>.docu.json`, `docu-v1.json`); `lines: []` deletes the remote long text.
@@ -108,6 +111,8 @@ Upstream [abap-file-formats](https://github.com/SAP/abap-file-formats) defines n
 | `VIEW` | `view-v1.json` | local extension | DD25V / DD26V / DD27P / DD28J / DD28V | No |
 | `SHLP` | `shlp-v1.json` | local extension | DD30V / DD31V / DD32P / DD33V | No |
 
+`SAJC` / `SAJT` vendor the official upstream AFF schemas, but the reference release serves the older flat JSON model; the CLI keeps the AFF document local and translates at the ADT boundary (see the per-type notes above).
+
 All three keep the AFF conventions (`formatVersion` + `header`, flat `<name>.<type>.json` names) and round-trip through the CLI; treat schema changes like source-code changes. Sources and upgrade notes: [src/abap_cli/schema/README.md](../src/abap_cli/schema/README.md).
 
 ## Not supported
@@ -115,6 +120,7 @@ All three keep the AFF conventions (`formatVersion` + `header`, flat `<name>.<ty
 | Object type | Status |
 |---|---|
 | `AUTH` / `SUSO` authorization objects | Not supported — candidate for a future release |
+| `JOBD` technical job definitions, `PINF` package interfaces, `SCP1` BC sets, Fiori launchpad (`UIAD` / `UIST` / `UIPG`), SM59 destinations / `SRFC` / `OA2P` | Not supported on the reference release — abapGit serializes them, but this CLI has no AFF or ADT channel for them yet; tracked for a future release |
 | Enhancements (`ENHO` / `ENHS`), BAdIs | Not supported — use `where-used` to find references |
 | AMDP classes, CDS table functions | Not supported |
 | SAPscript, Smart Forms, Adobe forms | Not supported |

@@ -4,14 +4,14 @@ title: SAP 开发任务覆盖率矩阵
 description: abap-cli 当前能 / 不能完成的 SAP 开发任务全景 — 用于未来 spec 选题 + 用户预期管理
 tags: [abap-cli, coverage, roadmap, scope]
 created at: 2026-09-01 00:00:00
-changed at: 2026-11-03 21:10:00
+changed at: 2026-11-03 21:55:00
 ---
 
 # SAP 开发任务覆盖率矩阵
 
 abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的开发工作**。本页是一份**诚实快照**——按 SAP 开发任务分类，给出当前覆盖度与缺口。对象类型补充的排序与取舍见 [roadmap](roadmap.md)。
 
-> 当前规模：**31 个顶层命令**、**34 个对象类型**（34 类可 create、34 类可 pull、32 类有 push 入口）、**6 个 skill + 1 个 agent**。基线：`v2.1.0` + 本地 ATC / CDS 技术 / 类型池扩展。
+> 当前规模：**31 个顶层命令**、**36 个对象类型**（36 类可 create、36 类可 pull、34 类有 push 入口）、**6 个 skill + 1 个 agent**。基线：`v2.1.0` + SRVB 发布命令 / 本地 ATC / CDS 技术 / 类型池 / 应用作业扩展。
 
 ## 评分图例
 
@@ -56,6 +56,7 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | CDS 标量函数实现（DSFI） | `create / pull / push / delete DSFI` | ✅ | ADT `/ddic/dsfi`；`source/main` 即 AFF JSON；名称须 `<函数>_ANA`，引用 DSFD 须已激活；真机闭环 |
 | CDS 简单类型（DRTY） | `create / pull / push / delete DRTY` | ✅ | ADT `/ddic/drty/sources`；AFF 元数据 + `.acds`；写入需 `CDS_SIMPLE_TYPES` 用户参数；真机闭环 |
 | 类型池（TYPE） | `create / pull / push / delete TYPE` | ✅ | ADT `/ddic/typegroups`（`TYPE/DG`，名称 ≤5）；AFF 官方 `type-v1.json` + `.type.abap` 经典 ABAP 源码；真机闭环 |
+| 应用作业目录/模板（SAJC / SAJT） | `create / pull / push / delete SAJC|SAJT` | ✅ | ADT `/applicationjob/{catalogs,templates}` blueSource + `source/main` JSON；本地 AFF 单 JSON（官方 `sajc-v1` / `sajt-v1`）；参考 release 为旧扁平模型，CLI 做双向转换、不可表达字段显式报错；名称 ≤40；真机闭环 |
 | CDS 方面 / 字典调优索引 / 静态缓存（DRAS / DTIX / DTSC） | — | ❌（延后） | 官方 AFF schema 存在，但本机 typestructure 无 CREATE 能力、discovery 无 REST 资源；等有 ADT 通道的 release |
 | Pool/Cluster Table | — | ❌ | 仅 TABL/STRU |
 | 创建/修改数据库视图（VIEW） | `create / pull / push / delete VIEW` | ✅ | ICF `/ddic/view`；自建 `view-v1.json`（本地扩展）；DD25V/DD26V/DD27P/DD28J/DD28V 映射；删除仅 `$TMP`；真机 17/17 TC（join 视图 + 单表视图 create/pull/push/delete + DD26S/DD27S/DD28S 校验） |
@@ -96,7 +97,7 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | SE16N 等价 | `select` | ✅ | |
 | SE16H（带 HINT） | — | ❌ | |
 | SE11（数据浏览器） | — | ⚪ | 对象元数据走 `inspect`；DDIC 读写走 create/pull/push |
-| SM37（作业） | — | ❌ | |
+| SM37（作业） | — | 🟡 | `SAJC` / `SAJT` 已覆盖作业目录与模板的 create/pull/push/delete；SM37 的运行时监控、计划/调度仍未覆盖 | |
 | ST05（SQL 跟踪） | — | ❌ | |
 | STA（运行时统计） | — | ❌ | |
 

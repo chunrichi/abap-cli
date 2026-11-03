@@ -34,7 +34,9 @@ import { runDeleteAtc } from './delete-atc.js';
 import { isAtcType } from '../../formats/atc/json.js';
 import { runDeleteCdsTech } from './delete-cds-tech.js';
 import { runDeleteType } from './delete-type.js';
+import { runDeleteAppJob } from './delete-appjob.js';
 import { isCdsTechType } from '../../formats/cds-tech/json.js';
+import { isAppJobType } from '../../formats/appjob/json.js';
 
 export interface DeleteOptions {
   /** Object type code (CLAS / PROG / ...). Required — `delete` without a type
@@ -107,6 +109,11 @@ export async function runDelete(objectName: string, opts: DeleteOptions): Promis
   // from the metadata resource first.
   if (typeUpper === 'TYPE') {
     return runDeleteType(objectName, opts);
+  }
+  // Application jobs (SAJC / SAJT) have an ADT delete endpoint but their
+  // package is not reported by quickSearch, hence the dedicated branch.
+  if (isAppJobType(typeUpper)) {
+    return runDeleteAppJob(typeUpper, objectName, opts);
   }
   // VIEW (DDIC database view) has no ADT delete endpoint: deletion runs through
   // the bundled ICF service (RS_DD_DELETE_OBJ, $TMP only).

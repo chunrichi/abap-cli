@@ -11,6 +11,7 @@
 - **`abap publish` / `abap unpublish`**：服务绑定（SRVB）的本地 OData endpoint 发布/取消发布独立命令。版本从 ADT 绑定元数据推导，按 `V2`/`V4` 自动选择端点，支持幂等重复执行；缺绑定报 `OBJECT_NOT_FOUND`。
 
 - **TYPE（类型池）**：新增 AFF 官方格式的类型池对象，支持 `create` / `pull` / `push` / `delete`（`.type.json` + `.type.abap`；ADT `/ddic/typegroups`，名称上限 5 字符）。
+- **应用作业（SAJC / SAJT）**：新增应用作业目录条目与模板两类对象，支持 `create` / `pull` / `push` / `delete`（`<name>.sajc.json` / `<name>.sajt.json`，官方 AFF v1 单 JSON；名称上限 40 字符）。本地文件保持当前 AFF 模型，SAP 侧在读 / 写时适配目标 release 的 JSON 模型；目标系统无法表达的字段（目录条目的 `sections` / `groups` / `parameters`、模板的 `singleValueParameters`、通知退出类）按字段名报错而不是静默丢弃。目录条目引用的执行类、模板引用的目录条目由 SAP 在保存时校验，CLI 把 SAP 的通用拒绝映射为可操作的提示。写入即保存激活（SAP 侧没有 inactive 版本），因此 `--no-activate` 在该类型上会被拒绝；`create --check-only` 只做本地校验。名称上限 40 字符（通用上限 30 的本类型放宽）。
 
 ### Changed
 
@@ -19,7 +20,7 @@
 
 - **CDS 技术对象**：新增 `DTDC`（动态缓存）、`DTEB`（CDS 实体缓冲）、`DSFD`（CDS 标量函数定义）、`DSFI`（标量函数实现引用）四类对象，支持 `create` / `pull` / `push` / `delete`。前三类为「AFF 元数据 + `.acds` 源码」两件套，`DSFI` 为单个 JSON（其 ADT `source/main` 就是 AFF JSON）；`create` / `push` 写入源码后自动激活（`--no-activate` 只写），并同步 AFF 描述字段。
 - **CDS 简单类型（DRTY）**：在上述四个 CDS 技术对象之外新增 `DRTY`，支持 `create` / `pull` / `push` / `delete`（AFF 元数据 + `.drty.acds` 两件套）。SAP 侧写入受用户参数 `CDS_SIMPLE_TYPES` 控制；未启用时 CLI 报 `DRTY_FEATURE_NOT_ENABLED` 并给出 SU3 启用步骤。
-- **CDS 技术对象接入类型矩阵**：`abap types`、`create --schema` 与 `docs/supported.md` 现列出 33 个类型码。
+- **CDS 技术对象接入类型矩阵**：`abap types`、`create --schema` 与 `docs/supported.md` 并入 CDS 技术对象（类型矩阵当前 36 个类型码）。
 - **未接入**：`DRAS`（方面）/ `DTIX`（字典调优索引）/ `DTSC`（字典调优静态缓存）虽有官方 AFF schema，但参考 S/4HANA release 未提供 ADT 读写资源，暂不支持。
 
 - **ATC 检查配置对象**：新增 `CHKC`（检查类别）、`CHKO`（检查）、`CHKV`（检查变体）三类对象，支持 `create` / `pull` / `push` / `delete` 全生命周期。本地用官方 abap-file-format JSON（`<name>.chkc.json` / `.chko.json` / `.chkv.json`），`create` / `push` 写入后自动激活（`--no-activate` 只写不激活）。检查变体的 `selectedChecks` 参数（普通值、结构化值、值列表、range 列表）可无损往返。

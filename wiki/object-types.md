@@ -1,15 +1,15 @@
 ---
 type: reference
 title: 支持的对象类型
-description: abap CLI 支持的 ABAP 对象类型总览 — 34 个类型码 × create/pull/push/delete 路由（ADT / ICF）与本地 AFF 文件布局
+description: abap CLI 支持的 ABAP 对象类型总览 — 36 个类型码 × create/pull/push/delete 路由（ADT / ICF）与本地 AFF 文件布局
 tags: [abap-cli, object-types, ddic, http, sicf, reference]
 created at: 2026-08-29 10:00:00
-changed at: 2026-11-03 21:10:00
+changed at: 2026-11-03 21:55:00
 ---
 
 # 支持的对象类型
 
-abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **34 个对象类型**：4 个 ABAP 源对象、1 个 ADT 包（DEVC）、8 个 DDIC 对象（含 VIEW / SHLP）、3 个 ICF 事务/转换对象（HTTP / TRAN / XSLT）、3 个双通道 DDIC/CDS 对象、6 个 CDS/RAP 对象、3 个 ATC 检查配置对象（CHKC / CHKO / CHKV）、5 个 CDS 技术对象（DTDC / DTEB / DSFD / DSFI / DRTY）、1 个类型池（TYPE）。分两条路由：**ADT** 与 **ICF**（含本地扩展格式）。
+abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **36 个对象类型**：4 个 ABAP 源对象、1 个 ADT 包（DEVC）、8 个 DDIC 对象（含 VIEW / SHLP）、3 个 ICF 事务/转换对象（HTTP / TRAN / XSLT）、3 个双通道 DDIC/CDS 对象、6 个 CDS/RAP 对象、3 个 ATC 检查配置对象（CHKC / CHKO / CHKV）、5 个 CDS 技术对象（DTDC / DTEB / DSFD / DSFI / DRTY）、1 个类型池（TYPE）、2 个应用作业对象（SAJC / SAJT）。分两条路由：**ADT** 与 **ICF**（含本地扩展格式）。
 
 ## 类型 × 命令矩阵
 
@@ -49,6 +49,8 @@ abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **34 个
 | `DSFI` | Scalar Function Impl. Reference | ADT | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.dsfi.json` |
 | `DRTY` | CDS Type (simple type) | ADT | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.drty.{json,acds}` |
 | `TYPE` | Type Pool | ADT | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.type.{json,abap}` |
+| `SAJC` | 应用作业目录条目 | ADT | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.sajc.json` |
+| `SAJT` | 应用作业模板 | ADT | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.sajt.json` |
 
 > **`create local` 只支持 `CLAS` / `INTF` / `PROG` / `FUGR`**（`formats/templates.ts` 只有这四类模板），其余类型一律 `TYPE_NOT_SUPPORTED`（exit 7）。`SRVD` / `DCLS` / `DDLX` / `DDLA` 在 SAP 侧可创建（`createObjtype`），但没有本地骨架模板；`create local` 会拒绝它们并提示改用 `abap create <type> --file <aff.json>`。
 > **`create` 的 `--file` 是数据驱动必填项**（`types/registry.ts` 的 `ObjectTypeEntry.requiresFile`）：`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `NROB` / `HTTP` / `TRAN` / `XSLT` / `TTYP` / `MSAG` / `DDLS` / `BDEF` / `SRVB` / `SRVD` / `DCLS` / `DDLX` / `DDLA` / `CHKC` / `CHKO` / `CHKV` / `DTDC` / `DTEB` / `DSFD` / `DSFI` / `DRTY` / `TYPE` 缺 `--file` 直接 `USAGE`（exit 2）。`BDEF` 还需同目录的 `.bdef.abdl` 源码；`SRVB` 创建后可用 `--publish` 发布（publish job 受系统 transport 设置约束），push/update 不支持。
@@ -144,8 +146,8 @@ abap delete ZMY_SERVICE --type HTTP --yes
 ## 常见误判
 
 - `abap pull X --type SICF` / `abap create SICF ...` → **不会**再映射为 `HTTP`（别名已在 1.0.0 删除）；请直接写 `HTTP`。
-- `create <type>` 的 `--schema` `allowedValues` 已是全 34 类：`CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, ENQU, VIEW, SHLP, NROB, HTTP, TRAN, XSLT, TTYP, MSAG, DDLS, SRVB, SRVD, BDEF, DCLS, DDLX, DDLA, CHKC, CHKO, CHKV, DTDC, DTEB, DSFD, DSFI, DRTY, TYPE`。
-- `DDIC_NOT_SUPPORTED` (exit 7) → 文件按 ICF 路由、但类型不在 `types/registry.ts` 的 34 类内时触发；已注册类型不会命中。
+- `create <type>` 的 `--schema` `allowedValues` 已是全 36 类：`CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, ENQU, VIEW, SHLP, NROB, HTTP, TRAN, XSLT, TTYP, MSAG, DDLS, SRVB, SRVD, BDEF, DCLS, DDLX, DDLA, CHKC, CHKO, CHKV, DTDC, DTEB, DSFD, DSFI, DRTY, TYPE, SAJC, SAJT`。
+- `DDIC_NOT_SUPPORTED` (exit 7) → 文件按 ICF 路由、但类型不在 `types/registry.ts` 的 36 类内时触发；已注册类型不会命中。
 - 所有 ICF 路由类型在扩展未部署时都会失败 → 先 `abap deploy status`。
 - CDS 家族（`DDLS`/`DCLS`/`DDLX`/`DDLA`）+ RAP 三件套（`SRVB`/`SRVD`/`BDEF`）走 ADT，**不**经 ICF。`SRVB` 支持 create/pull/delete，`create --publish` 可发布（push/update 不支持；publish 受系统 transport 设置约束）；`DDLS` / `SRVD` / `BDEF` / `DCLS` / `DDLX` / `DDLA` 支持 create/pull/push；`BDEF` 的 create 需要 `.bdef.json` + `.bdef.abdl` 两件套并激活。
 
@@ -154,9 +156,9 @@ abap delete ZMY_SERVICE --type HTTP --yes
 ## todo
 
 - [x] `SICF` → `HTTP` 别名在 1.0.0 删除（旧文档里的"自动映射"描述已同步删除）
-- [x] `create <type>` `--schema` 补全 `allowedValues` 全 34 类（含 `ENQU`/`NROB`/`VIEW`/`SHLP`/`CHKC`/`CHKO`/`CHKV`/`DTDC`/`DTEB`/`DSFD`/`DSFI`/`DRTY`/`TYPE`）
+- [x] `create <type>` `--schema` 补全 `allowedValues` 全 36 类（含 `ENQU`/`NROB`/`VIEW`/`SHLP`/`CHKC`/`CHKO`/`CHKV`/`DTDC`/`DTEB`/`DSFD`/`DSFI`/`DRTY`/`TYPE`/`SAJC`/`SAJT`）
 - [x] 矩阵补全 `ENQU`/`NROB` 行、修正 `create local` 列（CDS/RAP 伴生对象不再落错误骨架）
-- [ ] 候选补充类型（AUTH / ENHO / STRANS…）的取舍与排期 → [roadmap](roadmap.md)
+- [ ] 候选补充类型（AUTH / ENHO / STRANS / JOBD / UIAD…）的取舍与排期 → [roadmap](roadmap.md)
 - [ ] `create` 的 help/description 文案随 registry 动态化
 
 # references

@@ -105,6 +105,28 @@ const typegroupStore = new Map();
 // DTDC/DTEB/DSFD store an XML metadata envelope + `.acds` source text; DSFI
 // stores a blueSource envelope + the AFF JSON document as its source.
 const cdsTechStore = new Map();
+// Application jobs (SAJC catalog entries / SAJT templates) — key = `<TYPE>:<NAME>`,
+// value = { metaXml, source, packageName }. `source` is the ADT JSON document
+// served on `source/main`; its shape follows MOCK_APPJOB_MODEL.
+const appjobStore = new Map();
+// Which application-job JSON model the mock system serves: 'legacy' (flat
+// className/reportName documents, the SAP_BASIS 757 reference release) or
+// 'nested' (the AFF v1 generalInformation model).
+const APPJOB_MODEL = process.env.MOCK_APPJOB_MODEL === 'nested' ? 'nested' : 'legacy';
+const APPJOB_COLLECTIONS = {
+  '/sap/bc/adt/applicationjob/catalogs': 'SAJC',
+  '/sap/bc/adt/applicationjob/templates': 'SAJT',
+};
+const APPJOB_SCHEMAS = {
+  legacy: {
+    SAJC: { formatVersion: {}, header: {}, className: {}, reportName: {}, checkExitClass: {}, valueHelpExitClass: {} },
+    SAJT: { formatVersion: {}, header: {}, catalogName: {}, parameters: {} },
+  },
+  nested: {
+    SAJC: { formatVersion: {}, header: {}, generalInformation: {}, exitClasses: {}, sections: {}, groups: {}, parameters: {} },
+    SAJT: { formatVersion: {}, header: {}, generalInformation: {}, parameters: {} },
+  },
+};
 // ADT collection path → CLI type code for the ATC configuration resources.
 const ATC_COLLECTIONS = {
   '/sap/bc/adt/atc/checkcategories': 'CHKC',
@@ -2409,6 +2431,116 @@ const server = http.createServer(async (req, res) => {
           return adtError(res, 403, `${type} ${name} is not locked by this session`);
         }
         cdsTechStore.delete(key);
+        objects.delete(name);
+        return ok(res, '');
+      }
+    }
+
+    // Application jobs (SAJC / SAJT) — blueSource create + JSON source/main.
+    const appjobMatch = /^\/sap\/bc\/adt\/applicationjob\/(catalogs|templates)(?:\/([^/]+))?(\/source\/main)?(?:\/\$schema)?$/.exec(path);
+    if (appjobMatch) {
+      const type = appjobMatch[1] === 'catalogs' ? 'SAJC' : 'SAJT';
+      const collection = `/sap/bc/adt/applicationjob/${appjobMatch[1]}`;
+      const rawName = appjobMatch[2];
+      const isSchema = rawName === '$schema';
+      const name = rawName && !isSchema ? rawName.toUpperCase() : undefined;
+      const isSource = Boolean(appjobMatch[3]);
+      const key = name ? `${type}:${name}` : '';
+      const objectUrl = name ? `${collection}/${name.toLowerCase()}` : collection;
+      if (isSchema && req.method === 'GET') {
+        return ok(
+          res,
+          JSON.stringify({ $schema: 'https://json-schema.org/draft/2020-12/schema', properties: APPJOB_SCHEMAS[APPJOB_MODEL][type] }),
+          'application/vnd.sap.adt.objecttypeschema.v1+json',
+        );
+      }
+      if (req.method === 'POST' && !name) {
+        const body = await readBody(req);
+        const objectName = /adtcore:name="([^"]+)"/.exec(body)?.[1]?.toUpperCase();
+        if (!objectName) return adtError(res, 400, `Missing adtcore:name in ${type} create body`);
+        if (appjobStore.has(`${type}:${objectName}`)) {
+          return adtError(res, 409, `${type} ${objectName} already exists`);
+        }
+        const packageName = /adtcore:packageRef[^>]*adtcore:name="([^"]+)"/.exec(body)?.[1] || '$TMP';
+        const description = /adtcore:description="([^"]*)"/.exec(body)?.[1] || '';
+        const defaultSource =
+          APPJOB_MODEL === 'nested'
+            ? JSON.stringify(
+                {
+                  formatVersion: '1',
+                  header: { description, originalLanguage: 'en' },
+                  generalInformation: type === 'SAJC' ? { className: '' } : { catalogName: '' },
+                },
+                null,
+                2,
+              )
+            : JSON.stringify(
+                {
+                  formatVersion: '1',
+                  header: { description, originalLanguage: 'en' },
+                  ...(type === 'SAJC' ? { className: '' } : { catalogName: '' }),
+                },
+                null,
+                2,
+              );
+        appjobStore.set(`${type}:${objectName}`, { metaXml: body, source: defaultSource, packageName });
+        const createdUrl = `${collection}/${objectName.toLowerCase()}`;
+        const obj = addObject(objectName, type, createdUrl, description, [], { packageName });
+        obj.inactive = true;
+        return ok(res, body);
+      }
+      if (name && isSource && req.method === 'GET') {
+        const stored = appjobStore.get(key);
+        if (!stored) return adtError(res, 404, `${type} ${name} source not found`);
+        return ok(res, stored.source, 'application/json');
+      }
+      if (name && isSource && req.method === 'PUT') {
+        const stored = appjobStore.get(key);
+        if (!stored) return adtError(res, 404, `${type} ${name} source not found`);
+        const obj = byObjectUrl(objectUrl);
+        if (!obj || !obj.lockedBy || obj.lockedBy.lockHandle !== q.get('lockHandle')) {
+          return adtError(res, 403, `${type} ${name} is not locked by this session`);
+        }
+        const body = await readBody(req);
+        try {
+          JSON.parse(body);
+        } catch {
+          return adtError(res, 400, `${type} ${name}: source/main is not a JSON document`);
+        }
+        stored.source = body;
+        return ok(res, body, 'application/json');
+      }
+      if (name && !isSource && req.method === 'GET') {
+        const stored = appjobStore.get(key);
+        if (!stored) return adtError(res, 404, `${type} ${name} not found`);
+        let meta = stored.metaXml;
+        if (stored.packageName && !/adtcore:packageRef/.test(meta)) {
+          meta = meta.replace(/<\/([A-Za-z0-9]+:[A-Za-z0-9]+)>$/, `<adtcore:packageRef adtcore:name="${stored.packageName}"/></$1>`);
+        }
+        return ok(res, meta);
+      }
+      if (name && !isSource && req.method === 'PUT') {
+        const stored = appjobStore.get(key);
+        if (!stored) return adtError(res, 404, `${type} ${name} not found`);
+        const obj = byObjectUrl(objectUrl);
+        if (!obj || !obj.lockedBy || obj.lockedBy.lockHandle !== q.get('lockHandle')) {
+          return adtError(res, 403, `${type} ${name} is not locked by this session`);
+        }
+        stored.metaXml = await readBody(req);
+        const desc = /adtcore:description="([^"]*)"/.exec(stored.metaXml)?.[1];
+        if (desc !== undefined) obj.description = desc;
+        const pkg = /adtcore:packageRef[^>]*adtcore:name="([^"]+)"/.exec(stored.metaXml)?.[1];
+        if (pkg) stored.packageName = pkg;
+        return ok(res, stored.metaXml);
+      }
+      if (name && !isSource && req.method === 'DELETE') {
+        const stored = appjobStore.get(key);
+        if (!stored) return adtError(res, 404, `${type} ${name} not found`);
+        const obj = byObjectUrl(objectUrl);
+        if (!obj || !obj.lockedBy || obj.lockedBy.lockHandle !== q.get('lockHandle')) {
+          return adtError(res, 403, `${type} ${name} is not locked by this session`);
+        }
+        appjobStore.delete(key);
         objects.delete(name);
         return ok(res, '');
       }
