@@ -24,7 +24,7 @@ ABAP 侧（`abap/src/zcl_abap_vibe_icf_jobd.clas.abap`）：
 
 - 读取：`CL_JR_JOB_DEFINITION=>GET_JD_ATTRIBUTES`（`STJR_JOBD_ROOT` + `STJR_JOBD_TREP`），序列化为 camelCase JSON；`package` 从 TADIR 读取。
 - 写入：`RS_CORR_INSERT` 记录 TADIR / 传输请求（`$` 本地包免传输）→ 类的 `CREATE_JD` / `MODIFY_JD` 落库 → handler 把写入时临时使用的 `$TMP` 包改回真实包（类的 `HANDLE_TRANSPORT` 会弹请求对话框，plugin 上下文无法执行）。**写入即保存激活**，`--no-activate` 被拒绝。
-- 删除：先清 `STJR_JOBD_ROOT` / `STJR_JOBD_TREP`（`CL_JR_JOB_DEFINITION=>DELETE_JD` 同样会走对话框路径），再经 `RS_CORR_INSERT(mode='D')` 删 TADIR 并记录传输；`TR_TADIR_INTERFACE` 在对象数据仍在时拒绝删除 TADIR（TR/692）。
+- 删除：先清 `STJR_JOBD_ROOT` / `STJR_JOBD_TREP`（`CL_JR_JOB_DEFINITION=>DELETE_JD` 同样会走对话框路径），再经 `RS_CORR_INSERT(mode='D')` 删 TADIR 并记录传输；`TR_TADIR_INTERFACE` 在对象数据仍在时拒绝删除 TADIR。
 - 不含 `CL_JR_JOB_DEFINITION` 的 release 返回 `JOBD_UNSUPPORTED`（exit 7）。
 
 ## 本地文件形态
@@ -75,7 +75,7 @@ abap delete ZCLI_TC_JOBD_TRANSP --type JOBD --tr NDK900123 --yes --json
 - **没有 ADT 端点**：不要指望 `abap pull` 走 ADT；必须先 `abap deploy` 安装 ICF 服务（`abap deploy status`）。
 - **写入即激活**：和 SAJC/SAJT 一样，`--no-activate` 会被拒绝；没有 inactive 版本可操作。
 - **可传输包必须 `--tr`**：create/push/delete 都会把对象记录进请求；没有请求时 CLI 在本地就报 `JOBD_TRANSPORT_REQUIRED`（exit 7），不会先写 SAP。`$` 前缀本地包一律免传输。
-- **创建时包名短暂使用 `$TMP`**：类的 transport 路径弹对话框，handler 用 `$TMP` 分支落库后立刻把 `STJR_JOBD_ROOT-JDPACKAGE` 改回真实包；删除时先清数据再删 TADIR（TR/692 约束）。
+- **创建时包名短暂使用 `$TMP`**：类的 transport 路径弹对话框，handler 用 `$TMP` 分支落库后立刻把 `STJR_JOBD_ROOT-JDPACKAGE` 改回真实包；删除时先清数据再删 TADIR（TADIR 删除接口要求对象数据已不存在）。
 - **报表/变式由 SAP 在运行时校验**：定义本身可以指向不存在的报表，实际调度才会报错；CLI 不做引用校验。
 - **可传输 delete 的 CTS 删除条目**：ICF 插件无法写 CTS 删除条目，delete 会清空对象数据与 TADIR，但请求里仍保留该对象原先的 insert 条目（`E071-OBJFUNC` 为空）。发布前请在 SE01/SE03 删除该条目，或改用 SE01 维护删除；本地包（`$`）无此问题。
 - **部署后的类装载缓存**：`abap deploy` 后 ICF handler 的新版本可能在 10–20 秒内未全部生效，期间可能返回 `unknown path: /jobd/...`；重试即可。

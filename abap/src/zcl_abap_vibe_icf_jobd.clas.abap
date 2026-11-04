@@ -484,7 +484,7 @@ CLASS zcl_abap_vibe_icf_jobd IMPLEMENTATION.
     " dialog-bound transport path, so the two tables are cleared here (same
     " statements as the class' DELETE_JD body). The TADIR entry is removed
     " afterwards: TR_TADIR_INTERFACE refuses to delete it while the repository
-    " object still exists (TR/692).
+    " object still exists.
     DELETE FROM stjr_jobd_root WHERE name = @iv_name.
     DELETE FROM stjr_jobd_trep WHERE name = @iv_name.
     COMMIT WORK.
@@ -606,7 +606,7 @@ CLASS zcl_abap_vibe_icf_jobd IMPLEMENTATION.
 
   METHOD tadir_delete.
     " TR_TADIR_INTERFACE is the background-safe TADIR path; its delete mode
-    " only accepts a TADIR entry once the object data is gone (TR/692). The
+    " only accepts a TADIR entry once the object data is gone. The
     " direct fallback keeps the directory consistent even when the interface
     " declines (e.g. a leftover orphan row from an earlier write).
     DATA: ls_tadir  TYPE tadir,
