@@ -11,7 +11,7 @@ changed at: 2026-11-04 00:32:00
 
 abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的开发工作**。本页是一份**诚实快照**——按 SAP 开发任务分类，给出当前覆盖度与缺口。对象类型补充的排序与取舍见 [roadmap](roadmap.md)。
 
-> 当前规模：**32 个顶层命令**、**37 个对象类型**（37 类可 create、37 类可 pull、35 类有 push 入口）、**6 个 skill + 1 个 agent**。基线：`v2.4.0` + SM59 HTTP 目标（RFCTYPE=G）/ 连接身份（whoami）/ SRVB 发布命令 / 本地 ATC / CDS 技术 / 类型池 / 应用作业扩展。
+> 当前规模：**32 个顶层命令**、**39 个对象类型**（39 类可 create、39 类可 pull、37 类有 push 入口）、**6 个 skill + 1 个 agent**。基线：`v2.5.0` + UCON RFC service（SRFC）/ OAuth 2.0 client profile（OA2P）/ SM59 HTTP 目标（RFCTYPE=G）/ 连接身份（whoami）/ SRVB 发布命令 / 本地 ATC / CDS 技术 / 类型池 / 应用作业扩展。
 
 ## 评分图例
 
@@ -43,6 +43,8 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | 创建/修改事务码（SE93 / TRAN） | `create / pull / push / delete TRAN` | ✅ | ICF `/tran` GET/POST/PUT/DELETE；dialog/report/parameter/variant，OO 明确拒绝；真机 23/23 TC |
 | 创建/修改 SM59 HTTP 目标（RFCTYPE='G'） | `create / pull / push / delete SM59` | ✅ | ICF `/sm59` + SRFC_DESTAPI；本地扩展 `sm59-v1`（targetHost / port / protocol / pathPrefix / description）；client-independent 系统表 `RFCDES`，无 package/传输（`--package`/`--tr` 拒绝）；pull→push 是整份定义覆盖；非 G 类型拒绝；真机闭环 |
 | 创建/修改转换程序（XSLT） | `create / pull / push / delete XSLT` | ✅ | ICF `/xslt` + `CL_O2_API_XSLTDESC`；AFF 两件套 `.xslt.json` + `.xslt.xml`；更新=原地更新并保留版本历史；真机 18/18 TC |
+| 创建/修改 UCON RFC service（SRFC） | `create / pull / push / delete SRFC` | ✅ | ICF `/srfc` + 公共 UCON RFC API / `CL_UCONRFC_OBJECT_PERSIST`；本地扩展 `srfc-v1`（functionName / scope / defaultProfile / description）；TADIR 对象（`--package` / `--tr` 适用）；写入后刷新运行时缓存；真机闭环 |
+| 创建/修改 OAuth 2.0 client profile（OA2P） | `create / pull / push / delete OA2P` | ✅ | ICF `/oa2p` + OA2P Workbench 持久化类；本地扩展 `oa2p-v1`（type / noAuthCheck / scopes）；TADIR 对象（`--package` / `--tr` 适用）；被 client 分配时拒绝删除；真机闭环 |
 | Table Type（TTYP） | `create / pull / push TTYP` | ✅ | ADT 主通道；ECC 自动 ICF 兜底 |
 | 消息类（MSAG） | `create / pull / push MSAG` | ✅ | ADT 主通道；ECC 自动 ICF 兜底 |
 | CDS View（DDLS） | `create / pull / push DDLS` | ✅ | 仅 ADT；ECC 旧内核硬错 `DDLS_NOT_SUPPORTED_ON_ECC` |
@@ -189,6 +191,8 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | 解析 SICF 节点（HTTP 类型） | `pull / create / push / delete HTTP` | ✅ | ICF；删除仅本地包（见 §1） |
 | 解析事务码（TRAN 类型） | `pull / create / push / delete TRAN` | ✅ | 读写闭环；删除仅 `$TMP`（见 §1） |
 | 解析 SM59 HTTP 目标（SM59 类型） | `pull / create / push / delete SM59` | ✅ | ICF `/sm59`；无 package/传输（显式拒绝 `--package` / `--tr`）；非 G 类型拒绝（见 §1） |
+| 解析 UCON RFC service（SRFC 类型） | `pull / create / push / delete SRFC` | ✅ | ICF `/srfc`；TADIR 对象（`--package` / `--tr` 适用）；FM 存在 / RFC-enabled 与 profile 存在性校验在 SAP 侧 |
+| 解析 OAuth 2.0 client profile（OA2P 类型） | `pull / create / push / delete OA2P` | ✅ | ICF `/oa2p`；TADIR 对象（`--package` / `--tr` 适用）；provider type 校验 + 被 client 分配时拒绝删除 |
 | 数据查询（SELECT） | `select` / `fields` | ✅ | ICF |
 | 报表运行 | `run-report` | ✅ | ICF；经典 list，5000 行/200k 字符 |
 | classrun wrapper | `deploy` | ✅ | ZCL_ABAP_VIBE_RUNNER |
@@ -250,7 +254,7 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | DTEL | 3 | 3 | 0 | 0 |
 | DEVC / HTTP / TRAN / TTYP / MSAG / DDLS | 各 1 | 各 1 | 0 | 0 |
 
-> 尚无 fixture 的类型：ENQU / NROB / VIEW / SHLP / SM59 / XSLT / SRVB / BDEF / CHKC / CHKO / CHKV / DTDC / DTEB / DSFD / DSFI / DRTY / TYPE；SRVD / DCLS / DDLA / DDLX 的 fixture 已存在，但 `aff/router.ts` 没有对应后缀规则，`validate:aff` 不覆盖它们。补类型时应同步补 fixture。
+> 尚无 fixture 的类型：ENQU / NROB / VIEW / SHLP / SM59 / SRFC / OA2P / XSLT / SRVB / BDEF / CHKC / CHKO / CHKV / DTDC / DTEB / DSFD / DSFI / DRTY / TYPE；SRVD / DCLS / DDLA / DDLX 的 fixture 已存在，但 `aff/router.ts` 没有对应后缀规则，`validate:aff` 不覆盖它们。补类型时应同步补 fixture。
 
 ### Schema paths
 
@@ -268,6 +272,8 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | NROB | `src/abap_cli/schema/nrob-v1.json` |
 | HTTP | `src/abap_cli/schema/http-v1.json` |
 | SM59 | `src/abap_cli/schema/sm59-v1.json`（上游无此格式，本地扩展） |
+| SRFC | `src/abap_cli/schema/srfc-v1.json`（上游无此格式，本地扩展） |
+| OA2P | `src/abap_cli/schema/oa2p-v1.json`（上游无此格式，本地扩展） |
 | TRAN | `src/abap_cli/schema/tran-v1.json` |
 | TTYP | `src/abap_cli/schema/ttyp-v1.json`（上游无此格式，本地维护） |
 | MSAG | `src/abap_cli/schema/msag-v1.json` |

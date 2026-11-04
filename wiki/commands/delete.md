@@ -1,7 +1,7 @@
 ---
 type: command
 title: abap delete
-description: "从 SAP 删除单个 ABAP 对象（lock → delete → unlock）：--type 必填消歧、--yes 显式确认、非本地包对象必须用 --tr 指定传输请求；SM59 / DEVC 等无 transport 的路径单独处理。"
+description: "从 SAP 删除单个 ABAP 对象（lock → delete → unlock）：--type 必填消歧、--yes 显式确认、非本地包对象必须用 --tr 指定传输请求；SM59 / DEVC 等无 transport 的路径单独处理；SRFC / OA2P 从 ICF GET 读 package 决定是否需要 --tr。"
 tags: [abap-cli, command, delete, adt, lock, transport, sm59, cleanup]
 created at: 2026-10-29 14:30:14
 changed at: 2026-11-04 00:45:00
@@ -23,7 +23,7 @@ abap delete --schema --json
 ## Options
 
 - `<object>`: SAP 对象名（如 `ZCL_MY_CLASS`），不是本地文件名；内部走 ADT quickSearch 解析成对象 URL。
-- `--type <type>`: **必填**。对象类型码（`CLAS` / `PROG` / `INTF` / `FUGR` / `DEVC` / `TABL` / `VIEW` / `SHLP` / `TRAN` / `HTTP` / `SM59` / ... / `XSLT`），大小写不敏感。`DEVC` 走独立删除路径（包资源按名字直接寻址，不依赖 quickSearch，也不加锁）；`VIEW` / `SHLP` / `ENQU` / `NROB` / `HTTP` / `SM59` 走 ICF delete：VIEW/SHLP 先激活 inactive 版本再 `RS_DD_DELETE_OBJ`，ENQU 先回填本地 TADIR 再 `RS_DD_DELETE_OBJ`，NROB 清区间后 `NUMBER_RANGE_OBJECT_DELETE`，HTTP 用 `cl_icf_tree` 删 SICF 节点（根节点 / 有子节点 / 可传输节点拒绝），SM59 走 `DELETE /sm59/<name>`（`CL_DEST_FACTORY=>delete`，无需 transport）。
+- `--type <type>`: **必填**。对象类型码（`CLAS` / `PROG` / `INTF` / `FUGR` / `DEVC` / `TABL` / `VIEW` / `SHLP` / `TRAN` / `HTTP` / `SM59` / `SRFC` / `OA2P` / ... / `XSLT`），大小写不敏感。`DEVC` 走独立删除路径（包资源按名字直接寻址，不依赖 quickSearch，也不加锁）；`VIEW` / `SHLP` / `ENQU` / `NROB` / `HTTP` / `SM59` 走 ICF delete：VIEW/SHLP 先激活 inactive 版本再 `RS_DD_DELETE_OBJ`，ENQU 先回填本地 TADIR 再 `RS_DD_DELETE_OBJ`，NROB 清区间后 `NUMBER_RANGE_OBJECT_DELETE`，HTTP 用 `cl_icf_tree` 删 SICF 节点（根节点 / 有子节点 / 可传输节点拒绝），SM59 走 `DELETE /sm59/<name>`（`CL_DEST_FACTORY=>delete`，无需 transport）；SRFC / OA2P 走 ICF `DELETE /srfc|oa2p/<name>`，package 从 ICF GET 读取，非本地包需要 `--tr`（SRFC 用 UCON API factory 删除，OA2P 用 Workbench 持久化类删除，且被 client 分配的 OA2P profile 拒绝删除）。
 - `--tr <request>`: 传输请求号。本地包对象可省略；其它包必填。
 - `--yes`: **必填**。显式确认删除；无 TTY 时缺失直接报 `USAGE`。
 - `--schema`: 打印本命令参数 schema 并退出，不调用 SAP。
@@ -32,7 +32,7 @@ abap delete --schema --json
 ## 前置条件
 
 - 工作区已绑定 profile（`.abap.json`），SAP 可达且凭据有效。
-- 对象存在且名字、类型正确；`--tr` 必须是对象所属的打开请求（已释放 / 已关闭的请求会被 SAP 拒绝）。`XSLT` 的包从 ICF GET 读取，非本地包缺 `--tr` 时在发 DELETE 前被 `MISSING_TRANSPORT`（exit 2）拦截。
+- 对象存在且名字、类型正确；`--tr` 必须是对象所属的打开请求（已释放 / 已关闭的请求会被 SAP 拒绝）。`XSLT` / `SRFC` / `OA2P` 的包从 ICF GET 读取，非本地包缺 `--tr` 时在发 DELETE 前被 `MISSING_TRANSPORT`（exit 2）拦截。
 - 非本地包对象需要一个可修改的 transport：先 `abap transport list --open` 或 `abap transport create`。
 - 对象没有被其他用户锁住。
 
@@ -75,6 +75,10 @@ abap delete /sap/zmy_service --type HTTP --yes --json
 ```bash
 # 删除 SM59 HTTP 目标（client-independent 系统表条目：无 package、无 transport，不能带 --tr）
 abap delete ZCLI_SM59_DEMO --type SM59 --yes --json
+
+# 删除 UCON RFC service / OAuth 2.0 client profile（TADIR 对象：非 $ 前缀本地包需要 --tr）
+abap delete ZCLI_SRFC_DEMO --type SRFC --yes --json
+abap delete ZCLI_OA2P_DEMO --type OA2P --tr NDK900123 --yes --json
 
 # 非 HTTP 目标（RFCTYPE != G）会被拒绝：SM59_TYPE_NOT_SUPPORTED（exit 7）
 # 目标不存在 → NOT_FOUND（exit 8）；带 --tr → TYPE_NOT_SUPPORTED（exit 7）

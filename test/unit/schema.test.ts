@@ -105,7 +105,7 @@ describe('abap create --schema (introspection)', () => {
       'DEVC',
       'TABL', 'STRU', 'DOMA', 'DTEL',
       'ENQU', 'VIEW', 'SHLP', 'NROB',
-      'HTTP', 'TRAN', 'SM59', 'XSLT',
+      'HTTP', 'TRAN', 'SM59', 'SRFC', 'OA2P', 'XSLT',
       'TTYP', 'MSAG', 'DDLS',
       'SRVB', 'SRVD', 'BDEF', 'DCLS', 'DDLX', 'DDLA',
       'CHKC', 'CHKO', 'CHKV',

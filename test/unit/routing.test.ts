@@ -41,6 +41,8 @@ const EXPECTED: Record<string, ExpectedRoute> = {
   HTTP: { create: 'icf', pull: 'icf', push: 'icf' },
   TRAN: { create: 'icf', pull: 'icf', push: 'icf' },
   SM59: { create: 'icf', pull: 'icf', push: 'icf' },
+  SRFC: { create: 'icf', pull: 'icf', push: 'icf' },
+  OA2P: { create: 'icf', pull: 'icf', push: 'icf' },
   XSLT: { create: 'icf', pull: 'icf', push: 'icf' },
   TTYP: { create: 'auto', pull: 'auto', push: 'auto' },
   MSAG: { create: 'auto', pull: 'auto', push: 'auto' },

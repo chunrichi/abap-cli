@@ -71,6 +71,11 @@ const httpStore = new Map();
 // exercised without pretending to support them.
 const sm59Store = new Map();
 const sm59OtherTypeStore = new Map();
+// UCON RFC service (SRFC) and OAuth 2.0 client profile (OA2P) stores — key =
+// object name (upper), value = the wire document. Both are TADIR objects: the
+// stored document carries the read-only `package` the CLI sends on create.
+const srfcStore = new Map();
+const oa2pStore = new Map();
 // XSLT (transformation program) store — key = NAME, value = { name, description,
 // originalLanguage, source, package }. `source` is stored in the canonical
 // (LF, no trailing break) form; GET adds the CRLF read-back the real
@@ -1875,6 +1880,147 @@ const server = http.createServer(async (req, res) => {
       }
 
       return sm59Error(405, 'METHOD_NOT_ALLOWED', `${req.method} not supported on /sm59/${sm59Name}`);
+    }
+
+    // /sap/abap_cli/srfc/<name> and /oa2p/<name> (GET pull / POST upsert / DELETE)
+    // — UCON RFC service / OAuth 2.0 client profile routes. Both are TADIR
+    // objects, so the wire document carries the read-only `package`; POST
+    // validates the modelled fields and upserts the store; DELETE removes the
+    // entry. Statuses mirror the handlers: 404 absent, 400 invalid payload,
+    // 405 unsupported method.
+    const uconReply = (res, status, payload) => {
+      res.writeHead(status, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(payload));
+    };
+    const uconNameProblem = (name) => {
+      if (!name) return 'name is empty';
+      if (name.length > 30) return `name must not exceed 30 characters (got ${name.length})`;
+      if (!/^[A-Z0-9_/]+$/.test(name)) return `name may only contain A-Z, 0-9, '_' and '/' (got '${name}')`;
+      return undefined;
+    };
+
+    const srfcRoute = /^\/sap\/abap_cli\/srfc(?:\/([^/]+))?$/.exec(path);
+    if (srfcRoute) {
+      const err = (status, code, message) => uconReply(res, status, { status: 'error', error: { code, message } });
+      if (!srfcRoute[1]) return err(400, 'SRFC_NAME_INVALID', 'service name is required on /srfc/<name>');
+      const name = decodeURIComponent(srfcRoute[1]).trim().toUpperCase();
+      const nameProblem = uconNameProblem(name);
+      if (nameProblem) return err(400, 'SRFC_NAME_INVALID', nameProblem);
+
+      if (req.method === 'GET') {
+        if (!srfcStore.has(name)) return err(404, 'SRFC_OBJECT_NOT_FOUND', `UCON RFC service ${name} not found`);
+        return uconReply(res, 200, { status: 'success', data: srfcStore.get(name) });
+      }
+      if (req.method === 'POST') {
+        const body = await readBody(req);
+        let payload;
+        try {
+          payload = JSON.parse(body);
+        } catch (_e) {
+          return err(400, 'SRFC_INVALID_PAYLOAD', 'request body is not valid JSON');
+        }
+        const invalid = (message) => err(400, 'SRFC_INVALID_PAYLOAD', message);
+        if (payload.formatVersion !== undefined && String(payload.formatVersion) !== '1') {
+          return invalid(`formatVersion must be "1" (got "${String(payload.formatVersion)}")`);
+        }
+        if (payload.name !== undefined && String(payload.name).trim().toUpperCase() !== name) {
+          return invalid(`payload name ${String(payload.name)} does not match URL service ${name}`);
+        }
+        const functionName = typeof payload.functionName === 'string' ? payload.functionName.trim().toUpperCase() : '';
+        if (!functionName) return invalid('functionName is required');
+        if (functionName.length > 30) return invalid(`functionName must not exceed 30 characters (got ${functionName.length})`);
+        const scope = payload.scope === undefined ? '' : String(payload.scope).trim().toUpperCase();
+        if (scope !== '' && !['E', 'O', 'P', 'S'].includes(scope)) {
+          return invalid(`scope must be one of E, O, P, S or empty (got "${String(payload.scope)}")`);
+        }
+        const description = payload.description === undefined ? '' : String(payload.description);
+        if (description.length > 255) return invalid(`description must not exceed 255 characters (got ${description.length})`);
+        const defaultProfile = payload.defaultProfile === undefined ? '' : String(payload.defaultProfile).trim().toUpperCase();
+        if (defaultProfile.length > 30) return invalid(`defaultProfile must not exceed 30 characters (got ${defaultProfile.length})`);
+        const existed = srfcStore.has(name);
+        const previous = existed ? srfcStore.get(name) : undefined;
+        srfcStore.set(name, {
+          formatVersion: '1',
+          name,
+          description,
+          functionName,
+          scope,
+          defaultProfile,
+          package: typeof payload.package === 'string' && payload.package.trim() ? payload.package.trim().toUpperCase() : (previous?.package ?? '$TMP'),
+          createdBy: previous?.createdBy ?? CURRENT_USER,
+          createdOn: previous?.createdOn ?? NOW.slice(0, 10),
+          createdAt: previous?.createdAt ?? NOW.slice(11, 19),
+          changedBy: existed ? CURRENT_USER : '',
+          changedOn: existed ? NOW.slice(0, 10) : '',
+          changedAt: existed ? NOW.slice(11, 19) : '',
+        });
+        return uconReply(res, 200, { status: 'success', data: { name, type: 'SRFC', action: existed ? 'updated' : 'created', package: srfcStore.get(name).package } });
+      }
+      if (req.method === 'DELETE') {
+        if (!srfcStore.has(name)) return err(404, 'SRFC_OBJECT_NOT_FOUND', `UCON RFC service ${name} not found`);
+        srfcStore.delete(name);
+        return uconReply(res, 200, { status: 'success', data: { name, type: 'SRFC', action: 'deleted' } });
+      }
+      return err(405, 'METHOD_NOT_ALLOWED', `${req.method} not supported on /srfc/${name}`);
+    }
+
+    const oa2pRoute = /^\/sap\/abap_cli\/oa2p(?:\/([^/]+))?$/.exec(path);
+    if (oa2pRoute) {
+      const err = (status, code, message) => uconReply(res, status, { status: 'error', error: { code, message } });
+      if (!oa2pRoute[1]) return err(400, 'OA2P_NAME_INVALID', 'OAuth2 profile name is required on /oa2p/<name>');
+      const name = decodeURIComponent(oa2pRoute[1]).trim().toUpperCase();
+      const nameProblem = uconNameProblem(name);
+      if (nameProblem) return err(400, 'OA2P_NAME_INVALID', nameProblem);
+
+      if (req.method === 'GET') {
+        if (!oa2pStore.has(name)) return err(404, 'OA2P_OBJECT_NOT_FOUND', `OAuth2 profile ${name} not found`);
+        return uconReply(res, 200, { status: 'success', data: oa2pStore.get(name) });
+      }
+      if (req.method === 'POST') {
+        const body = await readBody(req);
+        let payload;
+        try {
+          payload = JSON.parse(body);
+        } catch (_e) {
+          return err(400, 'OA2P_INVALID_PAYLOAD', 'request body is not valid JSON');
+        }
+        const invalid = (message) => err(400, 'OA2P_INVALID_PAYLOAD', message);
+        if (payload.formatVersion !== undefined && String(payload.formatVersion) !== '1') {
+          return invalid(`formatVersion must be "1" (got "${String(payload.formatVersion)}")`);
+        }
+        if (payload.name !== undefined && String(payload.name).trim().toUpperCase() !== name) {
+          return invalid(`payload name ${String(payload.name)} does not match URL profile ${name}`);
+        }
+        const type = payload.type === undefined || String(payload.type).trim() === '' ? 'DEFAULT' : String(payload.type).trim().toUpperCase();
+        if (type.length > 20) return invalid(`type must not exceed 20 characters (got ${type.length})`);
+        if (payload.noAuthCheck !== undefined && typeof payload.noAuthCheck !== 'boolean') {
+          return invalid('noAuthCheck must be a boolean');
+        }
+        const scopes = Array.isArray(payload.scopes) ? payload.scopes.map((scope) => String(scope).trim()).filter(Boolean) : [];
+        const existed = oa2pStore.has(name);
+        const previous = existed ? oa2pStore.get(name) : undefined;
+        oa2pStore.set(name, {
+          formatVersion: '1',
+          name,
+          type,
+          noAuthCheck: payload.noAuthCheck === true,
+          scopes,
+          package: typeof payload.package === 'string' && payload.package.trim() ? payload.package.trim().toUpperCase() : (previous?.package ?? '$TMP'),
+          createdBy: previous?.createdBy ?? CURRENT_USER,
+          createdOn: previous?.createdOn ?? NOW.slice(0, 10),
+          createdAt: previous?.createdAt ?? NOW.slice(11, 19),
+          changedBy: CURRENT_USER,
+          changedOn: NOW.slice(0, 10),
+          changedAt: NOW.slice(11, 19),
+        });
+        return uconReply(res, 200, { status: 'success', data: { name, type: 'OA2P', action: existed ? 'updated' : 'created', package: oa2pStore.get(name).package } });
+      }
+      if (req.method === 'DELETE') {
+        if (!oa2pStore.has(name)) return err(404, 'OA2P_OBJECT_NOT_FOUND', `OAuth2 profile ${name} not found`);
+        oa2pStore.delete(name);
+        return uconReply(res, 200, { status: 'success', data: { name, type: 'OA2P', action: 'deleted' } });
+      }
+      return err(405, 'METHOD_NOT_ALLOWED', `${req.method} not supported on /oa2p/${name}`);
     }
 
     // 014: /sap/abap_cli/textpool/<category>?object=<name>&type=<type> (GET read / POST write).

@@ -230,6 +230,35 @@ export type ErrorCode =
   | 'SM59_INVALID_PAYLOAD'      // malformed JSON body / not an sm59-v1 document (VALIDATION_ERROR)
   | 'SM59_WRITE_FAILED'         // create/update through the SM59 maintenance API failed (SAP_ERROR)
   | 'SM59_READ_FAILED'          // read/delete through the SM59 maintenance API failed (SAP_ERROR)
+  // UCON RFC service (SRFC) ICF /srfc route — local-extension srfc-v1 document
+  | 'SRFC_OBJECT_NOT_FOUND'      // service does not exist (GET / DELETE) (NOT_FOUND)
+  | 'SRFC_NAME_INVALID'          // service name empty, >30 chars, or illegal characters (VALIDATION_ERROR)
+  | 'SRFC_INVALID_PAYLOAD'       // malformed JSON body / not an srfc-v1 document (VALIDATION_ERROR)
+  | 'SRFC_FUNCTION_NOT_FOUND'    // functionName does not name an existing function module (VALIDATION_ERROR)
+  | 'SRFC_FUNCTION_NOT_RFC_ENABLED' // function module exists but is not RFC-enabled (VALIDATION_ERROR)
+  | 'SRFC_PROFILE_NOT_FOUND'     // defaultProfile does not exist in UCONPROFHEAD (VALIDATION_ERROR)
+  | 'SRFC_PACKAGE_INVALID'       // target package does not exist (VALIDATION_ERROR)
+  | 'SRFC_TRANSPORT_REQUIRED'    // transportable package without a transport request (VALIDATION_ERROR)
+  | 'SRFC_PACKAGE_ASSIGN_FAILED' // RS_CORR_INSERT failed to record TADIR/CTS (SAP_ERROR)
+  | 'SRFC_NOT_AUTHORIZED'        // missing package/transport authorization (AUTH_ERROR)
+  | 'SRFC_LOCK_FAILED'           // service locked by another user (LOCKED)
+  | 'SRFC_ALREADY_EXISTS'        // create raced with an existing service (VALIDATION_ERROR)
+  | 'SRFC_WRITE_FAILED'          // create/update through the persistence classes failed (SAP_ERROR)
+  | 'SRFC_READ_FAILED'           // read through the UCON API failed (SAP_ERROR)
+  | 'SRFC_DELETE_FAILED'         // delete through the UCON API failed (SAP_ERROR)
+  // OAuth 2.0 client profile (OA2P) ICF /oa2p route — local-extension oa2p-v1 document
+  | 'OA2P_OBJECT_NOT_FOUND'      // profile does not exist (GET / DELETE) (NOT_FOUND)
+  | 'OA2P_NAME_INVALID'          // profile name empty, >30 chars, or illegal characters (VALIDATION_ERROR)
+  | 'OA2P_INVALID_PAYLOAD'       // malformed JSON body / unknown service provider type (VALIDATION_ERROR)
+  | 'OA2P_PROFILE_IN_USE'        // profile still assigned to OAuth 2.0 clients (VALIDATION_ERROR)
+  | 'OA2P_PACKAGE_INVALID'       // target package does not exist (VALIDATION_ERROR)
+  | 'OA2P_TRANSPORT_REQUIRED'    // transportable package without a transport request (VALIDATION_ERROR)
+  | 'OA2P_PACKAGE_ASSIGN_FAILED' // RS_CORR_INSERT failed to record TADIR/CTS (SAP_ERROR)
+  | 'OA2P_NOT_AUTHORIZED'        // missing package/transport authorization (AUTH_ERROR)
+  | 'OA2P_LOCK_FAILED'           // profile locked by another user (LOCKED)
+  | 'OA2P_WRITE_FAILED'          // create/update through the persistence classes failed (SAP_ERROR)
+  | 'OA2P_READ_FAILED'           // read through the persistence classes failed (SAP_ERROR)
+  | 'OA2P_DELETE_FAILED'         // delete through the persistence classes failed (SAP_ERROR)
   // ICF route dispatch — HTTP method not supported by the endpoint (e.g. 405)
   | 'METHOD_NOT_ALLOWED'        // ICF route received an unsupported HTTP method (VALIDATION_ERROR)
   ;
@@ -424,6 +453,35 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   XSLT_OBJECT_EXISTS: 'SAP_ERROR',
   DSFD_FEATURE_NOT_ENABLED: 'VALIDATION_ERROR',
   DRTY_FEATURE_NOT_ENABLED: 'VALIDATION_ERROR',
+  // — UCON RFC services (SRFC)
+  SRFC_OBJECT_NOT_FOUND: 'NOT_FOUND',
+  SRFC_NAME_INVALID: 'VALIDATION_ERROR',
+  SRFC_INVALID_PAYLOAD: 'VALIDATION_ERROR',
+  SRFC_FUNCTION_NOT_FOUND: 'VALIDATION_ERROR',
+  SRFC_FUNCTION_NOT_RFC_ENABLED: 'VALIDATION_ERROR',
+  SRFC_PROFILE_NOT_FOUND: 'VALIDATION_ERROR',
+  SRFC_PACKAGE_INVALID: 'VALIDATION_ERROR',
+  SRFC_TRANSPORT_REQUIRED: 'VALIDATION_ERROR',
+  SRFC_PACKAGE_ASSIGN_FAILED: 'SAP_ERROR',
+  SRFC_NOT_AUTHORIZED: 'AUTH_ERROR',
+  SRFC_LOCK_FAILED: 'LOCKED',
+  SRFC_ALREADY_EXISTS: 'VALIDATION_ERROR',
+  SRFC_WRITE_FAILED: 'SAP_ERROR',
+  SRFC_READ_FAILED: 'SAP_ERROR',
+  SRFC_DELETE_FAILED: 'SAP_ERROR',
+  // — OAuth 2.0 client profiles (OA2P)
+  OA2P_OBJECT_NOT_FOUND: 'NOT_FOUND',
+  OA2P_NAME_INVALID: 'VALIDATION_ERROR',
+  OA2P_INVALID_PAYLOAD: 'VALIDATION_ERROR',
+  OA2P_PROFILE_IN_USE: 'VALIDATION_ERROR',
+  OA2P_PACKAGE_INVALID: 'VALIDATION_ERROR',
+  OA2P_TRANSPORT_REQUIRED: 'VALIDATION_ERROR',
+  OA2P_PACKAGE_ASSIGN_FAILED: 'SAP_ERROR',
+  OA2P_NOT_AUTHORIZED: 'AUTH_ERROR',
+  OA2P_LOCK_FAILED: 'LOCKED',
+  OA2P_WRITE_FAILED: 'SAP_ERROR',
+  OA2P_READ_FAILED: 'SAP_ERROR',
+  OA2P_DELETE_FAILED: 'SAP_ERROR',
   // — SM59 HTTP destinations
   SM59_OBJECT_NOT_FOUND: 'NOT_FOUND',
   SM59_TYPE_NOT_SUPPORTED: 'VALIDATION_ERROR',

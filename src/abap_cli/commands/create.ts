@@ -7,6 +7,8 @@ import { getDdicJsonExample } from '../formats/ddic/examples.js';
 import { getViewJsonExample } from '../formats/view/json.js';
 import { getShlpJsonExample } from '../formats/shlp/json.js';
 import { getSm59JsonExample } from '../formats/sm59/json.js';
+import { getSrfcJsonExample } from '../formats/srfc/json.js';
+import { getOa2pJsonExample } from '../formats/oa2p/json.js';
 import type { DdicSupportedType } from '../formats/ddic/types.js';
 import { listTemplates } from '../formats/templates.js';
 import {
@@ -216,12 +218,19 @@ export function createSchema(type?: string): CreateCommandSchema {
     // dimension of the schema states which flags are not applicable instead of
     // silently accepting them.
     const isSm59 = t === 'SM59';
+    // SRFC/OA2P are TADIR objects (package + transport apply), so only their
+    // wire shape and the no-activation note differ from the DDIC types.
+    const isUcon = t === 'SRFC' || t === 'OA2P';
     const message = t === 'VIEW'
       ? 'VIEW (DDIC database view) is created through the self-built ICF service (/ddic/view). Requires --file with a local-extension view-v1 JSON: header.description, viewClass, rootTable, tables[] and fields[]; joinConditions[] for a multi-table view.'
       : t === 'SHLP'
         ? 'SHLP (DDIC search help) is created through the self-built ICF service (/ddic/shlp). Requires --file with a local-extension shlp-v1 JSON: kind (elementary/collective), header.description and parameters[]; an elementary search help also needs selectionMethod, a collective one needs includedSearchHelps[] and parameterMappings[].'
         : isSm59
           ? 'SM59 (HTTP destination, RFCTYPE=G) is created through the self-built ICF service (/sm59/<name>). Requires --file with a local-extension sm59-v1 JSON: targetHost, protocol (HTTP/HTTPS), optional port, pathPrefix and description. Destinations are client-independent system-table entries: --package and --tr are not applicable (no TADIR object, no transport), and there is no activation step. Names are RFCDEST (max 32 chars); SAP rejects its reserved/internal name patterns — maintain those directly in SM59.'
+          : t === 'SRFC'
+            ? 'SRFC (UCON RFC service) is created through the self-built ICF service (/srfc/<name>). Requires --file with a local-extension srfc-v1 JSON: functionName (RFC-enabled function module), optional description/scope/defaultProfile. There is no separate activation step: the write stores the active version and refreshes the UCON runtime cache. Names are UCONRFCSERVID (max 30 chars); every scope is client-independent and lifecycle/cache maintenance stays in UCONCOCKPIT.'
+            : t === 'OA2P'
+              ? 'OA2P (OAuth 2.0 client profile) is created through the self-built ICF service (/oa2p/<name>). Requires --file with a local-extension oa2p-v1 JSON: type (OAuth 2.0 service provider type from OA2C_TYPES), optional noAuthCheck/scopes. There is no description field and no activation step. Names are OA2C_PROFILE (max 30 chars); profile assignments to OAuth 2.0 clients stay in OA2C_CONFIG.'
           : isDdic
             ? `DDIC type ${t} created via the self-built ICF service. Requires --file <abap-file-format JSON> with top-level fields: name, description, fields[].`
             : t === 'XSLT'
@@ -233,6 +242,10 @@ export function createSchema(type?: string): CreateCommandSchema {
         ? getShlpJsonExample()
         : isSm59
           ? getSm59JsonExample()
+          : t === 'SRFC'
+            ? getSrfcJsonExample()
+            : t === 'OA2P'
+              ? getOa2pJsonExample()
           : isDdic
             ? getDdicJsonExample(t as DdicSupportedType)
             : undefined;
@@ -252,7 +265,19 @@ export function createSchema(type?: string): CreateCommandSchema {
           }
           return o;
         })
-      : base.options;
+      : isUcon
+        ? base.options.map((o) => {
+            if (o.name === '--description') {
+              return t === 'OA2P'
+                ? { ...o, required: false, description: 'Not applicable for OA2P: profiles have no description field' }
+                : { ...o, required: false, description: 'Optional override of the document description (SRFC short text)' };
+            }
+            if (o.name === '--no-activate') {
+              return { ...o, description: `Not applicable for ${t}: the write stores the active version directly` };
+            }
+            return o;
+          })
+        : base.options;
     return {
       ...base,
       type: t,
@@ -271,7 +296,11 @@ export function createSchema(type?: string): CreateCommandSchema {
             ? 'abap-file-format DDIC JSON input (top-level fields; see exampleJson)'
             : isSm59
               ? 'local-extension sm59-v1 JSON input (see exampleJson)'
-              : `abap-file-format ${t} JSON input`,
+              : t === 'SRFC'
+                ? 'local-extension srfc-v1 JSON input (see exampleJson)'
+                : t === 'OA2P'
+                  ? 'local-extension oa2p-v1 JSON input (see exampleJson)'
+                  : `abap-file-format ${t} JSON input`,
         },
       ],
     };

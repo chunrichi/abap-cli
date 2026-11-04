@@ -1,0 +1,51 @@
+{
+  "$comment": "Local extension: upstream SAP abap-file-formats has no UCON RFC service (SRFC) format. Field names map to UCONRFCSERVHEAD (scope, function module, default profile) and UCONRFCSERVTEXT (short text); the ICF /srfc/<name> wire document mirrors this shape.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "UCON RFC Service Properties",
+  "description": "UCON RFC service (SRFC): an RFC-enabled function module exposed through Unified Connectivity",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["formatVersion", "functionName"],
+  "properties": {
+    "formatVersion": {
+      "title": "ABAP File Format Version",
+      "type": "string",
+      "const": "1"
+    },
+    "description": {
+      "title": "Description",
+      "description": "Short text of the RFC service (UCONRFCSERVTEXT-SHORTTEXT, CHAR 255, single line). Language-dependent: the CLI reads and writes the session language.",
+      "type": "string",
+      "maxLength": 255,
+      "pattern": "^[^\r\n]*$"
+    },
+    "functionName": {
+      "title": "Function Module",
+      "description": "RFC-enabled function module backing the service (UCONRFCSERVHEAD-FUNCNAME, CHAR 30). Must exist and be RFC-enabled.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 30,
+      "pattern": "^[A-Za-z0-9_/]+$"
+    },
+    "scope": {
+      "title": "Scope",
+      "description": "Call scope of the service (UCONRFCSCOPE domain). O = obsolete function, should not be called; E = callable from other systems; P = not callable from outside the client or system; S = callable from own system only (all clients).",
+      "type": "string",
+      "enum": ["E", "O", "P", "S"],
+      "enumTitles": [
+        "Callable from other systems",
+        "Obsolete function",
+        "Not callable from outside the client or system",
+        "Callable from own system only"
+      ]
+    },
+    "defaultProfile": {
+      "title": "Default Profile",
+      "description": "UCON profile assigned to the service (UCONRFCSERVHEAD-DEFAULT_PROFILE, CHAR 30). Must exist in UCONPROFHEAD when set.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 30,
+      "pattern": "^[A-Za-z0-9_/]+$"
+    }
+  }
+}
