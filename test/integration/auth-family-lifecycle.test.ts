@@ -14,7 +14,7 @@
  *   - delete removes the object; a follow-up pull maps to OBJECT_NOT_FOUND
  *   - the `--regenerate-profiles` opt-in is SUSO-only and the write answers
  *     `profilesRegenerated` only when the request asked for it (default: off)
- *   - the read-side standard-object fixtures (VKORG / CV / CMMFDOR /
+ *   - the read-side standard-object fixtures (VKORG / CV / CMMFDOR~S_TABU_DIS /
  *     OCS_GET_INSTALLED_COMPS / /AIF/CDLOG) exercise pull and the where-used
  *     delete refusal
  *
@@ -173,11 +173,6 @@ async function pullFamily(
   return readSrc(relPath);
 }
 
-/** SUCU canonical name: the 40-character padded TADIR composite. */
-function paddedSucu(group: string, object: string): string {
-  return `${group.padEnd(30)}${object.padEnd(10)}`;
-}
-
 const AUTH_DOC = {
   formatVersion: '1',
   generalInformation: { dataElement: 'ACTIV_AUTH', activityField: true },
@@ -191,7 +186,7 @@ const SUSC_DOC = {
 
 const SUCU_GROUP = 'ZCLI_TC_SUCU_A';
 const SUCU_OBJECT = 'S_TABU_DIS';
-const SUCU_NAME = paddedSucu(SUCU_GROUP, SUCU_OBJECT);
+const SUCU_NAME = `${SUCU_GROUP}~${SUCU_OBJECT}`;
 const SUCU_TOKEN = 'zcli_tc_sucu_a~s_tabu_dis';
 
 const SUCU_DOC = {
@@ -328,27 +323,35 @@ describe.skipIf(!hasBuiltCli)('authorization-object family lifecycle (mock ICF r
     });
   });
 
-  it('SUCU: create → pull → push → pull → delete (padded composite key)', async () => {
+  it('SUCU: create → pull → push → pull → delete (compact composite key)', async () => {
     await withMock(async () => {
       const input = writeSrc('sucu-input.sucu.json', SUCU_DOC);
       const created = await runCli([
-        'create', 'SUCU', `${SUCU_GROUP}/${SUCU_OBJECT}`, '--package', '$TMP', '--file', input, '--yes', '--json',
+        'create', 'SUCU', SUCU_NAME, '--package', '$TMP', '--file', input, '--yes', '--json',
       ]);
       expect(created.exit, created.stderr || created.stdout).toBe(0);
       expect(parseEnvelope(created).data).toMatchObject({
         object: SUCU_NAME, type: 'SUCU', action: 'created', package: '$TMP',
       });
 
+      // A single `/` is not a key separator (OBJECT may itself be namespaced):
+      // only the compact `~` form and the raw 40-character TADIR name are valid.
+      expectFailure(
+        await runCli(['pull', `${SUCU_GROUP}/${SUCU_OBJECT}`, '--type', 'SUCU', '--json']),
+        7,
+        'SUCU_NAME_INVALID',
+      );
+
       // The pull token keeps the group/object split reversible (`~` separator,
       // no dot because the generic AFF resolver splits the stem on `.`).
       const rel = `src/${SUCU_TOKEN}.sucu.json`;
-      const pulled = await pullFamily('SUCU', `${SUCU_GROUP}/${SUCU_OBJECT}`, rel);
+      const pulled = await pullFamily('SUCU', SUCU_NAME, rel);
       expect(pulled).toMatchObject({
         formatVersion: '1',
-        header: { description: 'CLI test authorization group', originalLanguage: 'EN' },
+        header: { description: 'CLI test authorization group', originalLanguage: 'en' },
         generalInformation: { authorizationGroup: SUCU_GROUP, authorizationObject: SUCU_OBJECT },
       });
-      expect(pulled.texts).toEqual([{ language: 'DE', description: 'CLI-Test-Berechtigungsgruppe' }]);
+      expect(pulled.texts).toEqual([{ language: 'de', description: 'CLI-Test-Berechtigungsgruppe' }]);
       expect(pulled).not.toHaveProperty('name');
       expect(pulled).not.toHaveProperty('package');
 
@@ -359,13 +362,13 @@ describe.skipIf(!hasBuiltCli)('authorization-object family lifecycle (mock ICF r
       const pushed = await runCli(['push', rel, '--yes', '--json']);
       expect(pushed.exit, pushed.stderr || pushed.stdout).toBe(0);
 
-      const repulled = await pullFamily('SUCU', `${SUCU_GROUP}/${SUCU_OBJECT}`, rel);
+      const repulled = await pullFamily('SUCU', SUCU_NAME, rel);
       expect(repulled.header).toMatchObject({ description: 'CLI test authorization group v2' });
 
-      const deleted = await runCli(['delete', `${SUCU_GROUP}/${SUCU_OBJECT}`, '--type', 'SUCU', '--yes', '--json']);
+      const deleted = await runCli(['delete', SUCU_NAME, '--type', 'SUCU', '--yes', '--json']);
       expect(deleted.exit, deleted.stderr || deleted.stdout).toBe(0);
       expect(parseEnvelope(deleted).data).toMatchObject({ object: SUCU_NAME, type: 'SUCU', deleted: true });
-      expectFailure(await runCli(['pull', `${SUCU_GROUP}/${SUCU_OBJECT}`, '--type', 'SUCU', '--json']), 8, 'OBJECT_NOT_FOUND');
+      expectFailure(await runCli(['pull', SUCU_NAME, '--type', 'SUCU', '--json']), 8, 'OBJECT_NOT_FOUND');
     });
   });
 
@@ -574,7 +577,7 @@ describe.skipIf(!hasBuiltCli)('authorization-object family lifecycle (mock ICF r
       expect(authFixture.generalInformation).toMatchObject({ dataElement: 'VKORG' });
       const suscFixture = await pullFamily('SUSC', 'CV', 'src/fixtures/cv.susc.json', ['--dir', 'src/fixtures']);
       expect(suscFixture.header).toMatchObject({ originalLanguage: 'en' });
-      const sucuFixture = await pullFamily('SUCU', `CMMFDOR/${SUCU_OBJECT}`, 'src/fixtures/cmmfdor~s_tabu_dis.sucu.json', ['--dir', 'src/fixtures']);
+      const sucuFixture = await pullFamily('SUCU', 'CMMFDOR~S_TABU_DIS', 'src/fixtures/cmmfdor~s_tabu_dis.sucu.json', ['--dir', 'src/fixtures']);
       expect(sucuFixture.generalInformation).toMatchObject({ authorizationGroup: 'CMMFDOR', authorizationObject: SUCU_OBJECT });
       const sushFixture = await pullFamily('SUSH', 'OCS_GET_INSTALLED_COMPS.RF', 'src/fixtures/ocs_get_installed_comps_rf.sush.json', ['--dir', 'src/fixtures']);
       expect(sushFixture.generalInformation).toMatchObject({ applicationName: 'OCS_GET_INSTALLED_COMPS', applicationType: 'FUNC' });
@@ -594,7 +597,7 @@ describe.skipIf(!hasBuiltCli)('authorization-object family lifecycle (mock ICF r
       );
       // Non-local SUCU objects cannot record the CTS delete from the ICF session.
       expectFailure(
-        await runCli(['delete', `CMMFDOR/${SUCU_OBJECT}`, '--type', 'SUCU', '--tr', 'TRN001', '--yes', '--json']),
+        await runCli(['delete', 'CMMFDOR~S_TABU_DIS', '--type', 'SUCU', '--tr', 'TRN001', '--yes', '--json']),
         7,
         'SUCU_DELETE_UNSUPPORTED',
       );

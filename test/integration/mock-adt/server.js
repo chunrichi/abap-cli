@@ -176,21 +176,27 @@ function isLocalPackage(pkg) {
 // Authorization objects the SUCU handler checks against TOBJ (check table).
 const AUTH_TOBJ_FIXTURES = new Set(['S_TABU_DIS', 'S_RFC', 'S_TCODE', 'S_DEVELOP', 'S_PROGRAM']);
 
-/** Canonicalize one family object name (the CLI sends the canonical form). */
+/**
+ * Canonicalize one family object name (the CLI sends the canonical form).
+ *
+ * SUCU: the canonical CLI/route name is the compact `<GROUP>~<OBJECT>` form;
+ * the raw 40-character padded TADIR name (`BRGRU` padded to 30 + `OBJECT`
+ * padded to 10) is accepted as an alias and normalized back to the compact
+ * form. A single `/` is not a separator (OBJECT may itself be namespaced).
+ */
 function canonicalAuthName(type, rawName) {
   if (type !== 'SUCU') return rawName.trim().toUpperCase();
-  // SUCU: the canonical name is the 40-char TADIR composite (BRGRU padded to 30
-  // + OBJECT padded to 10, both left-justified). Compact `BRGRU~OBJECT` /
-  // `BRGRU/OBJECT` aliases are accepted the same way `normalizeName` does.
-  const upper = String(rawName || '').toUpperCase();
-  if (upper.length === 40) return upper;
-  const compact = upper.trim();
-  if (!compact) return compact;
-  const splitAt = Math.max(compact.lastIndexOf('~'), compact.lastIndexOf('/'));
-  const group = splitAt > 0 ? compact.slice(0, splitAt) : compact;
-  const object = splitAt > 0 ? compact.slice(splitAt + 1) : '';
-  if (!object) return compact;
-  return `${group.padEnd(30)}${object.padEnd(10)}`;
+  const raw = String(rawName || '').trim();
+  if (!raw) return '';
+  if (raw.includes('~')) {
+    const parts = raw.split('~');
+    if (parts.length !== 2) return raw.toUpperCase();
+    return `${parts[0].trim()}~${parts[1].trim()}`.toUpperCase();
+  }
+  if (raw.length === 40) {
+    return `${raw.slice(0, 30).trimEnd()}~${raw.slice(30).trimEnd()}`.toUpperCase();
+  }
+  return raw.toUpperCase();
 }
 
 /** Validate one canonical family object name against the SAP-side rules. */
@@ -202,11 +208,13 @@ function authNameValid(type, name) {
       // TOBC-OCLSS is CHAR 4: plain 1-4 chars or the `/XXX` namespace form.
       return /^(?:[A-Z0-9][A-Z0-9_-]{0,3}|\/[A-Z0-9_-]{3})$/.test(name);
     case 'SUCU': {
-      if (name.length !== 40) return false;
-      const group = name.slice(0, 30).trimEnd();
-      const object = name.slice(30).trimEnd();
+      // Compact `<GROUP>~<OBJECT>`: group 1-30, object 1-10, A-Z 0-9 _ /.
+      const parts = name.split('~');
+      if (parts.length !== 2) return false;
+      const [group, object] = parts;
       return (
         /^[A-Z0-9_/]+$/.test(group) &&
+        group.length >= 1 &&
         group.length <= 30 &&
         /^[A-Z0-9_/]+$/.test(object) &&
         object.length >= 1 &&
@@ -229,13 +237,13 @@ function authNameValid(type, name) {
   }
 }
 
-/** SUCU document → canonical padded name (build-side name agreement check). */
+/** SUCU document → canonical compact name (URL/document agreement check). */
 function sucuNameFromDocument(document) {
   const general = (document && document.generalInformation) || {};
   const group = String(general.authorizationGroup || '').trim().toUpperCase();
   const object = String(general.authorizationObject || '').trim().toUpperCase();
   if (!group || !object) return undefined;
-  return `${group.padEnd(30)}${object.padEnd(10)}`;
+  return `${group}~${object}`;
 }
 
 /**
@@ -396,13 +404,13 @@ function authWriteData(type, name, action, packageName, regenerate) {
   );
   seed(
     'sucu',
-    `${'CMMFDOR'.padEnd(30)}${'S_TABU_DIS'.padEnd(10)}`,
+    'CMMFDOR~S_TABU_DIS',
     'FS_CMM_CDOTE_ORDER_REQUEST',
     {
       formatVersion: '1',
-      header: { description: 'Authorization group for commodity derivative orders', originalLanguage: 'EN' },
+      header: { description: 'Commodity order authorization group', originalLanguage: 'EN' },
       generalInformation: { authorizationGroup: 'CMMFDOR', authorizationObject: 'S_TABU_DIS' },
-      texts: [{ language: 'DE', description: 'Berechtigungsgruppe für Warentermingeschäfte' }],
+      texts: [{ language: 'DE', description: 'Berechtigungsgruppe Commodity' }],
     },
   );
   seed('sush', 'OCS_GET_INSTALLED_COMPS.RF', 'SPAM', {

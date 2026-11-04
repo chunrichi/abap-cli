@@ -54,7 +54,7 @@ describe('schema-paths priority chain', () => {
     );
   });
 
-  it('affSupportedTypes matches the router table (16 + 6 + 2 + VIEW + XSLT + SHLP + DOCU + ATC + CDS technical + TYPE + UCON)', () => {
+  it('affSupportedTypes matches the router table (16 + 6 + 2 + VIEW + XSLT + SHLP + DOCU + ATC + CDS technical + TYPE + UCON + authorization family)', () => {
     const types = affSupportedTypes();
     expect(types).toEqual(
       expect.arrayContaining([
@@ -100,7 +100,8 @@ describe('schema-paths priority chain', () => {
     // added SM59 (HTTP destination local extension) = 41 total.
     // added SRFC / OA2P (UCON RFC service / OAuth2 profile) = 43 total.
     // added JOBD (application job definition, local extension) = 44 total.
-    expect(types).toHaveLength(44);
+    // added AUTH / SUSC / SUCU / SUSH / SUSO (authorization family) = 49 total.
+    expect(types).toHaveLength(49);
   });
 
   it('bundled root contains every supported schema', () => {
