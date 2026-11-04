@@ -50,7 +50,7 @@ Connection identity:
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap whoami", "version": "2.4.0", "timestamp": "2026-11-03T00:00:00.000Z", "durationMs": 280, "warnings": [] },
+  "meta": { "command": "abap whoami", "version": "2.6.0", "timestamp": "2026-11-03T00:00:00.000Z", "durationMs": 280, "warnings": [] },
   "data": {
     "profile": "test",
     "url": "https://sap.example.com:44300",
