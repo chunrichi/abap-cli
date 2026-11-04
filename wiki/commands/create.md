@@ -24,7 +24,7 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 
 ## Options
 
-- `<type>`: 支持 40 个类型码（完整矩阵见 [object-types](../object-types.md)）：4 个源对象 `CLAS` / `INTF` / `PROG` / `FUGR` 走 ADT 骨架；`DEVC` 走独立 ADT handler（`--package` 是**父包**，无需 `--file`，见 [DEVC（Package）](#devcpackage)）；其余 35 类必须配 `--file`（AFF JSON；VIEW/SHLP/JOBD/SM59/SRFC/OA2P 为本地扩展 `view-v1.json` / `shlp-v1.json` / `jobd-v1.json` / `sm59-v1.json` / `srfc-v1.json` / `oa2p-v1.json`）：`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `VIEW` / `SHLP` / `JOBD` / `NROB` / `HTTP` / `TRAN` / `XSLT` / `SM59` / `SRFC` / `OA2P` / `TTYP` / `TYPE` / `MSAG` / `DDLS` / `SRVB` / `SRVD` / `BDEF` / `DCLS` / `DDLX` / `DDLA` / `CHKC` / `CHKO` / `CHKV` / `DTDC` / `DTEB` / `DSFD` / `DSFI` / `DRTY` / `SAJC` / `SAJT`。未知类型 → `TYPE_NOT_SUPPORTED`（exit 7）。
+- `<type>`: 支持 45 个类型码（完整矩阵见 [object-types](../object-types.md)）：4 个源对象 `CLAS` / `INTF` / `PROG` / `FUGR` 走 ADT 骨架；`DEVC` 走独立 ADT handler（`--package` 是**父包**，无需 `--file`，见 [DEVC（Package）](#devcpackage)）；其余 40 类必须配 `--file`（AFF JSON；VIEW/SHLP/JOBD/SM59/SRFC/OA2P/AUTH/SUSC/SUCU/SUSO 为本地扩展 `view-v1.json` / `shlp-v1.json` / `jobd-v1.json` / `sm59-v1.json` / `srfc-v1.json` / `oa2p-v1.json`）：`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `VIEW` / `SHLP` / `JOBD` / `NROB` / `HTTP` / `TRAN` / `XSLT` / `SM59` / `SRFC` / `OA2P` / `TTYP` / `TYPE` / `MSAG` / `DDLS` / `SRVB` / `SRVD` / `BDEF` / `DCLS` / `DDLX` / `DDLA` / `CHKC` / `CHKO` / `CHKV` / `DTDC` / `DTEB` / `DSFD` / `DSFI` / `DRTY` / `SAJC` / `SAJT` / `AUTH` / `SUSC` / `SUCU` / `SUSH` / `SUSO`。未知类型 → `TYPE_NOT_SUPPORTED`（exit 7）。
 - `<name>`: 对象名（自动转大写；命名空间名如 `/UI2/CL_JSON` 在磁盘上用 AFF 括号 token `(ui2)cl_json`）。本地预校验：≤30 字符、仅 `A-Z 0-9 _`、命名空间形如 `/NS/NAME`（NS ≤10，总长 ≤30），违规 → `VALIDATION_ERROR`（exit 7）
 - `--package <package>`: 目标 SAP 包（必填）
 - `--description <desc>`: 对象描述（必填；有 `--file` 时可选，由 JSON 提供）
@@ -361,7 +361,7 @@ abap create local CLAS ZCL_DRAFT --template public-method --dir src/
 
 ## todo
 
-- [x] `TTYP` / `MSAG` / `DDLS` / `ENQU` / `NROB` / `XSLT` / `TYPE` / `SRVB` / `BDEF` / `CHKC` / `CHKO` / `CHKV` / `DTDC` / `DTEB` / `DSFD` / `DSFI` / `DRTY` / `SAJC` / `SAJT` 等 `--file` 类型已接入（`create` 的 `--schema.allowedValues` 全 39 类）
+- [x] `TTYP` / `MSAG` / `DDLS` / `ENQU` / `NROB` / `XSLT` / `TYPE` / `SRVB` / `BDEF` / `CHKC` / `CHKO` / `CHKV` / `DTDC` / `DTEB` / `DSFD` / `DSFI` / `DRTY` / `SAJC` / `SAJT` 等 `--file` 类型已接入（`create` 的 `--schema.allowedValues` 全 45 类）
 - [x] `TRAN` 写路径已实现（`/tran` POST/PUT，dialog/report/parameter/variant；OO 事务明确拒绝）
 - [ ] `create local` 为实验性命令，待与 `create` 主流程的落库闭环稳定后转正
 

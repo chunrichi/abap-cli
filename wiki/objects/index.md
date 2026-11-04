@@ -1,8 +1,8 @@
 ---
 type: reference
 title: 对象类型详细文档索引
-description: 每个 SAP 对象类型的字段契约、命令路径、本地文件形态与示例
-tags: [abap-cli, object-types, reference, clas, intf, prog, fugr, devc, tabl, stru, doma, dtel, enqu, view, shlp, jobd, nrob, http, tran, xslt, sm59, ttyp, msag, ddls, srvb, srvd, bdef, dcls, ddlx, ddla, chkc, chko, chkv, dtdc, dteb, dsfd, dsfi, drty, type, sajc, sajt]
+description: 每个 SAP 对象类型的字段契约、命令路径、本地文件形态与示例（45 个类型）
+tags: [abap-cli, object-types, reference, clas, intf, prog, fugr, devc, tabl, stru, doma, dtel, enqu, view, shlp, jobd, nrob, http, tran, xslt, sm59, ttyp, msag, ddls, srvb, srvd, bdef, dcls, ddlx, ddla, chkc, chko, chkv, dtdc, dteb, dsfd, dsfi, drty, type, sajc, sajt, srfc, oa2p, auth, susc, sucu, sush, suso]
 created at: 2026-09-01 00:00:00
 changed at: 2026-11-04 00:33:00
 ---
@@ -33,6 +33,11 @@ changed at: 2026-11-04 00:33:00
 | `SM59` | ICF | `src/<name>.sm59.json`（SM59 HTTP 目标，RFCTYPE='G'，本地扩展 `sm59-v1.json`） | [sm59.md](sm59.md) |
 | `SRFC` | ICF | `src/<name>.srfc.json`（UCON RFC service，本地扩展 `srfc-v1.json`） | [srfc.md](srfc.md) |
 | `OA2P` | ICF | `src/<name>.oa2p.json`（OAuth 2.0 client profile，本地扩展 `oa2p-v1.json`） | [oa2p.md](oa2p.md) |
+| `AUTH` | ICF | `src/<token>.auth.json`（SU20 授权字段，本地扩展 `auth-v1.json`） | [auth.md](auth.md) |
+| `SUSC` | ICF | `src/<token>.susc.json`（SU21 授权对象类，本地扩展 `susc-v1.json`） | [susc.md](susc.md) |
+| `SUCU` | ICF | `src/<group>~<object>.sucu.json`（SU21 授权组，本地扩展 `sucu-v1.json`） | [sucu.md](sucu.md) |
+| `SUSH` | ICF | `src/<name>_<type>.sush.json`（SU22 授权缺省值分配，上游 AFF `sush-v1`） | [sush.md](sush.md) |
+| `SUSO` | ICF | `src/<token>.suso.json`（SU21 授权对象，本地扩展 `suso-v1.json`） | [suso.md](suso.md) |
 | `TTYP` | ADT + ICF 兜底 | `src/<name>.ttyp.json`（纯元数据） | [ttyp.md](ttyp.md) |
 | `TYPE` | ADT（无兜底） | `src/<name>.type.json` + `src/<name>.type.abap` | [type.md](type.md) |
 | `SAJC` | ADT（无兜底） | `src/<name>.sajc.json`（应用作业目录条目，AFF 单 JSON） | [sajc.md](sajc.md) |
@@ -57,7 +62,7 @@ changed at: 2026-11-04 00:33:00
 ## 路由速查
 
 - **ADT**（源对象）：无需 ICF 部署；直接打 SAP ADT REST API；走 `abap-adt-api` 库
-- **ICF** 自建（DDIC/HTTP/TRAN/VIEW/SHLP/XSLT/JOBD）：需要先 `abap deploy`；走 `/sap/abap_cli/<domain>/<type>/<name>`（VIEW 为 `/ddic/view/<name>`，SHLP 为 `/ddic/shlp/<name>`，XSLT 为 `/xslt/<name>`）
+- **ICF** 自建（DDIC/HTTP/TRAN/VIEW/SHLP/XSLT/JOBD/授权族）：需要先 `abap deploy`；走 `/sap/abap_cli/<domain>/<type>/<name>`（VIEW 为 `/ddic/view/<name>`，SHLP 为 `/ddic/shlp/<name>`，XSLT 为 `/xslt/<name>`，授权族为 `/auth/<sub>/<name>`）
 - **ADT + ICF 兜底**（TTYP/MSAG）：优先 ADT；ECC EHP5/6 内核（< 753）自动切 ICF，现代内核缺 ADT 端点时运行时降级，envelope 写 `data.channel` + `data.fallbackReason`
 - **ADT 无兜底**（DDLS / SRVD / BDEF / DCLS / DDLX / DDLA / SRVB）：不发起 ICF 调用；DDLS 在旧内核直接硬错 `DDLS_NOT_SUPPORTED_ON_ECC`（exit 64）
 
