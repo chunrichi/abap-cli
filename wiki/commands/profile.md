@@ -128,7 +128,7 @@ abap profile import profiles.json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap profile add", "version": "2.4.0", "timestamp": "2026-10-31T00:00:00.000Z", "durationMs": 210, "warnings": [] },
+  "meta": { "command": "abap profile add", "version": "2.6.0", "timestamp": "2026-10-31T00:00:00.000Z", "durationMs": 210, "warnings": [] },
   "data": {
     "system": { "name": "dev", "url": "https://sap:44300", "client": "100", "username": "DEV", "language": "EN" },
     "passwordUpdated": true,

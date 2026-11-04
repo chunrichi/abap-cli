@@ -52,7 +52,7 @@ abap push src/zcl_my_class.clas.abap --tr DEVK900001    # 锁 → 写 → 激活
 ## 能做什么
 
 - **就地在本地编辑**——`pull` 把对象拉成 abap-file-format 文件树，用编辑器改，`push` 写回（锁 → 写 → 激活 → 解锁）；写之前可以先 `check` 和 `diff`。
-- **覆盖 45 种对象类型**——类、接口、程序、函数组；包；DDIC 表、结构、域、数据元素、数据库视图、搜索帮助、锁对象、编号范围对象；SICF 节点、事务码、XSLT 转换程序、SM59 HTTP 目标；UCON RFC service 与 OAuth 2.0 client profile；表类型、消息类、CDS 视图及 CDS / RAP 配套对象；ATC 检查配置对象；CDS 技术对象；类型池；应用程序作业目录条目与模板，以及应用作业定义（SM36），以及授权对象族（授权字段、授权对象类、授权组、SU22 授权缺省值、授权对象）。其中 45 种支持 create、45 种支持 pull、43 种有 push 入口、45 种有 delete 路径；`DEVC` 支持 create / pull / delete（无 push），`SRVB` 仅元数据，`SAJC` / `SAJT` / `JOBD` 写入即激活，`SUCU` 只删除 `$` 前缀本地授权组。
+- **覆盖 51 种对象类型**——类、接口、程序、函数组；包；DDIC 表、结构、域、数据元素、数据库视图、搜索帮助、锁对象、编号范围对象；SICF 节点、事务码、XSLT 转换程序、SM59 HTTP 目标；UCON RFC service 与 OAuth 2.0 client profile；表类型、消息类、CDS 视图及 CDS / RAP 配套对象；ATC 检查分类、检查与检查变式；CDS 技术对象、类型池、应用程序作业目录条目与模板、应用作业定义（SM36）；授权对象族（授权字段、授权对象类、授权组、SU22 授权缺省值分配、授权对象）；以及官方 AFF 对象（应用日志、更改文档、事件绑定、业务配置维护对象走标准 ADT 通道；BAdI 增强点 / 实现只读 pull）。其中 49 种支持 create、51 种支持 pull、47 种支持 push、49 种支持 delete；`DEVC` 支持 create / pull / delete（无 push），`SRVB` 仅元数据，`SAJC` / `SAJT` / `JOBD` 写入即激活，`SUCU` 只删除 `$` 前缀本地授权组，`ENHO` / `ENHS` 只读。
 - **只读探查 SAP**——`search`、`inspect`、`where-used`、`tcode`、`list`、`dumps`、`fields`、`select`、`run-report` 都不改系统。
 - **运行与验证**——`abap run` 执行类（classrun）或 PUBLIC STATIC 方法；`abap run-report` 返回列表输出；`abap select` 就是 SE16N 的等价物。
 - **管理传输**——`transport list / create / show / resolve / assign`，`push` 时按对象自动解析。
@@ -216,7 +216,7 @@ src/(ui2)cl_json.clas.abap                # 命名空间对象 /UI2/CL_JSON
 
 ```jsonc
 // 成功 — 写 stdout，exit 0
-{ "status": "success", "meta": { "command": "abap pull", "version": "2.4.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { /* ... */ } }
+{ "status": "success", "meta": { "command": "abap pull", "version": "2.6.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { /* ... */ } }
 
 // 失败 — 写 stderr，非零退出码，stdout 保持为空
 { "status": "error", "meta": { /* ... */ }, "error": { "code": "NO_TRANSPORT", "category": "VALIDATION_ERROR", "message": "..." } }
