@@ -259,6 +259,21 @@ export type ErrorCode =
   | 'OA2P_WRITE_FAILED'          // create/update through the persistence classes failed (SAP_ERROR)
   | 'OA2P_READ_FAILED'           // read through the persistence classes failed (SAP_ERROR)
   | 'OA2P_DELETE_FAILED'         // delete through the persistence classes failed (SAP_ERROR)
+  // JOBD (application job definition) ICF route — local-extension jobd-v1 document
+  | 'JOBD_INVALID_PAYLOAD'      // malformed JSON body / not a jobd-v1 document (VALIDATION_ERROR)
+  | 'JOBD_SERVICE_INVALID'      // route name missing / malformed path (VALIDATION_ERROR)
+  | 'JOBD_NAME_INVALID'         // name empty, >32 chars, illegal characters, or payload/URL mismatch (VALIDATION_ERROR)
+  | 'JOBD_NOT_FOUND'            // job definition does not exist (NOT_FOUND)
+  | 'JOBD_ALREADY_EXISTS'       // create of an existing job definition (VALIDATION_ERROR)
+  | 'JOBD_PACKAGE_REQUIRED'     // create without a package (VALIDATION_ERROR)
+  | 'JOBD_TRANSPORT_REQUIRED'   // non-local package write/delete without a request (VALIDATION_ERROR)
+  | 'JOBD_TRANSPORT_INVALID'    // request number malformed (VALIDATION_ERROR)
+  | 'JOBD_PACKAGE_ERROR'        // TADIR/package recording failed (SAP_ERROR)
+  | 'JOBD_NOT_AUTHORIZED'       // TADIR/transport permission failure (AUTH_ERROR)
+  | 'JOBD_WRITE_FAILED'         // CL_JR_JOB_DEFINITION save failure (SAP_ERROR)
+  | 'JOBD_READ_FAILED'          // CL_JR_JOB_DEFINITION read failure (SAP_ERROR)
+  | 'JOBD_LOCKED'               // foreign lock on the job definition (LOCKED)
+  | 'JOBD_UNSUPPORTED'          // release lacks CL_JR_JOB_DEFINITION (VALIDATION_ERROR)
   // ICF route dispatch — HTTP method not supported by the endpoint (e.g. 405)
   | 'METHOD_NOT_ALLOWED'        // ICF route received an unsupported HTTP method (VALIDATION_ERROR)
   ;
@@ -490,6 +505,21 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   SM59_INVALID_PAYLOAD: 'VALIDATION_ERROR',
   SM59_WRITE_FAILED: 'SAP_ERROR',
   SM59_READ_FAILED: 'SAP_ERROR',
+  // — JOBD application job definitions
+  JOBD_INVALID_PAYLOAD: 'VALIDATION_ERROR',
+  JOBD_SERVICE_INVALID: 'VALIDATION_ERROR',
+  JOBD_NAME_INVALID: 'VALIDATION_ERROR',
+  JOBD_NOT_FOUND: 'NOT_FOUND',
+  JOBD_ALREADY_EXISTS: 'VALIDATION_ERROR',
+  JOBD_PACKAGE_REQUIRED: 'VALIDATION_ERROR',
+  JOBD_TRANSPORT_REQUIRED: 'VALIDATION_ERROR',
+  JOBD_TRANSPORT_INVALID: 'VALIDATION_ERROR',
+  JOBD_PACKAGE_ERROR: 'SAP_ERROR',
+  JOBD_NOT_AUTHORIZED: 'AUTH_ERROR',
+  JOBD_WRITE_FAILED: 'SAP_ERROR',
+  JOBD_READ_FAILED: 'SAP_ERROR',
+  JOBD_LOCKED: 'LOCKED',
+  JOBD_UNSUPPORTED: 'VALIDATION_ERROR',
   METHOD_NOT_ALLOWED: 'VALIDATION_ERROR',
 };
 

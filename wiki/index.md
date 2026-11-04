@@ -55,7 +55,7 @@ changed at: 2026-11-04 00:33:00
 
 ### 跨命令契约
 
-- [支持的对象类型](object-types.md) — 39 个类型码 × 命令 × 路由（ADT / ICF）总览；SICF 节点对应类型码 `HTTP`，包对应 `DEVC`，SM59 HTTP 目标对应 `SM59`，UCON RFC service / OAuth 2.0 client profile 对应 `SRFC` / `OA2P`
+- [支持的对象类型](object-types.md) — 40 个类型码 × 命令 × 路由（ADT / ICF）总览；SICF 节点对应类型码 `HTTP`，包对应 `DEVC`，SM59 HTTP 目标对应 `SM59`，UCON RFC service / OAuth 2.0 client profile 对应 `SRFC` / `OA2P`
 - [output path contract](commands/path-output.md) — `--json` 路径字段统一 POSIX，跨平台 Agent 消费稳定
 
 ## Notes

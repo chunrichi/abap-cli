@@ -6,6 +6,7 @@ import { normalizeTypeInput } from '../cli/type-alias.js';
 import { getDdicJsonExample } from '../formats/ddic/examples.js';
 import { getViewJsonExample } from '../formats/view/json.js';
 import { getShlpJsonExample } from '../formats/shlp/json.js';
+import { getJobdJsonExample } from '../formats/jobd/json.js';
 import { getSm59JsonExample } from '../formats/sm59/json.js';
 import { getSrfcJsonExample } from '../formats/srfc/json.js';
 import { getOa2pJsonExample } from '../formats/oa2p/json.js';
@@ -225,7 +226,9 @@ export function createSchema(type?: string): CreateCommandSchema {
       ? 'VIEW (DDIC database view) is created through the self-built ICF service (/ddic/view). Requires --file with a local-extension view-v1 JSON: header.description, viewClass, rootTable, tables[] and fields[]; joinConditions[] for a multi-table view.'
       : t === 'SHLP'
         ? 'SHLP (DDIC search help) is created through the self-built ICF service (/ddic/shlp). Requires --file with a local-extension shlp-v1 JSON: kind (elementary/collective), header.description and parameters[]; an elementary search help also needs selectionMethod, a collective one needs includedSearchHelps[] and parameterMappings[].'
-        : isSm59
+        : t === 'JOBD'
+          ? 'JOBD (application job definition, SM36) is created through the self-built ICF service (/jobd/<name>). Requires --file with a local-extension jobd-v1 JSON. Writes save and activate in one step; --no-activate is not supported.'
+          : isSm59
           ? 'SM59 (HTTP destination, RFCTYPE=G) is created through the self-built ICF service (/sm59/<name>). Requires --file with a local-extension sm59-v1 JSON: targetHost, protocol (HTTP/HTTPS), optional port, pathPrefix and description. Destinations are client-independent system-table entries: --package and --tr are not applicable (no TADIR object, no transport), and there is no activation step. Names are RFCDEST (max 32 chars); SAP rejects its reserved/internal name patterns — maintain those directly in SM59.'
           : t === 'SRFC'
             ? 'SRFC (UCON RFC service) is created through the self-built ICF service (/srfc/<name>). Requires --file with a local-extension srfc-v1 JSON: functionName (RFC-enabled function module), optional description/scope/defaultProfile. There is no separate activation step: the write stores the active version and refreshes the UCON runtime cache. Names are UCONRFCSERVID (max 30 chars); every scope is client-independent and lifecycle/cache maintenance stays in UCONCOCKPIT.'
@@ -240,7 +243,9 @@ export function createSchema(type?: string): CreateCommandSchema {
       ? getViewJsonExample()
       : t === 'SHLP'
         ? getShlpJsonExample()
-        : isSm59
+        : t === 'JOBD'
+          ? getJobdJsonExample()
+          : isSm59
           ? getSm59JsonExample()
           : t === 'SRFC'
             ? getSrfcJsonExample()
@@ -294,6 +299,8 @@ export function createSchema(type?: string): CreateCommandSchema {
           required: true,
           description: isDdic
             ? 'abap-file-format DDIC JSON input (top-level fields; see exampleJson)'
+            : t === 'JOBD'
+              ? 'local-extension jobd-v1 JSON input (see exampleJson)'
             : isSm59
               ? 'local-extension sm59-v1 JSON input (see exampleJson)'
               : t === 'SRFC'

@@ -11,7 +11,7 @@ changed at: 2026-11-04 00:32:00
 
 abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的开发工作**。本页是一份**诚实快照**——按 SAP 开发任务分类，给出当前覆盖度与缺口。对象类型补充的排序与取舍见 [roadmap](roadmap.md)。
 
-> 当前规模：**32 个顶层命令**、**39 个对象类型**（39 类可 create、39 类可 pull、37 类有 push 入口）、**6 个 skill + 1 个 agent**。基线：`v2.5.0` + UCON RFC service（SRFC）/ OAuth 2.0 client profile（OA2P）/ SM59 HTTP 目标（RFCTYPE=G）/ 连接身份（whoami）/ SRVB 发布命令 / 本地 ATC / CDS 技术 / 类型池 / 应用作业扩展。
+> 当前规模：**32 个顶层命令**、**40 个对象类型**（40 类可 create、40 类可 pull、38 类有 push 入口）、**6 个 skill + 1 个 agent**。基线：`v2.6.0` + 应用作业定义（JOBD）/ UCON RFC service（SRFC）/ OAuth 2.0 client profile（OA2P）/ SM59 HTTP 目标（RFCTYPE=G）/ 连接身份（whoami）/ SRVB 发布命令 / 本地 ATC / CDS 技术 / 类型池 / 应用作业扩展。
 
 ## 评分图例
 
@@ -43,6 +43,7 @@ abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的
 | 创建/修改事务码（SE93 / TRAN） | `create / pull / push / delete TRAN` | ✅ | ICF `/tran` GET/POST/PUT/DELETE；dialog/report/parameter/variant，OO 明确拒绝；真机 23/23 TC |
 | 创建/修改 SM59 HTTP 目标（RFCTYPE='G'） | `create / pull / push / delete SM59` | ✅ | ICF `/sm59` + SRFC_DESTAPI；本地扩展 `sm59-v1`（targetHost / port / protocol / pathPrefix / description）；client-independent 系统表 `RFCDES`，无 package/传输（`--package`/`--tr` 拒绝）；pull→push 是整份定义覆盖；非 G 类型拒绝；真机闭环 |
 | 创建/修改转换程序（XSLT） | `create / pull / push / delete XSLT` | ✅ | ICF `/xslt` + `CL_O2_API_XSLTDESC`；AFF 两件套 `.xslt.json` + `.xslt.xml`；更新=原地更新并保留版本历史；真机 18/18 TC |
+| 创建/修改应用作业定义（SM36） | `create / pull / push / delete JOBD` | ✅ | ICF `/jobd` + `CL_JR_JOB_DEFINITION`；本地扩展 `jobd-v1.json`；`RS_CORR_INSERT` 记录 TADIR/传输；写入即激活；真机闭环 |
 | 创建/修改 UCON RFC service（SRFC） | `create / pull / push / delete SRFC` | ✅ | ICF `/srfc` + 公共 UCON RFC API / `CL_UCONRFC_OBJECT_PERSIST`；本地扩展 `srfc-v1`（functionName / scope / defaultProfile / description）；TADIR 对象（`--package` / `--tr` 适用）；写入后刷新运行时缓存；真机闭环 |
 | 创建/修改 OAuth 2.0 client profile（OA2P） | `create / pull / push / delete OA2P` | ✅ | ICF `/oa2p` + OA2P Workbench 持久化类；本地扩展 `oa2p-v1`（type / noAuthCheck / scopes）；TADIR 对象（`--package` / `--tr` 适用）；被 client 分配时拒绝删除；真机闭环 |
 | Table Type（TTYP） | `create / pull / push TTYP` | ✅ | ADT 主通道；ECC 自动 ICF 兜底 |

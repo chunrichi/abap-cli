@@ -72,6 +72,7 @@ import { createNrobHandler } from './create-nrob.js';
 import { createDevcHandler } from './create-devc.js';
 import { createViewHandler } from './create-view.js';
 import { createShlpHandler } from './create-shlp.js';
+import { createJobdHandler } from './create-jobd.js';
 import { pullDevcHandler } from './pull-devc.js';
 import { createXsltHandler } from './create-xslt.js';
 import { runPullXslt } from './pull-xslt.js';
@@ -86,6 +87,7 @@ import { pullEnquHandler } from './pull-enqu.js';
 import { pullNrobHandler } from './pull-nrob.js';
 import { runPullView } from './pull-view.js';
 import { runPullShlp } from './pull-shlp.js';
+import { runPullJobd } from './pull-jobd.js';
 import { runPullDdic } from './pull-ddic.js';
 import { runPullHttp } from './pull-http.js';
 import { runPullTran } from './pull-transport.js';
@@ -107,6 +109,7 @@ import {
 } from './ucon-object-flows.js';
 import { pushViewFile, validateViewFile } from './push-view.js';
 import { pushShlpFile, validateShlpFile } from './push-shlp.js';
+import { pushJobdFile, validateJobdFile } from './push-jobd.js';
 import {
   pushDdicFile,
   pushHttpFile,
@@ -396,6 +399,19 @@ export const TYPE_ROUTES: Readonly<Record<string, TypeRoute>> = {
       channel: 'icf',
       run: ({ client, resolved, file, opts }) => pushShlpFile(client, resolved, file, opts),
       validate: (file) => validateShlpFile(file),
+    },
+  },
+
+  // Application job definition (SM36) — local-extension `jobd-v1` document,
+  // ICF only (no ADT resource for JOBD on the supported releases).
+  JOBD: {
+    create: handler('icf', createJobdHandler),
+    pull: handler('icf', ({ objectName, opts }) => runPullJobd(objectName, opts)),
+    push: {
+      kind: 'icf-json',
+      channel: 'icf',
+      run: ({ client, resolved, file, opts }) => pushJobdFile(client, resolved, file, opts),
+      validate: (file) => validateJobdFile(file),
     },
   },
 

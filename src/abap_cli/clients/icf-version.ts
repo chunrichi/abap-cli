@@ -32,8 +32,9 @@ export const ICF_BASE_PATH = '/sap/abap_cli';
  *  2.3.0: GET /whoami reports the session identity from the SAP system.
  *  2.4.0: GET/POST/DELETE /sm59 manage SM59 HTTP destinations (RFCTYPE='G').
  *  2.5.0: GET/POST/DELETE /srfc manage UCON RFC services and /oa2p manage
- *         OAuth 2.0 client profiles. */
-export const ICF_SERVICE_VERSION = '2.5.0';
+ *         OAuth 2.0 client profiles.
+ *  2.6.0: GET/POST/PUT/DELETE /jobd manage SM36 application job definitions. */
+export const ICF_SERVICE_VERSION = '2.6.0';
 
 export type IcfDeploymentStatus = 'not_deployed' | 'current' | 'outdated' | 'unreachable';
 

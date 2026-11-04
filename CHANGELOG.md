@@ -6,7 +6,7 @@
 
 ## [Unreleased]
 
-本版新增 `abap whoami`：连接身份由 SAP 系统返回，而不是读取本地 profile 配置，因此配置与真实会话不一致、或将来接入 SSO 等认证方式时依然准确。本版还新增 `SM59`、`SRFC` 与 `OA2P` 三个类型，分别管理 SM59 HTTP destination、UCON RFC service 与 OAuth 2.0 client profile。内置 ICF 服务相应新增身份端点及这三个类型的端点，CLI 与 ICF 服务版本线统一到 2.5.0；升级后执行一次 `abap deploy --yes` 才能使用这些能力，部署前 `abap deploy status` 会显示 outdated。
+本版新增 `abap whoami`：连接身份由 SAP 系统返回，而不是读取本地 profile 配置，因此配置与真实会话不一致、或将来接入 SSO 等认证方式时依然准确。本版还新增 `SM59`、`SRFC`、`OA2P` 与 `JOBD` 四个类型，分别管理 SM59 HTTP destination、UCON RFC service、OAuth 2.0 client profile 与 SM36 应用作业定义。内置 ICF 服务相应新增身份端点及这四个类型的端点，CLI 与 ICF 服务版本线统一到 2.6.0；升级后执行一次 `abap deploy --yes` 才能使用这些能力，部署前 `abap deploy status` 会显示 outdated。
 
 ### Added
 
@@ -14,6 +14,7 @@
 - **`SM59`（SM59 HTTP destination）**：新增 `SM59` 类型，管理 SM59 中「HTTP 连接到外部服务器」的目的地，支持 `create` / `pull` / `push` / `delete`。本地文件 `<name>.sm59.json` 可编辑描述、目标主机、端口、协议（HTTP/HTTPS）与路径前缀，`pull` 也能读取系统里已有的 HTTP destination 作为起点。SM59 目的地是客户端无关的系统级配置：没有 package，也不能记录 transport，因此这些命令不接受 `--package` / `--tr`（传了会明确报错，而不是静默忽略）；`create` 不需要 package，创建后所有 client 都能看到该目的地。注意 `push` 是整份目的地定义的覆盖写，而当前只建模了上述常用字段：SSL 证书、代理、登录过程等高级选项不会随文件往返，写入后按 SAP 默认值生效；`pull` 读取已有目的地后 `push` 也会覆盖这些高级设置，请在用途明确的测试目的地或新建目的地上使用。其它 SM59 类型（RFC destination 等）与 UCON HTTP service 不在本版范围内；UCON RFC service（`SRFC`）与 OAuth2 profile（`OA2P`）作为独立类型提供（见下）。
 - **`SRFC`（UCON RFC service）**：新增 `SRFC` 类型，管理 Unified Connectivity 中「RFC service」条目，支持 `create` / `pull` / `push` / `delete`。本地文件 `<name>.srfc.json` 建模 function module、scope（`E` / `O` / `P` / `S`，可省略）、默认 UCON profile 与短文本；`create` 要求 function module 存在且 RFC-enabled，`defaultProfile` 必须存在于 `UCONPROFHEAD`。RFC service 是 TADIR 对象：`--package` / `--tr` 适用，本地 `$` 开头包不需传输请求；写入后刷新 UCON RFC 运行时缓存，使服务无需重启立即生效。注意：短文本按会话语言读写（其它语言行不被修改）；创建时留空 description 会生成与 UCONCOCKPIT 相同的默认文本；communication assembly / RFC profile 的维护不在本类型范围。`create` / `push` 会校验 SAP 侧字段（FM 是否存在 / RFC-enabled、profile 是否存在），错误直接返回而不是静默跳过。
 - **`OA2P`（OAuth 2.0 client profile）**：新增 `OA2P` 类型，管理 OAuth 2.0 client profile，支持 `create` / `pull` / `push` / `delete`。本地文件 `<name>.oa2p.json` 建模 service provider type（必须已在 `OA2C_TYPES` 配置）、scopes 列表与 `noAuthCheck` 标志；profile 是 TADIR 对象，`--package` / `--tr` 适用。删除前会检查 profile 是否仍被 OAuth 2.0 client 使用（被使用时拒绝并提示先在 OA2C_CONFIG 解除分配）。注意：profile 没有描述字段（`--description` 不适用）；provider 专属配置对象是无状态的，不在文件里往返；OAuth 2.0 client 与 profile 的分配关系仍在 OA2C_CONFIG 维护。
+- **JOBD（应用作业定义，SM36）**：新增应用作业定义类型，支持 `create` / `pull` / `push` / `delete`。本地文件 `<name>.jobd.json` 是本地扩展格式（`jobd-v1`：要执行的报表 / 变式与时间或事件调度参数）；参考 release 没有可用的 ADT 资源，对象经内置 ICF 服务读写，需要先执行一次 `abap deploy`。写入即保存并激活，`--no-activate` 会被拒绝；可传输包需要 `--tr`，`$` 开头的本地包免传输。名称上限 32 字符；报表 / 变式引用由 SAP 在调度时校验，CLI 不做本地校验。删除可传输对象后，传输请求中仍会保留该对象原来的插入条目，发布前需在 SE01/SE03 移除（本地包不受影响）。类型矩阵增至 40 类。
 
 ## [2.2.0] - 2026-11-03
 

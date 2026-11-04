@@ -76,6 +76,7 @@ const TADIR_OBJECT_BY_CLI: Record<string, Omit<TadirMapping, 'cliType'>> = {
   VIEW: { pgmid: 'R3TR', tadirObject: 'VIEW', ddicTabclass: 'VIEW', channel: 'ICF', affSchema: 'view-v1.json', description: 'Database view (DDIC) — local-extension view-v1 document; TADIR OBJECT is VIEW' },
   SHLP: { pgmid: 'R3TR', tadirObject: 'SHLP', ddicTabclass: '', channel: 'ICF', affSchema: 'shlp-v1.json', description: 'Search help (DDIC) — local-extension shlp-v1 document; elementary or collective' },
   ENQU: { pgmid: 'R3TR', tadirObject: 'ENQU', ddicTabclass: '', channel: 'ICF', affSchema: 'enqu-v1.json', description: 'Lock object (DDIC)' },
+  JOBD: { pgmid: 'R3TR', tadirObject: 'JOBD', ddicTabclass: '', channel: 'ICF', affSchema: 'jobd-v1.json', description: 'Application job definition (SM36) — local-extension jobd-v1 document' },
   NROB: { pgmid: 'R3TR', tadirObject: 'NROB', ddicTabclass: '', channel: 'ADT', affSchema: 'nrob-v1.json', description: 'Number range object' },
 
   // CDS family (ADT)

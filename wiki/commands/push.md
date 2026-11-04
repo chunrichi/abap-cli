@@ -1,7 +1,7 @@
 ---
 type: command
 title: abap push
-description: 推送本地 ABAP 文件到 SAP — lock → set source → syntax check → activate → unlock，支持源码对象、FUGR、textpool、DDIC/HTTP/TRAN/XSLT/SM59/SRFC/OA2P JSON 与 DOMA/DTEL 长文本伴生，按对象解析 transport（textpool 写受系统限制）
+description: 推送本地 ABAP 文件到 SAP — lock → set source → syntax check → activate → unlock，支持源码对象、FUGR、textpool、DDIC/HTTP/TRAN/XSLT/SM59/SRFC/OA2P/JOBD JSON 与 DOMA/DTEL 长文本伴生，按对象解析 transport（textpool 写受系统限制）
 tags: [abap-cli, command, push, upload, abap-file-format, ddic, docu, xslt, sm59, textpool, transport]
 created at: 2026-08-07 00:11:03
 changed at: 2026-11-04 00:45:00
@@ -9,7 +9,7 @@ changed at: 2026-11-04 00:45:00
 
 # abap push
 
-把本地 ABAP 文件推送到 SAP 系统，核心流程是 **lock → set source → syntax check → activate → unlock**。支持：普通源码对象（CLAS/PROG/INTF）、FUGR 子对象、textpool `.properties`，以及 ICF 路由的 `.json`（DDIC / HTTP / TRAN / VIEW / SHLP / XSLT / SM59 / SRFC / OA2P，其中 DOMA/DTEL 同目录的 `<name>.<type>.docu.json` 长文本伴生会随主文件自动推送，XSLT 的 `<name>.xslt.xml` 源码随 `.xslt.json` 一起推送）与通道路由的 TTYP / MSAG / DDLS。文件级编排在 `flows/edit/push.ts`（`runPush` / `preparePushTarget` / `dispatchPushFile`；`preparePushTarget` 只做本地判定，失败时不创建 ADT client），单对象核心在 `flows/edit/push-object.ts`（`pushObject`）。
+把本地 ABAP 文件推送到 SAP 系统，核心流程是 **lock → set source → syntax check → activate → unlock**。支持：普通源码对象（CLAS/PROG/INTF）、FUGR 子对象、textpool `.properties`，以及 ICF 路由的 `.json`（DDIC / HTTP / TRAN / VIEW / SHLP / XSLT / SM59 / SRFC / OA2P / JOBD，其中 DOMA/DTEL 同目录的 `<name>.<type>.docu.json` 长文本伴生会随主文件自动推送，XSLT 的 `<name>.xslt.xml` 源码随 `.xslt.json` 一起推送）与通道路由的 TTYP / MSAG / DDLS。文件级编排在 `flows/edit/push.ts`（`runPush` / `preparePushTarget` / `dispatchPushFile`；`preparePushTarget` 只做本地判定，失败时不创建 ADT client），单对象核心在 `flows/edit/push-object.ts`（`pushObject`）。
 
 > ⚠️ **textpool 写限制**：textpool `.properties` 的**读**（`abap pull --textpool`）在 ADT / ICF 两种路由都可用；**写**需要 ADT text-elements 写端点。在只提供非交互式 textpool API 的 release 上（vhcala4hci / A4H 实测），profile 缓存 `adtTextpool.write: false` → 写路由到 ICF `/textpool/*`，而自带 ICF handler 对 POST **无条件**返回 `TEXTPOOL_WRITE_UNSUPPORTED`（SAP_ERROR / exit 6）。此时选择屏幕标签改用 `SELECTION-SCREEN COMMENT <pos>(<len>) lbl_xxx` + `INITIALIZATION` 赋值，不要依赖 `push` 文本元素。
 
@@ -93,6 +93,7 @@ push 是「把本地文件写进 SAP 的**已存在**对象」，不是创建入
 - **DDIC**（DOMA/DTEL/TABL/STRU/ENQU/VIEW/NROB）与 **TRAN**：push 前先 ICF GET 探测存在性（`GET /ddic/<type>/<name>` / `GET /tran/<code>`，与 pull 同一端点）。对象不存在 → `OBJECT_NOT_FOUND`（`nextSteps` 引导 `abap create <TYPE> <name> --file ...`），**不再**让 ICF POST 隐式 upsert 创建。
 - **HTTP**（SICF 节点）：**明确例外，保留 push 即创建**。`abap create HTTP` 现在也要求 `--file`（032 US10 的"无 `--file` 落本地骨架"路径已按重构决策 1A 删除），所以 SICF 节点的两条建法都保留：`abap create HTTP <name> --file <path>` 走真实 create，或直接 `abap push <file>.http.json` 由 ICF POST 创建；因此 HTTP 不做存在性探测。HTTP 写入**只支持 `$` 前缀本地包**：可传输包在本地预检即返回 `HTTP_PACKAGE_NOT_SUPPORTED`（exit 7）；pulled 文件不带 `package` 时保留节点现有的本地包，`--tr` 对 HTTP 不生效。
 - **SM59**（HTTP 目标）：push 先 ICF `GET /sm59/<name>` 探测，只更新已存在的目标（不存在 → NOT_FOUND / exit 8，提示改用 `abap create`）；非 `RFCTYPE='G'` 的目标 → `SM59_TYPE_NOT_SUPPORTED`（exit 7）。目标是 client-independent 系统表条目，没有 package / transport：`--tr` 显式拒绝（`TYPE_NOT_SUPPORTED`，exit 7）。写入是整份 v1 定义覆盖（`targetHost` / `port` / `protocol` / `pathPrefix` / `description`）；维护 API 会在 save 时重建 `RFCOPTIONS`，对 SAP 自带目标会丢掉 API 不认识的 legacy option 代码。
+- **JOBD**（应用作业定义，SM36）：push 先 ICF `GET /jobd/<name>` 探测，只更新已存在的定义（不存在 → NOT_FOUND / exit 8，提示改用 `abap create`）。package 取自探测响应，`$` 前缀本地包不需要 transport，其它包按 `--tr` 解析；写入即保存并激活，`--no-activate` 会被拒绝（VALIDATION_ERROR）。可传输 delete 无法写 CTS 删除条目，见 [delete](delete.md)。
 - **SRFC / OA2P**（UCON 对象）：push 先 ICF `GET /srfc|oa2p/<name>` 探测，只更新已存在的对象（不存在 → NOT_FOUND / exit 8，提示改用 `abap create`）。目标 package 取自探测响应，`$` 前缀本地包不需要 transport，其它包按 `--tr` > 项目配置 > 打开的请求解析。写入是整份 v1 定义覆盖；SRFC 写入后刷新 UCON 运行时缓存，OA2P 无描述字段；都没有 `--no-activate`（写入即生效）。
 
 DDIC/TRAN 的探测在 `--dry-run` 之后（plan-only 不做多余 round-trip）；探测的 not-found 之外的错误（网络/权限）按原错误码传播。
@@ -106,12 +107,12 @@ DDIC/TRAN 的探测在 `--dry-run` 之后（plan-only 不做多余 round-trip）
 | 普通源码（adt） | `pushObject` | 锁对象 → 写每个 part 源码 → check/activate → 解锁（`finally` 保证） |
 | FUGR | `push-fugr.ts` | 子对象（FM/include）是独立 ADT 锁对象，逐文件锁自己的目标、写源，最后激活整个 function group |
 | Textpool | `push-textpool.ts` | 混合模式：profile 缓存能力决定走 ADT `setTextElements`（lock→write→unlock）还是 ICF `/textpool/*`；`--check-only` 不支持（`VALIDATION_ERROR`）。**ICF 写为 stub**——`adtTextpool.write: false` 的系统上 POST 无条件报 `TEXTPOOL_WRITE_UNSUPPORTED`（见上方限制说明） |
-| ICF JSON（`route: 'icf'`） | `TYPE_ROUTES`（`icf-json`）→ `push-icf.ts` / `ucon-object-flows.ts` | DDIC（`.doma/.dtel/.tabl/.stru/.enqu/.view/.shlp/.nrob.json`）、HTTP（`.http.json`）、TRAN（`.tran.json`）、SM59（`.sm59.json`）、SRFC（`.srfc.json`）、OA2P（`.oa2p.json`）。`dispatchPushFile` 查 `routing.ts` 的 `TYPE_ROUTES[objectType]` 取到具体 handler，不再有 per-type `if` 分支。DOMA/DTEL 额外处理同目录长文本伴生（见下节） |
+| ICF JSON（`route: 'icf'`） | `TYPE_ROUTES`（`icf-json`）→ `push-icf.ts` / `ucon-object-flows.ts` | DDIC（`.doma/.dtel/.tabl/.stru/.enqu/.view/.shlp/.nrob.json`）、JOBD（`.jobd.json`）、HTTP（`.http.json`）、TRAN（`.tran.json`）、SM59（`.sm59.json`）、SRFC（`.srfc.json`）、OA2P（`.oa2p.json`）。`dispatchPushFile` 查 `routing.ts` 的 `TYPE_ROUTES[objectType]` 取到具体 handler，不再有 per-type `if` 分支。DOMA/DTEL 额外处理同目录长文本伴生（见下节） |
 | TTYP / MSAG / DDLS / NROB（`route: 'adt'` 或 `icf`） | `TYPE_ROUTES`（`aff-json`）→ `push-{ttyp,msag,ddls,nrob}.ts` | 路由表里这几类 `channel: 'auto'`（NROB 为 `icf`），`resolveFile` 给的是 `route: 'adt'`，但文件是 AFF `.json` 而非 ABAP 源码，所以 dispatch 必须在通用源码分支**之前**拦截；每个 flow 自己跑 `channel-detect` |
 
 **JSON 文件的两类拦截**（都由 `routing.ts` 的 `TYPE_ROUTES` 声明，在 `readAbapFile` 之前）：
 
-- **ICF JSON**（`.doma/.dtel/.tabl/.stru/.enqu/.http/.tran/.sm59.json`）：`kind: 'icf-json'`，`resolveFile` 直接给 `route: 'icf'`。
+- **ICF JSON**（`.doma/.dtel/.tabl/.stru/.enqu/.jobd/.http/.tran/.sm59.json`）：`kind: 'icf-json'`，`resolveFile` 直接给 `route: 'icf'`。
 - **通道路由 JSON**（`.ttyp/.msag/.ddls/.nrob.json`）：`kind: 'aff-json'`，`route` 是 `'adt'`（NROB 为 `'icf'`），但文件是 AFF 文档，dispatch 在通用源码分支之前命中。
 
 两类共用同一套闸门语义：`--check-only` 抛 `VALIDATION_ERROR`（`--check-only is not supported for AFF JSON artifact files`）；`--dry-run` 返回 `status: dry-run` / `stage: ddic-icf` 且**零 SAP 调用**（通道路由类同样不会去连 ADT/ICF，也不会记录 `channel-*`）。

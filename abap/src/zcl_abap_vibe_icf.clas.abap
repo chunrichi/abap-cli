@@ -62,6 +62,10 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
       ENDTRY.
     ELSEIF lv_path CP '/mime/*'.
       zcl_abap_vibe_icf_mime=>dispatch_mime( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
+    ELSEIF lv_path CP '/jobd/*'.
+      " Application job definitions (SM36) - no ADT resource for JOBD, so the
+      " customizing object is served through the ICF service.
+      zcl_abap_vibe_icf_jobd=>dispatch_jobd( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
     ELSEIF lv_path CP '/xslt/*'.
       " Transformation (XSLT) programs: metadata + source in one route.
       zcl_abap_vibe_icf_xslt=>dispatch_xslt( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).

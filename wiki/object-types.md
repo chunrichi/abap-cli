@@ -1,7 +1,7 @@
 ---
 type: reference
 title: 支持的对象类型
-description: abap CLI 支持的 ABAP 对象类型总览 — 37 个类型码 × create/pull/push/delete 路由（ADT / ICF）与本地 AFF 文件布局
+description: abap CLI 支持的 ABAP 对象类型总览 — 40 个类型码 × create/pull/push/delete 路由（ADT / ICF）与本地 AFF 文件布局
 tags: [abap-cli, object-types, ddic, http, sicf, reference]
 created at: 2026-08-29 10:00:00
 changed at: 2026-11-04 00:30:00
@@ -9,7 +9,7 @@ changed at: 2026-11-04 00:30:00
 
 # 支持的对象类型
 
-abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **39 个对象类型**：4 个 ABAP 源对象、1 个 ADT 包（DEVC）、8 个 DDIC 对象（含 VIEW / SHLP）、6 个 ICF 事务/转换/目标对象（HTTP / TRAN / XSLT / SM59 / SRFC / OA2P）、3 个双通道 DDIC/CDS 对象、6 个 CDS/RAP 对象、3 个 ATC 检查配置对象（CHKC / CHKO / CHKV）、5 个 CDS 技术对象（DTDC / DTEB / DSFD / DSFI / DRTY）、1 个类型池（TYPE）、2 个应用作业对象（SAJC / SAJT）。分两条路由：**ADT** 与 **ICF**（含本地扩展格式）。
+abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **40 个对象类型**：4 个 ABAP 源对象、1 个 ADT 包（DEVC）、8 个 DDIC 对象（含 VIEW / SHLP）、6 个 ICF 事务/转换/目标对象（HTTP / TRAN / XSLT / SM59 / SRFC / OA2P）、3 个双通道 DDIC/CDS 对象、6 个 CDS/RAP 对象、3 个 ATC 检查配置对象（CHKC / CHKO / CHKV）、5 个 CDS 技术对象（DTDC / DTEB / DSFD / DSFI / DRTY）、1 个类型池（TYPE）、2 个应用作业对象（SAJC / SAJT）、1 个应用作业定义（JOBD）。分两条路由：**ADT** 与 **ICF**（含本地扩展格式）。
 
 ## 类型 × 命令矩阵
 
@@ -54,9 +54,10 @@ abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **39 个
 | `TYPE` | Type Pool | ADT | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.type.{json,abap}` |
 | `SAJC` | 应用作业目录条目 | ADT | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.sajc.json` |
 | `SAJT` | 应用作业模板 | ADT | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.sajt.json` |
+| `JOBD` | 应用作业定义（SM36） | ICF | `--file`（`jobd-v1.json`，本地扩展） | ✅ | ✅ | ✅ | ❌ | `<name>.jobd.json` |
 
 > **`create local` 只支持 `CLAS` / `INTF` / `PROG` / `FUGR`**（`formats/templates.ts` 只有这四类模板），其余类型一律 `TYPE_NOT_SUPPORTED`（exit 7）。`SRVD` / `DCLS` / `DDLX` / `DDLA` 在 SAP 侧可创建（`createObjtype`），但没有本地骨架模板；`create local` 会拒绝它们并提示改用 `abap create <type> --file <aff.json>`。
-> **`create` 的 `--file` 是数据驱动必填项**（`types/registry.ts` 的 `ObjectTypeEntry.requiresFile`）：`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `NROB` / `HTTP` / `TRAN` / `XSLT` / `TTYP` / `MSAG` / `DDLS` / `BDEF` / `SRVB` / `SRVD` / `DCLS` / `DDLX` / `DDLA` / `CHKC` / `CHKO` / `CHKV` / `DTDC` / `DTEB` / `DSFD` / `DSFI` / `DRTY` / `TYPE` / `SAJC` / `SAJT` / `SM59` / `SRFC` / `OA2P` 缺 `--file` 直接 `USAGE`（exit 2）。`BDEF` 还需同目录的 `.bdef.abdl` 源码；`SRVB` 创建后可用 `--publish` 发布（publish job 受系统 transport 设置约束），push/update 不支持。`SM59` 的 `--file` 文件名必须与目标名一致（`<name>.sm59.json`），因为没有 `name` 字段承载身份。
+> **`create` 的 `--file` 是数据驱动必填项**（`types/registry.ts` 的 `ObjectTypeEntry.requiresFile`）：`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `JOBD` / `NROB` / `HTTP` / `TRAN` / `XSLT` / `TTYP` / `MSAG` / `DDLS` / `BDEF` / `SRVB` / `SRVD` / `DCLS` / `DDLX` / `DDLA` / `CHKC` / `CHKO` / `CHKV` / `DTDC` / `DTEB` / `DSFD` / `DSFI` / `DRTY` / `TYPE` / `SAJC` / `SAJT` / `SM59` / `SRFC` / `OA2P` 缺 `--file` 直接 `USAGE`（exit 2）。`BDEF` 还需同目录的 `.bdef.abdl` 源码；`SRVB` 创建后可用 `--publish` 发布（publish job 受系统 transport 设置约束），push/update 不支持。`SM59` 的 `--file` 文件名必须与目标名一致（`<name>.sm59.json`），因为没有 `name` 字段承载身份。
 > **`ENQU` / `NROB` 的 create/delete 仅支持本地包（`$` 前缀）**：可传输创建/删除需要额外写 TADIR 记录，ICF 服务对非本地包直接拒绝（`ENQU_PACKAGE_NOT_SUPPORTED` / `NROB_PACKAGE_NOT_SUPPORTED`、`ENQU_DELETE_UNSUPPORTED` / `NROB_DELETE_UNSUPPORTED`）。`ENQU` 删除先回填本地 TADIR 行再走 `RS_DD_DELETE_OBJ`；`NROB` 删除清空区间后走 `NUMBER_RANGE_OBJECT_DELETE`。可传输对象请在 SE11（ENQU）/ SNRO（NROB）删除。`TEST...` 前缀的包不视为本地。（真机：`$` 前缀本地包中 ENQU/NROB create → delete 通过，TADIR/DD25L/TNRO 无残留；证据 `tests/261102013-enqu-nrob-delete/`，本地不入库。）
 
 > **`TRAN` 写路径已实现**：ABAP `/tran/<code>` 支持 GET / POST / PUT / DELETE，覆盖 dialog / report（含 report variant）/ parameter / variant 四种事务；OO 事务返回 `TRAN_OO_NOT_SUPPORTED`（规范 FM 没有 class/method 参数，仍用 SE93 维护）。`delete` 只支持 `$TMP` 事务（可传输事务请在 SE93 删除以便记录到请求）。类型页面：[tran](objects/tran.md)。
@@ -67,6 +68,8 @@ abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **39 个
 > **`SRFC`（UCON RFC service）新增**：ABAP `/srfc/<name>` 支持 GET / POST / DELETE，本地扩展 `srfc-v1.json`（functionName / scope / defaultProfile / description）。读走公共 UCON RFC API，写走 `CL_UCONRFC_OBJECT_PERSIST`（UCONCOCKPIT 保存路径）+ `RS_CORR_INSERT`（TADIR / package / transport），写入后刷新 UCON RFC 运行时缓存；删除走 `CL_UCON_API_FACTORY=>DELETE_RFC_SERVICE`。function module 必须存在且 RFC-enabled，defaultProfile 必须存在于 `UCONPROFHEAD`；短文本按会话语言读写。communication assembly / RFC profile 不在范围。类型页面：[srfc](objects/srfc.md)。
 >
 > **`OA2P`（OAuth 2.0 client profile）新增**：ABAP `/oa2p/<name>` 支持 GET / POST / DELETE，本地扩展 `oa2p-v1.json`（type / noAuthCheck / scopes）。走 OA2P Workbench 持久化类 + `RS_CORR_INSERT`（TADIR / package / transport）；provider type 必须存在于 `OA2C_TYPES`；被 OAuth 2.0 client 分配的 profile 拒绝删除（`OA2P_PROFILE_IN_USE`）；没有描述字段与激活步骤。OAuth 2.0 client 与 profile 的分配仍在 `OA2C_CONFIG`。类型页面：[oa2p](objects/oa2p.md)。
+
+> **`JOBD` 写路径已实现（本地扩展 + ICF）**：上游 AFF 没有 JOBD 格式、参考 release 也没有 ADT 资源，所以本地格式 `jobd-v1.json` 是**本地扩展**（镜像 `CL_JR_JOB_DEFINITION=>TY_JOB_DEFINITION`，去掉系统字段），SAP 侧走 ICF `/jobd/<name>`（GET/POST/PUT/DELETE）。写入即保存激活（`--no-activate` 被拒绝）；`create/push/delete` 用 `RS_CORR_INSERT` 记录 TADIR（可传输包带 `--tr`），类的 `CREATE_JD`/`MODIFY_JD` 负责落库，handler 再把写入时临时用的 `$TMP` 包改回真实包。名称上限 32 字符；不含 `CL_JR_JOB_DEFINITION` 的 release 返回 `JOBD_UNSUPPORTED`（exit 7）。类型页面：[jobd](objects/jobd.md)。
 
 > **`SHLP` 写路径已实现（真机 18/18 TC 通过）**：ABAP `/ddic/shlp` 支持 GET / POST / PUT / DELETE（`DDIF_SHLP_GET` / `RS_CORR_INSERT` + `DDIF_SHLP_PUT` + `DDIF_SHLP_ACTIVATE`；删除 `$TMP` 搜索帮助用 `RS_DD_DELETE_OBJ(no_ask, objtype='H')`）。本地格式 `shlp-v1.json` 是**本地扩展**——覆盖 elementary（selectionMethod + 参数）与 collective（includedSearchHelps + parameterMappings）；名称上限 30 字符。类型页面：[shlp](objects/shlp.md)。
 
@@ -167,7 +170,7 @@ abap delete ZMY_SERVICE --type HTTP --yes
 - [x] `SICF` → `HTTP` 别名在 1.0.0 删除（旧文档里的"自动映射"描述已同步删除）
 - [x] `create <type>` `--schema` 补全 `allowedValues` 全 39 类（含 `ENQU`/`NROB`/`VIEW`/`SHLP`/`CHKC`/`CHKO`/`CHKV`/`DTDC`/`DTEB`/`DSFD`/`DSFI`/`DRTY`/`TYPE`/`SAJC`/`SAJT`/`SM59`/`SRFC`/`OA2P`）
 - [x] 矩阵补全 `ENQU`/`NROB` 行、修正 `create local` 列（CDS/RAP 伴生对象不再落错误骨架）
-- [ ] 候选补充类型（AUTH / ENHO / STRANS / JOBD / UIAD…）的取舍与排期 → [roadmap](roadmap.md)
+- [ ] 候选补充类型（AUTH / ENHO / STRANS / UIAD…）的取舍与排期 → [roadmap](roadmap.md)
 - [ ] `create` 的 help/description 文案随 registry 动态化
 
 # references

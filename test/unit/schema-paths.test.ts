@@ -69,7 +69,7 @@ describe('schema-paths priority chain', () => {
         'ENQU', 'NROB',
         // — database view (VIEW) and search help (SHLP) local-extension
         //   schemas; XSLT also has a local-extension schema.
-        'VIEW', 'SHLP', 'XSLT',
+        'VIEW', 'SHLP', 'JOBD', 'XSLT',
         // — package (DEVC) metadata document.
         'DEVC',
         // — DOMA/DTEL long-text companion schema (not an object type).
@@ -99,7 +99,8 @@ describe('schema-paths priority chain', () => {
     // added SAJC / SAJT (application jobs) = 40 total.
     // added SM59 (HTTP destination local extension) = 41 total.
     // added SRFC / OA2P (UCON RFC service / OAuth2 profile) = 43 total.
-    expect(types).toHaveLength(43);
+    // added JOBD (application job definition, local extension) = 44 total.
+    expect(types).toHaveLength(44);
   });
 
   it('bundled root contains every supported schema', () => {

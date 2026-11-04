@@ -80,6 +80,10 @@
     {
       "global": "ZCL_ABAP_VIBE_ICF_OA2P",
       "local": "lcl_oa2p"
+    },
+    {
+      "global": "ZCL_ABAP_VIBE_ICF_JOBD",
+      "local": "lcl_jobd"
     }
   ],
   "standalone": [

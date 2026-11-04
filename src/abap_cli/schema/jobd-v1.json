@@ -1,0 +1,169 @@
+{
+  "$comment": "Local extension: upstream SAP abap-file-formats has no schema for JOBD (application job definition, SM36). Field names and value ranges are derived from the flat CL_JR_JOB_DEFINITION=>TY_JOB_DEFINITION structure (STJR_JOBD_ROOT + STJR_JOBD_TREP as serialized by abapGit), verified on S/4HANA: GET/POST/PUT/DELETE /sap/abap_cli/jobd/<name>. Server-managed fields are not part of the document: package and owner travel as request metadata, created*/changed*/btcjobUser are system fields.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Application Job Definition Properties",
+  "description": "ABAP application job definition (SM36 job definition) properties",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["formatVersion", "name"],
+  "properties": {
+    "formatVersion": {
+      "title": "ABAP File Format Version",
+      "type": "string",
+      "const": "1"
+    },
+    "name": {
+      "title": "Job Definition Name",
+      "description": "Job definition name (STJR_JOBD_ROOT-NAME / TADIR JOBD obj_name). At most 32 characters.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "pattern": "^[A-Za-z0-9_/]+$"
+    },
+    "package": {
+      "title": "Package",
+      "description": "Package recorded for the job definition in TADIR (read-side only; create/push take the package from the command line).",
+      "type": "string",
+      "maxLength": 30
+    },
+    "btcjobName": {
+      "title": "Job Name",
+      "description": "STJR_JOBD_ROOT-BTCJOB_NAME: batch job name the definition schedules.",
+      "type": "string",
+      "maxLength": 32
+    },
+    "prodClient": { "title": "Productive Client", "$ref": "#/$defs/indicator" },
+    "sysClient": { "title": "System Client", "$ref": "#/$defs/indicator" },
+    "maintMode": { "title": "Maintenance Mode", "$ref": "#/$defs/indicator" },
+    "isScope": { "title": "Scope Check", "$ref": "#/$defs/indicator" },
+    "maxRuntime": {
+      "title": "Maximum Runtime",
+      "description": "STJR_JOBD_ROOT-MAX_RUNTIME (NUMC 2). 0 means no limit.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 99
+    },
+    "abortionCode": {
+      "title": "Abortion Code",
+      "description": "STJR_JOBD_ROOT-ABORTION_CODE.",
+      "type": "string",
+      "maxLength": 1
+    },
+    "isTimeBased": { "title": "Time Based", "$ref": "#/$defs/indicator" },
+    "isEventBased": { "title": "Event Based", "$ref": "#/$defs/indicator" },
+    "startTime": {
+      "title": "Start Time",
+      "description": "STJR_JOBD_ROOT-START_TIME (TIMS, ISO notation).",
+      "type": "string",
+      "pattern": "^[0-9]{2}:[0-9]{2}:[0-9]{2}$"
+    },
+    "startWeekday": {
+      "title": "Start Weekday",
+      "description": "STJR_JOBD_ROOT-START_WEEKDAY (NUMC 1, 1 = Monday).",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 6
+    },
+    "startMonthday": {
+      "title": "Start Day of Month",
+      "description": "STJR_JOBD_ROOT-START_MONTHDAY (NUMC 2).",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 31
+    },
+    "beginMonth": { "title": "Begin of Month", "$ref": "#/$defs/indicator" },
+    "endMonth": { "title": "End of Month", "$ref": "#/$defs/indicator" },
+    "recurCode": {
+      "title": "Recurrence Code",
+      "description": "STJR_JOBD_ROOT-RECUR_CODE (JR_FREQUENCY, e.g. D daily, W weekly, M monthly).",
+      "type": "string",
+      "maxLength": 2
+    },
+    "recurValue": {
+      "title": "Recurrence Value",
+      "description": "STJR_JOBD_ROOT-RECUR_VALUE (NUMC 2).",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 99
+    },
+    "eventName": {
+      "title": "Event Name",
+      "description": "STJR_JOBD_ROOT-EVENT_NAME (BTCEVENTID).",
+      "type": "string",
+      "maxLength": 32
+    },
+    "eventParam": {
+      "title": "Event Parameter",
+      "description": "STJR_JOBD_ROOT-EVENT_PARAM (BTCEVTPARM).",
+      "type": "string",
+      "maxLength": 64
+    },
+    "isLight": { "title": "Lightweight Job", "$ref": "#/$defs/indicator" },
+    "jdType": {
+      "title": "Job Definition Type",
+      "description": "STJR_JOBD_ROOT-JD_TYPE (single character, e.g. V/R/D).",
+      "type": "string",
+      "maxLength": 1
+    },
+    "timezoneIndicator": {
+      "title": "Time Zone Indicator",
+      "description": "STJR_JOBD_ROOT-TIMEZONE_INDICATOR.",
+      "type": "string",
+      "maxLength": 1
+    },
+    "scopeClass": {
+      "title": "Scope Class",
+      "description": "STJR_JOBD_ROOT-SCOPE_CLASS (SEOCLSNAME).",
+      "type": "string",
+      "maxLength": 30
+    },
+    "schedulingConditions": {
+      "title": "Scheduling Conditions",
+      "description": "STJR_JOBD_ROOT-SCHEDULING_CONDITIONS (JR_CONDITIONS).",
+      "type": "string",
+      "maxLength": 40
+    },
+    "alwaysRun": { "title": "Always Run", "$ref": "#/$defs/indicator" },
+    "techClntRun": { "title": "Technical Client Run", "$ref": "#/$defs/indicator" },
+    "noRandomStarttime": { "title": "No Random Start Time", "$ref": "#/$defs/indicator" },
+    "isScopeChanged": { "title": "Scope Changed", "$ref": "#/$defs/indicator" },
+    "passClient": {
+      "title": "Pass Client",
+      "description": "CL_JR_JOB_DEFINITION=>TY_JOB_DEFINITION-PASS_CLIENT (ABAP_BOOL).",
+      "type": "boolean"
+    },
+    "sysTimezoneIndicator": {
+      "title": "System Time Zone Indicator",
+      "description": "CL_JR_JOB_DEFINITION=>TY_JOB_DEFINITION-SYS_TIMEZONE_INDICATOR (ABAP_BOOL).",
+      "type": "boolean"
+    },
+    "reportName": {
+      "title": "Report Name",
+      "description": "STJR_JOBD_TREP-REPORT_NAME (BTCREP): report the job runs.",
+      "type": "string",
+      "maxLength": 40
+    },
+    "variantName": {
+      "title": "Variant Name",
+      "description": "STJR_JOBD_TREP-VARIANT_NAME (RALDB_VARI).",
+      "type": "string",
+      "maxLength": 14
+    },
+    "localDeact": {
+      "title": "Local Deactivation",
+      "type": "boolean"
+    },
+    "localCust": {
+      "title": "Local Customizing",
+      "type": "boolean"
+    }
+  },
+  "$defs": {
+    "indicator": {
+      "title": "Indicator",
+      "description": "ABAP indicator as serialized by the ICF service: \"\" or \"X\".",
+      "type": "string",
+      "enum": ["", "X"]
+    }
+  }
+}

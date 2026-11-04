@@ -3,11 +3,11 @@
 These JSON schemas are vendored from the SAP `abap-file-formats` repository
 (https://github.com/SAP/abap-file-formats), commit `5bd63fdecb8b4a03c73b1433a36b779c0c9b1121`.
 
-Every file except `ttyp-v1.json`, `view-v1.json`, `shlp-v1.json`, `sm59-v1.json`, `srfc-v1.json` and
-`oa2p-v1.json` is a byte-for-byte copy of the upstream schema with the same name. Those six are local
-extensions: upstream has no TTYP, view, search-help, SM59-destination, UCON RFC service or OAuth 2.0
-client profile schema at this commit, so the files are handcrafted here and `scripts/sync-aff-schema.sh`
-never overwrites them.
+Every file except `ttyp-v1.json`, `view-v1.json`, `shlp-v1.json`, `jobd-v1.json`, `sm59-v1.json`,
+`srfc-v1.json` and `oa2p-v1.json` is a byte-for-byte copy of the upstream schema with the same name.
+Those seven are local extensions: upstream has no TTYP, view, search-help, application job definition,
+SM59-destination, UCON RFC service or OAuth 2.0 client profile schema at this commit, so the files are
+handcrafted here and `scripts/sync-aff-schema.sh` never overwrites them.
 
 The set is intentionally minimal — only the schemas abap-cli resolves through
 `schemaPathFor()` in `src/abap_cli/aff/schema-paths.ts` (the map behind
@@ -37,6 +37,7 @@ The set is intentionally minimal — only the schemas abap-cli resolves through
 | `ttyp-v1.json` | TTYP | — | **local variant**, handcrafted (`keyKind`, `rowTypeLength`, `rowTypeDecimals` are local extensions) |
 | `view-v1.json` | VIEW | — | **local extension**, handcrafted from DD25V / DD26V / DD27P / DD28J / DD28V |
 | `shlp-v1.json` | SHLP | — | **local extension**, handcrafted from DD30V / DD31V / DD32P / DD33V |
+| `jobd-v1.json` | JOBD | — | **local extension**, handcrafted from `CL_JR_JOB_DEFINITION=>TY_JOB_DEFINITION` / STJR_JOBD_ROOT + STJR_JOBD_TREP (no upstream AFF format, no ADT resource) |
 | `msag-v1.json` | MSAG | `file-formats/msag/msag-v1.json` | |
 | `ddls-v1.json` | DDLS | `file-formats/ddls/ddls-v1.json` | |
 | `srvb-v1.json` | SRVB | `file-formats/srvb/srvb-v1.json` | |

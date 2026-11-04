@@ -54,6 +54,8 @@ const ddicStore = new Map();
 const docuStore = new Map();
 // VIEW (database view) store — key = view name, value = view-v1 wire document.
 const viewStore = new Map();
+// JOBD application job definitions: /sap/abap_cli/jobd/<name> (local-extension jobd-v1).
+const jobdStore = new Map();
 // SHLP (search help) store — key = shlp name, value = shlp-v1 wire document.
 const shlpStore = new Map();
 // 014: textpool store — key = `<TYPE>:<OBJ>:<CATEGORY>`, value = array of { id, text }.
@@ -1441,6 +1443,81 @@ const server = http.createServer(async (req, res) => {
         return ok(res, JSON.stringify({ status: 'success', data: { name: viewName, type: 'VIEW', action: 'deleted' } }), 'application/json');
       }
       return ok(res, JSON.stringify({ status: 'error', error: { code: 'METHOD_NOT_ALLOWED', message: `${req.method} not supported on /ddic/view` } }), 'application/json');    }
+
+    // JOBD (application job definition) — local-extension jobd-v1 document via
+    // ICF. Mirrors the ABAP handler contract for GET/POST/PUT/DELETE
+    // (/jobd/<name>): 32-character names, create on POST, update on PUT,
+    // transport required for non-local packages, delete only for local ones.
+    const jobdRoute = /^\/sap\/abap_cli\/jobd\/(.+)$/.exec(path);
+    if (jobdRoute) {
+      const jobdName = decodeURIComponent(jobdRoute[1]).toUpperCase();
+      const query = new URLSearchParams(String(req.url || '').split('?')[1] || '');
+      const queryPackage = String(query.get('package') || '').toUpperCase();
+      const queryTransport = String(query.get('transportRequest') || query.get('tr') || '').toUpperCase();
+      const jsonError = (code, message) => ok(res, JSON.stringify({ status: 'error', error: { code, message } }), 'application/json');
+
+      if (!jobdName || jobdName.length > 32 || /\s/.test(jobdName)) {
+        return jsonError('JOBD_NAME_INVALID', `job definition name must be 1-32 characters without whitespace (got '${jobdName}')`);
+      }
+
+      if (req.method === 'GET') {
+        if (!jobdStore.has(jobdName)) {
+          return jsonError('JOBD_NOT_FOUND', `job definition ${jobdName} does not exist`);
+        }
+        return ok(res, JSON.stringify({ status: 'success', data: jobdStore.get(jobdName) }), 'application/json');
+      }
+
+      if (req.method === 'POST' || req.method === 'PUT') {
+        const body = await readBody(req);
+        let payload = {};
+        try { payload = JSON.parse(body); } catch (_e) { payload = {}; }
+        if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+          return jsonError('JOBD_INVALID_PAYLOAD', 'request body is not a valid job definition document');
+        }
+        const existed = jobdStore.has(jobdName);
+        if (req.method === 'POST' && existed) {
+          return jsonError('JOBD_ALREADY_EXISTS', `job definition ${jobdName} already exists; update it instead`);
+        }
+        if (req.method === 'PUT' && !existed) {
+          return jsonError('JOBD_NOT_FOUND', `job definition ${jobdName} does not exist; create it first`);
+        }
+        const stored = existed ? jobdStore.get(jobdName) : {};
+        const pkg = queryPackage || String(stored.package || payload.package || '').toUpperCase() || '$TMP';
+        if (!isLocalPackage(pkg) && !queryTransport) {
+          return jsonError('JOBD_TRANSPORT_REQUIRED', `write of a job definition requires transportRequest for package ${pkg}`);
+        }
+        jobdStore.set(jobdName, Object.assign({}, stored, payload, {
+          formatVersion: '1',
+          name: jobdName,
+          package: pkg,
+          passClient: payload.passClient === true,
+          sysTimezoneIndicator: payload.sysTimezoneIndicator === true,
+          localDeact: payload.localDeact === true,
+          localCust: payload.localCust === true,
+        }));
+        return ok(res, JSON.stringify({
+          status: 'success',
+          data: { name: jobdName, type: 'JOBD', action: existed ? 'updated' : 'created', package: pkg, activated: true },
+        }), 'application/json');
+      }
+
+      if (req.method === 'DELETE') {
+        if (!jobdStore.has(jobdName)) {
+          return jsonError('JOBD_NOT_FOUND', `job definition ${jobdName} does not exist`);
+        }
+        const stored = jobdStore.get(jobdName);
+        if (!isLocalPackage(stored.package) && !queryTransport) {
+          return jsonError('JOBD_TRANSPORT_REQUIRED', `delete of a job definition requires transportRequest for package ${stored.package}`);
+        }
+        jobdStore.delete(jobdName);
+        return ok(res, JSON.stringify({
+          status: 'success',
+          data: { name: jobdName, type: 'JOBD', action: 'deleted', package: stored.package, activated: false },
+        }), 'application/json');
+      }
+
+      return jsonError('METHOD_NOT_ALLOWED', `${req.method} not supported on /jobd/<name>`);
+    }
 
     // SHLP (search help) — local-extension shlp-v1 document via ICF.
     // Mirrors the ABAP handler contract for GET / POST|PUT / DELETE

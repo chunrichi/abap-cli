@@ -791,6 +791,70 @@ TYPES:
     data   TYPE ty_xslt_write_data,
   END OF ty_xslt_write.
 
+" ----- Application job definition (JOBD) -----
+" JOBD is a customizing object without an ADT resource: the ICF endpoint
+" serializes CL_JR_JOB_DEFINITION=>TY_JOB_DEFINITION, i.e. the STJR_JOBD_ROOT
+" row plus the report/variant reference (STJR_JOBD_TREP). The document mirrors
+" that flat structure camelCase and leaves out the server-managed fields
+" (package, owner, btcjobUser, created*/changed*).
+"   GET  response: { status, data: { formatVersion, name, package, ... } }
+"   POST/PUT body: { formatVersion, name, ... }  (package/transportRequest query)
+"   write response: { status, data: { name, type, action, package, activated } }
+TYPES:
+  BEGIN OF ty_jobd_doc,
+    format_version         TYPE string,
+    name                   TYPE jr_jdname,
+    package                TYPE devclass,
+    btcjob_name            TYPE btcjob,
+    prod_client            TYPE jr_indicator,
+    sys_client             TYPE jr_indicator,
+    maint_mode             TYPE jr_indicator,
+    is_scope               TYPE jr_indicator,
+    max_runtime            TYPE n LENGTH 2,
+    abortion_code          TYPE jr_termination,
+    is_time_based          TYPE jr_indicator,
+    is_event_based         TYPE jr_indicator,
+    start_time             TYPE btcsdltime,
+    start_weekday          TYPE sc_weekday,
+    start_monthday         TYPE btcworkday,
+    begin_month            TYPE jr_indicator,
+    end_month              TYPE jr_indicator,
+    recur_code             TYPE jr_frequency,
+    recur_value            TYPE n LENGTH 2,
+    event_name             TYPE btceventid,
+    event_param            TYPE btcevtparm,
+    is_light               TYPE jr_indicator,
+    jd_type                TYPE char1,
+    timezone_indicator     TYPE char1,
+    scope_class            TYPE seoclsname,
+    scheduling_conditions  TYPE jr_conditions,
+    always_run             TYPE jr_always_run,
+    tech_clnt_run          TYPE jr_tech_clnt_run,
+    no_random_starttime    TYPE jr_not_allow_random,
+    is_scope_changed       TYPE jr_indicator,
+    pass_client            TYPE abap_bool,
+    sys_timezone_indicator TYPE abap_bool,
+    report_name            TYPE btcrep,
+    variant_name           TYPE raldb_vari,
+    local_deact            TYPE abap_bool,
+    local_cust             TYPE abap_bool,
+  END OF ty_jobd_doc,
+  BEGIN OF ty_jobd_get,
+    status TYPE string,
+    data   TYPE ty_jobd_doc,
+  END OF ty_jobd_get,
+  BEGIN OF ty_jobd_write_data,
+    name      TYPE string,
+    type      TYPE string,
+    action    TYPE string,
+    package   TYPE string,
+    activated TYPE abap_bool,
+  END OF ty_jobd_write_data,
+  BEGIN OF ty_jobd_write,
+    status TYPE string,
+    data   TYPE ty_jobd_write_data,
+  END OF ty_jobd_write.
+
   " ----- local package predicate -----
   CLASS-METHODS is_local_package
     IMPORTING iv_package      TYPE devclass
