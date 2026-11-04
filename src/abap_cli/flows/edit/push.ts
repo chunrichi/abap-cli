@@ -210,7 +210,7 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
     try {
       const resolved = preparePushTarget(file);
       const client = await getClient();
-      const { transport, status, docu } = await dispatchPushFile(client, resolved, file, opts, onStage, onWarning);
+      const { transport, status, docu, profilesRegenerated } = await dispatchPushFile(client, resolved, file, opts, onStage, onWarning);
       if (opts.dryRun) {
         results.push({ file, status: 'dry-run', plan: stages, written: false, activated: false, ...(docu ? { docu } : {}) });
       } else {
@@ -224,6 +224,7 @@ export async function runPush(files: string[], opts: PushFileOptions): Promise<P
           written: !opts.checkOnly,
           activated: resolvedStatus === 'activated',
           ...(docu ? { docu } : {}),
+          ...(profilesRegenerated !== undefined ? { profilesRegenerated } : {}),
         });
       }
       if (opts.failFast && failed > 0) break;

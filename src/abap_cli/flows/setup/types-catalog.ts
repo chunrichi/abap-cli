@@ -78,6 +78,12 @@ const TADIR_OBJECT_BY_CLI: Record<string, Omit<TadirMapping, 'cliType'>> = {
   ENQU: { pgmid: 'R3TR', tadirObject: 'ENQU', ddicTabclass: '', channel: 'ICF', affSchema: 'enqu-v1.json', description: 'Lock object (DDIC)' },
   JOBD: { pgmid: 'R3TR', tadirObject: 'JOBD', ddicTabclass: '', channel: 'ICF', affSchema: 'jobd-v1.json', description: 'Application job definition (SM36) — local-extension jobd-v1 document' },
   NROB: { pgmid: 'R3TR', tadirObject: 'NROB', ddicTabclass: '', channel: 'ADT', affSchema: 'nrob-v1.json', description: 'Number range object' },
+  // Authorization-object family (hand-written ICF routes under /auth/<sub>).
+  AUTH: { pgmid: 'R3TR', tadirObject: 'AUTH', ddicTabclass: '', channel: 'ICF', affSchema: 'auth-v1.json', description: 'Authorization field (SU20) — auth-v1 document; TADIR OBJECT is AUTH' },
+  SUSC: { pgmid: 'R3TR', tadirObject: 'SUSC', ddicTabclass: '', channel: 'ICF', affSchema: 'susc-v1.json', description: 'Authorization object class (SU21, TOBC/TOBCT) — local-extension susc-v1 document' },
+  SUCU: { pgmid: 'R3TR', tadirObject: 'SUCU', ddicTabclass: '', channel: 'ICF', affSchema: 'sucu-v1.json', description: 'Authorization group (TBRG_AUTH) — local-extension sucu-v1 document; TADIR name is the composite group+object key' },
+  SUSH: { pgmid: 'R3TR', tadirObject: 'SUSH', ddicTabclass: '', channel: 'ICF', affSchema: 'sush-v1.json', description: 'Authorization default assignment (SU22, USOB*) — sush-v1 document' },
+  SUSO: { pgmid: 'R3TR', tadirObject: 'SUSO', ddicTabclass: '', channel: 'ICF', affSchema: 'suso-v1.json', description: 'Authorization object (SU21, TOBJ*) — suso-v1 document' },
 
   // CDS family (ADT)
   DDLS: { pgmid: 'R3TR', tadirObject: 'DDLS', ddicTabclass: '', channel: 'ADT', affSchema: 'ddls-v1.json', description: 'CDS view (DDDLSRC-SOURCE_TYPE=V); not supported on ECC pre-7.40' },

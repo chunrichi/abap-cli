@@ -121,6 +121,12 @@ const SUFFIX_RULES: ReadonlyArray<{ suffix: string; type: string; schemaFile?: s
   // `source/main` (SAJC catalog entry / SAJT template).
   { suffix: '.sajc.json', type: 'SAJC' },
   { suffix: '.sajt.json', type: 'SAJT' },
+  // Authorization-object family: hand-written ICF routes (no ADT resource).
+  { suffix: '.auth.json', type: 'AUTH' },
+  { suffix: '.susc.json', type: 'SUSC' },
+  { suffix: '.sucu.json', type: 'SUCU' },
+  { suffix: '.sush.json', type: 'SUSH' },
+  { suffix: '.suso.json', type: 'SUSO' },
 ];
 
 const SUFFIX_INDEX: Map<string, string> = new Map(

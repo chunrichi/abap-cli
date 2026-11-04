@@ -52,7 +52,7 @@ abap push src/zcl_my_class.clas.abap --tr DEVK900001    # 锁 → 写 → 激活
 ## 能做什么
 
 - **就地在本地编辑**——`pull` 把对象拉成 abap-file-format 文件树，用编辑器改，`push` 写回（锁 → 写 → 激活 → 解锁）；写之前可以先 `check` 和 `diff`。
-- **覆盖 40 种对象类型**——类、接口、程序、函数组；包；DDIC 表、结构、域、数据元素、数据库视图、搜索帮助、锁对象、编号范围对象；SICF 节点、事务码、XSLT 转换程序、SM59 HTTP 目标；UCON RFC service 与 OAuth 2.0 client profile；表类型、消息类、CDS 视图及 CDS / RAP 配套对象；ATC 检查配置对象；CDS 技术对象；类型池；应用程序作业目录条目与模板，以及应用作业定义（SM36）。其中 40 种支持 create、40 种支持 pull、38 种有 push 入口、40 种有 delete 路径；`DEVC` 支持 create / pull / delete（无 push），`SRVB` 仅元数据，`SAJC` / `SAJT` / `JOBD` 写入即激活。
+- **覆盖 45 种对象类型**——类、接口、程序、函数组；包；DDIC 表、结构、域、数据元素、数据库视图、搜索帮助、锁对象、编号范围对象；SICF 节点、事务码、XSLT 转换程序、SM59 HTTP 目标；UCON RFC service 与 OAuth 2.0 client profile；表类型、消息类、CDS 视图及 CDS / RAP 配套对象；ATC 检查配置对象；CDS 技术对象；类型池；应用程序作业目录条目与模板，以及应用作业定义（SM36），以及授权对象族（授权字段、授权对象类、授权组、SU22 授权缺省值、授权对象）。其中 45 种支持 create、45 种支持 pull、43 种有 push 入口、45 种有 delete 路径；`DEVC` 支持 create / pull / delete（无 push），`SRVB` 仅元数据，`SAJC` / `SAJT` / `JOBD` 写入即激活，`SUCU` 只删除 `$` 前缀本地授权组。
 - **只读探查 SAP**——`search`、`inspect`、`where-used`、`tcode`、`list`、`dumps`、`fields`、`select`、`run-report` 都不改系统。
 - **运行与验证**——`abap run` 执行类（classrun）或 PUBLIC STATIC 方法；`abap run-report` 返回列表输出；`abap select` 就是 SE16N 的等价物。
 - **管理传输**——`transport list / create / show / resolve / assign`，`push` 时按对象自动解析。
@@ -204,7 +204,7 @@ src/(ui2)cl_json.clas.abap                # 命名空间对象 /UI2/CL_JSON
 
 ## 支持的对象类型
 
-40 个类型码，按 ADT REST API 或捆绑 ICF 服务路由：源对象、包、DDIC 对象、SICF 节点、事务码、XSLT 转换、SM59 HTTP 目标、UCON RFC service（`SRFC`）、OAuth 2.0 client profile（`OA2P`）、表类型、消息类、CDS 与 RAP 源对象、ATC 检查配置对象、CDS 技术对象、类型池、应用程序作业，以及应用作业定义（`JOBD`）。40 种支持 `create`，40 种支持 `pull`，38 种支持 `push`，40 种支持 `delete`；每个类型对应一组平铺在 `src/` 下的产物文件（多数为官方 AFF，`TTYP` / `VIEW` / `SHLP` / `JOBD` / `SM59` / `SRFC` / `OA2P` 使用本地扩展 schema）。
+45 个类型码，按 ADT REST API 或捆绑 ICF 服务路由：源对象、包、DDIC 对象、SICF 节点、事务码、XSLT 转换、SM59 HTTP 目标、UCON RFC service（`SRFC`）、OAuth 2.0 client profile（`OA2P`）、表类型、消息类、CDS 与 RAP 源对象、ATC 检查配置对象、CDS 技术对象、类型池、应用程序作业、应用作业定义（`JOBD`），以及授权对象族（`AUTH` / `SUSC` / `SUCU` / `SUSH` / `SUSO`）。45 种支持 `create`，45 种支持 `pull`，43 种支持 `push`，45 种支持 `delete`；每个类型对应一组平铺在 `src/` 下的产物文件（多数为官方 AFF，`TTYP` / `VIEW` / `SHLP` / `JOBD` / `SM59` / `SRFC` / `OA2P` / `AUTH` / `SUSC` / `SUCU` / `SUSO` 使用本地扩展 schema）。
 
 完整类型 × 命令矩阵、产物文件集、通道路由与逐类型注意事项见 **[docs/supported.md](docs/supported.md)**；逐类型细节与真机证据见 [wiki/object-types.md](wiki/object-types.md)。
 

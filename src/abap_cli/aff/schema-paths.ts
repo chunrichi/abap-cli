@@ -97,6 +97,13 @@ const SCHEMA_FILE: Record<string, string> = {
   // Application jobs: AFF `sajc-v1` / `sajt-v1` documents (ADT JSON source
   // resources; see clients/appjob.ts for the release-specific wire mapping).
   SAJC: 'sajc-v1.json',
+  // Authorization-object family: upstream AFF auth/suso/sush schemas where the
+  // field model fits; susc/sucu are local extensions (upstream has no schema).
+  AUTH: 'auth-v1.json',
+  SUSC: 'susc-v1.json',
+  SUCU: 'sucu-v1.json',
+  SUSH: 'sush-v1.json',
+  SUSO: 'suso-v1.json',
   SAJT: 'sajt-v1.json',
 };
 

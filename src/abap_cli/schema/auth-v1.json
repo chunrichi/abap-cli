@@ -1,0 +1,60 @@
+{
+  "$comment": "Local extension of the upstream SAP abap-file-formats auth-v1.json (2026): upstream models only generalInformation.dataElement and alternativeSearchHelp.checkTable, but the AUTHX maintenance row also stores EXIT_FB (search-help exit function module) and ACTVT_FLAG (activity field). The local schema keeps every upstream property name and adds generalInformation.searchHelpExit + generalInformation.activityField. The AFF header is omitted: AUTH has no text table, so there is no description/language to carry. Excluded from scripts/sync-aff-schema.sh.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/chunrichi/abap-cli/blob/main/src/abap_cli/schema/auth-v1.json",
+  "title": "Authorization Field",
+  "description": "Authorization field (transaction SU20 / table AUTHX)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["formatVersion", "generalInformation"],
+  "properties": {
+    "formatVersion": {
+      "title": "Format Version",
+      "description": "Format version",
+      "type": "string",
+      "const": "1"
+    },
+    "generalInformation": {
+      "title": "General Information",
+      "description": "General information",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dataElement"],
+      "properties": {
+        "dataElement": {
+          "title": "Data Element",
+          "description": "Name of the data element (AUTHX-ROLLNAME), at most 30 characters",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30
+        },
+        "searchHelpExit": {
+          "title": "Search Help Exit",
+          "description": "Local extension: search-help exit function module (AUTHX-EXIT_FB), at most 30 characters",
+          "type": "string",
+          "maxLength": 30
+        },
+        "activityField": {
+          "title": "Activity Field",
+          "description": "Local extension: marks the field as an activity field (AUTHX-ACTVT_FLAG = 'X')",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "alternativeSearchHelp": {
+      "title": "Alternative Search Help in Standard Maintenance Dialog",
+      "description": "Alternative search help in standard maintenance dialog",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "checkTable": {
+          "title": "Check Table",
+          "description": "Check table used for value selection (AUTHX-CHECKTABLE), at most 30 characters",
+          "type": "string",
+          "maxLength": 30
+        }
+      }
+    }
+  }
+}

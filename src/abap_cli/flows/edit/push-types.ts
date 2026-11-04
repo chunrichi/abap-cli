@@ -16,6 +16,8 @@ export interface PushFileOptions {
   failFast?: boolean;
   atomic?: boolean;
   yes?: boolean;
+  /** With SUSO files: regenerate SAP_ALL/SAP_NEW after the write (explicit opt-in). */
+  regenerateProfiles?: boolean;
 }
 
 export interface PushFileResult {
@@ -48,6 +50,8 @@ export interface PushFileResult {
   messages?: unknown[];
   /** DOMA/DTEL long-text companion action (`saved` / `deleted`), when pushed. */
   docu?: 'saved' | 'deleted';
+  /** SUSO only: whether the opt-in SAP_ALL/SAP_NEW regeneration ran successfully. */
+  profilesRegenerated?: boolean;
 }
 
 /** Outcome of pushing one file (before the coordinator decorates the result). */
@@ -64,6 +68,8 @@ export interface PushOneResult {
    * `deleted` when the companion carried `lines: []`.
    */
   docu?: 'saved' | 'deleted';
+  /** SUSO only: whether the opt-in SAP_ALL/SAP_NEW regeneration ran successfully. */
+  profilesRegenerated?: boolean;
 }
 
 /** Minimal shape a push route needs from `resolveFile`. */

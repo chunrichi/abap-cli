@@ -1,0 +1,90 @@
+{
+  "$comment": "Local extension: upstream SAP abap-file-formats has no SUCU schema (its suco-v1.json models the different TADIR object type SUCO, authorization default variant). The document maps the cross-client authorization group key (TBRG_AUTH-BRGRU + TBRG_AUTH-OBJECT) and its language-dependent texts (TBRG_AUTHT); the SAP object is the 40-character TADIR composite <BRGRU padded to 30><OBJECT padded to 10>. Header.description is the text of the original language, texts[] carries the other TBRG_AUTHT rows.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/chunrichi/abap-cli/blob/main/src/abap_cli/schema/sucu-v1.json",
+  "title": "Authorization Group",
+  "description": "Authorization group (transaction SU21 / tables TBRG_AUTH + TBRG_AUTHT)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["formatVersion", "header", "generalInformation"],
+  "properties": {
+    "formatVersion": {
+      "title": "Format Version",
+      "description": "Format version",
+      "type": "string",
+      "const": "1"
+    },
+    "header": {
+      "title": "Header",
+      "description": "Header",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["originalLanguage"],
+      "properties": {
+        "description": {
+          "title": "Description",
+          "description": "Group text of the original language (TBRG_AUTHT-BEZEI), at most 40 characters",
+          "type": "string",
+          "maxLength": 40
+        },
+        "originalLanguage": {
+          "title": "Original Language",
+          "description": "Two-letter ISO language code of the original language (TADIR-MASTERLANG via T002-LAISO)",
+          "type": "string",
+          "pattern": "^[A-Za-z]{2}$"
+        }
+      }
+    },
+    "generalInformation": {
+      "title": "General Information",
+      "description": "Authorization group key fields",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authorizationGroup", "authorizationObject"],
+      "properties": {
+        "authorizationGroup": {
+          "title": "Authorization Group Name",
+          "description": "TBRG_AUTH-BRGRU (CHAR 30): group name, may be namespaced (/NS/NAME)",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "pattern": "^[A-Za-z0-9_/]+$"
+        },
+        "authorizationObject": {
+          "title": "Authorization Object",
+          "description": "TBRG_AUTH-OBJECT (CHAR 10, check table TOBJ): the authorization object the group belongs to",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10,
+          "pattern": "^[A-Za-z0-9_/]+$"
+        }
+      }
+    },
+    "texts": {
+      "title": "Texts",
+      "description": "TBRG_AUTHT texts of the languages other than header.originalLanguage",
+      "type": "array",
+      "items": {
+        "title": "Text",
+        "description": "One TBRG_AUTHT row",
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["language", "description"],
+        "properties": {
+          "language": {
+            "title": "Language",
+            "description": "Two-letter ISO language code (TBRG_AUTHT-SPRAS via T002-LAISO)",
+            "type": "string",
+            "pattern": "^[A-Za-z]{2}$"
+          },
+          "description": {
+            "title": "Description",
+            "description": "Group text (TBRG_AUTHT-BEZEI), at most 40 characters",
+            "type": "string",
+            "maxLength": 40
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "$comment": "Local extension: SAP abap-file-formats (2026) has no SUSC schema. The document maps the SU21 authorization object class (TOBC-OCLSS + its TOBCT text). The AFF header convention is kept; the multi-language text table is represented by the single original language, like the abapGit exporter.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/chunrichi/abap-cli/blob/main/src/abap_cli/schema/susc-v1.json",
+  "title": "Authorization Object Class",
+  "description": "Authorization object class (transaction SU21 / tables TOBC + TOBCT)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["formatVersion", "header"],
+  "properties": {
+    "formatVersion": {
+      "title": "Format Version",
+      "description": "Format version",
+      "type": "string",
+      "const": "1"
+    },
+    "header": {
+      "title": "Header",
+      "description": "Header",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "originalLanguage"],
+      "properties": {
+        "description": {
+          "title": "Description",
+          "description": "Class text (TOBCT-CTEXT), at most 60 characters",
+          "type": "string",
+          "maxLength": 60
+        },
+        "originalLanguage": {
+          "title": "Original Language",
+          "description": "Two-letter ISO language code of the text row that is maintained (TOBCT-LANGU via T002)",
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 2
+        }
+      }
+    }
+  }
+}

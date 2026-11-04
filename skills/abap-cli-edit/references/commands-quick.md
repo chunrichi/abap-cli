@@ -55,6 +55,7 @@ abap push [options] [files...]
 | `--dry-run` | Plan only — no mutating ADT calls. |
 | `--fail-fast` | Stop at the first failing file (default: --keep-going). |
 | `--atomic` | Validate all files first; write nothing if any file fails validation. |
+| `--regenerate-profiles` | With SUSO files: regenerate SAP_ALL/SAP_NEW after the write (off by default). |
 | `--yes` | Confirm in non-interactive mode. |
 
 - Push a single file
@@ -115,12 +116,13 @@ abap create <type> <name> [options]
 | `--check-only` | Validate the proposed object without creating it |
 | `--audit` | Include the before-checksum (extra SAP round-trip, off by default) |
 | `--overwrite` | When pulling the new object back, replace an existing local file (default: keep the local draft) |
-| `--file <path>` | abap-file-format JSON input (required for TABL/STRU/DOMA/DTEL/ENQU/VIEW/SHLP/JOBD/NROB/HTTP/TRAN/SM59/SRFC/OA2P/XSLT/TTYP/MSAG/DDLS/SRVB/SRVD/BDEF/DCLS/DDLX/DDLA/CHKC/CHKO/CHKV/DTDC/DTEB/DSFD/DSFI/DRTY/TYPE/SAJC/SAJT) |
+| `--file <path>` | abap-file-format JSON input (required for TABL/STRU/DOMA/DTEL/ENQU/VIEW/SHLP/JOBD/AUTH/SUSC/SUCU/SUSH/SUSO/NROB/HTTP/TRAN/SM59/SRFC/OA2P/XSLT/TTYP/MSAG/DDLS/SRVB/SRVD/BDEF/DCLS/DDLX/DDLA/CHKC/CHKO/CHKV/DTDC/DTEB/DSFD/DSFI/DRTY/TYPE/SAJC/SAJT) |
 | `--func <name>` | With FUGR: create a function module (FUGR/FF) inside the existing function group <name> |
 | `--software-component <swcomp>` | With DEVC: software component of the new package (default: inherited from the super package) |
 | `--transport-layer <layer>` | With DEVC: transport layer of the new package (default: inherited from the super package) |
 | `--package-type <type>` | With DEVC: package type |
 | `--publish` | With SRVB: publish the service binding after activation |
+| `--regenerate-profiles` | With SUSO: regenerate SAP_ALL/SAP_NEW after the write (off by default) |
 | `--yes` | Confirm in non-interactive environments. |
 | `--non-interactive` | Alias of --yes. |
 
@@ -254,6 +256,7 @@ abap delete <object> --type <type> [--tr <request>] --yes
 | --- | --- |
 | `--type <type>` | Object type code (CLAS, PROG, INTF, FUGR, TABL, ...). |
 | `--tr <request>` | Transport request number (required for non-local packages). |
+| `--regenerate-profiles` | With type SUSO: regenerate SAP_ALL/SAP_NEW after the delete (off by default). |
 | `--yes` | Confirm the deletion. Required — there is no implicit confirmation. |
 
 - Delete a local $TMP class

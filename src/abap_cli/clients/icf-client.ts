@@ -213,6 +213,28 @@ export class IcfClient {
     return this.request('delete', path, body);
   }
 
+  /** GET /auth/<sub>/<name> — read one authorization-family document. */
+  async getAuth<T>(sub: string, name: string, query: AuthQuery = {}): Promise<IcfResponse<T>> {
+    return this.get(`${authPath(sub, name)}${authQuery(query)}`);
+  }
+
+  /** POST /auth/<sub>/<name> — create an authorization-family object.
+   *  `timeoutMs` overrides the client timeout (the SUSO opt-in profile
+   *  regeneration takes tens of seconds). */
+  async postAuth<T>(sub: string, name: string, body: unknown, query: AuthQuery = {}, timeoutMs?: number): Promise<IcfResponse<T>> {
+    return this.request('post', `${authPath(sub, name)}${authQuery(query)}`, body, timeoutMs);
+  }
+
+  /** PUT /auth/<sub>/<name> — update an authorization-family object. */
+  async putAuth<T>(sub: string, name: string, body: unknown, query: AuthQuery = {}, timeoutMs?: number): Promise<IcfResponse<T>> {
+    return this.request('put', `${authPath(sub, name)}${authQuery(query)}`, body, timeoutMs);
+  }
+
+  /** DELETE /auth/<sub>/<name> — delete an authorization-family object. */
+  async deleteAuth<T>(sub: string, name: string, query: AuthQuery = {}, timeoutMs?: number): Promise<IcfResponse<T>> {
+    return this.request('delete', `${authPath(sub, name)}${authQuery(query)}`, undefined, timeoutMs);
+  }
+
   /** GET /tcode/<tcode> — resolve a transaction code to its entry program (read-only). */
   async getTcode<T>(tcode: string): Promise<IcfResponse<T>> {
     return this.get(`/tcode/${encodeURIComponent(tcode)}`);
@@ -295,9 +317,9 @@ export class IcfClient {
   }
 
   /** Run one HTTP call and normalize transport errors into a CliError. */
-  private async request<T>(method: 'get' | 'post' | 'put' | 'delete', path: string, body?: unknown): Promise<IcfResponse<T>> {
+  private async request<T>(method: 'get' | 'post' | 'put' | 'delete', path: string, body?: unknown, timeoutMs?: number): Promise<IcfResponse<T>> {
     try {
-      const resp = await this.send<T>(method, path, body);
+      const resp = await this.send<T>(method, path, body, timeoutMs);
       return resp.data;
     } catch (error: unknown) {
       return this.normalizeError(error);
@@ -305,11 +327,17 @@ export class IcfClient {
   }
 
   /** Low-level send used by `request` (single attempt, no cookie fallback). */
-  private async send<T>(method: 'get' | 'post' | 'put' | 'delete', path: string, body?: unknown): Promise<AxiosResponse<IcfResponse<T>>> {
-    if (method === 'get') return this.http.get<IcfResponse<T>>(path);
-    if (method === 'post') return this.http.post<IcfResponse<T>>(path, body);
-    if (method === 'delete') return this.http.delete<IcfResponse<T>>(path, { data: body });
-    return this.http.put<IcfResponse<T>>(path, body);
+  private async send<T>(
+    method: 'get' | 'post' | 'put' | 'delete',
+    path: string,
+    body?: unknown,
+    timeoutMs?: number,
+  ): Promise<AxiosResponse<IcfResponse<T>>> {
+    const config = timeoutMs === undefined ? undefined : { timeout: timeoutMs };
+    if (method === 'get') return this.http.get<IcfResponse<T>>(path, config);
+    if (method === 'post') return this.http.post<IcfResponse<T>>(path, body, config);
+    if (method === 'delete') return this.http.delete<IcfResponse<T>>(path, { data: body, ...config });
+    return this.http.put<IcfResponse<T>>(path, body, config);
   }
 
   private normalizeError(error: unknown): never {
@@ -335,6 +363,36 @@ function jobdQuery(query: { package?: string; transportRequest?: string }): stri
   const params = new URLSearchParams();
   if (query.package) params.set('package', query.package);
   if (query.transportRequest) params.set('transportRequest', query.transportRequest);
+  const qs = params.toString();
+  return qs ? `?${qs}` : '';
+}
+
+/**
+ * Query parameters accepted by the authorization-family ICF routes
+ * (`/auth/<sub>/<name>`). Package and transport travel out of band because the
+ * AFF documents carry neither; `regenerateProfiles` is the SUSO-only opt-in
+ * for the SAP_ALL/SAP_NEW regeneration.
+ */
+export interface AuthQuery {
+  /** Target package for create/update (required by the server on create). */
+  package?: string;
+  /** Transport request for non-local packages. */
+  transportRequest?: string;
+  /** SUSO only: run PRGN_AFTER_IMP_SUSO_SAP_ALL after the write. */
+  regenerateProfiles?: boolean;
+}
+
+/** Path of one `/auth/<sub>/<name>` route (both segments URL-encoded). */
+function authPath(sub: string, name: string): string {
+  return `/auth/${encodeURIComponent(sub.trim().toLowerCase())}/${encodeURIComponent(name)}`;
+}
+
+/** Query string for one `/auth/...` request. */
+function authQuery(query: AuthQuery): string {
+  const params = new URLSearchParams();
+  if (query.package) params.set('package', query.package);
+  if (query.transportRequest) params.set('transportRequest', query.transportRequest);
+  if (query.regenerateProfiles) params.set('regenerateProfiles', 'true');
   const qs = params.toString();
   return qs ? `?${qs}` : '';
 }

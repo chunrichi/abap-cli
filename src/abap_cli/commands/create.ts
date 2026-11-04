@@ -11,6 +11,7 @@ import { getSm59JsonExample } from '../formats/sm59/json.js';
 import { getSrfcJsonExample } from '../formats/srfc/json.js';
 import { getOa2pJsonExample } from '../formats/oa2p/json.js';
 import type { DdicSupportedType } from '../formats/ddic/types.js';
+import { isAuthType, authSpecOf } from '../formats/auth/registry.js';
 import { listTemplates } from '../formats/templates.js';
 import {
   isDdicSupportedType,
@@ -47,6 +48,11 @@ export function registerCreateCommand(program: Command): void {
       '  VIEW  Database view      (ICF /ddic/view — requires --file; view-v1)',
       '  SHLP  Search help        (ICF /ddic/shlp — requires --file; shlp-v1, elementary/collective)',
       '  ENQU  Lock object        (ICF /ddic/enqu — requires --file)',
+      '  AUTH  Authorization field (ICF /auth/auth — requires --file; SU20)',
+      '  SUSC  Auth object class   (ICF /auth/susc — requires --file; SU21)',
+      '  SUCU  Authorization group (ICF /auth/sucu — requires --file; TBRG_AUTH)',
+      '  SUSH  Auth default assgmt (ICF /auth/sush — requires --file; SU22)',
+      '  SUSO  Authorization object(ICF /auth/suso — requires --file; SU21)',
       '  NROB  Number range obj.  (ICF /ddic/nrob — requires --file; no abap-adt-api endpoint)',
       '  HTTP  SICF service node  (ICF /http/<name> — requires --file)',
       '  TRAN  Transaction code   (ICF /tran/<code> — requires --file)',
@@ -76,6 +82,7 @@ export function registerCreateCommand(program: Command): void {
     .option('--transport-layer <layer>', 'With DEVC: transport layer of the new package (default: inherited from the super package)')
     .option('--package-type <type>', 'With DEVC: package type — development (default), main, or structure')
     .option('--publish', 'With SRVB: publish the service binding after activation')
+    .option('--regenerate-profiles', 'With SUSO: regenerate SAP_ALL/SAP_NEW after the write (off by default)')
     .option('--schema', 'Print the command parameter schema as JSON and exit (no SAP call)')
     .option('--yes', 'Confirm in non-interactive mode')
     .action(async (type, name, opts, cmd) => {
@@ -177,6 +184,7 @@ export function createSchema(type?: string): CreateCommandSchema {
       { name: '--transport-layer', type: 'string', valuePlaceholder: '<layer>', description: 'With DEVC: transport layer of the new package (default: inherited from the super package)' },
       { name: '--package-type', type: 'string', valuePlaceholder: '<type>', description: 'With DEVC: package type', allowedValues: ['development', 'main', 'structure'] },
       { name: '--publish', type: 'boolean', description: 'With SRVB: publish the service binding after activation' },
+      { name: '--regenerate-profiles', type: 'boolean', description: 'With SUSO: regenerate SAP_ALL/SAP_NEW after the write (off by default)' },
       schemaOption(),
       { name: '--yes', type: 'boolean', default: false, description: 'Confirm in non-interactive environments.' },
       { name: '--non-interactive', type: 'boolean', default: false, description: 'Alias of --yes.' },
@@ -206,6 +214,32 @@ export function createSchema(type?: string): CreateCommandSchema {
       examples: [
         "abap create DEVC $MY_PACKAGE --package '$TMP' --description \"Scratch package\"",
         'abap create DEVC ZPKG_SUB --package ZPKG_MAIN --description "Sub package" --software-component HOME --tr NDK900123',
+      ],
+    };
+  }
+  // Authorization-object family — hand-written ICF routes; the per-type spec
+  // owns the local document shape and the minimal example.
+  if (isAuthType(t)) {
+    const spec = authSpecOf(t);
+    return {
+      ...base,
+      type: t,
+      supported: true,
+      route: 'icf',
+      message:
+        `${spec.description} is managed through the bundled ICF service (/auth/${spec.route}/<name>). ` +
+        `Requires --file with a ${spec.schemaFile} document; --description and --no-activate are not supported` +
+        (t === 'SUSO' ? '; --regenerate-profiles opts into the SAP_ALL/SAP_NEW regeneration.' : '.'),
+      exampleJson: JSON.stringify(spec.example(), null, 2),
+      options: [
+        ...base.options,
+        {
+          name: '--file',
+          type: 'string',
+          valuePlaceholder: '<path>',
+          required: true,
+          description: `AFF-shaped ${t} JSON document (see exampleJson)`,
+        },
       ],
     };
   }

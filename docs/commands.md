@@ -406,6 +406,7 @@ abap delete <object> --type <type> [--tr <request>] --yes
 | --- | --- | --- | --- | --- |
 | `--type` `<type>` | yes |  |  | Object type code (CLAS, PROG, INTF, FUGR, TABL, ...). |
 | `--tr` `<request>` | no |  |  | Transport request number (required for non-local packages). |
+| `--regenerate-profiles` | no |  |  | With type SUSO: regenerate SAP_ALL/SAP_NEW after the delete (off by default). |
 | `--yes` | yes |  |  | Confirm the deletion. Required — there is no implicit confirmation. |
 
 ### Examples
@@ -446,6 +447,7 @@ abap push [options] [files...]
 | `--dry-run` | no |  |  | Plan only — no mutating ADT calls. |
 | `--fail-fast` | no |  |  | Stop at the first failing file (default: --keep-going). |
 | `--atomic` | no |  |  | Validate all files first; write nothing if any file fails validation. |
+| `--regenerate-profiles` | no |  |  | With SUSO files: regenerate SAP_ALL/SAP_NEW after the write (off by default). |
 | `--yes` | no |  |  | Confirm in non-interactive mode. |
 
 ### Examples
@@ -607,7 +609,7 @@ abap create <type> <name> [options]
 
 | Argument | Required | Values | Description |
 | --- | --- | --- | --- |
-| `type` | yes | CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, ENQU, VIEW, SHLP, JOBD, NROB, HTTP, TRAN, SM59, SRFC, OA2P, XSLT, TTYP, MSAG, DDLS, SRVB, SRVD, BDEF, DCLS, DDLX, DDLA, CHKC, CHKO, CHKV, DTDC, DTEB, DSFD, DSFI, DRTY, TYPE, SAJC, SAJT | Object type |
+| `type` | yes | CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, ENQU, VIEW, SHLP, JOBD, AUTH, SUSC, SUCU, SUSH, SUSO, NROB, HTTP, TRAN, SM59, SRFC, OA2P, XSLT, TTYP, MSAG, DDLS, SRVB, SRVD, BDEF, DCLS, DDLX, DDLA, CHKC, CHKO, CHKV, DTDC, DTEB, DSFD, DSFI, DRTY, TYPE, SAJC, SAJT | Object type |
 | `name` | yes |  | Object name |
 
 ### Options
@@ -623,12 +625,13 @@ abap create <type> <name> [options]
 | `--check-only` | no |  |  | Validate the proposed object without creating it |
 | `--audit` | no |  |  | Include the before-checksum (extra SAP round-trip, off by default) |
 | `--overwrite` | no |  |  | When pulling the new object back, replace an existing local file (default: keep the local draft) |
-| `--file` `<path>` | no |  |  | abap-file-format JSON input (required for TABL/STRU/DOMA/DTEL/ENQU/VIEW/SHLP/JOBD/NROB/HTTP/TRAN/SM59/SRFC/OA2P/XSLT/TTYP/MSAG/DDLS/SRVB/SRVD/BDEF/DCLS/DDLX/DDLA/CHKC/CHKO/CHKV/DTDC/DTEB/DSFD/DSFI/DRTY/TYPE/SAJC/SAJT) |
+| `--file` `<path>` | no |  |  | abap-file-format JSON input (required for TABL/STRU/DOMA/DTEL/ENQU/VIEW/SHLP/JOBD/AUTH/SUSC/SUCU/SUSH/SUSO/NROB/HTTP/TRAN/SM59/SRFC/OA2P/XSLT/TTYP/MSAG/DDLS/SRVB/SRVD/BDEF/DCLS/DDLX/DDLA/CHKC/CHKO/CHKV/DTDC/DTEB/DSFD/DSFI/DRTY/TYPE/SAJC/SAJT) |
 | `--func` `<name>` | no |  |  | With FUGR: create a function module (FUGR/FF) inside the existing function group <name> |
 | `--software-component` `<swcomp>` | no |  |  | With DEVC: software component of the new package (default: inherited from the super package) |
 | `--transport-layer` `<layer>` | no |  |  | With DEVC: transport layer of the new package (default: inherited from the super package) |
 | `--package-type` `<type>` | no |  | development, main, structure | With DEVC: package type |
 | `--publish` | no |  |  | With SRVB: publish the service binding after activation |
+| `--regenerate-profiles` | no |  |  | With SUSO: regenerate SAP_ALL/SAP_NEW after the write (off by default) |
 | `--yes` | no | `false` |  | Confirm in non-interactive environments. |
 | `--non-interactive` | no | `false` |  | Alias of --yes. |
 

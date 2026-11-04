@@ -55,6 +55,13 @@ export interface ObjectTypeEntry {
    * explicit `--package` / `--tr` instead of silently dropping it.
    */
   packageNotApplicable?: boolean;
+  /**
+   * The type's object names do not follow the generic SAP
+   * `[A-Z0-9_]+` / namespaced shape (e.g. a composite TADIR key); the type
+   * flow validates the name itself and `abap create` skips the generic
+   * `validateObjectName` fail-fast.
+   */
+  customNameValidation?: boolean;
 }
 
 /** per-type capability hints for channel-detect. */
@@ -108,6 +115,16 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
   // reference releases expose no ADT resource, so `jobd-v1.json` is a local
   // extension served by the bundled ICF service (`/jobd/<name>`).
   { type: 'JOBD', source: 'ICF', affSchemaFile: 'jobd-v1.json', requiresFile: true, maxNameLength: 32 },
+  // Authorization-object family — no ADT resource and no AFF handler on the
+  // reference releases, so each type is a hand-written ICF route
+  // (`/auth/<sub>/<name>`) ported from the abapGit handlers. The local file is
+  // an AFF-shaped JSON document (upstream auth/suso/sush schemas where the
+  // field model fits, local extensions for susc/sucu).
+  { type: 'AUTH', source: 'ICF', affSchemaFile: 'auth-v1.json', requiresFile: true, maxNameLength: 30, customNameValidation: true },
+  { type: 'SUSC', source: 'ICF', affSchemaFile: 'susc-v1.json', requiresFile: true, maxNameLength: 4, customNameValidation: true },
+  { type: 'SUCU', source: 'ICF', affSchemaFile: 'sucu-v1.json', requiresFile: true, customNameValidation: true },
+  { type: 'SUSH', source: 'ICF', affSchemaFile: 'sush-v1.json', requiresFile: true, customNameValidation: true },
+  { type: 'SUSO', source: 'ICF', affSchemaFile: 'suso-v1.json', requiresFile: true, maxNameLength: 10 },
   { type: 'NROB', source: 'ADT', affSchemaFile: 'nrob-v1.json', requiresFile: true },
   // HTTP service (SICF node) via ICF. originally wrote a local
   // skeleton when --file was absent; that path was removed (refactor decision
@@ -351,6 +368,11 @@ export function createObjtypeFor(type: string): string | undefined {
  * Whether `abap create <type>` requires an abap-file-format `--file <path>`
  * input (no skeleton path exists). Case-insensitive; `false` for unknown types.
  */
+export function customNameValidationFor(type: string): boolean {
+  const primary = type.split('/')[0]!.toUpperCase();
+  return INDEX[primary]?.customNameValidation === true;
+}
+
 export function requiresFileFor(type: string): boolean {
   const primary = type.split('/')[0]!.toUpperCase();
   return INDEX[primary]?.requiresFile === true;

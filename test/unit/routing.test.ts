@@ -65,6 +65,11 @@ const EXPECTED: Record<string, ExpectedRoute> = {
   TYPE: { create: 'adt', pull: 'adt', push: 'adt' },
   SAJC: { create: 'adt', pull: 'adt', push: 'adt' },
   SAJT: { create: 'adt', pull: 'adt', push: 'adt' },
+  AUTH: { create: 'icf', pull: 'icf', push: 'icf' },
+  SUSC: { create: 'icf', pull: 'icf', push: 'icf' },
+  SUCU: { create: 'icf', pull: 'icf', push: 'icf' },
+  SUSH: { create: 'icf', pull: 'icf', push: 'icf' },
+  SUSO: { create: 'icf', pull: 'icf', push: 'icf' },
 };
 
 const OPS = ['create', 'pull', 'push'] as const;
