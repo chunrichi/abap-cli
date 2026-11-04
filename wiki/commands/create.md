@@ -24,17 +24,17 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 
 ## Options
 
-- `<type>`: 支持 45 个类型码（完整矩阵见 [object-types](../object-types.md)）：4 个源对象 `CLAS` / `INTF` / `PROG` / `FUGR` 走 ADT 骨架；`DEVC` 走独立 ADT handler（`--package` 是**父包**，无需 `--file`，见 [DEVC（Package）](#devcpackage)）；其余 40 类必须配 `--file`（AFF JSON；VIEW/SHLP/JOBD/SM59/SRFC/OA2P/AUTH/SUSC/SUCU/SUSO 为本地扩展 `view-v1.json` / `shlp-v1.json` / `jobd-v1.json` / `sm59-v1.json` / `srfc-v1.json` / `oa2p-v1.json`）：`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `VIEW` / `SHLP` / `JOBD` / `NROB` / `HTTP` / `TRAN` / `XSLT` / `SM59` / `SRFC` / `OA2P` / `TTYP` / `TYPE` / `MSAG` / `DDLS` / `SRVB` / `SRVD` / `BDEF` / `DCLS` / `DDLX` / `DDLA` / `CHKC` / `CHKO` / `CHKV` / `DTDC` / `DTEB` / `DSFD` / `DSFI` / `DRTY` / `SAJC` / `SAJT` / `AUTH` / `SUSC` / `SUCU` / `SUSH` / `SUSO`。未知类型 → `TYPE_NOT_SUPPORTED`（exit 7）。
+- `<type>`: 支持 51 个类型码（完整矩阵见 [object-types](../object-types.md)）：4 个源对象 `CLAS` / `INTF` / `PROG` / `FUGR` 走 ADT 骨架；`DEVC` 走独立 ADT handler（`--package` 是**父包**，无需 `--file`，见 [DEVC（Package）](#devcpackage)）；其余 44 类必须配 `--file`（AFF JSON；VIEW/SHLP/JOBD/SM59/SRFC/OA2P/AUTH/SUSC/SUCU/SUSO 为本地扩展 `view-v1.json` / `shlp-v1.json` / `jobd-v1.json` / `sm59-v1.json` / `srfc-v1.json` / `oa2p-v1.json`）：`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `VIEW` / `SHLP` / `JOBD` / `NROB` / `HTTP` / `TRAN` / `XSLT` / `SM59` / `SRFC` / `OA2P` / `TTYP` / `TYPE` / `MSAG` / `DDLS` / `SRVB` / `SRVD` / `BDEF` / `DCLS` / `DDLX` / `DDLA` / `CHKC` / `CHKO` / `CHKV` / `DTDC` / `DTEB` / `DSFD` / `DSFI` / `DRTY` / `SAJC` / `SAJT` / `AUTH` / `SUSC` / `SUCU` / `SUSH` / `SUSO` / `APLO` / `CHDO` / `EVTB` / `SMBC`。**`ENHO` / `ENHS` 是只读类型，不支持 create**（AFF handler 只读，仅 pull）；未知类型 → `TYPE_NOT_SUPPORTED`（exit 7）。
 - `<name>`: 对象名（自动转大写；命名空间名如 `/UI2/CL_JSON` 在磁盘上用 AFF 括号 token `(ui2)cl_json`）。本地预校验：≤30 字符、仅 `A-Z 0-9 _`、命名空间形如 `/NS/NAME`（NS ≤10，总长 ≤30），违规 → `VALIDATION_ERROR`（exit 7）
 - `--package <package>`: 目标 SAP 包（必填）
 - `--description <desc>`: 对象描述（必填；有 `--file` 时可选，由 JSON 提供）
 - `--tr <transport>`: 传输请求号；缺省时 `resolveTransport` 解析（非本地包下 DDIC 必须显式给出；本地包 = `$` 前缀，如 `$TMP` / `$CRW`）。HTTP（SICF）写入只支持 `$` 前缀本地包：可传输包会在调用 SAP 前返回 `HTTP_PACKAGE_NOT_SUPPORTED`（exit 7），`--tr` 对 HTTP 不生效
-- `--no-activate`: 创建并写 skeleton 但不激活
+- `--no-activate`: 创建并写 skeleton 但不激活。**AFF 对象（`APLO` / `CHDO` / `EVTB` / `SMBC`）不支持**：AFF 写是保存 + 激活一步完成，传了会报 `VALIDATION_ERROR`（exit 7）
 - `--template <template>`: skeleton 模板（`minimal` / `public-method` / `report` / `selection-screen`…）；未知模板 → `INVALID_ARGUMENT`
 - `--no-pull`: 跳过 create-then-pull 本地副本（默认拉取）
 - `--check-only`: 只校验对象可行性（`validateNewObject`），不创建
 - `--audit`: 额外一次 SAP 往返记录 before-checksum（默认关）
-- `--file <path>`: abap-file-format JSON 输入（`types/registry.ts` 的 `requiresFile` 类型必填：TABL/STRU/DOMA/DTEL/ENQU/VIEW/SHLP/JOBD/NROB/HTTP/TRAN/XSLT/SM59/SRFC/OA2P/TTYP/MSAG/DDLS/SRVD/DCLS/DDLX/DDLA）。TABL/STRU 是三件套：`--file` 指向 main `.tabl.json`，CLI 自动读同目录 `.tabl.ddic`（DDL 源）与 `.tabl.settings.json`；XSLT 用 `<name>.xslt.json` + 同目录 `<name>.xslt.xml` 两件套；SM59 用 `<name>.sm59.json`，文件名必须与目标名一致；只有 main JSON 时回落 legacy wire-flat 单文件（顶层 `name` / `fields[]`）。DDL 解析失败 → `TABL_DDL_INVALID`（exit 7）
+- `--file <path>`: abap-file-format JSON 输入（`types/registry.ts` 的 `requiresFile` 类型必填：TABL/STRU/DOMA/DTEL/ENQU/VIEW/SHLP/JOBD/NROB/HTTP/TRAN/XSLT/SM59/SRFC/OA2P/TTYP/MSAG/DDLS/SRVD/DCLS/DDLX/DDLA/APLO/CHDO/EVTB/SMBC）。TABL/STRU 是三件套：`--file` 指向 main `.tabl.json`，CLI 自动读同目录 `.tabl.ddic`（DDL 源）与 `.tabl.settings.json`；XSLT 用 `<name>.xslt.json` + 同目录 `<name>.xslt.xml` 两件套；SM59 用 `<name>.sm59.json`，文件名必须与目标名一致；只有 main JSON 时回落 legacy wire-flat 单文件（顶层 `name` / `fields[]`）。DDL 解析失败 → `TABL_DDL_INVALID`（exit 7）
 - `--func <module>`: 仅 `FUGR` 类型可用 — 在**既有函数组 `<name>`** 内新建函数模块（`FUGR/FF` 子对象）。组不存在 → `OBJECT_NOT_FOUND`（exit 8，附建组指引）；组内同名模块已存在 → `OBJECT_EXISTS`（exit 2）；模块名同样过本地预校验（≤30、`A-Z 0-9 _`）。`--check-only` 不支持该形态
 - `--software-component <swcomp>`: 仅 `DEVC` — 新包的软件组件；缺省从父包继承（`$TMP` → `LOCAL`）。LOCAL 包名必须 `$`/`TEST` 开头（命名约束；是否免 transport 只看 `$` 前缀）
 - `--transport-layer <layer>`: 仅 `DEVC` — 新包的传输层；缺省从父包继承（`$TMP` → 空）
@@ -162,6 +162,25 @@ abap create OA2P ZCLI_OA2P_DEMO --file src/zcli_oa2p_demo.oa2p.json --package '$
 abap create --schema SRFC   # 带 exampleJson 的机器契约
 abap create --schema OA2P
 ```
+
+### AFF 对象（APLO / CHDO / EVTB / SMBC / ENHO / ENHS）
+
+六类官方 AFF 文档按能力分两条通道（用户命令面不变）：
+
+- **`APLO` / `CHDO` / `EVTB` / `SMBC`**：走 **ADT blueSource**——`--file` 指向该对象的 AFF JSON（`<token>.<type>.json`），ADT 侧先 `POST` 集合建对象，再 lock → `PUT source/main`（保存即激活）→ unlock；CLI 不做字段映射。非 `$` 前缀本地包需要 `--tr`；`$` 前缀本地包 transport-free。`create` 默认 create-then-pull，`--no-activate` 被拒绝；只支持单文件 bundle。
+- **`ENHO` / `ENHS`**：**不支持 create**（只读类型，只能 `abap pull`），本地即报 `VALIDATION_ERROR`（exit 7），不发起 SAP 请求。SAP 的 AFF handler 对这两类只读：create 门禁要求已存在 active 增强对象、persistence 的保存是空实现；写入需 SEEF API 适配（后续独立排期）。这两类的 AFF 格式也只覆盖 BAdI 实现 / 定义。
+
+```bash
+# 应用日志对象（$TMP 免 transport；ADT blueSource）
+abap create APLO ZCLI_AFF_LOG --file src/zcli_aff_log.aplo.json --package '$TMP' --yes --json
+abap create --schema APLO   # 带 exampleJson 的机器契约
+# ENHO / ENHS：只读，只能 pull；create 会被拒绝
+abap pull ZEX_HU_BASICS_PRODUCT --type ENHO --json
+```
+
+- `APLO` / `CHDO` / `EVTB` / `SMBC` 不需要 `abap deploy`；字段契约与本地文件形态见 [objects/aplo](../objects/aplo.md) 等各类型页。
+- `SMBC` 在参考系统上没有对象，未做真机验证（前置：已存在的 `SRVB` service binding）。
+
 
 ### DEVC（Package）
 
@@ -361,7 +380,7 @@ abap create local CLAS ZCL_DRAFT --template public-method --dir src/
 
 ## todo
 
-- [x] `TTYP` / `MSAG` / `DDLS` / `ENQU` / `NROB` / `XSLT` / `TYPE` / `SRVB` / `BDEF` / `CHKC` / `CHKO` / `CHKV` / `DTDC` / `DTEB` / `DSFD` / `DSFI` / `DRTY` / `SAJC` / `SAJT` 等 `--file` 类型已接入（`create` 的 `--schema.allowedValues` 全 45 类）
+- [x] `TTYP` / `MSAG` / `DDLS` / `ENQU` / `NROB` / `XSLT` / `TYPE` / `SRVB` / `BDEF` / `CHKC` / `CHKO` / `CHKV` / `DTDC` / `DTEB` / `DSFD` / `DSFI` / `DRTY` / `SAJC` / `SAJT` / `SM59` / `APLO` / `CHDO` / `EVTB` / `SMBC` / `ENHO` / `ENHS` 等 `--file` 类型已接入（`create` 的 `--schema.allowedValues` 全 51 类）
 - [x] `TRAN` 写路径已实现（`/tran` POST/PUT，dialog/report/parameter/variant；OO 事务明确拒绝）
 - [ ] `create local` 为实验性命令，待与 `create` 主流程的落库闭环稳定后转正
 

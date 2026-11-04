@@ -41,7 +41,7 @@ abap pull --help
 
 ## 路由与布局
 
-按优先级分派五条路线：
+按优先级分派以下路线：
 
    - **PR2 `--user <sap-user>`**：可选过滤 — 仅保留 owner 匹配的对象（直接对象用 transport 顶层 owner；task 内对象用 task owner）。`TransportObjectInfo.owner` 字段在 `showTransport` 里填入；过滤在 `pull-tr.ts` dedup 之前进行，不匹配的对象静默丢弃，不影响其他对象的拉取。`--user` 单独使用 → `INVALID_ARGUMENT`（exit 2）。响应 `data` 增加 `filtered`（被过滤数）与 `user`（归一化后的大写用户名）字段，便于 agent 解释"为什么 N 个对象没出现"。
 1. **`--tr <request>`**（T4.2）— 调 `transportDetails` 取请求下**所有对象引用**：直接对象（`objects`）+ 嵌套 task 对象（`tasks[].objects`）；按 `type::name` 去重得到有序对象列表，再逐个走下面第 3-5 条路由。单对象失败不中断整体（记为 `failed`），部分失败时 `data.partial: true`；响应额外含 `transport` / `requested` / `deduplicated`（来自 transport `tasks` 的 `TransportRequestInfo.deduplicated`）。HTTP/DDIC 路由走 ICF、其余走 ADT。
@@ -54,6 +54,10 @@ abap pull --help
 8. **SM59（HTTP 目标）** — 见下节「SM59（HTTP 目标）」：ICF `GET /sm59/<name>`，单文件 `src/<name>.sm59.json`。
 9. **SRFC / OA2P（UCON 对象）** — ICF `GET /srfc/<name>` / `GET /oa2p/<name>`，单文件 `src/<name>.srfc.json` / `src/<name>.oa2p.json`（本地扩展 schema；不含 `name` / `package` / admin 字段，可直接作为 create / push 模板）。
 10. **JOBD（应用作业定义，SM36）** — ICF `GET /jobd/<name>`，单文件 `src/<name>.jobd.json`（本地扩展 `jobd-v1`；`package` 是只读元数据，包含报表 / 变式与调度参数）。
+11. **AFF 对象**（APLO/CHDO/EVTB/SMBC/ENHO/ENHS）— 按通道分流（`data.channel` 为 `adt-blue` 或 `icf`）：
+   - `APLO` / `CHDO` / `EVTB` / `SMBC` 走 **ADT blueSource**：读 `source/main`（就是官方 AFF JSON）原样写成 `src/<token>.<type>.json`，包信息取自 ADT 元数据（`data.package`）；对象不存在 → `OBJECT_NOT_FOUND`（exit 8）。
+   - `ENHO` / `ENHS` 走 **ICF 只读端点** `GET /aff/<TYPE>/<name>`（需 `abap deploy`）：端点返回 `data.files[]`（AFF 原生文件），每个文件按 `data.files[].name` 原样写入输出目录（AFF 小写 token、命名空间括号形式）；对象不存在 → `AFF_NOT_FOUND`（exit 8），目标 release 没有该类型 handler → `AFF_UNSUPPORTED`。这两类只能 pull，不能 push（见 push 页）。
+
 
 ### 新增 TTYP / MSAG / DDLS（双通道）
 

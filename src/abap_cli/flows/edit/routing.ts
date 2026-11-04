@@ -23,7 +23,7 @@ import * as path from 'node:path';
 import { readFile } from 'node:fs/promises';
 import type { AdtClientWrapper } from '../../clients/adt-client.js';
 import { CliError, type OutputMode } from '../../output/json.js';
-import type { DdicSupportedType } from '../../types/registry.js';
+import { AFF_BUNDLE_TYPES, affChannelFor, type DdicSupportedType } from '../../types/registry.js';
 import { ttypArtifact } from '../../formats/ttyp/json.js';
 import { typeArtifact } from '../../formats/type/json.js';
 import { msagArtifact } from '../../formats/msag/json.js';
@@ -73,6 +73,9 @@ import { createDevcHandler } from './create-devc.js';
 import { createViewHandler } from './create-view.js';
 import { createShlpHandler } from './create-shlp.js';
 import { createJobdHandler } from './create-jobd.js';
+import { createAffHandler } from './create-aff.js';
+import { pullAffHandler } from './pull-aff.js';
+import { pushAffFile, validateAffBundleFile } from './push-aff.js';
 import { pullDevcHandler } from './pull-devc.js';
 import { createXsltHandler } from './create-xslt.js';
 import { runPullXslt } from './pull-xslt.js';
@@ -202,6 +205,34 @@ function ddicPushRoute(type: DdicSupportedType): JsonPushRoute {
     channel: 'icf',
     run: ({ client, resolved, file, opts }) => pushDdicFile(client, resolved, file, opts, type),
     validate: (file) => validateDdicFile(file, type),
+  };
+}
+
+/**
+ * Generic AFF object channel. The registry picks the transport per type:
+ *
+ *   - `'adt-blue'` (APLO / CHDO / EVTB / SMBC): standard ADT create/pull/push
+ *     over the type's blueSource resource, `source/main` being the AFF JSON;
+ *   - `'icf'` (ENHO / ENHS): read-only pull through `/aff/<TYPE>/<NAME>`; the
+ *     registry's unsupported reasons make create/push/delete fail locally with
+ *     an actionable message (nothing is sent to SAP).
+ *
+ * One create/pull/push implementation serves all six; the concrete type and
+ * channel travel in the handler args / resolved file.
+ */
+function affBundleRoute(type: (typeof AFF_BUNDLE_TYPES)[number]): TypeRoute {
+  if (affChannelFor(type) === 'icf') {
+    return { pull: handler('icf', pullAffHandler) };
+  }
+  return {
+    create: handler('adt', createAffHandler),
+    pull: handler('adt', pullAffHandler),
+    push: {
+      kind: 'aff-json',
+      channel: 'adt',
+      run: ({ client, resolved, file, opts }) => pushAffFile(client, resolved, file, opts),
+      validate: (file, objectType) => validateAffBundleFile(file, objectType),
+    },
   };
 }
 
@@ -657,6 +688,9 @@ export const TYPE_ROUTES: Readonly<Record<string, TypeRoute>> = {
     pull: authPullRoute('SUSO'),
     push: authPushRoute('SUSO'),
   },
+  // Generic AFF object types — the registry's `affChannel` selects the
+  // transport (ADT blueSource for four types, read-only ICF /aff for ENHO/ENHS).
+  ...Object.fromEntries(AFF_BUNDLE_TYPES.map((type) => [type, affBundleRoute(type)])),
 };
 
 /** Full route row for a type code (case-insensitive). */

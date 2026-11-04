@@ -64,7 +64,7 @@
 ## 六、对象类型补充路线（2026-10 评估）
 
 > 判据：**开发价值 × SAP 侧可行性（ADT / DDIC API）× AFF 成熟度 × agent 闭环收益**。
-> 对比依据：abap-cli 45 类 vs SAP abap-file-formats 上游 102 个类型格式（2026-10-30 HEAD）vs abapGit 168 个 TADIR handler（2026-10-29 HEAD）。
+> 对比依据：abap-cli 51 类 vs SAP abap-file-formats 上游 102 个类型格式（2026-10-30 HEAD）vs abapGit 168 个 TADIR handler（2026-10-29 HEAD）。
 > 本轮范围约定：**P0 不做 transport request 管理（release/delete）；P1 暂不做授权字段（AUTH）**。
 
 ### 6.1 P0：先在现有类型内补完
@@ -96,15 +96,18 @@
 | `JOBD`（application job definition） | ICF `/jobd`：`CL_JR_JOB_DEFINITION`（`GET_JD_ATTRIBUTES` / `CREATE_JD` / `MODIFY_JD`）序列化 STJR_JOBD_ROOT + STJR_JOBD_TREP，TADIR / CTS 用 `RS_CORR_INSERT`，删除先清 STJR 行再删 TADIR | 自建 `jobd-v1.json`（AFF 无此格式；镜像 `TY_JOB_DEFINITION` 去掉系统字段） | - [x] 已完成（ABAP/CLI/mock/unit/integration + 真机闭环；写入即激活，名称 ≤32） |
 | `AUTH` / `SUSC` / `SUCU` / `SUSH` / `SUSO` | ICF `/auth/<type>/<name>`：AUTHX / TOBC+TOBCT / TBRG_AUTH+TBRG_AUTHT / SU22（`CL_SU22_ADT_OBJECT`）/ SU21（`CL_SUSO_GEN` + DOKU） | `AUTH` 上游 AFF + SU20 两字段扩展；`SUSC`/`SUCU`/`SUSO` 本地扩展；`SUSH` 上游 AFF `sush-v1` | - [x] 已完成（真机 handler + CLI 闭环；SUSO 重生成 opt-in、SUSH create 仅 RF、SUCU 仅本地包可删） |
 
+
 > VIEW / SHLP 因 AFF 上游无格式，需按 TTYP 先例维护本地扩展 schema；可同步向上游 AFF 提 PR，采纳后切回官方 schema。
+>
+> 本轮 AFF 对象落地状态：6 类官方 schema 已 vendored；`APLO` / `CHDO` / `EVTB` / `SMBC` 走 ADT blueSource 读写（`APLO` / `CHDO` / `EVTB` 真机 create/pull/push/delete 闭环，`SMBC` 参考系统无对象未验证）；`ENHO` / `ENHS` 为 ICF 只读 pull（写入限制见 6.3）。
 
 ### 6.3 P2：场景驱动（有真实需求再排）
 
-- **ENHO / ENHS**（增强/BAdI 相关）：先只读 pull（`CL_ENH_FACTORY`），push 后置；复杂度大
+- **ENHO / ENHS**（增强/BAdI 相关）：`pull` 已支持（ICF `/aff` 只读端点，官方 AFF 格式只覆盖 BAdI 实现 / 定义）。**写入（create / push / delete）为已知限制**：SAP AFF handler 对这两类只读——create 门禁要求已存在 active 增强对象、persistence 的保存是空实现、ENHS 删除是断言；写入需 SEEF API 适配（`CL_ENH_FACTORY`、`CL_ENH_ADT_*` persist、`ENH_WB_ACTIVATE`），独立排期。其他增强工具无 AFF 格式
 - **授权族**：`SUSO` / `SUSH` / `SUSI` / `SUCO` / `SIA5` / `SIAD`（AUTH 本轮暂缓）
 - **SVIM / VCLS**（表维护生成器 / 视图簇）：AFF 近 3 个月新增格式；需真机验证 SAP 侧 API
 - **TTYP 本地文件收口**：表类型是纯 DDIC 元数据（abapGit 也只序列化元数据），已移除 pull 生成的 `.type.abap` 只读侧车；`.type.abap` 归还给 AFF type pool（`TYPE`）。旧侧车文件被忽略，不再生成。
-- **AFF-stable 27 类中的云/UI 类**（APLO/BGQC/CDBO/COTA/DESD/EVTB/EEEC/GSMP/SMBC/SWCR/NONT/RONT/UIAD/UIPG/UIST）：接入成本低，但按 BTP/云需求排期（`SAJC` / `SAJT` 已完成）。
+- **AFF-stable 27 类中的云/UI 类**（BGQC/CDBO/COTA/DESD/EEEC/GSMP/SWCR/NONT/RONT/UIAD/UIPG/UIST）：接入成本低，但按 BTP/云需求排期（`SAJC` / `SAJT` 已完成；`APLO` / `CHDO` / `EVTB` / `SMBC` 已接入 ADT blueSource，`ENHO` / `ENHS` 已接入 ICF 只读 pull，写入需 SEEF 适配）。
 - **`PINF` / `SCP1` / SM59 其它目标类型（RFC 连接 `3`·`I`·`T`·`L`）/ UCON HTTP service**：参考 release 没有可用 ADT 通道，暂不支持；SM59 HTTP 目标（RFCTYPE='G'）、UCON RFC service（`SRFC`）、OAuth2 profile（`OA2P`）与授权对象族（`AUTH` / `SUSC` / `SUCU` / `SUSH` / `SUSO`）已完成（类型码 `UCON_HTTP` 待定）。
 - **`DRAS` / `DTIX` / `DTSC`**：官方 AFF schema 已在镜像中，但本机 typestructure 无 CREATE、discovery 无 ADT 资源（2026-11-03 实测），等有 ADT 通道的 release 再实现；不硬做 ICF
 - **表单/集成**：`SFPF`（AFF 有格式）、`SSFO`/SAPscript、`IDOC`（AFF 无格式，复杂度高）

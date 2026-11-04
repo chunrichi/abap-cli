@@ -204,7 +204,7 @@ src/(ui2)cl_json.clas.abap                # 命名空间对象 /UI2/CL_JSON
 
 ## 支持的对象类型
 
-45 个类型码，按 ADT REST API 或捆绑 ICF 服务路由：源对象、包、DDIC 对象、SICF 节点、事务码、XSLT 转换、SM59 HTTP 目标、UCON RFC service（`SRFC`）、OAuth 2.0 client profile（`OA2P`）、表类型、消息类、CDS 与 RAP 源对象、ATC 检查配置对象、CDS 技术对象、类型池、应用程序作业、应用作业定义（`JOBD`），以及授权对象族（`AUTH` / `SUSC` / `SUCU` / `SUSH` / `SUSO`）。45 种支持 `create`，45 种支持 `pull`，43 种支持 `push`，45 种支持 `delete`；每个类型对应一组平铺在 `src/` 下的产物文件（多数为官方 AFF，`TTYP` / `VIEW` / `SHLP` / `JOBD` / `SM59` / `SRFC` / `OA2P` / `AUTH` / `SUSC` / `SUCU` / `SUSO` 使用本地扩展 schema）。
+51 个类型码，按 ADT REST API 或捆绑 ICF 服务路由：源对象、包、DDIC 对象、SICF 节点、事务码、XSLT 转换、SM59 HTTP 目标、UCON RFC service（`SRFC`）、OAuth 2.0 client profile（`OA2P`）、表类型、消息类、CDS 与 RAP 源对象、ATC 检查配置对象、CDS 技术对象、类型池、应用程序作业、应用作业定义（`JOBD`），授权对象族（`AUTH` / `SUSC` / `SUCU` / `SUSH` / `SUSO`），以及官方 AFF 对象（应用日志、更改凭证、事件绑定、业务配置维护对象走 ADT blueSource；增强点 / 增强实现通过 ICF 只读 pull）。49 种支持 `create`，51 种支持 `pull`，47 种支持 `push`，49 种支持 `delete`；`ENHO` / `ENHS` 只读（SAP 的 AFF handler 没有可用的写/删路径）。每个类型对应一组平铺在 `src/` 下的产物文件（多数为官方 AFF，`TTYP` / `VIEW` / `SHLP` / `JOBD` / `SM59` / `SRFC` / `OA2P` / `AUTH` / `SUSC` / `SUCU` / `SUSO` 使用本地扩展 schema）。
 
 完整类型 × 命令矩阵、产物文件集、通道路由与逐类型注意事项见 **[docs/supported.md](docs/supported.md)**；逐类型细节与真机证据见 [wiki/object-types.md](wiki/object-types.md)。
 
@@ -216,7 +216,7 @@ src/(ui2)cl_json.clas.abap                # 命名空间对象 /UI2/CL_JSON
 
 ```jsonc
 // 成功 — 写 stdout，exit 0
-{ "status": "success", "meta": { "command": "abap pull", "version": "2.3.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { /* ... */ } }
+{ "status": "success", "meta": { "command": "abap pull", "version": "2.4.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { /* ... */ } }
 
 // 失败 — 写 stderr，非零退出码，stdout 保持为空
 { "status": "error", "meta": { /* ... */ }, "error": { "code": "NO_TRANSPORT", "category": "VALIDATION_ERROR", "message": "..." } }

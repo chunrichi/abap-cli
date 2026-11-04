@@ -23,6 +23,8 @@ export interface PushFileOptions {
 export interface PushFileResult {
   file: string;
   status: 'activated' | 'checked-only' | 'written' | 'failed' | 'dry-run';
+  /** Transport channel actually used (AFF object types report theirs). */
+  channel?: 'adt' | 'icf';
   transport?: string;
   code?: string;
   stage?: string;

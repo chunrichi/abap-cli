@@ -56,6 +56,15 @@ import {
   buildAppJobCreateBody,
 } from './appjob.js';
 import {
+  ADT_BLUE_MEDIA_TYPE,
+  ADT_BLUE_SOURCE_MEDIA_TYPE,
+  ADT_BLUE_SOURCE_INFO,
+  adtBlueSourceObjectUrl,
+  adtBlueSourceSourceUrl,
+  buildAdtBlueSourceBody,
+  type AdtBlueSourceType,
+} from './adt-blue-source.js';
+import {
   TYPEGROUP_COLLECTION,
   TYPEGROUP_MEDIA,
   TYPEGROUP_OBJTYPE,
@@ -1016,6 +1025,146 @@ export class AdtClientWrapper {
       } finally {
         await this.unLock(objectUrl, handle).catch(() => undefined);
       }
+    });
+  }
+
+  // --- Generic AFF objects over ADT blueSource resources ---
+
+  /** Read the blueSource metadata XML of one AFF object. */
+  getBlueSourceObject(type: AdtBlueSourceType, name: string): Promise<string> {
+    return this._call(async () => {
+      const response = await this.client.httpClient.request(adtBlueSourceObjectUrl(type, name), {
+        method: 'GET',
+        headers: { Accept: ADT_BLUE_MEDIA_TYPE },
+      });
+      return String(response.body ?? '');
+    });
+  }
+
+  /** Read `source/main` — the object's official AFF JSON document. */
+  getBlueSourceSource(type: AdtBlueSourceType, name: string): Promise<string> {
+    return this._call(async () => {
+      const response = await this.client.httpClient.request(adtBlueSourceSourceUrl(type, name), {
+        method: 'GET',
+        headers: { Accept: ADT_BLUE_SOURCE_MEDIA_TYPE },
+      });
+      return String(response.body ?? '');
+    });
+  }
+
+  /**
+   * Create an AFF object (POST collection). The AFF document is written
+   * afterwards with {@link writeBlueSourceSource}; that write also saves the
+   * object (blueSource JSON resources never keep an inactive version).
+   */
+  createBlueSourceObject(
+    type: AdtBlueSourceType,
+    name: string,
+    meta: { packageName: string; description: string; transport?: string; originalLanguage?: string },
+  ): Promise<void> {
+    return this._call(async () => {
+      const body = buildAdtBlueSourceBody(type, name, {
+        packageName: meta.packageName,
+        description: meta.description,
+        language: this.config.sap.language,
+        originalLanguage: meta.originalLanguage,
+      });
+      await this.client.httpClient.request(ADT_BLUE_SOURCE_INFO[type].collection, {
+        method: 'POST',
+        body,
+        headers: { 'Content-Type': ADT_BLUE_MEDIA_TYPE, Accept: '*/*' },
+        qs: meta.transport ? { corrNr: meta.transport } : {},
+      });
+    });
+  }
+
+  /**
+   * Write `source/main` and activate the object.
+   *
+   * The AFF document is sent with an explicit `application/json` content type:
+   * the generic `setObjectSource` helper derives the media type from the body
+   * and would send JSON as `text/plain` (SAP answers 415). The write leaves
+   * APLO active automatically but CHDO/EVTB/SMBC inactive, so activation is
+   * always requested — for an already-active object it is a harmless no-op.
+   * Activation failures surface SAP's messages through `ACTIVATION_FAILED`.
+   */
+  writeBlueSourceSource(
+    type: AdtBlueSourceType,
+    name: string,
+    source: string,
+    meta: { transport?: string; originalLanguage?: string; description?: string; masterLanguage?: string } = {},
+  ): Promise<void> {
+    return this._call(async () => {
+      const objectUrl = adtBlueSourceObjectUrl(type, name);
+      const lock = await this.lock(objectUrl);
+      const handle = lock.LOCK_HANDLE;
+      if (typeof handle !== 'string' || handle === '') {
+        throw new CliError('LOCK_FAILED', `SAP returned no LOCK_HANDLE for ${type} ${name}`, {
+          object: name,
+          type,
+          nextSteps: ['The object may be locked by another user; retry after the lock is released.'],
+        });
+      }
+      let wrote = false;
+      try {
+        await this.client.httpClient.request(adtBlueSourceSourceUrl(type, name), {
+          method: 'PUT',
+          headers: { 'Content-Type': ADT_BLUE_SOURCE_MEDIA_TYPE, Accept: '*/*' },
+          qs: {
+            lockHandle: handle,
+            ...(meta.transport ? { corrNr: meta.transport } : {}),
+          },
+          body: source,
+        });
+        // Sync the metadata description under the same lock. The master
+        // language must come from the object's existing metadata (never from
+        // the logon session): the metadata PUT rewrites originalLanguage and
+        // would otherwise change the object's master language.
+        if (meta.description !== undefined && meta.masterLanguage !== undefined) {
+          const metadataBody = buildAdtBlueSourceBody(type, name, {
+            description: meta.description,
+            language: meta.masterLanguage,
+            originalLanguage: meta.masterLanguage,
+          });
+          await this.client.httpClient.request(objectUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': ADT_BLUE_MEDIA_TYPE, Accept: ADT_BLUE_MEDIA_TYPE },
+            qs: {
+              lockHandle: handle,
+              ...(meta.transport ? { corrNr: meta.transport } : {}),
+            },
+            body: metadataBody,
+          });
+        }
+        wrote = true;
+      } finally {
+        // Activation while the edit lock is still held makes SAP answer
+        // "currently being edited" (enqueue conflict), so unlock first. The
+        // object stays inactive until this activation, and activation is what
+        // surfaces SAP's document validation messages.
+        await this.unLock(objectUrl, handle).catch(() => undefined);
+      }
+      if (wrote && ADT_BLUE_SOURCE_INFO[type].autoActive !== true) {
+        // `source/main` saves an inactive version for CHDO / EVTB / SMBC; the
+        // activation below is what surfaces SAP's document validation messages.
+        // APLO saves and activates in one step, so no activation is needed
+        // (calling it would only report `activationExecuted=false`).
+        await this.activate(objectUrl, ADT_BLUE_SOURCE_INFO[type].objtype, name);
+      }
+    });
+  }
+
+  /**
+   * Delete an AFF blueSource object. ADT's DELETE needs no lock; transportable
+   * packages record the removal through the `corrNr` query parameter.
+   */
+  deleteBlueSourceObject(type: AdtBlueSourceType, name: string, transport?: string): Promise<void> {
+    return this._call(async () => {
+      await this.client.httpClient.request(adtBlueSourceObjectUrl(type, name), {
+        method: 'DELETE',
+        headers: { Accept: '*/*' },
+        qs: transport ? { corrNr: transport } : {},
+      });
     });
   }
 

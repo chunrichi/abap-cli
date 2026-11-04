@@ -14,6 +14,7 @@ import { defaultSkeleton, getTemplate } from '../../formats/templates.js';
 import type { CreatableTypeIds } from 'abap-adt-api';
 import {
   createObjtypeFor,
+  createUnsupportedReasonFor,
   isDdicSupportedType,
   isHttpSupportedType,
   isTranSupportedType,
@@ -109,6 +110,20 @@ export async function runCreate(type: string | undefined, name: string | undefin
     const packageFlag = packageNotApplicableFor(typeUpper) ? '' : ' --package $TMP';
     throw new CliError('USAGE', `Type ${typeUpper} requires --file <path> with an abap-file-format JSON`, {
       example: `abap create ${typeUpper} ${objectName} --file src/${affObjectToken(objectName)}.${typeUpper.toLowerCase()}.json${packageFlag} --yes`,
+    });
+  }
+  // Data-driven fail-fast (registry `createUnsupportedReason`): read-only AFF
+  // types (ENHO / ENHS) cannot be created at all — reject before the write
+  // confirmation and before any SAP round-trip, with the reason stated once.
+  const createUnsupported = createUnsupportedReasonFor(typeUpper);
+  if (createUnsupported) {
+    throw new CliError('VALIDATION_ERROR', `Cannot create ${typeUpper}: ${createUnsupported}`, {
+      type: typeUpper,
+      object: objectName,
+      nextSteps: [
+        `Pull the existing object instead: abap pull ${objectName} --type ${typeUpper}`,
+        'Maintain enhancement spots/implementations in Eclipse ADT/SEEF.',
+      ],
     });
   }
   requireWriteConfirmation(

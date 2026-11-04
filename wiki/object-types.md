@@ -1,15 +1,15 @@
 ---
 type: reference
 title: 支持的对象类型
-description: abap CLI 支持的 ABAP 对象类型总览 — 45 个类型码 × create/pull/push/delete 路由（ADT / ICF）与本地 AFF 文件布局
+description: abap CLI 支持的 ABAP 对象类型总览 — 51 个类型码 × create/pull/push/delete 路由（ADT / ICF）与本地 AFF 文件布局
 tags: [abap-cli, object-types, ddic, http, sicf, reference]
 created at: 2026-08-29 10:00:00
-changed at: 2026-11-04 00:30:00
+changed at: 2026-11-04 02:42:00
 ---
 
 # 支持的对象类型
 
-abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **45 个对象类型**：4 个 ABAP 源对象、1 个 ADT 包（DEVC）、8 个 DDIC 对象（含 VIEW / SHLP）、6 个 ICF 事务/转换/目标对象（HTTP / TRAN / XSLT / SM59 / SRFC / OA2P）、3 个双通道 DDIC/CDS 对象、6 个 CDS/RAP 对象、3 个 ATC 检查配置对象（CHKC / CHKO / CHKV）、5 个 CDS 技术对象（DTDC / DTEB / DSFD / DSFI / DRTY）、1 个类型池（TYPE）、3 个应用作业对象（SAJC / SAJT / JOBD）、5 个授权对象类型（AUTH / SUSC / SUCU / SUSH / SUSO）。分两条路由：**ADT** 与 **ICF**（含本地扩展格式）。
+abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **51 个对象类型**：4 个 ABAP 源对象、1 个 ADT 包（DEVC）、8 个 DDIC 对象（含 VIEW / SHLP）、6 个 ICF 事务/转换/目标对象（HTTP / TRAN / XSLT / SM59 / SRFC / OA2P）、3 个双通道 DDIC/CDS 对象、6 个 CDS/RAP 对象、3 个 ATC 检查配置对象（CHKC / CHKO / CHKV）、5 个 CDS 技术对象（DTDC / DTEB / DSFD / DSFI / DRTY）、1 个类型池（TYPE）、3 个应用作业对象（SAJC / SAJT / JOBD）、5 个授权对象类型（AUTH / SUSC / SUCU / SUSH / SUSO）、6 个 AFF 对象（APLO / CHDO / EVTB / SMBC 走 ADT blueSource 读写；ENHO / ENHS 走 ICF 只读 pull）。分两条路由：**ADT** 与 **ICF**（含本地扩展格式）。
 
 ## 类型 × 命令矩阵
 
@@ -75,9 +75,15 @@ abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **45 个
 | `SUCU` | 授权组（TBRG_AUTH） | ICF | `--file`（`sucu-v1.json`，本地扩展；名称 `<GROUP>~<OBJECT>`） | ✅ | ✅ | ✅（仅 `$` 本地包） | ❌ | `<group>~<object>.sucu.json` |
 | `SUSH` | SU22 授权缺省值分配 | ICF | `--file`（上游 AFF `sush-v1`；`create` 仅 `RF`） | ✅ | ✅ | ✅ | ❌ | `<name>_<type>.sush.json` |
 | `SUSO` | 授权对象（SU21） | ICF | `--file`（`suso-v1.json`，本地扩展） | ✅ | ✅ | ✅ | ❌ | `<token>.suso.json` |
+| `APLO` | 应用日志对象 | ADT（blueSource） | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.aplo.json` |
+| `CHDO` | 更改凭证对象 | ADT（blueSource） | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.chdo.json` |
+| `EVTB` | 事件绑定 | ADT（blueSource） | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.evtb.json` |
+| `SMBC` | 业务配置维护对象 | ADT（blueSource；参考系统未验证） | `--file` | ✅ | ✅ | ✅ | ❌ | `<name>.smbc.json` |
+| `ENHO` | 增强实现（仅 BAdI） | ICF（**仅 pull**） | ❌（只读） | ✅ | ❌（只读） | ❌（只读） | ❌ | `<name>.enho.json` |
+| `ENHS` | 增强点（仅 BAdI） | ICF（**仅 pull**） | ❌（只读） | ✅ | ❌（只读） | ❌（只读） | ❌ | `<name>.enhs.json` |
 
 > **`create local` 只支持 `CLAS` / `INTF` / `PROG` / `FUGR`**（`formats/templates.ts` 只有这四类模板），其余类型一律 `TYPE_NOT_SUPPORTED`（exit 7）。`SRVD` / `DCLS` / `DDLX` / `DDLA` 在 SAP 侧可创建（`createObjtype`），但没有本地骨架模板；`create local` 会拒绝它们并提示改用 `abap create <type> --file <aff.json>`。
-> **`create` 的 `--file` 是数据驱动必填项**（`types/registry.ts` 的 `ObjectTypeEntry.requiresFile`）：`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `JOBD` / `NROB` / `HTTP` / `TRAN` / `XSLT` / `TTYP` / `MSAG` / `DDLS` / `BDEF` / `SRVB` / `SRVD` / `DCLS` / `DDLX` / `DDLA` / `CHKC` / `CHKO` / `CHKV` / `DTDC` / `DTEB` / `DSFD` / `DSFI` / `DRTY` / `TYPE` / `SAJC` / `SAJT` / `SM59` / `SRFC` / `OA2P` 缺 `--file` 直接 `USAGE`（exit 2）。`BDEF` 还需同目录的 `.bdef.abdl` 源码；`SRVB` 创建后可用 `--publish` 发布（publish job 受系统 transport 设置约束），push/update 不支持。`SM59` 的 `--file` 文件名必须与目标名一致（`<name>.sm59.json`），因为没有 `name` 字段承载身份。
+> **`create` 的 `--file` 是数据驱动必填项**（`types/registry.ts` 的 `ObjectTypeEntry.requiresFile`）：`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `JOBD` / `NROB` / `HTTP` / `TRAN` / `XSLT` / `TTYP` / `MSAG` / `DDLS` / `BDEF` / `SRVB` / `SRVD` / `DCLS` / `DDLX` / `DDLA` / `CHKC` / `CHKO` / `CHKV` / `DTDC` / `DTEB` / `DSFD` / `DSFI` / `DRTY` / `TYPE` / `SAJC` / `SAJT` / `SM59` / `SRFC` / `OA2P` 缺 `--file` 直接 `USAGE`（exit 2）。`BDEF` 还需同目录的 `.bdef.abdl` 源码；`SRVB` 创建后可用 `--publish` 发布（publish job 受系统 transport 设置约束），push/update 不支持。`SM59` 的 `--file` 文件名必须与目标名一致（`<name>.sm59.json`），因为没有 `name` 字段承载身份。`ENHO` / `ENHS` 是只读类型，没有 `create` 路径（见「AFF 对象：ADT blueSource 与 ICF 只读」）。
 > **`ENQU` / `NROB` 的 create/delete 仅支持本地包（`$` 前缀）**：可传输创建/删除需要额外写 TADIR 记录，ICF 服务对非本地包直接拒绝（`ENQU_PACKAGE_NOT_SUPPORTED` / `NROB_PACKAGE_NOT_SUPPORTED`、`ENQU_DELETE_UNSUPPORTED` / `NROB_DELETE_UNSUPPORTED`）。`ENQU` 删除先回填本地 TADIR 行再走 `RS_DD_DELETE_OBJ`；`NROB` 删除清空区间后走 `NUMBER_RANGE_OBJECT_DELETE`。可传输对象请在 SE11（ENQU）/ SNRO（NROB）删除。`TEST...` 前缀的包不视为本地。（真机：`$` 前缀本地包中 ENQU/NROB create → delete 通过，TADIR/DD25L/TNRO 无残留；证据 `tests/261102013-enqu-nrob-delete/`，本地不入库。）
 
 > **`TRAN` 写路径已实现**：ABAP `/tran/<code>` 支持 GET / POST / PUT / DELETE，覆盖 dialog / report（含 report variant）/ parameter / variant 四种事务；OO 事务返回 `TRAN_OO_NOT_SUPPORTED`（规范 FM 没有 class/method 参数，仍用 SE93 维护）。`delete` 只支持 `$TMP` 事务（可传输事务请在 SE93 删除以便记录到请求）。类型页面：[tran](objects/tran.md)。
@@ -148,13 +154,26 @@ abap delete ZMY_SERVICE --type HTTP --yes
 - **delete**：包删除**不加锁、不传 lockHandle**（先 lock 再 DELETE 会被 SAP 拒绝），且不能删除仍有子包的包；transportable 包（软件组件非 `LOCAL`）需 `--tr`。
 - **push**：不支持。ADT 对包只有读 + 创建 + 删除，`PUT` 直接被资源控制器拒绝，`abap push *.devc.json` 报 `TYPE_NOT_SUPPORTED`（exit 7）并说明替代路径。
 
+## AFF 对象：ADT blueSource 与 ICF 只读
+
+六类官方 AFF 对象按**能力**分两条通道（用户命令面不变，仍是 `abap create/pull/push/delete <TYPE>` + 本地官方 AFF JSON）：
+
+| 类型 | 通道 | 能力 | 说明 |
+|---|---|---|---|
+| `APLO` / `CHDO` / `EVTB` / `SMBC` | **ADT blueSource** | create / pull / push / delete | 对象的 ADT 资源把官方 AFF JSON 直接作为 `source/main`；lock / 保存即激活 / transport 由 ADT 生命周期承担，CLI 不做字段映射。`SMBC` 参考系统无对象，未真机验证（前置：SRVB service binding） |
+| `ENHO` / `ENHS` | **ICF `/aff`（只读）** | 仅 pull | `GET /sap/abap_cli/aff/<TYPE>/<name>` 由 SAP AFF 框架序列化（需 `abap deploy`）。SAP 的 AFF handler 对这两类只读：create 门禁要求已存在 active 增强对象、persistence 的 save 是空实现、ENHS 删除实现是断言——因此 `create` / `push` / `delete` 不支持，写入需 SEEF API 适配（后续独立排期） |
+
+- 本地文件都是 `<token>.<type>.json` 单文件（官方 schema 见 `src/abap_cli/schema/<type>-v1.json`）；`ENHO` / `ENHS` 的 pull 产物只用于阅读 / 比对，不能 push。
+- `APLO` / `CHDO` / `EVTB` / `SMBC` 不需要 `abap deploy`；`ENHO` / `ENHS` 的 pull 需要。读操作都不需要 `--tr`；写操作按包是否 `$` 前缀决定是否要 `--tr`。
+- 上游 AFF 的 `ENHO` / `ENHS` 格式只覆盖 BAdI 实现 / 定义。类型页：[aplo](objects/aplo.md) · [chdo](objects/chdo.md) · [evtb](objects/evtb.md) · [smbc](objects/smbc.md) · [enho](objects/enho.md) · [enhs](objects/enhs.md)。
+
 ## 两种 "ICF" 的区别
 
 仓库里 "ICF" 指两件不同的事，别混淆：
 
 | | 含义 | 对应 |
 |---|---|---|
-| **ICF 作为通道** | 自建服务 `/sap/abap_cli` 旁路 ADT，承载 DDIC CRUD / textpool **读** / `select` / `tcode` / `run` / `mime` | `abap deploy` / `deploy status` |
+| **ICF 作为通道** | 自建服务 `/sap/abap_cli` 旁路 ADT，承载 DDIC CRUD / textpool **读** / `select` / `tcode` / `run` / `mime` / AFF 只读端点（`/aff/<TYPE>/<name>`，仅 ENHO/ENHS pull） | `abap deploy` / `deploy status` |
 | **ICF 作为对象** | 被管理的 SICF 服务节点本身 | `--type HTTP` |
 
 也就是说：**用 ICF（通道）来管理 ICF（节点）**。前者是前提，后者是能力——`--type HTTP` 依赖扩展已部署。
@@ -163,8 +182,9 @@ abap delete ZMY_SERVICE --type HTTP --yes
 
 | 类型 | 状态 | 去向 |
 |---|---|---|
-| `ENHO` / `ENHS` 增强 | 不支持 | 候选补充类型，见 [roadmap](roadmap.md) |
-| BAdI 定义/实现、AMDP、CDS Table Function | 不支持 | 来源对象可用 `where-used` 查引用 |
+| `ENHO` / `ENHS` 写入（create / push / delete） | 不支持（已知限制） | SAP AFF handler 对这两类只读（空保存 / 删除断言）；写入需 SEEF API 适配，后续独立排期；pull 已支持 |
+| 非 BAdI 的增强（source-code plug-in 等） | 不支持 | 官方 AFF 增强格式只覆盖 BAdI |
+| AMDP、CDS Table Function | 不支持 | 来源对象可用 `where-used` 查引用 |
 | SAPscript / Smart Forms / Adobe Form | 不支持 | — |
 | Web Dynpro / ITS / BSP | 不支持 | — |
 | IDoc / ALE 配置、Workflow | 不支持 | — |
@@ -177,9 +197,10 @@ abap delete ZMY_SERVICE --type HTTP --yes
 ## 常见误判
 
 - `abap pull X --type SICF` / `abap create SICF ...` → **不会**再映射为 `HTTP`（别名已在 1.0.0 删除）；请直接写 `HTTP`。
-- `create <type>` 的 `--schema` `allowedValues` 已是全 45 类：`CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, ENQU, VIEW, SHLP, JOBD, NROB, HTTP, TRAN, XSLT, SM59, SRFC, OA2P, AUTH, SUSC, SUCU, SUSH, SUSO, TTYP, MSAG, DDLS, SRVB, SRVD, BDEF, DCLS, DDLX, DDLA, CHKC, CHKO, CHKV, DTDC, DTEB, DSFD, DSFI, DRTY, TYPE, SAJC, SAJT`。
-- `DDIC_NOT_SUPPORTED` (exit 7) → 文件按 ICF 路由、但类型不在 `types/registry.ts` 的 45 类内时触发；已注册类型不会命中。
-- 所有 ICF 路由类型在扩展未部署时都会失败 → 先 `abap deploy status`。
+- `create <type>` 的 `--schema` `allowedValues` 已是全 51 类：`CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, ENQU, VIEW, SHLP, JOBD, NROB, HTTP, TRAN, XSLT, SM59, SRFC, OA2P, AUTH, SUSC, SUCU, SUSH, SUSO, TTYP, MSAG, DDLS, SRVB, SRVD, BDEF, DCLS, DDLX, DDLA, CHKC, CHKO, CHKV, DTDC, DTEB, DSFD, DSFI, DRTY, TYPE, SAJC, SAJT, APLO, CHDO, EVTB, SMBC, ENHO, ENHS`（顺序以 `abap create --schema` 输出为准；`ENHO` / `ENHS` 虽在列表里，create 会在本地拒绝）。
+- `DDIC_NOT_SUPPORTED` (exit 7) → 文件按 ICF 路由、但类型不在 `types/registry.ts` 的 51 类内时触发；已注册类型不会命中。
+- `APLO` / `CHDO` / `EVTB` / `SMBC` 走 ADT blueSource，**不需要** `abap deploy`；`SM59` / `SRFC` / `OA2P` / `JOBD` / 授权族与 `ENHO` / `ENHS` 的 pull 需要 ICF 服务已部署 → 先 `abap deploy status`。
+- `ENHO` / `ENHS` **只读**：`create` / `push` / `delete` 不支持（AFF handler 只读）。`abap pull` 正常工作，产物不能 push 回系统；维护请在 SE80 / SE11 / SEEF。
 - CDS 家族（`DDLS`/`DCLS`/`DDLX`/`DDLA`）+ RAP 三件套（`SRVB`/`SRVD`/`BDEF`）走 ADT，**不**经 ICF。`SRVB` 支持 create/pull/delete，`create --publish` 可发布（push/update 不支持；publish 受系统 transport 设置约束）；`DDLS` / `SRVD` / `BDEF` / `DCLS` / `DDLX` / `DDLA` 支持 create/pull/push；`BDEF` 的 create 需要 `.bdef.json` + `.bdef.abdl` 两件套并激活。
 
 # More
@@ -187,9 +208,12 @@ abap delete ZMY_SERVICE --type HTTP --yes
 ## todo
 
 - [x] `SICF` → `HTTP` 别名在 1.0.0 删除（旧文档里的"自动映射"描述已同步删除）
-- [x] `create <type>` `--schema` 补全 `allowedValues` 全 45 类（含 `ENQU`/`NROB`/`VIEW`/`SHLP`/`CHKC`/`CHKO`/`CHKV`/`DTDC`/`DTEB`/`DSFD`/`DSFI`/`DRTY`/`TYPE`/`SAJC`/`SAJT`/`SM59`/`SRFC`/`OA2P`/`AUTH`/`SUSC`/`SUCU`/`SUSH`/`SUSO`）
+- [x] `create <type>` `--schema` 补全 `allowedValues` 全 51 类（含 `ENQU`/`NROB`/`VIEW`/`SHLP`/`CHKC`/`CHKO`/`CHKV`/`DTDC`/`DTEB`/`DSFD`/`DSFI`/`DRTY`/`TYPE`/`SAJC`/`SAJT`/`SM59`/`SRFC`/`OA2P`/`AUTH`/`SUSC`/`SUCU`/`SUSH`/`SUSO`/`APLO`/`CHDO`/`EVTB`/`SMBC`/`ENHO`/`ENHS`）
 - [x] 矩阵补全 `ENQU`/`NROB` 行、修正 `create local` 列（CDS/RAP 伴生对象不再落错误骨架）
-- [ ] 候选补充类型（ENHO / STRANS / UIAD…）的取舍与排期 → [roadmap](roadmap.md)
+- [x] AFF 对象按能力拆分通道：`APLO`/`CHDO`/`EVTB`/`SMBC` 走 ADT blueSource 读写，`ENHO`/`ENHS` 走 ICF 只读 pull
+- [ ] `ENHO` / `ENHS` 写入路径（SEEF API 适配）→ 独立排期
+- [ ] `SMBC` 真机验证（需先有 SRVB service binding 前置对象）
+- [ ] 候选补充类型（BGQC / STRANS / UIAD…）的取舍与排期 → [roadmap](roadmap.md)
 - [ ] `create` 的 help/description 文案随 registry 动态化
 
 # references

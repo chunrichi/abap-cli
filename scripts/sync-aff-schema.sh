@@ -96,6 +96,20 @@ FILES=(
   # authorization-default assignment (SUSH) — added for the authorization family
   "sush/sush-v1.json"
   "sajt/sajt-v1.json"
+  # AFF-over-ICF objects served by the generic /aff endpoint: application
+  # log object, change documents, event binding, business configuration
+  # maintenance object type, enhancement spot / BAdI implementation.
+  "aplo/aplo-v1.json"
+  # CHDO / ENHO are intentionally absent: the reference release (SAP_BASIS 757)
+  # still serves the older v1 document while upstream main changed both formats
+  # (CHDO: generatedObject under generalInformation + databaseInsertions;
+  # ENHO: enhancementSpot under generalInformation), so those two files are the
+  # reference-release variants pinned to the upstream commits below.
+  #   chdo-v1.json <- upstream d371351 (2022-05-06)
+  #   enho-v1.json <- upstream aa640dd (2024-04-10)
+  "evtb/evtb-v1.json"
+  "smbc/smbc-v1.json"
+  "enhs/enhs-v1.json"
 )
 
 echo ">> Copying ${#FILES[@]} schema files"

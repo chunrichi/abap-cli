@@ -26,6 +26,9 @@
  *   *.oa2p.json                        → OA2P
  *   *.xslt.json / *.xslt.xml           → XSLT  (metadata + source pair)
  *   *.devc.json                        → DEVC
+ *   *.aplo.json / *.chdo.json          → APLO / CHDO  (AFF over ICF)
+ *   *.evtb.json / *.smbc.json          → EVTB / SMBC  (AFF over ICF)
+ *   *.enho.json / *.enhs.json          → ENHO / ENHS  (AFF over ICF)
  *
  * STRU is routed to `tabl-v1.json` at runtime via schemaPathFor().
  * DOCU is the 0..1 long-text companion of DOMA/DTEL, validated against
@@ -127,6 +130,15 @@ const SUFFIX_RULES: ReadonlyArray<{ suffix: string; type: string; schemaFile?: s
   { suffix: '.sucu.json', type: 'SUCU' },
   { suffix: '.sush.json', type: 'SUSH' },
   { suffix: '.suso.json', type: 'SUSO' },
+  // AFF-over-ICF objects served by the generic /aff endpoint: application log
+  // object, change document object, event binding, business configuration
+  // maintenance object type, enhancement spot / implementation.
+  { suffix: '.aplo.json', type: 'APLO' },
+  { suffix: '.chdo.json', type: 'CHDO' },
+  { suffix: '.evtb.json', type: 'EVTB' },
+  { suffix: '.smbc.json', type: 'SMBC' },
+  { suffix: '.enho.json', type: 'ENHO' },
+  { suffix: '.enhs.json', type: 'ENHS' },
 ];
 
 const SUFFIX_INDEX: Map<string, string> = new Map(

@@ -1,5 +1,8 @@
 import * as path from 'node:path';
 import { isTablArtifactFile, tablArtifactPaths } from '../../formats/ddic/tabl-artifact.js';
+import { affLocalPrefix } from '../../formats/aff/bundle.js';
+import { resolveFile } from '../../formats/file-resolver.js';
+import { isAffBundleType } from '../../types/registry.js';
 
 /**
  * (C1): when a workspace holds the full TABL/STRU artifact trio
@@ -54,3 +57,34 @@ export function deduplicateXsltArtifactTargets(files: string[]): string[] {
   return [...passthrough, ...kept].sort((a, b) => a.index - b.index).map((entry) => entry.file);
 }
 
+/**
+ * Generic AFF bundle types (APLO / CHDO / EVTB / SMBC / ENHO / ENHS) push the
+ * object's whole local file group, so passing two files of the same object
+ * (`abap push a.enhs.json b.enhs.json`, or a future multi-file bundle) would
+ * deserialize it twice. Collapse each object group to the first listed file;
+ * the push handler re-discovers the full bundle from that file's directory.
+ */
+export function deduplicateAffBundleTargets(files: string[]): string[] {
+  const seen = new Set<string>();
+  const kept: string[] = [];
+  for (const file of files) {
+    let resolved;
+    try {
+      resolved = resolveFile(file);
+    } catch {
+      kept.push(file);
+      continue;
+    }
+    if (!isAffBundleType(resolved.objectType)) {
+      kept.push(file);
+      continue;
+    }
+    const key = path
+      .join(path.dirname(path.resolve(file)), affLocalPrefix(resolved.objectName, resolved.objectType))
+      .toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    kept.push(file);
+  }
+  return kept;
+}

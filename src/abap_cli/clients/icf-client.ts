@@ -149,6 +149,30 @@ export class IcfClient {
     return this.request('delete', `/xslt/${encodeURIComponent(name)}`, body);
   }
 
+  /** GET /aff/<TYPE>/<NAME> — serialize an object through SAP's AFF framework. */
+  async getAff<T>(type: string, name: string): Promise<IcfResponse<T>> {
+    return this.get(`/aff/${encodeURIComponent(type)}/${encodeURIComponent(name)}`);
+  }
+
+  /** POST /aff/<TYPE>/<NAME> — create an object from its AFF file bundle. */
+  async postAff<T>(type: string, name: string, body: unknown): Promise<IcfResponse<T>> {
+    return this.post(`/aff/${encodeURIComponent(type)}/${encodeURIComponent(name)}`, body);
+  }
+
+  /** PUT /aff/<TYPE>/<NAME> — update an existing object from its AFF file bundle. */
+  async putAff<T>(type: string, name: string, body: unknown): Promise<IcfResponse<T>> {
+    return this.put(`/aff/${encodeURIComponent(type)}/${encodeURIComponent(name)}`, body);
+  }
+
+  /** DELETE /aff/<TYPE>/<NAME>[?transportRequest=…] — delete an AFF object. */
+  async deleteAff<T>(type: string, name: string, transportRequest?: string): Promise<IcfResponse<T>> {
+    const qs = transportRequest ? `?${new URLSearchParams({ transportRequest }).toString()}` : '';
+    return this.request(
+      'delete',
+      `/aff/${encodeURIComponent(type)}/${encodeURIComponent(name)}${qs}`,
+    );
+  }
+
   /** DELETE /tran/<tcode> — delete a transaction code (SE93). */
   async deleteTran<T>(tcode: string, body?: { transportRequest?: string }): Promise<IcfResponse<T>> {
     return this.request('delete', `/tran/${encodeURIComponent(tcode)}`, body);

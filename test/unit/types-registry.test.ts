@@ -5,9 +5,14 @@
 import { describe, it, expect } from 'vitest';
 import {
   TYPE_REGISTRY,
+  AFF_BUNDLE_TYPES,
+  affChannelFor,
+  createUnsupportedReasonFor,
+  deleteUnsupportedReasonFor,
   allSupportedTypes,
   maxNameLengthFor,
   packageNotApplicableFor,
+  pushUnsupportedReasonFor,
   createObjtypeFor,
   sourceFor,
   isSupportedType,
@@ -20,11 +25,13 @@ import {
 } from '../../src/abap_cli/types/registry.js';
 
 describe('types/registry.ts (single source of truth)', () => {
-  it('contains exactly 45 supported types (4 source + DEVC + 4 DDIC + ENQU + VIEW + SHLP + JOBD + NROB + HTTP + TRAN + SM59 + 2 UCON + XSLT + 3 dual-channel + 6 + 3 ATC + 5 CDS technical + TYPE + 2 application jobs + 5 authorization-family types)', () => {
+  it('contains exactly 51 supported types (4 source + DEVC + 4 DDIC + ENQU + VIEW + SHLP + JOBD + NROB + HTTP + TRAN + SM59 + 2 UCON + XSLT + 6 AFF bundle + 3 dual-channel + 6 + 3 ATC + 5 CDS technical + TYPE + 2 application jobs + 5 authorization-family types)', () => {
     // added: SRVB (metadata-only), SRVD, BDEF, DCLS, DDLX, DDLA.
     // added: ENQU (lock object, ICF) and NROB (number range object, ICF).
     // added: DEVC (package, ADT package resource; push unsupported).
-    expect(allSupportedTypes()).toHaveLength(45);
+    // added: SM59 (HTTP destination, ICF; no package/transport).
+    // added: APLO / CHDO / EVTB / SMBC / ENHO / ENHS (generic AFF bundle).
+    expect(allSupportedTypes()).toHaveLength(51);
     expect(allSupportedTypes()).toEqual([
       'CLAS', 'INTF', 'PROG', 'FUGR',         // ADT source
       'DEVC',                                  // ADT package resource
@@ -34,6 +41,7 @@ describe('types/registry.ts (single source of truth)', () => {
       'NROB',
       'HTTP', 'TRAN', 'SM59', 'SRFC', 'OA2P',  // ICF (SM59 = HTTP destination; SRFC/OA2P = UCON objects)
       'XSLT',
+      'APLO', 'CHDO', 'EVTB', 'SMBC', 'ENHO', 'ENHS', // generic AFF bundle
       'TTYP', 'MSAG', 'DDLS',                  // dual-channel
       'SRVB', 'SRVD', 'BDEF',                  // /
       'DCLS', 'DDLX', 'DDLA',
@@ -159,6 +167,26 @@ describe('types/registry.ts (single source of truth)', () => {
     expect(createObjtypeFor('CLAS/OC')).toBe('CLAS/OC');
     expect(isDdicSupportedType('TABL')).toBe(true);
     expect(isDdicSupportedType('tabl')).toBe(false); // guards expect uppercase
+  });
+
+  it('classifies the generic AFF types by transport channel (ADT blueSource vs read-only ICF)', () => {
+    expect([...AFF_BUNDLE_TYPES]).toEqual(['APLO', 'CHDO', 'EVTB', 'SMBC', 'ENHO', 'ENHS']);
+    for (const type of ['APLO', 'CHDO', 'EVTB', 'SMBC']) {
+      expect(sourceFor(type)).toBe('ADT');
+      expect(affChannelFor(type)).toBe('adt-blue');
+    }
+    for (const type of ['ENHO', 'ENHS']) {
+      expect(sourceFor(type)).toBe('ICF');
+      expect(affChannelFor(type)).toBe('icf');
+      // Read-only types: create/push/delete state their limitation once.
+      expect(createUnsupportedReasonFor(type)).toMatch(/read-only/i);
+      expect(pushUnsupportedReasonFor(type)).toMatch(/read-only/i);
+      expect(deleteUnsupportedReasonFor(type)).toMatch(/read-only|cannot be deleted/i);
+    }
+    // CHDO rejects 17-character names on the reference release.
+    expect(maxNameLengthFor('CHDO')).toBe(16);
+    expect(maxNameLengthFor('APLO')).toBe(20);
+    expect(affChannelFor('CLAS')).toBeUndefined();
   });
 
   it('TYPE_REGISTRY entries match the public helpers (no duplication drift)', () => {

@@ -103,4 +103,29 @@ describe('aff-router', () => {
     expect(routeAffSchema('zcl_demo.clas.definitions.abap')?.isJson).toBe(false);
     expect(routeAffSchema('zmy.tabl.ddic')?.isJson).toBe(false);
   });
+
+  it('routes the AFF-over-ICF documents (APLO/CHDO/EVTB/SMBC/ENHO/ENHS)', () => {
+    const cases: Array<[string, string, string]> = [
+      ['zmy_log.aplo.json', 'APLO', 'aplo-v1.json'],
+      ['zmy_change.chdo.json', 'CHDO', 'chdo-v1.json'],
+      ['zmy_event.evtb.json', 'EVTB', 'evtb-v1.json'],
+      ['zmy_bc.smbc.json', 'SMBC', 'smbc-v1.json'],
+      ['zmy_impl.enho.json', 'ENHO', 'enho-v1.json'],
+      ['zmy_spot.enhs.json', 'ENHS', 'enhs-v1.json'],
+    ];
+    for (const [file, type, schemaFile] of cases) {
+      expect(routeAffSchema(file)).toEqual({ type, isJson: true, schemaFile });
+    }
+    // Namespaced AFF token keeps the same suffix mapping.
+    expect(routeType('(ui2)zmy_change.chdo.json')).toBe('CHDO');
+    // Neighbouring suffixes must not swallow the new ones.
+    expect(routeType('zmy.sajt.json')).toBe('SAJT');
+    expect(routeType('zmy.enho.txt')).toBeUndefined();
+  });
+
+  it('schemaFileFor derives the upstream schema name for the AFF-over-ICF types', () => {
+    for (const type of ['APLO', 'CHDO', 'EVTB', 'SMBC', 'ENHO', 'ENHS']) {
+      expect(schemaFileFor(type)).toBe(`${type.toLowerCase()}-v1.json`);
+    }
+  });
 });

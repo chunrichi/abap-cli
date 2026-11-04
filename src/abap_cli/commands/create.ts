@@ -18,6 +18,7 @@ import {
   allSupportedTypes,
   createObjtypeFor,
   isSupportedType,
+  createUnsupportedReasonFor,
   requiresFileFor,
   sourceFor,
   typesRequiringFile,
@@ -27,9 +28,9 @@ import { schemaOption } from './schema-helpers.js';
 export function registerCreateCommand(program: Command): void {
   const createCmd = program
     .command('create')
-    .description('Create a new ABAP object (CLAS, INTF, PROG, FUGR, DEVC, DDIC, HTTP, TRAN, VIEW, SHLP, XSLT, CDS)')
+    .description('Create a new ABAP object (CLAS, INTF, PROG, FUGR, DEVC, DDIC, HTTP, TRAN, VIEW, SHLP, XSLT, CDS, AFF)')
     // [type]/[name]（可选）是因为 --schema 模式下不需要 name；真实创建仍需两者。
-    .argument('[type]', 'Object type (CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, ENQU, VIEW, SHLP, NROB, HTTP, TRAN, XSLT)')
+    .argument('[type]', 'Object type (CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, ENQU, VIEW, SHLP, NROB, HTTP, TRAN, XSLT, APLO, CHDO, EVTB, SMBC, ENHO, ENHS)')
     .argument('[name]', 'Object name')
     .addHelpText('after', [
       '',
@@ -57,6 +58,12 @@ export function registerCreateCommand(program: Command): void {
       '  HTTP  SICF service node  (ICF /http/<name> — requires --file)',
       '  TRAN  Transaction code   (ICF /tran/<code> — requires --file)',
       '  XSLT  Transformation     (ICF /xslt/<name> — requires --file <name>.xslt.json + .xslt.xml)',
+      '  APLO  Application log obj.(ADT blueSource — official AFF JSON, requires --file)',
+      '  CHDO  Change document obj.(ADT blueSource — official AFF JSON, requires --file)',
+      '  EVTB  Event binding      (ADT blueSource — official AFF JSON, requires --file)',
+      '  SMBC  Business config    (ADT blueSource — official AFF JSON, requires --file)',
+      '  ENHO  Enhancement impl.  (ICF /aff — pull-only; create/push/delete unsupported)',
+      '  ENHS  Enhancement spot   (ICF /aff — pull-only; create/push/delete unsupported)',
       '  TTYP / MSAG / DDLS       (requires --file; ADT, ICF fallback on ECC for TTYP/MSAG)',
       '',
       'Run `abap create <type> --schema` for the machine-readable contract of a specific type.',
@@ -241,6 +248,19 @@ export function createSchema(type?: string): CreateCommandSchema {
           description: `AFF-shaped ${t} JSON document (see exampleJson)`,
         },
       ],
+    };
+  }
+  // Read-only types own a local artifact but have no create path at all (the
+  // AFF reference framework has no create for ENHO/ENHS). The registry states
+  // the reason once; the schema marks the type unsupported.
+  const createUnsupported = createUnsupportedReasonFor(t);
+  if (createUnsupported) {
+    return {
+      ...base,
+      type: t,
+      supported: false,
+      reason: 'TYPE_NOT_SUPPORTED',
+      message: createUnsupported,
     };
   }
   // Types whose `create` has no skeleton path require `--file`; the registry

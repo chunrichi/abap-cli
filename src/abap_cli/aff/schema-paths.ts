@@ -105,6 +105,13 @@ const SCHEMA_FILE: Record<string, string> = {
   SUSH: 'sush-v1.json',
   SUSO: 'suso-v1.json',
   SAJT: 'sajt-v1.json',
+  // AFF-over-ICF objects served by the generic /aff endpoint.
+  APLO: 'aplo-v1.json',
+  CHDO: 'chdo-v1.json',
+  EVTB: 'evtb-v1.json',
+  SMBC: 'smbc-v1.json',
+  ENHO: 'enho-v1.json',
+  ENHS: 'enhs-v1.json',
 };
 
 /** Resolve the bundled-schema directory shipped with the package.
