@@ -57,6 +57,12 @@ const SCHEMA_FILE: Record<string, string> = {
   DEVC: 'devc-v1.json',
   HTTP: 'http-v1.json',
   TRAN: 'tran-v1.json',
+  // SM59 HTTP destination — local extension (upstream AFF has no SM59 schema).
+  SM59: 'sm59-v1.json',
+  // UCON RFC service — local extension (upstream AFF has no SRFC schema).
+  SRFC: 'srfc-v1.json',
+  // OAuth 2.0 client profile — local extension (upstream AFF has no OA2P schema).
+  OA2P: 'oa2p-v1.json',
   // Transformation (XSLT) AFF metadata schema.
   XSLT: 'xslt-v1.json',
   // three new dual-channel types.

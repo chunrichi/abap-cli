@@ -141,7 +141,7 @@ describe('create dispatcher — handler registry routing', () => {
 });
 
 describe('create dispatcher — requiresFile fail-fast', () => {
-  it.each(['TTYP', 'MSAG', 'DDLS', 'TABL', 'HTTP', 'TRAN'])(
+  it.each(['TTYP', 'MSAG', 'DDLS', 'TABL', 'HTTP', 'TRAN', 'SM59'])(
     'rejects %s without --file with USAGE (exit 2)',
     async (type) => {
       const res = await run(['create', type, 'ZMY_TEST']);

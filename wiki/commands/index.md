@@ -35,5 +35,6 @@ Per-command knowledge pages (prerequisites, gotchas, real-system evidence) live 
 | `abap mime` | [mime.md](mime.md) | Create, delete, or upload MIME Repository resources (create \| delete \| push) |
 | `abap validate:aff` | [validate-aff.md](validate-aff.md) | Validate JSON files against official abap-file-format (AFF) canonical schemas (Draft 2020-12) |
 | `abap session` | [session.md](session.md) | Inspect / manage session cookie reuse state |
+| `abap whoami` | [whoami.md](whoami.md) | Show the identity the SAP system reports for the current connection (user / system / client) |
 
 Non-command contracts in this directory: [path-output.md](path-output.md).

@@ -202,8 +202,7 @@ CLASS zcl_abap_vibe_icf_jobd IMPLEMENTATION.
           lv_locked    TYPE abap_bool,
           lv_rule_code TYPE string,
           lv_rule_msg  TYPE string.
-    FIELD-SYMBOLS: <ls_attr>  TYPE any,
-                   <lv_field> TYPE any.
+    FIELD-SYMBOLS <ls_attr> TYPE any.
 
     lv_query = io_server->request->get_header_field( '~query_string' ).
     lv_package = to_upper( zcl_abap_vibe_icf_response=>query_param( iv_query = lv_query iv_name = 'package' ) ).
@@ -219,7 +218,7 @@ CLASS zcl_abap_vibe_icf_jobd IMPLEMENTATION.
       CATCH cx_root.
         respond_error( io_server = io_server
                        iv_status = 400
-                       iv_code   = 'JOBD_BODY_INVALID'
+                       iv_code   = 'JOBD_INVALID_PAYLOAD'
                        iv_msg    = 'request body is not a valid job definition document (JSON object)' ).
         RETURN.
     ENDTRY.

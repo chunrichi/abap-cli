@@ -1,15 +1,15 @@
 ---
 type: reference
 title: 支持的对象类型
-description: abap CLI 支持的 ABAP 对象类型总览 — 37 个类型码 × create/pull/push/delete 路由（ADT / ICF）与本地 AFF 文件布局
+description: abap CLI 支持的 ABAP 对象类型总览 — 40 个类型码 × create/pull/push/delete 路由（ADT / ICF）与本地 AFF 文件布局
 tags: [abap-cli, object-types, ddic, http, sicf, reference]
 created at: 2026-08-29 10:00:00
-changed at: 2026-11-03 21:55:00
+changed at: 2026-11-04 00:30:00
 ---
 
 # 支持的对象类型
 
-abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **37 个对象类型**：4 个 ABAP 源对象、1 个 ADT 包（DEVC）、8 个 DDIC 对象（含 VIEW / SHLP）、3 个 ICF 事务/转换对象（HTTP / TRAN / XSLT）、3 个双通道 DDIC/CDS 对象、6 个 CDS/RAP 对象、3 个 ATC 检查配置对象（CHKC / CHKO / CHKV）、5 个 CDS 技术对象（DTDC / DTEB / DSFD / DSFI / DRTY）、1 个类型池（TYPE）、2 个应用作业对象（SAJC / SAJT）、1 个应用作业定义（JOBD）。分两条路由：**ADT** 与 **ICF**（含本地扩展格式）。
+abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **40 个对象类型**：4 个 ABAP 源对象、1 个 ADT 包（DEVC）、8 个 DDIC 对象（含 VIEW / SHLP）、6 个 ICF 事务/转换/目标对象（HTTP / TRAN / XSLT / SM59 / SRFC / OA2P）、3 个双通道 DDIC/CDS 对象、6 个 CDS/RAP 对象、3 个 ATC 检查配置对象（CHKC / CHKO / CHKV）、5 个 CDS 技术对象（DTDC / DTEB / DSFD / DSFI / DRTY）、1 个类型池（TYPE）、2 个应用作业对象（SAJC / SAJT）、1 个应用作业定义（JOBD）。分两条路由：**ADT** 与 **ICF**（含本地扩展格式）。
 
 ## 类型 × 命令矩阵
 
@@ -27,6 +27,9 @@ abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **37 个
 | `ENQU` | 锁对象 | ICF | `--file` | ✅ | ✅ | ✅（仅 `$TMP`） | ❌ | `<name>.enqu.json` |
 | `VIEW` | 数据库视图 | ICF | `--file`（`view-v1.json`，本地扩展） | ✅ | ✅ | ✅（仅 `$TMP`） | ❌ | `<name>.view.json` |
 | `SHLP` | 搜索帮助 | ICF | `--file`（`shlp-v1.json`，本地扩展；elementary/collective） | ✅ | ✅ | ✅（仅 `$TMP`） | ❌ | `<name>.shlp.json` |
+| `SM59` | HTTP 目标（RFCDES RFCTYPE=G） | ICF | `--file`（`sm59-v1.json`，本地扩展） | ✅ | ✅ | ✅（无 package/传输，拒绝 `--package` / `--tr`） | ❌ | `<name>.sm59.json` |
+| `SRFC` | UCON RFC service | ICF | `--file`（`srfc-v1.json`，本地扩展） | ✅ | ✅ | ✅（TADIR 对象，`--package` / `--tr` 适用） | ❌ | `<name>.srfc.json` |
+| `OA2P` | OAuth 2.0 client profile | ICF | `--file`（`oa2p-v1.json`，本地扩展） | ✅ | ✅ | ✅（TADIR 对象，`--package` / `--tr` 适用；被 client 分配时拒绝删除） | ❌ | `<name>.oa2p.json` |
 | `NROB` | 编号范围对象 | ICF（pull 主 ADT + ICF 兜底） | `--file` | ✅ | ✅ | ✅（仅 `$TMP`） | ❌ | `<name>.nrob.json` |
 | `HTTP` | **ICF / SICF 节点** | ICF | `--file`（仅 `$` 前缀本地包） | ✅ | ✅（仅 `$` 前缀本地包） | ✅（仅 `$` 前缀本地包；根节点/有子节点/可传输节点除外） | ❌ | `<name>.http.json` |
 | `TRAN` | 事务码 (SE93) | ICF | `--file` | ✅ | ✅ | ✅（仅 `$TMP`） | ❌ | `<code>.tran.json` |
@@ -54,15 +57,21 @@ abap CLI 的类型注册表（`src/abap_cli/types/registry.ts`）覆盖 **37 个
 | `JOBD` | 应用作业定义（SM36） | ICF | `--file`（`jobd-v1.json`，本地扩展） | ✅ | ✅ | ✅ | ❌ | `<name>.jobd.json` |
 
 > **`create local` 只支持 `CLAS` / `INTF` / `PROG` / `FUGR`**（`formats/templates.ts` 只有这四类模板），其余类型一律 `TYPE_NOT_SUPPORTED`（exit 7）。`SRVD` / `DCLS` / `DDLX` / `DDLA` 在 SAP 侧可创建（`createObjtype`），但没有本地骨架模板；`create local` 会拒绝它们并提示改用 `abap create <type> --file <aff.json>`。
-> **`create` 的 `--file` 是数据驱动必填项**（`types/registry.ts` 的 `ObjectTypeEntry.requiresFile`）：`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `NROB` / `HTTP` / `TRAN` / `XSLT` / `TTYP` / `MSAG` / `DDLS` / `BDEF` / `SRVB` / `SRVD` / `DCLS` / `DDLX` / `DDLA` / `CHKC` / `CHKO` / `CHKV` / `DTDC` / `DTEB` / `DSFD` / `DSFI` / `DRTY` / `TYPE` / `JOBD` 缺 `--file` 直接 `USAGE`（exit 2）。`BDEF` 还需同目录的 `.bdef.abdl` 源码；`SRVB` 创建后可用 `--publish` 发布（publish job 受系统 transport 设置约束），push/update 不支持。
+> **`create` 的 `--file` 是数据驱动必填项**（`types/registry.ts` 的 `ObjectTypeEntry.requiresFile`）：`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `JOBD` / `NROB` / `HTTP` / `TRAN` / `XSLT` / `TTYP` / `MSAG` / `DDLS` / `BDEF` / `SRVB` / `SRVD` / `DCLS` / `DDLX` / `DDLA` / `CHKC` / `CHKO` / `CHKV` / `DTDC` / `DTEB` / `DSFD` / `DSFI` / `DRTY` / `TYPE` / `SAJC` / `SAJT` / `SM59` / `SRFC` / `OA2P` 缺 `--file` 直接 `USAGE`（exit 2）。`BDEF` 还需同目录的 `.bdef.abdl` 源码；`SRVB` 创建后可用 `--publish` 发布（publish job 受系统 transport 设置约束），push/update 不支持。`SM59` 的 `--file` 文件名必须与目标名一致（`<name>.sm59.json`），因为没有 `name` 字段承载身份。
 > **`ENQU` / `NROB` 的 create/delete 仅支持本地包（`$` 前缀）**：可传输创建/删除需要额外写 TADIR 记录，ICF 服务对非本地包直接拒绝（`ENQU_PACKAGE_NOT_SUPPORTED` / `NROB_PACKAGE_NOT_SUPPORTED`、`ENQU_DELETE_UNSUPPORTED` / `NROB_DELETE_UNSUPPORTED`）。`ENQU` 删除先回填本地 TADIR 行再走 `RS_DD_DELETE_OBJ`；`NROB` 删除清空区间后走 `NUMBER_RANGE_OBJECT_DELETE`。可传输对象请在 SE11（ENQU）/ SNRO（NROB）删除。`TEST...` 前缀的包不视为本地。（真机：`$` 前缀本地包中 ENQU/NROB create → delete 通过，TADIR/DD25L/TNRO 无残留；证据 `tests/261102013-enqu-nrob-delete/`，本地不入库。）
 
 > **`TRAN` 写路径已实现**：ABAP `/tran/<code>` 支持 GET / POST / PUT / DELETE，覆盖 dialog / report（含 report variant）/ parameter / variant 四种事务；OO 事务返回 `TRAN_OO_NOT_SUPPORTED`（规范 FM 没有 class/method 参数，仍用 SE93 维护）。`delete` 只支持 `$TMP` 事务（可传输事务请在 SE93 删除以便记录到请求）。类型页面：[tran](objects/tran.md)。
 > **`XSLT` 两件套**：`<name>.xslt.json`（AFF xslt-v1 元数据）+ `<name>.xslt.xml`（源码）必须成对存在；SAP 侧走 ICF `/xslt/<name>` + `CL_O2_API_XSLTDESC`，更新语义是**原地更新并保留版本历史**（`load` → `set_source` → `save` → `activate`）。行尾统一规范化（SAP 读回多一个 CRLF）。类型页面：[xslt](objects/xslt.md)。
 
-> **`SHLP` 写路径已实现（真机 18/18 TC 通过）**：ABAP `/ddic/shlp` 支持 GET / POST / PUT / DELETE（`DDIF_SHLP_GET` / `RS_CORR_INSERT` + `DDIF_SHLP_PUT` + `DDIF_SHLP_ACTIVATE`；删除 `$TMP` 搜索帮助用 `RS_DD_DELETE_OBJ(no_ask, objtype='H')`）。本地格式 `shlp-v1.json` 是**本地扩展**——覆盖 elementary（selectionMethod + 参数）与 collective（includedSearchHelps + parameterMappings）；名称上限 30 字符。类型页面：[shlp](objects/shlp.md)。
+> **`SM59` HTTP 目标新增**：ABAP `/sm59/<name>` 支持 GET / POST / DELETE，覆盖 SM59 的 HTTP connection to external server（RFCTYPE='G'）：target host / port / protocol / path prefix / 描述。本地格式 `sm59-v1.json` 是**本地扩展**（上游 AFF 无 SM59 格式）；目标写在 client-independent 系统表 `RFCDES`（描述在 `RFCDOC`），没有 package、无法进 CTS 传输请求——`--package` / `--tr` 显式拒绝（exit 7），需要在每个系统单独 create。SAP 侧走标准维护 API `SRFC_DESTAPI`；create 使用 API 默认值，push 保留 API 已加载的选项值，但维护 API 会在 save 时重建 `RFCOPTIONS`，因此对 SAP 自带目标 push 会丢掉 API 不认识的 legacy option 代码（v1 自己 create 的目标 pull→push 稳定）。描述按语言存 `RFCDOC`（≤72 字符，pull 回退任意语言行）。GUI 确认弹窗保留名被拒绝（`SM59_NAME_INVALID`，请在 SM59 维护）。其它 RFCTYPE（`3` / `I` / `T` / `L` …）在 pull / push / delete 时返回 `SM59_TYPE_NOT_SUPPORTED`（exit 7）。类型页面：[sm59](objects/sm59.md)。
+
+> **`SRFC`（UCON RFC service）新增**：ABAP `/srfc/<name>` 支持 GET / POST / DELETE，本地扩展 `srfc-v1.json`（functionName / scope / defaultProfile / description）。读走公共 UCON RFC API，写走 `CL_UCONRFC_OBJECT_PERSIST`（UCONCOCKPIT 保存路径）+ `RS_CORR_INSERT`（TADIR / package / transport），写入后刷新 UCON RFC 运行时缓存；删除走 `CL_UCON_API_FACTORY=>DELETE_RFC_SERVICE`。function module 必须存在且 RFC-enabled，defaultProfile 必须存在于 `UCONPROFHEAD`；短文本按会话语言读写。communication assembly / RFC profile 不在范围。类型页面：[srfc](objects/srfc.md)。
+>
+> **`OA2P`（OAuth 2.0 client profile）新增**：ABAP `/oa2p/<name>` 支持 GET / POST / DELETE，本地扩展 `oa2p-v1.json`（type / noAuthCheck / scopes）。走 OA2P Workbench 持久化类 + `RS_CORR_INSERT`（TADIR / package / transport）；provider type 必须存在于 `OA2C_TYPES`；被 OAuth 2.0 client 分配的 profile 拒绝删除（`OA2P_PROFILE_IN_USE`）；没有描述字段与激活步骤。OAuth 2.0 client 与 profile 的分配仍在 `OA2C_CONFIG`。类型页面：[oa2p](objects/oa2p.md)。
 
 > **`JOBD` 写路径已实现（本地扩展 + ICF）**：上游 AFF 没有 JOBD 格式、参考 release 也没有 ADT 资源，所以本地格式 `jobd-v1.json` 是**本地扩展**（镜像 `CL_JR_JOB_DEFINITION=>TY_JOB_DEFINITION`，去掉系统字段），SAP 侧走 ICF `/jobd/<name>`（GET/POST/PUT/DELETE）。写入即保存激活（`--no-activate` 被拒绝）；`create/push/delete` 用 `RS_CORR_INSERT` 记录 TADIR（可传输包带 `--tr`），类的 `CREATE_JD`/`MODIFY_JD` 负责落库，handler 再把写入时临时用的 `$TMP` 包改回真实包。名称上限 32 字符；不含 `CL_JR_JOB_DEFINITION` 的 release 返回 `JOBD_UNSUPPORTED`（exit 7）。类型页面：[jobd](objects/jobd.md)。
+
+> **`SHLP` 写路径已实现（真机 18/18 TC 通过）**：ABAP `/ddic/shlp` 支持 GET / POST / PUT / DELETE（`DDIF_SHLP_GET` / `RS_CORR_INSERT` + `DDIF_SHLP_PUT` + `DDIF_SHLP_ACTIVATE`；删除 `$TMP` 搜索帮助用 `RS_DD_DELETE_OBJ(no_ask, objtype='H')`）。本地格式 `shlp-v1.json` 是**本地扩展**——覆盖 elementary（selectionMethod + 参数）与 collective（includedSearchHelps + parameterMappings）；名称上限 30 字符。类型页面：[shlp](objects/shlp.md)。
 
 > **`VIEW` 写路径已实现（真机 17/17 TC 通过）**：ABAP `/ddic/view` 支持 GET / POST / PUT / DELETE（`DDIF_VIEW_GET` / `RS_CORR_INSERT` + `DDIF_VIEW_PUT` + `DDIF_VIEW_ACTIVATE`；删除 `$TMP` 视图用 `RS_DD_DELETE_OBJ(no_ask)`，可传输视图请在 SE11 删除）。本地格式 `view-v1.json` 是**本地扩展**——上游 abap-file-formats 没有 view 格式，字段按 DD25V/DD26V/DD27P/DD28J/DD28V 设计；视图名上限 16 字符。类型页面：[view](objects/view.md)。
 
@@ -149,8 +158,8 @@ abap delete ZMY_SERVICE --type HTTP --yes
 ## 常见误判
 
 - `abap pull X --type SICF` / `abap create SICF ...` → **不会**再映射为 `HTTP`（别名已在 1.0.0 删除）；请直接写 `HTTP`。
-- `create <type>` 的 `--schema` `allowedValues` 已是全 37 类：`CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, ENQU, VIEW, SHLP, JOBD, NROB, HTTP, TRAN, XSLT, TTYP, MSAG, DDLS, SRVB, SRVD, BDEF, DCLS, DDLX, DDLA, CHKC, CHKO, CHKV, DTDC, DTEB, DSFD, DSFI, DRTY, TYPE, SAJC, SAJT`。
-- `DDIC_NOT_SUPPORTED` (exit 7) → 文件按 ICF 路由、但类型不在 `types/registry.ts` 的 37 类内时触发；已注册类型不会命中。
+- `create <type>` 的 `--schema` `allowedValues` 已是全 39 类：`CLAS, INTF, PROG, FUGR, DEVC, TABL, STRU, DOMA, DTEL, ENQU, VIEW, SHLP, NROB, HTTP, TRAN, XSLT, TTYP, MSAG, DDLS, SRVB, SRVD, BDEF, DCLS, DDLX, DDLA, CHKC, CHKO, CHKV, DTDC, DTEB, DSFD, DSFI, DRTY, TYPE, SAJC, SAJT, SM59, SRFC, OA2P`。
+- `DDIC_NOT_SUPPORTED` (exit 7) → 文件按 ICF 路由、但类型不在 `types/registry.ts` 的 39 类内时触发；已注册类型不会命中。
 - 所有 ICF 路由类型在扩展未部署时都会失败 → 先 `abap deploy status`。
 - CDS 家族（`DDLS`/`DCLS`/`DDLX`/`DDLA`）+ RAP 三件套（`SRVB`/`SRVD`/`BDEF`）走 ADT，**不**经 ICF。`SRVB` 支持 create/pull/delete，`create --publish` 可发布（push/update 不支持；publish 受系统 transport 设置约束）；`DDLS` / `SRVD` / `BDEF` / `DCLS` / `DDLX` / `DDLA` 支持 create/pull/push；`BDEF` 的 create 需要 `.bdef.json` + `.bdef.abdl` 两件套并激活。
 
@@ -159,9 +168,9 @@ abap delete ZMY_SERVICE --type HTTP --yes
 ## todo
 
 - [x] `SICF` → `HTTP` 别名在 1.0.0 删除（旧文档里的"自动映射"描述已同步删除）
-- [x] `create <type>` `--schema` 补全 `allowedValues` 全 37 类（含 `ENQU`/`NROB`/`VIEW`/`SHLP`/`CHKC`/`CHKO`/`CHKV`/`DTDC`/`DTEB`/`DSFD`/`DSFI`/`DRTY`/`TYPE`/`SAJC`/`SAJT`）
+- [x] `create <type>` `--schema` 补全 `allowedValues` 全 39 类（含 `ENQU`/`NROB`/`VIEW`/`SHLP`/`CHKC`/`CHKO`/`CHKV`/`DTDC`/`DTEB`/`DSFD`/`DSFI`/`DRTY`/`TYPE`/`SAJC`/`SAJT`/`SM59`/`SRFC`/`OA2P`）
 - [x] 矩阵补全 `ENQU`/`NROB` 行、修正 `create local` 列（CDS/RAP 伴生对象不再落错误骨架）
-- [ ] 候选补充类型（AUTH / ENHO / STRANS / JOBD / UIAD…）的取舍与排期 → [roadmap](roadmap.md)
+- [ ] 候选补充类型（AUTH / ENHO / STRANS / UIAD…）的取舍与排期 → [roadmap](roadmap.md)
 - [ ] `create` 的 help/description 文案随 registry 动态化
 
 # references

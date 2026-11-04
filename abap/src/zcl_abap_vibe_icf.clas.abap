@@ -27,6 +27,15 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
       zcl_abap_vibe_icf_tcode=>dispatch_tcode( io_server = server iv_path = lv_path iv_method = lv_method ).
     ELSEIF lv_path CP '/tran/*'.
       zcl_abap_vibe_icf_tcode=>dispatch_tran( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
+    ELSEIF lv_path CP '/sm59/*'.
+      " SM59 HTTP destinations (RFCTYPE='G') through the standard SRFC_DESTAPI.
+      zcl_abap_vibe_icf_sm59=>dispatch_sm59( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
+    ELSEIF lv_path CP '/srfc/*'.
+      " UCON RFC services (SRFC) through the public UCON RFC service API.
+      zcl_abap_vibe_icf_srfc=>dispatch_srfc( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
+    ELSEIF lv_path CP '/oa2p/*'.
+      " OAuth 2.0 client profiles (OA2P) through the Workbench persistence classes.
+      zcl_abap_vibe_icf_oa2p=>dispatch_oa2p( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
     ELSEIF lv_path CP '/data/*'.
       " Read-only table data query (SE16N equivalent).
       TRY.
@@ -62,6 +71,10 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
       zcl_abap_vibe_icf_xslt=>dispatch_xslt( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
     ELSEIF lv_path CP '/version-source*'.
       zcl_abap_vibe_icf_version=>dispatch_version_management( io_server = server iv_path = lv_path iv_method = lv_method ).
+    ELSEIF lv_path CP '/whoami*'.
+      " System-side identity of the authenticated session (works for basic auth
+      " today and for any future SSO / ticket mechanism).
+      zcl_abap_vibe_icf_response=>handle_whoami( io_server = server iv_method = lv_method ).
     ELSEIF lv_path CP '/_class-check*'.
       zcl_abap_vibe_icf_response=>handle_class_check( io_server = server ).
     ELSE.

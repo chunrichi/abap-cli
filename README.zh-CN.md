@@ -52,7 +52,7 @@ abap push src/zcl_my_class.clas.abap --tr DEVK900001    # 锁 → 写 → 激活
 ## 能做什么
 
 - **就地在本地编辑**——`pull` 把对象拉成 abap-file-format 文件树，用编辑器改，`push` 写回（锁 → 写 → 激活 → 解锁）；写之前可以先 `check` 和 `diff`。
-- **覆盖 37 种对象类型**——类、接口、程序、函数组；包；DDIC 表、结构、域、数据元素、数据库视图、搜索帮助、锁对象、编号范围对象；SICF 节点、事务码、XSLT 转换程序；表类型、消息类、CDS 视图及 CDS / RAP 配套对象；ATC 检查配置对象；CDS 技术对象；类型池；应用程序作业目录条目与模板；应用程序作业定义（SM36）。其中 37 种支持 create、37 种支持 pull、35 种有 push 入口、37 种有 delete 路径；`DEVC` 支持 create / pull / delete（无 push），`SRVB` 仅元数据，`SAJC` / `SAJT` / `JOBD` 写入即激活。
+- **覆盖 40 种对象类型**——类、接口、程序、函数组；包；DDIC 表、结构、域、数据元素、数据库视图、搜索帮助、锁对象、编号范围对象；SICF 节点、事务码、XSLT 转换程序、SM59 HTTP 目标；UCON RFC service 与 OAuth 2.0 client profile；表类型、消息类、CDS 视图及 CDS / RAP 配套对象；ATC 检查配置对象；CDS 技术对象；类型池；应用程序作业目录条目与模板，以及应用作业定义（SM36）。其中 40 种支持 create、40 种支持 pull、38 种有 push 入口、40 种有 delete 路径；`DEVC` 支持 create / pull / delete（无 push），`SRVB` 仅元数据，`SAJC` / `SAJT` / `JOBD` 写入即激活。
 - **只读探查 SAP**——`search`、`inspect`、`where-used`、`tcode`、`list`、`dumps`、`fields`、`select`、`run-report` 都不改系统。
 - **运行与验证**——`abap run` 执行类（classrun）或 PUBLIC STATIC 方法；`abap run-report` 返回列表输出；`abap select` 就是 SE16N 的等价物。
 - **管理传输**——`transport list / create / show / resolve / assign`，`push` 时按对象自动解析。
@@ -136,7 +136,7 @@ graph LR
 ```
 
 - **ADT 通道**——源对象（CLAS / INTF / PROG / FUGR / CDS / RAP）走标准 ADT REST API：搜索、源码读写、加锁、语法检查、激活、传输、where-used。
-- **ICF 通道**——DDIC 对象、SICF 节点与事务码、表数据、报表、MIME、远程版本拉取、无 ADT text-elements 端点时的 textpool 读取，以及运行时 wrapper 走捆绑 ABAP 服务，由 `abap deploy` 安装。端点包括 `/ddic/*`、`/http/*`、`/tran/*`、`/tcode/*`、`/data/*`、`/run/*`、`/mime/*`、`/textpool/*`、`/version-source*` 与 `/_class-check*`。
+- **ICF 通道**——DDIC 对象、SICF 节点与事务码、表数据、报表、MIME、远程版本拉取、无 ADT text-elements 端点时的 textpool 读取、运行时 wrapper，以及由系统返回的连接身份走捆绑 ABAP 服务，由 `abap deploy` 安装。端点包括 `/ddic/*`、`/http/*`、`/tran/*`、`/tcode/*`、`/data/*`、`/run/*`、`/mime/*`、`/textpool/*`、`/version-source*`、`/whoami` 与 `/_class-check*`。
 
 发布形态只装 **3 个全局类**（handler + setup + 运行时 wrapper）；`abap deploy --dev` 装完整的 20 类开发形态供维护者使用。ICF 节点由 setup 类幂等创建，所以 `abap deploy` 可以安全重跑。
 
@@ -168,6 +168,7 @@ src/(ui2)cl_json.clas.abap                # 命名空间对象 /UI2/CL_JSON
 | `abap profile` | 管理全局连接 profile：`list` / `show` / `add` / `set` / `test` / `delete` / `export` / `import` |
 | `abap doctor` | 诊断环境与配置（只读且不连 SAP——连通性用 `abap profile test`）；`--fix` 应用安全修复 |
 | `abap session` | 查看当前 profile 的会话 cookie jar（`session info`） |
+| `abap whoami` | 打印由 SAP 系统返回的连接身份——用户、系统 / 客户端，以及应用服务器 / 数据库 / OS / ABAP release；附带工作区 profile 与 endpoint，需要内置 ICF 服务 |
 | `abap deploy` | 部署捆绑 ICF 服务（`status` 探测 SAP 侧已装版本；`--dev` 安装开发形态） |
 | `abap transport` | `list`（`--open`）/ `create` / `show` / `resolve` / `assign` 传输请求 |
 | `abap pull <object>` | 把对象、包或整个 transport 拉成本地 AFF 文件（`--type`、`--package`、`--tr`、`--remote`、`--textpool`、`--active`、`--dir`、`--overwrite`、`--include-tests`） |
@@ -203,7 +204,7 @@ src/(ui2)cl_json.clas.abap                # 命名空间对象 /UI2/CL_JSON
 
 ## 支持的对象类型
 
-37 个类型码，按 ADT REST API 或捆绑 ICF 服务路由：源对象、包、DDIC 对象、SICF 节点、事务码、XSLT 转换、表类型、消息类、CDS 与 RAP 源对象、ATC 检查配置对象、CDS 技术对象、类型池、应用程序作业，以及应用程序作业定义。37 种支持 `create`，37 种支持 `pull`，35 种支持 `push`，37 种支持 `delete`；每个类型对应一组平铺在 `src/` 下的产物文件（多数为官方 AFF，`TTYP` / `VIEW` / `SHLP` / `JOBD` 使用本地扩展 schema）。
+40 个类型码，按 ADT REST API 或捆绑 ICF 服务路由：源对象、包、DDIC 对象、SICF 节点、事务码、XSLT 转换、SM59 HTTP 目标、UCON RFC service（`SRFC`）、OAuth 2.0 client profile（`OA2P`）、表类型、消息类、CDS 与 RAP 源对象、ATC 检查配置对象、CDS 技术对象、类型池、应用程序作业，以及应用作业定义（`JOBD`）。40 种支持 `create`，40 种支持 `pull`，38 种支持 `push`，40 种支持 `delete`；每个类型对应一组平铺在 `src/` 下的产物文件（多数为官方 AFF，`TTYP` / `VIEW` / `SHLP` / `JOBD` / `SM59` / `SRFC` / `OA2P` 使用本地扩展 schema）。
 
 完整类型 × 命令矩阵、产物文件集、通道路由与逐类型注意事项见 **[docs/supported.md](docs/supported.md)**；逐类型细节与真机证据见 [wiki/object-types.md](wiki/object-types.md)。
 
@@ -215,7 +216,7 @@ src/(ui2)cl_json.clas.abap                # 命名空间对象 /UI2/CL_JSON
 
 ```jsonc
 // 成功 — 写 stdout，exit 0
-{ "status": "success", "meta": { "command": "abap pull", "version": "2.2.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { /* ... */ } }
+{ "status": "success", "meta": { "command": "abap pull", "version": "2.3.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { /* ... */ } }
 
 // 失败 — 写 stderr，非零退出码，stdout 保持为空
 { "status": "error", "meta": { /* ... */ }, "error": { "code": "NO_TRANSPORT", "category": "VALIDATION_ERROR", "message": "..." } }
@@ -260,6 +261,8 @@ npm 包内含 6 个 skill 和 1 个 agent 定义：
 - 仅 basic 认证：不支持 X.509 客户端证书、浏览器 SSO、OAuth password grant 与 Kerberos。
 - DDIC、表数据 / 报表类命令以及 `run --method` 需要先 `abap deploy` 一次；较旧的 ECC 版本 ADT 端点更少（CDS 会以 `DDLS_NOT_SUPPORTED_ON_ECC` 拒绝）。
 - 当 ADT 没有非交互式 text-elements 写端点时，textpool 写入不可用（`TEXTPOOL_WRITE_UNSUPPORTED`）。
+- SM59 只覆盖 HTTP 目标（`RFCTYPE='G'`）；其他 SM59 目标类型与 UCON HTTP service 不在范围内。本地文档只建模 target host / port / protocol / path prefix / description——高级 SM59 选项（登录数据、代理、SSL 证书、HTTP version / timeout 等）不由 CLI 编辑；对 SAP 自带目标执行 push 会丢掉维护 API 不认识的 legacy option 代码。目标是 client-independent 系统表 `RFCDES` 的条目，没有 package、也无法记录到传输请求——`create` / `push` / `delete` 显式拒绝 `--package` / `--tr`，不会静默忽略。
+- `SRFC` 覆盖 UCON RFC service（function module / scope / 默认 UCON profile / 短文本），`OA2P` 覆盖 OAuth 2.0 client profile（service provider type / scopes / no-authority-check 标志）。两者都是 TADIR 对象：`--package` / `--tr` 适用；`SRFC` 的运行时缓存刷新、`OA2P` 的 OAuth 2.0 client 分配等生命周期操作仍在 UCONCOCKPIT / OA2C_CONFIG 中完成。`SRFC` 短文本是单语言的（按会话语言读写），UCON communication assembly / RFC profile 不在建模范围内。
 - 目前不支持：增强（ENHO）、SAPscript / Smart Forms、Web Dynpro、BAdI、IDoc / workflow。诚实的覆盖快照见 [wiki/coverage-matrix.md](wiki/coverage-matrix.md)。
 
 ---

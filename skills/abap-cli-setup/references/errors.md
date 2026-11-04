@@ -19,7 +19,7 @@
 
 `error.category` 在 `--json` 信封中 1:1 对应退出码。≥10 保留。
 
-## 本 skill 错误码清单（7 命令范围）
+## 本 skill 错误码清单（8 命令范围）
 
 ### init / profile
 
@@ -76,6 +76,14 @@
 | `current` | 安装且版本匹配 | 跳过 |
 | `outdated` | 安装但版本过期 | `deploy --yes` 升级 |
 | `unreachable` | 探测不可达 | 不阻断；查 `meta.warnings`（ICF_CHECK_DEGRADED） |
+
+<a id="icf_identity_unavailable"></a>
+
+### whoami
+
+| code | cat/exit | 触发 | 修复 |
+|---|---|---|---|
+| `ICF_IDENTITY_UNAVAILABLE` | NOT_FOUND/8 | 内置 ICF 服务未部署或版本过旧，没有 `/whoami` 身份端点（身份只能由 SAP 系统返回） | `abap deploy --yes` 后重试；`abap deploy status --json` 确认 `current`。刚部署完仍报错时等约 1 分钟（SICF handler class load 刷新延迟），不要重复部署 |
 
 ### session
 

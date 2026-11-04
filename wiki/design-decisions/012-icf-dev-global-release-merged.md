@@ -4,7 +4,7 @@ title: ICF 服务开发期全局类树 / 发布期合并单类
 description: abap/src 以全局类开发仓形态维护，abap/deploy.json 是清单；abap deploy 推送前把 helper 降级为 lcl_* 合并进 handler，SAP 上只装 3 个全局类
 tags: [abap-cli, design-decisions, icf, deploy, abap]
 created at: 2026-10-30 21:40:00
-changed at: 2026-10-31 18:06:00
+changed at: 2026-11-04 02:15:00
 ---
 
 # 012 — ICF 服务开发期全局类树 / 发布期合并单类
@@ -15,9 +15,9 @@ changed at: 2026-10-31 18:06:00
 
 `abap/deploy.json` 是唯一清单：`handler`、`merged[]`（开发期全局类名 → 发布期本地类名 `lcl_*`）、`standalone[]`。
 
-`abap deploy`（默认）产出**发布形态**：读取开发源码，把 16 个 merged helper 的类头降级为 `lcl_*`、按依赖拓扑排序后合并进 handler 的 definitions / implementations 两个 include，并把 handler main 里的 `zcl_*` 引用机械改名为 `lcl_*`。SAP 上最终只装 3 个全局类：`ZCL_ABAP_VIBE_ICF` + `ZCL_ABAP_VIBE_ICF_SETUP` + `ZCL_ABAP_VIBE_RUNNER`。
+`abap deploy`（默认）产出**发布形态**：读取开发源码，把 19 个 merged helper 的类头降级为 `lcl_*`、按依赖拓扑排序后合并进 handler 的 definitions / implementations 两个 include，并把 handler main 里的 `zcl_*` 引用机械改名为 `lcl_*`。SAP 上最终只装 3 个全局类：`ZCL_ABAP_VIBE_ICF` + `ZCL_ABAP_VIBE_ICF_SETUP` + `ZCL_ABAP_VIBE_RUNNER`。
 
-`abap deploy --dev` 产出**开发形态**：跳过合并，按依赖顺序把 20 个类逐个安装为全局对象，供本仓库在真机上做单类语法检查、激活、ABAP Unit 与端点迭代。
+`abap deploy --dev` 产出**开发形态**：跳过合并，按依赖顺序把 21 个类逐个安装为全局对象，供本仓库在真机上做单类语法检查、激活、ABAP Unit 与端点迭代。
 
 ## 上下文
 
@@ -30,7 +30,7 @@ changed at: 2026-10-31 18:06:00
 
 - **fragments 方案（仓库内按域拆文件、deploy 时纯拼接回两个 include）**：能把巨石拆小且可证逐字节还原，但产物仍是"两个 include + 10 个 local class"，单个 helper 不能当全局类做语法检查 / 激活 / 真机调用，开发期粒度没变。被本方案取代。
 - **abapmerge 式同名 local class 合并**：开发期也用 `lcl_*` 名写进待合并文件，发布时原样输出。形态只有一种，dev 形态没有可单独安装的全局类 → 无法单类迭代；且两种形态共用同一套名字和同一个对象，无法在同一系统共存对照。
-- **把 20 个全局类直接发布**：每个对象都要创建 / 激活 / 传输 / 授权，安装与升级面从 3 个对象涨到 20 个，正是要避免的分发成本。
+- **把 22 个全局类直接发布**：每个对象都要创建 / 激活 / 传输 / 授权，安装与升级面从 3 个对象涨到 23 个，正是要避免的分发成本。
 - **保留两个 include 巨石**：不引入清单与合并器，但继续支付整类编辑 / 检查 / review 的成本，与 Agent 使用优化相悖。
 
 ## 当前代价

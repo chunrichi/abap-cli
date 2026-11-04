@@ -1,9 +1,13 @@
 CLASS zcl_abap_vibe_icf_response DEFINITION PUBLIC FINAL CREATE PUBLIC.
   PUBLIC SECTION.
     CONSTANTS gc_service TYPE string VALUE 'abap_cli'.
-    CONSTANTS gc_version TYPE string VALUE '2.2.0'.
+    CONSTANTS gc_version TYPE string VALUE '2.6.0'.
 
     CLASS-METHODS handle_root
+      IMPORTING io_server TYPE REF TO if_http_server
+                iv_method TYPE string.
+
+    CLASS-METHODS handle_whoami
       IMPORTING io_server TYPE REF TO if_http_server
                 iv_method TYPE string.
 
@@ -65,6 +69,33 @@ CLASS zcl_abap_vibe_icf_response IMPLEMENTATION.
                      iv_code = 'METHOD_NOT_ALLOWED'
                      iv_msg = |GET only on /sap/abap_cli/| ).
     ENDIF.
+  ENDMETHOD.
+  METHOD handle_whoami.
+    " System-side identity: sy-uname is the user the HTTP request (and hence
+    " the SAP session) was authenticated as, regardless of the auth method.
+    IF iv_method <> 'GET'.
+      respond_error( io_server = io_server
+                     iv_status = 405
+                     iv_reason = 'Method Not Allowed'
+                     iv_code   = 'METHOD_NOT_ALLOWED'
+                     iv_msg    = |GET only on /sap/abap_cli/whoami| ).
+      RETURN.
+    ENDIF.
+
+    DATA(ls_identity) = VALUE zcl_abap_vibe_icf_types=>ty_identity(
+      status = 'success'
+      data   = VALUE zcl_abap_vibe_icf_types=>ty_identity_data(
+        user               = sy-uname
+        system_id          = sy-sysid
+        client             = sy-mandt
+        application_server = sy-host
+        database           = sy-dbsys
+        os                 = sy-opsys
+        abap_release       = sy-saprl ) ).
+    respond_json( io_server = io_server
+                  iv_status = 200
+                  iv_reason = 'OK'
+                  is_payload = ls_identity ).
   ENDMETHOD.
   METHOD handle_class_check.
     " ops endpoint: probe the runtime class load version + last source

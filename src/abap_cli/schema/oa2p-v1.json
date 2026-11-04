@@ -1,0 +1,40 @@
+{
+  "$comment": "Local extension: upstream SAP abap-file-formats has no OAuth 2.0 client profile (OA2P) format. Field names map to OA2C_PROFILES (service provider type, no-authority-check flag) and OA2P_SCOPES (scope list); the ICF /oa2p/<name> wire document mirrors this shape.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OAuth 2.0 Client Profile Properties",
+  "description": "OAuth 2.0 client profile (OA2P): a service provider type plus the scopes the profile requests",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["formatVersion", "type"],
+  "properties": {
+    "formatVersion": {
+      "title": "ABAP File Format Version",
+      "type": "string",
+      "const": "1"
+    },
+    "type": {
+      "title": "Service Provider Type",
+      "description": "OAuth 2.0 service provider type (OA2C_PROFILES-TYPE / OA2C_TYPES, CHAR 20), e.g. DEFAULT or HANA_CLOUD_PLATFORM. The type must be configured in OA2C_TYPES.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 20
+    },
+    "noAuthCheck": {
+      "title": "No Authority Check",
+      "description": "When true, the profile skips the S_OA2C_ADM authority check for its users (OA2C_PROFILES-NO_AUTH_CHECK). Defaults to false.",
+      "type": "boolean",
+      "default": false
+    },
+    "scopes": {
+      "title": "Scopes",
+      "description": "OAuth 2.0 scopes requested for this profile (OA2P_SCOPES-SCOPE, one string per entry). Empty values are dropped by the SAP side.",
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
+      }
+    }
+  }
+}

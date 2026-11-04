@@ -68,7 +68,7 @@ cp agents/abap-developer.agent.md <your-project>/.claude/agents/
 | **`abap-cli`** | meta | `report-stuck` | 入口路由层：按意图分发到 4 个领域 skill + 1 个方法论 skill；本地卡死留痕；CLI 反馈直接提 GitHub issue |
 | **`abap-cli-setup`** | workspace-and-sap | `init` `profile` `doctor` `transport` `deploy` `session` `types` | 环境就绪：工作区、凭证、诊断、传输请求、ICF 部署、session、TADIR 映射 |
 | **`abap-cli-search`** | sap（只读） | `search` `where-used` `inspect` `tcode` `diff` `status` `dumps` | 元数据探查：不改对象、不加锁、不写 transport；`dumps` 列 ST22 dump |
-| **`abap-cli-edit`** | sap（写） | `pull` `push` `check` `create`（含 `create local`）`activate` `delete` `list` `mime` `validate:aff` | 写路径：源码/DDIC/MIME 的拉取、创建、修改、推送、激活、删除；类型码以 `src/abap_cli/types/registry.ts` 为准（当前 37 个注册类型，`DEVC` / `SRVB` 有 create/pull/delete 但无 push） |
+| **`abap-cli-edit`** | sap（写） | `pull` `push` `check` `create`（含 `create local`）`activate` `delete` `list` `mime` `validate:aff` | 写路径：源码/DDIC/MIME 的拉取、创建、修改、推送、激活、删除；类型码以 `src/abap_cli/types/registry.ts` 为准（当前 40 个注册类型，`DEVC` / `SRVB` 有 create/pull/delete 但无 push） |
 | **`abap-cli-data`** | sap（只读消费） | `select` `fields` `run` `run-report` `test` | 运行时消费：查表/字段、跑类、跑报表、跑 ABAP Unit；全程只读 |
 | **`abap-cli-performance`** | abap-performance-review | （方法论；触发只读命令 `search` / `inspect` / `pull` / `check` / `select`） | ABAP 性能 review：慢路径诊断、分平台建议、`check` / ATC 核验 |
 
@@ -116,24 +116,24 @@ skills/<name>/
 - `abap-cli-data`：`WRAPPER_NOT_DEPLOYED` / `WRAPPER_INPUT_UNAVAILABLE` / `METHOD_NOT_SUPPORTED` / `METHOD_FAILED` / `CLASS_NOT_RUNNABLE` / `LOCAL_CLASS_NOT_RUNNABLE` / `TABLE_NOT_FOUND` / `TABLE_TYPE_NOT_SUPPORTED` / `INVALID_FIELD` / `INVALID_WHERE` / `LIMIT_EXCEEDED` / `OFFSET_EXCEEDED` / `QUERY_FAILED` / `TIMEOUT` / `TEST_FAILED`
 - `abap-cli-edit`：`LOCK_FAILED` / `LOCKED` / `SYNTAX_ERROR` / `OBJECT_NOT_ACTIVE` / `ACTIVATION_FAILED` / `DDIC_NOT_SUPPORTED` / `TYPE_NOT_SUPPORTED` / `CHANNEL_DETECTION_FAILED` / `DDLS_NOT_SUPPORTED_ON_ECC` / `PUSH_FAILED`
 - `abap-cli-search`：`OBJECT_NOT_FOUND` / `TCODE_NOT_FOUND` / `AUTH_ERROR` / `TCODE_NOT_AUTHORIZED` / `AMBIGUOUS_OBJECT`
-- `abap-cli-setup`：`CONFIG_ERROR` / `TLS_ERROR` / `NO_TRANSPORT` / `SESSION_INVALID` / `SESSION_JAR_DECRYPT_FAILED`
+- `abap-cli-setup`：`CONFIG_ERROR` / `TLS_ERROR` / `NO_TRANSPORT` / `SESSION_INVALID` / `SESSION_JAR_DECRYPT_FAILED` / `ICF_IDENTITY_UNAVAILABLE`
 - `abap-cli`（meta）：无专属错误码（`report-stuck` 只用公共 `USAGE`）
 - 公共错误（`INVALID_ARGUMENT` / `USAGE` / `VALIDATION_ERROR` / `SAP_ERROR` 等）在涉及它的每个 skill 中各自内联，不做 cross-reference
 
-## 命令覆盖核对（31 CLI 命令）
+## 命令覆盖核对（32 CLI 命令）
 
-- ✅ `abap-cli-setup`：`init` `profile` `doctor` `transport` `deploy` `session` `types` — **7 顶层**
+- ✅ `abap-cli-setup`：`init` `profile` `doctor` `whoami` `transport` `deploy` `session` `types` — **8 顶层**
 - ✅ `abap-cli-search`：`search` `where-used` `inspect` `tcode` `diff` `status` `dumps` — **7 顶层**
 - ✅ `abap-cli-edit`：`pull` `push` `check` `create`（含 `create local`）`activate` `publish` `unpublish` `delete` `list` `mime` `validate:aff` — **11 顶层 + `create local` 子命令**
 - ✅ `abap-cli-data`：`select` `fields` `run` `run-report` `test` — **5 顶层**
 - ✅ `abap-cli`（meta）：`report-stuck` — **1 顶层**
 - ✅ `abap-cli-performance`：方法论 skill，不占顶层命令
-- **合计**：7 + 7 + 11 + 5 + 1 = **31 顶层命令**（与 `src/abap_cli/registry/commands.ts` 的 `COMMAND_SPECS` 1:1，由 `npm run check-skills-drift` 校验）
+- **合计**：8 + 7 + 11 + 5 + 1 = **32 顶层命令**（与 `src/abap_cli/registry/commands.ts` 的 `COMMAND_SPECS` 1:1，由 `npm run check-skills-drift` 校验）
 
 ## 版本
 
-- **CLI 版本**：`2.2.0`
-- **类型注册表**：37 个类型码（`src/abap_cli/types/registry.ts`）
+- **CLI 版本**：`2.6.0`
+- **类型注册表**：40 个类型码（`src/abap_cli/types/registry.ts`）
 - **agentskills.io 标准**：<https://agentskills.io/>
 
 ## references

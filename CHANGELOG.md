@@ -6,13 +6,22 @@
 
 ## [Unreleased]
 
+本版新增 `abap whoami`：连接身份由 SAP 系统返回，而不是读取本地 profile 配置，因此配置与真实会话不一致、或将来接入 SSO 等认证方式时依然准确。本版还新增 `SM59`、`SRFC`、`OA2P` 与 `JOBD` 四个类型，分别管理 SM59 HTTP destination、UCON RFC service、OAuth 2.0 client profile 与 SM36 应用作业定义。内置 ICF 服务相应新增身份端点及这四个类型的端点，CLI 与 ICF 服务版本线统一到 2.6.0；升级后执行一次 `abap deploy --yes` 才能使用这些能力，部署前 `abap deploy status` 会显示 outdated。
+
+### Added
+
+- **`abap whoami`**：由 SAP 系统返回当前连接的实际身份——登录用户、系统 ID / 客户端，以及应用服务器 / 数据库 / OS / ABAP release；输出同时带上工作区 profile 与 endpoint。身份取自 SAP 会话而不是本地 profile 配置，因此在切换 profile、CI 注入配置或将来接入 SSO 等认证方式时都能反映真实登录身份。命令需要已部署新版内置 ICF 服务：服务未安装或版本过旧时会提示先执行 `abap deploy --yes`；`abap whoami --schema --json` 不连 SAP。
+- **`SM59`（SM59 HTTP destination）**：新增 `SM59` 类型，管理 SM59 中「HTTP 连接到外部服务器」的目的地，支持 `create` / `pull` / `push` / `delete`。本地文件 `<name>.sm59.json` 可编辑描述、目标主机、端口、协议（HTTP/HTTPS）与路径前缀，`pull` 也能读取系统里已有的 HTTP destination 作为起点。SM59 目的地是客户端无关的系统级配置：没有 package，也不能记录 transport，因此这些命令不接受 `--package` / `--tr`（传了会明确报错，而不是静默忽略）；`create` 不需要 package，创建后所有 client 都能看到该目的地。注意 `push` 是整份目的地定义的覆盖写，而当前只建模了上述常用字段：SSL 证书、代理、登录过程等高级选项不会随文件往返，写入后按 SAP 默认值生效；`pull` 读取已有目的地后 `push` 也会覆盖这些高级设置，请在用途明确的测试目的地或新建目的地上使用。其它 SM59 类型（RFC destination 等）与 UCON HTTP service 不在本版范围内；UCON RFC service（`SRFC`）与 OAuth2 profile（`OA2P`）作为独立类型提供（见下）。
+- **`SRFC`（UCON RFC service）**：新增 `SRFC` 类型，管理 Unified Connectivity 中「RFC service」条目，支持 `create` / `pull` / `push` / `delete`。本地文件 `<name>.srfc.json` 建模 function module、scope（`E` / `O` / `P` / `S`，可省略）、默认 UCON profile 与短文本；`create` 要求 function module 存在且 RFC-enabled，`defaultProfile` 必须存在于 `UCONPROFHEAD`。RFC service 是 TADIR 对象：`--package` / `--tr` 适用，本地 `$` 开头包不需传输请求；写入后刷新 UCON RFC 运行时缓存，使服务无需重启立即生效。注意：短文本按会话语言读写（其它语言行不被修改）；创建时留空 description 会生成与 UCONCOCKPIT 相同的默认文本；communication assembly / RFC profile 的维护不在本类型范围。`create` / `push` 会校验 SAP 侧字段（FM 是否存在 / RFC-enabled、profile 是否存在），错误直接返回而不是静默跳过。
+- **`OA2P`（OAuth 2.0 client profile）**：新增 `OA2P` 类型，管理 OAuth 2.0 client profile，支持 `create` / `pull` / `push` / `delete`。本地文件 `<name>.oa2p.json` 建模 service provider type（必须已在 `OA2C_TYPES` 配置）、scopes 列表与 `noAuthCheck` 标志；profile 是 TADIR 对象，`--package` / `--tr` 适用。删除前会检查 profile 是否仍被 OAuth 2.0 client 使用（被使用时拒绝并提示先在 OA2C_CONFIG 解除分配）。注意：profile 没有描述字段（`--description` 不适用）；provider 专属配置对象是无状态的，不在文件里往返；OAuth 2.0 client 与 profile 的分配关系仍在 OA2C_CONFIG 维护。
+- **JOBD（应用作业定义，SM36）**：新增应用作业定义类型，支持 `create` / `pull` / `push` / `delete`。本地文件 `<name>.jobd.json` 是本地扩展格式（`jobd-v1`：要执行的报表 / 变式与时间或事件调度参数）；参考 release 没有可用的 ADT 资源，对象经内置 ICF 服务读写，需要先执行一次 `abap deploy`。写入即保存并激活，`--no-activate` 会被拒绝；可传输包需要 `--tr`，`$` 开头的本地包免传输。名称上限 32 字符；报表 / 变式引用由 SAP 在调度时校验，CLI 不做本地校验。删除可传输对象后，传输请求中仍会保留该对象原来的插入条目，发布前需在 SE01/SE03 移除（本地包不受影响）。类型矩阵增至 40 类。
+
 ## [2.2.0] - 2026-11-03
 
 本版把对象面扩到 ATC 检查配置、CDS 技术对象、CDS 简单类型、类型池和应用作业目录（新增 11 个类型码，`abap types` 现列出 36 类），新增 `abap publish` / `abap unpublish` 两个服务绑定发布命令，并修正本地包 DDIC 对象 push 的 transport 判定。没有移除命令或参数，但有两处行为收紧需要留意（多余位置参数改为报错、TTYP 不再生成 `.type.abap` 侧车），见 Changed。内置 ICF 服务版本随 CLI 统一到 2.2.0，服务端行为没有变化；`abap deploy status` 会提示 outdated，需要时可执行一次 `abap deploy --yes` 对齐版本号。
 
 ### Added
 
-- **JOBD（应用作业定义，SM36）**：参考 release 没有 ADT 资源、上游 AFF 也没有官方 schema，因此用本地扩展 `jobd-v1.json` + 自建 ICF 端点 `/jobd/<name>` 实现 `create` / `pull` / `push` / `delete`（配方参考 abapGit 的 `CL_JR_JOB_DEFINITION` handler）。文档镜像 `TY_JOB_DEFINITION`（`STJR_JOBD_ROOT` + `STJR_JOBD_TREP`）去掉系统字段；`package` 是只读元数据。写入即保存激活（`--no-activate` 被拒绝）；TADIR / 传输记录用 `RS_CORR_INSERT`（可传输包要 `--tr`，`$` 本地包免传输），类的 `CREATE_JD` / `MODIFY_JD` 负责落库、handler 再修回真实包；删除先清数据再删 TADIR（TR/692 约束）。名称上限 32 字符。类型矩阵增至 37 类；需要 `abap deploy` 安装新的 ICF 服务版本。
 - **`abap publish` / `abap unpublish`**：服务绑定的本地 OData endpoint 发布 / 取消发布命令。服务版本与协议版本从绑定元数据推导，按 V2 / V4 自动选择端点，可重复执行；绑定不存在时报对象未找到，元数据缺版本时报校验错误并提示先 `pull` / `inspect`。
 - **TYPE（类型池）**：新增 AFF 官方格式的类型池对象，支持 `create` / `pull` / `push` / `delete`（`.type.json` 元数据 + `.type.abap` 源码，名称上限 5 字符）。`TYPES` 名必须带 `<池名>_` 前缀；`push` 只替换描述、保留 SAP 的 Unicode 检查标记，避免后续激活失败。
 - **ATC 检查配置对象**：新增 `CHKC`（检查类别）、`CHKO`（检查）、`CHKV`（检查变体）三类对象，支持 `create` / `pull` / `push` / `delete` 全生命周期。`create` / `push` 写入后自动激活（`--no-activate` 只写不激活）；检查变体的 `selectedChecks` 参数（普通值、结构化值、值列表、range 列表）可无损往返。SAP 侧前置条件按原样返回：`CHKO` 的实现类需注册为活动的 ATC 检查且参数 id 匹配，`CHKV` 的参数需与实现类一致。

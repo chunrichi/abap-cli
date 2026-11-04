@@ -184,4 +184,12 @@ export const COMMAND_SPECS: LazyCommandSpec[] = [
     description: 'Inspect / manage session cookie reuse state',
     load: () => import('../commands/session.js').then((m) => ({ register: m.registerSessionCommand })),
   },
+  {
+    // Identity of the live connection: profile + server-reported SID/client/
+    // user, proven by an authenticated ADT request.
+    name: 'whoami',
+    scope: 'sap',
+    description: 'Show the identity the SAP system reports for the current connection (user / system / client)',
+    load: () => import('../commands/whoami.js').then((m) => ({ register: m.registerWhoamiCommand })),
+  },
 ];

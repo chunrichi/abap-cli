@@ -54,11 +54,11 @@ describe('schema-paths priority chain', () => {
     );
   });
 
-  it('affSupportedTypes matches the router table (16 + 6 + 2 + VIEW + XSLT + SHLP + DOCU + ATC + CDS technical + TYPE)', () => {
+  it('affSupportedTypes matches the router table (16 + 6 + 2 + VIEW + XSLT + SHLP + DOCU + ATC + CDS technical + TYPE + UCON)', () => {
     const types = affSupportedTypes();
     expect(types).toEqual(
       expect.arrayContaining([
-        'CLAS', 'INTF', 'PROG', 'FUGR', 'TABL', 'STRU', 'TABT', 'DOMA', 'DTEL', 'HTTP', 'TRAN', 'XSLT',
+        'CLAS', 'INTF', 'PROG', 'FUGR', 'TABL', 'STRU', 'TABT', 'DOMA', 'DTEL', 'HTTP', 'TRAN', 'SM59', 'SRFC', 'OA2P', 'XSLT',
         // channel-routed types.
         'TTYP', 'MSAG', 'DDLS',
         // FUGR companion schemas for.reps.json and.func.json files.
@@ -69,7 +69,7 @@ describe('schema-paths priority chain', () => {
         'ENQU', 'NROB',
         // — database view (VIEW) and search help (SHLP) local-extension
         //   schemas; XSLT also has a local-extension schema.
-        'VIEW', 'SHLP', 'XSLT',
+        'VIEW', 'SHLP', 'JOBD', 'XSLT',
         // — package (DEVC) metadata document.
         'DEVC',
         // — DOMA/DTEL long-text companion schema (not an object type).
@@ -81,8 +81,6 @@ describe('schema-paths priority chain', () => {
         'TYPE',
         // — application jobs.
         'SAJC', 'SAJT',
-        // — application job definitions (local extension, ICF only).
-        'JOBD',
       ]),
     );
     // TABT is exposed as a schema key for the .settings.json override path.
@@ -99,8 +97,10 @@ describe('schema-paths priority chain', () => {
     // added DRTY = 37 total.
     // added TYPE (type pool) = 38 total.
     // added SAJC / SAJT (application jobs) = 40 total.
-    // added JOBD (application job definition, local extension) = 41 total.
-    expect(types).toHaveLength(41);
+    // added SM59 (HTTP destination local extension) = 41 total.
+    // added SRFC / OA2P (UCON RFC service / OAuth2 profile) = 43 total.
+    // added JOBD (application job definition, local extension) = 44 total.
+    expect(types).toHaveLength(44);
   });
 
   it('bundled root contains every supported schema', () => {

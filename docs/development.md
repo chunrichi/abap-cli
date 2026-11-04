@@ -118,8 +118,8 @@ src/abap_cli/
 
 The bundled ICF service ships in two forms generated from the same sources (decision record: [012](../wiki/design-decisions/012-icf-dev-global-release-merged.md)):
 
-- **Development form** — `abap/src/` is a tree of normal global classes: handler `zcl_abap_vibe_icf`, shared types `zcl_abap_vibe_icf_types`, eleven domain helpers (`response` / `mime` / `http` / `ddic` / `textpool` / `tcode` / `data` / `fields` / `version` / `run` / `xslt`), five `zcl_abap_vibe_*_format` renderers, and the standalone `zcl_abap_vibe_icf_setup` / `zcl_abap_vibe_runner`. Each class is one `<name>.clas.abap` (definition + implementation) plus a canonical `<name>.clas.json`; there are no committed handler `definitions` / `implementations` includes.
-- **Release form** — `abap deploy` merges the 17 merged classes (shared types + 16 helpers) into the handler as `lcl_*` local classes (3 global objects on SAP). `abap/deploy.json` is the single manifest: `handler`, `merged[]` (global name → local `lcl_*` name), `standalone[]`.
+- **Development form** — `abap/src/` is a tree of normal global classes: handler `zcl_abap_vibe_icf`, shared types `zcl_abap_vibe_icf_types`, fifteen domain helpers (`response` / `mime` / `http` / `ddic` / `textpool` / `tcode` / `data` / `fields` / `version` / `run` / `xslt` / `sm59` / `srfc` / `oa2p` / `jobd`), five `zcl_abap_vibe_*_format` renderers, and the standalone `zcl_abap_vibe_icf_setup` / `zcl_abap_vibe_runner`. Each class is one `<name>.clas.abap` (definition + implementation) plus a canonical `<name>.clas.json`; there are no committed handler `definitions` / `implementations` includes.
+- **Release form** — `abap deploy` merges the 21 merged classes (shared types + 20 helpers) into the handler as `lcl_*` local classes (3 global objects on SAP). `abap/deploy.json` is the single manifest: `handler`, `merged[]` (global name → local `lcl_*` name), `standalone[]`.
 - **Merger** — `src/abap_cli/flows/edit/deploy-merge.ts` is pure (strings in / strings out): manifest validation, class-header downgrade, `zcl_*` → `lcl_*` rename, dependency topological sort, deterministic output, leftover-global guard. Covered by unit tests in `test/unit/deploy-merge*.test.ts`; it is not an ABAP compiler, so real syntax errors surface on the first activation.
 
 Loop for a single-class change:
@@ -127,7 +127,7 @@ Loop for a single-class change:
 ```bash
 # 1. iterate: push and activate the development form on a maintainer system
 abap push abap/src/zcl_abap_vibe_icf_data.clas.abap --yes   # or:
-abap deploy --dev --yes                                  # all 20 globals, dependency order
+abap deploy --dev --yes                                  # all 24 globals, dependency order
 
 # 2. verify the class itself, then the endpoint
 abap inspect ZCL_ABAP_VIBE_ICF_DATA --activation --json

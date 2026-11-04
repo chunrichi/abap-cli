@@ -36,6 +36,8 @@ import { isAtcType } from '../../formats/atc/json.js';
 import { runDeleteCdsTech } from './delete-cds-tech.js';
 import { runDeleteType } from './delete-type.js';
 import { runDeleteAppJob } from './delete-appjob.js';
+import { runDeleteSm59 } from './delete-sm59.js';
+import { OA2P_FLOW, SRFC_FLOW, runDeleteUcon } from './ucon-object-flows.js';
 import { isCdsTechType } from '../../formats/cds-tech/json.js';
 import { isAppJobType } from '../../formats/appjob/json.js';
 
@@ -153,6 +155,21 @@ export async function runDelete(objectName: string, opts: DeleteOptions): Promis
   // delete endpoint; they are deleted through ICF `DELETE /xslt/<name>`.
   if (typeUpper === 'XSLT') {
     return runDeleteXslt(objectName, opts);
+  }
+  // UCON RFC service (SRFC) and OAuth 2.0 client profile (OA2P) are TADIR
+  // objects served by the bundled ICF service; the package read from the ICF
+  // GET decides whether --tr is required.
+  if (typeUpper === 'SRFC') {
+    return runDeleteUcon(SRFC_FLOW, objectName, opts);
+  }
+  if (typeUpper === 'OA2P') {
+    return runDeleteUcon(OA2P_FLOW, objectName, opts);
+  }
+  // SM59 (HTTP destinations) are client-independent RFCDES entries served by
+  // the bundled ICF service (`DELETE /sm59/<name>`); they have no package and
+  // cannot be transported.
+  if (typeUpper === 'SM59') {
+    return runDeleteSm59(objectName, opts);
   }
   const client = await AdtClientWrapper.create();
   const resolved = await resolveObject(client, objectName, typeUpper);

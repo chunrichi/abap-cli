@@ -37,6 +37,9 @@ const DDIC_FAIL = process.env.MOCK_DDIC_FAIL === '1';
 const REMOTE_MISSING = process.env.MOCK_REMOTE_MISSING === '1';
 // Deployed abap_cli version served by the mock root (mirrors CLI ICF_SERVICE_VERSION).
 const ICF_SERVICE_VERSION = process.env.MOCK_ICF_VERSION || '0.4.0';
+// MOCK_ICF_OLD=1 → simulate a deployed service from before /whoami existed:
+// the identity route answers the old handler's 404 NOT_FOUND envelope.
+const ICF_OLD = process.env.MOCK_ICF_OLD === '1';
 const NOW = '2026-08-01T00:00:00Z';
 const CURRENT_USER = 'MOCKUSER';
 let putCount = 0; // global PUT counter (MOCK_ATOMIC_FAIL fails on the 2nd write)
@@ -63,6 +66,18 @@ const remoteSourceStore = new Map();
 const tranStore = new Map();
 // HTTP (SICF node) store — key = node name (upper), value = AFF wire document.
 const httpStore = new Map();
+// SM59 (RFC destination) store — key = destination name (upper), value = the
+// wire document posted by the CLI (target host / port / protocol / path prefix /
+// description). Only RFCTYPE='G' (HTTP connection to external server) is
+// manageable; other types are seeded in a separate map so the type gate can be
+// exercised without pretending to support them.
+const sm59Store = new Map();
+const sm59OtherTypeStore = new Map();
+// UCON RFC service (SRFC) and OAuth 2.0 client profile (OA2P) stores — key =
+// object name (upper), value = the wire document. Both are TADIR objects: the
+// stored document carries the read-only `package` the CLI sends on create.
+const srfcStore = new Map();
+const oa2pStore = new Map();
 // XSLT (transformation program) store — key = NAME, value = { name, description,
 // originalLanguage, source, package }. `source` is stored in the canonical
 // (LF, no trailing break) form; GET adds the CRLF read-back the real
@@ -492,6 +507,15 @@ textpoolStore.set('STRU:ZST_DEMO:symbols', [
   { id: '001', text: 'Structure demo (en)' },
 ]);
 // STRU has no selections/headings — exercises TEXTPOOL_CATEGORY_MISSING warning.
+
+// SM59: one non-HTTP destination fixture (RFCTYPE='3' = R/3 connection). The
+// bundled /sm59 route only manages RFCTYPE='G' destinations, so pull / push /
+// delete of this name must answer SM59_TYPE_NOT_SUPPORTED instead of touching it.
+sm59OtherTypeStore.set('ZCLI_MOCK_SM59_RFC', {
+  name: 'ZCLI_MOCK_SM59_RFC',
+  type: '3',
+  description: 'R/3 connection fixture (not an HTTP destination)',
+});
 
 // ICF service classes (013): handler + setup, targets for deploy enumeration / classrun.
 addObject('ZCL_ABAP_VIBE_ICF', 'CLAS', '/sap/bc/adt/oo/classes/zcl_abap_vibe_icf', 'ICF handler for abap_cli', [
@@ -1201,6 +1225,29 @@ const server = http.createServer(async (req, res) => {
       return ok(res, JSON.stringify({ status: 'success', data: { service: 'abap_cli', version: ICF_SERVICE_VERSION } }), 'application/json');
     }
 
+    // /sap/abap_cli/whoami — system-side identity of the authenticated session
+    // (`abap whoami`). Mirrors the ABAP handler's sy-* projection.
+    if (path === '/sap/abap_cli/whoami' && req.method === 'GET') {
+      if (ICF_OLD) {
+        const body = JSON.stringify({
+          status: 'error',
+          error: { code: 'NOT_FOUND', message: 'unknown path: /sap/abap_cli/whoami' },
+        });
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        return res.end(body);
+      }
+      const identity = {
+        user: CURRENT_USER,
+        systemId: 'S4H',
+        client: '100',
+        applicationServer: 'mockhost',
+        database: 'HDB',
+        os: 'Linux',
+        abapRelease: '757',
+      };
+      return ok(res, JSON.stringify({ status: 'success', data: identity }), 'application/json');
+    }
+
     // ADT classrun (runClass) — simulates the remote ICF setup execution (013)
     // and the runner wrapper execution (015).
     const classrun = /^\/sap\/bc\/adt\/oo\/classrun\/([^/?]+)/.exec(path);
@@ -1782,6 +1829,275 @@ const server = http.createServer(async (req, res) => {
         return ok(res, JSON.stringify({ status: 'success', data: { name: xsltName, action: 'deleted' } }), 'application/json');
       }
       return ok(res, JSON.stringify({ status: 'error', error: { code: 'METHOD_NOT_ALLOWED', message: `${req.method} not supported on /xslt/${xsltName}` } }), 'application/json');
+    }
+
+    // /sap/abap_cli/sm59/<name> (GET pull / POST upsert / DELETE) — frozen wire
+    // contract. Only RFCTYPE='G' (HTTP connection to external server)
+    // destinations are manageable, a write replaces the whole modelled
+    // definition, and RFCDES is a client-independent system table (no package /
+    // transport envelope). Statuses mirror the handler: 404 absent, 400 for
+    // type / name / payload validation, 405 for unsupported methods.
+    // GET /sm59 (list) is deliberately not implemented.
+    const sm59Route = /^\/sap\/abap_cli\/sm59(?:\/([^/]+))?$/.exec(path);
+    if (sm59Route) {
+      const sm59Reply = (status, payload) => {
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(payload));
+      };
+      const sm59Error = (status, code, message, details) =>
+        sm59Reply(status, { status: 'error', error: { code, message, ...(details ? { details } : {}) } });
+      const sm59NameProblem = (name) => {
+        if (!name) return 'destination name is empty';
+        if (name.length > 32) return `destination name must not exceed 32 characters (got ${name.length})`;
+        if (/[\s\x00-\x1f]/.test(name)) return 'destination name must not contain whitespace or control characters';
+        if ('#@$%*_+-:.;,/\\&?"=!'.includes(name[0])) return `destination name must not start with '${name[0]}'`;
+        if (name === 'A_RFC' || name === 'B_RFC') return `destination name ${name} is reserved by SAP`;
+        if (/_[A-Z0-9]{3,8}_[0-9]{2}$/.test(name) || name.includes('_TRUSTED') || /\[[^\]]*\]$/.test(name) || name.startsWith('NONE[')) {
+          return `destination name ${name} matches a SAP-reserved popup pattern; create it in SM59`;
+        }
+        return undefined;
+      };
+
+      if (!sm59Route[1]) {
+        return sm59Error(400, 'SM59_NAME_INVALID', 'destination name is required on /sm59/<name>');
+      }
+      const sm59Name = decodeURIComponent(sm59Route[1]).trim().toUpperCase();
+      const nameProblem = sm59NameProblem(sm59Name);
+      if (nameProblem) return sm59Error(400, 'SM59_NAME_INVALID', nameProblem);
+
+      // Non-HTTP destinations are visible in SM59 but outside this type's scope.
+      const nonHttp = sm59OtherTypeStore.get(sm59Name);
+      if (nonHttp) {
+        return sm59Error(
+          400,
+          'SM59_TYPE_NOT_SUPPORTED',
+          `${sm59Name} has RFCTYPE='${nonHttp.type}', only HTTP destinations (RFCTYPE='G') are supported`,
+          { rfctype: nonHttp.type },
+        );
+      }
+
+      if (req.method === 'GET') {
+        if (!sm59Store.has(sm59Name)) {
+          return sm59Error(404, 'SM59_OBJECT_NOT_FOUND', `SM59 HTTP destination ${sm59Name} not found`);
+        }
+        return sm59Reply(200, { status: 'success', data: sm59Store.get(sm59Name) });
+      }
+
+      if (req.method === 'POST') {
+        const body = await readBody(req);
+        let payload;
+        try {
+          payload = JSON.parse(body);
+        } catch (_e) {
+          return sm59Error(400, 'SM59_INVALID_PAYLOAD', 'request body is not valid JSON');
+        }
+        if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+          return sm59Error(400, 'SM59_INVALID_PAYLOAD', 'request body is not a destination document');
+        }
+        const invalid = (message) => sm59Error(400, 'SM59_INVALID_PAYLOAD', message);
+        if (payload.formatVersion !== undefined && String(payload.formatVersion) !== '1') {
+          return invalid(`formatVersion must be "1" (got "${String(payload.formatVersion)}")`);
+        }
+        if (payload.name !== undefined && String(payload.name).trim().toUpperCase() !== sm59Name) {
+          return invalid(`payload name ${String(payload.name)} does not match URL destination ${sm59Name}`);
+        }
+        if (payload.type !== undefined && String(payload.type).toUpperCase() !== 'G') {
+          return invalid(`payload type must be "G" (got "${String(payload.type)}")`);
+        }
+        const targetHost = typeof payload.targetHost === 'string' ? payload.targetHost.trim() : '';
+        if (!targetHost) return invalid('targetHost is required');
+        if (targetHost.length > 1024) return invalid(`targetHost must not exceed 1024 characters (RFCHOST_EXT; got ${targetHost.length})`);
+        const protocol = typeof payload.protocol === 'string' ? payload.protocol.trim().toUpperCase() : '';
+        if (protocol !== 'HTTP' && protocol !== 'HTTPS') {
+          return invalid('protocol must be "HTTP" or "HTTPS"');
+        }
+        let port;
+        if (payload.port !== undefined) {
+          port = typeof payload.port === 'number' ? payload.port : Number(payload.port);
+          if (!Number.isInteger(port) || port < 0 || port > 65535) {
+            return invalid(`port must be an integer between 1 and 65535 (got "${String(payload.port)}")`);
+          }
+        }
+        if (!port) {
+          // 0 / omitted: the handler resolves the default (443 HTTPS / 80 HTTP)
+          // and always writes it explicitly.
+          port = protocol === 'HTTPS' ? 443 : 80;
+        }
+        const description = payload.description === undefined ? '' : String(payload.description).trim();
+        if (description.length > 72) {
+          return invalid(`description must not exceed 72 characters (RFCDOC_D; got ${description.length})`);
+        }
+        const pathPrefix = payload.pathPrefix === undefined ? '' : String(payload.pathPrefix).trim();
+        if (pathPrefix.length > 255) {
+          return invalid(`pathPrefix must not exceed 255 characters (PFADPRE; got ${pathPrefix.length})`);
+        }
+        const existed = sm59Store.has(sm59Name);
+        sm59Store.set(sm59Name, {
+          formatVersion: '1',
+          name: sm59Name,
+          type: 'G',
+          description,
+          targetHost,
+          port,
+          protocol,
+          pathPrefix,
+        });
+        return sm59Reply(200, {
+          status: 'success',
+          data: { name: sm59Name, type: 'G', action: existed ? 'updated' : 'created' },
+        });
+      }
+
+      if (req.method === 'DELETE') {
+        if (!sm59Store.has(sm59Name)) {
+          return sm59Error(404, 'SM59_OBJECT_NOT_FOUND', `SM59 HTTP destination ${sm59Name} not found`);
+        }
+        sm59Store.delete(sm59Name);
+        return sm59Reply(200, { status: 'success', data: { name: sm59Name, type: 'G', action: 'deleted' } });
+      }
+
+      return sm59Error(405, 'METHOD_NOT_ALLOWED', `${req.method} not supported on /sm59/${sm59Name}`);
+    }
+
+    // /sap/abap_cli/srfc/<name> and /oa2p/<name> (GET pull / POST upsert / DELETE)
+    // — UCON RFC service / OAuth 2.0 client profile routes. Both are TADIR
+    // objects, so the wire document carries the read-only `package`; POST
+    // validates the modelled fields and upserts the store; DELETE removes the
+    // entry. Statuses mirror the handlers: 404 absent, 400 invalid payload,
+    // 405 unsupported method.
+    const uconReply = (res, status, payload) => {
+      res.writeHead(status, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(payload));
+    };
+    const uconNameProblem = (name) => {
+      if (!name) return 'name is empty';
+      if (name.length > 30) return `name must not exceed 30 characters (got ${name.length})`;
+      if (!/^[A-Z0-9_/]+$/.test(name)) return `name may only contain A-Z, 0-9, '_' and '/' (got '${name}')`;
+      return undefined;
+    };
+
+    const srfcRoute = /^\/sap\/abap_cli\/srfc(?:\/([^/]+))?$/.exec(path);
+    if (srfcRoute) {
+      const err = (status, code, message) => uconReply(res, status, { status: 'error', error: { code, message } });
+      if (!srfcRoute[1]) return err(400, 'SRFC_NAME_INVALID', 'service name is required on /srfc/<name>');
+      const name = decodeURIComponent(srfcRoute[1]).trim().toUpperCase();
+      const nameProblem = uconNameProblem(name);
+      if (nameProblem) return err(400, 'SRFC_NAME_INVALID', nameProblem);
+
+      if (req.method === 'GET') {
+        if (!srfcStore.has(name)) return err(404, 'SRFC_OBJECT_NOT_FOUND', `UCON RFC service ${name} not found`);
+        return uconReply(res, 200, { status: 'success', data: srfcStore.get(name) });
+      }
+      if (req.method === 'POST') {
+        const body = await readBody(req);
+        let payload;
+        try {
+          payload = JSON.parse(body);
+        } catch (_e) {
+          return err(400, 'SRFC_INVALID_PAYLOAD', 'request body is not valid JSON');
+        }
+        const invalid = (message) => err(400, 'SRFC_INVALID_PAYLOAD', message);
+        if (payload.formatVersion !== undefined && String(payload.formatVersion) !== '1') {
+          return invalid(`formatVersion must be "1" (got "${String(payload.formatVersion)}")`);
+        }
+        if (payload.name !== undefined && String(payload.name).trim().toUpperCase() !== name) {
+          return invalid(`payload name ${String(payload.name)} does not match URL service ${name}`);
+        }
+        const functionName = typeof payload.functionName === 'string' ? payload.functionName.trim().toUpperCase() : '';
+        if (!functionName) return invalid('functionName is required');
+        if (functionName.length > 30) return invalid(`functionName must not exceed 30 characters (got ${functionName.length})`);
+        const scope = payload.scope === undefined ? '' : String(payload.scope).trim().toUpperCase();
+        if (scope !== '' && !['E', 'O', 'P', 'S'].includes(scope)) {
+          return invalid(`scope must be one of E, O, P, S or empty (got "${String(payload.scope)}")`);
+        }
+        const description = payload.description === undefined ? '' : String(payload.description);
+        if (description.length > 255) return invalid(`description must not exceed 255 characters (got ${description.length})`);
+        const defaultProfile = payload.defaultProfile === undefined ? '' : String(payload.defaultProfile).trim().toUpperCase();
+        if (defaultProfile.length > 30) return invalid(`defaultProfile must not exceed 30 characters (got ${defaultProfile.length})`);
+        const existed = srfcStore.has(name);
+        const previous = existed ? srfcStore.get(name) : undefined;
+        srfcStore.set(name, {
+          formatVersion: '1',
+          name,
+          description,
+          functionName,
+          scope,
+          defaultProfile,
+          package: typeof payload.package === 'string' && payload.package.trim() ? payload.package.trim().toUpperCase() : (previous?.package ?? '$TMP'),
+          createdBy: previous?.createdBy ?? CURRENT_USER,
+          createdOn: previous?.createdOn ?? NOW.slice(0, 10),
+          createdAt: previous?.createdAt ?? NOW.slice(11, 19),
+          changedBy: existed ? CURRENT_USER : '',
+          changedOn: existed ? NOW.slice(0, 10) : '',
+          changedAt: existed ? NOW.slice(11, 19) : '',
+        });
+        return uconReply(res, 200, { status: 'success', data: { name, type: 'SRFC', action: existed ? 'updated' : 'created', package: srfcStore.get(name).package } });
+      }
+      if (req.method === 'DELETE') {
+        if (!srfcStore.has(name)) return err(404, 'SRFC_OBJECT_NOT_FOUND', `UCON RFC service ${name} not found`);
+        srfcStore.delete(name);
+        return uconReply(res, 200, { status: 'success', data: { name, type: 'SRFC', action: 'deleted' } });
+      }
+      return err(405, 'METHOD_NOT_ALLOWED', `${req.method} not supported on /srfc/${name}`);
+    }
+
+    const oa2pRoute = /^\/sap\/abap_cli\/oa2p(?:\/([^/]+))?$/.exec(path);
+    if (oa2pRoute) {
+      const err = (status, code, message) => uconReply(res, status, { status: 'error', error: { code, message } });
+      if (!oa2pRoute[1]) return err(400, 'OA2P_NAME_INVALID', 'OAuth2 profile name is required on /oa2p/<name>');
+      const name = decodeURIComponent(oa2pRoute[1]).trim().toUpperCase();
+      const nameProblem = uconNameProblem(name);
+      if (nameProblem) return err(400, 'OA2P_NAME_INVALID', nameProblem);
+
+      if (req.method === 'GET') {
+        if (!oa2pStore.has(name)) return err(404, 'OA2P_OBJECT_NOT_FOUND', `OAuth2 profile ${name} not found`);
+        return uconReply(res, 200, { status: 'success', data: oa2pStore.get(name) });
+      }
+      if (req.method === 'POST') {
+        const body = await readBody(req);
+        let payload;
+        try {
+          payload = JSON.parse(body);
+        } catch (_e) {
+          return err(400, 'OA2P_INVALID_PAYLOAD', 'request body is not valid JSON');
+        }
+        const invalid = (message) => err(400, 'OA2P_INVALID_PAYLOAD', message);
+        if (payload.formatVersion !== undefined && String(payload.formatVersion) !== '1') {
+          return invalid(`formatVersion must be "1" (got "${String(payload.formatVersion)}")`);
+        }
+        if (payload.name !== undefined && String(payload.name).trim().toUpperCase() !== name) {
+          return invalid(`payload name ${String(payload.name)} does not match URL profile ${name}`);
+        }
+        const type = payload.type === undefined || String(payload.type).trim() === '' ? 'DEFAULT' : String(payload.type).trim().toUpperCase();
+        if (type.length > 20) return invalid(`type must not exceed 20 characters (got ${type.length})`);
+        if (payload.noAuthCheck !== undefined && typeof payload.noAuthCheck !== 'boolean') {
+          return invalid('noAuthCheck must be a boolean');
+        }
+        const scopes = Array.isArray(payload.scopes) ? payload.scopes.map((scope) => String(scope).trim()).filter(Boolean) : [];
+        const existed = oa2pStore.has(name);
+        const previous = existed ? oa2pStore.get(name) : undefined;
+        oa2pStore.set(name, {
+          formatVersion: '1',
+          name,
+          type,
+          noAuthCheck: payload.noAuthCheck === true,
+          scopes,
+          package: typeof payload.package === 'string' && payload.package.trim() ? payload.package.trim().toUpperCase() : (previous?.package ?? '$TMP'),
+          createdBy: previous?.createdBy ?? CURRENT_USER,
+          createdOn: previous?.createdOn ?? NOW.slice(0, 10),
+          createdAt: previous?.createdAt ?? NOW.slice(11, 19),
+          changedBy: CURRENT_USER,
+          changedOn: NOW.slice(0, 10),
+          changedAt: NOW.slice(11, 19),
+        });
+        return uconReply(res, 200, { status: 'success', data: { name, type: 'OA2P', action: existed ? 'updated' : 'created', package: oa2pStore.get(name).package } });
+      }
+      if (req.method === 'DELETE') {
+        if (!oa2pStore.has(name)) return err(404, 'OA2P_OBJECT_NOT_FOUND', `OAuth2 profile ${name} not found`);
+        oa2pStore.delete(name);
+        return uconReply(res, 200, { status: 'success', data: { name, type: 'OA2P', action: 'deleted' } });
+      }
+      return err(405, 'METHOD_NOT_ALLOWED', `${req.method} not supported on /oa2p/${name}`);
     }
 
     // 014: /sap/abap_cli/textpool/<category>?object=<name>&type=<type> (GET read / POST write).

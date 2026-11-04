@@ -76,6 +76,7 @@ export type ErrorCode =
   | 'LOCAL_CLASS_NOT_RUNNABLE'// class name contains `~` (local class) (SAP_ERROR)
   | 'OBJECT_NOT_ACTIVE'       // target class is inactive (SAP_ERROR)
   | 'WRAPPER_NOT_DEPLOYED'    // ZCL_ABAP_VIBE_RUNNER missing on target system (NOT_FOUND)
+  | 'ICF_IDENTITY_UNAVAILABLE' // ICF /whoami route missing — bundled service not deployed / outdated (NOT_FOUND)
   | 'TIMEOUT'                 // classrun exceeded --timeout (SAP_ERROR)
   | 'WRAPPER_INPUT_UNAVAILABLE' // SAP classrun endpoint does not inject method args (SAP_ERROR)
   // read-only table data query error codes
@@ -168,19 +169,6 @@ export type ErrorCode =
   | 'SHLP_PACKAGE_ASSIGN_FAILED'// RS_CORR_INSERT failed for another reason (SAP_ERROR)
   | 'SHLP_DELETE_UNSUPPORTED'   // delete of a transported search help via ICF (VALIDATION_ERROR)
   | 'SHLP_DELETE_FAILED'        // RS_DD_DELETE_OBJ failure (SAP_ERROR)
-  // JOBD (application job definition) ICF route — local-extension jobd-v1 document
-  | 'JOBD_INVALID_PAYLOAD'      // malformed JSON body / not a jobd-v1 document (VALIDATION_ERROR)
-  | 'JOBD_NAME_INVALID'         // name empty, >32 chars, illegal characters, or payload/URL mismatch (VALIDATION_ERROR)
-  | 'JOBD_NOT_FOUND'            // job definition does not exist (NOT_FOUND)
-  | 'JOBD_ALREADY_EXISTS'       // create of an existing job definition (VALIDATION_ERROR)
-  | 'JOBD_TRANSPORT_REQUIRED'   // non-local package write/delete without a request (VALIDATION_ERROR)
-  | 'JOBD_TRANSPORT_INVALID'    // request number malformed (VALIDATION_ERROR)
-  | 'JOBD_PACKAGE_ERROR'        // TADIR/package recording failed (SAP_ERROR)
-  | 'JOBD_NOT_AUTHORIZED'       // TADIR/transport permission failure (AUTH_ERROR)
-  | 'JOBD_WRITE_FAILED'         // CL_JR_JOB_DEFINITION save failure (SAP_ERROR)
-  | 'JOBD_READ_FAILED'          // CL_JR_JOB_DEFINITION read failure (SAP_ERROR)
-  | 'JOBD_LOCKED'               // foreign lock on the job definition (LOCKED)
-  | 'JOBD_UNSUPPORTED'          // release lacks CL_JR_JOB_DEFINITION (TYPE_NOT_SUPPORTED)
   // AFF validator/CLI errors
   | 'AFF_SCHEMA_MISSING'        // canonical schema file not found for a type (VALIDATION_ERROR/exit 7)
   | 'AFF_SCHEMA_INVALID'        // canonical schema file present but unparseable (VALIDATION_ERROR/exit 7)
@@ -234,6 +222,60 @@ export type ErrorCode =
   // CDS technical objects (DTDC / DTEB / DSFD / DSFI)
   | 'DSFD_FEATURE_NOT_ENABLED'  // SAP user parameter DD_CDS_DSFD not set; DSFD writes are rejected (VALIDATION_ERROR)
   | 'DRTY_FEATURE_NOT_ENABLED'  // SAP user parameter CDS_SIMPLE_TYPES not set; DRTY writes are rejected (VALIDATION_ERROR)
+  // SM59 (HTTP destination) ICF /sm59 route — local-extension sm59-v1 document
+  | 'SM59_OBJECT_NOT_FOUND'     // destination does not exist (GET / DELETE) (NOT_FOUND)
+  | 'SM59_TYPE_NOT_SUPPORTED'   // destination exists but RFCTYPE is not G (VALIDATION_ERROR)
+  | 'SM59_NAME_INVALID'         // destination name empty, >32 chars, or illegal characters (VALIDATION_ERROR)
+  | 'SM59_UNSUPPORTED'          // release lacks the SRFC_DESTAPI maintenance classes (VALIDATION_ERROR)
+  | 'SM59_INVALID_PAYLOAD'      // malformed JSON body / not an sm59-v1 document (VALIDATION_ERROR)
+  | 'SM59_WRITE_FAILED'         // create/update through the SM59 maintenance API failed (SAP_ERROR)
+  | 'SM59_READ_FAILED'          // read/delete through the SM59 maintenance API failed (SAP_ERROR)
+  // UCON RFC service (SRFC) ICF /srfc route — local-extension srfc-v1 document
+  | 'SRFC_OBJECT_NOT_FOUND'      // service does not exist (GET / DELETE) (NOT_FOUND)
+  | 'SRFC_NAME_INVALID'          // service name empty, >30 chars, or illegal characters (VALIDATION_ERROR)
+  | 'SRFC_INVALID_PAYLOAD'       // malformed JSON body / not an srfc-v1 document (VALIDATION_ERROR)
+  | 'SRFC_FUNCTION_NOT_FOUND'    // functionName does not name an existing function module (VALIDATION_ERROR)
+  | 'SRFC_FUNCTION_NOT_RFC_ENABLED' // function module exists but is not RFC-enabled (VALIDATION_ERROR)
+  | 'SRFC_PROFILE_NOT_FOUND'     // defaultProfile does not exist in UCONPROFHEAD (VALIDATION_ERROR)
+  | 'SRFC_PACKAGE_INVALID'       // target package does not exist (VALIDATION_ERROR)
+  | 'SRFC_TRANSPORT_REQUIRED'    // transportable package without a transport request (VALIDATION_ERROR)
+  | 'SRFC_PACKAGE_ASSIGN_FAILED' // RS_CORR_INSERT failed to record TADIR/CTS (SAP_ERROR)
+  | 'SRFC_NOT_AUTHORIZED'        // missing package/transport authorization (AUTH_ERROR)
+  | 'SRFC_LOCK_FAILED'           // service locked by another user (LOCKED)
+  | 'SRFC_ALREADY_EXISTS'        // create raced with an existing service (VALIDATION_ERROR)
+  | 'SRFC_WRITE_FAILED'          // create/update through the persistence classes failed (SAP_ERROR)
+  | 'SRFC_READ_FAILED'           // read through the UCON API failed (SAP_ERROR)
+  | 'SRFC_DELETE_FAILED'         // delete through the UCON API failed (SAP_ERROR)
+  // OAuth 2.0 client profile (OA2P) ICF /oa2p route — local-extension oa2p-v1 document
+  | 'OA2P_OBJECT_NOT_FOUND'      // profile does not exist (GET / DELETE) (NOT_FOUND)
+  | 'OA2P_NAME_INVALID'          // profile name empty, >30 chars, or illegal characters (VALIDATION_ERROR)
+  | 'OA2P_INVALID_PAYLOAD'       // malformed JSON body / unknown service provider type (VALIDATION_ERROR)
+  | 'OA2P_PROFILE_IN_USE'        // profile still assigned to OAuth 2.0 clients (VALIDATION_ERROR)
+  | 'OA2P_PACKAGE_INVALID'       // target package does not exist (VALIDATION_ERROR)
+  | 'OA2P_TRANSPORT_REQUIRED'    // transportable package without a transport request (VALIDATION_ERROR)
+  | 'OA2P_PACKAGE_ASSIGN_FAILED' // RS_CORR_INSERT failed to record TADIR/CTS (SAP_ERROR)
+  | 'OA2P_NOT_AUTHORIZED'        // missing package/transport authorization (AUTH_ERROR)
+  | 'OA2P_LOCK_FAILED'           // profile locked by another user (LOCKED)
+  | 'OA2P_WRITE_FAILED'          // create/update through the persistence classes failed (SAP_ERROR)
+  | 'OA2P_READ_FAILED'           // read through the persistence classes failed (SAP_ERROR)
+  | 'OA2P_DELETE_FAILED'         // delete through the persistence classes failed (SAP_ERROR)
+  // JOBD (application job definition) ICF route — local-extension jobd-v1 document
+  | 'JOBD_INVALID_PAYLOAD'      // malformed JSON body / not a jobd-v1 document (VALIDATION_ERROR)
+  | 'JOBD_SERVICE_INVALID'      // route name missing / malformed path (VALIDATION_ERROR)
+  | 'JOBD_NAME_INVALID'         // name empty, >32 chars, illegal characters, or payload/URL mismatch (VALIDATION_ERROR)
+  | 'JOBD_NOT_FOUND'            // job definition does not exist (NOT_FOUND)
+  | 'JOBD_ALREADY_EXISTS'       // create of an existing job definition (VALIDATION_ERROR)
+  | 'JOBD_PACKAGE_REQUIRED'     // create without a package (VALIDATION_ERROR)
+  | 'JOBD_TRANSPORT_REQUIRED'   // non-local package write/delete without a request (VALIDATION_ERROR)
+  | 'JOBD_TRANSPORT_INVALID'    // request number malformed (VALIDATION_ERROR)
+  | 'JOBD_PACKAGE_ERROR'        // TADIR/package recording failed (SAP_ERROR)
+  | 'JOBD_NOT_AUTHORIZED'       // TADIR/transport permission failure (AUTH_ERROR)
+  | 'JOBD_WRITE_FAILED'         // CL_JR_JOB_DEFINITION save failure (SAP_ERROR)
+  | 'JOBD_READ_FAILED'          // CL_JR_JOB_DEFINITION read failure (SAP_ERROR)
+  | 'JOBD_LOCKED'               // foreign lock on the job definition (LOCKED)
+  | 'JOBD_UNSUPPORTED'          // release lacks CL_JR_JOB_DEFINITION (VALIDATION_ERROR)
+  // ICF route dispatch — HTTP method not supported by the endpoint (e.g. 405)
+  | 'METHOD_NOT_ALLOWED'        // ICF route received an unsupported HTTP method (VALIDATION_ERROR)
   ;
 
 const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
@@ -283,6 +325,7 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   LOCAL_CLASS_NOT_RUNNABLE: 'SAP_ERROR',
   OBJECT_NOT_ACTIVE: 'SAP_ERROR',
   WRAPPER_NOT_DEPLOYED: 'NOT_FOUND',
+  ICF_IDENTITY_UNAVAILABLE: 'NOT_FOUND',
   TIMEOUT: 'SAP_ERROR',
   WRAPPER_INPUT_UNAVAILABLE: 'SAP_ERROR',
   // mappings
@@ -425,11 +468,50 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   XSLT_OBJECT_EXISTS: 'SAP_ERROR',
   DSFD_FEATURE_NOT_ENABLED: 'VALIDATION_ERROR',
   DRTY_FEATURE_NOT_ENABLED: 'VALIDATION_ERROR',
+  // — UCON RFC services (SRFC)
+  SRFC_OBJECT_NOT_FOUND: 'NOT_FOUND',
+  SRFC_NAME_INVALID: 'VALIDATION_ERROR',
+  SRFC_INVALID_PAYLOAD: 'VALIDATION_ERROR',
+  SRFC_FUNCTION_NOT_FOUND: 'VALIDATION_ERROR',
+  SRFC_FUNCTION_NOT_RFC_ENABLED: 'VALIDATION_ERROR',
+  SRFC_PROFILE_NOT_FOUND: 'VALIDATION_ERROR',
+  SRFC_PACKAGE_INVALID: 'VALIDATION_ERROR',
+  SRFC_TRANSPORT_REQUIRED: 'VALIDATION_ERROR',
+  SRFC_PACKAGE_ASSIGN_FAILED: 'SAP_ERROR',
+  SRFC_NOT_AUTHORIZED: 'AUTH_ERROR',
+  SRFC_LOCK_FAILED: 'LOCKED',
+  SRFC_ALREADY_EXISTS: 'VALIDATION_ERROR',
+  SRFC_WRITE_FAILED: 'SAP_ERROR',
+  SRFC_READ_FAILED: 'SAP_ERROR',
+  SRFC_DELETE_FAILED: 'SAP_ERROR',
+  // — OAuth 2.0 client profiles (OA2P)
+  OA2P_OBJECT_NOT_FOUND: 'NOT_FOUND',
+  OA2P_NAME_INVALID: 'VALIDATION_ERROR',
+  OA2P_INVALID_PAYLOAD: 'VALIDATION_ERROR',
+  OA2P_PROFILE_IN_USE: 'VALIDATION_ERROR',
+  OA2P_PACKAGE_INVALID: 'VALIDATION_ERROR',
+  OA2P_TRANSPORT_REQUIRED: 'VALIDATION_ERROR',
+  OA2P_PACKAGE_ASSIGN_FAILED: 'SAP_ERROR',
+  OA2P_NOT_AUTHORIZED: 'AUTH_ERROR',
+  OA2P_LOCK_FAILED: 'LOCKED',
+  OA2P_WRITE_FAILED: 'SAP_ERROR',
+  OA2P_READ_FAILED: 'SAP_ERROR',
+  OA2P_DELETE_FAILED: 'SAP_ERROR',
+  // — SM59 HTTP destinations
+  SM59_OBJECT_NOT_FOUND: 'NOT_FOUND',
+  SM59_TYPE_NOT_SUPPORTED: 'VALIDATION_ERROR',
+  SM59_NAME_INVALID: 'VALIDATION_ERROR',
+  SM59_UNSUPPORTED: 'VALIDATION_ERROR',
+  SM59_INVALID_PAYLOAD: 'VALIDATION_ERROR',
+  SM59_WRITE_FAILED: 'SAP_ERROR',
+  SM59_READ_FAILED: 'SAP_ERROR',
   // — JOBD application job definitions
   JOBD_INVALID_PAYLOAD: 'VALIDATION_ERROR',
+  JOBD_SERVICE_INVALID: 'VALIDATION_ERROR',
   JOBD_NAME_INVALID: 'VALIDATION_ERROR',
   JOBD_NOT_FOUND: 'NOT_FOUND',
   JOBD_ALREADY_EXISTS: 'VALIDATION_ERROR',
+  JOBD_PACKAGE_REQUIRED: 'VALIDATION_ERROR',
   JOBD_TRANSPORT_REQUIRED: 'VALIDATION_ERROR',
   JOBD_TRANSPORT_INVALID: 'VALIDATION_ERROR',
   JOBD_PACKAGE_ERROR: 'SAP_ERROR',
@@ -438,6 +520,7 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   JOBD_READ_FAILED: 'SAP_ERROR',
   JOBD_LOCKED: 'LOCKED',
   JOBD_UNSUPPORTED: 'VALIDATION_ERROR',
+  METHOD_NOT_ALLOWED: 'VALIDATION_ERROR',
 };
 
 export function categoryOf(code: ErrorCode): ErrorCategory {
