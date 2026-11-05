@@ -60,7 +60,7 @@ abap fields --find UNAM --with-text --limit 50 --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap fields", "version": "2.6.0", "timestamp": "2026-10-31T05:30:12.310Z", "durationMs": 286, "warnings": [] },
+  "meta": { "command": "abap fields", "version": "2.6.1", "timestamp": "2026-10-31T05:30:12.310Z", "durationMs": 286, "warnings": [] },
   "data": {
     "table": "VRSD", "count": 2, "truncated": false,
     "fields": [
@@ -75,7 +75,7 @@ abap fields --find UNAM --with-text --limit 50 --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap fields", "version": "2.6.0", "timestamp": "2026-10-31T05:31:40.872Z", "durationMs": 391, "warnings": [] },
+  "meta": { "command": "abap fields", "version": "2.6.1", "timestamp": "2026-10-31T05:31:40.872Z", "durationMs": 391, "warnings": [] },
   "data": {
     "total": 2, "truncated": false, "mode": "all", "requestedCount": 2,
     "matches": [ { "table": "VRSD", "tabclass": "TRANSP", "hitCount": 2, "fields": [

@@ -56,7 +56,7 @@ abap run-report ZR_MY_REPORT --param P_USERNAME=DEVELOPER --param P_MAX=10 --jso
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap run-report", "version": "2.6.0", "timestamp": "2026-10-31T05:40:18.204Z", "durationMs": 2317, "warnings": [] },
+  "meta": { "command": "abap run-report", "version": "2.6.1", "timestamp": "2026-10-31T05:40:18.204Z", "durationMs": 2317, "warnings": [] },
   "data": {
     "report": "ZR_MY_REPORT", "params": [ { "name": "P_MAX", "value": "10" } ],
     "lines": ["|------|--------|", "|USER  |COUNT   |", "|DEV   |42      |", "|------|--------|"],
