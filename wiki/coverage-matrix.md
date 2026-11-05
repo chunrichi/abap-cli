@@ -11,7 +11,7 @@ changed at: 2026-11-04 02:42:00
 
 abap-cli 的终极目标：**用 CLI + agent 覆盖绝大部分 SAP 内支持的开发工作**。本页是一份**诚实快照**——按 SAP 开发任务分类，给出当前覆盖度与缺口。对象类型补充的排序与取舍见 [roadmap](roadmap.md)。
 
-> 当前规模：**32 个顶层命令**、**51 个对象类型**（49 类可 create、51 类可 pull、47 类有 push 入口）、**6 个 skill + 1 个 agent**。基线：`v2.6.0` + AFF 对象（ADT blueSource 读写 + ENHO/ENHS 只读 pull）/ 授权对象族（AUTH / SUSC / SUCU / SUSH / SUSO）/ 应用作业定义（JOBD）/ UCON RFC service（SRFC）/ OAuth 2.0 client profile（OA2P）/ SM59 HTTP 目标（RFCTYPE=G）/ 连接身份（whoami）/ SRVB 发布命令 / 本地 ATC / CDS 技术 / 类型池 / 应用作业扩展。
+> 当前规模：**32 个顶层命令**、**51 个对象类型**（49 类可 create、51 类可 pull、47 类有 push 入口）、**6 个 skill + 1 个 agent**。基线：`v2.6.1` + AFF 对象（ADT blueSource 读写 + ENHO/ENHS 只读 pull）/ 授权对象族（AUTH / SUSC / SUCU / SUSH / SUSO）/ 应用作业定义（JOBD）/ UCON RFC service（SRFC）/ OAuth 2.0 client profile（OA2P）/ SM59 HTTP 目标（RFCTYPE=G）/ 连接身份（whoami）/ SRVB 发布命令 / 本地 ATC / CDS 技术 / 类型池 / 应用作业扩展。
 
 ## 评分图例
 

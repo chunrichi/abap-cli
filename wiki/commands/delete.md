@@ -91,7 +91,7 @@ abap delete ZCLI_OA2P_DEMO --type OA2P --tr NDK900123 --yes --json
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap delete", "version": "2.6.0", "timestamp": "2026-10-31T05:20:11.482Z", "durationMs": 1432, "warnings": [] },
+  "meta": { "command": "abap delete", "version": "2.6.1", "timestamp": "2026-10-31T05:20:11.482Z", "durationMs": 1432, "warnings": [] },
   "data": { "object": "ZCL_ZR_CHK9", "type": "CLAS", "packageName": "$TMP", "deleted": true, "lockReleased": true }
 }
 ```
@@ -102,7 +102,7 @@ lock/unlock）：
 ```json
 {
   "status": "success",
-  "meta": { "command": "abap delete", "version": "2.6.0", "timestamp": "2026-10-31T08:09:44.747Z", "durationMs": 1490, "warnings": [] },
+  "meta": { "command": "abap delete", "version": "2.6.1", "timestamp": "2026-10-31T08:09:44.747Z", "durationMs": 1490, "warnings": [] },
   "data": { "object": "$ZCLI_TC_PKG10", "type": "DEVC", "packageName": "$TMP", "deleted": true, "lockReleased": false }
 }
 ```
@@ -112,7 +112,7 @@ lock/unlock）：
 ```json
 {
   "status": "error",
-  "meta": { "command": "abap delete", "version": "2.6.0", "timestamp": "2026-10-31T05:21:03.117Z", "durationMs": 803, "warnings": [] },
+  "meta": { "command": "abap delete", "version": "2.6.1", "timestamp": "2026-10-31T05:21:03.117Z", "durationMs": 803, "warnings": [] },
   "error": {
     "code": "MISSING_TRANSPORT", "category": "USAGE",
     "message": "Object ZCL_MY_CLASS is in package ZDEV; --tr is required",

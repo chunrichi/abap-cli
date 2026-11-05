@@ -6,9 +6,13 @@
 
 ## [Unreleased]
 
+## [2.6.1] - 2026-11-05
+
+本版修复 TABL / STRU 建表对数值与深类型字段的支持：含 `abap.int4` / `abap.dec` / `abap.string` 等字段的表此前会被 SAP 拒绝（增强类别不匹配、深类型名不存在），现在按 DDL 的 `@AbapCatalog.enhancement.category` 提交增强类别、缺省时按字段类型推导，`abap pull` 出来的表改完字段 `abap push` 会保留 SAP 侧原有类别。没有破坏性变更；内置 ICF 服务版本随本版到 2.6.1，升级后执行一次 `abap deploy --yes`。
+
 ### Fixed
 
-- **TABL / STRU 创建支持数值与深类型字段**：以前 `abap create TABL` 一律按「Can Be Enhanced (Char. Type)」提交，含 `abap.int4` / `abap.dec` / `abap.fltp` 等数值字段或 `abap.string` / `abap.rawstring` 等深字段的表会被 SAP 拒绝（exit 6）；深字段还会报「Data type STRI is not supported」。现在创建按 DDL 的 `@AbapCatalog.enhancement.category` 提交增强类别（DDL 没写时按字段类型推导），`abap.string` / `abap.rawstring` 也能正确建表；`abap pull` 出的表改完字段 `abap push` 会保留 SAP 侧原有增强类别，不再需要手改 DDL。升级后执行一次 `abap deploy --yes` 获取服务端修复（ICF 服务版本 2.6.1）；旧版 CLI 配新版 ICF 也能创建这两类表。
+- **TABL / STRU 创建支持数值与深类型字段**：以前 `abap create TABL` 一律按「Can Be Enhanced (Char. Type)」提交，含 `abap.int4` / `abap.dec` / `abap.fltp` 等数值字段或 `abap.string` / `abap.rawstring` 等深字段的表会被 SAP 拒绝（exit 6）；深字段还会报「Data type STRI is not supported」。现在创建按 DDL 的 `@AbapCatalog.enhancement.category` 提交增强类别（DDL 没写时按字段类型推导），`abap.string` / `abap.rawstring` 也能正确建表；`abap pull` 出的表改完字段 `abap push` 会保留 SAP 侧原有增强类别，不再需要手改 DDL；旧版 CLI 配新版 ICF 也能创建这两类表。
 
 ## [2.6.0] - 2026-11-04
 
