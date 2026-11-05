@@ -14,7 +14,7 @@ CLASS zcl_abap_vibe_runner DEFINITION PUBLIC CREATE PUBLIC.
       iv_timeout_ms   TYPE string.
 
   PRIVATE SECTION.
-    CONSTANTS gc_version TYPE string VALUE '2.6.0'.
+    CONSTANTS gc_version TYPE string VALUE '2.6.1'.
 
     " Message types serialized via /ui2/cl_json (camelCase wire).
     TYPES:

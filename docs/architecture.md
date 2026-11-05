@@ -111,7 +111,7 @@ The bundled ICF service under `/sap/abap_cli` is maintained in two forms generat
 
 The ICF endpoint is **stateless** (`IF_HTTP_SERVER->SET_SESSION_STATEFUL( abap_false )` in the handler): every route does its work inside one request, and no SAP user session is kept between requests. Before this, each CLI command that used ICF left one session in SM04.
 
-Endpoints exposed under `/sap/abap_cli/` (current service version `2.6.0`, see `src/abap_cli/clients/icf-version.ts`):
+Endpoints exposed under `/sap/abap_cli/` (current service version `2.6.1`, see `src/abap_cli/clients/icf-version.ts`):
 
 | Endpoint | Used by |
 |---|---|

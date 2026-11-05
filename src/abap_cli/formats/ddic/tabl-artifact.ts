@@ -85,6 +85,13 @@ export async function readTablArtifact(filePath: string): Promise<TablArtifact |
     localGeneral.dbSpecificSettings = settings.dbSpecificSettings as Record<string, unknown>;
   }
   if (parsed.deliveryClass !== undefined) localGeneral.deliveryClass = parsed.deliveryClass;
+  // The enhancement category lives in the DDL annotation (AFF has no TABT
+  // field for it). Forward the AFF token so the ICF handler can pick the
+  // matching DD02V-EXCLASS instead of falling back to a fixed category that
+  // rejects numeric / deep fields.
+  if (parsed.enhancementCategory !== undefined) {
+    localGeneral.enhancementCategory = parsed.enhancementCategory;
+  }
   if (typeof generalInformation.dataClassCategory === 'string') {
     localGeneral.dataClassCategory = generalInformation.dataClassCategory;
   }
@@ -113,13 +120,25 @@ export interface ParsedTablDdic {
   objectName: string;
   type: Extract<DdicSupportedType, 'TABL' | 'STRU'>;
   deliveryClass?: string;
+  /** `@AbapCatalog.enhancement.category` token (AFF enum name, no `#`). */
+  enhancementCategory?: string;
   fields: DdicFieldLocal[];
 }
+
+/** AFF `@AbapCatalog.enhancement.category` values (DDL token, without `#`). */
+export const ENHANCEMENT_CATEGORIES = [
+  'NOT_CLASSIFIED',
+  'NOT_EXTENSIBLE',
+  'EXTENSIBLE_CHARACTER',
+  'EXTENSIBLE_CHARACTER_NUMERIC',
+  'EXTENSIBLE_ANY',
+] as const;
 
 export function parseTablDdic(source: string): ParsedTablDdic {
   const lines = source.replace(/\r\n?/g, '\n').split('\n');
   let declaration: RegExpMatchArray | null = null;
   let deliveryClass: string | undefined;
+  let enhancementCategory: string | undefined;
   let inBody = false;
   let pendingLabel: string | undefined;
   let pendingReference: { table: string; field: string } | undefined;
@@ -138,6 +157,17 @@ export function parseTablDdic(source: string): ParsedTablDdic {
     const deliveryMatch = line.match(/^@AbapCatalog\.deliveryClass\s*:\s*#([A-Za-z0-9_]+)\s*$/i);
     if (deliveryMatch) {
       deliveryClass = deliveryMatch[1]!.toUpperCase();
+      continue;
+    }
+    const enhancementMatch = line.match(/^@AbapCatalog\.enhancement\.category\s*:\s*#([A-Za-z0-9_]+)\s*$/i);
+    if (enhancementMatch) {
+      const token = enhancementMatch[1]!.toUpperCase();
+      if (!(ENHANCEMENT_CATEGORIES as readonly string[]).includes(token)) {
+        throw new Error(
+          `Invalid Table and Structure DDL: unsupported @AbapCatalog.enhancement.category #${token} (expected one of ${ENHANCEMENT_CATEGORIES.map((c) => `#${c}`).join(', ')})`,
+        );
+      }
+      enhancementCategory = token;
       continue;
     }
     const clientHandlingMatch = line.match(/^@ClientHandling\.type\s*:\s*#([A-Za-z0-9_]+)\s*$/i);
@@ -249,6 +279,7 @@ export function parseTablDdic(source: string): ParsedTablDdic {
     objectName: normalizeDdlObjectName(declaration[2]!),
     type: declaration[1]!.toUpperCase() === 'STRUCTURE' ? 'STRU' : 'TABL',
     deliveryClass,
+    enhancementCategory,
     fields,
   };
 }
@@ -279,19 +310,19 @@ function parseDdlType(value: string): Pick<DdicFieldLocal, 'rollname' | 'dataTyp
 }
 
 /**
- * Server DDL token (`abap.<token>` from `zcl_abap_vibe_tabl_format`) → DDIC data
- * type name.
+ * Server DDL token (`abap.<token>` from `zcl_abap_vibe_tabl_format`) → DDIC
+ * data type code.
  *
  * The keys MUST match what the ICF ABAP handler actually emits for each DD03L
  * `DATATYPE` (see `zcl_abap_vibe_tabl_format.clas.abap` `get_field_type`). The
- * map previously held a mix of DDIC codes that the server never emits, so every
- * table using one of those types failed with
- * `TABL_DDL_INVALID: Unsupported ABAP built-in type ... abap.rawstring(000000)`
- * (feedback F-14 / F-27: REPOSRC, REPOTEXT, and any table with a STRING, LRAW,
- * decfloat or UTC-long column).
+ * values are the 4-character DDIC type codes (`STRG`, `RSTR`, `D16D`, ...) that
+ * `GOX_GEN_TABLE_STD` expects on the wire — ABAP-internal spellings such as
+ * `STRING` / `RAWSTRING` are not DDIC types and get truncated to `STRI` by the
+ * 4-character DATATYPE field, which fails the create with
+ * `Data type STRI is not supported`.
  *
- * The parsed fields are used to VALIDATE the DDL before it is written verbatim,
- * so the mapped value only has to be a faithful DDIC type name.
+ * The parsed fields feed the ICF wire payload, so the mapped value must be the
+ * exact DD03L type code rather than a faithful-looking ABAP type name.
  */
 const BUILTIN_DATA_TYPES: Record<string, string> = {
   ACCP: 'ACCP',
@@ -312,38 +343,38 @@ const BUILTIN_DATA_TYPES: Record<string, string> = {
   PREC: 'PREC',
   QUAN: 'QUAN',
   RAW: 'RAW',
-  RAWSTRING: 'RAWSTRING',
-  SSTRING: 'SSTRING',
-  STRING: 'STRING',
+  RAWSTRING: 'RSTR',
+  SSTRING: 'SSTR',
+  STRING: 'STRG',
   TIMN: 'TIMN',
   TIMS: 'TIMS',
   UNIT: 'UNIT',
-  UTCLONG: 'UTCLONG',
+  UTCLONG: 'UTCL',
   VARC: 'VARC',
-  // Decfloat family: the server uses the ABAP spelling, DDIC uses the DF* names.
-  DF16_DEC: 'DF16_DEC',
-  DF16_RAW: 'DF16_RAW',
-  DF16_SCL: 'DF16_SCL',
-  DECFLOAT16: 'DECFLOAT16',
-  DF34_DEC: 'DF34_DEC',
-  DF34_RAW: 'DF34_RAW',
-  DF34_SCL: 'DF34_SCL',
-  DECFLOAT34: 'DECFLOAT34',
-  GEOM_EWKB: 'GEOM_EWKB',
-  // Legacy aliases: older/other wire producers used the DDIC codes directly.
+  // Decfloat family: DDL tokens use the ABAP spelling, DDIC uses D16*/D34*.
+  DF16_DEC: 'D16D',
+  DF16_RAW: 'D16R',
+  DF16_SCL: 'D16S',
+  DECFLOAT16: 'D16N',
+  DF34_DEC: 'D34D',
+  DF34_RAW: 'D34R',
+  DF34_SCL: 'D34S',
+  DECFLOAT34: 'D34N',
+  GEOM_EWKB: 'GGM1',
+  // Legacy aliases: the same DDL tokens spelled as DDIC codes.
   DEC: 'DEC',
-  D16D: 'DF16_DEC',
-  D16N: 'DECFLOAT16',
-  D16R: 'DF16_RAW',
-  D16S: 'DF16_SCL',
-  D34D: 'DF34_DEC',
-  D34N: 'DECFLOAT34',
-  D34R: 'DF34_RAW',
-  D34S: 'DF34_SCL',
-  RSTR: 'RAWSTRING',
-  STRG: 'STRING',
-  UTCL: 'UTCLONG',
-  GGM1: 'GEOM_EWKB',
+  D16D: 'D16D',
+  D16N: 'D16N',
+  D16R: 'D16R',
+  D16S: 'D16S',
+  D34D: 'D34D',
+  D34N: 'D34N',
+  D34R: 'D34R',
+  D34S: 'D34S',
+  RSTR: 'RSTR',
+  STRG: 'STRG',
+  UTCL: 'UTCL',
+  GGM1: 'GGM1',
 };
 
 function unescapeDdlString(value: string): string {
