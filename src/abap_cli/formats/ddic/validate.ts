@@ -3,6 +3,7 @@
  * TABT settings gate used by `push`.
  */
 import type { DdicFieldLocal, DdicObject } from './types.js';
+import { ENHANCEMENT_CATEGORIES } from './tabl-artifact.js';
 import { stripClientFields } from './wire.js';
 
 /**
@@ -103,6 +104,23 @@ export function validateDdicObject(data: DdicObject, objectType: string): string
               seen.add(key);
             }
           }
+        }
+      }
+      // The enhancement category is derived from the DDL annotation; a
+      // hand-written JSON may name one directly, so validate the AFF token the
+      // ICF handler maps to DD02V-EXCLASS.
+      {
+        const generalInformation = (data as Record<string, unknown>).generalInformation as
+          | Record<string, unknown>
+          | undefined;
+        const enhancementCategory = generalInformation?.enhancementCategory;
+        if (
+          enhancementCategory !== undefined
+          && !(ENHANCEMENT_CATEGORIES as readonly string[]).includes(String(enhancementCategory))
+        ) {
+          errors.push(
+            `generalInformation.enhancementCategory: '${String(enhancementCategory)}' is not a valid @AbapCatalog.enhancement.category value (expected one of ${ENHANCEMENT_CATEGORIES.map((c) => `#${c}`).join(', ')})`,
+          );
         }
       }
       break;

@@ -603,3 +603,124 @@ describe('create STRU/DTEL/DOMA', () => {
     expect(out.error.code).toBe('VALIDATION_ERROR');
   });
 });
+
+/**
+ * TABL/STRU wire fidelity for numeric / deep fields: the DDL enhancement
+ * category must reach the ICF handler (GOX validates EXCLASS against the field
+ * types) and abap.string / abap.rawstring must travel as the DDIC type codes
+ * STRG / RSTR instead of the ABAP-internal names.
+ */
+describe('create TABL/STRU numeric and deep field types', () => {
+  function writeThreePiece(type: 'tabl' | 'stru', name: string, ddic: string, settings?: unknown): string {
+    const main = path.join(cwd, `src/${name}.${type}.json`);
+    fs.writeFileSync(main, JSON.stringify({
+      formatVersion: '1',
+      header: { description: `${name} three-piece`, originalLanguage: 'EN' },
+    }, null, 2));
+    fs.writeFileSync(path.join(cwd, `src/${name}.${type}.ddic`), ddic);
+    if (settings !== undefined) {
+      fs.writeFileSync(path.join(cwd, `src/${name}.${type}.settings.json`), JSON.stringify(settings, null, 2));
+    }
+    return main;
+  }
+
+  it('forwards the DDL enhancement category and numeric field types on the TABL wire', async () => {
+    writeThreePiece('tabl', 'ztab_num', [
+      "@EndUserText.label : 'numeric table'",
+      '@AbapCatalog.enhancement.category : #EXTENSIBLE_CHARACTER_NUMERIC',
+      '@AbapCatalog.tableCategory : #TRANSPARENT',
+      '@AbapCatalog.deliveryClass : #A',
+      '@AbapCatalog.dataMaintenance : #RESTRICTED',
+      'define table ztab_num {',
+      '  key client : abap.clnt not null;',
+      '  key id     : abap.char(10) not null;',
+      '  version    : abap.int4 not null;',
+      '}',
+    ].join('\n'), { formatVersion: '1', generalInformation: { dataClassCategory: 'APPL0', sizeCategory: '0' } });
+    const program = makeProgram();
+    registerCreateCommand(program);
+    const res = await runCommand(program, [
+      'create', 'TABL', 'ZTAB_NUM',
+      '--file', 'src/ztab_num.tabl.json',
+      '--package', '$TMP',
+      '--yes', '--json',
+    ], { cwd });
+    expect(res.exitCode).toBeUndefined();
+    const [, wire] = icfPostDdic.mock.calls[0]!;
+    expect((wire as any).generalInformation.enhancementCategory).toBe('EXTENSIBLE_CHARACTER_NUMERIC');
+    expect((wire as any).fields).toContainEqual(expect.objectContaining({ fieldName: 'VERSION', dataType: 'INT4' }));
+  });
+
+  it('maps abap.string / abap.rawstring to STRG / RSTR on the TABL wire', async () => {
+    writeThreePiece('tabl', 'ztab_deep', [
+      "@EndUserText.label : 'deep table'",
+      '@AbapCatalog.enhancement.category : #EXTENSIBLE_ANY',
+      '@AbapCatalog.tableCategory : #TRANSPARENT',
+      '@AbapCatalog.deliveryClass : #A',
+      'define table ztab_deep {',
+      '  key client : abap.clnt not null;',
+      '  key id     : abap.char(10) not null;',
+      '  payload    : abap.string(0);',
+      '  blob       : abap.rawstring(0);',
+      '}',
+    ].join('\n'), { formatVersion: '1', generalInformation: { dataClassCategory: 'APPL0', sizeCategory: '0' } });
+    const program = makeProgram();
+    registerCreateCommand(program);
+    const res = await runCommand(program, [
+      'create', 'TABL', 'ZTAB_DEEP',
+      '--file', 'src/ztab_deep.tabl.json',
+      '--package', '$TMP',
+      '--yes', '--json',
+    ], { cwd });
+    expect(res.exitCode).toBeUndefined();
+    const [, wire] = icfPostDdic.mock.calls[0]!;
+    expect((wire as any).fields).toEqual(expect.arrayContaining([
+      expect.objectContaining({ fieldName: 'PAYLOAD', dataType: 'STRG' }),
+      expect.objectContaining({ fieldName: 'BLOB', dataType: 'RSTR' }),
+    ]));
+  });
+
+  it('forwards the enhancement category for a STRU three-piece artifact', async () => {
+    writeThreePiece('stru', 'zstr_deep', [
+      "@EndUserText.label : 'deep structure'",
+      '@AbapCatalog.enhancement.category : #EXTENSIBLE_ANY',
+      'define structure zstr_deep {',
+      '  payload : abap.string(0);',
+      '}',
+    ].join('\n'));
+    const program = makeProgram();
+    registerCreateCommand(program);
+    const res = await runCommand(program, [
+      'create', 'STRU', 'ZSTR_DEEP',
+      '--file', 'src/zstr_deep.stru.json',
+      '--package', '$TMP',
+      '--yes', '--json',
+    ], { cwd });
+    expect(res.exitCode).toBeUndefined();
+    const [, wire] = icfPostDdic.mock.calls[0]!;
+    expect((wire as any).generalInformation.enhancementCategory).toBe('EXTENSIBLE_ANY');
+    expect((wire as any).fields).toContainEqual(expect.objectContaining({ fieldName: 'PAYLOAD', dataType: 'STRG' }));
+  });
+
+  it('rejects an invalid generalInformation.enhancementCategory in a legacy wire-flat file', async () => {
+    fs.writeFileSync(path.join(cwd, 'src/zflat_bad.tabl.json'), JSON.stringify({
+      name: 'ZFLAT_BAD',
+      description: 'flat bad category',
+      generalInformation: { enhancementCategory: 'EXTENSIBLE_EVERYTHING' },
+      fields: [{ fieldName: 'F1', dataType: 'CHAR', length: 5 }],
+    }, null, 2));
+    const program = makeProgram();
+    registerCreateCommand(program);
+    const res = await runCommand(program, [
+      'create', 'TABL', 'ZFLAT_BAD',
+      '--file', 'src/zflat_bad.tabl.json',
+      '--package', '$TMP',
+      '--yes', '--json',
+    ], { cwd });
+    expect(res.exitCode).toBe(7);
+    expect(icfPostDdic).not.toHaveBeenCalled();
+    const out = JSON.parse(res.stderr);
+    expect(out.error.code).toBe('VALIDATION_ERROR');
+    expect(out.error.details.join(' ')).toContain('enhancementCategory');
+  });
+});

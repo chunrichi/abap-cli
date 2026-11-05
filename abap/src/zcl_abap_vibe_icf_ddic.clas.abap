@@ -31,6 +31,25 @@ CLASS zcl_abap_vibe_icf_ddic DEFINITION PUBLIC FINAL CREATE PUBLIC.
                 iv_start_pos  TYPE i DEFAULT 1
       EXPORTING et_object_new TYPE comt_gox_def_header
                 et_bapireturn TYPE bapirettab.
+
+    " GOX validates DD02V-EXCLASS against the field types: numeric fields need
+    " at least '3', deep fields need '4'. The wire carries the AFF annotation
+    " token when the DDL declared one; otherwise the category is derived from
+    " the field list so the create does not fall back to a fixed '2'.
+    CLASS-METHODS exclass_from_category
+      IMPORTING iv_category TYPE string
+      RETURNING VALUE(rv_exclass) TYPE dd02v-exclass.
+
+    CLASS-METHODS exclass_for_fields
+      IMPORTING it_fields TYPE zcl_abap_vibe_icf_types=>tt_field
+                iv_base   TYPE dd02v-exclass
+      RETURNING VALUE(rv_exclass) TYPE dd02v-exclass.
+
+    " Map ABAP-internal type names (STRING, RAWSTRING, ...) to the DDIC codes
+    " GOX expects; DDIC codes pass through unchanged.
+    CLASS-METHODS normalize_datatype
+      IMPORTING iv_datatype TYPE string
+      RETURNING VALUE(rv_datatype) TYPE string.
     " TABT writeback - apply buffering/storageType/loadUnit/logChanges/translation
     " to an existing TABL via DDIF_TABL_GET + DDIF_TABL_PUT. The wire payload
     " nested `is_settings-general_information-*` paths; this type keeps them flat.
@@ -800,7 +819,7 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
       IF <ls_field>-rollname IS NOT INITIAL.
         ls_details-fieldname = 'ROLLNAME'. ls_details-fieldvalue = <ls_field>-rollname. APPEND ls_details TO ls_object_new-details.
       ELSEIF <ls_field>-dataType IS NOT INITIAL.
-        ls_details-fieldname = 'DATATYPE'. ls_details-fieldvalue = <ls_field>-dataType. APPEND ls_details TO ls_object_new-details.
+        ls_details-fieldname = 'DATATYPE'. ls_details-fieldvalue = normalize_datatype( <ls_field>-dataType ). APPEND ls_details TO ls_object_new-details.
         IF <ls_field>-length IS NOT INITIAL.
           ls_details-fieldname = 'LENG'. ls_details-fieldvalue = <ls_field>-length. APPEND ls_details TO ls_object_new-details.
         ENDIF.
@@ -826,6 +845,72 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
 
       APPEND ls_object_new TO et_object_new.
     ENDLOOP.
+  ENDMETHOD.
+  METHOD exclass_from_category.
+    " AFF @AbapCatalog.enhancement.category token -> DD02V-EXCLASS.
+    CASE to_upper( iv_category ).
+      WHEN 'NOT_CLASSIFIED'.               rv_exclass = '0'.
+      WHEN 'NOT_EXTENSIBLE'.               rv_exclass = '1'.
+      WHEN 'EXTENSIBLE_CHARACTER'.         rv_exclass = '2'.
+      WHEN 'EXTENSIBLE_CHARACTER_NUMERIC'. rv_exclass = '3'.
+      WHEN 'EXTENSIBLE_ANY'.               rv_exclass = '4'.
+      WHEN OTHERS.                         CLEAR rv_exclass.
+    ENDCASE.
+  ENDMETHOD.
+  METHOD exclass_for_fields.
+    " Pick the smallest category that accepts the field list. Types that are
+    " not classified here fall back to '4' (deep) — the widest category — so an
+    " unexpected type does not fail the create on a category check.
+    DATA lv_has_numeric TYPE abap_bool.
+    DATA lv_has_deep    TYPE abap_bool.
+    DATA lv_type        TYPE string.
+
+    rv_exclass = iv_base.
+    LOOP AT it_fields ASSIGNING FIELD-SYMBOL(<ls_field>).
+      lv_type = to_upper( <ls_field>-dataType ).
+      IF lv_type = 'INT1' OR lv_type = 'INT2' OR lv_type = 'INT4' OR lv_type = 'INT8'
+          OR lv_type = 'DEC' OR lv_type = 'CURR' OR lv_type = 'QUAN' OR lv_type = 'FLTP'
+          OR lv_type = 'PREC' OR lv_type = 'ACCP' OR lv_type = 'UTCL'
+          OR lv_type = 'D16D' OR lv_type = 'D16N' OR lv_type = 'D16R' OR lv_type = 'D16S'
+          OR lv_type = 'D34D' OR lv_type = 'D34N' OR lv_type = 'D34R' OR lv_type = 'D34S'.
+        lv_has_numeric = abap_true.
+      ELSEIF lv_type = 'CHAR' OR lv_type = 'NUMC' OR lv_type = 'DATS' OR lv_type = 'TIMS'
+          OR lv_type = 'CLNT' OR lv_type = 'LANG' OR lv_type = 'CUKY'
+          OR lv_type = 'UNIT' OR lv_type = 'VARC'.
+        CONTINUE.
+      ELSE.
+        " Deep (STRG / RSTR) or a data element reference whose underlying
+        " type the wire does not carry.
+        lv_has_deep = abap_true.
+      ENDIF.
+    ENDLOOP.
+
+    IF lv_has_deep = abap_true.
+      rv_exclass = '4'.
+    ELSEIF lv_has_numeric = abap_true AND rv_exclass = '2'.
+      rv_exclass = '3'.
+    ENDIF.
+  ENDMETHOD.
+  METHOD normalize_datatype.
+    " GOX stores DATATYPE in the 4-character DD03L field, so ABAP-internal
+    " spellings such as STRING are truncated to STRI and rejected. Older
+    " clients sent those names; normalize them to the DDIC codes.
+    DATA(lv_type) = to_upper( iv_datatype ).
+    rv_datatype = SWITCH string( lv_type
+      WHEN 'STRING'     THEN 'STRG'
+      WHEN 'RAWSTRING'  THEN 'RSTR'
+      WHEN 'SSTRING'    THEN 'SSTR'
+      WHEN 'DECFLOAT16' THEN 'D16N'
+      WHEN 'DECFLOAT34' THEN 'D34N'
+      WHEN 'DF16_DEC'   THEN 'D16D'
+      WHEN 'DF16_RAW'   THEN 'D16R'
+      WHEN 'DF16_SCL'   THEN 'D16S'
+      WHEN 'DF34_DEC'   THEN 'D34D'
+      WHEN 'DF34_RAW'   THEN 'D34R'
+      WHEN 'DF34_SCL'   THEN 'D34S'
+      WHEN 'UTCLONG'    THEN 'UTCL'
+      WHEN 'GEOM_EWKB'  THEN 'GGM1'
+      ELSE lv_type ).
   ENDMETHOD.
   METHOD apply_ddic_table_settings.
 
@@ -1009,6 +1094,7 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
     DATA lt_fields     TYPE zcl_abap_vibe_icf_types=>tt_field.
     DATA ls_mandt      TYPE zcl_abap_vibe_icf_types=>ty_field.
     DATA lv_start      TYPE i.
+    DATA lv_exclass    TYPE dd02v-exclass.
     DATA ls_header_local TYPE coms_gox_def_header.
     DATA lt_field_entries TYPE comt_gox_def_header.
 
@@ -1040,10 +1126,20 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
       IF sy-subrc <> 0.
         ls_mandt-fieldName = 'MANDT'.
         ls_mandt-rollname   = 'MANDT'.
+        " ROLLNAME wins in build_field_entries; the data type only lets
+        " exclass_for_fields classify the client column as character-like.
+        ls_mandt-dataType   = 'CLNT'.
         ls_mandt-keyFlag    = abap_true.
         ls_mandt-notNull    = abap_true.
         INSERT ls_mandt INTO lt_fields INDEX 1.
       ENDIF.
+    ENDIF.
+
+    " Numeric and deep fields need a wider enhancement category than the old
+    " fixed default '2'; prefer the DDL annotation and derive it otherwise.
+    lv_exclass = exclass_from_category( ls_attr-general_information-enhancement_category ).
+    IF lv_exclass IS INITIAL.
+      lv_exclass = exclass_for_fields( it_fields = lt_fields iv_base = '2' ).
     ENDIF.
 
     build_table_header( EXPORTING iv_table_name    = CONV tabname( ls_attr-name )
@@ -1051,6 +1147,7 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
                                   iv_delivery_class = CONV dd02v-contflag( ls_attr-general_information-delivery_class )
                                   iv_data_class    = CONV dd09l-tabart( ls_attr-general_information-data_class_category )
                                   iv_size_category = CONV dd09l-tabkat( ls_attr-general_information-size_category )
+                                  iv_exclass       = lv_exclass
                         IMPORTING es_object_new    = ls_header_local
                                   et_object_new     = lt_object_new
                                   et_bapireturn    = lt_bapireturn ).
@@ -1138,15 +1235,18 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
     DATA lt_bapireturn TYPE bapirettab.
     DATA lt_transport  TYPE comt_gox_trans_object.
     DATA lt_fields     TYPE zcl_abap_vibe_icf_types=>tt_field.
+    DATA lv_exclass    TYPE dd02v-exclass.
     DATA ls_header_local TYPE coms_gox_def_header.
     DATA lt_field_entries TYPE comt_gox_def_header.
 
-    " AFF nested — STRU has no deliveryClass/dataClass/sizeCategory
-    " only header.description carries the description.
+    " AFF nested — STRU has no deliveryClass/dataClass/sizeCategory;
+    " header.description carries the description and generalInformation may
+    " carry the enhancement category annotation.
     DATA: BEGIN OF ls_attr,
-            name   TYPE string,
-            header TYPE zcl_abap_vibe_icf_types=>ty_ddic_header,
-            fields TYPE zcl_abap_vibe_icf_types=>tt_field,
+            name                TYPE string,
+            header              TYPE zcl_abap_vibe_icf_types=>ty_ddic_header,
+            general_information TYPE zcl_abap_vibe_icf_types=>ty_tabl_general_information,
+            fields              TYPE zcl_abap_vibe_icf_types=>tt_field,
           END OF ls_attr.
     /ui2/cl_json=>deserialize( EXPORTING json        = iv_payload
                                          pretty_name = /ui2/cl_json=>pretty_mode-camel_case
@@ -1156,13 +1256,20 @@ CLASS zcl_abap_vibe_icf_ddic IMPLEMENTATION.
     ENDIF.
     lt_fields = ls_attr-fields.
 
+    " Deep fields (STRING / RAWSTRING) need the deep category; structures keep
+    " the historical '3' base otherwise.
+    lv_exclass = exclass_from_category( ls_attr-general_information-enhancement_category ).
+    IF lv_exclass IS INITIAL.
+      lv_exclass = exclass_for_fields( it_fields = lt_fields iv_base = '3' ).
+    ENDIF.
+
     build_table_header( EXPORTING iv_table_name    = CONV tabname( ls_attr-name )
                                   iv_description   = CONV ddtext( ls_attr-header-description )
                                   iv_tabclass      = 'INTTAB'
                                   iv_delivery_class = 'A'
                                   iv_data_class    = 'APPL0'
                                   iv_size_category = '0'
-                                  iv_exclass       = '3'
+                                  iv_exclass       = lv_exclass
                         IMPORTING es_object_new    = ls_header_local
                                   et_object_new    = lt_object_new
                                   et_bapireturn    = lt_bapireturn ).

@@ -62,6 +62,7 @@ describe('tabl-artifact: parseTablDdic', () => {
     expect(parsed.type).toBe('TABL');
     expect(parsed.objectName).toBe('ZAFFEXAMPLE');
     expect(parsed.deliveryClass).toBe('L');
+    expect(parsed.enhancementCategory).toBe('NOT_EXTENSIBLE');
     expect(parsed.fields.map((f) => f.fieldName)).toEqual(['CLIENT', 'COUNTRY', 'CITY']);
     const client = parsed.fields[0]!;
     expect(client.keyFlag).toBe(true);
@@ -81,6 +82,7 @@ describe('tabl-artifact: parseTablDdic', () => {
     expect(parsed.type).toBe('STRU');
     expect(parsed.objectName).toBe('ZSTRUEXAMPLE');
     expect(parsed.deliveryClass).toBeUndefined();
+    expect(parsed.enhancementCategory).toBeUndefined();
     expect(parsed.fields).toHaveLength(2);
     for (const f of parsed.fields) {
       expect(f.keyFlag).toBeFalsy();
@@ -98,6 +100,39 @@ define table zdemo {
     expect(parsed.fields[0]?.dataType).toBe('CURR');
     expect(parsed.fields[0]?.length).toBe(15);
     expect(parsed.fields[0]?.decimals).toBe(2);
+  });
+
+  it('parses every @AbapCatalog.enhancement.category token (case-insensitive)', () => {
+    const tokens = [
+      'NOT_CLASSIFIED',
+      'NOT_EXTENSIBLE',
+      'EXTENSIBLE_CHARACTER',
+      'EXTENSIBLE_CHARACTER_NUMERIC',
+      'EXTENSIBLE_ANY',
+    ];
+    for (const token of tokens) {
+      const parsed = parseTablDdic(
+        `@AbapCatalog.enhancement.category : #${token}\ndefine table zx {\n  f : abap.char(1);\n}\n`,
+      );
+      expect(parsed.enhancementCategory).toBe(token);
+    }
+    const lowercase = parseTablDdic(
+      '@AbapCatalog.enhancement.category : #extensible_any\ndefine table zx {\n  f : abap.char(1);\n}\n',
+    );
+    expect(lowercase.enhancementCategory).toBe('EXTENSIBLE_ANY');
+  });
+
+  it('rejects an unknown @AbapCatalog.enhancement.category token', () => {
+    expect(() =>
+      parseTablDdic('@AbapCatalog.enhancement.category : #BOGUS\ndefine table zx {\n  f : abap.char(1);\n}\n'),
+    ).toThrow(/enhancement\.category #BOGUS/);
+  });
+
+  it('maps abap.string / abap.rawstring and the decfloat family to DDIC type codes', () => {
+    const parsed = parseTablDdic(
+      "@EndUserText.label : 'deep'\ndefine table zx {\n  s : abap.string(0);\n  r : abap.rawstring(0);\n  d : abap.decfloat16;\n  e : abap.decfloat34;\n  u : abap.utclong;\n}\n",
+    );
+    expect(parsed.fields.map((f) => f.dataType)).toEqual(['STRG', 'RSTR', 'D16N', 'D34N', 'UTCL']);
   });
 
   it('normalises namespaced DDL names — /NS/NAME and the AFF (ns)name token', () => {

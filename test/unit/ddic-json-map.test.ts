@@ -353,6 +353,7 @@ describe('ddic-json-map', () => {
           dataClassCategory: 'APPL1',
           sizeCategory: '3',
           clientDependent: true,
+          enhancementCategory: 'NOT_EXTENSIBLE',
         });
         // fields order matches DDL, MANDT/CLIENT dropped from output (server-side MANDT is server's job).
         expect((local.fields as any[]).map((f) => f.fieldName)).toEqual(['ID', 'PAYLOAD']);

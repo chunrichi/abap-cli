@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **TABL / STRU 创建支持数值与深类型字段**：以前 `abap create TABL` 一律按「Can Be Enhanced (Char. Type)」提交，含 `abap.int4` / `abap.dec` / `abap.fltp` 等数值字段或 `abap.string` / `abap.rawstring` 等深字段的表会被 SAP 拒绝（exit 6）；深字段还会报「Data type STRI is not supported」。现在创建按 DDL 的 `@AbapCatalog.enhancement.category` 提交增强类别（DDL 没写时按字段类型推导），`abap.string` / `abap.rawstring` 也能正确建表；`abap pull` 出的表改完字段 `abap push` 会保留 SAP 侧原有增强类别，不再需要手改 DDL。升级后执行一次 `abap deploy --yes` 获取服务端修复（ICF 服务版本 2.6.1）；旧版 CLI 配新版 ICF 也能创建这两类表。
+
 ## [2.6.0] - 2026-11-04
 
 本版把对象类型扩到 51 类（新增 15 个类型码），新增 `abap whoami`，并把内置 ICF 服务版本线与 CLI 统一到 2.6.0。新增的类型覆盖 basis 配置的几个主要族：SM59 HTTP 目的地、UCON RFC service（`SRFC`）、OAuth 2.0 client profile（`OA2P`）、SM36 应用作业定义（`JOBD`）、授权对象族（`AUTH` / `SUSC` / `SUCU` / `SUSH` / `SUSO`，对应 SU20 / SU21 / SU22 的授权字段、授权对象类、授权组、授权缺省值分配和授权对象），以及 6 类官方 AFF 对象（应用日志对象、更改文档对象、事件绑定、业务配置维护对象，以及 BAdI 实现 / BAdI 增强点）。`abap whoami` 的登录身份由 SAP 系统返回，而不是读取本地 profile 配置，因此切换 profile、CI 注入配置或将来接入 SSO 等认证方式时依然准确。

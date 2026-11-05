@@ -216,7 +216,7 @@ src/(ui2)cl_json.clas.abap                # 命名空间对象 /UI2/CL_JSON
 
 ```jsonc
 // 成功 — 写 stdout，exit 0
-{ "status": "success", "meta": { "command": "abap pull", "version": "2.6.0", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { /* ... */ } }
+{ "status": "success", "meta": { "command": "abap pull", "version": "2.6.1", "timestamp": "...", "durationMs": 42, "warnings": [] }, "data": { /* ... */ } }
 
 // 失败 — 写 stderr，非零退出码，stdout 保持为空
 { "status": "error", "meta": { /* ... */ }, "error": { "code": "NO_TRANSPORT", "category": "VALIDATION_ERROR", "message": "..." } }

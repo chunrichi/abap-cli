@@ -147,6 +147,13 @@ export interface DdicTableGeneralInformationWire {
   translation?: 'noLanguageKey' | 'standard' | 'loadTable' | 'objectSpecific' | 'notRelevant';
   buffering?: DdicTableBufferingWire;
   dbSpecificSettings?: DdicTableDbSpecificSettingsWire;
+  /** `@AbapCatalog.enhancement.category` token, forwarded from the DDL annotation. */
+  enhancementCategory?:
+    | 'NOT_CLASSIFIED'
+    | 'NOT_EXTENSIBLE'
+    | 'EXTENSIBLE_CHARACTER'
+    | 'EXTENSIBLE_CHARACTER_NUMERIC'
+    | 'EXTENSIBLE_ANY';
 }
 
 /** TABL/STRU technical-settings wire payload — fields declared by `tabt-v1.json`. */

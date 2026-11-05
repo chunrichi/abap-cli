@@ -134,7 +134,9 @@ TYPES:
     fieldName   TYPE fieldname,
     precField   TYPE dd03p-precfield,
     rollname    TYPE rollname,
-    dataType    TYPE dd03p-datatype,
+    " DDIC data type code (DD03L-DATATYPE, 4 characters) or an ABAP-internal
+    " type name from older clients; build_field_entries normalizes the latter.
+    dataType    TYPE string,
     length      TYPE dd03p-leng,
     decimals    TYPE dd03p-decimals,
     keyFlag     TYPE abap_bool,
@@ -174,6 +176,7 @@ TYPES:
     data_class_category  TYPE string,
     size_category        TYPE string,
     client_dependent     TYPE abap_bool,
+    enhancement_category TYPE string,
     allow_maintenance    TYPE abap_bool,
     log_changes          TYPE abap_bool,
     writable_by_amdp     TYPE abap_bool,

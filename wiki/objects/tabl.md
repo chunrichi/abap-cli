@@ -50,7 +50,7 @@ define table zmy_table {
 }
 ```
 
-支持的字段类型子集：`abap.clnt` / `abap.char(n)` / `abap.numc(n)` / `abap.curr(p,s)` / `abap.cuky` / `abap.quan(p,s)` / `abap.unit` / `abap.dats` / `abap.tims` / `abap.int1/2/4/8` / `abap.dec(p,s)` / `abap.fltp16/34` 等。
+支持的字段类型子集：`abap.clnt` / `abap.char(n)` / `abap.numc(n)` / `abap.curr(p,s)` / `abap.cuky` / `abap.quan(p,s)` / `abap.unit` / `abap.dats` / `abap.tims` / `abap.int1/2/4/8` / `abap.dec(p,s)` / `abap.fltp` / `abap.string` / `abap.rawstring` 等。
 
 ### `zmy_table.tabl.settings.json`
 
@@ -73,6 +73,8 @@ define table zmy_table {
 - **`key` 关键字**：DDL 源里的 `key` 对应 abap-file-format 的 `keyFlag: true`
 - **`.INCLUDE` / `.INCLU--AP`**：24 版支持；`precField` 字段保存 include 目标结构名
 - **DDL 扩展解析**（commit `185252b`）：`.INCLUDE ... WITH SUFFIX <suffix>` → `field.includeSuffix`；多列复合 key；行内 foreign key 与 `@AbapCatalog.foreignKeys` 块 → `field.foreignKeys[]`；`@ClientHandling.type` → 显式覆盖 `clientDependent`
+- **增强类别（`@AbapCatalog.enhancement.category`）**：`create` / `push` 按 DDL 注解提交 DD02V-EXCLASS。含数值字段（`abap.int4` / `abap.dec` / `abap.curr` / `abap.quan` / `abap.fltp` / decfloat 等）的表不能用 `#EXTENSIBLE_CHARACTER`，可用 `#EXTENSIBLE_CHARACTER_NUMERIC`、`#EXTENSIBLE_ANY` 或 `#NOT_EXTENSIBLE`；含深字段（`abap.string` / `abap.rawstring`）的表可用 `#EXTENSIBLE_ANY` 或 `#NOT_EXTENSIBLE`。DDL 没写注解时服务端按字段类型推导（字符类 → `#EXTENSIBLE_CHARACTER`，数值 → `#EXTENSIBLE_CHARACTER_NUMERIC`，深类型 / 数据元素引用 → `#EXTENSIBLE_ANY`）；`pull` 把 SAP 侧实际类别写回 DDL，改完字段 `push` 会保留它
+- **深类型字段**：`abap.string` / `abap.rawstring` 在 wire 上按 DDIC 类型码发送；旧版 CLI 发送 ABAP 内部类型名时，服务端会归一化
 
 ## 命令示例
 
@@ -93,6 +95,7 @@ abap push src/zmy_table.tabl.json --tr DEVK900001 --json
 
 ## 已知坑
 
+- **注解与字段类型冲突**：DDL 写了 `@AbapCatalog.enhancement.category : #EXTENSIBLE_CHARACTER` 却包含数值字段时，SAP 会拒绝创建并列出该表可选类别——按提示改注解（数值表至少 `#EXTENSIBLE_CHARACTER_NUMERIC`，深字段表用 `#EXTENSIBLE_ANY`）
 - **外键不写入**：ICF 写路径只把 `CHECKTABLE` 放进字段元数据，不写 DD05V / DD08V。本地文档带 `@AbapCatalog.foreignKeys` 块或 DDL 里带 `with foreign key ... check <table>` 时，`create` / `push` 在本地报 `TABL_FOREIGN_KEY_UNSUPPORTED`（exit 7），不会静默丢约束；做法是从本地文档移除外键声明，创建后在 SE11 / ADT 维护外键（MANDT / CLIENT 列上的外键按既有 client 字段过滤规则忽略）
 - **fallback 行为**：create 时如果只给 main JSON（无 ddic/settings），CLI 自动回退到 legacy wire-flat 单文件（向后兼容）
 - **append structure（`.INCLU--AP`）**：pull 时按 024 实现；写入时需要 Z 段 DDIC 后端配合
