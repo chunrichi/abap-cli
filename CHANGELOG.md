@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Windows 上读取已存密码失败**：在 Windows 上，凡是用到已保存密码的命令（`abap init`、`abap profile test` 等）都会在读取凭据管理器的环节直接失败，只能用 `--password` 重新输入密码。现在可以正常读出已存密码并继续连接；密码里的非 ASCII 字符和首尾空格也会原样保留。
+
 ## [2.6.1] - 2026-11-05
 
 本版修复 TABL / STRU 建表对数值与深类型字段的支持：含 `abap.int4` / `abap.dec` / `abap.string` 等字段的表此前会被 SAP 拒绝（增强类别不匹配、深类型名不存在），现在按 DDL 的 `@AbapCatalog.enhancement.category` 提交增强类别、缺省时按字段类型推导，`abap pull` 出来的表改完字段 `abap push` 会保留 SAP 侧原有类别。没有破坏性变更；内置 ICF 服务版本随本版到 2.6.1，升级后执行一次 `abap deploy --yes`。
