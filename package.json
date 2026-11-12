@@ -53,7 +53,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@clack/prompts": "^1.8.1",
+    "@clack/prompts": "^1.9.0",
     "abap-adt-api": "^9.2.0",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
