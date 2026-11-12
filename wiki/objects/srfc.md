@@ -11,7 +11,7 @@ changed at: 2026-11-04 02:15:00
 
 Unified Connectivity（UCON）里的 **RFC service**：把一个 RFC-enabled function module 暴露成 UCON 管理的 RFC 服务，可附带 call scope、默认 UCON profile 与短文本。持久化在 `UCONRFCSERVHEAD` / `UCONRFCSERVTEXT`，是 TADIR 对象（`OBJECT = 'SRFC'`）。UCON 没有 ADT 资源，上游 abap-file-format 也没有 SRFC 格式，所以本 CLI 用本地扩展格式 + 自建 ICF 端点实现。
 
-本类型只管理 RFC service 本身；**communication assembly（UCSA）与 RFC profile 的维护仍在 UCONCOCKPIT**。同族但独立的 UCON HTTP service 尚未支持（类型码待定，见 roadmap），OAuth 2.0 profile 是另一类型 [`OA2P`](oa2p.md)。
+本类型只管理 RFC service 本身；**communication assembly（UCSA）与 RFC profile 的维护仍在 UCONCOCKPIT**。同族的 UCON HTTP service 是另一类型 [`UCON_HTTP`](ucon_http.md)，OAuth 2.0 profile 是另一类型 [`OA2P`](oa2p.md)。
 
 ## 路由（单通道 ICF）
 

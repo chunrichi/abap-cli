@@ -39,7 +39,7 @@ import { runDeleteCdsTech } from './delete-cds-tech.js';
 import { runDeleteType } from './delete-type.js';
 import { runDeleteAppJob } from './delete-appjob.js';
 import { runDeleteSm59 } from './delete-sm59.js';
-import { OA2P_FLOW, SRFC_FLOW, runDeleteUcon } from './ucon-object-flows.js';
+import { OA2P_FLOW, SRFC_FLOW, UCON_HTTP_FLOW, runDeleteUcon } from './ucon-object-flows.js';
 import { isCdsTechType } from '../../formats/cds-tech/json.js';
 import { isAppJobType } from '../../formats/appjob/json.js';
 import { isAuthType } from '../../formats/auth/registry.js';
@@ -194,6 +194,11 @@ export async function runDelete(objectName: string, opts: DeleteOptions): Promis
   }
   if (typeUpper === 'OA2P') {
     return runDeleteUcon(OA2P_FLOW, objectName, opts);
+  }
+  // UCON HTTP services (UCON_HTTP) use the same TADIR package / transport rule
+  // and the shared ICF delete route.
+  if (typeUpper === 'UCON_HTTP') {
+    return runDeleteUcon(UCON_HTTP_FLOW, objectName, opts);
   }
   // SM59 (HTTP destinations) are client-independent RFCDES entries served by
   // the bundled ICF service (`DELETE /sm59/<name>`); they have no package and

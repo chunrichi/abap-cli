@@ -363,6 +363,17 @@ export type ErrorCode =
   | 'OA2P_WRITE_FAILED'          // create/update through the persistence classes failed (SAP_ERROR)
   | 'OA2P_READ_FAILED'           // read through the persistence classes failed (SAP_ERROR)
   | 'OA2P_DELETE_FAILED'         // delete through the persistence classes failed (SAP_ERROR)
+  // UCON HTTP service (UCON_HTTP) ICF /ucon_http route — local-extension ucon_http-v1 document
+  | 'UCON_HTTP_OBJECT_NOT_FOUND'   // service does not exist (GET / DELETE) (NOT_FOUND)
+  | 'UCON_HTTP_NAME_INVALID'       // service name empty, >30 chars, or illegal characters (VALIDATION_ERROR)
+  | 'UCON_HTTP_INVALID_PAYLOAD'    // malformed JSON body / invalid handler list (VALIDATION_ERROR)
+  | 'UCON_HTTP_HANDLER_NOT_FOUND'  // handler class does not exist in the target system (VALIDATION_ERROR)
+  | 'UCON_HTTP_PACKAGE_INVALID'    // target package does not exist (VALIDATION_ERROR)
+  | 'UCON_HTTP_TRANSPORT_REQUIRED' // transportable package without a transport request (VALIDATION_ERROR)
+  | 'UCON_HTTP_WRITE_FAILED'       // create/update through the UCON HTTP API failed (SAP_ERROR)
+  | 'UCON_HTTP_READ_FAILED'        // read through the UCON HTTP API failed (SAP_ERROR)
+  | 'UCON_HTTP_DELETE_FAILED'      // delete through the UCON HTTP API failed (SAP_ERROR)
+  | 'UCON_HTTP_API_UNAVAILABLE'    // release lacks the UCON HTTP service API (VALIDATION_ERROR)
   // JOBD (application job definition) ICF route — local-extension jobd-v1 document
   | 'JOBD_INVALID_PAYLOAD'      // malformed JSON body / not a jobd-v1 document (VALIDATION_ERROR)
   | 'JOBD_SERVICE_INVALID'      // route name missing / malformed path (VALIDATION_ERROR)
@@ -703,6 +714,17 @@ const CATEGORY_OF_CODE: Record<ErrorCode, ErrorCategory> = {
   OA2P_WRITE_FAILED: 'SAP_ERROR',
   OA2P_READ_FAILED: 'SAP_ERROR',
   OA2P_DELETE_FAILED: 'SAP_ERROR',
+  // — UCON HTTP services (UCON_HTTP)
+  UCON_HTTP_OBJECT_NOT_FOUND: 'NOT_FOUND',
+  UCON_HTTP_NAME_INVALID: 'VALIDATION_ERROR',
+  UCON_HTTP_INVALID_PAYLOAD: 'VALIDATION_ERROR',
+  UCON_HTTP_HANDLER_NOT_FOUND: 'VALIDATION_ERROR',
+  UCON_HTTP_PACKAGE_INVALID: 'VALIDATION_ERROR',
+  UCON_HTTP_TRANSPORT_REQUIRED: 'VALIDATION_ERROR',
+  UCON_HTTP_WRITE_FAILED: 'SAP_ERROR',
+  UCON_HTTP_READ_FAILED: 'SAP_ERROR',
+  UCON_HTTP_DELETE_FAILED: 'SAP_ERROR',
+  UCON_HTTP_API_UNAVAILABLE: 'VALIDATION_ERROR',
   // — SM59 HTTP destinations
   SM59_OBJECT_NOT_FOUND: 'NOT_FOUND',
   SM59_TYPE_NOT_SUPPORTED: 'VALIDATION_ERROR',

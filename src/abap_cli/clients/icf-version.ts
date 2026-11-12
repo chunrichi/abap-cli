@@ -36,8 +36,10 @@ export const ICF_BASE_PATH = '/sap/abap_cli';
  *  2.6.0: GET/POST/PUT/DELETE /jobd manage SM36 application job definitions;
  *         GET /aff/<TYPE>/<NAME> serializes AFF objects (ENHO / ENHS).
  *  2.6.1: TABL/STRU create honors the DDL enhancement category and maps
- *         abap.string / abap.rawstring to the DDIC codes STRG / RSTR. */
-export const ICF_SERVICE_VERSION = '2.6.1';
+ *         abap.string / abap.rawstring to the DDIC codes STRG / RSTR.
+ *  2.7.0: GET/POST/DELETE /ucon_http manage UCON HTTP services
+ *         (UCONHTTPSERVHEAD handlers / description / ICF node link). */
+export const ICF_SERVICE_VERSION = '2.7.0';
 
 export type IcfDeploymentStatus = 'not_deployed' | 'current' | 'outdated' | 'unreachable';
 

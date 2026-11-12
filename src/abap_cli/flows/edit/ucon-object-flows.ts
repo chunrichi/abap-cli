@@ -1,14 +1,15 @@
 /**
- * Shared ICF flows for the UCON RFC service (SRFC) and OAuth 2.0 profile (OA2P)
- * object types.
+ * Shared ICF flows for the UCON object types: UCON RFC service (SRFC),
+ * OAuth 2.0 profile (OA2P) and UCON HTTP service (UCON_HTTP).
  *
- * Both types are TADIR objects served by the bundled ICF service with the same
- * shape: a single `<name>.<type>.json` local-extension document, create/update
+ * All three types are TADIR objects served by the bundled ICF service with the
+ * same shape: a single `<name>.<type>.json` local-extension document, create/update
  * through `POST /<type>/<name>`, read through `GET`, delete through `DELETE`,
  * and package / transport rules identical to the ICF DDIC types (local
  * `$`-prefixed packages are transport-free, everything else needs `--tr`).
  * The per-type differences live in the `UconFlowSpec` bound at the bottom
- * (`SRFC_FLOW` / `OA2P_FLOW`), so the four operations stay one implementation.
+ * (`SRFC_FLOW` / `OA2P_FLOW` / `UCON_HTTP_FLOW`), so the four operations stay
+ * one implementation.
  */
 import * as path from 'node:path';
 import type { AdtClientWrapper } from '../../clients/adt-client.js';
@@ -28,6 +29,7 @@ import type { DeleteOptions, DeleteResult } from './delete.js';
 import { assertUconFileNameMatches, validateUconName } from './ucon-shared.js';
 import { srfcArtifact, type SrfcLocal, type SrfcWire } from '../../formats/srfc/json.js';
 import { oa2pArtifact, type Oa2pLocal, type Oa2pWire } from '../../formats/oa2p/json.js';
+import { uconHttpArtifact, type UconHttpLocal, type UconHttpWire } from '../../formats/ucon-http/json.js';
 
 /** Error codes the flows surface for one UCON type. */
 export interface UconErrorCodes {
@@ -45,8 +47,8 @@ export interface UconErrorCodes {
 
 /** Everything one UCON object type contributes to the shared flows. */
 export interface UconFlowSpec<TLocal extends { formatVersion: string }, TWire extends TLocal> {
-  /** User-facing type code (SRFC / OA2P). */
-  type: 'SRFC' | 'OA2P';
+  /** User-facing type code (SRFC / OA2P / UCON_HTTP). */
+  type: 'SRFC' | 'OA2P' | 'UCON_HTTP';
   /** Human label used in messages ("UCON RFC service" / "OAuth2 profile"). */
   label: string;
   /** SAP-side object key length (both are CHAR 30). */
@@ -57,8 +59,10 @@ export interface UconFlowSpec<TLocal extends { formatVersion: string }, TWire ex
   endpoint: string;
   /** Local ↔ wire mapping + schema validation. */
   artifact: WireArtifact<TLocal, TWire>;
-  /** Whether `--description` overrides the local document (SRFC only). */
+  /** Whether `--description` overrides the local document (SRFC / UCON_HTTP). */
   descriptionApplicable: boolean;
+  /** Tables the write touches, shown in the `--check-only` plan. */
+  writes: string[];
   /** `abap create` invocation shown in name / usage errors. */
   createExample: string;
   codes: UconErrorCodes;
@@ -86,6 +90,26 @@ function nameSpec(spec: UconFlowSpec<any, any>) {
  * type's route becomes the generic OBJECT_NOT_FOUND contract used by every
  * other flow (with a type-specific next step).
  */
+function objectNotFound(
+  spec: UconFlowSpec<any, any>,
+  action: 'read' | 'write' | 'delete',
+  name: string,
+  opts: { file?: string; details?: unknown[] } = {},
+): CliError {
+  const file = opts.file;
+  const nextSteps =
+    action === 'read'
+      ? [`Verify the ${spec.label} exists in the target system.`, 'Run `abap search <name>` to confirm the object name.']
+      : [`Verify the ${spec.label} exists in the target system.`];
+  return new CliError('OBJECT_NOT_FOUND', `${spec.label} ${name} does not exist${action === 'read' ? '' : ' any more'}`, {
+    object: name,
+    type: spec.type,
+    ...(file ? { file } : {}),
+    details: opts.details,
+    nextSteps,
+  });
+}
+
 function icfFailure(
   spec: UconFlowSpec<any, any>,
   resp: IcfResponse<unknown>,
@@ -95,17 +119,7 @@ function icfFailure(
 ): CliError {
   const file = opts.file;
   if (resp.error?.code === spec.codes.notFound) {
-    const nextSteps =
-      action === 'read'
-        ? [`Verify the ${spec.label} exists in the target system.`, 'Run `abap search <name>` to confirm the object name.']
-        : [`Verify the ${spec.label} exists in the target system.`];
-    return new CliError('OBJECT_NOT_FOUND', `${spec.label} ${name} does not exist${action === 'read' ? '' : ' any more'}`, {
-      object: name,
-      type: spec.type,
-      ...(file ? { file } : {}),
-      details: resp.error?.details,
-      nextSteps,
-    });
+    return objectNotFound(spec, action, name, { ...(file ? { file } : {}), details: resp.error?.details });
   }
   const fallback =
     action === 'read' ? spec.codes.readFailed : action === 'delete' ? spec.codes.deleteFailed : spec.codes.writeFailed;
@@ -115,6 +129,43 @@ function icfFailure(
     ...(file ? { file } : {}),
     details: resp.error?.details,
     nextSteps: ['Fix the cause above and re-run.'],
+  });
+}
+
+/**
+ * The ICF client throws 4xx envelopes (`normalizeError`) instead of returning
+ * them with `status:'error'`, so the flows translate the type's not-found code
+ * here. Other envelope codes keep flowing through verbatim; the `icfFailure`
+ * path still covers responses the client returns as an envelope.
+ */
+async function callIcf<T>(
+  call: Promise<IcfResponse<T>>,
+  spec: UconFlowSpec<any, any>,
+  action: 'read' | 'write' | 'delete',
+  name: string,
+  opts: { file?: string } = {},
+): Promise<IcfResponse<T>> {
+  try {
+    return await call;
+  } catch (error) {
+    if (error instanceof CliError && error.code === spec.codes.notFound) {
+      throw objectNotFound(spec, action, name, opts);
+    }
+    throw error;
+  }
+}
+
+/** Push is update-only: a missing target gets the create-first hint. */
+function pushMissingError(spec: UconFlowSpec<any, any>, name: string, outFile: string): CliError {
+  return new CliError('OBJECT_NOT_FOUND', `${spec.label} ${name} does not exist; push updates existing objects only`, {
+    object: name,
+    type: spec.type,
+    file: outFile,
+    nextSteps: [
+      `Create it first: abap create ${spec.type} ${name} --file ${outFile} --package '<package>' --yes`,
+      'Then push again to update the object.',
+    ],
+    example: `abap push ${outFile}`,
   });
 }
 
@@ -209,7 +260,7 @@ export async function runCreateUcon<TLocal extends { formatVersion: string }, TW
         object: name,
         type: spec.type,
         details: { action: 'create' },
-        nextSteps: [`Edit the ${spec.fileSuffix} document instead: --description is only applicable to SRFC.`],
+        nextSteps: [`Edit the ${spec.fileSuffix} document instead: this type has no description field.`],
         example: spec.createExample,
       });
     }
@@ -252,7 +303,7 @@ export async function runCreateUcon<TLocal extends { formatVersion: string }, TW
           action: 'POST',
           path: `/sap/abap_cli${routePath(spec, name)}`,
           package: targetPackage,
-          writes: ['TADIR', spec.type === 'SRFC' ? 'UCONRFCSERVHEAD/UCONRFCSERVTEXT' : 'OA2C_PROFILES/OA2P_SCOPES'],
+          writes: ['TADIR', ...spec.writes],
         },
       },
       `${spec.label} ${name} document is valid (no object created).`,
@@ -266,9 +317,12 @@ export async function runCreateUcon<TLocal extends { formatVersion: string }, TW
   if (transportRequest) wire.transportRequest = transportRequest;
 
   const icf = await IcfClient.create();
-  const resp = await icf.post<{ name: string; type: string; action: 'created' | 'updated'; package?: string }>(
-    routePath(spec, name),
-    wire,
+  const resp = await callIcf(
+    icf.post<{ name: string; type: string; action: 'created' | 'updated'; package?: string }>(routePath(spec, name), wire),
+    spec,
+    'write',
+    name,
+    { file: toOutputPath(opts.file) },
   );
   if (resp.status !== 'success' || !resp.data) {
     throw icfFailure(spec, resp, 'write', name, { file: toOutputPath(opts.file) });
@@ -297,7 +351,7 @@ export async function runPullUcon<TLocal extends { formatVersion: string }, TWir
 ): Promise<PullResult> {
   const name = validateUconName(objectName, nameSpec(spec));
   const icf = await IcfClient.create();
-  const resp = await icf.get<TWire>(routePath(spec, name));
+  const resp = await callIcf(icf.get<TWire>(routePath(spec, name)), spec, 'read', name);
   if (resp.status !== 'success' || !resp.data) {
     throw icfFailure(spec, resp, 'read', name);
   }
@@ -379,19 +433,18 @@ export async function pushUconFile<TLocal extends { formatVersion: string }, TWi
 
   const icf = await IcfClient.create();
   // push updates existing objects only; `create` is the creating path.
-  const head = await icf.get<TWire>(routePath(spec, name));
+  let head: IcfResponse<TWire>;
+  try {
+    head = await icf.get<TWire>(routePath(spec, name));
+  } catch (error) {
+    if (error instanceof CliError && error.code === spec.codes.notFound) {
+      throw pushMissingError(spec, name, outFile);
+    }
+    throw error;
+  }
   if (head.status !== 'success' || !head.data) {
     if (head.error?.code === spec.codes.notFound) {
-      throw new CliError('OBJECT_NOT_FOUND', `${spec.label} ${name} does not exist; push updates existing objects only`, {
-        object: name,
-        type: spec.type,
-        file: outFile,
-        nextSteps: [
-          `Create it first: abap create ${spec.type} ${name} --file ${outFile} --package '<package>' --yes`,
-          'Then push again to update the object.',
-        ],
-        example: `abap push ${outFile}`,
-      });
+      throw pushMissingError(spec, name, outFile);
     }
     throw icfFailure(spec, head, 'read', name, { file: outFile });
   }
@@ -411,7 +464,13 @@ export async function pushUconFile<TLocal extends { formatVersion: string }, TWi
   if (packageName !== undefined && packageName !== '') wire.package = packageName;
   wire.transportRequest = transport || undefined;
 
-  const resp = await icf.post<{ name: string; action: 'created' | 'updated' }>(routePath(spec, name), wire);
+  const resp = await callIcf(
+    icf.post<{ name: string; action: 'created' | 'updated' }>(routePath(spec, name), wire),
+    spec,
+    'write',
+    name,
+    { file: outFile },
+  );
   if (resp.status !== 'success' || !resp.data) {
     throw icfFailure(spec, resp, 'write', name, { file: outFile });
   }
@@ -433,7 +492,7 @@ export async function runDeleteUcon<TLocal extends { formatVersion: string }, TW
   const name = validateUconName(objectName, nameSpec(spec));
 
   const icf = await IcfClient.create();
-  const probe = await icf.get<{ package?: string }>(routePath(spec, name));
+  const probe = await callIcf(icf.get<{ package?: string }>(routePath(spec, name)), spec, 'read', name);
   if (probe.status !== 'success' || !probe.data) {
     throw icfFailure(spec, probe, 'read', name);
   }
@@ -449,9 +508,14 @@ export async function runDeleteUcon<TLocal extends { formatVersion: string }, TW
     });
   }
 
-  const resp = await icf.deleteIcfRoute<{ name: string; action: string }>(
-    routePath(spec, name),
-    opts.tr ? { transportRequest: opts.tr } : {},
+  const resp = await callIcf(
+    icf.deleteIcfRoute<{ name: string; action: string }>(
+      routePath(spec, name),
+      opts.tr ? { transportRequest: opts.tr } : {},
+    ),
+    spec,
+    'delete',
+    name,
   );
   if (resp.status !== 'success' || !resp.data) {
     throw icfFailure(spec, resp, 'delete', name);
@@ -481,6 +545,7 @@ export const SRFC_FLOW: UconFlowSpec<SrfcLocal, SrfcWire> = {
   endpoint: '/srfc',
   artifact: srfcArtifact,
   descriptionApplicable: true,
+  writes: ['UCONRFCSERVHEAD/UCONRFCSERVTEXT'],
   createExample: "abap create SRFC ZMY_RFC_SERVICE --file src/zmy_rfc_service.srfc.json --package '$TMP' --yes",
   codes: {
     notFound: 'SRFC_OBJECT_NOT_FOUND',
@@ -500,6 +565,7 @@ export const OA2P_FLOW: UconFlowSpec<Oa2pLocal, Oa2pWire> = {
   endpoint: '/oa2p',
   artifact: oa2pArtifact,
   descriptionApplicable: false,
+  writes: ['OA2C_PROFILES/OA2P_SCOPES'],
   createExample: "abap create OA2P ZMY_OAUTH_PROFILE --file src/zmy_oauth_profile.oa2p.json --package '$TMP' --yes",
   codes: {
     notFound: 'OA2P_OBJECT_NOT_FOUND',
@@ -507,5 +573,25 @@ export const OA2P_FLOW: UconFlowSpec<Oa2pLocal, Oa2pWire> = {
     writeFailed: 'OA2P_WRITE_FAILED',
     deleteFailed: 'OA2P_DELETE_FAILED',
     transportRequired: 'OA2P_TRANSPORT_REQUIRED',
+  },
+};
+
+/** UCON HTTP service (UCON_HTTP) binding of the shared flows. */
+export const UCON_HTTP_FLOW: UconFlowSpec<UconHttpLocal, UconHttpWire> = {
+  type: 'UCON_HTTP',
+  label: 'UCON HTTP service',
+  maxNameLength: 30,
+  fileSuffix: 'ucon_http.json',
+  endpoint: '/ucon_http',
+  artifact: uconHttpArtifact,
+  descriptionApplicable: true,
+  writes: ['UCONHTTPSERVHEAD/UCONHTTPSERVTEXT/UCONHTTPSERVHANDL'],
+  createExample: "abap create UCON_HTTP ZMY_HTTP_SERVICE --file src/zmy_http_service.ucon_http.json --package '$TMP' --yes",
+  codes: {
+    notFound: 'UCON_HTTP_OBJECT_NOT_FOUND',
+    readFailed: 'UCON_HTTP_READ_FAILED',
+    writeFailed: 'UCON_HTTP_WRITE_FAILED',
+    deleteFailed: 'UCON_HTTP_DELETE_FAILED',
+    transportRequired: 'UCON_HTTP_TRANSPORT_REQUIRED',
   },
 };

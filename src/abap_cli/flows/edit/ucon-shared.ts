@@ -1,11 +1,11 @@
 /**
- * Shared helpers for the UCON RFC service (SRFC) and OAuth 2.0 profile (OA2P)
- * flows.
+ * Shared helpers for the UCON object flows: UCON RFC service (SRFC),
+ * OAuth 2.0 profile (OA2P) and UCON HTTP service (UCON_HTTP).
  *
- * Both types are TADIR objects managed through the bundled ICF service
- * (`/srfc/<name>`, `/oa2p/<name>`). Their names are CHAR 30 object keys, so the
- * local name rule is the same; the file-name guard reuses the AFF token form so
- * the file name and the SAP-side key stay in sync.
+ * The types are TADIR objects managed through the bundled ICF service
+ * (`/srfc/<name>`, `/oa2p/<name>`, `/ucon_http/<name>`). Their names are
+ * CHAR 30 object keys, so the local name rule is the same; the file-name guard
+ * reuses the AFF token form so the file name and the SAP-side key stay in sync.
  */
 import * as path from 'node:path';
 import { CliError } from '../../output/json.js';

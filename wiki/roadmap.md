@@ -93,6 +93,7 @@
 | `SM59`（HTTP destination） | ICF `/sm59`：标准维护 API `SRFC_DESTAPI`（`CL_DEST_FACTORY` / `CL_DEST_ROOT` / `CL_DEST_HTTP_EXT`，RFCTYPE='G'；删除 `CL_DEST_FACTORY=>delete`），dialog-free | 自建 `sm59-v1.json`（AFF 无此格式；targetHost / port / protocol / pathPrefix / description，描述 ≤72） | - [x] 已完成（ABAP/CLI/mock/unit/integration + 真机闭环；无 package/传输，legacy RFCOPTIONS 不保留） |
 | `SRFC`（UCON RFC service） | ICF `/srfc`：公共 UCON RFC API（`CL_UCON_API_FACTORY=>GET/DELETE_RFC_SERVICE`）+ Workbench 持久化类 `CL_UCONRFC_OBJECT_PERSIST`（创建 / 修改）+ `RS_CORR_INSERT`（TADIR / package / 传输）+ 运行时缓存刷新 | 自建 `srfc-v1.json`（AFF 无此格式；functionName / scope / defaultProfile / description） | - [x] 已完成（ABAP/CLI/mock/unit/integration + 真机闭环；TADIR 对象，短文本按会话语言） |
 | `OA2P`（OAuth 2.0 client profile） | ICF `/oa2p`：OA2P Workbench 持久化类 `CL_OA2P_OBJECT_PERSIST` / `CL_OA2P_OBJECT_DATA` + `RS_CORR_INSERT`；删除前检查 client 分配 | 自建 `oa2p-v1.json`（AFF 无此格式；type / noAuthCheck / scopes） | - [x] 已完成（ABAP/CLI/mock/unit/integration + 真机闭环；TADIR 对象，无描述字段） |
+| `UCON_HTTP`（UCON HTTP service） | ICF `/ucon_http`：公共 UCON HTTP service API（`CL_UCON_API_FACTORY=>GET/NEW/DELETE_HTTP_SERVICE` + `IF_UCON_API_HTTP_SERVICE~SET_HANDLER/SET_DESCRIPTION/SET_ICF_SERVICE/ACTIVATE/SAVE`），`SAVE` 记录 TADIR / package / transport | 自建 `ucon_http-v1.json`（AFF 无此格式；有序 handler 类列表 / description / 可选 icfService） | - [ ] 进行中（ABAP/CLI/mock/unit/integration 已完成；真机部署与闭环待凭据恢复后补跑） |
 | `JOBD`（application job definition） | ICF `/jobd`：`CL_JR_JOB_DEFINITION`（`GET_JD_ATTRIBUTES` / `CREATE_JD` / `MODIFY_JD`）序列化 STJR_JOBD_ROOT + STJR_JOBD_TREP，TADIR / CTS 用 `RS_CORR_INSERT`，删除先清 STJR 行再删 TADIR | 自建 `jobd-v1.json`（AFF 无此格式；镜像 `TY_JOB_DEFINITION` 去掉系统字段） | - [x] 已完成（ABAP/CLI/mock/unit/integration + 真机闭环；写入即激活，名称 ≤32） |
 | `AUTH` / `SUSC` / `SUCU` / `SUSH` / `SUSO` | ICF `/auth/<type>/<name>`：AUTHX / TOBC+TOBCT / TBRG_AUTH+TBRG_AUTHT / SU22（`CL_SU22_ADT_OBJECT`）/ SU21（`CL_SUSO_GEN` + DOKU） | `AUTH` 上游 AFF + SU20 两字段扩展；`SUSC`/`SUCU`/`SUSO` 本地扩展；`SUSH` 上游 AFF `sush-v1` | - [x] 已完成（真机 handler + CLI 闭环；SUSO 重生成 opt-in、SUSH create 仅 RF、SUCU 仅本地包可删） |
 
@@ -108,7 +109,7 @@
 - **SVIM / VCLS**（表维护生成器 / 视图簇）：AFF 近 3 个月新增格式；需真机验证 SAP 侧 API
 - **TTYP 本地文件收口**：表类型是纯 DDIC 元数据（abapGit 也只序列化元数据），已移除 pull 生成的 `.type.abap` 只读侧车；`.type.abap` 归还给 AFF type pool（`TYPE`）。旧侧车文件被忽略，不再生成。
 - **AFF-stable 27 类中的云/UI 类**（BGQC/CDBO/COTA/DESD/EEEC/GSMP/SWCR/NONT/RONT/UIAD/UIPG/UIST）：接入成本低，但按 BTP/云需求排期（`SAJC` / `SAJT` 已完成；`APLO` / `CHDO` / `EVTB` / `SMBC` 已接入 ADT blueSource，`ENHO` / `ENHS` 已接入 ICF 只读 pull，写入需 SEEF 适配）。
-- **`PINF` / `SCP1` / SM59 其它目标类型（RFC 连接 `3`·`I`·`T`·`L`）/ UCON HTTP service**：参考 release 没有可用 ADT 通道，暂不支持；SM59 HTTP 目标（RFCTYPE='G'）、UCON RFC service（`SRFC`）、OAuth2 profile（`OA2P`）与授权对象族（`AUTH` / `SUSC` / `SUCU` / `SUSH` / `SUSO`）已完成（类型码 `UCON_HTTP` 待定）。
+- **`PINF` / `SCP1` / SM59 其它目标类型（RFC 连接 `3`·`I`·`T`·`L`）**：参考 release 没有可用 ADT 通道，暂不支持；SM59 HTTP 目标（RFCTYPE='G'）、UCON RFC service（`SRFC`）、UCON HTTP service（`UCON_HTTP`）、OAuth2 profile（`OA2P`）与授权对象族（`AUTH` / `SUSC` / `SUCU` / `SUSH` / `SUSO`）已完成（`UCON_HTTP` 的真机验证待补跑）。
 - **`DRAS` / `DTIX` / `DTSC`**：官方 AFF schema 已在镜像中，但本机 typestructure 无 CREATE、discovery 无 ADT 资源（2026-11-03 实测），等有 ADT 通道的 release 再实现；不硬做 ICF
 - **表单/集成**：`SFPF`（AFF 有格式）、`SSFO`/SAPscript、`IDOC`（AFF 无格式，复杂度高）
 

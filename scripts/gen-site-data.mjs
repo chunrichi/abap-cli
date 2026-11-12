@@ -40,7 +40,7 @@ for (const [category, types] of Object.entries({
   source: ['CLAS', 'INTF', 'PROG', 'FUGR', 'TYPE', 'DEVC'],
   cds: ['DDLS', 'DDLA', 'DDLX', 'DCLS', 'SRVD', 'SRVB', 'BDEF', 'DTDC', 'DTEB', 'DSFD', 'DSFI', 'DRTY'],
   ddic: ['TABL', 'STRU', 'DOMA', 'DTEL', 'TTYP', 'VIEW', 'SHLP', 'ENQU', 'NROB', 'MSAG'],
-  services: ['HTTP', 'TRAN', 'XSLT', 'SM59', 'SRFC', 'OA2P'],
+  services: ['HTTP', 'TRAN', 'XSLT', 'SM59', 'SRFC', 'OA2P', 'UCON_HTTP'],
   jobs: ['CHKC', 'CHKO', 'CHKV', 'SAJC', 'SAJT', 'JOBD'],
   security: ['AUTH', 'SUSC', 'SUCU', 'SUSH', 'SUSO'],
   aff: ['APLO', 'CHDO', 'EVTB', 'SMBC', 'ENHO', 'ENHS'],
@@ -56,7 +56,7 @@ for (const line of markdown.split('\n')) {
   const cells = line.slice(1, -1).split('|').map((cell) => cell.trim());
   if (cells.length !== 8) continue;
   const code = cells[0].replaceAll('`', '');
-  if (!/^[A-Z0-9]+$/.test(code)) continue;
+  if (!/^[A-Z0-9_]+$/.test(code)) continue;
   const [, name, createCell, pullCell, pushCell, deleteCell, channelCell, artifacts] = cells;
   if (rows.some((row) => row.code === code)) continue;
 
@@ -99,7 +99,7 @@ const stats = {
   categories: categories.length,
 };
 
-if (stats.total !== 51 || stats.create !== 49 || stats.pull !== 51 || stats.push !== 47 || stats.delete !== 49) {
+if (stats.total !== 52 || stats.create !== 50 || stats.pull !== 52 || stats.push !== 48 || stats.delete !== 50) {
   throw new Error(`Object matrix counts changed: ${JSON.stringify(stats)}. Update the site copy and this guard together.`);
 }
 

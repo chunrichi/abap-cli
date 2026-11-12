@@ -52,7 +52,7 @@ abap pull --help
 6. **通道路由类型**（TTYP/MSAG/DDLS）— 见下节。
 7. **包（DEVC）** — 见下节「Package（DEVC）」：`GET /sap/bc/adt/packages/<name>`，单文件落盘，无批量选择器差异。
 8. **SM59（HTTP 目标）** — 见下节「SM59（HTTP 目标）」：ICF `GET /sm59/<name>`，单文件 `src/<name>.sm59.json`。
-9. **SRFC / OA2P（UCON 对象）** — ICF `GET /srfc/<name>` / `GET /oa2p/<name>`，单文件 `src/<name>.srfc.json` / `src/<name>.oa2p.json`（本地扩展 schema；不含 `name` / `package` / admin 字段，可直接作为 create / push 模板）。
+9. **SRFC / OA2P / UCON_HTTP（UCON 对象）** — ICF `GET /srfc/<name>` / `GET /oa2p/<name>` / `GET /ucon_http/<name>`，单文件 `src/<name>.srfc.json` / `src/<name>.oa2p.json` / `src/<name>.ucon_http.json`（本地扩展 schema；不含 `name` / `package` / admin 字段，可直接作为 create / push 模板）。
 10. **JOBD（应用作业定义，SM36）** — ICF `GET /jobd/<name>`，单文件 `src/<name>.jobd.json`（本地扩展 `jobd-v1`；`package` 是只读元数据，包含报表 / 变式与调度参数）。
 11. **AFF 对象**（APLO/CHDO/EVTB/SMBC/ENHO/ENHS）— 按通道分流（`data.channel` 为 `adt-blue` 或 `icf`）：
    - `APLO` / `CHDO` / `EVTB` / `SMBC` 走 **ADT blueSource**：读 `source/main`（就是官方 AFF JSON）原样写成 `src/<token>.<type>.json`，包信息取自 ADT 元数据（`data.package`）；对象不存在 → `OBJECT_NOT_FOUND`（exit 8）。

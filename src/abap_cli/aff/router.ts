@@ -24,6 +24,7 @@
  *   *.sm59.json                        → SM59
  *   *.srfc.json                        → SRFC
  *   *.oa2p.json                        → OA2P
+ *   *.ucon_http.json                   → UCON_HTTP
  *   *.xslt.json / *.xslt.xml           → XSLT  (metadata + source pair)
  *   *.devc.json                        → DEVC
  *   *.aplo.json / *.chdo.json          → APLO / CHDO  (AFF over ICF)
@@ -83,6 +84,8 @@ const SUFFIX_RULES: ReadonlyArray<{ suffix: string; type: string; schemaFile?: s
   { suffix: '.srfc.json', type: 'SRFC' },
   // OAuth 2.0 client profile local-extension document (no upstream AFF format).
   { suffix: '.oa2p.json', type: 'OA2P' },
+  // UCON HTTP service local-extension document (no upstream AFF format).
+  { suffix: '.ucon_http.json', type: 'UCON_HTTP' },
   // Database view local-extension document (upstream AFF has no view format).
   { suffix: '.view.json', type: 'VIEW' },
   // Transformation pair: metadata + source companion.

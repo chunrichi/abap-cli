@@ -9,6 +9,7 @@ import { getShlpJsonExample } from '../formats/shlp/json.js';
 import { getJobdJsonExample } from '../formats/jobd/json.js';
 import { getSm59JsonExample } from '../formats/sm59/json.js';
 import { getSrfcJsonExample } from '../formats/srfc/json.js';
+import { getUconHttpJsonExample } from '../formats/ucon-http/json.js';
 import { getOa2pJsonExample } from '../formats/oa2p/json.js';
 import type { DdicSupportedType } from '../formats/ddic/types.js';
 import { isAuthType, authSpecOf } from '../formats/auth/registry.js';
@@ -273,9 +274,9 @@ export function createSchema(type?: string): CreateCommandSchema {
     // dimension of the schema states which flags are not applicable instead of
     // silently accepting them.
     const isSm59 = t === 'SM59';
-    // SRFC/OA2P are TADIR objects (package + transport apply), so only their
-    // wire shape and the no-activation note differ from the DDIC types.
-    const isUcon = t === 'SRFC' || t === 'OA2P';
+    // SRFC/OA2P/UCON_HTTP are TADIR objects (package + transport apply), so
+    // only their wire shape and the no-activation note differ from the DDIC types.
+    const isUcon = t === 'SRFC' || t === 'OA2P' || t === 'UCON_HTTP';
     const message = t === 'VIEW'
       ? 'VIEW (DDIC database view) is created through the self-built ICF service (/ddic/view). Requires --file with a local-extension view-v1 JSON: header.description, viewClass, rootTable, tables[] and fields[]; joinConditions[] for a multi-table view.'
       : t === 'SHLP'
@@ -288,6 +289,8 @@ export function createSchema(type?: string): CreateCommandSchema {
             ? 'SRFC (UCON RFC service) is created through the self-built ICF service (/srfc/<name>). Requires --file with a local-extension srfc-v1 JSON: functionName (RFC-enabled function module), optional description/scope/defaultProfile. There is no separate activation step: the write stores the active version and refreshes the UCON runtime cache. Names are UCONRFCSERVID (max 30 chars); every scope is client-independent and lifecycle/cache maintenance stays in UCONCOCKPIT.'
             : t === 'OA2P'
               ? 'OA2P (OAuth 2.0 client profile) is created through the self-built ICF service (/oa2p/<name>). Requires --file with a local-extension oa2p-v1 JSON: type (OAuth 2.0 service provider type from OA2C_TYPES), optional noAuthCheck/scopes. There is no description field and no activation step. Names are OA2C_PROFILE (max 30 chars); profile assignments to OAuth 2.0 clients stay in OA2C_CONFIG.'
+              : t === 'UCON_HTTP'
+                ? 'UCON_HTTP (UCON HTTP service) is created through the self-built ICF service (/ucon_http/<name>). Requires --file with a local-extension ucon_http-v1 JSON: handlers[] (ordered handler classes, each must exist), optional description and icfService link. There is no separate activation step: the write activates and saves the service. Names are UCONHTTPSERVID (max 30 chars); runtime/cache maintenance stays in UCONCOCKPIT.'
           : isDdic
             ? `DDIC type ${t} created via the self-built ICF service. Requires --file <abap-file-format JSON> with top-level fields: name, description, fields[].`
             : t === 'XSLT'
@@ -305,6 +308,8 @@ export function createSchema(type?: string): CreateCommandSchema {
             ? getSrfcJsonExample()
             : t === 'OA2P'
               ? getOa2pJsonExample()
+              : t === 'UCON_HTTP'
+                ? getUconHttpJsonExample()
           : isDdic
             ? getDdicJsonExample(t as DdicSupportedType)
             : undefined;
@@ -329,7 +334,7 @@ export function createSchema(type?: string): CreateCommandSchema {
             if (o.name === '--description') {
               return t === 'OA2P'
                 ? { ...o, required: false, description: 'Not applicable for OA2P: profiles have no description field' }
-                : { ...o, required: false, description: 'Optional override of the document description (SRFC short text)' };
+                : { ...o, required: false, description: 'Optional override of the document description (service short text)' };
             }
             if (o.name === '--no-activate') {
               return { ...o, description: `Not applicable for ${t}: the write stores the active version directly` };
@@ -361,6 +366,8 @@ export function createSchema(type?: string): CreateCommandSchema {
                 ? 'local-extension srfc-v1 JSON input (see exampleJson)'
                 : t === 'OA2P'
                   ? 'local-extension oa2p-v1 JSON input (see exampleJson)'
+                  : t === 'UCON_HTTP'
+                    ? 'local-extension ucon_http-v1 JSON input (see exampleJson)'
                   : `abap-file-format ${t} JSON input`,
         },
       ],

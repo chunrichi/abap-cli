@@ -403,6 +403,17 @@ window.ABAP_OBJECTS = [
     "artifacts": ".tran.json"
   },
   {
+    "code": "UCON_HTTP",
+    "name": "UCON HTTP service",
+    "category": "services",
+    "channel": "icf",
+    "create": "file",
+    "pull": true,
+    "push": true,
+    "delete": "direct",
+    "artifacts": ".ucon_http.json"
+  },
+  {
     "code": "XSLT",
     "name": "Transformation",
     "category": "services",
@@ -603,11 +614,11 @@ window.ABAP_OBJECTS = [
 ];
 
 window.ABAP_STATS = {
-  "total": 51,
-  "create": 49,
-  "pull": 51,
-  "push": 47,
-  "delete": 49,
+  "total": 52,
+  "create": 50,
+  "pull": 52,
+  "push": 48,
+  "delete": 50,
   "readOnly": 2,
   "categories": 7
 };

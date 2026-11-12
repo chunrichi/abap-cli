@@ -25,13 +25,13 @@ import {
 } from '../../src/abap_cli/types/registry.js';
 
 describe('types/registry.ts (single source of truth)', () => {
-  it('contains exactly 51 supported types (4 source + DEVC + 4 DDIC + ENQU + VIEW + SHLP + JOBD + NROB + HTTP + TRAN + SM59 + 2 UCON + XSLT + 6 AFF bundle + 3 dual-channel + 6 + 3 ATC + 5 CDS technical + TYPE + 2 application jobs + 5 authorization-family types)', () => {
+  it('contains exactly 52 supported types (4 source + DEVC + 4 DDIC + ENQU + VIEW + SHLP + JOBD + NROB + HTTP + TRAN + SM59 + 3 UCON + XSLT + 6 AFF bundle + 3 dual-channel + 6 + 3 ATC + 5 CDS technical + TYPE + 2 application jobs + 5 authorization-family types)', () => {
     // added: SRVB (metadata-only), SRVD, BDEF, DCLS, DDLX, DDLA.
     // added: ENQU (lock object, ICF) and NROB (number range object, ICF).
     // added: DEVC (package, ADT package resource; push unsupported).
     // added: SM59 (HTTP destination, ICF; no package/transport).
     // added: APLO / CHDO / EVTB / SMBC / ENHO / ENHS (generic AFF bundle).
-    expect(allSupportedTypes()).toHaveLength(51);
+    expect(allSupportedTypes()).toHaveLength(52);
     expect(allSupportedTypes()).toEqual([
       'CLAS', 'INTF', 'PROG', 'FUGR',         // ADT source
       'DEVC',                                  // ADT package resource
@@ -39,7 +39,7 @@ describe('types/registry.ts (single source of truth)', () => {
       'ENQU', 'VIEW', 'SHLP', 'JOBD',          // — ICF DDIC family + job definitions
       'AUTH', 'SUSC', 'SUCU', 'SUSH', 'SUSO',  // authorization-object family (ICF)
       'NROB',
-      'HTTP', 'TRAN', 'SM59', 'SRFC', 'OA2P',  // ICF (SM59 = HTTP destination; SRFC/OA2P = UCON objects)
+      'HTTP', 'TRAN', 'SM59', 'SRFC', 'OA2P', 'UCON_HTTP', // ICF (SM59 = destination; SRFC/OA2P/UCON_HTTP = UCON objects)
       'XSLT',
       'APLO', 'CHDO', 'EVTB', 'SMBC', 'ENHO', 'ENHS', // generic AFF bundle
       'TTYP', 'MSAG', 'DDLS',                  // dual-channel

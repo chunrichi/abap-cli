@@ -85,6 +85,7 @@ const sm59OtherTypeStore = new Map();
 // stored document carries the read-only `package` the CLI sends on create.
 const srfcStore = new Map();
 const oa2pStore = new Map();
+const uconHttpStore = new Map();
 // XSLT (transformation program) store — key = NAME, value = { name, description,
 // originalLanguage, source, package }. `source` is stored in the canonical
 // (LF, no trailing break) form; GET adds the CRLF read-back the real
@@ -2607,6 +2608,111 @@ const server = http.createServer(async (req, res) => {
         return uconReply(res, 200, { status: 'success', data: { name, type: 'OA2P', action: 'deleted' } });
       }
       return err(405, 'METHOD_NOT_ALLOWED', `${req.method} not supported on /oa2p/${name}`);
+    }
+
+    // /sap/abap_cli/ucon_http/<name> (GET pull / POST upsert / DELETE) — UCON
+    // HTTP service route. Mirrors the handler contract: ordered handler classes
+    // (at least one, unique service orders), optional description / ICF node
+    // link, TADIR package + transport rule. Handler classes ending in _MISSING
+    // are rejected to exercise the UCON_HTTP_HANDLER_NOT_FOUND mapping.
+    const uconHttpRoute = /^\/sap\/abap_cli\/ucon_http(?:\/([^/]+))?$/.exec(path);
+    if (uconHttpRoute) {
+      const err = (status, code, message) => uconReply(res, status, { status: 'error', error: { code, message } });
+      if (!uconHttpRoute[1]) return err(400, 'UCON_HTTP_NAME_INVALID', 'service name is required on /ucon_http/<name>');
+      const name = decodeURIComponent(uconHttpRoute[1]).trim().toUpperCase();
+      const nameProblem = uconNameProblem(name);
+      if (nameProblem) return err(400, 'UCON_HTTP_NAME_INVALID', nameProblem);
+
+      if (req.method === 'GET') {
+        if (!uconHttpStore.has(name)) return err(404, 'UCON_HTTP_OBJECT_NOT_FOUND', `UCON HTTP service ${name} not found`);
+        return uconReply(res, 200, { status: 'success', data: uconHttpStore.get(name) });
+      }
+      if (req.method === 'POST') {
+        const body = await readBody(req);
+        let payload;
+        try {
+          payload = JSON.parse(body);
+        } catch (_e) {
+          return err(400, 'UCON_HTTP_INVALID_PAYLOAD', 'request body is not valid JSON');
+        }
+        const invalid = (message) => err(400, 'UCON_HTTP_INVALID_PAYLOAD', message);
+        if (payload.formatVersion !== undefined && String(payload.formatVersion) !== '1') {
+          return invalid(`formatVersion must be "1" (got "${String(payload.formatVersion)}")`);
+        }
+        if (payload.name !== undefined && String(payload.name).trim().toUpperCase() !== name) {
+          return invalid(`payload name ${String(payload.name)} does not match URL service ${name}`);
+        }
+        const description = payload.description === undefined ? '' : String(payload.description);
+        if (description.length > 255) return invalid(`description must not exceed 255 characters (got ${description.length})`);
+        const rawHandlers = Array.isArray(payload.handlers) ? payload.handlers : [];
+        if (rawHandlers.length === 0) return invalid('handlers must contain at least one handler class');
+        const seenOrders = new Set();
+        const handlers = [];
+        for (const [index, entry] of rawHandlers.entries()) {
+          const handlerClass = entry && typeof entry.handlerClass === 'string' ? entry.handlerClass.trim().toUpperCase() : '';
+          if (!handlerClass) return invalid(`handlers[${index}].handlerClass is required`);
+          if (handlerClass.length > 30) return invalid(`handlers[${index}].handlerClass must not exceed 30 characters`);
+          const order = entry.order === undefined || String(entry.order).trim() === '' ? String(index + 1) : String(entry.order).trim();
+          if (!/^[0-9]{1,2}$/.test(order)) return invalid(`handlers[${index}].order must be a 1 or 2 digit service order`);
+          const orderKey = String(Number(order));
+          if (seenOrders.has(orderKey)) return invalid(`handler service order ${order} is used more than once`);
+          seenOrders.add(orderKey);
+          if (handlerClass.endsWith('_MISSING')) {
+            return err(400, 'UCON_HTTP_HANDLER_NOT_FOUND', `handler class ${handlerClass} does not exist`);
+          }
+          handlers.push({ order, handlerClass });
+        }
+        let icfService;
+        if (payload.icfService && typeof payload.icfService === 'object') {
+          const icfName = payload.icfService.icfName === undefined ? '' : String(payload.icfService.icfName).trim().toUpperCase();
+          const icfParGuid =
+            payload.icfService.icfParGuid === undefined ? '' : String(payload.icfService.icfParGuid).trim().toUpperCase();
+          if (icfName.length > 15) return invalid(`icfService.icfName must not exceed 15 characters (got ${icfName.length})`);
+          if (icfParGuid.length > 25) return invalid(`icfService.icfParGuid must not exceed 25 characters (got ${icfParGuid.length})`);
+          if (icfName || icfParGuid) icfService = { icfName, icfParGuid };
+        }
+        const existed = uconHttpStore.has(name);
+        const previous = existed ? uconHttpStore.get(name) : undefined;
+        const packageName =
+          typeof payload.package === 'string' && payload.package.trim()
+            ? payload.package.trim().toUpperCase()
+            : (previous?.package ?? '$TMP');
+        uconHttpStore.set(name, {
+          formatVersion: '1',
+          name,
+          ...(description ? { description } : {}),
+          handlers,
+          ...(icfService ? { icfService } : {}),
+          package: packageName,
+        });
+        return uconReply(res, 200, {
+          status: 'success',
+          data: { name, type: 'UCON_HTTP', action: existed ? 'updated' : 'created', package: packageName },
+        });
+      }
+      if (req.method === 'DELETE') {
+        if (!uconHttpStore.has(name)) return err(404, 'UCON_HTTP_OBJECT_NOT_FOUND', `UCON HTTP service ${name} not found`);
+        const stored = uconHttpStore.get(name);
+        if (!String(stored.package ?? '').startsWith('$')) {
+          let transport = '';
+          try {
+            const payload = JSON.parse(await readBody(req));
+            transport = typeof payload.transportRequest === 'string' ? payload.transportRequest : '';
+          } catch (_e) {
+            transport = '';
+          }
+          if (!transport) {
+            return err(
+              400,
+              'UCON_HTTP_TRANSPORT_REQUIRED',
+              `UCON HTTP service ${name} is in package ${stored.package}; a transport request is required to record the deletion`,
+            );
+          }
+        }
+        uconHttpStore.delete(name);
+        return uconReply(res, 200, { status: 'success', data: { name, type: 'UCON_HTTP', action: 'deleted' } });
+      }
+      return err(405, 'METHOD_NOT_ALLOWED', `${req.method} not supported on /ucon_http/${name}`);
     }
 
     // Generic AFF endpoint: /sap/abap_cli/aff/<TYPE>/<NAME>

@@ -58,7 +58,7 @@ describe('schema-paths priority chain', () => {
     const types = affSupportedTypes();
     expect(types).toEqual(
       expect.arrayContaining([
-        'CLAS', 'INTF', 'PROG', 'FUGR', 'TABL', 'STRU', 'TABT', 'DOMA', 'DTEL', 'HTTP', 'TRAN', 'SM59', 'SRFC', 'OA2P', 'XSLT',
+        'CLAS', 'INTF', 'PROG', 'FUGR', 'TABL', 'STRU', 'TABT', 'DOMA', 'DTEL', 'HTTP', 'TRAN', 'SM59', 'SRFC', 'OA2P', 'UCON_HTTP', 'XSLT',
         // channel-routed types.
         'TTYP', 'MSAG', 'DDLS',
         // FUGR companion schemas for.reps.json and.func.json files.
@@ -104,7 +104,8 @@ describe('schema-paths priority chain', () => {
     // added JOBD (application job definition, local extension) = 44 total.
     // added AUTH / SUSC / SUCU / SUSH / SUSO (authorization family) = 49 total.
     // added APLO / CHDO / EVTB / SMBC / ENHO / ENHS (generic AFF bundle) = 55 total.
-    expect(types).toHaveLength(55);
+    // added UCON_HTTP (UCON HTTP service local extension) = 56 total.
+    expect(types).toHaveLength(56);
   });
 
   it('bundled root contains every supported schema', () => {

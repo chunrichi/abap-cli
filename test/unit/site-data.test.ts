@@ -45,14 +45,14 @@ describe('project-site object matrix', () => {
   const stats = window.ABAP_STATS;
 
   it('publishes the documented number of unique types and capabilities', () => {
-    expect(objects).toHaveLength(51);
-    expect(new Set(objects.map((row) => row.code)).size).toBe(51);
+    expect(objects).toHaveLength(52);
+    expect(new Set(objects.map((row) => row.code)).size).toBe(52);
     expect(stats).toEqual({
-      total: 51,
-      create: 49,
-      pull: 51,
-      push: 47,
-      delete: 49,
+      total: 52,
+      create: 50,
+      pull: 52,
+      push: 48,
+      delete: 50,
       readOnly: 2,
       categories: 7,
     });
@@ -61,7 +61,7 @@ describe('project-site object matrix', () => {
   it('keeps every row inside the rendering contract', () => {
     const categoryIds = new Set(categories.map((category) => category.id));
     for (const row of objects) {
-      expect(row.code).toMatch(/^[A-Z0-9]+$/);
+      expect(row.code).toMatch(/^[A-Z0-9_]+$/);
       expect(row.name.length).toBeGreaterThan(0);
       expect(categoryIds.has(row.category)).toBe(true);
       expect(['adt', 'icf', 'auto']).toContain(row.channel);

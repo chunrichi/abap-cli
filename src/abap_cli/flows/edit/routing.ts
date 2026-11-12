@@ -104,6 +104,7 @@ import { pushSm59File, validateSm59File } from './push-sm59.js';
 import {
   OA2P_FLOW,
   SRFC_FLOW,
+  UCON_HTTP_FLOW,
   pushUconFile,
   runCreateUcon,
   runDeleteUcon,
@@ -528,6 +529,18 @@ export const TYPE_ROUTES: Readonly<Record<string, TypeRoute>> = {
       channel: 'icf',
       run: ({ client, resolved, file, opts }) => pushUconFile(OA2P_FLOW, client, resolved, file, opts),
       validate: (file) => validateUconFile(OA2P_FLOW, file),
+    },
+  },
+  // UCON HTTP service (UCON_HTTP): TADIR object backed by UCONHTTPSERVHEAD /
+  // UCONHTTPSERVTEXT / UCONHTTPSERVHANDL, served by `/ucon_http/<name>`.
+  UCON_HTTP: {
+    create: handler('icf', ({ name, opts, mode }) => runCreateUcon(UCON_HTTP_FLOW, name, opts, mode)),
+    pull: handler('icf', ({ objectName, opts }) => runPullUcon(UCON_HTTP_FLOW, objectName, opts)),
+    push: {
+      kind: 'icf-json',
+      channel: 'icf',
+      run: ({ client, resolved, file, opts }) => pushUconFile(UCON_HTTP_FLOW, client, resolved, file, opts),
+      validate: (file) => validateUconFile(UCON_HTTP_FLOW, file),
     },
   },
   // Transformation (XSLT program) — ICF `/xslt/<name>`; AFF pair
