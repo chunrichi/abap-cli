@@ -122,6 +122,7 @@ const TADIR_OBJECT_BY_CLI: Record<string, Omit<TadirMapping, 'cliType'>> = {
   // UCON RFC service + OAuth 2.0 client profile (Workbench objects via ICF).
   SRFC: { pgmid: 'R3TR', tadirObject: 'SRFC', ddicTabclass: '', channel: 'ICF', affSchema: 'srfc-v1.json', description: 'UCON RFC service — local-extension srfc-v1 document (UCONRFCSERVHEAD/UCONRFCSERVTEXT; TADIR SRFC)' },
   OA2P: { pgmid: 'R3TR', tadirObject: 'OA2P', ddicTabclass: '', channel: 'ICF', affSchema: 'oa2p-v1.json', description: 'OAuth 2.0 client profile — local-extension oa2p-v1 document (OA2C_PROFILES/OA2P_SCOPES; TADIR OA2P)' },
+  UCON_HTTP: { pgmid: 'R3TR', tadirObject: 'HTTP', ddicTabclass: '', channel: 'ICF', affSchema: 'ucon_http-v1.json', description: 'UCON HTTP service — local-extension ucon_http-v1 document (UCONHTTPSERVHEAD/UCONHTTPSERVTEXT/UCONHTTPSERVHANDL; TADIR HTTP)' },
 
   // Transformation (XSLT program)
   XSLT: { pgmid: 'R3TR', tadirObject: 'XSLT', ddicTabclass: '', channel: 'ICF', affSchema: 'xslt-v1.json', description: 'Transformation / XSLT program (O2XSLTDESC; AFF pair .xslt.json + .xslt.xml)' },

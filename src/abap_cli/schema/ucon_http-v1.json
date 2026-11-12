@@ -1,0 +1,76 @@
+{
+  "$comment": "Local extension: upstream SAP abap-file-formats has no UCON HTTP service format. Field names map to UCONHTTPSERVTEXT (short text), UCONHTTPSERVHANDL (ordered handler classes) and the optional ICF node link (ICFNAME/ICFPARGUID); the ICF /ucon_http/<name> wire document mirrors this shape.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "UCON HTTP Service Properties",
+  "description": "UCON HTTP service (UCON_HTTP): ordered ICF handler classes exposed through Unified Connectivity",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "formatVersion",
+    "handlers"
+  ],
+  "properties": {
+    "formatVersion": {
+      "title": "ABAP File Format Version",
+      "type": "string",
+      "const": "1"
+    },
+    "description": {
+      "title": "Description",
+      "description": "Short text of the HTTP service (UCONHTTPSERVTEXT-SHORTTEXT, CHAR 255, single line). Language-dependent: the CLI reads and writes the session language.",
+      "type": "string",
+      "maxLength": 255,
+      "pattern": "^[^\r\n]*$"
+    },
+    "handlers": {
+      "title": "Handlers",
+      "description": "Handler classes in service order (UCONHTTPSERVHANDL-SERVICEORDER / SERVICEHANDLER). At least one class is required; classes must exist in the target system.",
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "title": "Handler",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "handlerClass"
+        ],
+        "properties": {
+          "order": {
+            "title": "Service Order",
+            "description": "2-digit service order (UCONHTTPSERVHANDL-SERVICEORDER). Optional: the list position is used when omitted.",
+            "type": "string",
+            "pattern": "^[0-9]{1,2}$"
+          },
+          "handlerClass": {
+            "title": "Handler Class",
+            "description": "Global ABAP class that handles the service (UCONHTTPSERVHANDL-SERVICEHANDLER, CHAR 30). Must exist in the target system.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30,
+            "pattern": "^[A-Za-z0-9_/]+$"
+          }
+        }
+      }
+    },
+    "icfService": {
+      "title": "ICF Service Link",
+      "description": "Optional link to an existing SICF node (ICFNAME / ICFPARGUID). Older releases require the link; omit it for a standalone service. A pull fills it when the service carries a link.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "icfName": {
+          "title": "ICF Name",
+          "description": "SICF node name (ICFNAME, CHAR 15).",
+          "type": "string",
+          "maxLength": 15
+        },
+        "icfParGuid": {
+          "title": "ICF Parent GUID",
+          "description": "SICF parent node GUID (ICFPARGUID, CHAR 25).",
+          "type": "string",
+          "maxLength": 25
+        }
+      }
+    }
+  }
+}

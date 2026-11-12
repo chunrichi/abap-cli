@@ -1,7 +1,7 @@
 ---
 type: command
 title: abap create
-description: 在 SAP 创建新对象并激活 — 源对象（CLAS/INTF/PROG/FUGR，ADT REST）、DDIC（DOMA/DTEL/TABL/STRU/ENQU/VIEW/SHLP/NROB，--file 走 ICF）、HTTP/SICF 节点、SM59 HTTP 目标、UCON RFC service（SRFC）、OAuth 2.0 client profile（OA2P）、应用作业定义（JOBD）、事务码、TTYP/MSAG/DDLS 及 CDS/RAP 配套对象；FUGR 配 --func 可在既有函数组内新建函数模块（FUGR/FF）；--no-activate / --template / --no-pull / --check-only / --audit；--schema 提供 agent 参数自省；create local 为离线草稿（仅 4 类源对象）
+description: 在 SAP 创建新对象并激活 — 源对象（CLAS/INTF/PROG/FUGR，ADT REST）、DDIC（DOMA/DTEL/TABL/STRU/ENQU/VIEW/SHLP/NROB，--file 走 ICF）、HTTP/SICF 节点、SM59 HTTP 目标、UCON RFC service（SRFC）、UCON HTTP service（UCON_HTTP）、OAuth 2.0 client profile（OA2P）、应用作业定义（JOBD）、事务码、TTYP/MSAG/DDLS 及 CDS/RAP 配套对象；FUGR 配 --func 可在既有函数组内新建函数模块（FUGR/FF）；--no-activate / --template / --no-pull / --check-only / --audit；--schema 提供 agent 参数自省；create local 为离线草稿（仅 4 类源对象）
 tags: [abap-cli, command, create, clas, intf, prog, fugr, fugr-ff, doma, dtel, tabl, stru, ddic, icf, sm59, template, schema]
 created at: 2026-08-07 00:00:00
 changed at: 2026-11-04 00:45:00
@@ -9,7 +9,7 @@ changed at: 2026-11-04 00:45:00
 
 # abap create
 
-在 SAP 中创建新 ABAP 对象并激活。源对象（`CLAS`/`INTF`/`PROG`/`FUGR`）走 ADT REST API；DDIC 对象（`DOMA`/`DTEL`/`TABL`/`STRU`/`ENQU`/`VIEW`/`SHLP`/`NROB`）、SM59 HTTP 目标（`SM59`）、UCON RFC service（`SRFC`）、OAuth 2.0 client profile（`OA2P`）与应用作业定义（`JOBD`）走自建 ICF 服务（需 `--file`）。创建后默认 create-then-pull 写本地副本。拒绝覆盖已存在对象（`OBJECT_EXISTS`）。
+在 SAP 中创建新 ABAP 对象并激活。源对象（`CLAS`/`INTF`/`PROG`/`FUGR`）走 ADT REST API；DDIC 对象（`DOMA`/`DTEL`/`TABL`/`STRU`/`ENQU`/`VIEW`/`SHLP`/`NROB`）、SM59 HTTP 目标（`SM59`）、UCON RFC service（`SRFC`）、UCON HTTP service（`UCON_HTTP`）、OAuth 2.0 client profile（`OA2P`）与应用作业定义（`JOBD`）走自建 ICF 服务（需 `--file`）。创建后默认 create-then-pull 写本地副本。拒绝覆盖已存在对象（`OBJECT_EXISTS`）。
 
 `FUGR` 类型有两种形态：`abap create FUGR <group>` 新建**函数组**；`abap create FUGR <group> --func <module>` 在**既有函数组内新建函数模块**（`FUGR/FF`，ADT `POST /sap/bc/adt/functions/groups/<group>/fmodules`）。后者的 `<name>` 是组名，须已存在于 SAP。
 
@@ -24,7 +24,7 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 
 ## Options
 
-- `<type>`: 支持 51 个类型码（完整矩阵见 [object-types](../object-types.md)）：4 个源对象 `CLAS` / `INTF` / `PROG` / `FUGR` 走 ADT 骨架；`DEVC` 走独立 ADT handler（`--package` 是**父包**，无需 `--file`，见 [DEVC（Package）](#devcpackage)）；其余 44 类必须配 `--file`（AFF JSON；VIEW/SHLP/JOBD/SM59/SRFC/OA2P/AUTH/SUSC/SUCU/SUSO 为本地扩展 `view-v1.json` / `shlp-v1.json` / `jobd-v1.json` / `sm59-v1.json` / `srfc-v1.json` / `oa2p-v1.json`）：`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `VIEW` / `SHLP` / `JOBD` / `NROB` / `HTTP` / `TRAN` / `XSLT` / `SM59` / `SRFC` / `OA2P` / `TTYP` / `TYPE` / `MSAG` / `DDLS` / `SRVB` / `SRVD` / `BDEF` / `DCLS` / `DDLX` / `DDLA` / `CHKC` / `CHKO` / `CHKV` / `DTDC` / `DTEB` / `DSFD` / `DSFI` / `DRTY` / `SAJC` / `SAJT` / `AUTH` / `SUSC` / `SUCU` / `SUSH` / `SUSO` / `APLO` / `CHDO` / `EVTB` / `SMBC`。**`ENHO` / `ENHS` 是只读类型，不支持 create**（AFF handler 只读，仅 pull）；未知类型 → `TYPE_NOT_SUPPORTED`（exit 7）。
+- `<type>`: 支持 52 个类型码（完整矩阵见 [object-types](../object-types.md)）：4 个源对象 `CLAS` / `INTF` / `PROG` / `FUGR` 走 ADT 骨架；`DEVC` 走独立 ADT handler（`--package` 是**父包**，无需 `--file`，见 [DEVC（Package）](#devcpackage)）；其余 45 类必须配 `--file`（AFF JSON；VIEW/SHLP/JOBD/SM59/SRFC/OA2P/UCON_HTTP/AUTH/SUSC/SUCU/SUSO 为本地扩展 `view-v1.json` / `shlp-v1.json` / `jobd-v1.json` / `sm59-v1.json` / `srfc-v1.json` / `oa2p-v1.json` / `ucon_http-v1.json`）：`TABL` / `STRU` / `DOMA` / `DTEL` / `ENQU` / `VIEW` / `SHLP` / `JOBD` / `NROB` / `HTTP` / `TRAN` / `XSLT` / `SM59` / `SRFC` / `OA2P` / `UCON_HTTP` / `TTYP` / `TYPE` / `MSAG` / `DDLS` / `SRVB` / `SRVD` / `BDEF` / `DCLS` / `DDLX` / `DDLA` / `CHKC` / `CHKO` / `CHKV` / `DTDC` / `DTEB` / `DSFD` / `DSFI` / `DRTY` / `SAJC` / `SAJT` / `AUTH` / `SUSC` / `SUCU` / `SUSH` / `SUSO` / `APLO` / `CHDO` / `EVTB` / `SMBC`。**`ENHO` / `ENHS` 是只读类型，不支持 create**（AFF handler 只读，仅 pull）；未知类型 → `TYPE_NOT_SUPPORTED`（exit 7）。
 - `<name>`: 对象名（自动转大写；命名空间名如 `/UI2/CL_JSON` 在磁盘上用 AFF 括号 token `(ui2)cl_json`）。本地预校验：≤30 字符、仅 `A-Z 0-9 _`、命名空间形如 `/NS/NAME`（NS ≤10，总长 ≤30），违规 → `VALIDATION_ERROR`（exit 7）
 - `--package <package>`: 目标 SAP 包（必填）
 - `--description <desc>`: 对象描述（必填；有 `--file` 时可选，由 JSON 提供）
@@ -34,7 +34,7 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 - `--no-pull`: 跳过 create-then-pull 本地副本（默认拉取）
 - `--check-only`: 只校验对象可行性（`validateNewObject`），不创建
 - `--audit`: 额外一次 SAP 往返记录 before-checksum（默认关）
-- `--file <path>`: abap-file-format JSON 输入（`types/registry.ts` 的 `requiresFile` 类型必填：TABL/STRU/DOMA/DTEL/ENQU/VIEW/SHLP/JOBD/NROB/HTTP/TRAN/XSLT/SM59/SRFC/OA2P/TTYP/MSAG/DDLS/SRVD/DCLS/DDLX/DDLA/APLO/CHDO/EVTB/SMBC）。TABL/STRU 是三件套：`--file` 指向 main `.tabl.json`，CLI 自动读同目录 `.tabl.ddic`（DDL 源）与 `.tabl.settings.json`；XSLT 用 `<name>.xslt.json` + 同目录 `<name>.xslt.xml` 两件套；SM59 用 `<name>.sm59.json`，文件名必须与目标名一致；只有 main JSON 时回落 legacy wire-flat 单文件（顶层 `name` / `fields[]`）。DDL 解析失败 → `TABL_DDL_INVALID`（exit 7）
+- `--file <path>`: abap-file-format JSON 输入（`types/registry.ts` 的 `requiresFile` 类型必填：TABL/STRU/DOMA/DTEL/ENQU/VIEW/SHLP/JOBD/NROB/HTTP/TRAN/XSLT/SM59/SRFC/OA2P/UCON_HTTP/TTYP/MSAG/DDLS/SRVD/DCLS/DDLX/DDLA/APLO/CHDO/EVTB/SMBC）。TABL/STRU 是三件套：`--file` 指向 main `.tabl.json`，CLI 自动读同目录 `.tabl.ddic`（DDL 源）与 `.tabl.settings.json`；XSLT 用 `<name>.xslt.json` + 同目录 `<name>.xslt.xml` 两件套；SM59 用 `<name>.sm59.json`，文件名必须与目标名一致；只有 main JSON 时回落 legacy wire-flat 单文件（顶层 `name` / `fields[]`）。DDL 解析失败 → `TABL_DDL_INVALID`（exit 7）
 - `--func <module>`: 仅 `FUGR` 类型可用 — 在**既有函数组 `<name>`** 内新建函数模块（`FUGR/FF` 子对象）。组不存在 → `OBJECT_NOT_FOUND`（exit 8，附建组指引）；组内同名模块已存在 → `OBJECT_EXISTS`（exit 2）；模块名同样过本地预校验（≤30、`A-Z 0-9 _`）。`--check-only` 不支持该形态
 - `--software-component <swcomp>`: 仅 `DEVC` — 新包的软件组件；缺省从父包继承（`$TMP` → `LOCAL`）。LOCAL 包名必须 `$`/`TEST` 开头（命名约束；是否免 transport 只看 `$` 前缀）
 - `--transport-layer <layer>`: 仅 `DEVC` — 新包的传输层；缺省从父包继承（`$TMP` → 空）
@@ -50,7 +50,7 @@ abap create --schema [type]                    # agent 参数自省，不连 SAP
 
 ## 行为规则
 
-- **三条路由**：源对象 → ADT REST `createObject`；DDIC / HTTP / TRAN / XSLT / SM59 / SRFC / OA2P / TTYP / MSAG / DDLS / CDS-RAP（`--file`）→ 各自 ICF/ADT handler（XSLT 走 ICF `POST /sap/abap_cli/xslt/<name>`，SM59 走 ICF `POST /sap/abap_cli/sm59/<name>`）；`local` → 仅写本地文件（零 SAP 调用、不读凭据）
+- **三条路由**：源对象 → ADT REST `createObject`；DDIC / HTTP / TRAN / XSLT / SM59 / SRFC / OA2P / UCON_HTTP / TTYP / MSAG / DDLS / CDS-RAP（`--file`）→ 各自 ICF/ADT handler（XSLT 走 ICF `POST /sap/abap_cli/xslt/<name>`，SM59 走 ICF `POST /sap/abap_cli/sm59/<name>`）；`local` → 仅写本地文件（零 SAP 调用、不读凭据）
 - **本地名称预校验**（快失败，零 SAP 往返，先于任何路由/`assertNotExists`）：所有带 `<name>` 的入口（源对象 / DDIC `--file` / HTTP / TRAN / XSLT / `--check-only` / `create local`）先校验规范化（大写）后的名字——≤30 字符，仅 `A-Z 0-9 _`；命名空间形如 `/NS/NAME`（NS ≤10 且仅 `A-Z 0-9 _`，含斜杠总长 ≤30）；空名同样拒绝。**不强制 Z/Y 前缀**（`$TMP` 接受 `A123`）。违规 → `VALIDATION_ERROR`（exit 7），避免超长/非法名拨号 SAP 后报误导性的 `OBJECT_NOT_FOUND`；与 DDIC 客户端命名校验（exit 7）保持一致。**SM59 例外**：RFCDEST 是 CHAR 32，允许 `A-Z 0-9 _ / . - @`，由 `flows/edit/sm59-shared.ts` 单独校验（`SM59_NAME_INVALID`，exit 7）；文件名必须等于 `<name>.sm59.json`（`INVALID_ARGUMENT`，exit 2）
 - **防覆盖**：创建前 `assertNotExists`；已存在 → `OBJECT_EXISTS`（不覆盖）
 - **创建即激活**：复用 push 流程（lock → 写 skeleton → activate → unlock）；`--no-activate` 跳过激活
@@ -147,20 +147,23 @@ abap create SM59 ZCLI_SM59_DEMO --file src/zcli_sm59_demo.sm59.json --yes
 abap create --schema SM59   # 带 exampleJson 的机器契约
 ```
 
-### SRFC / OA2P（UCON 对象）
+### SRFC / OA2P / UCON_HTTP（UCON 对象）
 
-`SRFC`（UCON RFC service）与 `OA2P`（OAuth 2.0 client profile）是本地扩展类型，都是 TADIR 对象（`--package` 必填，非 `$` 前缀本地包需要 `--tr`）：
+`SRFC`（UCON RFC service）、`OA2P`（OAuth 2.0 client profile）与 `UCON_HTTP`（UCON HTTP service）是本地扩展类型，都是 TADIR 对象（`--package` 必填，非 `$` 前缀本地包需要 `--tr`）：
 
 - **SRFC**：`--file` 为 `<name>.srfc.json`（functionName / scope / defaultProfile / description）。SAP 侧校验 function module 存在且 RFC-enabled、defaultProfile 存在于 `UCONPROFHEAD`；写入后刷新 UCON RFC 运行时缓存。短文本按会话语言读写。
 - **OA2P**：`--file` 为 `<name>.oa2p.json`（type / noAuthCheck / scopes）。provider type 必须存在于 `OA2C_TYPES`；profile 没有描述字段（`--description` 被拒绝）。
+- **UCON_HTTP**：`--file` 为 `<name>.ucon_http.json`（有序 `handlers[]` / description / 可选 `icfService`）。handler 类必须存在、服务序号唯一；写入经 UCON HTTP service API 激活并保存，`SAVE` 记录 TADIR / transport。短文本按会话语言读写；`--no-activate` 不适用。
 - 两者都没有 `--no-activate`（写入即生效）；`create --check-only` 只做本地校验。
 - 类型页面：[srfc](../objects/srfc.md) / [oa2p](../objects/oa2p.md)。
 
 ```bash
 abap create SRFC ZCLI_SRFC_DEMO --file src/zcli_srfc_demo.srfc.json --package '$TMP' --yes
 abap create OA2P ZCLI_OA2P_DEMO --file src/zcli_oa2p_demo.oa2p.json --package '$TMP' --yes
+abap create UCON_HTTP ZCLI_HTTP_DEMO --file src/zcli_http_demo.ucon_http.json --package '$TMP' --yes
 abap create --schema SRFC   # 带 exampleJson 的机器契约
 abap create --schema OA2P
+abap create --schema UCON_HTTP
 ```
 
 ### AFF 对象（APLO / CHDO / EVTB / SMBC / ENHO / ENHS）
@@ -380,7 +383,7 @@ abap create local CLAS ZCL_DRAFT --template public-method --dir src/
 
 ## todo
 
-- [x] `TTYP` / `MSAG` / `DDLS` / `ENQU` / `NROB` / `XSLT` / `TYPE` / `SRVB` / `BDEF` / `CHKC` / `CHKO` / `CHKV` / `DTDC` / `DTEB` / `DSFD` / `DSFI` / `DRTY` / `SAJC` / `SAJT` / `SM59` / `APLO` / `CHDO` / `EVTB` / `SMBC` / `ENHO` / `ENHS` 等 `--file` 类型已接入（`create` 的 `--schema.allowedValues` 全 51 类）
+- [x] `TTYP` / `MSAG` / `DDLS` / `ENQU` / `NROB` / `XSLT` / `TYPE` / `SRVB` / `BDEF` / `CHKC` / `CHKO` / `CHKV` / `DTDC` / `DTEB` / `DSFD` / `DSFI` / `DRTY` / `SAJC` / `SAJT` / `SM59` / `SRFC` / `OA2P` / `UCON_HTTP` / `APLO` / `CHDO` / `EVTB` / `SMBC` / `ENHO` / `ENHS` 等 `--file` 类型已接入（`create` 的 `--schema.allowedValues` 全 52 类）
 - [x] `TRAN` 写路径已实现（`/tran` POST/PUT，dialog/report/parameter/variant；OO 事务明确拒绝）
 - [ ] `create local` 为实验性命令，待与 `create` 主流程的落库闭环稳定后转正
 

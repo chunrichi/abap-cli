@@ -107,7 +107,7 @@ describe('abap create --schema (introspection)', () => {
       'ENQU', 'VIEW', 'SHLP', 'JOBD',
       'AUTH', 'SUSC', 'SUCU', 'SUSH', 'SUSO',
       'NROB',
-      'HTTP', 'TRAN', 'SM59', 'SRFC', 'OA2P', 'XSLT',
+      'HTTP', 'TRAN', 'SM59', 'SRFC', 'OA2P', 'UCON_HTTP', 'XSLT',
       // Generic AFF types (registry order).
       'APLO', 'CHDO', 'EVTB', 'SMBC', 'ENHO', 'ENHS',
       'TTYP', 'MSAG', 'DDLS',

@@ -82,6 +82,10 @@
       "local": "lcl_oa2p"
     },
     {
+      "global": "ZCL_ABAP_VIBE_ICF_UCON_HTTP",
+      "local": "lcl_ucon_http"
+    },
+    {
       "global": "ZCL_ABAP_VIBE_ICF_JOBD",
       "local": "lcl_jobd"
     },

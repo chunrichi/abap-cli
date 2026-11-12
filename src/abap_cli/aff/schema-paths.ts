@@ -63,6 +63,8 @@ const SCHEMA_FILE: Record<string, string> = {
   SRFC: 'srfc-v1.json',
   // OAuth 2.0 client profile — local extension (upstream AFF has no OA2P schema).
   OA2P: 'oa2p-v1.json',
+  // UCON HTTP service — local extension (upstream AFF has no UCON_HTTP schema).
+  UCON_HTTP: 'ucon_http-v1.json',
   // Transformation (XSLT) AFF metadata schema.
   XSLT: 'xslt-v1.json',
   // three new dual-channel types.

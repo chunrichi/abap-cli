@@ -14,6 +14,7 @@ import { registerCreateCommand } from '../../src/abap_cli/commands/create.js';
 import { registerPullCommand } from '../../src/abap_cli/commands/pull.js';
 import { registerPushCommand } from '../../src/abap_cli/commands/push.js';
 import { registerDeleteCommand } from '../../src/abap_cli/commands/delete.js';
+import { CliError } from '../../src/abap_cli/output/json.js';
 import { makeProgram, runCommand } from './cli-helper.js';
 
 /** One mock ICF route table keyed by (method, path). */
@@ -96,6 +97,21 @@ const OA2P_WIRE = {
   createdAt: '12:00:00',
 };
 
+const UCON_HTTP_LOCAL = {
+  formatVersion: '1',
+  description: 'Demo UCON HTTP service',
+  handlers: [
+    { order: '01', handlerClass: 'ZCL_HTTP_DEMO_HANDLER' },
+    { order: '02', handlerClass: 'ZCL_HTTP_AUDIT_HANDLER' },
+  ],
+};
+
+const UCON_HTTP_WIRE = {
+  ...UCON_HTTP_LOCAL,
+  name: 'ZHTTP_DEMO',
+  package: '$TMP',
+};
+
 let cwd: string;
 beforeEach(() => {
   vi.clearAllMocks();
@@ -108,9 +124,12 @@ beforeEach(() => {
   respond('GET', '/oa2p/ZOA2P_DEMO', OA2P_WIRE);
   respond('POST', '/oa2p/ZOA2P_DEMO', { name: 'ZOA2P_DEMO', type: 'OA2P', action: 'created', package: '$TMP' });
   respond('DELETE', '/oa2p/ZOA2P_DEMO', { name: 'ZOA2P_DEMO', type: 'OA2P', action: 'deleted' });
+  respond('GET', '/ucon_http/ZHTTP_DEMO', UCON_HTTP_WIRE);
+  respond('POST', '/ucon_http/ZHTTP_DEMO', { name: 'ZHTTP_DEMO', type: 'UCON_HTTP', action: 'created', package: '$TMP' });
+  respond('DELETE', '/ucon_http/ZHTTP_DEMO', { name: 'ZHTTP_DEMO', type: 'UCON_HTTP', action: 'deleted' });
 });
 
-function writeLocal(type: 'srfc' | 'oa2p', name: string, doc: Record<string, unknown>) {
+function writeLocal(type: 'srfc' | 'oa2p' | 'ucon_http', name: string, doc: Record<string, unknown>) {
   const file = path.join(cwd, 'src', `${name}.${type}.json`);
   fs.writeFileSync(file, JSON.stringify(doc, null, 2) + '\n');
   return `src/${name}.${type}.json`;
@@ -308,5 +327,134 @@ describe('abap create OA2P', () => {
     expect(res.exitCode).toBe(7);
     expect(parseStderr(res).error.code).toBe('TYPE_NOT_SUPPORTED');
     expect(icfPost).not.toHaveBeenCalled();
+  });
+});
+
+describe('abap create UCON_HTTP', () => {
+  it('posts the ordered handler list through /ucon_http/<name>', async () => {
+    const file = writeLocal('ucon_http', 'zhttp_demo', UCON_HTTP_LOCAL);
+    const res = await run(['create', 'UCON_HTTP', 'ZHTTP_DEMO', '--file', file, '--package', '$TMP', '--yes']);
+    expect(res.exitCode).toBeUndefined();
+    expect(icfPost).toHaveBeenCalledWith('/ucon_http/ZHTTP_DEMO', {
+      ...UCON_HTTP_LOCAL,
+      name: 'ZHTTP_DEMO',
+      package: '$TMP',
+    });
+    expect(parseStdout(res)).toMatchObject({
+      status: 'success',
+      data: { object: 'ZHTTP_DEMO', type: 'UCON_HTTP', action: 'created', channel: 'icf', package: '$TMP' },
+    });
+  });
+
+  it('--check-only reports the handler tables and never calls SAP', async () => {
+    const file = writeLocal('ucon_http', 'zhttp_demo', UCON_HTTP_LOCAL);
+    const res = await run(['create', 'UCON_HTTP', 'ZHTTP_DEMO', '--file', file, '--package', '$TMP', '--check-only', '--yes']);
+    expect(res.exitCode).toBeUndefined();
+    expect(icfCreate).not.toHaveBeenCalled();
+    expect(parseStdout(res)).toMatchObject({
+      data: {
+        checkOnly: true,
+        valid: true,
+        plan: { writes: ['TADIR', 'UCONHTTPSERVHEAD/UCONHTTPSERVTEXT/UCONHTTPSERVHANDL'] },
+      },
+    });
+  });
+
+  it('rejects a document without handlers before the SAP call', async () => {
+    const file = writeLocal('ucon_http', 'zhttp_demo', { formatVersion: '1', handlers: [] });
+    const res = await run(['create', 'UCON_HTTP', 'ZHTTP_DEMO', '--file', file, '--package', '$TMP', '--yes']);
+    expect(res.exitCode).toBe(7);
+    expect(parseStderr(res).error.code).toBe('AFF_FIXTURE_INVALID');
+    expect(icfPost).not.toHaveBeenCalled();
+  });
+
+  it('rejects a transportable package without --tr', async () => {
+    const file = writeLocal('ucon_http', 'zhttp_demo', UCON_HTTP_LOCAL);
+    const res = await run(['create', 'UCON_HTTP', 'ZHTTP_DEMO', '--file', file, '--package', 'ZPKG_DEV', '--yes']);
+    expect(res.exitCode).toBe(7);
+    expect(parseStderr(res).error.code).toBe('VALIDATION_ERROR');
+    expect(icfPost).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a missing handler class verbatim', async () => {
+    fail('POST', '/ucon_http/ZHTTP_DEMO', 'UCON_HTTP_HANDLER_NOT_FOUND', 'handler class ZCL_NOPE does not exist');
+    const file = writeLocal('ucon_http', 'zhttp_demo', UCON_HTTP_LOCAL);
+    const res = await run(['create', 'UCON_HTTP', 'ZHTTP_DEMO', '--file', file, '--package', '$TMP', '--yes']);
+    expect(res.exitCode).toBe(7);
+    expect(parseStderr(res).error).toMatchObject({ code: 'UCON_HTTP_HANDLER_NOT_FOUND' });
+  });
+});
+
+describe('abap pull UCON_HTTP', () => {
+  it('writes the local document without server-owned fields', async () => {
+    const res = await run(['pull', 'ZHTTP_DEMO', '--type', 'UCON_HTTP']);
+    expect(res.exitCode).toBeUndefined();
+    expect(icfGet).toHaveBeenCalledWith('/ucon_http/ZHTTP_DEMO');
+    const file = path.join(cwd, 'src', 'zhttp_demo.ucon_http.json');
+    expect(JSON.parse(fs.readFileSync(file, 'utf8'))).toEqual(UCON_HTTP_LOCAL);
+  });
+
+  it('maps a missing service to OBJECT_NOT_FOUND', async () => {
+    fail('GET', '/ucon_http/ZHTTP_DEMO', 'UCON_HTTP_OBJECT_NOT_FOUND', 'not found');
+    const res = await run(['pull', 'ZHTTP_DEMO', '--type', 'UCON_HTTP']);
+    expect(res.exitCode).toBe(8);
+    expect(parseStderr(res).error.code).toBe('OBJECT_NOT_FOUND');
+  });
+
+  it('translates a thrown 4xx envelope into OBJECT_NOT_FOUND', async () => {
+    // The ICF client throws 4xx envelopes instead of returning status:'error'.
+    icfGet.mockRejectedValueOnce(new CliError('UCON_HTTP_OBJECT_NOT_FOUND', 'not found'));
+    const res = await run(['pull', 'ZHTTP_DEMO', '--type', 'UCON_HTTP']);
+    expect(res.exitCode).toBe(8);
+    expect(parseStderr(res).error.code).toBe('OBJECT_NOT_FOUND');
+  });
+});
+
+describe('abap push UCON_HTTP', () => {
+  it('probes the service and sends the package read from the GET payload', async () => {
+    const file = writeLocal('ucon_http', 'zhttp_demo', { ...UCON_HTTP_LOCAL, description: 'changed' });
+    respond('POST', '/ucon_http/ZHTTP_DEMO', { name: 'ZHTTP_DEMO', type: 'UCON_HTTP', action: 'updated' });
+    const res = await run(['push', file, '--yes']);
+    expect(res.exitCode).toBeUndefined();
+    expect(icfGet).toHaveBeenCalledWith('/ucon_http/ZHTTP_DEMO');
+    expect(icfPost).toHaveBeenCalledWith('/ucon_http/ZHTTP_DEMO', {
+      ...UCON_HTTP_LOCAL,
+      description: 'changed',
+      name: 'ZHTTP_DEMO',
+      package: '$TMP',
+    });
+    expect(parseStdout(res)).toMatchObject({ data: { results: [{ status: 'written' }] } });
+  });
+
+  it('refuses to create through push when the service is missing', async () => {
+    fail('GET', '/ucon_http/ZHTTP_DEMO', 'UCON_HTTP_OBJECT_NOT_FOUND', 'not found');
+    const file = writeLocal('ucon_http', 'zhttp_demo', UCON_HTTP_LOCAL);
+    const res = await run(['push', file, '--yes']);
+    expect(res.exitCode).toBe(8);
+    expect(parseStderr(res).error.code).toBe('OBJECT_NOT_FOUND');
+    expect(icfPost).not.toHaveBeenCalled();
+  });
+});
+
+describe('abap delete UCON_HTTP', () => {
+  it('deletes a local-package service without a transport request', async () => {
+    const res = await run(['delete', 'ZHTTP_DEMO', '--type', 'UCON_HTTP', '--yes']);
+    expect(res.exitCode).toBeUndefined();
+    expect(icfDelete).toHaveBeenCalledWith('/ucon_http/ZHTTP_DEMO', {});
+    expect(parseStdout(res)).toMatchObject({
+      data: { object: 'ZHTTP_DEMO', type: 'UCON_HTTP', packageName: '$TMP', deleted: true },
+    });
+  });
+
+  it('requires --tr for a transportable service and records the deletion', async () => {
+    respond('GET', '/ucon_http/ZHTTP_DEMO', { ...UCON_HTTP_WIRE, package: 'ZPKG_DEV' });
+    let res = await run(['delete', 'ZHTTP_DEMO', '--type', 'UCON_HTTP', '--yes']);
+    expect(res.exitCode).toBe(2);
+    expect(parseStderr(res).error.code).toBe('MISSING_TRANSPORT');
+    expect(icfDelete).not.toHaveBeenCalled();
+
+    res = await run(['delete', 'ZHTTP_DEMO', '--type', 'UCON_HTTP', '--tr', 'NDK900123', '--yes']);
+    expect(res.exitCode).toBeUndefined();
+    expect(icfDelete).toHaveBeenCalledWith('/ucon_http/ZHTTP_DEMO', { transportRequest: 'NDK900123' });
   });
 });

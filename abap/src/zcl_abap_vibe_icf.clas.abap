@@ -53,6 +53,9 @@ CLASS zcl_abap_vibe_icf IMPLEMENTATION.
     ELSEIF lv_path CP '/oa2p/*'.
       " OAuth 2.0 client profiles (OA2P) through the Workbench persistence classes.
       zcl_abap_vibe_icf_oa2p=>dispatch_oa2p( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
+    ELSEIF lv_path CP '/ucon_http/*'.
+      " UCON HTTP services (UCON_HTTP) through the public UCON HTTP service API.
+      zcl_abap_vibe_icf_ucon_http=>dispatch_ucon_http( io_server = server iv_path = lv_path iv_method = lv_method iv_body = lv_body ).
     ELSEIF lv_path CP '/data/*'.
       " Read-only table data query (SE16N equivalent).
       TRY.

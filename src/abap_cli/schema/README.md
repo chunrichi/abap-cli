@@ -43,6 +43,7 @@ The set is intentionally minimal — only the schemas abap-cli resolves through
 | `sm59-v1.json` | SM59 | — | **local extension**, handcrafted from the SM59 HTTP connection properties (RFCDES / RFCOPTIONS / RFCDOC); no upstream AFF format, no TADIR object, not transportable |
 | `srfc-v1.json` | SRFC | — | **local extension**, handcrafted from the UCON RFC service attributes (UCONRFCSERVHEAD / UCONRFCSERVTEXT); no upstream AFF format |
 | `oa2p-v1.json` | OA2P | — | **local extension**, handcrafted from the OAuth 2.0 client profile data model (OA2C_PROFILES / OA2P_SCOPES / OA2C_TYPES); no upstream AFF format |
+| `ucon_http-v1.json` | UCON_HTTP | — | **local extension**, handcrafted from the UCON HTTP service data model (UCONHTTPSERVHEAD / UCONHTTPSERVTEXT / UCONHTTPSERVHANDL plus the optional ICF node link); no upstream AFF format |
 | `ttyp-v1.json` | TTYP | — | **local variant**, handcrafted (`keyKind`, `rowTypeLength`, `rowTypeDecimals` are local extensions) |
 | `view-v1.json` | VIEW | — | **local extension**, handcrafted from DD25V / DD26V / DD27P / DD28J / DD28V |
 | `shlp-v1.json` | SHLP | — | **local extension**, handcrafted from DD30V / DD31V / DD32P / DD33V |
@@ -100,10 +101,11 @@ join conditions, `DD28V` selection conditions) and mirrored by the ICF
 `/ddic/view` wire document. `sm59-v1.json` is a local extension for the SM59
 HTTP destination (RFCTYPE='G'), whose definition is encoded in the
 `RFCDES`/`RFCOPTIONS` system-table fields; its ICF wire document is
-`/sm59/<name>`. `srfc-v1.json` / `oa2p-v1.json` are local extensions for the
-UCON RFC service and OAuth 2.0 client profile types (`/srfc/<name>`,
-`/oa2p/<name>`). All six are excluded from the sync script's `FILES` list; treat
-them like source code (review edits, add tests).
+`/sm59/<name>`. `srfc-v1.json` / `oa2p-v1.json` / `ucon_http-v1.json` are local
+extensions for the UCON RFC service, OAuth 2.0 client profile and UCON HTTP
+service types (`/srfc/<name>`, `/oa2p/<name>`, `/ucon_http/<name>`). All seven
+are excluded from the sync script's `FILES` list; treat them like source code
+(review edits, add tests).
 
 The authorization-object family keeps the same rule: `auth-v1.json` is a local
 variant of the upstream schema (two AUTHX fields are missing upstream),

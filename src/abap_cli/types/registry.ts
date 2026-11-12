@@ -192,6 +192,18 @@ export const TYPE_REGISTRY: readonly ObjectTypeEntry[] = [
     requiresFile: true,
     maxNameLength: 30,
   },
+  // UCON HTTP service (UCON_HTTP) via ICF `/ucon_http/<name>`. Upstream AFF has
+  // no UCON HTTP format, so `ucon_http-v1.json` is a local extension. Services
+  // are TADIR objects (OBJECT='HTTP', the code the CLI's SICF type cannot use)
+  // backed by UCONHTTPSERVHEAD / UCONHTTPSERVTEXT / UCONHTTPSERVHANDL;
+  // UCONHTTPSERVID is CHAR 30.
+  {
+    type: 'UCON_HTTP',
+    source: 'ICF',
+    affSchemaFile: 'ucon_http-v1.json',
+    requiresFile: true,
+    maxNameLength: 30,
+  },
   // Transformation (XSLT program) via ICF `/xslt/<name>`. The AFF layout is a
   // pair: `<name>.xslt.json` (metadata) + `<name>.xslt.xml` (source).
   { type: 'XSLT', source: 'ICF', affSchemaFile: 'xslt-v1.json', requiresFile: true },

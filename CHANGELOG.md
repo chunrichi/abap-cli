@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`UCON_HTTP`（UCON HTTP service）**：新增 UCON HTTP service 类型，支持 `create` / `pull` / `push` / `delete`，本地文件为 `<name>.ucon_http.json`。文档建模按顺序排列的 handler 类列表（至少一个，类必须存在，服务序号唯一且可省略）、可选的短文本和可选的 SICF 节点关联；`pull` 会把已有服务的 handler 列表、描述和 ICF 节点关联一并带回，`push` 原样写回。服务是 TADIR 对象：`--package` / `--tr` 适用，`$` 开头的本地包免传输；写入即激活并保存（没有单独的 `--no-activate` 步骤）。短文本按会话语言读写（其它语言行不被修改）；UCON profile、运行时缓存维护和 handler 逻辑仍在 UCONCOCKPIT 完成。本类型依赖内置 ICF 服务 2.7.0，升级后执行一次 `abap deploy --yes`。
+
 ### Fixed
 
 - **Windows 上读取已存密码失败**：在 Windows 上，凡是用到已保存密码的命令（`abap init`、`abap profile test` 等）都会在读取凭据管理器的环节直接失败，只能用 `--password` 重新输入密码。现在可以正常读出已存密码并继续连接；密码里的非 ASCII 字符和首尾空格也会原样保留。
