@@ -84,6 +84,21 @@ function makeSpawnSuccess(stdout = '', stderr = '', code = 0) {
   };
 }
 
+/** Encode a secret the way the Windows helper writes it to stdout. */
+function b64(value: string): string {
+  return Buffer.from(value, 'utf8').toString('base64');
+}
+
+/** Last argument of the captured `powershell.exe -Command` invocation. */
+function readPowerShellScript(): string {
+  const call = execFileMock.mock.calls.find((args: unknown[]) => args[0] === 'powershell.exe');
+  if (!call) throw new Error('powershell.exe was not invoked');
+  const args = call[1] as string[];
+  const script = args[args.length - 1];
+  if (script === undefined) throw new Error('missing -Command argument');
+  return script;
+}
+
 describe('secrets (native backend dispatcher)', () => {
   const originalEnv = process.env.ABAP_CLI_KEYCHAIN_BACKEND;
 
@@ -121,23 +136,58 @@ describe('secrets (native backend dispatcher)', () => {
     it('reads via PowerShell Add-Type + Advapi32 CredReadW', async () => {
       execFileMock.mockImplementation((cmd: string) => {
         if (cmd === 'cmdkey.exe') return Promise.resolve({ stdout: '', stderr: '' });
-        if (cmd === 'powershell.exe') return Promise.resolve({ stdout: 'hunter2\n', stderr: '' });
+        if (cmd === 'powershell.exe') return Promise.resolve({ stdout: `${b64('hunter2')}\r\n`, stderr: '' });
         return Promise.reject(new Error(`unexpected ${cmd}`));
       });
       const backend = await resolveBackend();
       const got = await backend.get('PROD', 'password');
       expect(got).toBe('hunter2');
       expect(execFileMock).toHaveBeenCalledWith('powershell.exe', expect.arrayContaining(['-Command']), expect.any(Object));
+
+      // The C# source must reach the compiler verbatim: a double-quoted
+      // here-string would make PowerShell expand `$null` (and any other
+      // `$`-prefixed token) into an invalid C# literal.
+      const script = readPowerShellScript();
+      expect(script).toContain("-TypeDefinition @'");
+      expect(script).toContain("\n'@\n");
+      const csharp = script.slice(script.indexOf("@'") + 2, script.indexOf("\n'@"));
+      expect(csharp).not.toContain('$');
+      expect(csharp).toContain('return null;');
+      expect(csharp).toContain('return string.Empty;');
+      expect(csharp).not.toContain("return '';");
+      // Secrets cross the process boundary as Base64 so the console code
+      // page cannot corrupt non-ASCII passwords.
+      expect(script).toContain('[Convert]::ToBase64String');
     });
 
-    it('returns null when PowerShell emits `$null`', async () => {
+    it('returns null when the credential does not exist', async () => {
       execFileMock.mockImplementation((cmd: string) => {
         if (cmd === 'cmdkey.exe') return Promise.resolve({ stdout: '', stderr: '' });
-        if (cmd === 'powershell.exe') return Promise.resolve({ stdout: '$null\n', stderr: '' });
+        if (cmd === 'powershell.exe') return Promise.resolve({ stdout: '', stderr: '' });
         return Promise.reject(new Error(`unexpected ${cmd}`));
       });
       const backend = await resolveBackend();
       expect(await backend.get('MISSING', 'password')).toBeNull();
+    });
+
+    it('preserves surrounding whitespace in the stored secret', async () => {
+      execFileMock.mockImplementation((cmd: string) => {
+        if (cmd === 'cmdkey.exe') return Promise.resolve({ stdout: '', stderr: '' });
+        if (cmd === 'powershell.exe') return Promise.resolve({ stdout: `${b64('  pass word  ')}\r\n`, stderr: '' });
+        return Promise.reject(new Error(`unexpected ${cmd}`));
+      });
+      const backend = await resolveBackend();
+      expect(await backend.get('PROD', 'password')).toBe('  pass word  ');
+    });
+
+    it('rejects an unexpected PowerShell payload', async () => {
+      execFileMock.mockImplementation((cmd: string) => {
+        if (cmd === 'cmdkey.exe') return Promise.resolve({ stdout: '', stderr: '' });
+        if (cmd === 'powershell.exe') return Promise.resolve({ stdout: 'not base64!', stderr: '' });
+        return Promise.reject(new Error(`unexpected ${cmd}`));
+      });
+      const backend = await resolveBackend();
+      await expect(backend.get('PROD', 'password')).rejects.toMatchObject({ code: 'CONFIG_ERROR' });
     });
 
     it('returns false on delete when target does not exist (cmdkey exit 1)', async () => {
