@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { confirm, isCancel, select, text, password } from '@clack/prompts';
+import { confirm, isCancel, select, text, password, CANCEL_SYMBOL } from '@clack/prompts';
 import { getPassword, storePassword } from '../../config/secrets.js';
 import { getSystem, listSystemNames, type SystemProfile } from '../../config/user-config.js';
 import { upsertProfileWithPems } from '../../config/profile-pems.js';
@@ -30,7 +30,7 @@ export function str(v: string | boolean | undefined, fallback = ''): string {
 }
 
 /** Exit 130 on Ctrl+C (@clack cancel), otherwise return the value */
-export function orCancel<T>(value: T | symbol): T {
+export function orCancel<T>(value: T | typeof CANCEL_SYMBOL): T {
   if (isCancel(value)) {
     console.log('\nAborted. No files were created.');
     process.exit(130);
