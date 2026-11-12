@@ -66,6 +66,7 @@
     'loop.metricGui': 'GUI 界面',
     'loop.metricTransport': '传输请求',
     'loop.pipelineEyebrow': '六步循环',
+    'loop.pipelineTitle': '一个文件。六步。重复。',
     'loop.pipelineNote': '每条命令都说 JSON，所以同一套循环既给人用，也给 agent 用。',
     'loop.step1': '拉取',
     'loop.step1Desc': '对象 → 扁平 AFF 文件，落在 src/。',

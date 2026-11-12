@@ -283,48 +283,53 @@
           </article>
         </div>
 
-        <div class="pipeline-head" data-reveal>
-          <p class="eyebrow" data-i18n="loop.pipelineEyebrow">The six-step loop</p>
-          <p class="pipeline-note" data-i18n="loop.pipelineNote">Every command speaks JSON, so the same loop works for a human and for an agent.</p>
+        <div class="loop-panel" data-reveal>
+          <div class="loop-panel-head">
+            <div>
+              <p class="eyebrow" data-i18n="loop.pipelineEyebrow">The six-step loop</p>
+              <h3 data-i18n="loop.pipelineTitle">One file. Six moves. Repeat.</h3>
+            </div>
+            <p class="pipeline-note" data-i18n="loop.pipelineNote">Every command speaks JSON, so the same loop works for a human and for an agent.</p>
+          </div>
+          <ol class="pipeline">
+            <li class="pipe-step" data-reveal>
+              <span class="pipe-index">01</span>
+              <h4 data-i18n="loop.step1">Pull</h4>
+              <code>abap pull</code>
+              <p data-i18n="loop.step1Desc">Object → flat AFF files under src/.</p>
+            </li>
+            <li class="pipe-step" data-reveal style="--d:50ms">
+              <span class="pipe-index">02</span>
+              <h4 data-i18n="loop.step2">Edit</h4>
+              <code>your editor</code>
+              <p data-i18n="loop.step2Desc">Any editor, any agent, normal diffs.</p>
+            </li>
+            <li class="pipe-step" data-reveal style="--d:100ms">
+              <span class="pipe-index">03</span>
+              <h4 data-i18n="loop.step3">Check</h4>
+              <code>abap check</code>
+              <p data-i18n="loop.step3Desc">Syntax, ATC and local content before writing.</p>
+            </li>
+            <li class="pipe-step" data-reveal style="--d:150ms">
+              <span class="pipe-index">04</span>
+              <h4 data-i18n="loop.step4">Push</h4>
+              <code>abap push</code>
+              <p data-i18n="loop.step4Desc">Lock, write, activate, unlock in one transaction.</p>
+            </li>
+            <li class="pipe-step" data-reveal style="--d:200ms">
+              <span class="pipe-index">05</span>
+              <h4 data-i18n="loop.step5">Run</h4>
+              <code>abap run</code>
+              <p data-i18n="loop.step5Desc">Classrun or a public static method.</p>
+            </li>
+            <li class="pipe-step" data-reveal style="--d:250ms">
+              <span class="pipe-index">06</span>
+              <h4 data-i18n="loop.step6">Verify</h4>
+              <code>abap test</code>
+              <p data-i18n="loop.step6Desc">ABAP Unit results, exit codes, JSON.</p>
+            </li>
+          </ol>
         </div>
-        <ol class="pipeline">
-          <li class="pipe-step" data-reveal>
-            <span class="pipe-index">01</span>
-            <h4 data-i18n="loop.step1">Pull</h4>
-            <code>abap pull</code>
-            <p data-i18n="loop.step1Desc">Object → flat AFF files under src/.</p>
-          </li>
-          <li class="pipe-step" data-reveal style="--d:50ms">
-            <span class="pipe-index">02</span>
-            <h4 data-i18n="loop.step2">Edit</h4>
-            <code>your editor</code>
-            <p data-i18n="loop.step2Desc">Any editor, any agent, normal diffs.</p>
-          </li>
-          <li class="pipe-step" data-reveal style="--d:100ms">
-            <span class="pipe-index">03</span>
-            <h4 data-i18n="loop.step3">Check</h4>
-            <code>abap check</code>
-            <p data-i18n="loop.step3Desc">Syntax, ATC and local content before writing.</p>
-          </li>
-          <li class="pipe-step" data-reveal style="--d:150ms">
-            <span class="pipe-index">04</span>
-            <h4 data-i18n="loop.step4">Push</h4>
-            <code>abap push</code>
-            <p data-i18n="loop.step4Desc">Lock, write, activate, unlock in one transaction.</p>
-          </li>
-          <li class="pipe-step" data-reveal style="--d:200ms">
-            <span class="pipe-index">05</span>
-            <h4 data-i18n="loop.step5">Run</h4>
-            <code>abap run</code>
-            <p data-i18n="loop.step5Desc">Classrun or a public static method.</p>
-          </li>
-          <li class="pipe-step" data-reveal style="--d:250ms">
-            <span class="pipe-index">06</span>
-            <h4 data-i18n="loop.step6">Verify</h4>
-            <code>abap test</code>
-            <p data-i18n="loop.step6Desc">ABAP Unit results, exit codes, JSON.</p>
-          </li>
-        </ol>
       </div>
     </section>
 
