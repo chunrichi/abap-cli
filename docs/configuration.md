@@ -85,7 +85,7 @@ resolved in this order:
 2. `~/.abap-cli/sessions` (normal development machines);
 3. `<workspace>/.abap-cli/sessions` (sandboxed agents / CI where `$HOME` is read-only; the directory is self-ignored with `.gitignore` = `*`, mode 0700/0600).
 
-`$TMPDIR` is deliberately **not** used: a temp directory cannot be proven readable by the next process, and treating it as durable is how one orphan SAP session per command used to accumulate. When no store is writable the session layer degrades to "login + logout per command" (SM04 does not grow) and reports `SESSION_REUSE_DISABLED` in `meta.warnings`. Inspect the effective store with `abap session info --json`; reset it with `abap session reset --yes`.
+`$TMPDIR` is deliberately **not** used: a temp directory cannot be proven readable by the next process, and treating it as durable is how one orphan SAP session per command used to accumulate. When no store is writable the session layer degrades to "login + session close per command" (SM04 does not grow) and reports `SESSION_REUSE_DISABLED` in `meta.warnings`. Inspect the effective store with `abap session info --json`; reset it with `abap session reset --yes`.
 
 Passwords are **not** read from environment variables — they come from the OS keychain, `--password`, or a TTY prompt. `SAP_PASSWORD` / `BTP_PASSWORD` overrides were removed.
 

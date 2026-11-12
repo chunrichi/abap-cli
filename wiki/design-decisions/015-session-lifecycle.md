@@ -19,6 +19,8 @@ CLI 只在满足全部条件时于命令结束后保留 SAP 会话，否则登�
 
 `$TMPDIR` 不再是存储候选。没有可用存储时降级为「每条命令登录 + 登出」，并以 `SESSION_REUSE_DISABLED` 等结构化 warning 暴露在 `--json` 的 `meta.warnings`。
 
+释放会话优先走 ADT 的 close-session 交换（`GET /sap/bc/adt/core/http/sessions`，带 `sap-contextid` 与 stateless 会话类型）；NW 7.50 没有该资源时回退 stateless discovery，最后才回退旧 ICF logoff。关闭失败不再静默，stderr 输出 `WARN`。
+
 ## 上下文
 
 CLI 是短生命周期进程，跨命令复用 SAP 会话靠一个加密的 session jar。此前的实现有两个叠加缺陷：
@@ -45,4 +47,4 @@ CLI 是短生命周期进程，跨命令复用 SAP 会话靠一个加密的 sess
 
 ## 后果
 
-`SM04` 不再按命令数增长：能复用时跨命令只保留一个会话，不能复用时每条命令都登出；ICF 请求不再占用用户会话。agent/sandbox 场景无需配置即可工作，诊断信息（`abap session info` / `doctor` / `meta.warnings`）能直接回答「为什么没复用」。实现见 `src/abap_cli/session/{store,manager,cookies,jar,key}.ts`、`clients/session-http.ts` 与 `wiki/commands/session.md`。
+`SM04` 不再按命令数增长：能复用时跨命令只保留一个会话，不能复用时每条命令都关闭会话；ICF 请求不再占用用户会话。关闭走 ADT close-session，因此禁用 ICF logoff（403）的系统也不再泄漏会话；关闭失败会显式告警，便于人工清理。agent/sandbox 场景无需配置即可工作，诊断信息（`abap session info` / `doctor` / `meta.warnings`）能直接回答「为什么没复用」。实现见 `src/abap_cli/session/{store,manager,cookies,jar,key}.ts`、`clients/{adt-session-close,session-http,raw-adt-session}.ts` 与 `wiki/commands/session.md`。

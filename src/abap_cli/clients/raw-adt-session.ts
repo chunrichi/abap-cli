@@ -19,6 +19,7 @@
  */
 
 import type { ADTClient, ClientOptions } from 'abap-adt-api';
+import { adtSessionCloseWarning, closeAdtSession } from './adt-session-close.js';
 
 /** Connection inputs shared by every raw probe client. */
 export interface RawAdtSessionConfig {
@@ -32,7 +33,7 @@ export interface RawAdtSessionConfig {
 
 export interface RawAdtSession {
   readonly client: ADTClient;
-  /** Best-effort logout. Idempotent and never throws. */
+  /** Best-effort session close. Idempotent and never throws. */
   close(): Promise<void>;
 }
 
@@ -50,11 +51,11 @@ export async function openRawAdtSession(config: RawAdtSessionConfig): Promise<Ra
     async close(): Promise<void> {
       if (closed) return;
       closed = true;
-      try {
-        await client.logout();
-      } catch {
-        // Best-effort: a failed logout must never mask the probe result.
-      }
+      // A failed close must never mask the probe result, but it must not be
+      // silent either: an unreleased session can exhaust the SAP session table.
+      const result = await closeAdtSession(client);
+      const warning = adtSessionCloseWarning(result, 'after the probe');
+      if (warning) console.error(`WARN: ${warning}`);
     },
   };
 }
