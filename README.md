@@ -10,6 +10,8 @@
 
 `abap-cli` turns SAP's ADT REST API — plus a bundled ABAP service for the endpoints ADT does not cover — into one command chain: pull → edit → check → push → run → verify. Every command speaks `--json` and publishes a `--schema` contract, and the package ships skills plus an agent definition, so an AI agent can drive SAP end-to-end without the GUI.
 
+🌐 **Project page**: [chunrichi.github.io/abap-cli](https://chunrichi.github.io/abap-cli/)
+
 📖 **简体中文**: [README.zh-CN.md](README.zh-CN.md)
 
 ---
