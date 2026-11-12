@@ -1,0 +1,47 @@
+name: pages
+
+# Deploy the static project page to GitHub Pages.
+# Source: site/ (no build step). The object matrix is generated into
+# site/assets/objects.js by scripts/gen-site-data.mjs and checked by verify.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'scripts/gen-site-data.mjs'
+      - 'docs/supported.md'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

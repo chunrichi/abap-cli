@@ -17,7 +17,7 @@ npm run build        # tsc → dist/
 npm run build            # TypeScript compile check
 npm test                 # unit tests (vitest, test/unit/)
 npm run test:integration # integration tests (vitest, test/integration/; needs build)
-npm run verify           # build + unit + integration + docs:check + skills 漂移检查
+npm run verify           # build + unit + integration + docs:check + site:check + skills 漂移检查
 node dist/index.js --help
 ```
 
@@ -31,6 +31,7 @@ Verification is done via:
 6. **Local mock ADT server** — offline end-to-end checks (no SAP needed)
 7. **Real SAP integration** — protocol-level verification against a live system (`tests/<run-id>-*` directories)
 8. **`npm run docs:check`** — 生成物（`docs/commands.md`、skill quick refs、命令索引）与命令 schema 一致，并跑 `scripts/check-docs.mjs`：wiki 命令页 frontmatter / 章节契约、相对链接死链、命令 `--help` 选项 ⊆ `--schema` 契约（已并入 `npm run verify`）
+9. **`npm run site:check`** — `site/assets/objects.js` 与 `docs/supported.md` 的类型矩阵一致（已并入 `npm run verify`）
 
 ## Test Layout
 
@@ -67,6 +68,20 @@ npm run docs:check   # 只校验不写；已并入 npm run verify，CI / 发布�
 ```
 
 **生成文件禁止手改**：改命令 schema 后重新生成并把生成物一起提交；手改会在下一次 `npm run docs:check` 报漂移。
+
+## Project Site
+
+项目主页源码在 `site/`，是无需构建的静态页面；`.github/workflows/pages.yml` 把该目录发布到 GitHub Pages（`https://chunrichi.github.io/abap-cli/`）。
+
+```bash
+npm run site:data    # 从 docs/supported.md 生成 site/assets/objects.js
+npm run site:check   # 校验生成物；已并入 npm run verify
+python3 -m http.server 4173 --directory site   # 本地预览
+```
+
+- 改 `docs/supported.md` 的类型矩阵后必须重跑 `site:data` 并提交 `site/assets/objects.js`。
+- 新增类型时同步 `scripts/gen-site-data.mjs` 里的 `categoryByType`，否则生成器会直接报错。
+- 页面里的数字、矩阵和筛选都由这份生成数据驱动，不要手改 `objects.js`。
 
 ## Local Mock ADT Server
 
@@ -112,6 +127,9 @@ src/abap_cli/
 ├── aff/ adc/             # AFF schema validation; ADT Deployment Channel (probe + ICF register)
 ├── schema/               # vendored abap-file-format JSON schemas
 └── output/               # unified JSON output, error codes, meta, check-issue types — see output/README.md
+
+site/                     # GitHub Pages project page (static; deployed by .github/workflows/pages.yml)
+scripts/gen-site-data.mjs # docs/supported.md → site/assets/objects.js
 ```
 
 ## ICF Service Development
