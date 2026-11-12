@@ -79,7 +79,7 @@ abap delete ZCLI_TC_JOBD_TRANSP --type JOBD --tr NDK900123 --yes --json
 - **报表/变式由 SAP 在运行时校验**：定义本身可以指向不存在的报表，实际调度才会报错；CLI 不做引用校验。
 - **可传输 delete 的 CTS 删除条目**：ICF 插件无法写 CTS 删除条目，delete 会清空对象数据与 TADIR，但请求里仍保留该对象原先的 insert 条目（`E071-OBJFUNC` 为空）。发布前请在 SE01/SE03 删除该条目，或改用 SE01 维护删除；本地包（`$`）无此问题。
 - **部署后的类装载缓存**：`abap deploy` 后 ICF handler 的新版本可能在 10–20 秒内未全部生效，期间可能返回 `unknown path: /jobd/...`；重试即可。
-- **release 差异**：只有存在 `CL_JR_JOB_DEFINITION` 的 release 可用；老 release 返回 `JOBD_UNSUPPORTED`。
+- **release 差异**：只有存在 `CL_JR_JOB_DEFINITION` 的 release 可用；老 release（包括没有 STJR 作业库的 ECC）返回 `JOBD_UNSUPPORTED`。JOBD 的作业库 DDIC 类型与表都按运行时名称访问，所以这些系统上 handler 仍能激活，JOBD 不会再把整个 ICF 服务拖成激活失败；升级后照常 `abap deploy --yes`。
 
 ## 真机证据
 

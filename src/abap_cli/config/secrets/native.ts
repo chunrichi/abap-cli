@@ -60,10 +60,13 @@ class WindowsKeychainAdapter implements SecretsBackend {
 
   async get(account: string, kind: SecretKind): Promise<string | null> {
     const target = `${SERVICE}/${accountKey(account, kind)}`;
+    // Single-quoted here-string: PowerShell must not interpolate the C#
+    // source. A double-quoted here-string expands `$null` (and any other
+    // `$`-prefixed token) before the C# compiler sees it.
     const psScript = `
 $ErrorActionPreference = 'Stop'
 $target = ${psString(target)}
-Add-Type -TypeDefinition @"
+Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -81,21 +84,24 @@ public class WinCredRead {
   }
   public static string Read(string target) {
     IntPtr credPtr;
-    if (!CredRead(target, 1, 0, out credPtr)) return $null;
+    if (!CredRead(target, 1, 0, out credPtr)) return null;
     try {
       CREDENTIAL cred = (CREDENTIAL)Marshal.PtrToStructure(credPtr, typeof(CREDENTIAL));
-      if (cred.CredentialBlobSize <= 0 || cred.CredentialBlob == IntPtr.Zero) return '';
+      if (cred.CredentialBlobSize <= 0 || cred.CredentialBlob == IntPtr.Zero) return string.Empty;
       byte[] bytes = new byte[cred.CredentialBlobSize];
       Marshal.Copy(cred.CredentialBlob, bytes, 0, cred.CredentialBlobSize);
+      // The UTF-16 blob written by cmdkey may carry its trailing NUL; the
+      // legacy UTF-8 blob written by keytar does not. Drop it either way.
       if (bytes.Length >= 2 && bytes.Length % 2 == 0 && bytes[1] == 0) {
-        return Encoding.Unicode.GetString(bytes);
+        return Encoding.Unicode.GetString(bytes).TrimEnd('\0');
       }
-      return Encoding.UTF8.GetString(bytes);
+      return Encoding.UTF8.GetString(bytes).TrimEnd('\0');
     } finally { CredFree(credPtr); }
   }
 }
-"@
-[WinCredRead]::Read($target)
+'@
+$secret = [WinCredRead]::Read($target)
+if ($null -ne $secret) { [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($secret)) }
 `.trim();
 
     let stdout: string;
@@ -109,9 +115,15 @@ public class WinCredRead {
       const message = error instanceof Error ? error.message : String(error);
       throw new CliError('CONFIG_ERROR', `powershell.exe failed: ${message}`);
     }
-    const trimmed = stdout.trim();
-    if (trimmed === '' || trimmed === '$null') return null;
-    return trimmed.split(/\r?\n/)[0] ?? null;
+    // The helper emits Base64: Windows PowerShell encodes redirected stdout
+    // with the OEM code page by default, which corrupts non-ASCII secrets.
+    // Base64 is ASCII-only and keeps the exact secret bytes.
+    const payload = stdout.trim();
+    if (payload === '') return null;
+    if (payload.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(payload)) {
+      throw new CliError('CONFIG_ERROR', 'powershell.exe returned an unexpected payload');
+    }
+    return Buffer.from(payload, 'base64').toString('utf8');
   }
 
   async delete(account: string, kind: SecretKind): Promise<boolean> {

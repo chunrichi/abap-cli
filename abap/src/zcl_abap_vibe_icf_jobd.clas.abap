@@ -1,6 +1,6 @@
 CLASS zcl_abap_vibe_icf_jobd DEFINITION PUBLIC FINAL CREATE PUBLIC.
   PUBLIC SECTION.
-    " JR_JDNAME is CHAR 32.
+    " The jobd-v1 name limit is 32 characters (STJR_JOBD_ROOT-NAME).
     CONSTANTS gc_name_max_length TYPE i VALUE 32.
 
     CLASS-METHODS dispatch_jobd
@@ -62,6 +62,10 @@ CLASS zcl_abap_vibe_icf_jobd DEFINITION PUBLIC FINAL CREATE PUBLIC.
       IMPORTING iv_component TYPE string
                 iv_value     TYPE any
       CHANGING  cs_attr      TYPE any.
+    CLASS-METHODS patch_persisted_row
+      IMPORTING iv_name    TYPE string
+                iv_package TYPE devclass
+                iv_author  TYPE sy-uname.
     CLASS-METHODS tadir_delete
       IMPORTING iv_name      TYPE string
                 iv_package   TYPE devclass
@@ -405,11 +409,9 @@ CLASS zcl_abap_vibe_icf_jobd IMPLEMENTATION.
 
         " The class persisted the row with the transport-free '$TMP' package
         " (see above); restore the real package and owner before committing.
-        UPDATE stjr_jobd_root SET jdpackage = @lv_package
-                                 WHERE name = @iv_name AND is_active = @abap_true.
-        UPDATE stjr_jobd_root SET owner = @lv_author
-                                 WHERE name = @iv_name AND is_active = @abap_true
-                                   AND owner IS INITIAL.
+        patch_persisted_row( iv_name    = iv_name
+                             iv_package = lv_package
+                             iv_author  = lv_author ).
         COMMIT WORK.
 
         CALL METHOD lo_jd->('UNLOCK').
@@ -484,9 +486,12 @@ CLASS zcl_abap_vibe_icf_jobd IMPLEMENTATION.
     " dialog-bound transport path, so the two tables are cleared here (same
     " statements as the class' DELETE_JD body). The TADIR entry is removed
     " afterwards: TR_TADIR_INTERFACE refuses to delete it while the repository
-    " object still exists.
-    DELETE FROM stjr_jobd_root WHERE name = @iv_name.
-    DELETE FROM stjr_jobd_trep WHERE name = @iv_name.
+    " object still exists. The tables are addressed dynamically so the merged
+    " handler also activates on releases without STJR.
+    DATA lv_root_table TYPE tabname VALUE 'STJR_JOBD_ROOT'.
+    DATA lv_trep_table TYPE tabname VALUE 'STJR_JOBD_TREP'.
+    DELETE FROM (lv_root_table) WHERE name = @iv_name.
+    DELETE FROM (lv_trep_table) WHERE name = @iv_name.
     COMMIT WORK.
 
     tadir_delete( EXPORTING iv_name      = iv_name
@@ -651,6 +656,38 @@ CLASS zcl_abap_vibe_icf_jobd IMPLEMENTATION.
     IF sy-subrc = 0.
       <lv_field> = iv_value.
     ENDIF.
+  ENDMETHOD.
+
+  METHOD patch_persisted_row.
+    " STJR is a job-repository table that releases without JOBD support do not
+    " ship. Address it through a dynamic name and a dynamic row so this class
+    " still compiles and activates there (the route answers JOBD_UNSUPPORTED
+    " before any table access).
+    DATA lv_table TYPE tabname VALUE 'STJR_JOBD_ROOT'.
+    DATA lr_row TYPE REF TO data.
+    FIELD-SYMBOLS:
+      <ls_row>   TYPE any,
+      <lv_field> TYPE any.
+
+    CREATE DATA lr_row TYPE ('STJR_JOBD_ROOT').
+    ASSIGN lr_row->* TO <ls_row>.
+    SELECT SINGLE * FROM (lv_table) INTO <ls_row>
+      WHERE name = @iv_name AND is_active = @abap_true.
+    IF sy-subrc <> 0.
+      RETURN.
+    ENDIF.
+
+    ASSIGN COMPONENT 'JDPACKAGE' OF STRUCTURE <ls_row> TO <lv_field>.
+    IF sy-subrc = 0.
+      <lv_field> = iv_package.
+    ENDIF.
+    ASSIGN COMPONENT 'OWNER' OF STRUCTURE <ls_row> TO <lv_field>.
+    IF sy-subrc = 0.
+      IF <lv_field> IS INITIAL.
+        <lv_field> = iv_author.
+      ENDIF.
+    ENDIF.
+    MODIFY (lv_table) FROM <ls_row>.
   ENDMETHOD.
 
   METHOD jobd_available.
