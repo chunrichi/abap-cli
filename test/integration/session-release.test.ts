@@ -50,9 +50,14 @@ async function startMockSap(options: MockOptions = {}): Promise<MockSap> {
       res.writeHead(200, {
         'content-type': 'application/xml',
         'x-csrf-token': 'TOKEN',
-        'set-cookie': ['SAP_SESSIONID_S4H_100=abc; path=/'],
+        'set-cookie': ['SAP_SESSIONID_S4H_100=abc; path=/', 'sap-contextid=CTX; path=/sap/bc/adt'],
       });
       res.end('<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"/>');
+      return;
+    }
+    if (url.startsWith('/sap/bc/adt/core/http/sessions')) {
+      res.writeHead(200, { 'set-cookie': 'sap-contextid=0; path=/sap/bc/adt' });
+      res.end('');
       return;
     }
     if (url.startsWith('/sap/public/bc/icf/logoff')) {
@@ -139,6 +144,7 @@ function runCli(args: string[], env: NodeJS.ProcessEnv = {}): Promise<SpawnResul
 
 const count = (requests: string[], marker: string): number => requests.filter((r) => r.includes(marker)).length;
 const logins = (requests: string[]): number => count(requests, '/sap/bc/adt/compatibility/graph');
+const closes = (requests: string[]): number => count(requests, '/sap/bc/adt/core/http/sessions');
 const logoffs = (requests: string[]): number => count(requests, '/sap/public/bc/icf/logoff');
 
 beforeAll(() => {
@@ -160,7 +166,8 @@ describe.skipIf(!hasBuiltCli)('session release at process level', () => {
       const result = await runCli(['inspect', 'ZZZ', '--json'], { ABAP_CLI_SESSION_POLICY: 'always-logout' });
       expect(result.exit).not.toBe(0);
       expect(logins(mock.requests)).toBe(1);
-      expect(logoffs(mock.requests)).toBe(1);
+      expect(closes(mock.requests)).toBe(1);
+      expect(logoffs(mock.requests)).toBe(0);
     } finally {
       await mock.close();
     }
@@ -175,7 +182,8 @@ describe.skipIf(!hasBuiltCli)('session release at process level', () => {
       const result = await runCli(['inspect', 'ZZZ', '--json'], { ABAP_CLI_SESSION_POLICY: 'reuse' });
       expect(result.exit).not.toBe(0);
       expect(logins(mock.requests)).toBe(1);
-      expect(logoffs(mock.requests)).toBe(1);
+      expect(closes(mock.requests)).toBe(1);
+      expect(logoffs(mock.requests)).toBe(0);
     } finally {
       await mock.close();
     }
@@ -190,7 +198,8 @@ describe.skipIf(!hasBuiltCli)('session release at process level', () => {
       // session lifecycle must stay clean regardless.
       expect(result.exit).not.toBe(0);
       expect(logins(mock.requests)).toBe(1);
-      expect(logoffs(mock.requests)).toBe(1);
+      expect(closes(mock.requests)).toBe(1);
+      expect(logoffs(mock.requests)).toBe(0);
     } finally {
       await mock.close();
     }
@@ -204,7 +213,8 @@ describe.skipIf(!hasBuiltCli)('session release at process level', () => {
       expect(result.exit).toBe(0);
       // probe session + runtime-cache probe session; both must be released.
       expect(logins(mock.requests)).toBeGreaterThanOrEqual(2);
-      expect(logoffs(mock.requests)).toBe(logins(mock.requests));
+      expect(closes(mock.requests)).toBe(logins(mock.requests));
+      expect(logoffs(mock.requests)).toBe(0);
     } finally {
       await mock.close();
     }

@@ -32,6 +32,9 @@ interface MockSession {
 interface MockSap {
   url: string;
   logins: number;
+  /** ADT close-session calls (`GET /sap/bc/adt/core/http/sessions`). */
+  closes: number;
+  /** Legacy ICF logoff calls; the close exchange must make these unnecessary. */
   logoffs: number;
   /** Sessions created by SAP (login or a context-less request). */
   created: number;
@@ -55,7 +58,7 @@ function parseCookies(header: string | undefined): Map<string, string> {
 async function startMockSap(): Promise<MockSap> {
   let counter = 0;
   const sessions = new Map<string, MockSession>();
-  const state = { logins: 0, logoffs: 0, created: 0 };
+  const state = { logins: 0, closes: 0, logoffs: 0, created: 0 };
 
   function issueSession(res: http.ServerResponse): void {
     counter += 1;
@@ -88,12 +91,25 @@ async function startMockSap(): Promise<MockSap> {
       res.end('<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"/>');
       return;
     }
-    if (url.startsWith('/sap/public/bc/icf/logoff')) {
-      state.logoffs += 1;
+    const dropSession = (): void => {
       const cookies = parseCookies(req.headers.cookie);
       const sid = [...cookies.keys()].find((n) => /^SAP_SESSIONID_/i.test(n));
       const session = sid ? sessions.get(cookies.get(sid)!) : undefined;
       if (session) sessions.delete(session.sid);
+    };
+    if (url.startsWith('/sap/bc/adt/core/http/sessions')) {
+      state.closes += 1;
+      dropSession();
+      res.writeHead(200, {
+        'content-type': 'text/plain',
+        'set-cookie': 'sap-contextid=0; Path=/sap/bc/adt',
+      });
+      res.end('');
+      return;
+    }
+    if (url.startsWith('/sap/public/bc/icf/logoff')) {
+      state.logoffs += 1;
+      dropSession();
       res.writeHead(200, { 'content-type': 'text/plain' });
       res.end('');
       return;
@@ -123,6 +139,9 @@ async function startMockSap(): Promise<MockSap> {
     url: `http://127.0.0.1:${port}`,
     get logins() {
       return state.logins;
+    },
+    get closes() {
+      return state.closes;
     },
     get logoffs() {
       return state.logoffs;
@@ -237,6 +256,7 @@ describe.skipIf(!hasBuiltCli)('session reuse across CLI processes', () => {
       // session without sap-contextid would create one session per command).
       expect(mock.logins).toBe(1);
       expect(mock.created).toBe(1);
+      expect(mock.closes).toBe(0);
       expect(mock.logoffs).toBe(0);
       expect(mock.sessions.size).toBe(1);
     } finally {
@@ -253,9 +273,10 @@ describe.skipIf(!hasBuiltCli)('session reuse across CLI processes', () => {
         const result = await runCli(sandbox, SEARCH);
         expect(result.exit).toBe(0);
       }
-      // No session may outlive its command.
+      // No session may outlive its command; the ADT close exchange replaces logoff.
       expect(mock.logins).toBe(3);
-      expect(mock.logoffs).toBe(3);
+      expect(mock.closes).toBe(3);
+      expect(mock.logoffs).toBe(0);
       expect(mock.created).toBe(3);
       expect(mock.sessions.size).toBe(0);
     } finally {
@@ -282,14 +303,16 @@ describe.skipIf(!hasBuiltCli)('session reuse across CLI processes', () => {
       mock.invalidateAll();
       expect((await runCli(sandbox, SEARCH)).exit).toBe(0);
       expect(mock.logins).toBe(3);
-      expect(mock.logoffs).toBe(1);
+      expect(mock.closes).toBe(1);
+      expect(mock.logoffs).toBe(0);
       expect(mock.sessions.size).toBe(0);
 
       // Command 4: paused → fresh, released session.
       mock.invalidateAll();
       expect((await runCli(sandbox, SEARCH)).exit).toBe(0);
       expect(mock.logins).toBe(4);
-      expect(mock.logoffs).toBe(2);
+      expect(mock.closes).toBe(2);
+      expect(mock.logoffs).toBe(0);
       expect(mock.sessions.size).toBe(0);
     } finally {
       await mock.close();

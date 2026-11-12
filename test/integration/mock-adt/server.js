@@ -941,7 +941,10 @@ function ok(res, body, type = 'application/xml') {
   // response carries that cookie).
   res.writeHead(200, {
     'Content-Type': type,
-    'Set-Cookie': 'SAP_SESSIONID_S4H_100=mocksession; Path=/',
+    'Set-Cookie': [
+      'SAP_SESSIONID_S4H_100=mocksession; Path=/',
+      'sap-contextid=mockcontext; Path=/sap/bc/adt',
+    ],
   });
   res.end(body);
 }
@@ -1438,6 +1441,27 @@ const server = http.createServer(async (req, res) => {
     if (path === '/sap/bc/adt/compatibility/graph') {
       if (AUTH_FAIL) return adtError(res, 401, 'Simulated auth failure (MOCK_AUTH_FAIL=1)');
       return ok(res, '{}', 'application/json');
+    }
+
+    // Stateful session teardown: modern SAP closes the context through this
+    // resource; a real close resets sap-contextid to 0.
+    if (path === '/sap/bc/adt/core/http/sessions' && req.method === 'GET') {
+      res.writeHead(200, {
+        'Content-Type': 'text/plain',
+        'Set-Cookie': 'sap-contextid=0; Path=/sap/bc/adt',
+      });
+      res.end('');
+      return;
+    }
+
+    // Legacy ICF logoff stays available for the fallback path.
+    if (path === '/sap/public/bc/icf/logoff') {
+      res.writeHead(200, {
+        'Content-Type': 'text/plain',
+        'Set-Cookie': 'sap-contextid=0; Path=/sap/bc/adt',
+      });
+      res.end('');
+      return;
     }
 
     // ADT service document / discovery — used by `abap doctor` and the
