@@ -22,6 +22,7 @@
 
 import type { ADTClient } from 'abap-adt-api';
 import type { ProjectConfig } from '../config/project-config.js';
+import { adtSessionCloseWarning, closeAdtSession } from '../clients/adt-session-close.js';
 import { collectWarning } from '../output/meta.js';
 import { effectivePolicy, resolveSessionPolicy } from './policy.js';
 import { loadOrCreateSessionKey } from './key.js';
@@ -314,7 +315,8 @@ export class SessionLifecycle {
 
   /**
    * End-of-command release. Keeps a reusable session open for the next
-   * command; logs out (and forgets the jar) when it could not be handed off.
+   * command; closes the SAP context (and forgets the jar) when it could not be
+   * handed off.
    */
   async release(client: ADTClient): Promise<void> {
     if (!this.needsRelease) {
@@ -322,11 +324,22 @@ export class SessionLifecycle {
       return;
     }
     this.controller.enableInjection();
-    try {
-      await client.logout();
-    } catch {
-      // best effort — the command result must not be masked by a logout error
+    // The custom transport owns the live cookies; mirror them into the library
+    // jar so the close exchange can read the context id and observe SAP's
+    // `sap-contextid=0` acknowledgement.
+    const liveCookies = this.controller.headerValue();
+    if (liveCookies) {
+      try {
+        client.session?.importCookies?.({ cookieHeader: liveCookies, replace: true });
+      } catch {
+        // Fall back to whatever cookie set the library captured itself.
+      }
     }
+    // Prefer the ADT close exchange: the legacy ICF logoff can answer 403, and
+    // silently ignoring that used to leak the session into SM04.
+    const close = await closeAdtSession(client);
+    const warning = adtSessionCloseWarning(close, 'after the command');
+    if (warning) console.error(`WARN: ${warning}`);
     this.controller.clear();
     const store = this.persistedStore ?? this.writeCandidate;
     if (this.jar && this.key && store) {

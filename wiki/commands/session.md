@@ -100,16 +100,26 @@ abap session reset --yes
    - `<workspace>/.abap-cli/sessions`（HOME 不可写时自动启用；目录内自带 `.gitignore`=`*`，0700/0600，加密）。
    `$TMPDIR` **不再是存储**：它无法证明下一条命令能读到 jar。
 2. **会话身份成对保存**：jar 保存 stateful `SAP_SESSIONID_*` **及其 `sap-contextid`**。S/4HANA 会把「只带 session cookie、不带 context cookie」的 ADT 请求静默路由到一个新会话（HTTP 200、无报错）——这是此前 SM04 按命令数增长的根因。没有 stateful session cookie 时才丢弃 context cookie（stateless/降级路径，回放它会得到 `400 Session not found`）。
-3. **可复用才保留**：命令结束只有在 jar 已写入 durable 存储、包含 stateful cookie、且未被连续拒绝时才保留会话；否则本轮登录的会话在命令结束时登出。`always-logout` 策略下每条命令都登出。
+3. **可复用才保留**：命令结束只有在 jar 已写入 durable 存储、包含 stateful cookie、且未被连续拒绝时才保留会话；否则本轮登录的会话在命令结束时关闭。`always-logout` 策略下每条命令都关闭会话。关闭优先走 ADT 的会话关闭请求，失败时才回退旧的 ICF logoff，详见下一节。
 4. **自愈**：回放的会话被 SAP 拒绝（401/403/440）时允许一次重新登录+重试，并累计 `reuseFailures`；连续 2 次后复用暂停（`blocked`），后续命令按「登录+登出」运行，避免继续泄漏。暂停 10 分钟后自动重试一次，或 `abap session reset` 立即清除。
 5. **可见性**：复用不可用/工作区回退/连续被拒/损坏 jar 都会出现在 `--json` 的 `meta.warnings`（`SESSION_REUSE_DISABLED` / `SESSION_STORE_FALLBACK` / `SESSION_REUSE_UNSTABLE` / `SESSION_JAR_CORRUPT`）。
+
+### 关闭会话
+
+释放会话时不再依赖 `/sap/public/bc/icf/logoff`：
+
+1. 优先 `GET /sap/bc/adt/core/http/sessions`（`sap-adt-purpose: close-session`、带 `sap-contextid`、stateless 会话类型）；
+2. 该资源返回 404 时（NW 7.50 无此资源），用 stateless `HEAD /sap/bc/adt/core/discovery` 关闭上下文；
+3. 仍然失败时才回退旧的 ICF logoff。
+
+旧 logoff 在部分系统返回 403；以前这个失败被静默吞掉，会话留在 SM04，累计后表现为新请求 `400 Session not found`。现在关闭失败会在 stderr 输出 `WARN: could not close the SAP session ... (HTTP 403)`，据此判断是否需要在 SM04 清理。
 
 ### 配置字段 `.abap.json#sap.sessionPolicy`
 
 | 值 | 行为 |
 |----|------|
-| `reuse`（默认） | 复用 jar；不可复用时命令结束登出 |
-| `always-logout` | 命令结束 logout（SIGKILL 除外）；不写 jar |
+| `reuse`（默认） | 复用 jar；不可复用时命令结束关闭会话 |
+| `always-logout` | 命令结束关闭会话（SIGKILL 除外）；不写 jar |
 | `default` | 等价 `reuse` |
 
 环境变量 `ABAP_CLI_SESSION_POLICY=reuse|always-logout` 覆盖 `.abap.json`；`ABAP_CLI_SESSION_DIR` 覆盖存储目录；`ABAP_CLI_SESSION_KEY_MODE=derived` 强制使用 PBKDF2 派生密钥（测试/CI）。
