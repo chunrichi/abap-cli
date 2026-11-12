@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { text, password, confirm, isCancel } from '@clack/prompts';
+import { text, password, confirm, isCancel, CANCEL_SYMBOL } from '@clack/prompts';
 import { getSystem, loadUserConfig, deleteSystem, listSystemNames, type SystemProfile } from '../../config/user-config.js';
 import { getPassword, storePassword, deletePassword } from '../../config/secrets.js';
 import { CliError, printResult, type OutputMode } from '../../output/json.js';
@@ -14,7 +14,7 @@ import { fingerprint, collectOrphanPems } from '../../config/ca-store.js';
 import { applyPemsToProfileWithTimestamp, upsertProfileWithPems } from '../../config/profile-pems.js';
 
 /** Exit 130 on Ctrl+C (@clack cancel), otherwise return the value */
-export function orCancel<T>(value: T | symbol): T {
+export function orCancel<T>(value: T | typeof CANCEL_SYMBOL): T {
   if (isCancel(value)) {
     console.log('\nAborted.');
     process.exit(130);
